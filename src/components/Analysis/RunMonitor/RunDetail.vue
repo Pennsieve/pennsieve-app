@@ -84,6 +84,11 @@ const isExecuting = ref(false);
 const errorBanner = ref("");
 const errorBannerNodeId = ref("");
 const rerunSource = ref(null);
+// Environment layers (python-env / r-env / data) attached to the run being
+// configured. Carried over from the source run on a rerun so the rebuilt
+// payload re-attaches them — otherwise "Rerun with configuration" silently
+// drops the layer.
+const configLayers = ref([]);
 
 // File picker dialog state
 const filePickerVisible = ref(false);
@@ -168,6 +173,24 @@ const getComputeTypesForProcessor = (sourceUrl) => {
   const types = app?.runtimeConfig?.computeTypes;
   return types && types.length ? withGpu(types) : DEFAULT_COMPUTE_TYPES;
 };
+
+// Compliant compute nodes require ECS execution for per-execution isolation, so
+// the lambda target is offered but disabled (a Lambda mounts the shared
+// per-node filesystem and can't be isolated per run). Basic/secure are
+// unaffected. Mirrors the converter's compliant rejection.
+const LAMBDA_COMPLIANT_MSG =
+  "Lambda isn't available on compliant compute nodes — they require ECS execution so each run is isolated.";
+const configureNodeIsCompliant = computed(() => {
+  const n = computeNodes.value.find(
+    (cn) => cn.uuid === initiateForm.value.computeNodeId
+  );
+  return (n?.deploymentMode || "basic").toLowerCase() === "compliant";
+});
+const isComputeTypeDisabled = (ct) =>
+  ct === "lambda" && configureNodeIsCompliant.value;
+// Don't leave a disabled value selected — fall back to standard on compliant.
+const computeTypeForMode = (ct) =>
+  configureNodeIsCompliant.value && ct === "lambda" ? "standard" : ct;
 
 /* Version helpers — match WorkflowBuilder */
 const normalizeUrl = (url) => {
@@ -594,6 +617,8 @@ const initiateWorkflowFromConfig = async (pendingConfig) => {
   const { workflowId, computeNodeId, datasetId, rerunSource: source } = pendingConfig;
   initiateForm.value = { workflowId, computeNodeId, datasetId, name: "" };
   runNameError.value = "";
+  // Preserve any environment layers from the source run so the rerun re-attaches them.
+  configLayers.value = Array.isArray(source?.layers) ? [...source.layers] : [];
 
   try {
     const definition = await store.dispatch("analysisModule/fetchWorkflowDefinition", workflowId);
@@ -623,7 +648,7 @@ const initiateWorkflowFromConfig = async (pendingConfig) => {
           value: srcTargetParams[pd.name] != null ? String(srcTargetParams[pd.name]) : (pd.defaultValue != null ? String(pd.defaultValue) : ""),
         }));
         nodeConfigs[d.id] = {
-          computeType: srcCfg?.executionTarget || d.computeType || fallback,
+          computeType: computeTypeForMode(srcCfg?.executionTarget || d.computeType || fallback),
           targetType: d.targetType || null,
           params: targetParams,
         };
@@ -649,7 +674,7 @@ const initiateWorkflowFromConfig = async (pendingConfig) => {
 
         const matchedApp = findMatchedApp(d.sourceUrl);
         nodeConfigs[d.id] = {
-          executionTarget: srcCfg?.executionTarget || d.computeType || "standard",
+          executionTarget: computeTypeForMode(srcCfg?.executionTarget || d.computeType || "standard"),
           version: srcCfg?.version || d.tag || latestVersion(matchedApp)?.version || "",
           cpu: srcCfg?.cpu || (d.runtimeConfig?.cpu ? String(d.runtimeConfig.cpu) : ""),
           memory: srcCfg?.memory || (d.runtimeConfig?.memory ? String(d.runtimeConfig.memory) : ""),
@@ -694,6 +719,7 @@ const initiateWorkflowFromConfig = async (pendingConfig) => {
 const cancelConfigure = () => {
   mode.value = "browse";
   configDefinition.value = null;
+  configLayers.value = [];
   Object.keys(dataSourceFiles).forEach((k) => delete dataSourceFiles[k]);
   Object.keys(nodeConfigs).forEach((k) => delete nodeConfigs[k]);
   nodes.value = [];
@@ -825,6 +851,7 @@ const executeWorkflow = async () => {
       ...(trimmedName && { name: trimmedName }),
       ...(Object.keys(dataTargets).length > 0 && { dataTargets }),
       ...(Object.keys(processorParams).length > 0 && { processorParams }),
+      ...(configLayers.value.length > 0 && { layers: configLayers.value }),
     };
 
     await store.dispatch("analysisModule/createRun", payload);
@@ -1543,7 +1570,16 @@ onUnmounted(() => {
                       :key="ct"
                       :label="formatComputeTypeLabel(ct)"
                       :value="ct"
-                    />
+                      :disabled="isComputeTypeDisabled(ct)"
+                    >
+                      <el-tooltip
+                        :disabled="!isComputeTypeDisabled(ct)"
+                        :content="LAMBDA_COMPLIANT_MSG"
+                        placement="right"
+                      >
+                        <span>{{ formatComputeTypeLabel(ct) }}</span>
+                      </el-tooltip>
+                    </el-option>
                   </el-select>
                 </div>
                 <div class="config-field">
@@ -1724,7 +1760,16 @@ onUnmounted(() => {
                       :key="ct"
                       :label="formatComputeTypeLabel(ct)"
                       :value="ct"
-                    />
+                      :disabled="isComputeTypeDisabled(ct)"
+                    >
+                      <el-tooltip
+                        :disabled="!isComputeTypeDisabled(ct)"
+                        :content="LAMBDA_COMPLIANT_MSG"
+                        placement="right"
+                      >
+                        <span>{{ formatComputeTypeLabel(ct) }}</span>
+                      </el-tooltip>
+                    </el-option>
                   </el-select>
                 </div>
 
@@ -1826,6 +1871,10 @@ onUnmounted(() => {
                   <span class="info-value">
                     {{ datasetOptions.find(d => d.content?.id === initiateForm.datasetId)?.content?.name || initiateForm.datasetId }}
                   </span>
+                </div>
+                <div v-if="configLayers.length" class="info-row">
+                  <span class="info-label">Environment</span>
+                  <span class="info-value">{{ configLayers.join(', ') }}</span>
                 </div>
               </div>
               <p class="configure-hint">

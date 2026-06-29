@@ -41,8 +41,18 @@
     <div class="menu-wrap">
 
       <user-navigation-item
-        :link="{ name: 'shared-with-me' }"
-        label="My Data"
+        :link="{ name: 'shared-workspaces' }"
+        label="Shared Workspaces"
+        :condensed="primaryNavCondensed"
+      >
+        <template v-slot:icon>
+          <IconOrganization :width="20" :height="20" color="currentColor" />
+        </template>
+      </user-navigation-item>
+
+      <user-navigation-item
+        :link="{ name: 'shared-datasets' }"
+        label="Shared With Me"
         :condensed="primaryNavCondensed"
       >
         <template v-slot:icon>
@@ -50,7 +60,18 @@
         </template>
       </user-navigation-item>
 
+      <user-navigation-item
+        :link="{ name: 'public-datasets' }"
+        label="Public Datasets"
+        :condensed="primaryNavCondensed"
+        :active-for-routes="['public-dataset']"
+      >
+        <template v-slot:icon>
+          <IconGlobeCheck :width="20" :height="20" color="currentColor" />
+        </template>
+      </user-navigation-item>
 
+      <div class="nav-divider" />
 
       <user-navigation-item
         :link="{ name: 'my-code' }"
@@ -84,6 +105,7 @@
         </template>
       </user-navigation-item>
 
+      <div class="nav-divider" />
 
       <user-navigation-item
         :link="{ name: 'data-publishing' }"
@@ -112,7 +134,7 @@
     </div>
     
     <bf-navigation-tertiary
-      :bkColor="'#4d628c'"
+      :bkColor="'#011F5B'"
       :org-id="null"
     />
   </div>
@@ -132,6 +154,8 @@ import IconGitHub from '../icons/IconGitHub.vue'
 import IconShare from '../icons/IconShare.vue'
 import IconSettings from "@/components/icons/IconSettings.vue";
 import IconCollection from "@/components/icons/IconCollection.vue";
+import IconOrganization from "@/components/icons/IconOrganization.vue";
+import IconGlobeCheck from "@/components/icons/IconGlobeCheck.vue";
 
 export default {
   name: 'UserNavigation',
@@ -148,7 +172,9 @@ export default {
     IconUpload,
     IconAnalysis,
     IconGitHub,
-    IconShare
+    IconShare,
+    IconOrganization,
+    IconGlobeCheck
   },
 
   computed: {
@@ -200,7 +226,7 @@ export default {
 @use '../../styles/_theme.scss';
 
 .user-navigation {
-  background: linear-gradient(to top, theme.$purple_2, theme.$purple_1);
+  background: linear-gradient(160deg, theme.$purple_2 0%, theme.$purple_3 100%);
   box-sizing: border-box;
   color: theme.$white;
   display: flex;
@@ -216,11 +242,21 @@ export default {
     .menu-wrap {
       margin: 0 0 16px -6px;
     }
-    
+
     .logo-wrap {
       padding: 20px 12px;
       justify-content: center;
     }
+
+    .nav-divider {
+      margin: 8px 12px;
+    }
+  }
+
+  .nav-divider {
+    height: 1px;
+    margin: 8px 24px;
+    background: rgba(255, 255, 255, 0.12);
   }
 
   .logo-wrap {
@@ -228,7 +264,6 @@ export default {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 
     .logo {
       color: #fff;

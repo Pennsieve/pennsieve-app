@@ -178,7 +178,7 @@
       >
         <template #header> Date Created </template>
         <template #default="scope">
-          {{ formatDate(scope.row.content.createdAt) }}
+          {{ scope.row.content.createdAt ? formatDate(scope.row.content.createdAt) : "" }}
         </template>
       </el-table-column>
     </el-table>

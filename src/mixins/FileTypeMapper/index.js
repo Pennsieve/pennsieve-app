@@ -534,6 +534,10 @@ export default {
     isLayFile: function(pkg) {
       const fileName = pathOr('', ['content', 'name'], pkg).toLowerCase()
       return fileName.endsWith('.lay')
+    },
+    isNifti: function(pkg) {
+      const fileName = pathOr('', ['content', 'name'], pkg).toLowerCase()
+      return fileName.endsWith('.nii.gz') || fileName.endsWith('.nii')
     }
   }
 

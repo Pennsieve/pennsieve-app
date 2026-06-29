@@ -122,6 +122,14 @@ export default {
       this.onActiveOrgChange.bind(this)
     );
 
+    // Keep the document title in sync with the current route (org-less areas
+    // like My Workspace rely on the route's meta.title, not the active org).
+    this.$watch(
+      () => this.$route,
+      () => this.setPageMeta(this.activeOrganization),
+      { immediate: true }
+    );
+
     // Global Cmd+K / Ctrl+K shortcut to open Spotlight. Captures on the
     // document so it fires regardless of focused element. We don't try
     // to filter when an input is focused — letting the user trigger
@@ -309,12 +317,23 @@ export default {
      */
     setPageMeta: function (activeOrg) {
       const orgName = pathOr("", ["organization", "name"], activeOrg);
-      let pageTitle = `${orgName} | Pennsieve`;
-      let pageDescription = "";
+      const routeTitle = pathOr("", ["meta", "title"], this.$route);
+      const routeName = pathOr("", ["name"], this.$route);
 
-      if (!orgName) {
+      let pageTitle;
+      let pageDescription = pathOr("", ["meta", "description"], this.$route);
+
+      if (routeName === "login" || routeName === "home") {
+        // The unauthenticated landing/sign-in page.
         pageTitle = this.defaultPageTitle;
         pageDescription = this.defaultPageDescription;
+      } else if (routeTitle) {
+        // Org-less areas (e.g. My Workspace) carry their own route titles.
+        pageTitle = `${routeTitle} | Pennsieve`;
+      } else if (orgName) {
+        pageTitle = `${orgName} | Pennsieve`;
+      } else {
+        pageTitle = "Pennsieve";
       }
 
       setPageTitle(pageTitle);
