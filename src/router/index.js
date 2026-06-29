@@ -114,7 +114,14 @@ const UserGithubCode = () => import('../components/user/code/UserGithubCode.vue'
 const PublishedAppDetail = () => import('../components/user/code/PublishedAppDetail.vue')
 const UserGithubIntegrations = () => import('../components/user/integrations/UserGithubV2.vue')
 const DataPublishingDashboard = () => import('../components/user/publishing/DataPublishingDashboard.vue')
-const SharedWithMe = () => import('../components/user/shared/SharedWithMe.vue')
+const SharedWorkspaces = () => import('../components/user/shared/SharedWorkspaces.vue')
+const SharedDatasets = () => import('../components/user/shared/SharedDatasets.vue')
+const PublicDatasetList = () => import('../components/user/shared/PublicDatasetList.vue')
+const PublicDatasetDetail = () => import('../components/datasets/PublicDataset/PublicDatasetDetail.vue')
+const PublicDatasetOverview = () => import('../components/datasets/PublicDataset/PublicDatasetOverview.vue')
+const PublicDatasetFiles = () => import('../components/datasets/PublicDataset/PublicDatasetFiles.vue')
+const PublicDatasetFileDetails = () => import('../components/datasets/PublicDataset/PublicDatasetFileDetails.vue')
+const PublicDatasetNavigation = () => import('../components/datasets/PublicDataset/PublicDatasetNavigation.vue')
 const MyCollections = () => import('../components/user/collections/MyCollections.vue')
 const CollectionDetails = () => import('../components/user/collections/CollectionDetails.vue')
 const UserNavigation = () => import('../components/user-navigation/UserNavigation.vue')
@@ -205,6 +212,7 @@ const router = createRouter({
       components: {
         page: MyWorkSpacePage,
         navigation: UserNavigation,
+        navigationSecondary: PublicDatasetNavigation,
       },
       props: {
         page: (route) => ({
@@ -463,18 +471,88 @@ const router = createRouter({
           }
         },
         {
-          name: 'shared-with-me',
-          path: 'shared',
+          name: 'shared-workspaces',
+          path: 'shared-workspaces',
           components: {
-            stage: SharedWithMe,
+            stage: SharedWorkspaces,
             navigation: UserNavigation,
           },
-          props: true,
           meta: {
             hideSecondaryNav: true,
-            title: 'My Data',
-            description: 'Access workspaces and datasets that have been shared with you.'
+            title: 'Shared Workspaces',
+            description: 'Workspaces that have been shared with you.'
           }
+        },
+        {
+          name: 'shared-datasets',
+          path: 'shared-with-me',
+          components: {
+            stage: SharedDatasets,
+            navigation: UserNavigation,
+          },
+          meta: {
+            hideSecondaryNav: true,
+            title: 'Shared With Me',
+            description: 'Datasets shared with you from other workspaces.'
+          }
+        },
+        {
+          name: 'public-datasets',
+          path: 'public-datasets',
+          components: {
+            stage: PublicDatasetList,
+            navigation: UserNavigation,
+          },
+          meta: {
+            hideSecondaryNav: true,
+            title: 'Public Datasets',
+            description: 'Browse publicly available datasets published to Pennsieve Discover.'
+          }
+        },
+        // Backward-compat: old /my-workspace/shared (and { name: 'shared-with-me' })
+        // links now resolve to the Shared Workspaces page.
+        {
+          name: 'shared-with-me',
+          path: 'shared',
+          redirect: {
+            name: 'shared-workspaces'
+          }
+        },
+        {
+          name: 'public-dataset',
+          path: 'public/:datasetId',
+          components: {
+            stage: PublicDatasetDetail,
+            navigation: UserNavigation,
+          },
+          props: {
+            stage: true,
+          },
+          redirect: {
+            name: 'public-dataset-overview'
+          },
+          meta: {
+            hideSecondaryNav: false,
+            title: 'Public Dataset',
+            description: 'Browse a publicly available dataset published to Pennsieve Discover.'
+          },
+          children: [
+            {
+              name: 'public-dataset-overview',
+              path: 'overview',
+              component: PublicDatasetOverview,
+            },
+            {
+              name: 'public-dataset-files',
+              path: 'files',
+              component: PublicDatasetFiles,
+            },
+            {
+              name: 'public-dataset-file-details',
+              path: 'files/details',
+              component: PublicDatasetFileDetails,
+            },
+          ]
         },
         {
           name: 'my-collections',

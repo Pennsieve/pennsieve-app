@@ -152,7 +152,16 @@ The read-only detail experience should match the existing **workspace dataset na
 - Reuse the same secondary-nav shell so the layout/breadcrumbs feel native.
 - Data is sourced from the read-only adapter (Discover endpoints for `sourceType='discover'`), not the workspace dataset APIs.
 - Strip/disable write actions (upload, edit metadata, permissions, delete).
-- **Open detail**: decide whether to reuse the existing dataset routes with a read-only flag, or add parallel routes under the Public Datasets tab — TBD in Phase 2.
+
+**Route strategy (RESOLVED): parallel read-only routes that REUSE the real presentational components.** The container components (`Datasets.vue` shell, `DatasetOverview`) are tightly coupled to Vuex `activeOrganization` + a global `dataset` object + `getPermission()`, so we don't route public datasets *through* them. But the leaf presentational pieces ARE reused for fidelity:
+- **Secondary nav** — reuses `BfNavigationItem` (not Vuex-coupled) in a `PublicDatasetNavigation.vue` that mirrors `BfNavigationSecondary`'s container. Registered as the `navigationSecondary` named view on the `my-workspace` route (App.vue renders it when `meta.hideSecondaryNav === false`, which only the `public-dataset` route sets). Result: the real dark left nav column, Overview/Files items.
+- **File browser** — reuses the actual `FilesTable` + `BfFileLabel` components. `PublicDatasetFiles.vue` maps Discover file-browse entries onto the `{ content, storage, subtype, icon, type }` row shape those expect (directories → `packageType: 'Collection'` for the folder icon). Same el-table look, icons, columns, selection as workspace datasets.
+- Routes: `/my-workspace/public/:datasetId/{overview,files}` (parent `public-dataset` → `PublicDatasetDetail` stage shell that loads the dataset into `readOnlyDatasetStore.current` + renders the nested section `<router-view>`).
+- Components: `src/components/datasets/PublicDataset/{PublicDatasetDetail,PublicDatasetNavigation,PublicDatasetOverview,PublicDatasetFiles}.vue`.
+- Discover folder entries lack `createdAt`; guarded `FilesTable`'s Date cell to render blank when there's no date (backward-compatible — workspace datasets always supply `createdAt`).
+- **Read-only / provenance indicator (UX decision)**: landed on a **~18px gradient vertical strip** down the left of the secondary nav with a rotated "PUBLIC DATASET · READ-ONLY" label and a **gentle, intermittent sheen** (low opacity, 7s loop, sweeps then rests). Reinforced by a **labeled source chip beside the title** (same color/glyph). `sourceType`-driven (`discover` teal, `view` purple). (Tried alternatives along the way — thin border, glossy bevel, static color+glyph, text context bar — the wider strip read best; sheen dialed down from the first cut.)
+
+**Metadata (DEFERRED):** the Metadata nav item is present but disabled ("Soon"). It will be powered by **DuckDB over the dataset's published parquet files** (see `duckdbStore.js`), not the workspace metadata APIs — to be investigated in a later phase.
 
 ## Navigation decision (resolved)
 
@@ -168,6 +177,36 @@ Notes:
 - Public datasets get their **own tab** (public catalog is large & distinct from things shared *with you*).
 - Future private **views** surface under **"Shared With Me"**, not the Public tab — they're shared, not public.
 - Both tabs consume the same read-only dataset abstraction (§4a); they differ in data source + visibility, not in the detail / pipeline-input / collection machinery.
+
+## 4c. File Preview / Viewer (plan — mirror discover-app2)
+
+**Approach (revised after reviewing discover-app2 @ latest main)**: do NOT reuse the workspace viewer stack (`ViewerPane` / `static-viewer` / `viewerModule`) — it's package-id + streaming-backend coupled. Instead **mirror pennsieve-discover-app2's viewer system**, which is already designed for public datasets and driven entirely by **public endpoints + reusable `@pennsieve-viz/*` components**.
+
+**Why this is now low-friction:**
+- **Deps already present** in pennsieve-app `package.json`: `@pennsieve-viz/core` (`MarkdownViewer`, `TextViewer`, `OrthogonalFrame`), `@pennsieve-viz/micro-ct` (`OmeViewer`), `@pennsieve-viz/tsviewer` (`TSViewer`); plus `vue3-pdf-app`/`pdfjs-dist` for PDF and native `<img>`.
+- **All endpoints are public** (discover / api2):
+  - presigned file URL → `POST {discoverUrl}/datasets/{id}/versions/{ver}/files/download-manifest` (already wired as `getFileDownloadUrl`) — used as `src` for image/OME.
+  - package files (direct open) → `GET {discoverUrl}/packages/{sourcePackageId}/files`.
+  - text/markdown content → fetched via zipit (cf. discover `useFileContent`).
+  - timeseries / OME-Zarr / neuroglancer assets → `GET {api2Url}/packages/discover/assets?package_id={sourcePackageId}` (returns `assets[]` with `asset_type`, `asset_url`, `status`, optional `cloudfront`).
+  - timeseries streaming → public `wss .../streaming/discover/ts/query` + `https .../streaming`.
+- **Reference implementation to port**: discover-app2 `config/viewerRegistry.ts` (`resolveViewer(uri, packageType)`) + `pages/package/[id].vue` (resolution → fetch manifest/content/assets → `<component :is>`). Our Discover file-browse already returns `sourcePackageId` per file (set for processed packages like timeseries).
+
+**Plan of record:**
+1. Port `viewerRegistry.ts` + `resolveViewer()` into pennsieve-app (add PDF entry).
+2. Add store actions on the discover adapter: `getPackageFiles(sourcePackageId)`, `getViewerAssets(sourcePackageId)` (→ `{api2Url}/packages/discover/assets`), `getFileContent(...)` (zipit). Reuse `getFileDownloadUrl` for image/OME `src`.
+3. Build a viewer host that mirrors discover's `pages/package/[id].vue`: resolve viewer, fetch the right data, render the `@pennsieve-viz` component (or `<img>`) with `getProps`.
+4. Surface it as the **"Preview" section in `PublicDatasetFileDetails`** (matching the workspace File Details layout) and/or a full-page viewer route (discover uses a full `/package/{id}` page).
+
+### Phases (all unblocked — deps + endpoints exist)
+- [x] **V1 (DONE)**: inline **Preview** section in `PublicDatasetFileDetails` for **image / text / markdown / OME-TIFF**. Ported `viewerRegistry.js` (`resolveViewer`). All types use the **presigned S3 URL** (`getFileDownloadUrl`): image/OME as `src`/`source`; text/markdown via `getFileContent`, which fetches the presigned URL and reads it as text (NOT zipit — `site.json` `zipitUrl` 301-redirects to `:8443/zipit/` and `fetch` drops the POST body on redirect; the presigned URL is simpler and consistent). Renders `@pennsieve-viz/core` `Markdown`/`TextViewer`, `@pennsieve-viz/micro-ct` `OmeViewer`, or native `<img>`. Unsupported types → "No preview available". (PDF deferred.)
+- **V2**: **timeseries** (`TSViewer`) via `/packages/discover/assets` + public streaming endpoints.
+- **V3**: **OME-Zarr / neuroglancer** (`OrthogonalFrame`) via assets + cloudfront (ties to existing neuroglancer work).
+- Tabular CSV/Parquet (`DataExplorer`/DuckDB) remains a separate track with §4b metadata.
+
+Preview degrades gracefully: unsupported types show "No preview available".
+
+**Open decision**: inline Preview pane in file-details (matches workspace File Details) vs. a full-page viewer route like discover's `/package/{sourcePackageId}` (richer). Lean: inline preview in file-details for V1, full-page later if needed.
 
 ## 5. Open Questions
 
@@ -195,11 +234,18 @@ Notes:
 - [ ] Wire pagination to the store / `discover` adapter. (Search deferred to v2.)
 
 ### Phase 2 — Dataset Detail (read-only, mirrors workspace nav)
-- [ ] Decide route strategy: reuse existing dataset routes with a read-only flag vs. parallel routes (§4b).
-- [ ] Overview section (adapt `DatasetOverview.vue`).
-- [ ] Files browsing (adapt `DatasetFilesView.vue` / `BfDatasetFiles.vue` + `SecondaryPageHeaderFiles`).
-- [ ] Metadata section (adapt `metadata` view).
-- [ ] Strip/disable all write actions.
+- [x] Route strategy decided: **parallel read-only routes** under My Workspace (§4b).
+- [x] Detail shell + read-only secondary nav (`PublicDatasetDetail.vue`); store `get()` + `current` state.
+- [x] Overview section (`PublicDatasetOverview.vue`): mirrors the **pennsieve-discover-app2 `DatasetHeader`** top section — two-column (title/authors/description/metadata left, banner right) + bordered Files/Storage/Records/License stats row. (`get dataset`/embargo actions omitted — read-only/deferred.)
+- [x] Citation block (from Discover's bottom section, surfaced here in Overview): "Cite this dataset" box fed by `https://citation.doi.org/format?doi=…&style=…`, APA/Chicago/IEEE toggle + Crosscite link + copy button.
+- [x] Files browsing (`PublicDatasetFiles.vue`): path-scoped, paginated, breadcrumb folder nav via `browseFiles`.
+- [x] List cards navigate into the detail.
+- [ ] Metadata section — **deferred**, to be powered by DuckDB over published parquet files.
+- [x] No write actions present (read-only by construction).
+- [x] File details page (`PublicDatasetFileDetails.vue`, route `public-dataset-file-details` at `files/details?path=`): clicking a file in the browser opens a read-only details page mirroring the workspace File Details **properties block** (reuses `ConceptInstanceStaticProperty`): name, type, location, size, created, SHA-256. **Constraint**: the real `FileDetails.vue` (~3.5k lines) is bound to the workspace package/records/relationships/viewer/permissions model, which Discover files don't have — so we mirror only the applicable read-only properties; records/relationships/viewer/edit/download omitted (download + preview are later/DuckDB work).
+- [x] **Download**: single file → presigned S3 URL via `POST {discoverUrl}/datasets/{id}/versions/{version}/files/download-manifest` (`{paths:[path]}` → `data[0].url`), triggered with `utils/triggerBrowserDownload`. Multiple files / folders → server-side zip via the existing **zipit** form POST (`{paths, datasetId, version, userToken, rootPath?}`). Available both on the file-details page and from a selection bar in the file browser.
+  - ⚠️ **BACKEND FOLLOW-UP (forced download)**: the presigned URLs from `download-manifest` open inline for viewable types (PDF/image/etc.) because the S3 object has no `Content-Disposition: attachment`. A client-side blob-fetch workaround was tried and reverted (blocked by S3 CORS). **Fix server-side**: generate the presigned URLs with `ResponseContentDisposition=attachment` (+ filename). Update wherever `download-manifest` presigns — likely **discover-service** (`downloadManifest` operation in `discover-service/openapi/discover-service.yml`), or add/extend a per-file presign in **packages-service**. Until then, single-file downloads may open in a browser tab instead of saving.
+- [ ] _(Polish later)_ deep-linkable file paths in URL (folder nav); render README markdown; in-app preview.
 
 ### Phase 3 — Add to Collection
 - [ ] Wire "Add to collection" using existing `collectionStore` integration.
@@ -219,7 +265,13 @@ Notes:
 
 ## 7. Notes / Decisions Log
 
-- **Placement**: Public Datasets is a new third tab in `SharedWithMe.vue` (`/my-workspace/shared`), beside "Shared Workspaces" and "Shared With Me".
+- **Placement (final IA)**: "Shared Workspaces", "Shared With Me", and "Public Datasets" are **three top-level primary-nav entries** in `UserNavigation` (no in-page tabs, no `SharedWithMe` shell — removed). Each is its own flat route under `/my-workspace`:
+  - `shared-workspaces` → `/my-workspace/shared-workspaces` → `SharedWorkspaces.vue`
+  - `shared-datasets` → `/my-workspace/shared-with-me` → `SharedDatasets.vue`
+  - `public-datasets` → `/my-workspace/public-datasets` → `PublicDatasetList.vue`
+  - each component wraps itself in `<bf-stage>`; `meta.hideSecondaryNav: true`.
+  - Backward-compat: a `shared-with-me` route at `/my-workspace/shared` redirects to `shared-workspaces` (old links / login / guest redirects still work).
+  - Public Datasets nav item uses `activeForRoutes: ['public-dataset']` to stay highlighted on the detail pages. Breadcrumb (`MyWorkSpacePage.myDataSection`) maps each route to its own name + self-link.
 - **Views (2nd effort)**: created like a public dataset (cut a versioned release exposing a file subset) but kept **private**; surfaced under the existing "Shared With Me" tab, not the Public tab.
 - **Unifying model**: public datasets and views are both **read-only versioned release snapshots**, differing in visibility + which tab they appear in, sharing the §4a abstraction for detail / pipeline-input / collection.
 - **Detail view**: mirror existing workspace dataset nav (overview + metadata + files), read-only, write actions stripped (§4b).

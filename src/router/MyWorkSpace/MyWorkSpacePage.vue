@@ -47,10 +47,10 @@ export default {
       if (this.isPublishingSection) return 'Data Publishing';
       if (this.isCollectionsSection) return 'Collections';
       if (this.isCodeSection) return 'My Code';
+      if (this.myDataSection) return this.myDataSection.name;
 
       // Top-level pages
       const topLevel = {
-        'shared-with-me': 'My Data',
         'my-code': 'My Code',
         'my-analysis': 'My Analysis',
       };
@@ -62,6 +62,7 @@ export default {
       if (this.isPublishingSection) return { name: 'data-publishing' };
       if (this.isCollectionsSection) return { name: 'collections-list' };
       if (this.isCodeSection) return { name: 'my-code' };
+      if (this.myDataSection) return this.myDataSection.route;
       return null;
     },
 
@@ -140,6 +141,29 @@ export default {
 
     isCodeSection() {
       return this.routeName === 'published-app-details';
+    },
+
+    // The "My Data" routes are now separate primary-nav entries; each shows
+    // its own breadcrumb name and links back to its own route.
+    myDataSection() {
+      const names = {
+        'shared-with-me': 'Shared Workspaces',
+        'shared-workspaces': 'Shared Workspaces',
+        'shared-datasets': 'Shared With Me',
+        'public-datasets': 'Public Datasets',
+      };
+      if (names[this.routeName]) {
+        return { name: names[this.routeName], route: { name: this.routeName } };
+      }
+      // public-dataset detail (overview/files) → belongs to Public Datasets
+      if (
+        typeof this.routeName === 'string' &&
+        this.routeName.startsWith('public-dataset') &&
+        this.routeName !== 'public-datasets'
+      ) {
+        return { name: 'Public Datasets', route: { name: 'public-datasets' } };
+      }
+      return null;
     },
 
     isSettingsSection() {

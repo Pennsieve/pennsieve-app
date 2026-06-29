@@ -2,7 +2,7 @@
   <router-link
     :to="link"
     class="user-navigation-item"
-    :class="{ condensed: condensed }"
+    :class="{ condensed: condensed, 'router-link-active': isForcedActive }"
   >
     <div class="icon-main">
       <slot name="icon" />
@@ -34,6 +34,21 @@ export default {
     condensed: {
       type: Boolean,
       default: false
+    },
+    // Route names that should also light up this item (e.g. detail routes
+    // that live outside this item's `link` subtree).
+    activeForRoutes: {
+      type: Array,
+      default: () => []
+    }
+  },
+
+  computed: {
+    isForcedActive() {
+      if (!this.activeForRoutes.length) return false;
+      const names = this.$route.matched.map((r) => r.name).filter(Boolean);
+      names.push(this.$route.name);
+      return this.activeForRoutes.some((n) => names.includes(n));
     }
   }
 }
