@@ -234,6 +234,19 @@ Preview degrades gracefully: unsupported types show "No preview available".
 
 **Notes**: no auth/cursor — offset pagination or load-all for modest datasets; DuckDB queries run in a worker (already wrapped). Records.jsonl can be large — load on model select, not upfront.
 
+## 4e. Gaps / backlog (what's still missing)
+
+Inventory from the overall review, roughly prioritized:
+
+1. **Use as pipeline / notebook input (Vision Goal 3)** — the headline unmet goal. Run analytic pipelines on a public dataset (or selected files) from "My Workspace", outside an org. Needs the dataset-reference contract with the compute/notebook layer (§4b Q3) + Goal 4 (where outputs land).
+2. **Add to collection** — original Phase 3/4; not built. Lower effort (reuse `collectionStore`).
+3. **Catalog search** — DONE (v2 section). Facets/filters still open.
+4. **Discover parity**: version selector + version history (datasets are versioned; we pin the list's version); README on Overview — DONE; contributors w/ ORCID + external publications + funding; whole-dataset download (vs per-file/zip).
+5. **Preview depth**: timeseries (`TSViewer`) = V2, OME-Zarr/neuroglancer (`OrthogonalFrame`) = V3.
+6. **Metadata M4c**: Explore graph, typed numeric sort, per-column filters.
+7. **Private "views"** (`sourceType:'view'`) — the whole second effort; scaffolding (badges/abstraction) exists.
+8. **Polish**: deep-linkable file-folder paths in URL; entry-point discoverability.
+
 ## 5. Open Questions
 
 1. ~~**Placement**~~ — RESOLVED, see Navigation decision above.
@@ -286,8 +299,12 @@ Preview degrades gracefully: unsupported types show "No preview available".
 - [ ] Tests.
 
 ### v2 — Search
-- [ ] Keyword search over public datasets (`searchDatasets` / discover search endpoint).
+- [x] Keyword **catalog search** over public datasets — `PublicDatasetList` search box (debounced) → `readOnlyDatasetStore.setQuery` → adapter switches to `GET /discover/search/datasets?query=…` (else the plain list). Empty-state copy adapts to the query.
 - [ ] Facets/filters.
+
+### Overview dashboard (README + Citation widgets)
+- [x] Overview uses the **dashboard wrapper** (`StaticDashboard` from `pennsieve-dashboard`) as an extensible container. Widgets: **README** (read-only `MarkdownPanelWidget`, `locked`, fed `readme.md` via `getFileContent`) and **Citation** (`CitationPanelWidget` — APA/Chicago/IEEE + copy). Layout adapts (README w8 + Citation w4, or full-width if only one).
+- Citation degrades gracefully: `citation.doi.org` returns **404** for unregistered DOIs (common on **dev** — DOIs aren't registered with the resolver), now shown as "citation not available" + Crosscite link instead of an error/retry state. CORS is fine (`*`).
 
 ## 7. Notes / Decisions Log
 

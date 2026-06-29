@@ -58,8 +58,10 @@ const mapDiscoverDataset = (d) => ({
 
 // Adapter for Pennsieve Discover (public datasets).
 const discoverAdapter = {
-  async list({ limit, offset }) {
-    const url = `${siteConfig.discoverUrl}/datasets?limit=${limit}&offset=${offset}&datasetType=research&embargo=false`;
+  async list({ limit, offset, query }) {
+    const url = query
+      ? `${siteConfig.discoverUrl}/search/datasets?limit=${limit}&offset=${offset}&query=${encodeURIComponent(query)}`
+      : `${siteConfig.discoverUrl}/datasets?limit=${limit}&offset=${offset}&datasetType=research&embargo=false`;
     const response = await useSendXhr(url, { method: "GET" });
     return {
       items: (response?.datasets || []).map(mapDiscoverDataset),
@@ -191,6 +193,7 @@ export const useReadOnlyDatasetStore = defineStore("readOnlyDatasetStore", () =>
   const totalCount = ref(0);
   const limit = ref(20);
   const offset = ref(0);
+  const query = ref("");
   const isLoading = ref(false);
   const error = ref(null);
 
@@ -212,6 +215,7 @@ export const useReadOnlyDatasetStore = defineStore("readOnlyDatasetStore", () =>
       const result = await adapter.list({
         limit: limit.value,
         offset: offset.value,
+        query: query.value,
       });
       items.value = result.items;
       totalCount.value = result.totalCount;
@@ -519,11 +523,17 @@ export const useReadOnlyDatasetStore = defineStore("readOnlyDatasetStore", () =>
     offset.value = 0;
   };
 
+  const setQuery = (q) => {
+    query.value = q || "";
+    offset.value = 0;
+  };
+
   return {
     items,
     totalCount,
     limit,
     offset,
+    query,
     isLoading,
     error,
     current,
@@ -543,5 +553,6 @@ export const useReadOnlyDatasetStore = defineStore("readOnlyDatasetStore", () =>
     resolveRecords,
     setPage,
     setPageSize,
+    setQuery,
   };
 });

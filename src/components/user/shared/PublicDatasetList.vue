@@ -5,6 +5,17 @@
       <p class="section-description">
         Browse publicly available datasets published to Pennsieve Discover. These datasets are read-only.
       </p>
+      <el-input
+        v-model="searchTerm"
+        class="dataset-search"
+        placeholder="Search public datasets…"
+        clearable
+        @input="onSearchInput"
+      >
+        <template #prefix>
+          <IconMagnifyingGlass :width="16" :height="16" color="#71747c" />
+        </template>
+      </el-input>
     </div>
 
     <div v-if="store.isLoading" class="loading-state" v-loading="store.isLoading">
@@ -22,8 +33,14 @@
     <div v-else-if="store.items.length === 0" class="empty-state">
       <div class="empty-state-content">
         <IconCompass :width="48" :height="48" color="#71747c" />
-        <h3>No public datasets</h3>
-        <p>There are no public datasets to show right now.</p>
+        <template v-if="store.query">
+          <h3>No matching datasets</h3>
+          <p>No public datasets match “{{ store.query }}”.</p>
+        </template>
+        <template v-else>
+          <h3>No public datasets</h3>
+          <p>There are no public datasets to show right now.</p>
+        </template>
       </div>
     </div>
 
@@ -105,16 +122,28 @@
 </template>
 
 <script setup>
-import { computed, onMounted } from "vue";
+import { ref, computed, onMounted } from "vue";
 import { useRouter } from "vue-router";
 import { useReadOnlyDatasetStore } from "@/stores/readOnlyDatasetStore.js";
 import BfStage from "@/components/layout/BfStage/BfStage.vue";
 import PaginationPageMenu from "@/components/shared/PaginationPageMenu/PaginationPageMenu.vue";
 import IconCompass from "@/components/icons/IconCompass.vue";
 import IconArrowRight from "@/components/icons/IconArrowRight.vue";
+import IconMagnifyingGlass from "@/components/icons/IconMagnifyingGlass.vue";
 
 const store = useReadOnlyDatasetStore();
 const router = useRouter();
+
+const searchTerm = ref(store.query);
+let searchTimer = null;
+
+const onSearchInput = () => {
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(() => {
+    store.setQuery(searchTerm.value);
+    load();
+  }, 300);
+};
 
 const navigateToDataset = (dataset) => {
   router.push({ name: "public-dataset-overview", params: { datasetId: dataset.id } });
@@ -177,9 +206,13 @@ const formatDate = (value) => {
   .section-description {
     font-size: 14px;
     color: theme.$gray_4;
-    margin: 0;
+    margin: 0 0 16px 0;
     max-width: 600px;
   }
+}
+
+.dataset-search {
+  max-width: 360px;
 }
 
 .loading-state {

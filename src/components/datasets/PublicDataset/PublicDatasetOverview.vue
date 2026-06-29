@@ -82,55 +82,19 @@
       </div>
     </div>
 
-    <!-- Citation -->
-    <div v-if="dataset.doi" class="citation-section">
-      <h3>Cite this dataset</h3>
-
-      <div v-if="citationError" class="info-citation">
-        <p class="mb-0">
-          Sorry, an error has occurred.
-          <a href="#" @click.prevent="fetchCitation">Try again</a>
-        </p>
-      </div>
-      <div
-        v-else
-        v-loading="citationLoading"
-        class="info-citation"
-        aria-live="polite"
-      >
-        {{ citationText }}
-      </div>
-
-      <div class="info-citation-links">
-        Formatted as:
-        <button
-          :class="{ active: citationType === 'apa' }"
-          @click="citationType = 'apa'"
-        >APA</button>
-        |
-        <button
-          :class="{ active: citationType === 'chicago-note-bibliography' }"
-          @click="citationType = 'chicago-note-bibliography'"
-        >Chicago</button>
-        |
-        <button
-          :class="{ active: citationType === 'ieee' }"
-          @click="citationType = 'ieee'"
-        >IEEE</button>
-        |
-        <a :href="`https://crosscite.org/?doi=${dataset.doi}`" target="_blank" rel="noopener">
-          More on Crosscite.org
-        </a>
-        <button class="copy-btn" :disabled="!citationText" @click="copyCitation">
-          {{ copied ? "Copied" : "Copy" }}
-        </button>
-      </div>
-    </div>
+    <!-- README + Citation as dashboard widgets (extensible) -->
+    <StaticDashboard
+      v-if="showDashboard"
+      :key="dataset.id"
+      class="overview-dashboard"
+      :options="dashboardOptions"
+    />
   </div>
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted } from "vue";
+import { ref, computed, watch, onMounted, markRaw } from "vue";
+import { useReadOnlyDatasetStore } from "@/stores/readOnlyDatasetStore.js";
 import IconFiles from "@/components/icons/IconFiles.vue";
 import IconStorage from "@/components/icons/IconStorage.vue";
 import IconDocument from "@/components/icons/IconDocument.vue";
@@ -138,6 +102,10 @@ import IconLicense from "@/components/icons/IconLicense.vue";
 import IconGlobeCheck from "@/components/icons/IconGlobeCheck.vue";
 import IconEyeball from "@/components/icons/IconEyeball.vue";
 import BfPill from "@/components/shared/BfPill/BfPill.vue";
+import { StaticDashboard } from "pennsieve-dashboard";
+import "pennsieve-dashboard/style.css";
+import MarkdownPanelWidget from "@/components/datasets/DatasetOverview/widgets/MarkdownPanelWidget.vue";
+import CitationPanelWidget from "./widgets/CitationPanelWidget.vue";
 
 const props = defineProps({
   dataset: {
@@ -145,6 +113,71 @@ const props = defineProps({
     required: true,
   },
 });
+
+const store = useReadOnlyDatasetStore();
+
+// ---- README (rendered read-only in the dashboard wrapper) ----
+const readmeContent = ref("");
+
+const loadReadme = async () => {
+  readmeContent.value = "";
+  try {
+    readmeContent.value = await store.getFileContent({
+      id: props.dataset.id,
+      version: props.dataset.version,
+      path: "readme.md",
+    });
+  } catch (e) {
+    console.warn("No README available:", e);
+    readmeContent.value = "";
+  }
+};
+
+// Extensible overview dashboard: README (left) + Citation (right). Layout
+// adapts to whichever content exists. Add more widgets here as it grows.
+const dashboardLayout = computed(() => {
+  const hasReadme = !!readmeContent.value;
+  const hasDoi = !!props.dataset.doi;
+  const layout = [];
+  if (hasReadme) {
+    layout.push({
+      id: "readme-widget",
+      x: 0,
+      y: 0,
+      w: hasDoi ? 8 : 12,
+      fillHeight: true,
+      componentKey: "MarkdownPanelWidget",
+      componentName: "README",
+      component: markRaw(MarkdownPanelWidget),
+      Props: { widgetName: "README", value: readmeContent.value, locked: true },
+    });
+  }
+  if (hasDoi) {
+    layout.push({
+      id: "citation-widget",
+      x: hasReadme ? 8 : 0,
+      y: 0,
+      w: hasReadme ? 4 : 12,
+      fillHeight: true,
+      componentKey: "CitationPanelWidget",
+      componentName: "Citation",
+      component: markRaw(CitationPanelWidget),
+      Props: { widgetName: "Citation", doi: props.dataset.doi },
+    });
+  }
+  return layout;
+});
+
+const showDashboard = computed(() => dashboardLayout.value.length > 0);
+
+const dashboardOptions = computed(() => ({
+  globalData: {},
+  availableWidgets: [
+    { name: "MarkdownPanelWidget", component: markRaw(MarkdownPanelWidget) },
+    { name: "CitationPanelWidget", component: markRaw(CitationPanelWidget) },
+  ],
+  defaultLayout: dashboardLayout.value,
+}));
 
 const SOURCE_META = {
   discover: { key: "discover", label: "Public dataset", icon: IconGlobeCheck },
@@ -154,46 +187,8 @@ const sourceMeta = computed(
   () => SOURCE_META[props.dataset.sourceType] || SOURCE_META.discover
 );
 
-// ---- Citation (matches pennsieve-discover citation block) ----
-const citationType = ref("apa");
-const citationText = ref("");
-const citationLoading = ref(false);
-const citationError = ref(false);
-const copied = ref(false);
-
-const fetchCitation = async () => {
-  const doi = props.dataset.doi;
-  if (!doi) return;
-  citationLoading.value = true;
-  citationError.value = false;
-  try {
-    const url = `https://citation.doi.org/format?doi=${encodeURIComponent(doi)}&style=${citationType.value}&lang=en-US`;
-    const response = await fetch(url);
-    if (!response.ok) throw new Error(`Citation request failed: ${response.status}`);
-    citationText.value = (await response.text()).trim();
-  } catch (e) {
-    console.error("Error loading citation:", e);
-    citationError.value = true;
-    citationText.value = "";
-  } finally {
-    citationLoading.value = false;
-  }
-};
-
-const copyCitation = async () => {
-  if (!citationText.value) return;
-  try {
-    await navigator.clipboard.writeText(citationText.value);
-    copied.value = true;
-    setTimeout(() => (copied.value = false), 2000);
-  } catch (e) {
-    console.error("Error copying citation:", e);
-  }
-};
-
-onMounted(fetchCitation);
-watch(citationType, fetchCitation);
-watch(() => props.dataset.doi, fetchCitation);
+onMounted(loadReadme);
+watch(() => props.dataset.id, loadReadme);
 
 const contributorNames = computed(() =>
   (props.dataset.contributors || []).map((c) =>
@@ -335,69 +330,8 @@ const formatDate = (value) => {
   }
 }
 
-.citation-section {
-  margin-top: 24px;
-
-  h3 {
-    font-size: 16px;
-    font-weight: 600;
-    color: theme.$gray_6;
-    margin: 0 0 8px 0;
-  }
-}
-
-.info-citation {
-  border-radius: 4px;
-  background-color: #cddaff;
-  padding: 16px;
-  color: #011f5b;
-  font-size: 14px;
-  line-height: 24px;
-  margin-bottom: 8px;
-  min-height: 24px;
-
-  a {
-    color: #011f5b;
-    text-decoration: underline;
-  }
-}
-
-.info-citation-links {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px;
-  font-size: 14px;
-  line-height: 16px;
-  color: theme.$gray_4;
-
-  button,
-  a {
-    color: theme.$purple_2;
-    line-height: 16px;
-    text-decoration: underline;
-    font-size: 14px;
-    cursor: pointer;
-
-    &.active {
-      text-decoration: none;
-      font-weight: 600;
-      color: theme.$gray_6;
-    }
-
-    &:disabled {
-      color: theme.$gray_3;
-      cursor: default;
-      text-decoration: none;
-    }
-  }
-
-  .copy-btn {
-    margin-left: auto;
-    text-decoration: none;
-    border: 1px solid theme.$gray_2;
-    border-radius: 4px;
-    padding: 4px 12px;
-  }
+.overview-dashboard {
+  margin-top: 8px;
+  min-height: 360px;
 }
 </style>
