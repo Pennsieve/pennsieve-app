@@ -55,6 +55,7 @@ const mapDiscoverDataset = (d) => ({
   tags: d.tags || [],
   license: d.license,
   contributors: d.contributors || [],
+  externalPublications: d.externalPublications || [],
 });
 
 // Adapter for Pennsieve Discover (public datasets).

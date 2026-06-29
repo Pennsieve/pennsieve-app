@@ -40,6 +40,11 @@
 <script setup>
 import { ref, watch, onMounted } from "vue";
 
+// Match the dashboard's widget contract (see MarkdownPanelWidget): the
+// WidgetWrapper passes layout class/style; with a fragment root they must not
+// auto-inherit onto our root (it breaks grid sizing + warns).
+defineOptions({ inheritAttrs: false });
+
 const props = defineProps({
   doi: { type: String, default: "" },
   // Lib-injected props (from the dashboard).

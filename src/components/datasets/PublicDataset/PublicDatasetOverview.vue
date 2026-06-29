@@ -115,13 +115,24 @@
       </div>
     </div>
 
-    <!-- README + Citation as dashboard widgets (extensible) -->
-    <StaticDashboard
-      v-if="showDashboard"
-      :key="dataset.id"
-      class="overview-dashboard"
-      :options="dashboardOptions"
-    />
+    <!-- README + Citation side by side; References full width below. -->
+    <div class="overview-body">
+      <div v-if="readmeContent || dataset.doi" class="overview-row">
+        <section v-if="readmeContent" class="overview-card overview-card--readme">
+          <h3 class="overview-card-title">README</h3>
+          <markdown-panel-widget :value="readmeContent" :locked="true" />
+        </section>
+        <section v-if="dataset.doi" class="overview-card overview-card--citation">
+          <h3 class="overview-card-title">Citation</h3>
+          <citation-panel-widget :doi="dataset.doi" />
+        </section>
+      </div>
+
+      <section v-if="hasReferences" class="overview-card">
+        <h3 class="overview-card-title">References</h3>
+        <references-panel-widget :publications="dataset.externalPublications" />
+      </section>
+    </div>
 
     <add-to-collection-dialog
       v-model:visible="showAddToCollection"
@@ -132,7 +143,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted, markRaw } from "vue";
+import { ref, computed, watch, onMounted } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useReadOnlyDatasetStore } from "@/stores/readOnlyDatasetStore.js";
 import IconFiles from "@/components/icons/IconFiles.vue";
@@ -143,10 +154,9 @@ import IconGlobeCheck from "@/components/icons/IconGlobeCheck.vue";
 import IconEyeball from "@/components/icons/IconEyeball.vue";
 import BfPill from "@/components/shared/BfPill/BfPill.vue";
 import IconCollection from "@/components/icons/IconCollection.vue";
-import { StaticDashboard } from "pennsieve-dashboard";
-import "pennsieve-dashboard/style.css";
 import MarkdownPanelWidget from "@/components/datasets/DatasetOverview/widgets/MarkdownPanelWidget.vue";
 import CitationPanelWidget from "./widgets/CitationPanelWidget.vue";
+import ReferencesPanelWidget from "./widgets/ReferencesPanelWidget.vue";
 import AddToCollectionDialog from "./AddToCollectionDialog.vue";
 
 const props = defineProps({
@@ -180,7 +190,7 @@ const onSelectVersion = (version) => {
   router.push({ name: route.name, params: route.params, query });
 };
 
-// ---- README (rendered read-only in the dashboard wrapper) ----
+// ---- README (read-only markdown) ----
 const readmeContent = ref("");
 
 const loadReadme = async () => {
@@ -197,51 +207,9 @@ const loadReadme = async () => {
   }
 };
 
-// Extensible overview dashboard: README (left) + Citation (right). Layout
-// adapts to whichever content exists. Add more widgets here as it grows.
-const dashboardLayout = computed(() => {
-  const hasReadme = !!readmeContent.value;
-  const hasDoi = !!props.dataset.doi;
-  const layout = [];
-  if (hasReadme) {
-    layout.push({
-      id: "readme-widget",
-      x: 0,
-      y: 0,
-      w: hasDoi ? 8 : 12,
-      fillHeight: true,
-      componentKey: "MarkdownPanelWidget",
-      componentName: "README",
-      component: markRaw(MarkdownPanelWidget),
-      Props: { widgetName: "README", value: readmeContent.value, locked: true },
-    });
-  }
-  if (hasDoi) {
-    layout.push({
-      id: "citation-widget",
-      x: hasReadme ? 8 : 0,
-      y: 0,
-      w: hasReadme ? 4 : 12,
-      fillHeight: true,
-      componentKey: "CitationPanelWidget",
-      componentName: "Citation",
-      component: markRaw(CitationPanelWidget),
-      Props: { widgetName: "Citation", doi: props.dataset.doi },
-    });
-  }
-  return layout;
-});
-
-const showDashboard = computed(() => dashboardLayout.value.length > 0);
-
-const dashboardOptions = computed(() => ({
-  globalData: {},
-  availableWidgets: [
-    { name: "MarkdownPanelWidget", component: markRaw(MarkdownPanelWidget) },
-    { name: "CitationPanelWidget", component: markRaw(CitationPanelWidget) },
-  ],
-  defaultLayout: dashboardLayout.value,
-}));
+const hasReferences = computed(
+  () => (props.dataset.externalPublications || []).length > 0
+);
 
 const SOURCE_META = {
   discover: { key: "discover", label: "Public dataset", icon: IconGlobeCheck },
@@ -411,8 +379,63 @@ const formatDate = (value) => {
   }
 }
 
-.overview-dashboard {
-  margin-top: 8px;
-  min-height: 360px;
+.overview-body {
+  margin-top: 24px;
+}
+
+.overview-row {
+  display: flex;
+  gap: 48px;
+  align-items: flex-start;
+  margin-bottom: 40px;
+
+  @media (max-width: 900px) {
+    flex-direction: column;
+    gap: 32px;
+  }
+}
+
+.overview-card {
+  margin-bottom: 40px;
+
+  &:last-child {
+    margin-bottom: 0;
+  }
+
+  &--readme {
+    flex: 2 1 0;
+    min-width: 0;
+    margin-bottom: 0;
+  }
+
+  &--citation {
+    flex: 1 1 0;
+    min-width: 0;
+    margin-bottom: 0;
+  }
+}
+
+// Lightweight section label — no box, just a quiet eyebrow above the content.
+.overview-card-title {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: theme.$gray_4;
+  margin: 0 0 12px 0;
+}
+
+// The widgets ship their own internal padding for the dashboard chrome —
+// strip it so content sits flush under its section label.
+.overview-card :deep(.markdown-panel-widget),
+.overview-card :deep(.citation-panel-widget),
+.overview-card :deep(.references-panel-widget) {
+  padding: 0;
+}
+
+// MarkdownEditor's content area is padded for the editor chrome; in this
+// read-only preview, strip it so the README text aligns with the label.
+.overview-card--readme :deep(.content-wrap) {
+  padding: 0;
 }
 </style>
