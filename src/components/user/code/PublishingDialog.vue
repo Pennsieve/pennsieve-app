@@ -47,7 +47,7 @@
                 </label>
               </div>
 
-              <div v-if="hasAnyPublishing" class="publishing-info">
+              <div v-if="hasPublishing" class="publishing-info">
                 <h6>What happens when you publish?</h6>
                 <ul>
                   <li>A DOI (Digital Object Identifier) will be generated for each release</li>
@@ -143,8 +143,8 @@ export default {
       return publishing_to_discover || publishing_to_appstore
     },
 
-    hasAnyPublishing() {
-      return this.localSettings.publishToDiscover || this.localSettings.publishToAppstore
+    hasPublishing() {
+      return this.localSettings.publishToDiscover
     },
 
     applications() {
