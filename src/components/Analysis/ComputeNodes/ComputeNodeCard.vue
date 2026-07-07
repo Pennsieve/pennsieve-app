@@ -39,6 +39,14 @@
           <span v-if="node.defaultComputeType" class="tag compute-type">{{ node.defaultComputeType }}</span>
           <span v-if="node.enableLLMAccess === true || node.enableLLMAccess === 'true'" class="tag llm">LLM</span>
           <span v-if="node.maxGpuInstances > 0" class="tag gpu">GPU</span>
+          <el-tooltip
+            v-if="node.maxInteractiveSessions > 0"
+            content="Supports interactive Jupyter notebook sessions"
+            placement="top"
+            :show-after="300"
+          >
+            <span class="tag interactive">Interactive</span>
+          </el-tooltip>
         </div>
       </div>
       <div class="node-header-actions">
@@ -266,6 +274,11 @@ async function updateStatus(newStatus) {
     &.gpu {
       background: rgba(#F59E0B, 0.1);
       color: #D97706;
+    }
+
+    &.interactive {
+      background: rgba(#011F5B, 0.1);
+      color: #011F5B; /* brand navy */
     }
   }
 }

@@ -59,6 +59,7 @@ export default {
       // Top-level tabs: just one crumb (the tab name, as current)
       const topLevelTabs = {
         'runs': 'Runs',
+        'notebooks': 'Notebooks',
         'workflows': 'Workflows',
         'applications': 'Applications',
         'compute-nodes': 'Compute Nodes',
@@ -74,6 +75,8 @@ export default {
         'workflow-detail': { parent: 'Workflows', parentRoute: { name: 'workflows' } },
         'workflow-create': { parent: 'Workflows', parentRoute: { name: 'workflows' } },
         'application-detail': { parent: 'Applications', parentRoute: { name: 'applications' } },
+        'application-manifest-guide': { parent: 'Applications', parentRoute: { name: 'applications' } },
+        'application-manifest-builder': { parent: 'Applications', parentRoute: { name: 'applications' } },
         'compute-node-management': { parent: 'Compute Nodes', parentRoute: { name: 'compute-nodes' } },
       };
       const sub = subPages[routeName];
@@ -84,6 +87,8 @@ export default {
           'workflow-detail': this.selectedWorkflow?.name || 'Workflow',
           'workflow-create': 'New Workflow',
           'application-detail': this.applicationName || 'Application',
+          'application-manifest-guide': 'Manifest Guide',
+          'application-manifest-builder': 'Create Manifest',
           'compute-node-management': this.computeNodeName || 'Compute Node',
         };
         return [
@@ -139,6 +144,10 @@ export default {
         {
           name: "Runs",
           to: "runs",
+        },
+        {
+          name: "Notebooks",
+          to: "notebooks",
         },
         {
           name: "Workflows",

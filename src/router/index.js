@@ -114,7 +114,17 @@ const UserGithubCode = () => import('../components/user/code/UserGithubCode.vue'
 const PublishedAppDetail = () => import('../components/user/code/PublishedAppDetail.vue')
 const UserGithubIntegrations = () => import('../components/user/integrations/UserGithubV2.vue')
 const DataPublishingDashboard = () => import('../components/user/publishing/DataPublishingDashboard.vue')
-const SharedWithMe = () => import('../components/user/shared/SharedWithMe.vue')
+const SharedWorkspaces = () => import('../components/user/shared/SharedWorkspaces.vue')
+const SharedDatasets = () => import('../components/user/shared/SharedDatasets.vue')
+const PublicDatasetList = () => import('../components/user/shared/PublicDatasetList.vue')
+const PublicDatasetDetail = () => import('../components/datasets/PublicDataset/PublicDatasetDetail.vue')
+const PublicDatasetOverview = () => import('../components/datasets/PublicDataset/PublicDatasetOverview.vue')
+const PublicDatasetFiles = () => import('../components/datasets/PublicDataset/PublicDatasetFiles.vue')
+const PublicDatasetFileDetails = () => import('../components/datasets/PublicDataset/PublicDatasetFileDetails.vue')
+const PublicDatasetMetadata = () => import('../components/datasets/PublicDataset/PublicDatasetMetadata.vue')
+const PublicDatasetRecords = () => import('../components/datasets/PublicDataset/PublicDatasetRecords.vue')
+const PublicDatasetRecord = () => import('../components/datasets/PublicDataset/PublicDatasetRecord.vue')
+const PublicDatasetNavigation = () => import('../components/datasets/PublicDataset/PublicDatasetNavigation.vue')
 const MyCollections = () => import('../components/user/collections/MyCollections.vue')
 const CollectionDetails = () => import('../components/user/collections/CollectionDetails.vue')
 const UserNavigation = () => import('../components/user-navigation/UserNavigation.vue')
@@ -134,10 +144,14 @@ const ComputeNodesList = () => import ('../components/Analysis/ComputeNodes/Comp
 const ComputeNodeManagement = () => import ('../components/Analysis/ComputeNodes/ComputeNodeManagement.vue')
 const ApplicationsGrid = () => import ('../components/Analysis/Applications/ApplicationsGrid.vue')
 const ApplicationDetail = () => import ('../components/Analysis/Applications/ApplicationDetail.vue')
+const AppManifestGuide = () => import ('../components/Analysis/Applications/AppManifestGuide.vue')
+const AppManifestBuilder = () => import ('../components/Analysis/Applications/AppManifestBuilder.vue')
 const ActivityMonitor = () => import ('../components/Analysis/Activity/ActivityMonitor.vue')
 const RunMonitor = () => import ('../components/Analysis/RunMonitor/RunMonitor.vue')
 const RunsOverview = () => import ('../components/Analysis/RunMonitor/RunsOverview.vue')
 const RunDetail = () => import ('../components/Analysis/RunMonitor/RunDetail.vue')
+const NotebooksOverview = () => import ('../components/Analysis/RunMonitor/NotebooksOverview.vue')
+const NotebookSession = () => import ('../components/Analysis/JupyterSession/NotebookSession.vue')
 const WorkflowBuilder = () => import ('../components/Analysis/WorkflowBuilder/WorkflowBuilder.vue')
 const WorkflowsGrid = () => import ('../components/Analysis/Workflows/WorkflowsGrid.vue')
 
@@ -181,11 +195,27 @@ const router = createRouter({
       props: false,
     },
     {
+      // Interactive Jupyter notebook for a run. Its own page (keeps the
+      // BfNavigation left menu) but NOT a child of Analysis, so it doesn't show
+      // the Analysis tab bar — just a breadcrumb back to the run.
+      name: 'run-notebook',
+      path: '/:orgId/analysis/runs/:runId/notebook',
+      components: {
+        page: NotebookSession,
+        navigation: BfNavigation,
+      },
+      // navigation: true passes :orgId to BfNavigation (it builds links from the
+      // orgId prop); without it the left-nav router-links throw "Missing
+      // required param orgId".
+      props: { page: true, navigation: true },
+    },
+    {
       name: 'my-workspace',
       path: '/my-workspace',
       components: {
         page: MyWorkSpacePage,
         navigation: UserNavigation,
+        navigationSecondary: PublicDatasetNavigation,
       },
       props: {
         page: (route) => ({
@@ -444,18 +474,103 @@ const router = createRouter({
           }
         },
         {
-          name: 'shared-with-me',
-          path: 'shared',
+          name: 'shared-workspaces',
+          path: 'shared-workspaces',
           components: {
-            stage: SharedWithMe,
+            stage: SharedWorkspaces,
             navigation: UserNavigation,
           },
-          props: true,
           meta: {
             hideSecondaryNav: true,
-            title: 'My Data',
-            description: 'Access workspaces and datasets that have been shared with you.'
+            title: 'Shared Workspaces',
+            description: 'Workspaces that have been shared with you.'
           }
+        },
+        {
+          name: 'shared-datasets',
+          path: 'shared-with-me',
+          components: {
+            stage: SharedDatasets,
+            navigation: UserNavigation,
+          },
+          meta: {
+            hideSecondaryNav: true,
+            title: 'Shared With Me',
+            description: 'Datasets shared with you from other workspaces.'
+          }
+        },
+        {
+          name: 'public-datasets',
+          path: 'public-datasets',
+          components: {
+            stage: PublicDatasetList,
+            navigation: UserNavigation,
+          },
+          meta: {
+            hideSecondaryNav: true,
+            title: 'Public Datasets',
+            description: 'Browse publicly available datasets published to Pennsieve Discover.'
+          }
+        },
+        // Backward-compat: old /my-workspace/shared (and { name: 'shared-with-me' })
+        // links now resolve to the Shared Workspaces page.
+        {
+          name: 'shared-with-me',
+          path: 'shared',
+          redirect: {
+            name: 'shared-workspaces'
+          }
+        },
+        {
+          name: 'public-dataset',
+          path: 'public/:datasetId',
+          components: {
+            stage: PublicDatasetDetail,
+            navigation: UserNavigation,
+          },
+          props: {
+            stage: true,
+          },
+          redirect: {
+            name: 'public-dataset-overview'
+          },
+          meta: {
+            hideSecondaryNav: false,
+            title: 'Public Dataset',
+            description: 'Browse a publicly available dataset published to Pennsieve Discover.'
+          },
+          children: [
+            {
+              name: 'public-dataset-overview',
+              path: 'overview',
+              component: PublicDatasetOverview,
+            },
+            {
+              name: 'public-dataset-files',
+              path: 'files',
+              component: PublicDatasetFiles,
+            },
+            {
+              name: 'public-dataset-file-details',
+              path: 'files/details',
+              component: PublicDatasetFileDetails,
+            },
+            {
+              name: 'public-dataset-metadata',
+              path: 'metadata',
+              component: PublicDatasetMetadata,
+            },
+            {
+              name: 'public-dataset-records',
+              path: 'metadata/:model',
+              component: PublicDatasetRecords,
+            },
+            {
+              name: 'public-dataset-record',
+              path: 'metadata/:model/:recordId',
+              component: PublicDatasetRecord,
+            },
+          ]
         },
         {
           name: 'my-collections',
@@ -1610,6 +1725,13 @@ const router = createRouter({
           }
         },
         {
+          name: 'notebooks',
+          path: 'notebooks',
+          components: {
+            stage: NotebooksOverview,
+          }
+        },
+        {
           name: 'run-configure',
           path: 'runs/configure',
           components: {
@@ -1654,6 +1776,20 @@ const router = createRouter({
           path: 'applications',
           components: {
             stage: ApplicationsGrid,
+          }
+        },
+        {
+          name: 'application-manifest-guide',
+          path: 'applications/manifest-guide',
+          components: {
+            stage: AppManifestGuide,
+          }
+        },
+        {
+          name: 'application-manifest-builder',
+          path: 'applications/manifest-builder',
+          components: {
+            stage: AppManifestBuilder,
           }
         },
         {

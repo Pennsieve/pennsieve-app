@@ -202,6 +202,16 @@ export const useDuckDBStore = defineStore('duckdb', () => {
             CREATE OR REPLACE TABLE ${tableName} AS
             SELECT * FROM read_parquet('${fileName}');
           `
+                } else if (fileType === 'jsonl' || fileType === 'ndjson') {
+                    createTableQuery = `
+            CREATE OR REPLACE TABLE ${tableName} AS
+            SELECT * FROM read_json_auto('${fileName}', format='newline_delimited');
+          `
+                } else if (fileType === 'json') {
+                    createTableQuery = `
+            CREATE OR REPLACE TABLE ${tableName} AS
+            SELECT * FROM read_json_auto('${fileName}');
+          `
                 } else {
                     throw new Error(`Unsupported file type: ${fileType}`)
                 }
@@ -243,6 +253,75 @@ export const useDuckDBStore = defineStore('duckdb', () => {
                 isLoading: false,
                 error: err.message
             })
+            throw err
+        }
+    }
+
+    // Lenient JSONL loader: parse line-by-line in JS, skip malformed lines,
+    // then load the cleaned NDJSON into DuckDB. Fallback for published
+    // records.jsonl files that contain invalid JSON (e.g. double-escaped
+    // quotes from the publish pipeline). Returns { tableName, skipped }.
+    const loadJsonlLenient = async (fileUrl, tableName = 'my_data', fileId = null) => {
+        const stableKey = fileId || fileUrl
+
+        const existing = loadedFiles.value.get(stableKey)
+        if (existing && !existing.isLoading && !existing.error) {
+            return { tableName: existing.tableName, skipped: existing.skipped || 0 }
+        }
+
+        if (!isReady.value) {
+            await initDuckDB()
+        }
+
+        loadedFiles.value.set(stableKey, { tableName, fileType: 'jsonl', fileUrl, isLoading: true, error: null })
+
+        try {
+            const response = await fetch(fileUrl)
+            if (!response.ok) {
+                throw new Error(`Failed to fetch file: ${response.status} ${response.statusText}`)
+            }
+            const text = await response.text()
+
+            const cleaned = []
+            let skipped = 0
+            for (const line of text.split('\n')) {
+                const trimmed = line.trim()
+                if (!trimmed) continue
+                try {
+                    JSON.parse(trimmed)
+                    cleaned.push(trimmed)
+                } catch {
+                    skipped++
+                }
+            }
+
+            // Use a distinct filename so we don't collide with a prior
+            // (failed) native registration under the same fileId.
+            const fileName = `${fileId || tableName}.clean.jsonl`
+            await db.value.registerFileBuffer(fileName, new TextEncoder().encode(cleaned.join('\n')))
+
+            const tempConn = await db.value.connect()
+            try {
+                await tempConn.query(
+                    `CREATE OR REPLACE TABLE ${tableName} AS SELECT * FROM read_json_auto('${fileName}', format='newline_delimited');`
+                )
+                const result = await tempConn.query(`SELECT COUNT(*) as count FROM ${tableName};`)
+                const rowCount = result.toArray()[0].count
+
+                loadedFiles.value.set(stableKey, {
+                    tableName, fileType: 'jsonl', fileUrl,
+                    isLoading: false, error: null, rowCount, skipped, loadedAt: new Date()
+                })
+                if (skipped) {
+                    console.warn(`loadJsonlLenient: skipped ${skipped} malformed line(s) in ${fileName}`)
+                }
+                return { tableName, skipped }
+            } finally {
+                await tempConn.close()
+            }
+        } catch (err) {
+            console.error('Failed to load JSONL (lenient):', err)
+            loadedFiles.value.set(stableKey, { tableName, fileType: 'jsonl', fileUrl, isLoading: false, error: err.message })
             throw err
         }
     }
@@ -505,6 +584,7 @@ export const useDuckDBStore = defineStore('duckdb', () => {
         trackFileUsage,
         unloadFile,
         loadFile,
+        loadJsonlLenient,
         loadFiles,
         executeQuery,
         cleanup,

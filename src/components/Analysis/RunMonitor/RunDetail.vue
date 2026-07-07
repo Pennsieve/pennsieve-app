@@ -13,6 +13,9 @@ import IconFile from "../../icons/IconFile.vue";
 import IconCollection from "../../icons/IconCollection.vue";
 import IconCopyDocument from "../../icons/IconCopyDocument.vue";
 import IconArrowRight from "../../icons/IconArrowRight.vue";
+import IconControllerPlay from "../../icons/IconControllerPlay.vue";
+import IconXCircle from "../../icons/IconXCircle.vue";
+import { endInteractiveSession } from "@/composables/useJupyterSession";
 import AnalysisFilesTable from "../../FilesTable/AnalysisFilesTable.vue";
 import BreadcrumbNavigation from "../../datasets/files/BreadcrumbNavigation/BreadcrumbNavigation.vue";
 import { useGetToken } from "@/composables/useGetToken";
@@ -81,6 +84,11 @@ const isExecuting = ref(false);
 const errorBanner = ref("");
 const errorBannerNodeId = ref("");
 const rerunSource = ref(null);
+// Environment layers (python-env / r-env / data) attached to the run being
+// configured. Carried over from the source run on a rerun so the rebuilt
+// payload re-attaches them — otherwise "Rerun with configuration" silently
+// drops the layer.
+const configLayers = ref([]);
 
 // File picker dialog state
 const filePickerVisible = ref(false);
@@ -166,6 +174,24 @@ const getComputeTypesForProcessor = (sourceUrl) => {
   return types && types.length ? withGpu(types) : DEFAULT_COMPUTE_TYPES;
 };
 
+// Compliant compute nodes require ECS execution for per-execution isolation, so
+// the lambda target is offered but disabled (a Lambda mounts the shared
+// per-node filesystem and can't be isolated per run). Basic/secure are
+// unaffected. Mirrors the converter's compliant rejection.
+const LAMBDA_COMPLIANT_MSG =
+  "Lambda isn't available on compliant compute nodes — they require ECS execution so each run is isolated.";
+const configureNodeIsCompliant = computed(() => {
+  const n = computeNodes.value.find(
+    (cn) => cn.uuid === initiateForm.value.computeNodeId
+  );
+  return (n?.deploymentMode || "basic").toLowerCase() === "compliant";
+});
+const isComputeTypeDisabled = (ct) =>
+  ct === "lambda" && configureNodeIsCompliant.value;
+// Don't leave a disabled value selected — fall back to standard on compliant.
+const computeTypeForMode = (ct) =>
+  configureNodeIsCompliant.value && ct === "lambda" ? "standard" : ct;
+
 /* Version helpers — match WorkflowBuilder */
 const normalizeUrl = (url) => {
   if (!url) return "";
@@ -235,6 +261,56 @@ const runName = computed(() => {
   const raw = activity?.name || "";
   return typeof raw === "string" ? raw.trim() : "";
 });
+
+/*
+  Interactive (Jupyter) session entry point. A run is offered a notebook when its
+  DAG contains an interactive processor and the run is still active (the step
+  pauses the workflow while the user works). The connect endpoint is the source
+  of truth — the notebook page handles "still starting" / "no session" itself.
+*/
+const interactiveProcessor = computed(() => {
+  const dag = selectedWorkflowActivity.value?.dag || [];
+  return dag.find((d) => d.runtimeConfig?.interactive || d.interactive) || null;
+});
+
+const interactiveSessionAvailable = computed(() => {
+  const activity = selectedWorkflowActivity.value;
+  if (!activity?.uuid || !interactiveProcessor.value) return false;
+  return !isTerminalStatus(activity.status);
+});
+
+const openNotebook = () => {
+  const activity = selectedWorkflowActivity.value;
+  if (!activity?.uuid) return;
+  router.push({
+    name: "run-notebook",
+    params: { orgId: route.params.orgId, runId: activity.uuid },
+  });
+};
+
+// Terminate the interactive session without opening the notebook: ends it
+// cleanly so the workflow resumes to the next step. Confirmed via the in-app
+// Pennsieve dialog (not the browser prompt).
+const endingSession = ref(false);
+const confirmEndOpen = ref(false);
+const endSession = () => {
+  const activity = selectedWorkflowActivity.value;
+  if (!activity?.uuid || endingSession.value) return;
+  confirmEndOpen.value = true;
+};
+const confirmEndSession = async () => {
+  const activity = selectedWorkflowActivity.value;
+  if (!activity?.uuid) return;
+  endingSession.value = true;
+  try {
+    await endInteractiveSession(activity.uuid);
+    confirmEndOpen.value = false;
+  } catch (e) {
+    errorBanner.value = e?.message || "Could not end the interactive session.";
+  } finally {
+    endingSession.value = false;
+  }
+};
 
 /*
   In configure mode, check which data-source nodes still need files
@@ -541,6 +617,8 @@ const initiateWorkflowFromConfig = async (pendingConfig) => {
   const { workflowId, computeNodeId, datasetId, rerunSource: source } = pendingConfig;
   initiateForm.value = { workflowId, computeNodeId, datasetId, name: "" };
   runNameError.value = "";
+  // Preserve any environment layers from the source run so the rerun re-attaches them.
+  configLayers.value = Array.isArray(source?.layers) ? [...source.layers] : [];
 
   try {
     const definition = await store.dispatch("analysisModule/fetchWorkflowDefinition", workflowId);
@@ -570,7 +648,7 @@ const initiateWorkflowFromConfig = async (pendingConfig) => {
           value: srcTargetParams[pd.name] != null ? String(srcTargetParams[pd.name]) : (pd.defaultValue != null ? String(pd.defaultValue) : ""),
         }));
         nodeConfigs[d.id] = {
-          computeType: srcCfg?.executionTarget || d.computeType || fallback,
+          computeType: computeTypeForMode(srcCfg?.executionTarget || d.computeType || fallback),
           targetType: d.targetType || null,
           params: targetParams,
         };
@@ -596,10 +674,24 @@ const initiateWorkflowFromConfig = async (pendingConfig) => {
 
         const matchedApp = findMatchedApp(d.sourceUrl);
         nodeConfigs[d.id] = {
-          executionTarget: srcCfg?.executionTarget || d.computeType || "standard",
+          executionTarget: computeTypeForMode(srcCfg?.executionTarget || d.computeType || "standard"),
           version: srcCfg?.version || d.tag || latestVersion(matchedApp)?.version || "",
           cpu: srcCfg?.cpu || (d.runtimeConfig?.cpu ? String(d.runtimeConfig.cpu) : ""),
           memory: srcCfg?.memory || (d.runtimeConfig?.memory ? String(d.runtimeConfig.memory) : ""),
+          // Interactive (Jupyter) override. Seeded from the run/definition/app if
+          // already declared (forward-compatible once the app registry +
+          // workflow-service carry it); otherwise off, and the user can toggle it
+          // here so the run launches an interactive session.
+          interactive:
+            srcCfg?.interactive ??
+            d.runtimeConfig?.interactive ??
+            matchedApp?.runtimeConfig?.interactive ??
+            false,
+          sessionType:
+            srcCfg?.sessionType ||
+            d.runtimeConfig?.sessionType ||
+            matchedApp?.runtimeConfig?.sessionType ||
+            "jupyter",
           schemaParams,
           extraParams,
         };
@@ -627,6 +719,7 @@ const initiateWorkflowFromConfig = async (pendingConfig) => {
 const cancelConfigure = () => {
   mode.value = "browse";
   configDefinition.value = null;
+  configLayers.value = [];
   Object.keys(dataSourceFiles).forEach((k) => delete dataSourceFiles[k]);
   Object.keys(nodeConfigs).forEach((k) => delete nodeConfigs[k]);
   nodes.value = [];
@@ -712,6 +805,12 @@ const executeWorkflow = async () => {
         if (cfg.version) entry.version = cfg.version;
         if (cfg.cpu) entry.cpu = cfg.cpu;
         if (cfg.memory) entry.memory = cfg.memory;
+        // Interactive (Jupyter) override → workflow-service applies it to the run
+        // DAG node's runtimeConfig (interactive waitForTaskToken step).
+        if (cfg.interactive) {
+          entry.interactive = true;
+          entry.sessionType = cfg.sessionType || "jupyter";
+        }
         processorConfigs.push(entry);
       }
     });
@@ -752,6 +851,7 @@ const executeWorkflow = async () => {
       ...(trimmedName && { name: trimmedName }),
       ...(Object.keys(dataTargets).length > 0 && { dataTargets }),
       ...(Object.keys(processorParams).length > 0 && { processorParams }),
+      ...(configLayers.value.length > 0 && { layers: configLayers.value }),
     };
 
     await store.dispatch("analysisModule/createRun", payload);
@@ -1220,8 +1320,38 @@ onUnmounted(() => {
           <span v-if="runName && runTimeLabel" class="header-workflow-name">{{ runTimeLabel }}</span>
           <span v-if="runWorkflowName" class="header-workflow-name">{{ runWorkflowName }}</span>
         </span>
+        <div v-if="interactiveSessionAvailable" class="header-actions">
+          <bf-button class="secondary" :disabled="endingSession" @click="endSession">
+            {{ endingSession ? 'Ending…' : 'End Session' }}
+          </bf-button>
+          <bf-button class="primary" @click="openNotebook">Open Notebook</bf-button>
+        </div>
       </template>
     </div>
+
+    <!-- End-session confirmation (Pennsieve dialog, not the browser prompt) -->
+    <el-dialog
+      v-model="confirmEndOpen"
+      title="End interactive session?"
+      width="460px"
+      :close-on-click-modal="!endingSession"
+      :show-close="!endingSession"
+      align-center
+    >
+      <p style="margin: 0; color: #4d4d4d; line-height: 1.5;">
+        Ending the session shuts down the notebook kernel and resumes the
+        workflow at the next step. Any unsaved notebook changes will be lost —
+        open the notebook first if you need to save your work.
+      </p>
+      <template #footer>
+        <bf-button class="secondary mr-8" :disabled="endingSession" @click="confirmEndOpen = false">
+          Cancel
+        </bf-button>
+        <bf-button class="red" :disabled="endingSession" @click="confirmEndSession">
+          {{ endingSession ? 'Ending…' : 'End Session' }}
+        </bf-button>
+      </template>
+    </el-dialog>
 
     <!-- Error Banner -->
     <div v-if="errorBanner" class="error-banner">
@@ -1277,6 +1407,28 @@ onUnmounted(() => {
                 <Handle type="target" :position="Position.Top" />
                 <div class="custom-node" :class="mode === 'browse' ? statusClass(data.status) : ''">
                   <span v-if="nodeUnmetCount(id, 'processor') > 0" class="node-unmet-badge">{{ nodeUnmetCount(id, 'processor') }}</span>
+                  <div
+                    v-if="mode === 'browse' && interactiveSessionAvailable && id === interactiveProcessor?.id"
+                    class="node-actions"
+                    @click.stop
+                  >
+                    <button
+                      class="node-action node-action--end"
+                      title="End session — resumes the workflow"
+                      :disabled="endingSession"
+                      @click="endSession"
+                    >
+                      <IconXCircle :width="14" :height="14" color="#c14d49" />
+                    </button>
+                    <button
+                      class="node-action node-action--play"
+                      :class="{ 'node-action--waiting': data.status === 'STARTED' }"
+                      title="Interactive notebook is waiting for you — open it"
+                      @click="openNotebook"
+                    >
+                      <IconControllerPlay :width="18" :height="11" color="#011f5b" />
+                    </button>
+                  </div>
                   <div class="node-header">
                     <span class="node-title">{{ data.label }}</span>
                   </div>
@@ -1418,8 +1570,24 @@ onUnmounted(() => {
                       :key="ct"
                       :label="formatComputeTypeLabel(ct)"
                       :value="ct"
-                    />
+                      :disabled="isComputeTypeDisabled(ct)"
+                    >
+                      <el-tooltip
+                        :disabled="!isComputeTypeDisabled(ct)"
+                        :content="LAMBDA_COMPLIANT_MSG"
+                        placement="right"
+                      >
+                        <span>{{ formatComputeTypeLabel(ct) }}</span>
+                      </el-tooltip>
+                    </el-option>
                   </el-select>
+                </div>
+                <div class="config-field">
+                  <label>Interactive Notebook</label>
+                  <div style="display: flex; align-items: center; gap: 8px;">
+                    <el-switch v-model="nodeConfigs[selectedNode.id].interactive" />
+                    <span class="version-hint">Run this step as a live Jupyter notebook — the workflow pauses until you close the session.</span>
+                  </div>
                 </div>
                 <div class="config-field">
                   <label>Version</label>
@@ -1592,7 +1760,16 @@ onUnmounted(() => {
                       :key="ct"
                       :label="formatComputeTypeLabel(ct)"
                       :value="ct"
-                    />
+                      :disabled="isComputeTypeDisabled(ct)"
+                    >
+                      <el-tooltip
+                        :disabled="!isComputeTypeDisabled(ct)"
+                        :content="LAMBDA_COMPLIANT_MSG"
+                        placement="right"
+                      >
+                        <span>{{ formatComputeTypeLabel(ct) }}</span>
+                      </el-tooltip>
+                    </el-option>
                   </el-select>
                 </div>
 
@@ -1694,6 +1871,10 @@ onUnmounted(() => {
                   <span class="info-value">
                     {{ datasetOptions.find(d => d.content?.id === initiateForm.datasetId)?.content?.name || initiateForm.datasetId }}
                   </span>
+                </div>
+                <div v-if="configLayers.length" class="info-row">
+                  <span class="info-label">Environment</span>
+                  <span class="info-value">{{ configLayers.join(', ') }}</span>
                 </div>
               </div>
               <p class="configure-hint">
@@ -2550,6 +2731,63 @@ onUnmounted(() => {
   justify-content: center;
   z-index: 1;
   line-height: 1;
+}
+
+/* Interactive processor affordances: End session (✕) + Open notebook (▶). */
+.node-actions {
+  position: absolute;
+  top: -12px;
+  right: -10px;
+  display: flex;
+  gap: 5px;
+  z-index: 2;
+}
+.node-action {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 1px solid #b3bcce; /* purple_0_7 */
+  background: #fff;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+.node-action:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.node-action--play:hover {
+  background: #e6e9ef; /* purple_tint */
+  animation: none;
+}
+/* Pulse only while the interactive step is actually running (STARTED) — i.e.
+   the session is live and waiting for the user. */
+.node-action--waiting {
+  box-shadow: 0 0 0 0 rgba(1, 31, 91, 0.5);
+  animation: nb-waiting-pulse 2s infinite;
+}
+.node-action--waiting:hover {
+  animation: none;
+}
+/* The play glyph only fills the left half of its 0 0 20 12 viewBox, so nudge
+   it right to optically center within the round button. */
+.node-action--play svg {
+  transform: translateX(5px);
+}
+.node-action--end {
+  border-color: #f0c0bb;
+}
+.node-action--end:hover {
+  background: #feeeec; /* red_tint */
+  border-color: #c14d49; /* red_2 */
+}
+@keyframes nb-waiting-pulse {
+  0% { box-shadow: 0 0 0 0 rgba(1, 31, 91, 0.45); }
+  70% { box-shadow: 0 0 0 7px rgba(1, 31, 91, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(1, 31, 91, 0); }
 }
 
 .custom-node {
