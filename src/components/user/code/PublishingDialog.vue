@@ -47,7 +47,7 @@
                 </label>
               </div>
 
-              <div v-if="hasAnyPublishing" class="publishing-info">
+              <div v-if="hasPublishing" class="publishing-info">
                 <h6>What happens when you publish?</h6>
                 <ul>
                   <li>A DOI (Digital Object Identifier) will be generated for each release</li>
@@ -143,8 +143,8 @@ export default {
       return publishing_to_discover || publishing_to_appstore
     },
 
-    hasAnyPublishing() {
-      return this.localSettings.publishToDiscover || this.localSettings.publishToAppstore
+    hasPublishing() {
+      return this.localSettings.publishToDiscover
     },
 
     applications() {
@@ -388,10 +388,8 @@ export default {
     background-color: theme.$purple_2;
   }
 
-  // Keep the modal a stable height across tabs so switching to Permissions
-  // doesn't make the dialog shrink or grow.
   :deep(.el-tabs__content) {
-    min-height: 460px;
+    min-height: 250px;
   }
 }
 
