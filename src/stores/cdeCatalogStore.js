@@ -82,18 +82,15 @@ export const useCdeCatalogStore = defineStore('cdeCatalog', () => {
         const t = (term || '').trim()
         const n = Number.isFinite(limit) ? Math.max(1, Math.min(200, limit)) : 25
 
-        let where = ''
-        if (t) {
-            const like = `'%${escapeLike(t)}%'`
-            where =
-                `WHERE to_json(data) ->> 'cde_name' ILIKE ${like} ESCAPE '\\'` +
-                ` OR to_json(data) ->> 'cde_definition' ILIKE ${like} ESCAPE '\\'` +
-                ` OR to_json(data) ->> 'cde_source' ILIKE ${like} ESCAPE '\\'`
-        }
-
+        // Search across the whole record (name, definition, source, values, ...)
+        // by matching the serialized JSON. Order by name length so shorter,
+        // more-exact name matches surface first. Access fields via to_json(...)->>
+        // (not struct dot-access) so a key missing on some records is NULL rather
+        // than a struct binder error.
+        const where = t ? `WHERE CAST(to_json(data) AS VARCHAR) ILIKE '%${escapeLiteral(t)}%'` : ''
         const query =
             `SELECT to_json(data) AS data FROM ${TABLE} ${where}` +
-            ` ORDER BY length(to_json(data) ->> 'cde_name') LIMIT ${n}`
+            ` ORDER BY length(to_json(data) ->> 'cde_name') NULLS LAST LIMIT ${n}`
 
         const rows = await duck.executeQuery(query, connectionId)
         return rows.map(parseRow).filter(Boolean)
@@ -144,13 +141,4 @@ function parseRow(row) {
 // Escape a value used inside a single-quoted SQL string literal.
 function escapeLiteral(s) {
     return String(s).replace(/'/g, "''")
-}
-
-// Escape for use inside an ILIKE pattern (literal, wrapped in %...%): neutralize
-// the SQL-string quote plus the LIKE metacharacters % and _ (ESCAPE '\').
-function escapeLike(s) {
-    return String(s)
-        .replace(/'/g, "''")
-        .replace(/\\/g, '\\\\')
-        .replace(/[%_]/g, (c) => `\\${c}`)
 }

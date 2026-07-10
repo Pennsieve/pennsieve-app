@@ -55,6 +55,7 @@
 
       <div v-if="searching || store.loading" class="cde-status">Searching…</div>
       <div v-else-if="store.error" class="cde-status cde-error">{{ store.error }}</div>
+      <div v-else-if="searchError" class="cde-status cde-error">{{ searchError }}</div>
       <ul v-else-if="results.length" class="cde-results">
         <li
           v-for="r in results"
@@ -91,6 +92,7 @@ const store = useCdeCatalogStore()
 const term = ref('')
 const results = ref([])
 const searching = ref(false)
+const searchError = ref('')
 const selected = ref(null) // full CDE record
 const strength = ref('preferred')
 
@@ -102,10 +104,13 @@ const runSearch = async () => {
     return
   }
   searching.value = true
+  searchError.value = ''
   try {
     results.value = await store.search(t, 25)
-  } catch {
+  } catch (e) {
     results.value = []
+    searchError.value = e?.message || String(e)
+    console.error('CDE search failed:', e)
   } finally {
     searching.value = false
   }
