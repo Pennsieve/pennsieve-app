@@ -169,7 +169,7 @@
   import {compose, defaultTo, head, last, pathOr, propOr, split, sum, values} from 'ramda'
 
   import { markRaw } from 'vue'
-  import { StaticDashboard } from 'pennsieve-dashboard'
+  import { PennsieveDashboard as StaticDashboard } from 'pennsieve-dashboard'
   import 'pennsieve-dashboard/style.css'
   import DataCard from '../../shared/DataCard/DataCard.vue'
   import ChecklistItem from '../../shared/ChecklistItem/ChecklistItem.vue'

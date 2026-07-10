@@ -40,11 +40,6 @@ describe('viewer module', () => {
     expect(testState.viewerSlideInfo.curZoom).toBe(1)
   })
 
-  it('Sets channels when calling setChannels', () => {
-    actions.setChannels(actionParams, [1])
-    expect(testState.viewerChannels).toMatchObject([1])
-  })
-
   it('updates channel when calling updateChannel', () => {
     testState.viewerChannels = [{ id: 123, value: 2 }]
     actions.updateChannel({ ...actionParams, state: testState }, {id: 123, value: 3});

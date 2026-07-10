@@ -3,18 +3,11 @@ import {
   propOr,
   propEq,
   findIndex,
-  flatten,
   compose,
-  pluck,
-  pathOr,
-  includes,
-  remove,
   find,
-  map, otherwise
 } from 'ramda'
 import { viewerSidePanelTypes, viewerToolTypes } from '../utils/constants'
 import {useGetToken} from "@/composables/useGetToken";
-import toQueryParams from "@/utils/toQueryParams";
 
 const getLayerIndex = (key, data, viewerAnnotations) => {
   const layerId = propOr('', key, data)
@@ -37,15 +30,12 @@ const initialState = () => ({
   },
   viewerChannels: [],
   viewerAnnotations: [],
-  activeAnnotationLayer: {},
   activeAnnotation: {},
   viewerErrors: {},
   //TODO make strings enum constants
   viewerSidePanelView: viewerSidePanelTypes.INFO_PANEL,
   viewerActiveTool: viewerToolTypes.POINTER,
   viewerMontageScheme: 'NOT_MONTAGED',
-  customMontageMap: [],
-  workspaceMontages: [],
 })
 
 export const state = initialState()
@@ -76,10 +66,6 @@ export const mutations = {
     state.viewerSlideInfo = newSlideInfo
   },
 
-  SET_CHANNELS (state, channels) {
-    state.viewerChannels = channels
-  },
-
   UPDATE_CHANNEL (state, { data, channelIndex }) {
     state.viewerChannels[channelIndex] = data
   },
@@ -88,14 +74,6 @@ export const mutations = {
     state.viewerAnnotations.push(data)
   },
 
-  SET_ACTIVE_ANNOTATION_LAYER (state, data) {
-    state.activeAnnotationLayer = data
-    state.viewerAnnotations.forEach(index => index.selected = false)
-    const layerIndex = findIndex(propEq('id', data), state.viewerAnnotations)
-    state.viewerAnnotations[layerIndex].selected = true
-
-
-  },
   SET_ACTIVE_ANNOTATION (state, data) {
     state.viewerAnnotations.forEach( index =>
       index.annotations.forEach(ann =>
@@ -149,13 +127,6 @@ export const mutations = {
 
   SET_VIEWER_MONTAGE_SCHEME (state, data) {
     state.viewerMontageScheme = data
-  },
-
-  SET_CUSTOM_MONTAGE_MAP (state, data) {
-    state.customMontageMap = data
-  },
-  SET_WORKSPACE_MONTAGES (state, data) {
-    state.workspaceMontages = data
   }
 }
 
@@ -169,8 +140,6 @@ export const actions = {
     commit('SET_SIDE_PANEL', evt),
   setActiveTool: ({ commit }, evt) =>
     commit('SET_ACTIVE_TOOL', evt),
-  setChannels: ({ commit }, evt) => {
-    commit('SET_CHANNELS', evt)},
   updateChannel: ({ commit, state }, channel) => {
     const id = propOr('', 'id', channel)
     const channelIndex = findIndex(propEq('id', id), state.viewerChannels)
@@ -179,8 +148,6 @@ export const actions = {
   },
   createLayer: ({ commit }, evt) =>
     commit('CREATE_LAYER', evt),
-  setActiveAnnotationLayer: ({ commit }, evt) =>
-    commit('SET_ACTIVE_ANNOTATION_LAYER', evt),
   updateLayer: ({ commit, state }, data) => {
     const index = getLayerIndex('id', data, state.viewerAnnotations)
     const layer = Object.assign( state.viewerAnnotations[index], data)
@@ -212,41 +179,6 @@ export const actions = {
   },
   setViewerErrors: ({ commit }, evt) =>
     commit('SET_VIEWER_ERRORS', evt),
-  setViewerMontageScheme: ({commit}, evt) =>
-    commit('SET_VIEWER_MONTAGE_SCHEME', evt),
-  setCustomMontageMap: ({commit}, evt) => {
-    commit('SET_VIEWER_MONTAGE_SCHEME', evt.montageScheme)
-    commit('SET_CUSTOM_MONTAGE_MAP', JSON.parse(evt.customMontageMap))
-  },
-  fetchCloudFrontUrl: async ({rootState}, { packageId, datasetId }) => {
-    try {
-      const token = await useGetToken()
-      const queryParams = toQueryParams({
-        package_id: packageId,
-        dataset_id: datasetId
-      })
-      const url = `${rootState.config.apiUrl}/packages/cloudfront/sign?${queryParams}`
-
-      const myHeaders = new Headers()
-      myHeaders.append('Authorization', 'Bearer ' + token)
-      myHeaders.append('Accept', 'application/json')
-
-      const resp = await fetch(url, {
-        method: 'GET',
-        headers: myHeaders
-      })
-
-      if (resp.ok) {
-        const result = await resp.json()
-        return result.url
-      } else {
-        return Promise.reject(resp)
-      }
-    } catch (err) {
-      return Promise.reject(err)
-    }
-  },
-
   /**
    * Get viewer assets for a package
    * @param {String} packageId
@@ -443,74 +375,9 @@ export const actions = {
     }
   },
 
-  fetchWorkspaceMontages: async ({commit, rootState}, evt) => {
-    try {
-      let endpoint = `${rootState.config.api2Url}/timeseries/montages`
-      const token = await useGetToken()
-
-      const queryParams = toQueryParams({
-        organization_id: rootState.activeOrganization.organization.id
-      })
-
-      const url = `${endpoint}?${queryParams}`
-
-      const myHeaders = new Headers();
-      myHeaders.append('Authorization', 'Bearer ' + token)
-      myHeaders.append('Accept', 'application/json')
-
-      const resp = await fetch(url, {
-        method: 'GET',
-        headers: myHeaders
-      })
-
-      if (resp.ok) {
-        const montages = await resp.json()
-        commit('SET_WORKSPACE_MONTAGES', montages.montages)
-        return montages.montages
-      } else {
-        return Promise.reject(resp)
-      }
-    } catch (err) {
-      return Promise.reject(err)
-    }
-  }
-
 }
 
 export const getters = {
-  workspaceMontages: state => {
-    return state.workspaceMontages
-  },
-  viewerSelectedChannels: state => {
-    return state.viewerChannels.filter(channel => {
-      return channel.selected
-    })
-  },
-  getViewerActiveLayer: state => () => {
-    return find(propEq('selected', true), state.viewerAnnotations)
-  },
-  getAnnotationById: state => (id) => compose(
-    find(propEq('id', id)),
-    flatten,
-    pluck('annotations')
-  )(state.viewerAnnotations),
-
-  getMontageMessageByName: state => (montageName) => {
-
-    switch (montageName) {
-      case "NOT_MONTAGED":
-        return "NOT_MONTAGED"
-      default:
-        const m = find(propEq('name', montageName))(state.workspaceMontages)
-        const channelPairs = m.channelPairs.map(r => {
-          return r.channels
-        })
-
-        return channelPairs
-    }
-
-  },
-
   /**
    * MPP stands for Microns per Pixel
    * This is used to get the density of the slide
@@ -523,8 +390,6 @@ export const getters = {
     find(propEq('category', 'Blackfynn')),
     propOr([{}], 'properties')
   )(state.activeViewer)
-
-
 }
 
 const viewerModule = {
