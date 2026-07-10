@@ -28,6 +28,7 @@ export const useCdeCatalogStore = defineStore('cdeCatalog', () => {
     let loadPromise = null
     let models = {} // model name -> published version, from the release manifest
     let bundlesLoaded = false
+    let membershipCache = null // persistent_id -> [bundle_name, ...]
 
     const baseUrl = computed(() => (site.cdeCatalogUrl || '').replace(/\/+$/, ''))
     const isConfigured = computed(() => !!baseUrl.value)
@@ -165,6 +166,46 @@ export const useCdeCatalogStore = defineStore('cdeCatalog', () => {
         return rows.map(parseRow).filter(Boolean)
     }
 
+    // persistent_id -> [bundle_name, ...] for every CDE that belongs to a bundle.
+    // Computed once and cached (used to annotate search results with the bundle
+    // they're part of, without hiding them).
+    const getBundleMembership = async () => {
+        if (membershipCache) return membershipCache
+        await ensureBundlesLoaded()
+        const query = `
+            SELECT to_json(cde.data) ->> 'persistent_id' AS pid, to_json(b.data) ->> 'bundle_name' AS bundle_name
+            FROM ${TABLE} cde
+            JOIN cde_rel cl ON cl.target_record_id = CAST(cde.id AS VARCHAR) AND cl.relationship_type = 'CLASSIFIES'
+            JOIN cde_rel po ON po.source_record_id = cl.source_record_id AND po.relationship_type = 'PART_OF'
+            JOIN cde_bundle b ON CAST(b.id AS VARCHAR) = po.target_record_id`
+        const rows = await duck.executeQuery(query, connectionId)
+        const map = new Map()
+        for (const r of rows) {
+            if (!r.pid || !r.bundle_name) continue
+            const arr = map.get(r.pid) || []
+            if (!arr.includes(r.bundle_name)) arr.push(r.bundle_name)
+            map.set(r.pid, arr)
+        }
+        membershipCache = map
+        return map
+    }
+
+    // Unified search returning both bundles and individual CDEs (each CDE
+    // annotated with `_bundles`, the bundles it belongs to). With no term, lists
+    // all bundles (browse) and no CDEs (type to search elements).
+    const searchCatalog = async (term, limit = 25) => {
+        await ensureBundlesLoaded()
+        const t = (term || '').trim()
+        const [allBundles, membership] = await Promise.all([listBundles(), getBundleMembership()])
+        const bundles = t
+            ? allBundles.filter((b) => b.bundle_name.toLowerCase().includes(t.toLowerCase()))
+            : allBundles
+        const cdes = t
+            ? (await search(t, limit)).map((c) => ({ ...c, _bundles: membership.get(c.persistent_id) || [] }))
+            : []
+        return { bundles, cdes }
+    }
+
     return {
         loading,
         loaded,
@@ -176,6 +217,8 @@ export const useCdeCatalogStore = defineStore('cdeCatalog', () => {
         getByPersistentId,
         listBundles,
         getBundleMembers,
+        getBundleMembership,
+        searchCatalog,
     }
 })
 

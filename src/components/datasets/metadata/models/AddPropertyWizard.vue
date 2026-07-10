@@ -15,16 +15,12 @@
       <div v-show="step === 1" class="wiz-step">
         <div class="wiz-q">How are this property's values defined?</div>
         <div class="wiz-cards">
-          <div :class="['wiz-card', { active: sourceMode === 'cde' }]" @click="setSource('cde')">
+          <div :class="['wiz-card', { active: sourceMode === 'catalog' }]" @click="setSource('catalog')">
             <div class="wiz-card-head">
-              <span class="wiz-card-title"><el-icon><Link /></el-icon> Link a common data element</span>
+              <span class="wiz-card-title"><el-icon><Link /></el-icon> Common data element(s)</span>
               <span class="wiz-rec">Recommended</span>
             </div>
-            <div class="wiz-card-desc">Reuse a standardized element. Sets the type and allowed values, and harmonizes this field across datasets.</div>
-          </div>
-          <div :class="['wiz-card', { active: sourceMode === 'bundle' }]" @click="setSource('bundle')">
-            <div class="wiz-card-head"><span class="wiz-card-title"><el-icon><Files /></el-icon> Link a bundle</span></div>
-            <div class="wiz-card-desc">Add a group of related elements at once — one property per member.</div>
+            <div class="wiz-card-desc">Reuse a standardized element (or a group of them). Sets the type and allowed values, and harmonizes this field across datasets.</div>
           </div>
           <div :class="['wiz-card', { active: sourceMode === 'manual' }]" @click="setSource('manual')">
             <div class="wiz-card-head"><span class="wiz-card-title"><el-icon><EditPen /></el-icon> Define manually</span></div>
@@ -32,36 +28,62 @@
           </div>
         </div>
 
-        <div v-if="sourceMode === 'cde'" class="wiz-select">
-          <CdePicker v-model="binding" @select="onCdeSelected" />
-        </div>
+        <div v-if="sourceMode === 'catalog'" class="wiz-select">
+          <!-- Search + grouped results -->
+          <template v-if="!selectionKind">
+            <el-input v-model="term" placeholder="Search common data elements" clearable @input="onSearchInput">
+              <template #prefix><el-icon><Search /></el-icon></template>
+            </el-input>
 
-        <div v-else-if="sourceMode === 'bundle'" class="wiz-select">
-          <el-input v-model="bundleFilter" placeholder="Filter bundles" clearable>
-            <template #prefix><el-icon><Search /></el-icon></template>
-          </el-input>
-          <div v-if="bundlesLoading" class="wiz-status">Loading bundles…</div>
-          <div v-else-if="bundlesError" class="wiz-status wiz-error">{{ bundlesError }}</div>
-          <ul v-else class="wiz-bundle-list">
-            <li
-              v-for="b in filteredBundles"
-              :key="b.bundle_name"
-              :class="['wiz-bundle', { active: selectedBundleName === b.bundle_name }]"
-              @click="selectBundle(b)"
-            >
-              <span class="wiz-bundle-name">{{ b.bundle_name }}</span>
-              <span class="wiz-bundle-meta">
-                {{ b.member_count }} element{{ b.member_count === 1 ? '' : 's' }}<template v-if="b.domain"> · {{ b.domain }}</template>
-              </span>
-            </li>
-          </ul>
-          <div v-if="selectedBundleName" class="wiz-strength">
-            <div class="wiz-label">Binding strength (applies to all members)</div>
-            <el-radio-group v-model="bundleStrength" size="small">
-              <el-radio-button value="required">Required</el-radio-button>
-              <el-radio-button value="preferred">Preferred</el-radio-button>
-              <el-radio-button value="example">Example</el-radio-button>
-            </el-radio-group>
+            <div v-if="searching" class="wiz-status">Searching…</div>
+            <div v-else-if="searchError" class="wiz-status wiz-error">{{ searchError }}</div>
+            <div v-else class="wiz-results">
+              <template v-if="results.bundles.length">
+                <div class="wiz-group">Bundles</div>
+                <ul class="wiz-list">
+                  <li v-for="b in results.bundles" :key="'b:' + b.bundle_name" class="wiz-row" @click="chooseBundle(b)">
+                    <span class="wiz-row-name">{{ b.bundle_name }}</span>
+                    <span class="wiz-row-meta">bundle · {{ b.member_count }} element{{ b.member_count === 1 ? '' : 's' }}</span>
+                  </li>
+                </ul>
+              </template>
+              <template v-if="results.cdes.length">
+                <div class="wiz-group">Common data elements</div>
+                <ul class="wiz-list">
+                  <li v-for="c in results.cdes" :key="'c:' + c.persistent_id" class="wiz-row" @click="chooseCde(c)">
+                    <span class="wiz-row-name">{{ c.cde_name }}</span>
+                    <span class="wiz-row-meta">
+                      {{ c.cde_data_type }}
+                      <template v-if="c._bundles && c._bundles.length"> · part of {{ c._bundles.join(', ') }}</template>
+                    </span>
+                  </li>
+                </ul>
+              </template>
+              <div v-if="term.trim() && !results.bundles.length && !results.cdes.length" class="wiz-status">
+                No matching common data elements
+              </div>
+            </div>
+          </template>
+
+          <!-- Selected: summary + strength -->
+          <div v-else class="wiz-selected">
+            <div class="wiz-selected-head">
+              <span class="wiz-selected-name">{{ selectionKind === 'bundle' ? selectedBundleName : (selectedCde && selectedCde.cde_name) }}</span>
+              <el-button text size="small" @click="clearSelection"><el-icon><Close /></el-icon> Change</el-button>
+            </div>
+            <div class="wiz-selected-sub">
+              <template v-if="selectionKind === 'bundle'">bundle · {{ memberRows.length }} elements</template>
+              <template v-else>{{ selectedCde && selectedCde.cde_data_type }}</template>
+            </div>
+            <div class="wiz-strength">
+              <div class="wiz-label">Binding strength<span v-if="selectionKind === 'bundle'"> (applies to all members)</span></div>
+              <el-radio-group v-model="strength" size="small">
+                <el-radio-button value="required">Required</el-radio-button>
+                <el-radio-button value="preferred">Preferred</el-radio-button>
+                <el-radio-button value="example">Example</el-radio-button>
+              </el-radio-group>
+              <div class="wiz-hint">{{ strengthHint }}</div>
+            </div>
           </div>
         </div>
       </div>
@@ -79,16 +101,14 @@
             <el-input v-model="basics.description" type="textarea" :rows="2" />
           </el-form-item>
 
-          <el-form-item v-if="sourceMode === 'manual'" label="Data type">
+          <el-form-item v-if="isManual" label="Data type">
             <el-select v-model="manual.type">
               <el-option v-for="t in manualTypes" :key="t.value" :label="t.label" :value="t.value" />
             </el-select>
           </el-form-item>
 
           <div v-else class="wiz-cde-preview">
-            <div class="wiz-label">
-              Set by the CDE<span v-if="strength === 'required'"> — enforced on save</span>
-            </div>
+            <div class="wiz-label">Set by the CDE<span v-if="strength === 'required'"> — enforced on save</span></div>
             <div class="wiz-kv">Data type <b>{{ selectedCde && selectedCde.cde_data_type }}</b></div>
             <div v-if="cdeValues.length" class="wiz-values">
               <span v-for="(v, i) in cdeValues.slice(0, 8)" :key="i" class="wiz-chip">{{ v }}</span>
@@ -113,8 +133,7 @@
       <!-- STEP 3 — OPTIONS / REVIEW -->
       <div v-show="step === 3" class="wiz-step">
         <div v-if="isBundle" class="wiz-summary">
-          {{ includedMembers.length }} propert{{ includedMembers.length === 1 ? 'y' : 'ies' }} from
-          “{{ selectedBundleName }}” · strength {{ bundleStrength }}
+          {{ includedMembers.length }} propert{{ includedMembers.length === 1 ? 'y' : 'ies' }} from “{{ selectedBundleName }}” · strength {{ strength }}
         </div>
         <div v-else class="wiz-summary">{{ basics.name }} · {{ summaryType }}</div>
 
@@ -138,15 +157,14 @@
 <script setup>
 import { ref, reactive, computed, watch } from 'vue'
 import { ElMessage } from 'element-plus'
-import { Link, Files, EditPen, Search } from '@element-plus/icons-vue'
+import { Link, EditPen, Search, Close } from '@element-plus/icons-vue'
+import debounce from 'lodash.debounce'
 import BfDialogHeader from '@/components/shared/bf-dialog-header/BfDialogHeader.vue'
 import DialogBody from '@/components/shared/dialog-body/DialogBody.vue'
-import CdePicker from '@/components/datasets/metadata/models/CdePicker.vue'
 import { useCdeCatalogStore } from '@/stores/cdeCatalogStore'
 
 const props = defineProps({
   visible: { type: Boolean, default: false },
-  // Property names already on the model — used to flag/auto-dedupe collisions.
   existingProperties: { type: Array, default: () => [] },
 })
 const emit = defineEmits(['update:visible', 'save', 'cancel'])
@@ -159,21 +177,20 @@ const dialogVisible = computed({
 })
 
 const step = ref(1)
-const sourceMode = ref('')
+const sourceMode = ref('') // '' | 'catalog' | 'manual'
 
-// CDE (single) state
-const binding = ref(null) // { persistent_id, strength }
-const selectedCde = ref(null) // full record
-const strength = computed(() => (binding.value && binding.value.strength) || 'preferred')
+// Catalog search
+const term = ref('')
+const results = ref({ bundles: [], cdes: [] })
+const searching = ref(false)
+const searchError = ref('')
 
-// Bundle state
-const bundles = ref([])
-const bundlesLoading = ref(false)
-const bundlesError = ref('')
-const bundleFilter = ref('')
+// Selection within the catalog
+const selectionKind = ref('') // '' | 'cde' | 'bundle'
+const selectedCde = ref(null)
 const selectedBundleName = ref('')
-const bundleStrength = ref('preferred')
 const memberRows = ref([]) // [{ cde, name, include }]
+const strength = ref('preferred')
 
 // Shared form state
 const basics = reactive({ name: '', displayName: '', description: '' })
@@ -187,45 +204,54 @@ const manualTypes = [
   { value: 'boolean', label: 'True/False' },
 ]
 
-const isBundle = computed(() => sourceMode.value === 'bundle')
+const isBundle = computed(() => sourceMode.value === 'catalog' && selectionKind.value === 'bundle')
+const isManual = computed(() => sourceMode.value === 'manual')
 const summaryType = computed(() =>
-  sourceMode.value === 'manual' ? manual.type : (selectedCde.value && selectedCde.value.cde_data_type) || ''
+  isManual.value ? manual.type : (selectedCde.value && selectedCde.value.cde_data_type) || ''
 )
 const cdeValues = computed(() =>
   ((selectedCde.value && selectedCde.value.permissible_values) || []).map((pv) => pv.label || pv.code || '')
 )
-const filteredBundles = computed(() => {
-  const f = bundleFilter.value.trim().toLowerCase()
-  return f ? bundles.value.filter((b) => b.bundle_name.toLowerCase().includes(f)) : bundles.value
-})
 const includedMembers = computed(() => memberRows.value.filter((m) => m.include))
+const strengthHint = computed(
+  () =>
+    ({
+      required: 'Records must use these values — type and allowed values are enforced on save.',
+      preferred: 'Recommended values shown as guidance. Not enforced.',
+      example: 'Linked for reference only.',
+    }[strength.value] || '')
+)
 
 const setSource = (mode) => {
   sourceMode.value = mode
-  if (mode === 'bundle' && !bundles.value.length) loadBundles()
+  if (mode === 'catalog' && !selectionKind.value) runSearch()
 }
 
-const loadBundles = async () => {
-  bundlesLoading.value = true
-  bundlesError.value = ''
+const runSearch = async () => {
+  searching.value = true
+  searchError.value = ''
   try {
-    bundles.value = await store.listBundles()
+    results.value = await store.searchCatalog(term.value, 25)
   } catch (e) {
-    bundlesError.value = e?.message || String(e)
+    searchError.value = e?.message || String(e)
+    results.value = { bundles: [], cdes: [] }
+    console.error('CDE catalog search failed:', e)
   } finally {
-    bundlesLoading.value = false
+    searching.value = false
   }
 }
+const onSearchInput = debounce(runSearch, 300)
 
-const onCdeSelected = (cde) => {
+const chooseCde = (cde) => {
+  selectionKind.value = 'cde'
   selectedCde.value = cde
-  if (!cde) return
   basics.displayName = cde.cde_name || ''
   basics.name = toPropName(cde.cde_name)
   basics.description = cde.cde_definition || ''
 }
 
-const selectBundle = async (b) => {
+const chooseBundle = async (b) => {
+  selectionKind.value = 'bundle'
   selectedBundleName.value = b.bundle_name
   try {
     const members = await store.getBundleMembers(b.bundle_name)
@@ -237,8 +263,15 @@ const selectBundle = async (b) => {
     })
   } catch (e) {
     ElMessage.error('Failed to load bundle members: ' + (e?.message || e))
-    memberRows.value = []
+    clearSelection()
   }
+}
+
+const clearSelection = () => {
+  selectionKind.value = ''
+  selectedCde.value = null
+  selectedBundleName.value = ''
+  memberRows.value = []
 }
 
 const onDisplayNameInput = () => {
@@ -247,20 +280,19 @@ const onDisplayNameInput = () => {
 
 const canAdvance = computed(() => {
   if (step.value === 1) {
-    if (sourceMode.value === 'cde') return !!selectedCde.value
-    if (sourceMode.value === 'bundle') return memberRows.value.length > 0
-    if (sourceMode.value === 'manual') return true
+    if (isManual.value) return true
+    if (sourceMode.value === 'catalog') {
+      if (selectionKind.value === 'cde') return !!selectedCde.value
+      if (selectionKind.value === 'bundle') return memberRows.value.length > 0
+    }
     return false
   }
   if (step.value === 2) {
-    if (isBundle.value) return includedMembers.value.length > 0
-    return !!basics.name
+    return isBundle.value ? includedMembers.value.length > 0 : !!basics.name
   }
   return true
 })
-const canCreate = computed(() =>
-  isBundle.value ? includedMembers.value.length > 0 : !!basics.name
-)
+const canCreate = computed(() => (isBundle.value ? includedMembers.value.length > 0 : !!basics.name))
 
 const next = () => {
   if (canAdvance.value) step.value += 1
@@ -276,14 +308,11 @@ const create = () => {
 const buildSingleDef = () => {
   const schema = { title: basics.displayName || basics.name }
   if (basics.description) schema.description = basics.description
-  if (sourceMode.value === 'cde' && selectedCde.value) {
-    Object.assign(schema, dataTypeSchema(selectedCde.value.cde_data_type))
-    schema['x-pennsieve-cde'] = {
-      persistent_id: selectedCde.value.persistent_id,
-      strength: strength.value,
-    }
-  } else {
+  if (isManual.value) {
     schema.type = manual.type
+  } else if (selectedCde.value) {
+    Object.assign(schema, dataTypeSchema(selectedCde.value.cde_data_type))
+    schema['x-pennsieve-cde'] = { persistent_id: selectedCde.value.persistent_id, strength: strength.value }
   }
   if (options.isKey) schema['x-pennsieve-key'] = true
   if (options.isSensitive) schema['x-pennsieve-sensitive'] = true
@@ -300,18 +329,12 @@ const buildBundleDefs = () =>
     const schema = { title: m.cde.cde_name }
     if (m.cde.cde_definition) schema.description = m.cde.cde_definition
     Object.assign(schema, dataTypeSchema(m.cde.cde_data_type))
-    schema['x-pennsieve-cde'] = { persistent_id: m.cde.persistent_id, strength: bundleStrength.value }
-    return {
-      propertyName: m.name,
-      propertySchema: schema,
-      required: options.required,
-      oldPropertyName: null,
-    }
+    schema['x-pennsieve-cde'] = { persistent_id: m.cde.persistent_id, strength: strength.value }
+    return { propertyName: m.name, propertySchema: schema, required: options.required, oldPropertyName: null }
   })
 
 const collides = (name, index) => {
   if (props.existingProperties.includes(name)) return true
-  // collide within the batch
   return memberRows.value.some((m, i) => i !== index && m.include && m.name === name)
 }
 
@@ -323,7 +346,6 @@ const close = () => {
   dialogVisible.value = false
 }
 
-// Reset each time the wizard opens.
 watch(
   () => props.visible,
   (v) => {
@@ -333,12 +355,11 @@ watch(
 const reset = () => {
   step.value = 1
   sourceMode.value = ''
-  binding.value = null
-  selectedCde.value = null
-  selectedBundleName.value = ''
-  bundleStrength.value = 'preferred'
-  bundleFilter.value = ''
-  memberRows.value = []
+  term.value = ''
+  results.value = { bundles: [], cdes: [] }
+  searchError.value = ''
+  clearSelection()
+  strength.value = 'preferred'
   basics.name = ''
   basics.displayName = ''
   basics.description = ''
@@ -372,7 +393,7 @@ function dataTypeSchema(cdeType) {
     case 'Time':
       return { type: 'string', format: 'time' }
     default:
-      return { type: 'string' } // Text, Value List, Other
+      return { type: 'string' }
   }
 }
 </script>
@@ -382,7 +403,7 @@ function dataTypeSchema(cdeType) {
   margin-bottom: 24px;
 }
 .wiz-step {
-  min-height: 220px;
+  min-height: 240px;
 }
 .wiz-q {
   font-size: 15px;
@@ -444,19 +465,31 @@ function dataTypeSchema(cdeType) {
 .wiz-error {
   color: #e94b4b;
 }
-.wiz-bundle-list {
-  list-style: none;
-  margin: 8px 0 0;
-  padding: 0;
-  max-height: 200px;
+.wiz-results {
+  margin-top: 8px;
+  max-height: 260px;
   overflow-y: auto;
+}
+.wiz-group {
+  font-size: 12px;
+  font-weight: 500;
+  color: #9b9ea6;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin: 12px 0 4px;
+}
+.wiz-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
   border: 1px solid #dadde3;
   border-radius: 4px;
 }
-.wiz-bundle {
+.wiz-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 12px;
   padding: 8px 12px;
   cursor: pointer;
   border-bottom: 1px solid #f1f1f3;
@@ -466,24 +499,48 @@ function dataTypeSchema(cdeType) {
   &:hover {
     background: #f9f9fa;
   }
-  &.active {
-    background: #f7f9ff;
-  }
 }
-.wiz-bundle-name {
+.wiz-row-name {
   color: #1c1d1f;
 }
-.wiz-bundle-meta {
+.wiz-row-meta {
   font-size: 12px;
   color: #71747c;
+  white-space: nowrap;
+}
+.wiz-selected {
+  border: 1px solid #b6c0e6;
+  border-radius: 8px;
+  padding: 12px 14px;
+  background: #f7f9ff;
+}
+.wiz-selected-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.wiz-selected-name {
+  font-weight: 500;
+  color: #1c1d1f;
+}
+.wiz-selected-sub {
+  font-size: 13px;
+  color: #71747c;
+  margin-top: 2px;
 }
 .wiz-strength {
-  margin-top: 16px;
+  margin-top: 14px;
 }
 .wiz-label {
   font-size: 12px;
   color: #71747c;
   margin-bottom: 6px;
+}
+.wiz-hint {
+  font-size: 12px;
+  color: #71747c;
+  margin-top: 6px;
+  line-height: 1.4;
 }
 .wiz-cde-preview {
   background: #f7f9ff;
@@ -518,7 +575,7 @@ function dataTypeSchema(cdeType) {
   }
 }
 .wiz-members {
-  max-height: 260px;
+  max-height: 280px;
   overflow-y: auto;
 }
 .wiz-member {
