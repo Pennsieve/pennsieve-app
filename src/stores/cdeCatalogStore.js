@@ -26,9 +26,17 @@ export const useCdeCatalogStore = defineStore('cdeCatalog', () => {
 
     let connectionId = null
     let loadPromise = null
+    let models = {} // model name -> published version, from the release manifest
+    let bundlesLoaded = false
 
     const baseUrl = computed(() => (site.cdeCatalogUrl || '').replace(/\/+$/, ''))
     const isConfigured = computed(() => !!baseUrl.value)
+
+    const modelRecordsUrl = (name) =>
+        `${baseUrl.value}/cde/versions/${catalogVersion.value}` +
+        `/metadata/models/${name}/versions/${models[name]}/records.jsonl`
+    const relationshipsUrl = () =>
+        `${baseUrl.value}/cde/versions/${catalogVersion.value}/metadata/relationships.csv`
 
     // Resolve the current release and load its cde records.jsonl into DuckDB.
     // Single-flight so concurrent callers share one load.
@@ -52,14 +60,10 @@ export const useCdeCatalogStore = defineStore('cdeCatalog', () => {
                 catalogVersion.value = cv
 
                 const manifest = await fetchJson(`${baseUrl.value}/cde/versions/${cv}/manifest.json`)
-                const cdeModel = (manifest.models || []).find((m) => m.name === 'cde')
-                if (!cdeModel) throw new Error('catalog manifest has no cde model')
+                models = Object.fromEntries((manifest.models || []).map((m) => [m.name, m.version]))
+                if (!models.cde) throw new Error('catalog manifest has no cde model')
 
-                const recordsUrl =
-                    `${baseUrl.value}/cde/versions/${cv}` +
-                    `/metadata/models/cde/versions/${cdeModel.version}/records.jsonl`
-
-                await duck.loadFile(recordsUrl, 'jsonl', TABLE, {}, VIEWER_ID, `cde_catalog_${cv}`)
+                await duck.loadFile(modelRecordsUrl('cde'), 'jsonl', TABLE, {}, VIEWER_ID, `cde_catalog_${cv}`)
                 const { connectionId: cid } = await duck.createConnection(VIEWER_ID)
                 connectionId = cid
                 loaded.value = true
@@ -108,6 +112,59 @@ export const useCdeCatalogStore = defineStore('cdeCatalog', () => {
         return rows.length ? parseRow(rows[0]) : null
     }
 
+    // Bundle membership is a two-hop join over the relationship edges:
+    // bundle <-PART_OF- classification -CLASSIFIES-> cde. Load the bundle records
+    // + relationship edges lazily (only when bundle features are used); the cde
+    // table is already loaded by ensureLoaded.
+    const ensureBundlesLoaded = async () => {
+        await ensureLoaded()
+        if (bundlesLoaded) return
+        const cv = catalogVersion.value
+        await duck.loadFile(modelRecordsUrl('bundle'), 'jsonl', 'cde_bundle', {}, VIEWER_ID, `cde_bundle_${cv}`)
+        await duck.loadFile(relationshipsUrl(), 'csv', 'cde_rel', {}, VIEWER_ID, `cde_rel_${cv}`)
+        bundlesLoaded = true
+    }
+
+    // List bundles that have at least one member CDE, with member counts.
+    const listBundles = async () => {
+        await ensureBundlesLoaded()
+        const query = `
+            SELECT to_json(b.data) ->> 'bundle_name' AS bundle_name,
+                   to_json(b.data) ->> 'domain' AS domain,
+                   COUNT(DISTINCT cl.target_record_id) AS member_count
+            FROM cde_bundle b
+            LEFT JOIN cde_rel po ON po.target_record_id = CAST(b.id AS VARCHAR) AND po.relationship_type = 'PART_OF'
+            LEFT JOIN cde_rel cl ON cl.source_record_id = po.source_record_id AND cl.relationship_type = 'CLASSIFIES'
+            GROUP BY 1, 2
+            HAVING member_count > 0
+            ORDER BY bundle_name`
+        const rows = await duck.executeQuery(query, connectionId)
+        return rows.map((r) => ({
+            bundle_name: r.bundle_name,
+            domain: r.domain,
+            member_count: Number(r.member_count),
+        }))
+    }
+
+    // Resolve the member CDE records of a bundle (deduped; a CDE classified into
+    // the bundle under multiple contexts appears once).
+    const getBundleMembers = async (bundleName) => {
+        if (!bundleName) return []
+        await ensureBundlesLoaded()
+        const query = `
+            SELECT to_json(data) AS data FROM ${TABLE}
+            WHERE CAST(id AS VARCHAR) IN (
+                SELECT cl.target_record_id
+                FROM cde_bundle b
+                JOIN cde_rel po ON po.target_record_id = CAST(b.id AS VARCHAR) AND po.relationship_type = 'PART_OF'
+                JOIN cde_rel cl ON cl.source_record_id = po.source_record_id AND cl.relationship_type = 'CLASSIFIES'
+                WHERE to_json(b.data) ->> 'bundle_name' = '${escapeLiteral(bundleName)}'
+            )
+            ORDER BY length(to_json(data) ->> 'cde_name') NULLS LAST`
+        const rows = await duck.executeQuery(query, connectionId)
+        return rows.map(parseRow).filter(Boolean)
+    }
+
     return {
         loading,
         loaded,
@@ -117,6 +174,8 @@ export const useCdeCatalogStore = defineStore('cdeCatalog', () => {
         ensureLoaded,
         search,
         getByPersistentId,
+        listBundles,
+        getBundleMembers,
     }
 })
 
