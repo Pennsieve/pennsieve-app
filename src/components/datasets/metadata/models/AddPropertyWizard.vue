@@ -5,14 +5,12 @@
     </template>
 
     <dialog-body>
-      <el-steps :active="step - 1" finish-status="success" align-center class="wiz-steps">
-        <el-step title="Source" />
-        <el-step :title="isBundle ? 'Members' : 'Details'" />
-        <el-step title="Options" />
+      <el-steps :active="stepIndex" finish-status="success" align-center class="wiz-steps">
+        <el-step v-for="s in steps" :key="s.key" :title="s.title" />
       </el-steps>
 
-      <!-- STEP 1 — SOURCE -->
-      <div v-show="step === 1" class="wiz-step">
+      <!-- SOURCE -->
+      <div v-show="currentKey === 'source'" class="wiz-step">
         <div class="wiz-q">How are this property's values defined?</div>
         <div class="wiz-cards">
           <div :class="['wiz-card', { active: sourceMode === 'catalog' }]" @click="setSource('catalog')">
@@ -29,7 +27,6 @@
         </div>
 
         <div v-if="sourceMode === 'catalog'" class="wiz-select">
-          <!-- Search + grouped results -->
           <template v-if="!selectionKind">
             <el-input v-model="term" placeholder="Search common data elements" clearable @input="onSearchInput">
               <template #prefix><el-icon><Search /></el-icon></template>
@@ -65,7 +62,6 @@
             </div>
           </template>
 
-          <!-- Selected: summary + strength -->
           <div v-else class="wiz-selected">
             <div class="wiz-selected-head">
               <span class="wiz-selected-name">{{ selectionKind === 'bundle' ? selectedBundleName : (selectedCde && selectedCde.cde_name) }}</span>
@@ -88,9 +84,9 @@
         </div>
       </div>
 
-      <!-- STEP 2 — DETAILS (single) / MEMBERS (bundle) -->
-      <div v-show="step === 2" class="wiz-step">
-        <el-form v-if="!isBundle" label-position="top">
+      <!-- DETAILS -->
+      <div v-show="currentKey === 'details'" class="wiz-step">
+        <el-form label-position="top">
           <el-form-item label="Display name">
             <el-input v-model="basics.displayName" @input="onDisplayNameInput" />
           </el-form-item>
@@ -101,34 +97,7 @@
             <el-input v-model="basics.description" type="textarea" :rows="2" />
           </el-form-item>
 
-          <template v-if="isManual">
-            <el-form-item label="Data type">
-              <el-select v-model="manual.type">
-                <el-option v-for="t in manualTypes" :key="t.value" :label="t.label" :value="t.value" />
-              </el-select>
-            </el-form-item>
-
-            <el-form-item v-if="manual.type === 'string'" label="Format">
-              <el-select v-model="manual.format">
-                <el-option v-for="f in stringFormats" :key="f.value" :label="f.label" :value="f.value" />
-              </el-select>
-            </el-form-item>
-
-            <el-form-item label="Allowed values">
-              <el-input v-model="manual.enumInput" placeholder="Comma-separated, e.g. Low, Medium, High" />
-            </el-form-item>
-
-            <div class="wiz-manual-flags">
-              <el-checkbox v-model="manual.isArray">List of values (array)</el-checkbox>
-              <el-checkbox v-model="manual.allowNull">Allow null</el-checkbox>
-            </div>
-
-            <p class="wiz-manual-note">
-              For advanced constraints (min/max, length, pattern), add the property here and refine it in the JSON editor.
-            </p>
-          </template>
-
-          <div v-else class="wiz-cde-preview">
+          <div v-if="isSingleCde" class="wiz-cde-preview">
             <div class="wiz-label">Set by the CDE<span v-if="strength === 'required'"> — enforced on save</span></div>
             <div class="wiz-kv">Data type <b>{{ selectedCde && selectedCde.cde_data_type }}</b></div>
             <div v-if="cdeValues.length" class="wiz-values">
@@ -137,39 +106,98 @@
             </div>
           </div>
         </el-form>
-
-        <template v-else>
-          <div class="wiz-q">{{ memberRows.length }} properties will be created from “{{ selectedBundleName }}”</div>
-          <div class="wiz-members">
-            <div v-for="(m, i) in memberRows" :key="i" class="wiz-member">
-              <el-checkbox v-model="m.include" />
-              <el-input v-model="m.name" :disabled="!m.include" class="wiz-member-name" size="small" />
-              <span class="wiz-member-cde" :title="m.cde.cde_name">{{ m.cde.cde_name }}</span>
-              <span v-if="m.include && collides(m.name, i)" class="wiz-collision">name in use</span>
-            </div>
-          </div>
-        </template>
       </div>
 
-      <!-- STEP 3 — OPTIONS / REVIEW -->
-      <div v-show="step === 3" class="wiz-step">
+      <!-- TYPE & FORMAT (manual) -->
+      <div v-show="currentKey === 'type'" class="wiz-step">
+        <el-form label-position="top">
+          <el-form-item label="Data type">
+            <el-select v-model="manual.type">
+              <el-option v-for="t in manualTypes" :key="t.value" :label="t.label" :value="t.value" />
+            </el-select>
+          </el-form-item>
+          <el-form-item v-if="manual.type === 'string'" label="Format">
+            <el-select v-model="manual.format">
+              <el-option v-for="f in stringFormats" :key="f.value" :label="f.label" :value="f.value" />
+            </el-select>
+          </el-form-item>
+          <div class="wiz-manual-flags">
+            <el-checkbox v-model="manual.isArray">List of values (array)</el-checkbox>
+            <el-checkbox v-model="manual.allowNull">Allow null</el-checkbox>
+          </div>
+        </el-form>
+      </div>
+
+      <!-- VALUES & RULES (manual, type-aware) -->
+      <div v-show="currentKey === 'values'" class="wiz-step">
+        <el-form label-position="top">
+          <el-form-item label="Allowed values">
+            <el-input v-model="manual.enumInput" placeholder="Comma-separated, e.g. Low, Medium, High" />
+          </el-form-item>
+
+          <template v-if="manual.type === 'string'">
+            <div class="wiz-two">
+              <el-form-item label="Min length"><el-input v-model="manual.minLength" /></el-form-item>
+              <el-form-item label="Max length"><el-input v-model="manual.maxLength" /></el-form-item>
+            </div>
+            <el-form-item label="Pattern (regex)"><el-input v-model="manual.pattern" /></el-form-item>
+          </template>
+
+          <div v-if="manual.type === 'number' || manual.type === 'integer'" class="wiz-two">
+            <el-form-item label="Minimum"><el-input v-model="manual.minimum" /></el-form-item>
+            <el-form-item label="Maximum"><el-input v-model="manual.maximum" /></el-form-item>
+          </div>
+
+          <template v-if="manual.isArray">
+            <div class="wiz-two">
+              <el-form-item label="Min items"><el-input v-model="manual.minItems" /></el-form-item>
+              <el-form-item label="Max items"><el-input v-model="manual.maxItems" /></el-form-item>
+            </div>
+            <el-checkbox v-model="manual.uniqueItems">Unique items</el-checkbox>
+          </template>
+        </el-form>
+
+        <div class="wiz-flags">
+          <el-checkbox v-model="options.required">Required on every record</el-checkbox>
+          <el-checkbox v-model="options.isKey">Part of key</el-checkbox>
+          <el-checkbox v-model="options.isSensitive">Sensitive data</el-checkbox>
+        </div>
+      </div>
+
+      <!-- MEMBERS (bundle) -->
+      <div v-show="currentKey === 'members'" class="wiz-step">
+        <div class="wiz-q">{{ memberRows.length }} properties will be created from “{{ selectedBundleName }}”</div>
+        <div class="wiz-members">
+          <div v-for="(m, i) in memberRows" :key="i" class="wiz-member">
+            <el-checkbox v-model="m.include" />
+            <el-input v-model="m.name" :disabled="!m.include" class="wiz-member-name" size="small" />
+            <span class="wiz-member-cde" :title="m.cde.cde_name">{{ m.cde.cde_name }}</span>
+            <span v-if="m.include && collides(m.name, i)" class="wiz-collision">name in use</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- OPTIONS (cde / bundle) -->
+      <div v-show="currentKey === 'options'" class="wiz-step">
         <div v-if="isBundle" class="wiz-summary">
           {{ includedMembers.length }} propert{{ includedMembers.length === 1 ? 'y' : 'ies' }} from “{{ selectedBundleName }}” · strength {{ strength }}
         </div>
         <div v-else class="wiz-summary">{{ basics.name }} · {{ summaryType }}</div>
 
-        <el-checkbox v-model="options.required">Required on every record</el-checkbox>
-        <template v-if="!isBundle">
-          <el-checkbox v-model="options.isKey">Part of key</el-checkbox>
-          <el-checkbox v-model="options.isSensitive">Sensitive data</el-checkbox>
-        </template>
+        <div class="wiz-flags">
+          <el-checkbox v-model="options.required">Required on every record</el-checkbox>
+          <template v-if="!isBundle">
+            <el-checkbox v-model="options.isKey">Part of key</el-checkbox>
+            <el-checkbox v-model="options.isSensitive">Sensitive data</el-checkbox>
+          </template>
+        </div>
       </div>
     </dialog-body>
 
     <template #footer>
       <el-button @click="cancel">Cancel</el-button>
-      <el-button v-if="step > 1" @click="step -= 1">Back</el-button>
-      <el-button v-if="step < 3" type="primary" :disabled="!canAdvance" @click="next">Continue</el-button>
+      <el-button v-if="stepIndex > 0" @click="back">Back</el-button>
+      <el-button v-if="!isLastStep" type="primary" :disabled="!canAdvance" @click="next">Continue</el-button>
       <el-button v-else type="primary" :disabled="!canCreate" @click="create">Create</el-button>
     </template>
   </el-dialog>
@@ -197,7 +225,7 @@ const dialogVisible = computed({
   set: (v) => emit('update:visible', v),
 })
 
-const step = ref(1)
+const stepIndex = ref(0)
 const sourceMode = ref('') // '' | 'catalog' | 'manual'
 
 // Catalog search
@@ -206,16 +234,30 @@ const results = ref({ bundles: [], cdes: [] })
 const searching = ref(false)
 const searchError = ref('')
 
-// Selection within the catalog
+// Selection
 const selectionKind = ref('') // '' | 'cde' | 'bundle'
 const selectedCde = ref(null)
 const selectedBundleName = ref('')
-const memberRows = ref([]) // [{ cde, name, include }]
+const memberRows = ref([])
 const strength = ref('preferred')
 
-// Shared form state
+// Forms
 const basics = reactive({ name: '', displayName: '', description: '' })
-const manual = reactive({ type: 'string', format: 'plain', isArray: false, allowNull: false, enumInput: '' })
+const manual = reactive({
+  type: 'string',
+  format: 'plain',
+  isArray: false,
+  allowNull: false,
+  enumInput: '',
+  minLength: '',
+  maxLength: '',
+  pattern: '',
+  minimum: '',
+  maximum: '',
+  minItems: '',
+  maxItems: '',
+  uniqueItems: false,
+})
 const options = reactive({ required: false, isKey: false, isSensitive: false })
 
 const manualTypes = [
@@ -239,6 +281,34 @@ const stringFormats = [
 
 const isBundle = computed(() => sourceMode.value === 'catalog' && selectionKind.value === 'bundle')
 const isManual = computed(() => sourceMode.value === 'manual')
+const isSingleCde = computed(() => sourceMode.value === 'catalog' && selectionKind.value === 'cde')
+
+// Steps vary by path so each stays light.
+const steps = computed(() => {
+  if (isManual.value) {
+    return [
+      { key: 'source', title: 'Source' },
+      { key: 'details', title: 'Details' },
+      { key: 'type', title: 'Type & format' },
+      { key: 'values', title: 'Values & rules' },
+    ]
+  }
+  if (isBundle.value) {
+    return [
+      { key: 'source', title: 'Source' },
+      { key: 'members', title: 'Members' },
+      { key: 'options', title: 'Options' },
+    ]
+  }
+  return [
+    { key: 'source', title: 'Source' },
+    { key: 'details', title: 'Details' },
+    { key: 'options', title: 'Options' },
+  ]
+})
+const currentKey = computed(() => (steps.value[stepIndex.value] || steps.value[0]).key)
+const isLastStep = computed(() => stepIndex.value >= steps.value.length - 1)
+
 const summaryType = computed(() =>
   isManual.value ? manual.type : (selectedCde.value && selectedCde.value.cde_data_type) || ''
 )
@@ -312,23 +382,27 @@ const onDisplayNameInput = () => {
 }
 
 const canAdvance = computed(() => {
-  if (step.value === 1) {
-    if (isManual.value) return true
-    if (sourceMode.value === 'catalog') {
-      if (selectionKind.value === 'cde') return !!selectedCde.value
-      if (selectionKind.value === 'bundle') return memberRows.value.length > 0
-    }
-    return false
+  switch (currentKey.value) {
+    case 'source':
+      if (isManual.value) return true
+      if (isSingleCde.value) return !!selectedCde.value
+      if (isBundle.value) return memberRows.value.length > 0
+      return false
+    case 'details':
+      return !!basics.name
+    case 'members':
+      return includedMembers.value.length > 0
+    default:
+      return true // type, values, options
   }
-  if (step.value === 2) {
-    return isBundle.value ? includedMembers.value.length > 0 : !!basics.name
-  }
-  return true
 })
 const canCreate = computed(() => (isBundle.value ? includedMembers.value.length > 0 : !!basics.name))
 
 const next = () => {
-  if (canAdvance.value) step.value += 1
+  if (canAdvance.value && !isLastStep.value) stepIndex.value += 1
+}
+const back = () => {
+  if (stepIndex.value > 0) stepIndex.value -= 1
 }
 
 const create = () => {
@@ -386,7 +460,7 @@ watch(
   }
 )
 const reset = () => {
-  step.value = 1
+  stepIndex.value = 0
   sourceMode.value = ''
   term.value = ''
   results.value = { bundles: [], cdes: [] }
@@ -396,11 +470,21 @@ const reset = () => {
   basics.name = ''
   basics.displayName = ''
   basics.description = ''
-  manual.type = 'string'
-  manual.format = 'plain'
-  manual.isArray = false
-  manual.allowNull = false
-  manual.enumInput = ''
+  Object.assign(manual, {
+    type: 'string',
+    format: 'plain',
+    isArray: false,
+    allowNull: false,
+    enumInput: '',
+    minLength: '',
+    maxLength: '',
+    pattern: '',
+    minimum: '',
+    maximum: '',
+    minItems: '',
+    maxItems: '',
+    uniqueItems: false,
+  })
   options.required = false
   options.isKey = false
   options.isSensitive = false
@@ -433,26 +517,44 @@ function dataTypeSchema(cdeType) {
       return { type: 'string' }
   }
 }
-
-// Build the value part of a manually-defined property's schema (type, array
-// wrapping, allow-null, string format, allowed values). Mirrors the classic
-// PropertyDialog for the common options; deeper constraints go via the JSON editor.
-function manualValueSchema() {
-  const t = manual.type
-  const baseType = manual.allowNull ? [t, 'null'] : t
-  const en = String(manual.enumInput || '')
+function isNum(v) {
+  return v !== undefined && v !== null && v !== '' && !isNaN(v)
+}
+function parseCsv(input) {
+  return String(input || '')
     .split(',')
     .map((v) => v.trim())
     .filter(Boolean)
-  const addStringExtras = (obj) => {
-    if (t === 'string' && manual.format && manual.format !== 'plain') obj.format = manual.format
+}
+// Build the value part of a manual property's schema (type, array wrapping,
+// allow-null, format, type-aware constraints, allowed values). Mirrors the
+// classic PropertyDialog: for arrays the item-level constraints live in `items`.
+function manualValueSchema() {
+  const t = manual.type
+  const en = parseCsv(manual.enumInput)
+  const withConstraints = (obj) => {
+    if (t === 'string') {
+      if (manual.format && manual.format !== 'plain') obj.format = manual.format
+      if (isNum(manual.minLength)) obj.minLength = parseInt(manual.minLength, 10)
+      if (isNum(manual.maxLength)) obj.maxLength = parseInt(manual.maxLength, 10)
+      if (manual.pattern) obj.pattern = manual.pattern
+    }
+    if (t === 'number' || t === 'integer') {
+      if (isNum(manual.minimum)) obj.minimum = parseFloat(manual.minimum)
+      if (isNum(manual.maximum)) obj.maximum = parseFloat(manual.maximum)
+    }
     if (en.length) obj.enum = en
     return obj
   }
+  const baseType = manual.allowNull ? [t, 'null'] : t
   if (manual.isArray) {
-    return { type: 'array', items: addStringExtras({ type: baseType }) }
+    const s = { type: 'array', items: withConstraints({ type: baseType }) }
+    if (isNum(manual.minItems)) s.minItems = parseInt(manual.minItems, 10)
+    if (isNum(manual.maxItems)) s.maxItems = parseInt(manual.maxItems, 10)
+    if (manual.uniqueItems) s.uniqueItems = true
+    return s
   }
-  return addStringExtras({ type: baseType })
+  return withConstraints({ type: baseType })
 }
 </script>
 
@@ -632,6 +734,22 @@ function manualValueSchema() {
     color: #71747c;
   }
 }
+.wiz-two {
+  display: flex;
+  gap: 12px;
+  :deep(.el-form-item) {
+    flex: 1;
+  }
+}
+.wiz-manual-flags,
+.wiz-flags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+}
+.wiz-flags {
+  margin-top: 8px;
+}
 .wiz-members {
   max-height: 280px;
   overflow-y: auto;
@@ -662,16 +780,5 @@ function manualValueSchema() {
   font-size: 14px;
   color: #1c1d1f;
   margin-bottom: 16px;
-}
-.wiz-manual-flags {
-  display: flex;
-  gap: 20px;
-  margin-bottom: 8px;
-}
-.wiz-manual-note {
-  font-size: 12px;
-  color: #71747c;
-  line-height: 1.4;
-  margin: 4px 0 0;
 }
 </style>
