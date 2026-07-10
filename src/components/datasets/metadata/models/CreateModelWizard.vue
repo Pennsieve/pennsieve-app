@@ -6,13 +6,49 @@
 
     <dialog-body>
       <el-steps :active="stepIndex" finish-status="success" align-center class="cmw-steps">
+        <el-step title="Start" />
         <el-step title="Details" />
         <el-step title="Properties" />
         <el-step title="Save" />
       </el-steps>
 
-      <!-- STEP 1 — DETAILS -->
+      <!-- STEP 1 — START -->
       <div v-show="stepIndex === 0" class="cmw-step">
+        <div class="cmw-q">How do you want to start?</div>
+        <div class="cmw-cards">
+          <div :class="['cmw-card', { active: startMode === 'template' }]" @click="setStart('template')">
+            <div class="cmw-card-title"><el-icon><Files /></el-icon> From a template</div>
+            <div class="cmw-card-desc">Start from a reusable schema and adjust its properties.</div>
+          </div>
+          <div :class="['cmw-card', { active: startMode === 'scratch' }]" @click="setStart('scratch')">
+            <div class="cmw-card-title"><el-icon><EditPen /></el-icon> From scratch</div>
+            <div class="cmw-card-desc">Build the model property by property.</div>
+          </div>
+        </div>
+
+        <div v-if="startMode === 'template'" class="cmw-select">
+          <el-input v-model="templateFilter" placeholder="Filter templates" clearable>
+            <template #prefix><el-icon><Search /></el-icon></template>
+          </el-input>
+          <div v-if="templatesLoading" class="cmw-status">Loading templates…</div>
+          <div v-else-if="templatesError" class="cmw-status cmw-error">{{ templatesError }}</div>
+          <ul v-else-if="filteredTemplates.length" class="cmw-tpl-list">
+            <li
+              v-for="t in filteredTemplates"
+              :key="t.id"
+              :class="['cmw-tpl', { active: selectedTemplateId === t.id }]"
+              @click="chooseTemplate(t)"
+            >
+              <span class="cmw-tpl-name">{{ t.display_name || t.name }}</span>
+              <span class="cmw-tpl-meta">{{ templatePropCount(t) }} properties</span>
+            </li>
+          </ul>
+          <div v-else class="cmw-status">No templates available</div>
+        </div>
+      </div>
+
+      <!-- STEP 2 — DETAILS -->
+      <div v-show="stepIndex === 1" class="cmw-step">
         <el-form label-position="top">
           <el-form-item label="Display name">
             <el-input v-model="details.displayName" placeholder="e.g. Participant" @input="onDisplayNameInput" />
@@ -26,8 +62,8 @@
         </el-form>
       </div>
 
-      <!-- STEP 2 — PROPERTIES -->
-      <div v-show="stepIndex === 1" class="cmw-step">
+      <!-- STEP 3 — PROPERTIES -->
+      <div v-show="stepIndex === 2" class="cmw-step">
         <div class="cmw-props-head">
           <span class="cmw-q">Properties</span>
           <el-button size="small" @click="addVisible = true">
@@ -49,8 +85,8 @@
         </ul>
       </div>
 
-      <!-- STEP 3 — SAVE AS -->
-      <div v-show="stepIndex === 2" class="cmw-step">
+      <!-- STEP 4 — SAVE AS -->
+      <div v-show="stepIndex === 3" class="cmw-step">
         <div class="cmw-summary">
           {{ details.name }} · {{ properties.length }} propert{{ properties.length === 1 ? 'y' : 'ies' }}
         </div>
@@ -66,7 +102,7 @@
     <template #footer>
       <el-button @click="cancel">Cancel</el-button>
       <el-button v-if="stepIndex > 0" @click="stepIndex -= 1">Back</el-button>
-      <el-button v-if="stepIndex < 2" type="primary" :disabled="!canAdvance" @click="next">Continue</el-button>
+      <el-button v-if="stepIndex < 3" type="primary" :disabled="!canAdvance" @click="next">Continue</el-button>
       <el-button v-else type="primary" :loading="creating" :disabled="!canCreate" @click="create">
         Create {{ saveAs }}
       </el-button>
@@ -80,7 +116,7 @@
 <script setup>
 import { ref, reactive, computed, watch } from 'vue'
 import { ElMessage } from 'element-plus'
-import { Plus, Close } from '@element-plus/icons-vue'
+import { Plus, Close, Files, EditPen, Search } from '@element-plus/icons-vue'
 import BfDialogHeader from '@/components/shared/bf-dialog-header/BfDialogHeader.vue'
 import DialogBody from '@/components/shared/dialog-body/DialogBody.vue'
 import AddPropertyWizard from '@/components/datasets/metadata/models/AddPropertyWizard.vue'
@@ -101,6 +137,16 @@ const dialogVisible = computed({
 })
 
 const stepIndex = ref(0)
+const startMode = ref('') // '' | 'template' | 'scratch'
+
+// Template picker
+const templatesList = ref([])
+const templatesLoading = ref(false)
+const templatesError = ref('')
+const templateFilter = ref('')
+const selectedTemplateId = ref('')
+
+// Model details + properties
 const details = reactive({ name: '', displayName: '', description: '' })
 const properties = ref([]) // [{ propertyName, propertySchema, required }]
 const addVisible = ref(false)
@@ -109,13 +155,58 @@ const creating = ref(false)
 const createError = ref('')
 
 const propertyNames = computed(() => properties.value.map((p) => p.propertyName))
+const filteredTemplates = computed(() => {
+  const f = templateFilter.value.trim().toLowerCase()
+  return f
+    ? templatesList.value.filter((t) => (t.display_name || t.name || '').toLowerCase().includes(f))
+    : templatesList.value
+})
 
 const canAdvance = computed(() => {
-  if (stepIndex.value === 0) return !!details.name
-  if (stepIndex.value === 1) return properties.value.length > 0
+  if (stepIndex.value === 0) {
+    if (startMode.value === 'scratch') return true
+    if (startMode.value === 'template') return !!selectedTemplateId.value
+    return false
+  }
+  if (stepIndex.value === 1) return !!details.name
+  if (stepIndex.value === 2) return properties.value.length > 0
   return true
 })
 const canCreate = computed(() => !!details.name && properties.value.length > 0)
+
+const setStart = (mode) => {
+  startMode.value = mode
+  if (mode === 'template' && !templatesList.value.length) loadTemplates()
+}
+
+const loadTemplates = async () => {
+  templatesLoading.value = true
+  templatesError.value = ''
+  try {
+    templatesList.value = await metadataStore.fetchTemplates(props.orgId)
+  } catch (e) {
+    templatesError.value = e?.message || String(e)
+    templatesList.value = []
+  } finally {
+    templatesLoading.value = false
+  }
+}
+
+const chooseTemplate = (tpl) => {
+  selectedTemplateId.value = tpl.id
+  const schema = tpl.latest_version?.schema || tpl.schema || {}
+  const propsObj = schema.properties || {}
+  const req = new Set(schema.required || [])
+  properties.value = Object.entries(propsObj).map(([name, propSchema]) => ({
+    propertyName: name,
+    propertySchema: propSchema,
+    required: req.has(name),
+  }))
+  // Seed details from the template (editable).
+  details.displayName = tpl.display_name || tpl.name || ''
+  details.name = toName(details.displayName)
+  details.description = tpl.description || ''
+}
 
 const onDisplayNameInput = () => {
   details.name = toName(details.displayName)
@@ -136,7 +227,7 @@ const removeProperty = (i) => {
 }
 
 const next = () => {
-  if (canAdvance.value && stepIndex.value < 2) stepIndex.value += 1
+  if (canAdvance.value && stepIndex.value < 3) stepIndex.value += 1
 }
 
 const create = async () => {
@@ -190,6 +281,9 @@ watch(
 )
 const reset = () => {
   stepIndex.value = 0
+  startMode.value = ''
+  templateFilter.value = ''
+  selectedTemplateId.value = ''
   details.name = ''
   details.displayName = ''
   details.description = ''
@@ -199,6 +293,8 @@ const reset = () => {
   creating.value = false
   createError.value = ''
 }
+
+const templatePropCount = (t) => Object.keys(t.latest_version?.schema?.properties || t.schema?.properties || {}).length
 
 const propMeta = (p) => {
   const s = p.propertySchema || {}
@@ -232,6 +328,83 @@ function dedupe(name, taken) {
   font-size: 15px;
   font-weight: 500;
   color: #1c1d1f;
+}
+.cmw-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 12px 0;
+}
+.cmw-card {
+  border: 1px solid #dadde3;
+  border-radius: 8px;
+  padding: 12px 14px;
+  cursor: pointer;
+  &:hover {
+    border-color: #b6c0e6;
+  }
+  &.active {
+    border-color: #2760ff;
+    background: #f7f9ff;
+  }
+}
+.cmw-card-title {
+  font-weight: 500;
+  color: #1c1d1f;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.cmw-card-desc {
+  font-size: 13px;
+  color: #71747c;
+  margin-top: 4px;
+}
+.cmw-select {
+  margin-top: 8px;
+}
+.cmw-status {
+  color: #71747c;
+  font-size: 13px;
+  margin-top: 8px;
+}
+.cmw-error {
+  color: #e94b4b;
+  font-size: 13px;
+  margin-top: 12px;
+}
+.cmw-tpl-list {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  max-height: 220px;
+  overflow-y: auto;
+  border: 1px solid #dadde3;
+  border-radius: 4px;
+}
+.cmw-tpl {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  cursor: pointer;
+  border-bottom: 1px solid #f1f1f3;
+  &:last-child {
+    border-bottom: none;
+  }
+  &:hover {
+    background: #f9f9fa;
+  }
+  &.active {
+    background: #f7f9ff;
+  }
+}
+.cmw-tpl-name {
+  color: #1c1d1f;
+}
+.cmw-tpl-meta {
+  font-size: 12px;
+  color: #71747c;
 }
 .cmw-props-head {
   display: flex;
@@ -280,11 +453,6 @@ function dedupe(name, taken) {
   font-size: 12px;
   color: #71747c;
   margin-bottom: 8px;
-}
-.cmw-error {
-  color: #e94b4b;
-  font-size: 13px;
-  margin-top: 12px;
 }
 :deep(.el-radio) {
   display: flex;
