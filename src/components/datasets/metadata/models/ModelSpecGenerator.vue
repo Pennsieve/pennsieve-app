@@ -404,7 +404,8 @@ const openPropertyDialog = (propertyName = null) => {
       default: property.default,
       isKey: property['x-pennsieve-key'] || false,
       isSensitive: property['x-pennsieve-sensitive'] || false,
-      allowNull: allowNull
+      allowNull: allowNull,
+      cde: property['x-pennsieve-cde'] || null
     }
   } else {
     // Add new property
@@ -425,10 +426,11 @@ const openPropertyDialog = (propertyName = null) => {
       default: undefined,
       isKey: false,
       isSensitive: false,
-      allowNull: false
+      allowNull: false,
+      cde: null
     }
   }
-  
+
   propertyDialogVisible.value = true
 }
 

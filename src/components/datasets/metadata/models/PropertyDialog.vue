@@ -140,6 +140,16 @@
 
             </div>
 
+            <!-- Common Data Element -->
+            <div class="form-section">
+              <h3 class="section-title">Common Data Element (optional)</h3>
+              <p class="section-help">
+                Link a standardized element so this property harmonizes across datasets.
+                A “required” link sets and enforces the allowed values from the catalog on save.
+              </p>
+              <CdePicker v-model="propertyForm.cde" />
+            </div>
+
             <!-- Property Options -->
             <div class="property-options">
               <h4 class="options-title">Property Options</h4>
@@ -339,6 +349,7 @@ import { ElForm, ElFormItem, ElInput, ElSelect, ElOption, ElButton, ElCheckbox, 
 import BfButton from "@/components/shared/bf-button/BfButton.vue";
 import BfDialogHeader from "@/components/shared/bf-dialog-header/BfDialogHeader.vue";
 import DialogBody from "@/components/shared/dialog-body/DialogBody.vue";
+import CdePicker from "@/components/datasets/metadata/models/CdePicker.vue";
 
 // Props
 const props = defineProps({
@@ -389,7 +400,8 @@ const propertyForm = ref({
   isKey: false,
   isSensitive: false,
   allowNull: false,
-  isArray: false
+  isArray: false,
+  cde: null
 })
 
 // Object template state
@@ -680,7 +692,8 @@ watch(() => props.initialPropertyData, (newData) => {
       isKey: false,
       isSensitive: false,
       allowNull: false,
-      isArray: false
+      isArray: false,
+      cde: null
     }
   }
 }, { deep: true, immediate: true })
@@ -1059,6 +1072,16 @@ const handleSave = () => {
     property['x-pennsieve-sensitive'] = true
   }
 
+  // Link to a catalog CDE. Store only the intent { persistent_id, strength } —
+  // for a "required" binding the metadata service materializes the authoritative
+  // allowed values / datatype from the published catalog on save.
+  if (propertyForm.value.cde && propertyForm.value.cde.persistent_id) {
+    property['x-pennsieve-cde'] = {
+      persistent_id: propertyForm.value.cde.persistent_id,
+      strength: propertyForm.value.cde.strength || 'preferred'
+    }
+  }
+
   // Emit save event with all the data needed
   emit('save', {
     propertyName: propertyForm.value.name,
@@ -1119,7 +1142,14 @@ const handleSave = () => {
         border-radius: 2px;
       }
     }
-    
+
+    .section-help {
+      font-size: 13px;
+      color: theme.$gray_5;
+      line-height: 1.5;
+      margin: -8px 0 16px 0;
+    }
+
     .form-grid {
       display: grid;
       grid-template-columns: 1fr 1fr;
