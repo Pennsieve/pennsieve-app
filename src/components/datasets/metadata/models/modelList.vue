@@ -8,7 +8,7 @@
           class="graph-management-cards"
         >
           <button
-            @click="openModelGenerator"
+            @click="wizardVisible = true"
           >
             <bf-card
               :class="{ disabled: datasetLocked }"
@@ -94,18 +94,25 @@
 
       </div>
 
+      <create-model-wizard
+        v-model:visible="wizardVisible"
+        :dataset-id="datasetId"
+        :org-id="orgId"
+        @created="onModelCreated"
+      />
     </bf-stage>
 </template>
 
 <script lang=ts setup>
 
-import {onMounted, defineAsyncComponent} from 'vue'
+import {onMounted, ref, defineAsyncComponent} from 'vue'
 import { storeToRefs } from "pinia";
 import { useMetadataStore } from '@/stores/metadataStore.js'
 import IconOverview from "@/components/icons/IconOverview.vue";
 import BfCard from "@/components/shared/bf-card/BfCard.vue";
 import IconAddTemplate from "@/components/icons/IconAddTemplate.vue";
 import ModelListItem from "@/components/datasets/metadata/models/modelListItem.vue";
+import CreateModelWizard from "@/components/datasets/metadata/models/CreateModelWizard.vue";
 // Dynamic import to avoid circular dependency issues
 const TemplateGallery = defineAsyncComponent(() => import("@/components/datasets/metadata/models/TemplateGallery.vue"))
 import {useRouter} from "vue-router";
@@ -141,6 +148,17 @@ onMounted(async () => {
 
 const datasetLocked = false
 const router = useRouter()
+const wizardVisible = ref(false)
+
+// Refresh after the guided wizard creates a model/template. createModel already
+// refetches, but a template create does not, so refetch to be safe.
+const onModelCreated = async () => {
+  try {
+    await metadataStore.fetchModels(props.datasetId)
+  } catch (err) {
+    console.error(err)
+  }
+}
 
 // Methods
 const openModelGenerator = () => {
