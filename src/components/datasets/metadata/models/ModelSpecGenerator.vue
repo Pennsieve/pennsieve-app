@@ -5,6 +5,7 @@ import { ElRadioGroup, ElRadioButton, ElCard, ElForm, ElFormItem, ElInput, ElSel
 import { useMetadataStore } from '@/stores/metadataStore.js'
 import ModelSpecViewer from './ModelSpecViewer.vue'
 import PropertyDialog from './PropertyDialog.vue'
+import AddPropertyWizard from './AddPropertyWizard.vue'
 import BfButton from "@/components/shared/bf-button/BfButton.vue";
 import ViewToggle from '@/components/shared/ViewToggle/ViewToggle.vue';
 
@@ -100,6 +101,10 @@ const modelNameManuallyEdited = ref(false)
 
 // Property dialog
 const propertyDialogVisible = ref(false)
+const addWizardVisible = ref(false)
+const existingProperties = computed(() =>
+  Object.keys(modelData.value?.latest_version?.schema?.properties || {})
+)
 const editingProperty = ref(null)
 const propertyForm = ref({
   name: '',
@@ -981,7 +986,7 @@ watch([() => modelData.value.name, () => modelData.value.display_name, () => mod
                 <span>Properties</span>
 
                 <div class="header-controls">
-                  <button type="primary" size="small" @click="openPropertyDialog()">
+                  <button type="primary" size="small" @click="addWizardVisible = true">
                     Add Property
                   </button>
                   <div class="mode-switcher-tabs">
@@ -1106,13 +1111,20 @@ watch([() => modelData.value.name, () => modelData.value.display_name, () => mod
     </div>
 
 
-    <!-- Property Dialog -->
+    <!-- Property Dialog (edit an existing property) -->
     <PropertyDialog
       v-model:visible="propertyDialogVisible"
       :editing-property="editingProperty"
       :initial-property-data="propertyFormData"
       @save="handlePropertySave"
       @cancel="handlePropertyCancel"
+    />
+
+    <!-- Add-property wizard (guided: CDE / bundle / manual) -->
+    <AddPropertyWizard
+      v-model:visible="addWizardVisible"
+      :existing-properties="existingProperties"
+      @save="handlePropertiesSave"
     />
   </div>
 </template>

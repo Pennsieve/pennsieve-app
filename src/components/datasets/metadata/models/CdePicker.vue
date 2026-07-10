@@ -85,7 +85,10 @@ const props = defineProps({
   // The current binding intent: { persistent_id, strength } or null.
   modelValue: { type: Object, default: null },
 })
-const emit = defineEmits(['update:modelValue'])
+// update:modelValue carries the binding intent { persistent_id, strength };
+// select carries the full resolved CDE record (or null on detach) so a parent
+// wizard can auto-fill name / type / description.
+const emit = defineEmits(['update:modelValue', 'select'])
 
 const store = useCdeCatalogStore()
 
@@ -121,6 +124,7 @@ const select = (cde) => {
   selected.value = cde
   if (!strength.value) strength.value = 'preferred'
   emitBinding()
+  emit('select', cde)
 }
 
 const detach = () => {
@@ -128,6 +132,7 @@ const detach = () => {
   term.value = ''
   results.value = []
   emit('update:modelValue', null)
+  emit('select', null)
 }
 
 const emitBinding = () => {
