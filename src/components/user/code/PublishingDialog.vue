@@ -388,10 +388,8 @@ export default {
     background-color: theme.$purple_2;
   }
 
-  // Keep the modal a stable height across tabs so switching to Permissions
-  // doesn't make the dialog shrink or grow.
   :deep(.el-tabs__content) {
-    min-height: 460px;
+    min-height: 250px;
   }
 }
 
