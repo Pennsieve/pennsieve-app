@@ -101,11 +101,32 @@
             <el-input v-model="basics.description" type="textarea" :rows="2" />
           </el-form-item>
 
-          <el-form-item v-if="isManual" label="Data type">
-            <el-select v-model="manual.type">
-              <el-option v-for="t in manualTypes" :key="t.value" :label="t.label" :value="t.value" />
-            </el-select>
-          </el-form-item>
+          <template v-if="isManual">
+            <el-form-item label="Data type">
+              <el-select v-model="manual.type">
+                <el-option v-for="t in manualTypes" :key="t.value" :label="t.label" :value="t.value" />
+              </el-select>
+            </el-form-item>
+
+            <el-form-item v-if="manual.type === 'string'" label="Format">
+              <el-select v-model="manual.format">
+                <el-option v-for="f in stringFormats" :key="f.value" :label="f.label" :value="f.value" />
+              </el-select>
+            </el-form-item>
+
+            <el-form-item label="Allowed values">
+              <el-input v-model="manual.enumInput" placeholder="Comma-separated, e.g. Low, Medium, High" />
+            </el-form-item>
+
+            <div class="wiz-manual-flags">
+              <el-checkbox v-model="manual.isArray">List of values (array)</el-checkbox>
+              <el-checkbox v-model="manual.allowNull">Allow null</el-checkbox>
+            </div>
+
+            <p class="wiz-manual-note">
+              For advanced constraints (min/max, length, pattern), add the property here and refine it in the JSON editor.
+            </p>
+          </template>
 
           <div v-else class="wiz-cde-preview">
             <div class="wiz-label">Set by the CDE<span v-if="strength === 'required'"> — enforced on save</span></div>
@@ -194,7 +215,7 @@ const strength = ref('preferred')
 
 // Shared form state
 const basics = reactive({ name: '', displayName: '', description: '' })
-const manual = reactive({ type: 'string' })
+const manual = reactive({ type: 'string', format: 'plain', isArray: false, allowNull: false, enumInput: '' })
 const options = reactive({ required: false, isKey: false, isSensitive: false })
 
 const manualTypes = [
@@ -202,6 +223,18 @@ const manualTypes = [
   { value: 'number', label: 'Number' },
   { value: 'integer', label: 'Integer' },
   { value: 'boolean', label: 'True/False' },
+]
+const stringFormats = [
+  { value: 'plain', label: 'Plain text' },
+  { value: 'date', label: 'Date' },
+  { value: 'date-time', label: 'Date & time' },
+  { value: 'time', label: 'Time' },
+  { value: 'email', label: 'Email address' },
+  { value: 'uri', label: 'URL / URI' },
+  { value: 'uuid', label: 'UUID' },
+  { value: 'ipv4', label: 'IPv4 address' },
+  { value: 'ipv6', label: 'IPv6 address' },
+  { value: 'hostname', label: 'Hostname' },
 ]
 
 const isBundle = computed(() => sourceMode.value === 'catalog' && selectionKind.value === 'bundle')
@@ -309,7 +342,7 @@ const buildSingleDef = () => {
   const schema = { title: basics.displayName || basics.name }
   if (basics.description) schema.description = basics.description
   if (isManual.value) {
-    schema.type = manual.type
+    Object.assign(schema, manualValueSchema())
   } else if (selectedCde.value) {
     Object.assign(schema, dataTypeSchema(selectedCde.value.cde_data_type))
     schema['x-pennsieve-cde'] = { persistent_id: selectedCde.value.persistent_id, strength: strength.value }
@@ -364,6 +397,10 @@ const reset = () => {
   basics.displayName = ''
   basics.description = ''
   manual.type = 'string'
+  manual.format = 'plain'
+  manual.isArray = false
+  manual.allowNull = false
+  manual.enumInput = ''
   options.required = false
   options.isKey = false
   options.isSensitive = false
@@ -395,6 +432,27 @@ function dataTypeSchema(cdeType) {
     default:
       return { type: 'string' }
   }
+}
+
+// Build the value part of a manually-defined property's schema (type, array
+// wrapping, allow-null, string format, allowed values). Mirrors the classic
+// PropertyDialog for the common options; deeper constraints go via the JSON editor.
+function manualValueSchema() {
+  const t = manual.type
+  const baseType = manual.allowNull ? [t, 'null'] : t
+  const en = String(manual.enumInput || '')
+    .split(',')
+    .map((v) => v.trim())
+    .filter(Boolean)
+  const addStringExtras = (obj) => {
+    if (t === 'string' && manual.format && manual.format !== 'plain') obj.format = manual.format
+    if (en.length) obj.enum = en
+    return obj
+  }
+  if (manual.isArray) {
+    return { type: 'array', items: addStringExtras({ type: baseType }) }
+  }
+  return addStringExtras({ type: baseType })
 }
 </script>
 
@@ -604,5 +662,16 @@ function dataTypeSchema(cdeType) {
   font-size: 14px;
   color: #1c1d1f;
   margin-bottom: 16px;
+}
+.wiz-manual-flags {
+  display: flex;
+  gap: 20px;
+  margin-bottom: 8px;
+}
+.wiz-manual-note {
+  font-size: 12px;
+  color: #71747c;
+  line-height: 1.4;
+  margin: 4px 0 0;
 }
 </style>
