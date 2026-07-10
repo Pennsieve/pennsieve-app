@@ -559,6 +559,7 @@ function manualValueSchema() {
 </script>
 
 <style scoped lang="scss">
+@use "../../../../styles/theme" as theme;
 .wiz-steps {
   margin-bottom: 24px;
 }
@@ -568,7 +569,7 @@ function manualValueSchema() {
 .wiz-q {
   font-size: 15px;
   font-weight: 500;
-  color: #1c1d1f;
+  color: theme.$gray_6;
   margin-bottom: 12px;
 }
 .wiz-cards {
@@ -577,16 +578,16 @@ function manualValueSchema() {
   gap: 8px;
 }
 .wiz-card {
-  border: 1px solid #dadde3;
-  border-radius: 8px;
+  border: 1px solid theme.$gray_2;
+  border-radius: 3px;
   padding: 12px 14px;
   cursor: pointer;
   &:hover {
-    border-color: #b6c0e6;
+    border-color: theme.$purple_0_7;
   }
   &.active {
-    border-color: #2760ff;
-    background: #f7f9ff;
+    border-color: theme.$purple_2;
+    background: theme.$purple_tint;
   }
 }
 .wiz-card-head {
@@ -596,34 +597,34 @@ function manualValueSchema() {
 }
 .wiz-card-title {
   font-weight: 500;
-  color: #1c1d1f;
+  color: theme.$gray_6;
   display: flex;
   align-items: center;
   gap: 6px;
 }
 .wiz-card-desc {
   font-size: 13px;
-  color: #71747c;
+  color: theme.$gray_4;
   margin-top: 4px;
   line-height: 1.4;
 }
 .wiz-rec {
   font-size: 12px;
-  color: #2760ff;
-  background: #edf1ff;
+  color: theme.$purple_2;
+  background: theme.$purple_tint;
   padding: 2px 10px;
-  border-radius: 4px;
+  border-radius: 3px;
 }
 .wiz-select {
   margin-top: 16px;
 }
 .wiz-status {
-  color: #71747c;
+  color: theme.$gray_4;
   font-size: 13px;
   margin-top: 8px;
 }
 .wiz-error {
-  color: #e94b4b;
+  color: theme.$status_red;
 }
 .wiz-results {
   margin-top: 8px;
@@ -633,7 +634,7 @@ function manualValueSchema() {
 .wiz-group {
   font-size: 12px;
   font-weight: 500;
-  color: #9b9ea6;
+  color: theme.$gray_4;
   text-transform: uppercase;
   letter-spacing: 0.04em;
   margin: 12px 0 4px;
@@ -642,8 +643,8 @@ function manualValueSchema() {
   list-style: none;
   margin: 0;
   padding: 0;
-  border: 1px solid #dadde3;
-  border-radius: 4px;
+  border: 1px solid theme.$gray_2;
+  border-radius: 3px;
 }
 .wiz-row {
   display: flex;
@@ -652,27 +653,27 @@ function manualValueSchema() {
   gap: 12px;
   padding: 8px 12px;
   cursor: pointer;
-  border-bottom: 1px solid #f1f1f3;
+  border-bottom: 1px solid theme.$gray_1;
   &:last-child {
     border-bottom: none;
   }
   &:hover {
-    background: #f9f9fa;
+    background: theme.$gray_1;
   }
 }
 .wiz-row-name {
-  color: #1c1d1f;
+  color: theme.$gray_6;
 }
 .wiz-row-meta {
   font-size: 12px;
-  color: #71747c;
+  color: theme.$gray_4;
   white-space: nowrap;
 }
 .wiz-selected {
-  border: 1px solid #b6c0e6;
-  border-radius: 8px;
+  border: 1px solid theme.$purple_0_7;
+  border-radius: 3px;
   padding: 12px 14px;
-  background: #f7f9ff;
+  background: theme.$purple_tint;
 }
 .wiz-selected-head {
   display: flex;
@@ -681,11 +682,11 @@ function manualValueSchema() {
 }
 .wiz-selected-name {
   font-weight: 500;
-  color: #1c1d1f;
+  color: theme.$gray_6;
 }
 .wiz-selected-sub {
   font-size: 13px;
-  color: #71747c;
+  color: theme.$gray_4;
   margin-top: 2px;
 }
 .wiz-strength {
@@ -693,27 +694,27 @@ function manualValueSchema() {
 }
 .wiz-label {
   font-size: 12px;
-  color: #71747c;
+  color: theme.$gray_4;
   margin-bottom: 6px;
 }
 .wiz-hint {
   font-size: 12px;
-  color: #71747c;
+  color: theme.$gray_4;
   margin-top: 6px;
   line-height: 1.4;
 }
 .wiz-cde-preview {
-  background: #f7f9ff;
-  border: 1px solid #b6c0e6;
-  border-radius: 8px;
+  background: theme.$purple_tint;
+  border: 1px solid theme.$purple_0_7;
+  border-radius: 3px;
   padding: 12px 14px;
 }
 .wiz-kv {
   font-size: 13px;
-  color: #4a4b4f;
+  color: theme.$gray_5;
   margin-bottom: 8px;
   b {
-    color: #1c1d1f;
+    color: theme.$gray_6;
     font-weight: 500;
   }
 }
@@ -724,14 +725,14 @@ function manualValueSchema() {
 }
 .wiz-chip {
   font-size: 12px;
-  background: #fff;
-  border: 1px solid #dadde3;
-  border-radius: 4px;
+  background: theme.$white;
+  border: 1px solid theme.$gray_2;
+  border-radius: 3px;
   padding: 2px 8px;
-  color: #4a4b4f;
+  color: theme.$gray_5;
   &.more {
     border-style: dashed;
-    color: #71747c;
+    color: theme.$gray_4;
   }
 }
 .wiz-two {
@@ -759,7 +760,7 @@ function manualValueSchema() {
   align-items: center;
   gap: 8px;
   padding: 6px 0;
-  border-bottom: 1px solid #f1f1f3;
+  border-bottom: 1px solid theme.$gray_1;
 }
 .wiz-member-name {
   width: 200px;
@@ -767,18 +768,18 @@ function manualValueSchema() {
 .wiz-member-cde {
   flex: 1;
   font-size: 13px;
-  color: #71747c;
+  color: theme.$gray_4;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .wiz-collision {
   font-size: 12px;
-  color: #e6a23c;
+  color: theme.$orange_2;
 }
 .wiz-summary {
   font-size: 14px;
-  color: #1c1d1f;
+  color: theme.$gray_6;
   margin-bottom: 16px;
 }
 </style>

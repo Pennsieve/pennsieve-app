@@ -196,6 +196,8 @@ watch(
 </script>
 
 <style scoped lang="scss">
+@use '../../../../styles/theme' as theme;
+
 .cde-picker {
   font-size: 13px;
 }
@@ -203,11 +205,11 @@ watch(
 .cde-search {
   .cde-status {
     margin-top: 8px;
-    color: #71747c;
+    color: theme.$gray_4;
     font-size: 13px;
   }
   .cde-error {
-    color: #e94b4b;
+    color: theme.$status_red;
   }
 }
 
@@ -217,35 +219,35 @@ watch(
   padding: 0;
   max-height: 240px;
   overflow-y: auto;
-  border: 1px solid #dadde3;
-  border-radius: 4px;
+  border: 1px solid theme.$gray_2;
+  border-radius: 3px;
 }
 .cde-result {
   padding: 8px 12px;
   cursor: pointer;
-  border-bottom: 1px solid #f1f1f3;
+  border-bottom: 1px solid theme.$gray_1;
   &:last-child {
     border-bottom: none;
   }
   &:hover {
-    background: #f9f9fa;
+    background: theme.$gray_1;
   }
   .cde-result-name {
-    color: #1c1d1f;
+    color: theme.$gray_6;
     font-weight: 500;
   }
   .cde-result-meta {
-    color: #71747c;
+    color: theme.$gray_4;
     font-size: 12px;
     margin-top: 2px;
   }
 }
 
 .cde-selected {
-  border: 1px solid #b6c0e6;
-  border-radius: 8px;
+  border: 1px solid theme.$purple_0_7;
+  border-radius: 3px;
   padding: 12px 16px;
-  background: #f7f9ff;
+  background: theme.$purple_tint;
 }
 .cde-selected-head {
   display: flex;
@@ -254,17 +256,17 @@ watch(
   gap: 8px;
 }
 .cde-selected-name {
-  color: #1c1d1f;
+  color: theme.$gray_6;
   font-weight: 500;
 }
 .cde-detach {
-  color: #71747c;
+  color: theme.$gray_4;
   span {
     margin-left: 4px;
   }
 }
 .cde-def {
-  color: #4a4b4f;
+  color: theme.$gray_5;
   margin: 6px 0 12px;
   line-height: 1.5;
 }
@@ -272,19 +274,19 @@ watch(
   margin-top: 12px;
 }
 .cde-label {
-  color: #71747c;
+  color: theme.$gray_4;
   font-size: 12px;
   margin-bottom: 6px;
 }
 .cde-strong {
-  color: #1c1d1f;
+  color: theme.$gray_6;
   margin-left: 4px;
 }
 .cde-muted {
-  color: #9b9ea6;
+  color: theme.$gray_4;
 }
 .cde-hint {
-  color: #71747c;
+  color: theme.$gray_4;
   font-size: 12px;
   margin-top: 6px;
   line-height: 1.4;
@@ -300,18 +302,18 @@ watch(
 }
 .cde-chip {
   font-size: 12px;
-  background: #fff;
-  border: 1px solid #dadde3;
-  border-radius: 4px;
+  background: theme.$white;
+  border: 1px solid theme.$gray_2;
+  border-radius: 3px;
   padding: 2px 8px;
-  color: #4a4b4f;
+  color: theme.$gray_5;
 }
 .cde-chip-more {
-  color: #71747c;
+  color: theme.$gray_4;
   background: transparent;
   border-style: dashed;
 }
 .cde-chip-ref {
-  color: #71747c;
+  color: theme.$gray_4;
 }
 </style>

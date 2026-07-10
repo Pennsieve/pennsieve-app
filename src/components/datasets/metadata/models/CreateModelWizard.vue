@@ -318,6 +318,7 @@ function dedupe(name, taken) {
 </script>
 
 <style scoped lang="scss">
+@use "../../../../styles/theme" as theme;
 .cmw-steps {
   margin-bottom: 24px;
 }
@@ -327,7 +328,7 @@ function dedupe(name, taken) {
 .cmw-q {
   font-size: 15px;
   font-weight: 500;
-  color: #1c1d1f;
+  color: theme.$gray_6;
 }
 .cmw-cards {
   display: flex;
@@ -336,40 +337,40 @@ function dedupe(name, taken) {
   margin: 12px 0;
 }
 .cmw-card {
-  border: 1px solid #dadde3;
-  border-radius: 8px;
+  border: 1px solid theme.$gray_2;
+  border-radius: 3px;
   padding: 12px 14px;
   cursor: pointer;
   &:hover {
-    border-color: #b6c0e6;
+    border-color: theme.$purple_0_7;
   }
   &.active {
-    border-color: #2760ff;
-    background: #f7f9ff;
+    border-color: theme.$purple_2;
+    background: theme.$purple_tint;
   }
 }
 .cmw-card-title {
   font-weight: 500;
-  color: #1c1d1f;
+  color: theme.$gray_6;
   display: flex;
   align-items: center;
   gap: 6px;
 }
 .cmw-card-desc {
   font-size: 13px;
-  color: #71747c;
+  color: theme.$gray_4;
   margin-top: 4px;
 }
 .cmw-select {
   margin-top: 8px;
 }
 .cmw-status {
-  color: #71747c;
+  color: theme.$gray_4;
   font-size: 13px;
   margin-top: 8px;
 }
 .cmw-error {
-  color: #e94b4b;
+  color: theme.$status_red;
   font-size: 13px;
   margin-top: 12px;
 }
@@ -379,8 +380,8 @@ function dedupe(name, taken) {
   padding: 0;
   max-height: 220px;
   overflow-y: auto;
-  border: 1px solid #dadde3;
-  border-radius: 4px;
+  border: 1px solid theme.$gray_2;
+  border-radius: 3px;
 }
 .cmw-tpl {
   display: flex;
@@ -388,23 +389,23 @@ function dedupe(name, taken) {
   justify-content: space-between;
   padding: 8px 12px;
   cursor: pointer;
-  border-bottom: 1px solid #f1f1f3;
+  border-bottom: 1px solid theme.$gray_1;
   &:last-child {
     border-bottom: none;
   }
   &:hover {
-    background: #f9f9fa;
+    background: theme.$gray_1;
   }
   &.active {
-    background: #f7f9ff;
+    background: theme.$purple_tint;
   }
 }
 .cmw-tpl-name {
-  color: #1c1d1f;
+  color: theme.$gray_6;
 }
 .cmw-tpl-meta {
   font-size: 12px;
-  color: #71747c;
+  color: theme.$gray_4;
 }
 .cmw-props-head {
   display: flex;
@@ -413,7 +414,7 @@ function dedupe(name, taken) {
   margin-bottom: 12px;
 }
 .cmw-empty {
-  color: #71747c;
+  color: theme.$gray_4;
   font-size: 13px;
   padding: 24px 0;
   text-align: center;
@@ -422,36 +423,36 @@ function dedupe(name, taken) {
   list-style: none;
   margin: 0;
   padding: 0;
-  border: 1px solid #dadde3;
-  border-radius: 4px;
+  border: 1px solid theme.$gray_2;
+  border-radius: 3px;
 }
 .cmw-prop {
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 8px 12px;
-  border-bottom: 1px solid #f1f1f3;
+  border-bottom: 1px solid theme.$gray_1;
   &:last-child {
     border-bottom: none;
   }
 }
 .cmw-prop-name {
-  color: #1c1d1f;
+  color: theme.$gray_6;
   font-weight: 500;
 }
 .cmw-prop-meta {
   font-size: 12px;
-  color: #71747c;
+  color: theme.$gray_4;
   margin-left: 10px;
 }
 .cmw-summary {
   font-size: 14px;
-  color: #1c1d1f;
+  color: theme.$gray_6;
   margin-bottom: 16px;
 }
 .cmw-label {
   font-size: 12px;
-  color: #71747c;
+  color: theme.$gray_4;
   margin-bottom: 8px;
 }
 :deep(.el-radio) {
