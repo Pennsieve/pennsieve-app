@@ -610,62 +610,63 @@ const formatDate = (dateString) => {
   })
 }
 
-// Handle PropertyDialog save event
-const handlePropertySave = ({ propertyName, propertySchema, required, oldPropertyName }) => {
+// Merge one or more property definitions into the model schema in a single
+// update. A bundle expands to several definitions (one per member CDE); a single
+// property or edit is just a one-element batch.
+const applyPropertySaves = (defs) => {
   try {
-    // Validate Pennsieve-specific rules before saving
-    if (propertySchema['x-pennsieve-key'] === true && !required) {
-      ElMessage.error(`Property "${propertyName}" has x-pennsieve-key set but is not marked as required`)
-      return
-    }
+    const schema = modelData.value.latest_version.schema
+    const newProperties = { ...schema.properties }
+    const newRequired = [...(schema.required || [])]
 
-    // Note: Sensitive data properties (x-pennsieve-sensitive) are allowed to be optional
-    // Only key properties must be required
-
-    // Update schema
-    const newProperties = { ...modelData.value.latest_version.schema.properties }
-    const newRequired = [...(modelData.value.latest_version.schema.required || [])]
-
-    // Remove old property name if editing
-    if (oldPropertyName && oldPropertyName !== propertyName) {
-      delete newProperties[oldPropertyName]
-      const oldIndex = newRequired.indexOf(oldPropertyName)
-      if (oldIndex > -1) {
-        newRequired.splice(oldIndex, 1)
+    for (const { propertyName, propertySchema, required, oldPropertyName } of defs) {
+      // Validate Pennsieve-specific rules before saving. Only key properties
+      // must be required (sensitive properties may be optional).
+      if (propertySchema['x-pennsieve-key'] === true && !required) {
+        ElMessage.error(`Property "${propertyName}" has x-pennsieve-key set but is not marked as required`)
+        return
       }
+
+      // Remove old property name if editing (rename)
+      if (oldPropertyName && oldPropertyName !== propertyName) {
+        delete newProperties[oldPropertyName]
+        const oldIndex = newRequired.indexOf(oldPropertyName)
+        if (oldIndex > -1) newRequired.splice(oldIndex, 1)
+      }
+
+      newProperties[propertyName] = propertySchema
+
+      const requiredIndex = newRequired.indexOf(propertyName)
+      if (required && requiredIndex === -1) newRequired.push(propertyName)
+      else if (!required && requiredIndex > -1) newRequired.splice(requiredIndex, 1)
     }
 
-    // Add/update property
-    newProperties[propertyName] = propertySchema
-
-    // Handle required status
-    const requiredIndex = newRequired.indexOf(propertyName)
-    if (required && requiredIndex === -1) {
-      newRequired.push(propertyName)
-    } else if (!required && requiredIndex > -1) {
-      newRequired.splice(requiredIndex, 1)
-    }
-
-    // Update model
     modelData.value.latest_version.schema = {
-      ...modelData.value.latest_version.schema,
+      ...schema,
       properties: newProperties,
       required: newRequired
     }
 
-    // Update JSON content if in JSON mode
-    if (mode.value === 'json') {
-      updateJsonContent()
-    }
-
-    // Update shared JSON data for preview
+    if (mode.value === 'json') updateJsonContent()
     updateSharedJsonData()
 
-    ElMessage.success(oldPropertyName ? 'Property updated successfully' : 'Property added successfully')
+    const n = defs.length
+    ElMessage.success(
+      n > 1
+        ? `${n} properties added`
+        : (defs[0].oldPropertyName ? 'Property updated successfully' : 'Property added successfully')
+    )
   } catch (error) {
     ElMessage.error('Failed to save property: ' + error.message)
   }
 }
+
+// Handle PropertyDialog save event (single property)
+const handlePropertySave = (def) => applyPropertySaves([def])
+
+// Handle a batch save from the add-property/create-model wizard (e.g. a bundle
+// expanded to one property per member CDE)
+const handlePropertiesSave = (defs) => applyPropertySaves(defs)
 
 // Handle PropertyDialog cancel event
 const handlePropertyCancel = () => {
