@@ -13,8 +13,8 @@
       </el-steps>
 
       <div v-if="stepHelp" class="cmw-instruction">
-        <el-icon><InfoFilled /></el-icon>
-        <span>{{ stepHelp }}</span>
+        <span class="cmw-instruction-icon"><el-icon><InfoFilled /></el-icon></span>
+        <span class="cmw-instruction-text">{{ stepHelp }}</span>
       </div>
 
       <!-- STEP 1 — START -->
@@ -339,20 +339,29 @@ function dedupe(name, taken) {
 }
 .cmw-instruction {
   display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  background: theme.$gray_1;
+  align-items: center;
+  gap: 12px;
+  background: theme.$purple_tint;
   border-radius: 3px;
-  padding: 8px 12px;
+  padding: 12px 14px;
   margin-bottom: 20px;
-  font-size: 13px;
-  line-height: 1.4;
-  color: theme.$gray_5;
-  .el-icon {
-    color: theme.$purple_2;
-    margin-top: 2px;
-    flex-shrink: 0;
-  }
+}
+.cmw-instruction-icon {
+  flex-shrink: 0;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: theme.$status_purple;
+  color: theme.$white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 17px;
+}
+.cmw-instruction-text {
+  font-size: 14px;
+  line-height: 1.45;
+  color: theme.$gray_6;
 }
 .cmw-step {
   min-height: 220px;
