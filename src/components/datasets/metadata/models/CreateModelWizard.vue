@@ -13,8 +13,8 @@
       </el-steps>
 
       <div v-if="stepHelp" class="cmw-instruction">
-        <span class="cmw-instruction-icon"><el-icon><InfoFilled /></el-icon></span>
-        <span class="cmw-instruction-text">{{ stepHelp }}</span>
+        <span class="cmw-instruction-icon"><component :is="stepIcon" :width="34" :height="34" /></span>
+        <p class="cmw-instruction-text">{{ stepHelp }}</p>
       </div>
 
       <!-- STEP 1 — START -->
@@ -121,10 +121,14 @@
 <script setup>
 import { ref, reactive, computed, watch } from 'vue'
 import { ElMessage } from 'element-plus'
-import { Plus, Close, Files, EditPen, Search, InfoFilled } from '@element-plus/icons-vue'
+import { Plus, Close, Files, EditPen, Search } from '@element-plus/icons-vue'
 import BfDialogHeader from '@/components/shared/bf-dialog-header/BfDialogHeader.vue'
 import DialogBody from '@/components/shared/dialog-body/DialogBody.vue'
 import AddPropertyWizard from '@/components/datasets/metadata/models/AddPropertyWizard.vue'
+import IconGuide from '@/components/icons/IconGuide.vue'
+import IconDocument from '@/components/icons/IconDocument.vue'
+import IconToolbarListBulleted from '@/components/icons/IconToolbarListBulleted.vue'
+import IconDoneCheckCircle from '@/components/icons/IconDoneCheckCircle.vue'
 import { useMetadataStore } from '@/stores/metadataStore.js'
 
 const props = defineProps({
@@ -187,6 +191,9 @@ const stepHelp = computed(
       'Add the fields this model captures. Reuse common data elements wherever you can.',
       'Create it as a model in this dataset, or as a reusable template for the workspace.',
     ][stepIndex.value] || ''
+)
+const stepIcon = computed(
+  () => [IconGuide, IconDocument, IconToolbarListBulleted, IconDoneCheckCircle][stepIndex.value] || IconGuide
 )
 
 const setStart = (mode) => {
@@ -338,30 +345,28 @@ function dedupe(name, taken) {
   margin-bottom: 20px;
 }
 .cmw-instruction {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  background: theme.$purple_tint;
-  border-radius: 3px;
-  padding: 12px 14px;
-  margin-bottom: 20px;
+  text-align: center;
+  max-width: 520px;
+  margin: 4px auto 24px;
 }
 .cmw-instruction-icon {
-  flex-shrink: 0;
-  width: 30px;
-  height: 30px;
-  border-radius: 50%;
-  background: theme.$status_purple;
-  color: theme.$white;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 17px;
+  display: inline-flex;
+  color: theme.$purple_2;
 }
 .cmw-instruction-text {
-  font-size: 14px;
-  line-height: 1.45;
+  font-size: 15px;
+  line-height: 1.5;
+  color: theme.$gray_5;
+  margin: 8px 0 0;
+}
+:deep(.el-form-item) {
+  margin-bottom: 18px;
+}
+:deep(.el-form-item__label) {
   color: theme.$gray_6;
+  font-weight: 500;
+  padding-bottom: 4px;
+  line-height: 1.4;
 }
 .cmw-step {
   min-height: 220px;

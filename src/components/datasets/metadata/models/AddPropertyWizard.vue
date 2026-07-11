@@ -10,8 +10,8 @@
       </el-steps>
 
       <div v-if="stepHelp" class="wiz-instruction">
-        <span class="wiz-instruction-icon"><el-icon><InfoFilled /></el-icon></span>
-        <span class="wiz-instruction-text">{{ stepHelp }}</span>
+        <span class="wiz-instruction-icon"><component :is="stepIcon" :width="34" :height="34" /></span>
+        <p class="wiz-instruction-text">{{ stepHelp }}</p>
       </div>
 
       <!-- SOURCE -->
@@ -211,8 +211,14 @@
 <script setup>
 import { ref, reactive, computed, watch } from 'vue'
 import { ElMessage } from 'element-plus'
-import { Link, EditPen, Search, Close, InfoFilled } from '@element-plus/icons-vue'
+import { Link, EditPen, Search, Close } from '@element-plus/icons-vue'
 import debounce from 'lodash.debounce'
+import IconGuide from '@/components/icons/IconGuide.vue'
+import IconDocument from '@/components/icons/IconDocument.vue'
+import IconTag from '@/components/icons/IconTag.vue'
+import IconToolbarListBulleted from '@/components/icons/IconToolbarListBulleted.vue'
+import IconCollection from '@/components/icons/IconCollection.vue'
+import IconSettings from '@/components/icons/IconSettings.vue'
 import BfDialogHeader from '@/components/shared/bf-dialog-header/BfDialogHeader.vue'
 import DialogBody from '@/components/shared/dialog-body/DialogBody.vue'
 import { useCdeCatalogStore } from '@/stores/cdeCatalogStore'
@@ -324,6 +330,17 @@ const stepHelp = computed(
       members: 'This bundle adds several properties — one per element. Review the names and uncheck any you don’t need.',
       options: 'Choose how this property behaves on records.',
     }[currentKey.value] || '')
+)
+const stepIcon = computed(
+  () =>
+    ({
+      source: IconGuide,
+      details: IconDocument,
+      type: IconTag,
+      values: IconToolbarListBulleted,
+      members: IconCollection,
+      options: IconSettings,
+    }[currentKey.value] || IconGuide)
 )
 
 const summaryType = computed(() =>
@@ -581,30 +598,28 @@ function manualValueSchema() {
   margin-bottom: 20px;
 }
 .wiz-instruction {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  background: theme.$purple_tint;
-  border-radius: 3px;
-  padding: 12px 14px;
-  margin-bottom: 20px;
+  text-align: center;
+  max-width: 520px;
+  margin: 4px auto 24px;
 }
 .wiz-instruction-icon {
-  flex-shrink: 0;
-  width: 30px;
-  height: 30px;
-  border-radius: 50%;
-  background: theme.$status_purple;
-  color: theme.$white;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 17px;
+  display: inline-flex;
+  color: theme.$purple_2;
 }
 .wiz-instruction-text {
-  font-size: 14px;
-  line-height: 1.45;
+  font-size: 15px;
+  line-height: 1.5;
+  color: theme.$gray_5;
+  margin: 8px 0 0;
+}
+:deep(.el-form-item) {
+  margin-bottom: 18px;
+}
+:deep(.el-form-item__label) {
   color: theme.$gray_6;
+  font-weight: 500;
+  padding-bottom: 4px;
+  line-height: 1.4;
 }
 .wiz-step {
   min-height: 240px;
