@@ -31,7 +31,11 @@
           </div>
         </div>
 
-        <div v-if="sourceMode === 'catalog'" class="wiz-select">
+      </div>
+
+      <!-- FIND (catalog) -->
+      <div v-show="currentKey === 'find'" class="wiz-step">
+        <div class="wiz-select">
           <template v-if="!selectionKind">
             <el-input v-model="term" placeholder="Search common data elements" clearable @input="onSearchInput">
               <template #prefix><el-icon><Search /></el-icon></template>
@@ -214,6 +218,7 @@ import { ElMessage } from 'element-plus'
 import { Link, EditPen, Search, Close } from '@element-plus/icons-vue'
 import debounce from 'lodash.debounce'
 import IconGuide from '@/components/icons/IconGuide.vue'
+import IconSearch from '@/components/icons/IconSearch.vue'
 import IconDocument from '@/components/icons/IconDocument.vue'
 import IconTag from '@/components/icons/IconTag.vue'
 import IconToolbarListBulleted from '@/components/icons/IconToolbarListBulleted.vue'
@@ -296,26 +301,23 @@ const isSingleCde = computed(() => sourceMode.value === 'catalog' && selectionKi
 
 // Steps vary by path so each stays light.
 const steps = computed(() => {
+  const source = { key: 'source', title: 'Source' }
   if (isManual.value) {
     return [
-      { key: 'source', title: 'Source' },
+      source,
       { key: 'details', title: 'Details' },
       { key: 'type', title: 'Type & format' },
       { key: 'values', title: 'Values & rules' },
     ]
   }
-  if (isBundle.value) {
-    return [
-      { key: 'source', title: 'Source' },
-      { key: 'members', title: 'Members' },
-      { key: 'options', title: 'Options' },
-    ]
+  if (sourceMode.value === 'catalog') {
+    const find = { key: 'find', title: 'Find' }
+    if (selectionKind.value === 'bundle') {
+      return [source, find, { key: 'members', title: 'Members' }, { key: 'options', title: 'Options' }]
+    }
+    return [source, find, { key: 'details', title: 'Details' }, { key: 'options', title: 'Options' }]
   }
-  return [
-    { key: 'source', title: 'Source' },
-    { key: 'details', title: 'Details' },
-    { key: 'options', title: 'Options' },
-  ]
+  return [source]
 })
 const currentKey = computed(() => (steps.value[stepIndex.value] || steps.value[0]).key)
 const isLastStep = computed(() => stepIndex.value >= steps.value.length - 1)
@@ -324,6 +326,7 @@ const stepHelp = computed(
   () =>
     ({
       source: 'Choose where this property’s values come from. Reusing a common data element keeps your data consistent with other datasets.',
+      find: 'Search the catalog and pick a data element — or a bundle to add several related properties at once.',
       details: 'Name the property and describe it. If you linked a CDE these are pre-filled — adjust as needed.',
       type: 'Pick the kind of value this property holds.',
       values: 'Set the allowed values and any limits. Only the options relevant to your type are shown.',
@@ -335,6 +338,7 @@ const stepIcon = computed(
   () =>
     ({
       source: IconGuide,
+      find: IconSearch,
       details: IconDocument,
       type: IconTag,
       values: IconToolbarListBulleted,
@@ -418,10 +422,9 @@ const onDisplayNameInput = () => {
 const canAdvance = computed(() => {
   switch (currentKey.value) {
     case 'source':
-      if (isManual.value) return true
-      if (isSingleCde.value) return !!selectedCde.value
-      if (isBundle.value) return memberRows.value.length > 0
-      return false
+      return !!sourceMode.value
+    case 'find':
+      return isBundle.value ? memberRows.value.length > 0 : !!selectedCde.value
     case 'details':
       return !!basics.name
     case 'members':

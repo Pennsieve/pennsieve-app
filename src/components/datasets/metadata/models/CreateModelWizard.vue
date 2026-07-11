@@ -6,10 +6,7 @@
 
     <dialog-body>
       <el-steps :active="stepIndex" finish-status="success" align-center class="cmw-steps">
-        <el-step title="Start" />
-        <el-step title="Details" />
-        <el-step title="Properties" />
-        <el-step title="Save" />
+        <el-step v-for="s in steps" :key="s.key" :title="s.title" />
       </el-steps>
 
       <div v-if="stepHelp" class="cmw-instruction">
@@ -17,8 +14,8 @@
         <p class="cmw-instruction-text">{{ stepHelp }}</p>
       </div>
 
-      <!-- STEP 1 — START -->
-      <div v-show="stepIndex === 0" class="cmw-step">
+      <!-- START -->
+      <div v-show="currentKey === 'start'" class="cmw-step">
         <div class="cmw-q">How do you want to start?</div>
         <div class="cmw-cards">
           <div :class="['cmw-card', { active: startMode === 'template' }]" @click="setStart('template')">
@@ -30,8 +27,11 @@
             <div class="cmw-card-desc">Build the model property by property.</div>
           </div>
         </div>
+      </div>
 
-        <div v-if="startMode === 'template'" class="cmw-select">
+      <!-- TEMPLATE (choose one) -->
+      <div v-show="currentKey === 'template'" class="cmw-step">
+        <div class="cmw-select">
           <el-input v-model="templateFilter" placeholder="Filter templates" clearable>
             <template #prefix><el-icon><Search /></el-icon></template>
           </el-input>
@@ -52,8 +52,8 @@
         </div>
       </div>
 
-      <!-- STEP 2 — DETAILS -->
-      <div v-show="stepIndex === 1" class="cmw-step">
+      <!-- DETAILS -->
+      <div v-show="currentKey === 'details'" class="cmw-step">
         <el-form label-position="top">
           <el-form-item label="Display name">
             <el-input v-model="details.displayName" placeholder="e.g. Participant" @input="onDisplayNameInput" />
@@ -67,8 +67,8 @@
         </el-form>
       </div>
 
-      <!-- STEP 3 — PROPERTIES -->
-      <div v-show="stepIndex === 2" class="cmw-step">
+      <!-- PROPERTIES -->
+      <div v-show="currentKey === 'properties'" class="cmw-step">
         <div class="cmw-props-head">
           <span class="cmw-q">Properties</span>
           <el-button size="small" @click="addVisible = true">
@@ -90,8 +90,8 @@
         </ul>
       </div>
 
-      <!-- STEP 4 — SAVE AS -->
-      <div v-show="stepIndex === 3" class="cmw-step">
+      <!-- SAVE AS -->
+      <div v-show="currentKey === 'save'" class="cmw-step">
         <div class="cmw-summary">
           {{ details.name }} · {{ properties.length }} propert{{ properties.length === 1 ? 'y' : 'ies' }}
         </div>
@@ -107,7 +107,7 @@
     <template #footer>
       <el-button @click="cancel">Cancel</el-button>
       <el-button v-if="stepIndex > 0" @click="stepIndex -= 1">Back</el-button>
-      <el-button v-if="stepIndex < 3" type="primary" :disabled="!canAdvance" @click="next">Continue</el-button>
+      <el-button v-if="!isLastStep" type="primary" :disabled="!canAdvance" @click="next">Continue</el-button>
       <el-button v-else type="primary" :loading="creating" :disabled="!canCreate" @click="create">
         Create {{ saveAs }}
       </el-button>
@@ -126,6 +126,7 @@ import BfDialogHeader from '@/components/shared/bf-dialog-header/BfDialogHeader.
 import DialogBody from '@/components/shared/dialog-body/DialogBody.vue'
 import AddPropertyWizard from '@/components/datasets/metadata/models/AddPropertyWizard.vue'
 import IconGuide from '@/components/icons/IconGuide.vue'
+import IconAddTemplate from '@/components/icons/IconAddTemplate.vue'
 import IconDocument from '@/components/icons/IconDocument.vue'
 import IconToolbarListBulleted from '@/components/icons/IconToolbarListBulleted.vue'
 import IconDoneCheckCircle from '@/components/icons/IconDoneCheckCircle.vue'
@@ -171,29 +172,55 @@ const filteredTemplates = computed(() => {
     : templatesList.value
 })
 
+const steps = computed(() => {
+  const start = { key: 'start', title: 'Start' }
+  const rest = [
+    { key: 'details', title: 'Details' },
+    { key: 'properties', title: 'Properties' },
+    { key: 'save', title: 'Save' },
+  ]
+  return startMode.value === 'template'
+    ? [start, { key: 'template', title: 'Template' }, ...rest]
+    : [start, ...rest]
+})
+const currentKey = computed(() => (steps.value[stepIndex.value] || steps.value[0]).key)
+const isLastStep = computed(() => stepIndex.value >= steps.value.length - 1)
+
 const canAdvance = computed(() => {
-  if (stepIndex.value === 0) {
-    if (startMode.value === 'scratch') return true
-    if (startMode.value === 'template') return !!selectedTemplateId.value
-    return false
+  switch (currentKey.value) {
+    case 'start':
+      return !!startMode.value
+    case 'template':
+      return !!selectedTemplateId.value
+    case 'details':
+      return !!details.name
+    case 'properties':
+      return properties.value.length > 0
+    default:
+      return true
   }
-  if (stepIndex.value === 1) return !!details.name
-  if (stepIndex.value === 2) return properties.value.length > 0
-  return true
 })
 const canCreate = computed(() => !!details.name && properties.value.length > 0)
 
 const stepHelp = computed(
   () =>
-    [
-      'A model describes one kind of record (like a participant or a sample). Start from a template or build it from scratch.',
-      'Give your model a name and a short description.',
-      'Add the fields this model captures. Reuse common data elements wherever you can.',
-      'Create it as a model in this dataset, or as a reusable template for the workspace.',
-    ][stepIndex.value] || ''
+    ({
+      start: 'A model describes one kind of record (like a participant or a sample). Start from a template or build it from scratch.',
+      template: 'Pick a template to start from — its properties come along and you can adjust them in the next steps.',
+      details: 'Give your model a name and a short description.',
+      properties: 'Add the fields this model captures. Reuse common data elements wherever you can.',
+      save: 'Create it as a model in this dataset, or as a reusable template for the workspace.',
+    }[currentKey.value] || '')
 )
 const stepIcon = computed(
-  () => [IconGuide, IconDocument, IconToolbarListBulleted, IconDoneCheckCircle][stepIndex.value] || IconGuide
+  () =>
+    ({
+      start: IconGuide,
+      template: IconAddTemplate,
+      details: IconDocument,
+      properties: IconToolbarListBulleted,
+      save: IconDoneCheckCircle,
+    }[currentKey.value] || IconGuide)
 )
 
 const setStart = (mode) => {
@@ -249,7 +276,7 @@ const removeProperty = (i) => {
 }
 
 const next = () => {
-  if (canAdvance.value && stepIndex.value < 3) stepIndex.value += 1
+  if (canAdvance.value && !isLastStep.value) stepIndex.value += 1
 }
 
 const create = async () => {
