@@ -90,18 +90,25 @@
         </ul>
       </div>
 
-      <!-- SAVE AS -->
+      <!-- REVIEW -->
       <div v-show="currentKey === 'save'" class="cmw-step">
         <div class="cmw-summary">
           {{ details.name }} · {{ properties.length }} propert{{ properties.length === 1 ? 'y' : 'ies' }}
         </div>
-        <div class="cmw-label">Finish</div>
-        <el-radio-group v-model="finishMode" @change="onFinishModeChange">
-          <el-radio value="model">Create model — add it to this dataset now</el-radio>
-          <el-radio value="advanced">Advanced — edit the JSON Schema before saving</el-radio>
-        </el-radio-group>
+        <ul v-if="properties.length" class="cmw-prop-list">
+          <li v-for="(p, i) in properties" :key="i" class="cmw-prop">
+            <div class="cmw-prop-main">
+              <span class="cmw-prop-name">{{ p.propertyName }}</span>
+              <span class="cmw-prop-meta">{{ propMeta(p) }}</span>
+            </div>
+          </li>
+        </ul>
+        <div v-if="createError" class="cmw-error">{{ createError }}</div>
+      </div>
 
-        <div v-if="finishMode === 'advanced'" class="cmw-json">
+      <!-- ADVANCED (edit JSON Schema) -->
+      <div v-show="currentKey === 'advanced'" class="cmw-step">
+        <div class="cmw-json">
           <el-input
             ref="jsonEditor"
             v-model="jsonContent"
@@ -114,18 +121,27 @@
           />
           <div v-if="jsonError" class="cmw-error">{{ jsonError }}</div>
         </div>
-
         <div v-if="createError" class="cmw-error">{{ createError }}</div>
       </div>
     </dialog-body>
 
     <template #footer>
       <el-button @click="cancel">Cancel</el-button>
-      <el-button v-if="stepIndex > 0" @click="stepIndex -= 1">Back</el-button>
-      <el-button v-if="!isLastStep" type="primary" :disabled="!canAdvance" @click="next">Continue</el-button>
-      <el-button v-else type="primary" :loading="creating" :disabled="!canCreate" @click="create">
+      <el-button v-if="stepIndex > 0" @click="back">Back</el-button>
+      <template v-if="currentKey === 'save'">
+        <el-button :disabled="!canCreate" @click="goAdvanced">Advanced</el-button>
+        <el-button type="primary" :loading="creating" :disabled="!canCreate" @click="create">Create model</el-button>
+      </template>
+      <el-button
+        v-else-if="currentKey === 'advanced'"
+        type="primary"
+        :loading="creating"
+        :disabled="!canCreate"
+        @click="create"
+      >
         Create model
       </el-button>
+      <el-button v-else type="primary" :disabled="!canAdvance" @click="next">Continue</el-button>
     </template>
 
     <!-- Nested: reuse the add-property wizard to build each property -->
@@ -145,6 +161,7 @@ import IconAddTemplate from '@/components/icons/IconAddTemplate.vue'
 import IconDocument from '@/components/icons/IconDocument.vue'
 import IconToolbarListBulleted from '@/components/icons/IconToolbarListBulleted.vue'
 import IconDoneCheckCircle from '@/components/icons/IconDoneCheckCircle.vue'
+import IconSettings from '@/components/icons/IconSettings.vue'
 import { useMetadataStore } from '@/stores/metadataStore.js'
 
 const props = defineProps({
@@ -175,7 +192,7 @@ const selectedTemplateId = ref('')
 const details = reactive({ name: '', displayName: '', description: '' })
 const properties = ref([]) // [{ propertyName, propertySchema, required }]
 const addVisible = ref(false)
-const finishMode = ref('model') // 'model' | 'advanced'
+const advancedMode = ref(false) // true once the Advanced (JSON) step is opened
 const creating = ref(false)
 const createError = ref('')
 
@@ -197,20 +214,16 @@ const steps = computed(() => {
   const rest = [
     { key: 'details', title: 'Details' },
     { key: 'properties', title: 'Properties' },
-    { key: 'save', title: 'Save' },
+    { key: 'save', title: 'Review' },
   ]
-  return startMode.value === 'template'
+  const base = startMode.value === 'template'
     ? [start, { key: 'template', title: 'Template' }, ...rest]
     : [start, ...rest]
+  // The Advanced (JSON) step only exists once the user opts into it.
+  return advancedMode.value ? [...base, { key: 'advanced', title: 'Advanced' }] : base
 })
 const currentKey = computed(() => (steps.value[stepIndex.value] || steps.value[0]).key)
 const isLastStep = computed(() => stepIndex.value >= steps.value.length - 1)
-
-// Keep the advanced JSON in sync with the latest properties when arriving at
-// the final step (e.g. after going back to add a property).
-watch(currentKey, (k) => {
-  if (k === 'save' && finishMode.value === 'advanced') refreshJson()
-})
 
 const canAdvance = computed(() => {
   switch (currentKey.value) {
@@ -228,7 +241,7 @@ const canAdvance = computed(() => {
 })
 const canCreate = computed(() => {
   if (!details.name) return false
-  if (finishMode.value === 'advanced') return !!jsonContent.value.trim() && !jsonError.value
+  if (currentKey.value === 'advanced') return !!jsonContent.value.trim() && !jsonError.value
   return properties.value.length > 0
 })
 
@@ -239,7 +252,8 @@ const stepHelp = computed(
       template: 'Pick a template to start from — its properties come along and you can adjust them in the next steps.',
       details: 'Give your model a name and a short description.',
       properties: 'Add the fields this model captures. Reuse common data elements wherever you can.',
-      save: 'Create the model now — or switch to Advanced to fine-tune the raw JSON Schema first. (Templates are created later, from a saved model.)',
+      save: 'Review the model, then create it. Need finer control? Use Advanced to edit the raw JSON Schema first. (Templates are created later, from a saved model.)',
+      advanced: 'Fine-tune the raw JSON Schema. Edits here are what gets created.',
     }[currentKey.value] || '')
 )
 const stepIcon = computed(
@@ -250,6 +264,7 @@ const stepIcon = computed(
       details: IconDocument,
       properties: IconToolbarListBulleted,
       save: IconDoneCheckCircle,
+      advanced: IconSettings,
     }[currentKey.value] || IconGuide)
 )
 
@@ -308,6 +323,16 @@ const removeProperty = (i) => {
 const next = () => {
   if (canAdvance.value && !isLastStep.value) stepIndex.value += 1
 }
+// Back also collapses Advanced when stepping back into the guided flow, so the
+// JSON re-derives fresh from properties next time Advanced is opened.
+const back = () => {
+  if (stepIndex.value > 0) stepIndex.value -= 1
+  if (advancedMode.value && currentKey.value !== 'advanced' && currentKey.value !== 'save') {
+    advancedMode.value = false
+    jsonContent.value = ''
+    jsonError.value = ''
+  }
+}
 
 // Assemble the JSON Schema from the properties collected in the wizard.
 const buildSchema = () => {
@@ -337,8 +362,14 @@ const refreshJson = () => {
   jsonContent.value = JSON.stringify(buildSchema(), null, 2)
   jsonError.value = ''
 }
-const onFinishModeChange = (mode) => {
-  if (mode === 'advanced') refreshJson()
+// Open the Advanced step: on first open, seed the JSON from the guided
+// properties. Re-opening (after Back) keeps existing edits.
+const goAdvanced = () => {
+  if (!advancedMode.value) {
+    advancedMode.value = true
+    refreshJson()
+  }
+  stepIndex.value = steps.value.length - 1
 }
 const validateJson = () => {
   const text = jsonContent.value.trim()
@@ -386,7 +417,7 @@ const onJsonKeydown = (event) => {
 const create = async () => {
   createError.value = ''
   let schema
-  if (finishMode.value === 'advanced') {
+  if (currentKey.value === 'advanced') {
     if (!validateJson()) return
     schema = JSON.parse(jsonContent.value)
   } else {
@@ -429,7 +460,7 @@ const reset = () => {
   details.description = ''
   properties.value = []
   addVisible.value = false
-  finishMode.value = 'model'
+  advancedMode.value = false
   jsonContent.value = ''
   jsonError.value = ''
   creating.value = false
