@@ -12,6 +12,11 @@
         <el-step title="Save" />
       </el-steps>
 
+      <div v-if="stepHelp" class="cmw-instruction">
+        <el-icon><InfoFilled /></el-icon>
+        <span>{{ stepHelp }}</span>
+      </div>
+
       <!-- STEP 1 — START -->
       <div v-show="stepIndex === 0" class="cmw-step">
         <div class="cmw-q">How do you want to start?</div>
@@ -116,7 +121,7 @@
 <script setup>
 import { ref, reactive, computed, watch } from 'vue'
 import { ElMessage } from 'element-plus'
-import { Plus, Close, Files, EditPen, Search } from '@element-plus/icons-vue'
+import { Plus, Close, Files, EditPen, Search, InfoFilled } from '@element-plus/icons-vue'
 import BfDialogHeader from '@/components/shared/bf-dialog-header/BfDialogHeader.vue'
 import DialogBody from '@/components/shared/dialog-body/DialogBody.vue'
 import AddPropertyWizard from '@/components/datasets/metadata/models/AddPropertyWizard.vue'
@@ -173,6 +178,16 @@ const canAdvance = computed(() => {
   return true
 })
 const canCreate = computed(() => !!details.name && properties.value.length > 0)
+
+const stepHelp = computed(
+  () =>
+    [
+      'A model describes one kind of record (like a participant or a sample). Start from a template or build it from scratch.',
+      'Give your model a name and a short description.',
+      'Add the fields this model captures. Reuse common data elements wherever you can.',
+      'Create it as a model in this dataset, or as a reusable template for the workspace.',
+    ][stepIndex.value] || ''
+)
 
 const setStart = (mode) => {
   startMode.value = mode
@@ -320,7 +335,24 @@ function dedupe(name, taken) {
 <style scoped lang="scss">
 @use "../../../../styles/theme" as theme;
 .cmw-steps {
-  margin-bottom: 24px;
+  margin-bottom: 20px;
+}
+.cmw-instruction {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  background: theme.$gray_1;
+  border-radius: 3px;
+  padding: 8px 12px;
+  margin-bottom: 20px;
+  font-size: 13px;
+  line-height: 1.4;
+  color: theme.$gray_5;
+  .el-icon {
+    color: theme.$purple_2;
+    margin-top: 2px;
+    flex-shrink: 0;
+  }
 }
 .cmw-step {
   min-height: 220px;

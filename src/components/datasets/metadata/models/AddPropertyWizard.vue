@@ -9,6 +9,11 @@
         <el-step v-for="s in steps" :key="s.key" :title="s.title" />
       </el-steps>
 
+      <div v-if="stepHelp" class="wiz-instruction">
+        <el-icon><InfoFilled /></el-icon>
+        <span>{{ stepHelp }}</span>
+      </div>
+
       <!-- SOURCE -->
       <div v-show="currentKey === 'source'" class="wiz-step">
         <div class="wiz-q">How are this property's values defined?</div>
@@ -206,7 +211,7 @@
 <script setup>
 import { ref, reactive, computed, watch } from 'vue'
 import { ElMessage } from 'element-plus'
-import { Link, EditPen, Search, Close } from '@element-plus/icons-vue'
+import { Link, EditPen, Search, Close, InfoFilled } from '@element-plus/icons-vue'
 import debounce from 'lodash.debounce'
 import BfDialogHeader from '@/components/shared/bf-dialog-header/BfDialogHeader.vue'
 import DialogBody from '@/components/shared/dialog-body/DialogBody.vue'
@@ -308,6 +313,18 @@ const steps = computed(() => {
 })
 const currentKey = computed(() => (steps.value[stepIndex.value] || steps.value[0]).key)
 const isLastStep = computed(() => stepIndex.value >= steps.value.length - 1)
+
+const stepHelp = computed(
+  () =>
+    ({
+      source: 'Choose where this property’s values come from. Reusing a common data element keeps your data consistent with other datasets.',
+      details: 'Name the property and describe it. If you linked a CDE these are pre-filled — adjust as needed.',
+      type: 'Pick the kind of value this property holds.',
+      values: 'Set the allowed values and any limits. Only the options relevant to your type are shown.',
+      members: 'This bundle adds several properties — one per element. Review the names and uncheck any you don’t need.',
+      options: 'Choose how this property behaves on records.',
+    }[currentKey.value] || '')
+)
 
 const summaryType = computed(() =>
   isManual.value ? manual.type : (selectedCde.value && selectedCde.value.cde_data_type) || ''
@@ -561,7 +578,24 @@ function manualValueSchema() {
 <style scoped lang="scss">
 @use "../../../../styles/theme" as theme;
 .wiz-steps {
-  margin-bottom: 24px;
+  margin-bottom: 20px;
+}
+.wiz-instruction {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  background: theme.$gray_1;
+  border-radius: 3px;
+  padding: 8px 12px;
+  margin-bottom: 20px;
+  font-size: 13px;
+  line-height: 1.4;
+  color: theme.$gray_5;
+  .el-icon {
+    color: theme.$purple_2;
+    margin-top: 2px;
+    flex-shrink: 0;
+  }
 }
 .wiz-step {
   min-height: 240px;
