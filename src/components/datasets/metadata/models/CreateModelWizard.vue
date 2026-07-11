@@ -96,10 +96,25 @@
           {{ details.name }} · {{ properties.length }} propert{{ properties.length === 1 ? 'y' : 'ies' }}
         </div>
         <div class="cmw-label">Finish</div>
-        <el-radio-group v-model="finishMode">
+        <el-radio-group v-model="finishMode" @change="onFinishModeChange">
           <el-radio value="model">Create model — add it to this dataset now</el-radio>
-          <el-radio value="draft">Create draft (advanced) — open the full editor to fine-tune the JSON before saving</el-radio>
+          <el-radio value="advanced">Advanced — edit the JSON Schema before saving</el-radio>
         </el-radio-group>
+
+        <div v-if="finishMode === 'advanced'" class="cmw-json">
+          <el-input
+            ref="jsonEditor"
+            v-model="jsonContent"
+            type="textarea"
+            :rows="16"
+            spellcheck="false"
+            placeholder="JSON Schema…"
+            @input="validateJson"
+            @keydown="onJsonKeydown"
+          />
+          <div v-if="jsonError" class="cmw-error">{{ jsonError }}</div>
+        </div>
+
         <div v-if="createError" class="cmw-error">{{ createError }}</div>
       </div>
     </dialog-body>
@@ -109,7 +124,7 @@
       <el-button v-if="stepIndex > 0" @click="stepIndex -= 1">Back</el-button>
       <el-button v-if="!isLastStep" type="primary" :disabled="!canAdvance" @click="next">Continue</el-button>
       <el-button v-else type="primary" :loading="creating" :disabled="!canCreate" @click="create">
-        {{ finishMode === 'draft' ? 'Open advanced editor' : 'Create model' }}
+        Create model
       </el-button>
     </template>
 
@@ -120,7 +135,6 @@
 
 <script setup>
 import { ref, reactive, computed, watch } from 'vue'
-import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { Plus, Close, Files, EditPen, Search } from '@element-plus/icons-vue'
 import BfDialogHeader from '@/components/shared/bf-dialog-header/BfDialogHeader.vue'
@@ -141,7 +155,6 @@ const props = defineProps({
 const emit = defineEmits(['update:visible', 'created', 'cancel'])
 
 const metadataStore = useMetadataStore()
-const router = useRouter()
 
 const dialogVisible = computed({
   get: () => props.visible,
@@ -162,9 +175,14 @@ const selectedTemplateId = ref('')
 const details = reactive({ name: '', displayName: '', description: '' })
 const properties = ref([]) // [{ propertyName, propertySchema, required }]
 const addVisible = ref(false)
-const finishMode = ref('model') // 'model' | 'draft'
+const finishMode = ref('model') // 'model' | 'advanced'
 const creating = ref(false)
 const createError = ref('')
+
+// Inline "Advanced" JSON Schema editor (mirrors ModelSpecGenerator's JSON mode).
+const jsonContent = ref('')
+const jsonError = ref('')
+const jsonEditor = ref(null)
 
 const propertyNames = computed(() => properties.value.map((p) => p.propertyName))
 const filteredTemplates = computed(() => {
@@ -188,6 +206,12 @@ const steps = computed(() => {
 const currentKey = computed(() => (steps.value[stepIndex.value] || steps.value[0]).key)
 const isLastStep = computed(() => stepIndex.value >= steps.value.length - 1)
 
+// Keep the advanced JSON in sync with the latest properties when arriving at
+// the final step (e.g. after going back to add a property).
+watch(currentKey, (k) => {
+  if (k === 'save' && finishMode.value === 'advanced') refreshJson()
+})
+
 const canAdvance = computed(() => {
   switch (currentKey.value) {
     case 'start':
@@ -202,7 +226,11 @@ const canAdvance = computed(() => {
       return true
   }
 })
-const canCreate = computed(() => !!details.name && properties.value.length > 0)
+const canCreate = computed(() => {
+  if (!details.name) return false
+  if (finishMode.value === 'advanced') return !!jsonContent.value.trim() && !jsonError.value
+  return properties.value.length > 0
+})
 
 const stepHelp = computed(
   () =>
@@ -211,7 +239,7 @@ const stepHelp = computed(
       template: 'Pick a template to start from — its properties come along and you can adjust them in the next steps.',
       details: 'Give your model a name and a short description.',
       properties: 'Add the fields this model captures. Reuse common data elements wherever you can.',
-      save: 'Create the model now — or open the advanced editor to fine-tune the raw JSON first. (Templates are created later, from a saved model.)',
+      save: 'Create the model now — or switch to Advanced to fine-tune the raw JSON Schema first. (Templates are created later, from a saved model.)',
     }[currentKey.value] || '')
 )
 const stepIcon = computed(
@@ -281,7 +309,8 @@ const next = () => {
   if (canAdvance.value && !isLastStep.value) stepIndex.value += 1
 }
 
-const buildPayload = () => {
+// Assemble the JSON Schema from the properties collected in the wizard.
+const buildSchema = () => {
   const schema = {
     $schema: 'https://json-schema.org/draft/2020-12/schema',
     type: 'object',
@@ -292,39 +321,80 @@ const buildPayload = () => {
     schema.properties[p.propertyName] = p.propertySchema
     if (p.required) schema.required.push(p.propertyName)
   }
-  return {
-    name: details.name,
-    display_name: details.displayName || details.name,
-    description: details.description,
-    schema,
-  }
+  return schema
 }
+const buildPayload = (schema) => ({
+  name: details.name,
+  display_name: details.displayName || details.name,
+  description: details.description,
+  schema,
+})
 
-// "Create draft (advanced)": hand the assembled model off to the full model
-// editor — seeded via the same base64 query the template gallery uses — so the
-// user can fine-tune the raw JSON before saving. Nothing is persisted here.
-const openAdvanced = () => {
-  let encoded
-  try {
-    encoded = btoa(JSON.stringify(buildPayload()))
-  } catch (e) {
-    createError.value = 'Could not open the advanced editor (unsupported characters). Try “Create model” instead.'
-    return
+// Advanced mode: expose the assembled schema as editable JSON. Re-derive from
+// the current properties whenever the user enters advanced mode (or returns to
+// this step) so it always reflects what they built.
+const refreshJson = () => {
+  jsonContent.value = JSON.stringify(buildSchema(), null, 2)
+  jsonError.value = ''
+}
+const onFinishModeChange = (mode) => {
+  if (mode === 'advanced') refreshJson()
+}
+const validateJson = () => {
+  const text = jsonContent.value.trim()
+  if (!text) {
+    jsonError.value = 'JSON Schema cannot be empty'
+    return false
   }
-  close()
-  router.push({
-    name: 'new-model',
-    params: { datasetId: props.datasetId, orgId: props.orgId },
-    query: { template: encoded },
+  let parsed
+  try {
+    parsed = JSON.parse(jsonContent.value)
+  } catch (e) {
+    jsonError.value = `Invalid JSON: ${e.message}`
+    return false
+  }
+  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+    jsonError.value = 'Schema must be a JSON object'
+    return false
+  }
+  if (parsed.type !== 'object') {
+    jsonError.value = 'Root schema "type" must be "object"'
+    return false
+  }
+  if (!parsed.properties || typeof parsed.properties !== 'object') {
+    jsonError.value = 'Schema must have a "properties" object'
+    return false
+  }
+  jsonError.value = ''
+  return true
+}
+// TAB inserts two spaces instead of moving focus.
+const onJsonKeydown = (event) => {
+  if (event.key !== 'Tab') return
+  event.preventDefault()
+  const el = jsonEditor.value?.$refs?.textarea || jsonEditor.value?.textarea
+  if (!el) return
+  const start = el.selectionStart
+  const end = el.selectionEnd
+  const v = jsonContent.value
+  jsonContent.value = `${v.slice(0, start)}  ${v.slice(end)}`
+  requestAnimationFrame(() => {
+    el.selectionStart = el.selectionEnd = start + 2
   })
 }
 
 const create = async () => {
-  if (finishMode.value === 'draft') return openAdvanced()
   createError.value = ''
+  let schema
+  if (finishMode.value === 'advanced') {
+    if (!validateJson()) return
+    schema = JSON.parse(jsonContent.value)
+  } else {
+    schema = buildSchema()
+  }
   creating.value = true
   try {
-    const result = await metadataStore.createModel(props.datasetId, buildPayload())
+    const result = await metadataStore.createModel(props.datasetId, buildPayload(schema))
     ElMessage.success('Model created')
     emit('created', { kind: 'model', result })
     close()
@@ -360,6 +430,8 @@ const reset = () => {
   properties.value = []
   addVisible.value = false
   finishMode.value = 'model'
+  jsonContent.value = ''
+  jsonError.value = ''
   creating.value = false
   createError.value = ''
 }
@@ -548,6 +620,14 @@ function dedupe(name, taken) {
   font-size: 12px;
   color: theme.$gray_4;
   margin-bottom: 8px;
+}
+.cmw-json {
+  margin-top: 14px;
+  :deep(.el-textarea__inner) {
+    font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+    font-size: 12px;
+    line-height: 1.5;
+  }
 }
 :deep(.el-radio) {
   display: flex;
