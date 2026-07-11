@@ -109,16 +109,7 @@
       <!-- ADVANCED (edit JSON Schema) -->
       <div v-show="currentKey === 'advanced'" class="cmw-step">
         <div class="cmw-json">
-          <el-input
-            ref="jsonEditor"
-            v-model="jsonContent"
-            type="textarea"
-            :rows="16"
-            spellcheck="false"
-            placeholder="JSON Schema…"
-            @input="validateJson"
-            @keydown="onJsonKeydown"
-          />
+          <json-schema-editor v-model="jsonContent" autofocus />
           <div v-if="jsonError" class="cmw-error">{{ jsonError }}</div>
         </div>
         <div v-if="createError" class="cmw-error">{{ createError }}</div>
@@ -156,6 +147,7 @@ import { Plus, Close, Files, EditPen, Search } from '@element-plus/icons-vue'
 import BfDialogHeader from '@/components/shared/bf-dialog-header/BfDialogHeader.vue'
 import DialogBody from '@/components/shared/dialog-body/DialogBody.vue'
 import AddPropertyWizard from '@/components/datasets/metadata/models/AddPropertyWizard.vue'
+import JsonSchemaEditor from '@/components/datasets/metadata/models/JsonSchemaEditor.vue'
 import IconGuide from '@/components/icons/IconGuide.vue'
 import IconAddTemplate from '@/components/icons/IconAddTemplate.vue'
 import IconDocument from '@/components/icons/IconDocument.vue'
@@ -196,10 +188,9 @@ const advancedMode = ref(false) // true once the Advanced (JSON) step is opened
 const creating = ref(false)
 const createError = ref('')
 
-// Inline "Advanced" JSON Schema editor (mirrors ModelSpecGenerator's JSON mode).
+// Inline "Advanced" JSON Schema editor state.
 const jsonContent = ref('')
 const jsonError = ref('')
-const jsonEditor = ref(null)
 
 const propertyNames = computed(() => properties.value.map((p) => p.propertyName))
 const filteredTemplates = computed(() => {
@@ -399,20 +390,10 @@ const validateJson = () => {
   jsonError.value = ''
   return true
 }
-// TAB inserts two spaces instead of moving focus.
-const onJsonKeydown = (event) => {
-  if (event.key !== 'Tab') return
-  event.preventDefault()
-  const el = jsonEditor.value?.$refs?.textarea || jsonEditor.value?.textarea
-  if (!el) return
-  const start = el.selectionStart
-  const end = el.selectionEnd
-  const v = jsonContent.value
-  jsonContent.value = `${v.slice(0, start)}  ${v.slice(end)}`
-  requestAnimationFrame(() => {
-    el.selectionStart = el.selectionEnd = start + 2
-  })
-}
+// Re-validate as the user edits the JSON (drives canCreate + the error line).
+watch(jsonContent, () => {
+  if (advancedMode.value) validateJson()
+})
 
 const create = async () => {
   createError.value = ''
@@ -653,12 +634,7 @@ function dedupe(name, taken) {
   margin-bottom: 8px;
 }
 .cmw-json {
-  margin-top: 14px;
-  :deep(.el-textarea__inner) {
-    font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
-    font-size: 12px;
-    line-height: 1.5;
-  }
+  margin-top: 4px;
 }
 :deep(.el-radio) {
   display: flex;
