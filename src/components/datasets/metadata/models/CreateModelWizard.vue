@@ -95,10 +95,10 @@
         <div class="cmw-summary">
           {{ details.name }} · {{ properties.length }} propert{{ properties.length === 1 ? 'y' : 'ies' }}
         </div>
-        <div class="cmw-label">Save as</div>
-        <el-radio-group v-model="saveAs">
-          <el-radio value="model">Model — a metadata schema in this dataset</el-radio>
-          <el-radio value="template">Template — a reusable schema shared across the workspace</el-radio>
+        <div class="cmw-label">Finish</div>
+        <el-radio-group v-model="finishMode">
+          <el-radio value="model">Create model — add it to this dataset now</el-radio>
+          <el-radio value="draft">Create draft (advanced) — open the full editor to fine-tune the JSON before saving</el-radio>
         </el-radio-group>
         <div v-if="createError" class="cmw-error">{{ createError }}</div>
       </div>
@@ -109,7 +109,7 @@
       <el-button v-if="stepIndex > 0" @click="stepIndex -= 1">Back</el-button>
       <el-button v-if="!isLastStep" type="primary" :disabled="!canAdvance" @click="next">Continue</el-button>
       <el-button v-else type="primary" :loading="creating" :disabled="!canCreate" @click="create">
-        Create {{ saveAs }}
+        {{ finishMode === 'draft' ? 'Open advanced editor' : 'Create model' }}
       </el-button>
     </template>
 
@@ -120,6 +120,7 @@
 
 <script setup>
 import { ref, reactive, computed, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { Plus, Close, Files, EditPen, Search } from '@element-plus/icons-vue'
 import BfDialogHeader from '@/components/shared/bf-dialog-header/BfDialogHeader.vue'
@@ -140,6 +141,7 @@ const props = defineProps({
 const emit = defineEmits(['update:visible', 'created', 'cancel'])
 
 const metadataStore = useMetadataStore()
+const router = useRouter()
 
 const dialogVisible = computed({
   get: () => props.visible,
@@ -160,7 +162,7 @@ const selectedTemplateId = ref('')
 const details = reactive({ name: '', displayName: '', description: '' })
 const properties = ref([]) // [{ propertyName, propertySchema, required }]
 const addVisible = ref(false)
-const saveAs = ref('model')
+const finishMode = ref('model') // 'model' | 'draft'
 const creating = ref(false)
 const createError = ref('')
 
@@ -209,7 +211,7 @@ const stepHelp = computed(
       template: 'Pick a template to start from — its properties come along and you can adjust them in the next steps.',
       details: 'Give your model a name and a short description.',
       properties: 'Add the fields this model captures. Reuse common data elements wherever you can.',
-      save: 'Create it as a model in this dataset, or as a reusable template for the workspace.',
+      save: 'Create the model now — or open the advanced editor to fine-tune the raw JSON first. (Templates are created later, from a saved model.)',
     }[currentKey.value] || '')
 )
 const stepIcon = computed(
@@ -279,33 +281,52 @@ const next = () => {
   if (canAdvance.value && !isLastStep.value) stepIndex.value += 1
 }
 
+const buildPayload = () => {
+  const schema = {
+    $schema: 'https://json-schema.org/draft/2020-12/schema',
+    type: 'object',
+    properties: {},
+    required: [],
+  }
+  for (const p of properties.value) {
+    schema.properties[p.propertyName] = p.propertySchema
+    if (p.required) schema.required.push(p.propertyName)
+  }
+  return {
+    name: details.name,
+    display_name: details.displayName || details.name,
+    description: details.description,
+    schema,
+  }
+}
+
+// "Create draft (advanced)": hand the assembled model off to the full model
+// editor — seeded via the same base64 query the template gallery uses — so the
+// user can fine-tune the raw JSON before saving. Nothing is persisted here.
+const openAdvanced = () => {
+  let encoded
+  try {
+    encoded = btoa(JSON.stringify(buildPayload()))
+  } catch (e) {
+    createError.value = 'Could not open the advanced editor (unsupported characters). Try “Create model” instead.'
+    return
+  }
+  close()
+  router.push({
+    name: 'new-model',
+    params: { datasetId: props.datasetId, orgId: props.orgId },
+    query: { template: encoded },
+  })
+}
+
 const create = async () => {
+  if (finishMode.value === 'draft') return openAdvanced()
   createError.value = ''
   creating.value = true
   try {
-    const schema = {
-      $schema: 'https://json-schema.org/draft/2020-12/schema',
-      type: 'object',
-      properties: {},
-      required: [],
-    }
-    for (const p of properties.value) {
-      schema.properties[p.propertyName] = p.propertySchema
-      if (p.required) schema.required.push(p.propertyName)
-    }
-    const payload = {
-      name: details.name,
-      display_name: details.displayName || details.name,
-      description: details.description,
-      schema,
-    }
-    const result =
-      saveAs.value === 'template'
-        ? await metadataStore.createTemplateFromModel(payload, props.orgId)
-        : await metadataStore.createModel(props.datasetId, payload)
-
-    ElMessage.success(saveAs.value === 'template' ? 'Template created' : 'Model created')
-    emit('created', { kind: saveAs.value, result })
+    const result = await metadataStore.createModel(props.datasetId, buildPayload())
+    ElMessage.success('Model created')
+    emit('created', { kind: 'model', result })
     close()
   } catch (e) {
     createError.value = e?.message || String(e)
@@ -338,7 +359,7 @@ const reset = () => {
   details.description = ''
   properties.value = []
   addVisible.value = false
-  saveAs.value = 'model'
+  finishMode.value = 'model'
   creating.value = false
   createError.value = ''
 }
