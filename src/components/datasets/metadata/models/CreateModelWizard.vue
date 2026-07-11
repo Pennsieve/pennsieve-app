@@ -6,7 +6,13 @@
 
     <dialog-body>
       <el-steps :active="stepIndex" finish-status="success" align-center class="cmw-steps">
-        <el-step v-for="s in steps" :key="s.key" :title="s.title" />
+        <el-step
+          v-for="s in steps"
+          :key="s.key"
+          :title="s.title"
+          :status="stepSkipped(s.key) ? 'wait' : undefined"
+          :class="{ 'cmw-step-skipped': stepSkipped(s.key) }"
+        />
       </el-steps>
 
       <div v-if="stepHelp" class="cmw-instruction">
@@ -216,18 +222,19 @@ const filteredTemplates = computed(() => {
 })
 
 const steps = computed(() => {
-  const start = { key: 'start', title: 'Start' }
-  const rest = [
+  const base = [
+    { key: 'start', title: 'Start' },
+    { key: 'template', title: 'Template' },
     { key: 'details', title: 'Details' },
     { key: 'properties', title: 'Properties' },
     { key: 'save', title: 'Review' },
   ]
-  const base = startMode.value === 'template'
-    ? [start, { key: 'template', title: 'Template' }, ...rest]
-    : [start, ...rest]
   // The Advanced (JSON) step only exists once the user opts into it.
   return advancedMode.value ? [...base, { key: 'advanced', title: 'Advanced' }] : base
 })
+// The Template slot is always reserved in the rail so step numbers never shift;
+// it's skipped (and dimmed) unless the user chose to start from a template.
+const stepSkipped = (key) => key === 'template' && startMode.value !== 'template'
 const currentKey = computed(() => (steps.value[stepIndex.value] || steps.value[0]).key)
 const isLastStep = computed(() => stepIndex.value >= steps.value.length - 1)
 
@@ -330,12 +337,17 @@ const removeProperty = (i) => {
 }
 
 const next = () => {
-  if (canAdvance.value && !isLastStep.value) stepIndex.value += 1
+  if (!canAdvance.value || isLastStep.value) return
+  let i = stepIndex.value + 1
+  while (i < steps.value.length && stepSkipped(steps.value[i].key)) i += 1
+  if (i < steps.value.length) stepIndex.value = i
 }
 // Back also collapses Advanced when stepping back into the guided flow, so the
 // JSON re-derives fresh from properties next time Advanced is opened.
 const back = () => {
-  if (stepIndex.value > 0) stepIndex.value -= 1
+  let i = stepIndex.value - 1
+  while (i > 0 && stepSkipped(steps.value[i].key)) i -= 1
+  if (i >= 0) stepIndex.value = i
   if (advancedMode.value && currentKey.value !== 'advanced' && currentKey.value !== 'save') {
     advancedMode.value = false
     jsonContent.value = ''
@@ -515,6 +527,13 @@ function dedupe(name, taken) {
 @use "../../../../styles/theme" as theme;
 .cmw-steps {
   margin-bottom: 20px;
+}
+.cmw-step-skipped {
+  // Dim only the circle + label, not the connector line.
+  :deep(.el-step__icon),
+  :deep(.el-step__title) {
+    opacity: 0.45;
+  }
 }
 .cmw-instruction {
   text-align: center;
