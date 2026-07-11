@@ -109,7 +109,20 @@
       <!-- ADVANCED (edit JSON Schema) -->
       <div v-show="currentKey === 'advanced'" class="cmw-step">
         <div class="cmw-json">
-          <json-schema-editor v-model="jsonContent" autofocus />
+          <div v-if="jsonPropertyNames.length" class="cmw-json-bar">
+            <el-select
+              v-model="jumpTarget"
+              placeholder="Jump to property…"
+              size="small"
+              filterable
+              clearable
+              class="cmw-json-jump"
+              @change="onJumpTo"
+            >
+              <el-option v-for="n in jsonPropertyNames" :key="n" :label="n" :value="n" />
+            </el-select>
+          </div>
+          <json-schema-editor ref="jsonEditorRef" v-model="jsonContent" autofocus />
           <div v-if="jsonError" class="cmw-error">{{ jsonError }}</div>
         </div>
         <div v-if="createError" class="cmw-error">{{ createError }}</div>
@@ -191,6 +204,8 @@ const createError = ref('')
 // Inline "Advanced" JSON Schema editor state.
 const jsonContent = ref('')
 const jsonError = ref('')
+const jsonEditorRef = ref(null)
+const jumpTarget = ref('')
 
 const propertyNames = computed(() => properties.value.map((p) => p.propertyName))
 const filteredTemplates = computed(() => {
@@ -398,6 +413,27 @@ watch(jsonContent, () => {
   if (advancedMode.value) validateJson()
 })
 
+// Property names for the "Jump to…" dropdown — parsed live from the editor so
+// it tracks hand edits, falling back to the guided properties when invalid.
+const jsonPropertyNames = computed(() => {
+  try {
+    const parsed = JSON.parse(jsonContent.value)
+    if (parsed && parsed.properties && typeof parsed.properties === 'object') {
+      return Object.keys(parsed.properties)
+    }
+  } catch {
+    /* invalid mid-edit — fall back below */
+  }
+  return properties.value.map((p) => p.propertyName)
+})
+const onJumpTo = (name) => {
+  if (name) jsonEditorRef.value?.scrollToKey(name)
+  // Reset so the same property can be picked again.
+  requestAnimationFrame(() => {
+    jumpTarget.value = ''
+  })
+}
+
 const create = async () => {
   createError.value = ''
   let schema
@@ -447,6 +483,7 @@ const reset = () => {
   advancedMode.value = false
   jsonContent.value = ''
   jsonError.value = ''
+  jumpTarget.value = ''
   creating.value = false
   createError.value = ''
 }
@@ -638,6 +675,14 @@ function dedupe(name, taken) {
 }
 .cmw-json {
   margin-top: 4px;
+}
+.cmw-json-bar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 8px;
+}
+.cmw-json-jump {
+  width: 240px;
 }
 :deep(.el-radio) {
   display: flex;
