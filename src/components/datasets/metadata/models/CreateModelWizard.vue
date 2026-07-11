@@ -1,5 +1,5 @@
 <template>
-  <el-dialog v-model="dialogVisible" :show-close="false" width="720px" class="create-model-wizard">
+  <el-dialog v-model="dialogVisible" :show-close="false" :width="dialogWidth" class="create-model-wizard">
     <template #header>
       <bf-dialog-header title="Create model" />
     </template>
@@ -215,6 +215,9 @@ const steps = computed(() => {
 })
 const currentKey = computed(() => (steps.value[stepIndex.value] || steps.value[0]).key)
 const isLastStep = computed(() => stepIndex.value >= steps.value.length - 1)
+
+// The raw JSON step wants more room than the guided steps.
+const dialogWidth = computed(() => (currentKey.value === 'advanced' ? 'min(1040px, 94vw)' : '720px'))
 
 const canAdvance = computed(() => {
   switch (currentKey.value) {
