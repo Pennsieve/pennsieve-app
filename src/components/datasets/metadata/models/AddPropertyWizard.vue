@@ -352,18 +352,26 @@ const steps = computed(() => {
 const currentKey = computed(() => (steps.value[stepIndex.value] || steps.value[0]).key)
 const isLastStep = computed(() => stepIndex.value >= steps.value.length - 1)
 
-const stepHelp = computed(
-  () =>
-    ({
+const stepHelp = computed(() => {
+  // The Find step changes purpose once something is selected: searching vs.
+  // tuning the picked element. Keep enforcement wording with the strength
+  // control (below), not repeated here.
+  if (currentKey.value === 'find') {
+    return selectionKind.value
+      ? 'Set how strongly records should follow this element, then continue — or pick a different one.'
+      : 'Search the catalog and pick a data element — or a bundle to add several related properties at once.'
+  }
+  return (
+    {
       source: 'A common data element (CDE) is a standardized, reusable field — a shared name, data type, and allowed values — so the same concept is recorded the same way across datasets. Reuse one to keep your data comparable and mergeable, or define the property yourself.',
-      find: 'Search the catalog and pick a data element — or a bundle to add several related properties at once. Links default to Required, so the element’s data type and allowed values are enforced on your records.',
       details: 'Name the property and describe it. If you linked a CDE these are pre-filled — adjust as needed.',
       type: 'Pick the kind of value this property holds.',
       values: 'Set the allowed values and any limits. Only the options relevant to your type are shown.',
       members: 'These properties are added together as a set. Rename any as needed, then use the columns to set each one’s behavior.',
       options: 'Choose how this property behaves on records.',
-    }[currentKey.value] || '')
-)
+    }[currentKey.value] || ''
+  )
+})
 const stepIcon = computed(
   () =>
     ({
