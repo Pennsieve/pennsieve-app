@@ -81,18 +81,18 @@
               <template v-else>{{ selectedCde && selectedCde.cde_data_type }}</template>
             </div>
             <el-radio-group v-model="strength" class="wiz-choices">
-              <el-radio value="required" class="wiz-choice">
-                <span class="wiz-choice-label">Required</span>
-                <span class="wiz-choice-desc">Records must use these values; data type and allowed values are enforced.</span>
-              </el-radio>
-              <el-radio value="preferred" class="wiz-choice">
-                <span class="wiz-choice-label">Preferred</span>
-                <span class="wiz-choice-desc">Recommended values shown as guidance; not enforced.</span>
-              </el-radio>
-              <el-radio value="example" class="wiz-choice">
-                <span class="wiz-choice-label">Example</span>
-                <span class="wiz-choice-desc">Linked for reference only.</span>
-              </el-radio>
+              <div class="wiz-choice">
+                <el-radio value="required">Required</el-radio>
+                <p class="wiz-choice-desc">Records must use these values; data type and allowed values are enforced.</p>
+              </div>
+              <div class="wiz-choice">
+                <el-radio value="preferred">Preferred</el-radio>
+                <p class="wiz-choice-desc">Recommended values shown as guidance; not enforced.</p>
+              </div>
+              <div class="wiz-choice">
+                <el-radio value="example">Example</el-radio>
+                <p class="wiz-choice-desc">Linked for reference only.</p>
+              </div>
             </el-radio-group>
           </div>
         </div>
@@ -794,37 +794,30 @@ function manualValueSchema() {
   color: theme.$gray_5;
   margin-bottom: 6px;
 }
-// Vertical single-select list: each option shows its label + description.
+// Vertical single-select list. Plain <div> rows stack reliably (mirrors the
+// checkbox .wiz-option pattern); the el-radio holds only its label and the
+// description sits below. Override el-radio-group's default inline-flex.
 .wiz-choices {
-  display: flex;
-  flex-direction: column;
+  display: block;
   width: 100%;
 }
-:deep(.wiz-choice) {
-  display: flex;
-  align-items: flex-start;
-  height: auto;
-  margin: 0;
+.wiz-choice {
   padding: 10px 0;
-  white-space: normal;
 }
-:deep(.wiz-choice + .wiz-choice) {
+.wiz-choice + .wiz-choice {
   border-top: 1px solid theme.$gray_1;
 }
-:deep(.wiz-choice .el-radio__label) {
-  white-space: normal;
-  line-height: 1.4;
-}
-.wiz-choice-label {
-  display: block;
-  color: theme.$gray_6;
+:deep(.wiz-choice .el-radio) {
+  height: auto;
+  margin-right: 0;
   font-weight: 500;
+  color: theme.$gray_6;
 }
 .wiz-choice-desc {
-  display: block;
+  margin: 2px 0 0 24px;
   font-size: 12px;
   color: theme.$gray_5;
-  margin-top: 2px;
+  line-height: 1.4;
 }
 .wiz-cde-preview {
   background: theme.$purple_tint;
