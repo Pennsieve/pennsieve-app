@@ -325,8 +325,8 @@ const isLastStep = computed(() => stepIndex.value >= steps.value.length - 1)
 const stepHelp = computed(
   () =>
     ({
-      source: 'Choose where this property’s values come from. Reusing a common data element keeps your data consistent with other datasets.',
-      find: 'Search the catalog and pick a data element — or a bundle to add several related properties at once.',
+      source: 'A common data element (CDE) is a standardized, reusable field — a shared name, data type, and allowed values — so the same concept is recorded the same way across datasets. Reuse one to keep your data comparable and mergeable, or define the property yourself.',
+      find: 'Search the catalog and pick a data element — or a bundle to add several related properties at once. Links default to Required, so the element’s data type and allowed values are enforced on your records.',
       details: 'Name the property and describe it. If you linked a CDE these are pre-filled — adjust as needed.',
       type: 'Pick the kind of value this property holds.',
       values: 'Set the allowed values and any limits. Only the options relevant to your type are shown.',
@@ -357,7 +357,7 @@ const includedMembers = computed(() => memberRows.value.filter((m) => m.include)
 const strengthHint = computed(
   () =>
     ({
-      required: 'Records must use these values — type and allowed values are enforced on save.',
+      required: 'Default. Records must use these values — type and allowed values are enforced on save.',
       preferred: 'Recommended values shown as guidance. Not enforced.',
       example: 'Linked for reference only.',
     }[strength.value] || '')

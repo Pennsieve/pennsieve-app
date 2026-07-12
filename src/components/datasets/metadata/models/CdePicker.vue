@@ -154,7 +154,7 @@ const xrefs = computed(() => (Array.isArray(selected.value?.xrefs) ? selected.va
 const strengthHint = computed(
   () =>
     ({
-      required: 'Records must use these values — the data type and allowed values are set by this CDE and enforced when records are saved.',
+      required: 'Default. Records must use these values — the data type and allowed values are set by this CDE and enforced when records are saved.',
       preferred: 'Recommended values are shown as guidance. Not enforced.',
       example: 'Linked for reference only.',
     }[strength.value] || '')

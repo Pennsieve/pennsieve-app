@@ -144,8 +144,16 @@
             <div class="form-section">
               <h3 class="section-title">Common Data Element (optional)</h3>
               <p class="section-help">
-                Link a standardized element so this property harmonizes across datasets.
-                A “required” link sets and enforces the allowed values from the catalog on save.
+                A <strong>Common Data Element (CDE)</strong> is a standardized, reusable field —
+                a curated name, data type, and set of allowed values — so the same concept
+                (e.g. “Birth sex”) is recorded the same way across datasets. Linking one sets
+                this property’s type and values from the catalog, making your records comparable
+                and mergeable with others.
+              </p>
+              <p class="section-help">
+                New links default to <strong>Required</strong>, meaning the catalog’s allowed
+                values and data type are enforced on your records. Switch to <em>Preferred</em>
+                to keep them as non-binding guidance, or <em>Example</em> for a reference-only link.
               </p>
               <CdePicker v-model="propertyForm.cde" @select="onCdeSelect" />
             </div>
