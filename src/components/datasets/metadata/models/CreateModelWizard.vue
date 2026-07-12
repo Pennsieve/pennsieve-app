@@ -69,15 +69,15 @@
       <div v-show="currentKey === 'properties'" class="cmw-step">
         <div class="cmw-props-head">
           <span class="cmw-q">Properties</span>
-          <el-button size="small" @click="addVisible = true">
+          <el-button v-if="!addingProperty" size="small" @click="addingProperty = true">
             <el-icon><Plus /></el-icon> Add property
           </el-button>
         </div>
 
-        <div v-if="!properties.length" class="cmw-empty">
+        <div v-if="!properties.length && !addingProperty" class="cmw-empty">
           No properties yet. Add common data elements, a bundle, or define them manually.
         </div>
-        <ul v-else class="cmw-prop-list">
+        <ul v-else-if="properties.length" class="cmw-prop-list">
           <li v-for="(p, i) in properties" :key="i" class="cmw-prop">
             <div class="cmw-prop-main">
               <span class="cmw-prop-name">{{ p.propertyName }}</span>
@@ -86,6 +86,15 @@
             <el-button text size="small" @click="removeProperty(i)"><el-icon><Close /></el-icon></el-button>
           </li>
         </ul>
+
+        <!-- Add-property builder, inline (no nested dialog / second counter) -->
+        <property-form
+          v-if="addingProperty"
+          inline
+          :existing-properties="propertyNames"
+          @save="onPropsAdded"
+          @cancel="addingProperty = false"
+        />
       </div>
 
       <!-- REVIEW -->
@@ -145,9 +154,6 @@
       </el-button>
       <el-button v-else type="primary" :disabled="!canAdvance" @click="next">Continue</el-button>
     </template>
-
-    <!-- Nested: reuse the add-property wizard to build each property -->
-    <AddPropertyWizard v-model:visible="addVisible" :existing-properties="propertyNames" @save="onPropsAdded" />
   </el-dialog>
 </template>
 
@@ -157,7 +163,7 @@ import { ElMessage } from 'element-plus'
 import { Plus, Close, Files, EditPen, Search } from '@element-plus/icons-vue'
 import BfDialogHeader from '@/components/shared/bf-dialog-header/BfDialogHeader.vue'
 import DialogBody from '@/components/shared/dialog-body/DialogBody.vue'
-import AddPropertyWizard from '@/components/datasets/metadata/models/AddPropertyWizard.vue'
+import PropertyForm from '@/components/datasets/metadata/models/PropertyForm.vue'
 import JsonSchemaEditor from '@/components/datasets/metadata/models/JsonSchemaEditor.vue'
 import IconGuide from '@/components/icons/IconGuide.vue'
 import IconDocument from '@/components/icons/IconDocument.vue'
@@ -193,7 +199,7 @@ const selectedTemplateId = ref('')
 // Model details + properties
 const details = reactive({ name: '', displayName: '', description: '' })
 const properties = ref([]) // [{ propertyName, propertySchema, required }]
-const addVisible = ref(false)
+const addingProperty = ref(false)
 const advancedMode = ref(false) // true once the Advanced (JSON) step is opened
 const creating = ref(false)
 const createError = ref('')
@@ -313,6 +319,7 @@ const onPropsAdded = (defs) => {
     taken.add(name)
     properties.value.push({ ...def, propertyName: name })
   }
+  addingProperty.value = false
 }
 
 const removeProperty = (i) => {
@@ -469,7 +476,7 @@ const reset = () => {
   details.displayName = ''
   details.description = ''
   properties.value = []
-  addVisible.value = false
+  addingProperty.value = false
   advancedMode.value = false
   jsonContent.value = ''
   jsonError.value = ''
