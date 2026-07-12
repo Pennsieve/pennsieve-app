@@ -274,7 +274,7 @@ watch(
   margin-top: 12px;
 }
 .cde-label {
-  color: theme.$gray_4;
+  color: theme.$gray_5;
   font-size: 12px;
   margin-bottom: 6px;
 }

@@ -747,7 +747,7 @@ function manualValueSchema() {
 }
 .wiz-selected-sub {
   font-size: 13px;
-  color: theme.$gray_4;
+  color: theme.$gray_5;
   margin-top: 2px;
 }
 .wiz-strength {
@@ -755,7 +755,7 @@ function manualValueSchema() {
 }
 .wiz-label {
   font-size: 12px;
-  color: theme.$gray_4;
+  color: theme.$gray_5;
   margin-bottom: 6px;
 }
 .wiz-hint {
