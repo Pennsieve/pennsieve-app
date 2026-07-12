@@ -255,7 +255,7 @@ const selectionKind = ref('') // '' | 'cde' | 'bundle'
 const selectedCde = ref(null)
 const selectedBundleName = ref('')
 const memberRows = ref([])
-const strength = ref('preferred')
+const strength = ref('required')
 
 // Forms
 const basics = reactive({ name: '', displayName: '', description: '' })
@@ -503,7 +503,7 @@ const reset = () => {
   results.value = { bundles: [], cdes: [] }
   searchError.value = ''
   clearSelection()
-  strength.value = 'preferred'
+  strength.value = 'required'
   basics.name = ''
   basics.displayName = ''
   basics.description = ''

@@ -147,7 +147,7 @@
                 Link a standardized element so this property harmonizes across datasets.
                 A “required” link sets and enforces the allowed values from the catalog on save.
               </p>
-              <CdePicker v-model="propertyForm.cde" />
+              <CdePicker v-model="propertyForm.cde" @select="onCdeSelect" />
             </div>
 
             <!-- Property Options -->
@@ -609,6 +609,34 @@ const availableFormats = computed(() => {
   }
   return []
 })
+
+// When a CDE is linked, let it drive the property's datatype (not always
+// string) — mirrors the wizard's dataTypeSchema and the server's applyDatatype.
+// Detach (null) leaves the current type untouched.
+const onCdeSelect = (cde) => {
+  if (!cde || !cde.cde_data_type) return
+  switch (cde.cde_data_type) {
+    case 'Number':
+      propertyForm.value.type = 'number'
+      propertyForm.value.format = ''
+      break
+    case 'Date':
+      propertyForm.value.type = 'string'
+      propertyForm.value.format = 'date'
+      break
+    case 'Datetime':
+      propertyForm.value.type = 'string'
+      propertyForm.value.format = 'date-time'
+      break
+    case 'Time':
+      propertyForm.value.type = 'string'
+      propertyForm.value.format = 'time'
+      break
+    default: // Text, Value List, and other/unknown → string
+      propertyForm.value.type = 'string'
+      propertyForm.value.format = ''
+  }
+}
 
 const constraintsSectionTitle = computed(() => {
   if (propertyForm.value.isArray) {
@@ -1078,7 +1106,7 @@ const handleSave = () => {
   if (propertyForm.value.cde && propertyForm.value.cde.persistent_id) {
     property['x-pennsieve-cde'] = {
       persistent_id: propertyForm.value.cde.persistent_id,
-      strength: propertyForm.value.cde.strength || 'preferred'
+      strength: propertyForm.value.cde.strength || 'required'
     }
   }
 

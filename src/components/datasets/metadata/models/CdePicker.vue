@@ -97,7 +97,7 @@ const results = ref([])
 const searching = ref(false)
 const searchError = ref('')
 const selected = ref(null) // full CDE record
-const strength = ref('preferred')
+const strength = ref('required')
 
 const runSearch = async () => {
   const t = term.value.trim()
@@ -122,7 +122,7 @@ const onInput = debounce(runSearch, 300)
 
 const select = (cde) => {
   selected.value = cde
-  if (!strength.value) strength.value = 'preferred'
+  if (!strength.value) strength.value = 'required'
   emitBinding()
   emit('select', cde)
 }
@@ -164,7 +164,7 @@ const strengthHint = computed(
 const hydrate = async () => {
   const binding = props.modelValue
   if (!binding || !binding.persistent_id) return
-  strength.value = binding.strength || 'preferred'
+  strength.value = binding.strength || 'required'
   let record = null
   try {
     record = await store.getByPersistentId(binding.persistent_id)
