@@ -182,6 +182,8 @@
             <el-input v-model="m.name" :disabled="!m.include" class="wiz-member-name" size="small" />
             <span class="wiz-member-cde" :title="m.cde.cde_name">{{ m.cde.cde_name }}</span>
             <span v-if="m.include && collides(m.name, i)" class="wiz-collision">name in use</span>
+            <el-checkbox v-model="m.isKey" :disabled="!m.include" size="small" class="wiz-member-flag">Key</el-checkbox>
+            <el-checkbox v-model="m.isSensitive" :disabled="!m.include" size="small" class="wiz-member-flag">PHI</el-checkbox>
           </div>
         </div>
       </div>
@@ -197,15 +199,14 @@
           <el-checkbox v-model="options.required">
             Required on every record{{ isBundle ? ' (all members)' : '' }}
           </el-checkbox>
-          <el-checkbox v-model="options.isKey">
-            Part of key{{ isBundle ? ' (all members)' : '' }}
-          </el-checkbox>
-          <el-checkbox v-model="options.isSensitive">
-            Sensitive data / PHI{{ isBundle ? ' (all members)' : '' }}
-          </el-checkbox>
+          <template v-if="!isBundle">
+            <el-checkbox v-model="options.isKey">Part of key</el-checkbox>
+            <el-checkbox v-model="options.isSensitive">Sensitive data / PHI</el-checkbox>
+          </template>
         </div>
-        <p v-if="isBundle && options.isKey" class="wiz-hint">
-          The record key becomes a hash of all bundle members’ values (each is also marked required).
+        <p v-if="isBundle" class="wiz-hint">
+          Set “Part of key” and “Sensitive / PHI” per property back in the Members step. Any key
+          member’s value joins the record’s composite key.
         </p>
       </div>
     </dialog-body>
@@ -407,7 +408,7 @@ const chooseBundle = async (b) => {
     memberRows.value = members.map((cde) => {
       const name = dedupe(toPropName(cde.cde_name), taken)
       taken.add(name)
-      return { cde, name, include: true }
+      return { cde, name, include: true, isKey: false, isSensitive: false }
     })
   } catch (e) {
     ElMessage.error('Failed to load bundle members: ' + (e?.message || e))
@@ -481,9 +482,9 @@ const buildBundleDefs = () =>
     if (m.cde.cde_definition) schema.description = m.cde.cde_definition
     Object.assign(schema, dataTypeSchema(m.cde.cde_data_type))
     schema['x-pennsieve-cde'] = { persistent_id: m.cde.persistent_id, strength: strength.value }
-    if (options.isKey) schema['x-pennsieve-key'] = true
-    if (options.isSensitive) schema['x-pennsieve-sensitive'] = true
-    return { propertyName: m.name, propertySchema: schema, required: options.required || options.isKey, oldPropertyName: null }
+    if (m.isKey) schema['x-pennsieve-key'] = true
+    if (m.isSensitive) schema['x-pennsieve-sensitive'] = true
+    return { propertyName: m.name, propertySchema: schema, required: options.required || m.isKey, oldPropertyName: null }
   })
 
 const collides = (name, index) => {
@@ -846,6 +847,11 @@ function manualValueSchema() {
 .wiz-collision {
   font-size: 12px;
   color: theme.$orange_2;
+}
+.wiz-member-flag {
+  flex-shrink: 0;
+  margin-right: 0;
+  --el-checkbox-font-size: 12px;
 }
 .wiz-summary {
   font-size: 14px;
