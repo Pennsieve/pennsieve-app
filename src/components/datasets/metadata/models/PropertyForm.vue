@@ -69,10 +69,32 @@
           <template v-if="results.bundles.length">
             <div class="wiz-group">Bundles</div>
             <ul class="wiz-list">
-              <li v-for="b in results.bundles" :key="'b:' + b.bundle_name" class="wiz-row" @click="chooseBundle(b)">
-                <span class="wiz-row-name">{{ b.bundle_name }}</span>
-                <span class="wiz-row-meta">bundle · {{ b.member_count }} element{{ b.member_count === 1 ? '' : 's' }}</span>
-              </li>
+              <el-tooltip
+                v-for="b in results.bundles"
+                :key="'b:' + b.bundle_name"
+                placement="right"
+                effect="light"
+                :show-after="350"
+              >
+                <template #content>
+                  <div style="max-width: 340px">
+                    <div style="font-size: 12px; opacity: 0.7">
+                      bundle · {{ b.member_count }} element{{ b.member_count === 1 ? '' : 's' }}
+                      <template v-if="b.domain"> · {{ b.domain }}</template>
+                    </div>
+                    <div style="margin-top: 6px; font-size: 12px">
+                      <template v-if="!bundlePreviews[b.bundle_name] || bundlePreviews[b.bundle_name].loading">
+                        Loading members…
+                      </template>
+                      <template v-else>{{ bundlePreview(b) }}</template>
+                    </div>
+                  </div>
+                </template>
+                <li class="wiz-row" @click="chooseBundle(b)" @mouseenter="loadBundlePreview(b.bundle_name)">
+                  <span class="wiz-row-name">{{ b.bundle_name }}</span>
+                  <span class="wiz-row-meta">bundle · {{ b.member_count }} element{{ b.member_count === 1 ? '' : 's' }}</span>
+                </li>
+              </el-tooltip>
             </ul>
           </template>
           <template v-if="results.cdes.length">
@@ -390,6 +412,25 @@ const cdeValuesPreview = (c) => {
   if (!pvs.length) return ''
   const head = pvs.slice(0, 6).join(', ')
   return pvs.length > 6 ? `${head} +${pvs.length - 6} more` : head
+}
+
+// Bundle member names, lazy-loaded + cached on hover (not in the search result).
+const bundlePreviews = reactive({})
+const loadBundlePreview = async (name) => {
+  if (bundlePreviews[name]) return
+  bundlePreviews[name] = { loading: true, names: [] }
+  try {
+    const members = await store.getBundleMembers(name)
+    bundlePreviews[name] = { loading: false, names: members.map((m) => m.cde_name).filter(Boolean) }
+  } catch (e) {
+    bundlePreviews[name] = { loading: false, names: [] }
+  }
+}
+const bundlePreview = (b) => {
+  const p = bundlePreviews[b.bundle_name]
+  if (!p || !p.names.length) return 'No members'
+  const head = p.names.slice(0, 8).join(', ')
+  return p.names.length > 8 ? `${head} +${p.names.length - 8} more` : head
 }
 
 const canAdd = computed(() => {
