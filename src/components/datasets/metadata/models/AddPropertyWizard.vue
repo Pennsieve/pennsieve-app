@@ -166,23 +166,27 @@
           </template>
         </el-form>
 
-        <div class="wiz-flags">
-          <el-checkbox v-model="options.required">Required on every record</el-checkbox>
-          <el-checkbox v-model="options.isKey">Part of key</el-checkbox>
-          <el-checkbox v-model="options.isSensitive">Sensitive data / PHI</el-checkbox>
+        <div class="wiz-options">
+          <div v-for="f in optionFlags" :key="f.key" class="wiz-option">
+            <el-checkbox v-model="options[f.key]">{{ f.label }}</el-checkbox>
+            <p class="wiz-option-desc">{{ f.desc }}</p>
+          </div>
         </div>
       </div>
 
       <!-- MEMBERS (bundle) -->
       <div v-show="currentKey === 'members'" class="wiz-step">
         <div class="wiz-q">{{ memberRows.length }} properties from “{{ selectedBundleName }}”</div>
-        <p class="wiz-subq">
-          These are added together as a set. Rename any if needed, and mark which ones are part of
-          the record key or hold sensitive / PHI data.
-        </p>
+        <p class="wiz-subq">Added together as a set. Rename any if needed, and optionally mark each:</p>
+        <ul class="wiz-legend">
+          <li><b>Required</b> — every record must include a value.</li>
+          <li><b>Key</b> — its value helps identify a record (matching key values = the same record).</li>
+          <li><b>PHI</b> — protected health information or other sensitive data.</li>
+        </ul>
         <div class="wiz-members">
           <div class="wiz-members-head">
             <span>Property</span>
+            <span class="col-flag">Required</span>
             <span class="col-flag">Key</span>
             <span class="col-flag">PHI</span>
           </div>
@@ -194,32 +198,22 @@
                 <span v-if="collides(m.name, i)" class="wiz-collision"> · name in use</span>
               </div>
             </div>
+            <div class="col-flag"><el-checkbox v-model="m.required" /></div>
             <div class="col-flag"><el-checkbox v-model="m.isKey" /></div>
             <div class="col-flag"><el-checkbox v-model="m.isSensitive" /></div>
           </div>
         </div>
       </div>
 
-      <!-- OPTIONS (cde / bundle) -->
+      <!-- OPTIONS (single CDE) -->
       <div v-show="currentKey === 'options'" class="wiz-step">
-        <div v-if="isBundle" class="wiz-summary">
-          {{ includedMembers.length }} propert{{ includedMembers.length === 1 ? 'y' : 'ies' }} from “{{ selectedBundleName }}” · strength {{ strength }}
+        <div class="wiz-summary">{{ basics.name }} · {{ summaryType }}</div>
+        <div class="wiz-options">
+          <div v-for="f in optionFlags" :key="f.key" class="wiz-option">
+            <el-checkbox v-model="options[f.key]">{{ f.label }}</el-checkbox>
+            <p class="wiz-option-desc">{{ f.desc }}</p>
+          </div>
         </div>
-        <div v-else class="wiz-summary">{{ basics.name }} · {{ summaryType }}</div>
-
-        <div class="wiz-flags">
-          <el-checkbox v-model="options.required">
-            Required on every record{{ isBundle ? ' (all members)' : '' }}
-          </el-checkbox>
-          <template v-if="!isBundle">
-            <el-checkbox v-model="options.isKey">Part of key</el-checkbox>
-            <el-checkbox v-model="options.isSensitive">Sensitive data / PHI</el-checkbox>
-          </template>
-        </div>
-        <p v-if="isBundle" class="wiz-hint">
-          Set “Part of key” and “Sensitive / PHI” per property back in the Members step. Any key
-          member’s value joins the record’s composite key.
-        </p>
       </div>
     </dialog-body>
 
@@ -296,6 +290,22 @@ const manual = reactive({
 })
 const options = reactive({ required: false, isKey: false, isSensitive: false })
 
+// Plain-language definitions of the property behaviors, shown as labeled
+// options (single/manual) and as the bundle Members legend.
+const optionFlags = [
+  { key: 'required', label: 'Required', desc: 'Every record must include a value for this property.' },
+  {
+    key: 'isKey',
+    label: 'Part of the record key',
+    desc: 'Its value helps identify each record — records with the same key values are treated as the same record.',
+  },
+  {
+    key: 'isSensitive',
+    label: 'Sensitive / PHI',
+    desc: 'Protected health information or other sensitive data — flagged so it’s handled and redacted appropriately.',
+  },
+]
+
 const manualTypes = [
   { value: 'string', label: 'Text' },
   { value: 'number', label: 'Number' },
@@ -333,7 +343,8 @@ const steps = computed(() => {
   if (sourceMode.value === 'catalog') {
     const find = { key: 'find', title: 'Find' }
     if (selectionKind.value === 'bundle') {
-      return [source, find, { key: 'members', title: 'Members' }, { key: 'options', title: 'Options' }]
+      // The Members table carries all per-property behavior, so no Options step.
+      return [source, find, { key: 'members', title: 'Members' }]
     }
     return [source, find, { key: 'details', title: 'Details' }, { key: 'options', title: 'Options' }]
   }
@@ -422,7 +433,7 @@ const chooseBundle = async (b) => {
     memberRows.value = members.map((cde) => {
       const name = dedupe(toPropName(cde.cde_name), taken)
       taken.add(name)
-      return { cde, name, isKey: false, isSensitive: false }
+      return { cde, name, required: false, isKey: false, isSensitive: false }
     })
   } catch (e) {
     ElMessage.error('Failed to load bundle members: ' + (e?.message || e))
@@ -498,7 +509,7 @@ const buildBundleDefs = () =>
     schema['x-pennsieve-cde'] = { persistent_id: m.cde.persistent_id, strength: strength.value }
     if (m.isKey) schema['x-pennsieve-key'] = true
     if (m.isSensitive) schema['x-pennsieve-sensitive'] = true
-    return { propertyName: m.name, propertySchema: schema, required: options.required || m.isKey, oldPropertyName: null }
+    return { propertyName: m.name, propertySchema: schema, required: m.required || m.isKey, oldPropertyName: null }
   })
 
 const collides = (name, index) => {
@@ -828,13 +839,34 @@ function manualValueSchema() {
   }
 }
 .wiz-manual-flags,
-.wiz-flags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px 20px;
-}
-.wiz-flags {
+.wiz-options {
   margin-top: 8px;
+}
+.wiz-option {
+  margin-bottom: 16px;
+  &:last-child {
+    margin-bottom: 0;
+  }
+}
+.wiz-option-desc {
+  font-size: 12px;
+  color: theme.$gray_5;
+  line-height: 1.45;
+  margin: 4px 0 0 24px;
+}
+.wiz-legend {
+  list-style: none;
+  margin: 0 0 16px;
+  padding: 0;
+  li {
+    font-size: 12px;
+    color: theme.$gray_5;
+    line-height: 1.7;
+    b {
+      color: theme.$gray_6;
+      font-weight: 600;
+    }
+  }
 }
 .wiz-subq {
   font-size: 13px;
@@ -849,7 +881,7 @@ function manualValueSchema() {
 .wiz-members-head,
 .wiz-member {
   display: grid;
-  grid-template-columns: 1fr 52px 52px;
+  grid-template-columns: minmax(0, 1fr) 72px 48px 48px;
   align-items: center;
   gap: 8px;
 }
