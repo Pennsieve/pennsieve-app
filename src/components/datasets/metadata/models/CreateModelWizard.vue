@@ -6,13 +6,7 @@
 
     <dialog-body>
       <el-steps :active="stepIndex" finish-status="success" align-center class="cmw-steps">
-        <el-step
-          v-for="s in steps"
-          :key="s.key"
-          :title="s.title"
-          :status="stepSkipped(s.key) ? 'wait' : undefined"
-          :class="{ 'cmw-step-skipped': stepSkipped(s.key) }"
-        />
+        <el-step v-for="s in steps" :key="s.key" :title="s.title" />
       </el-steps>
 
       <div v-if="stepHelp" class="cmw-instruction">
@@ -33,11 +27,9 @@
             <div class="cmw-card-desc">Build the model property by property.</div>
           </div>
         </div>
-      </div>
 
-      <!-- TEMPLATE (choose one) -->
-      <div v-show="currentKey === 'template'" class="cmw-step">
-        <div class="cmw-select">
+        <!-- Template picker appears inline once "From a template" is chosen -->
+        <div v-if="startMode === 'template'" class="cmw-select">
           <el-input v-model="templateFilter" placeholder="Filter templates" clearable>
             <template #prefix><el-icon><Search /></el-icon></template>
           </el-input>
@@ -168,7 +160,6 @@ import DialogBody from '@/components/shared/dialog-body/DialogBody.vue'
 import AddPropertyWizard from '@/components/datasets/metadata/models/AddPropertyWizard.vue'
 import JsonSchemaEditor from '@/components/datasets/metadata/models/JsonSchemaEditor.vue'
 import IconGuide from '@/components/icons/IconGuide.vue'
-import IconAddTemplate from '@/components/icons/IconAddTemplate.vue'
 import IconDocument from '@/components/icons/IconDocument.vue'
 import IconToolbarListBulleted from '@/components/icons/IconToolbarListBulleted.vue'
 import IconDoneCheckCircle from '@/components/icons/IconDoneCheckCircle.vue'
@@ -224,7 +215,6 @@ const filteredTemplates = computed(() => {
 const steps = computed(() => {
   const base = [
     { key: 'start', title: 'Start' },
-    { key: 'template', title: 'Template' },
     { key: 'details', title: 'Details' },
     { key: 'properties', title: 'Properties' },
     { key: 'save', title: 'Review' },
@@ -232,9 +222,6 @@ const steps = computed(() => {
   // The Advanced (JSON) step only exists once the user opts into it.
   return advancedMode.value ? [...base, { key: 'advanced', title: 'Advanced' }] : base
 })
-// The Template slot is always reserved in the rail so step numbers never shift;
-// it's skipped (and dimmed) unless the user chose to start from a template.
-const stepSkipped = (key) => key === 'template' && startMode.value !== 'template'
 const currentKey = computed(() => (steps.value[stepIndex.value] || steps.value[0]).key)
 const isLastStep = computed(() => stepIndex.value >= steps.value.length - 1)
 
@@ -244,9 +231,7 @@ const dialogWidth = computed(() => (currentKey.value === 'advanced' ? 'min(1040p
 const canAdvance = computed(() => {
   switch (currentKey.value) {
     case 'start':
-      return !!startMode.value
-    case 'template':
-      return !!selectedTemplateId.value
+      return startMode.value === 'template' ? !!selectedTemplateId.value : !!startMode.value
     case 'details':
       return !!details.name
     case 'properties':
@@ -264,8 +249,7 @@ const canCreate = computed(() => {
 const stepHelp = computed(
   () =>
     ({
-      start: 'A model describes one kind of record (like a participant or a sample). Start from a template or build it from scratch.',
-      template: 'Pick a template to start from — its properties come along and you can adjust them in the next steps.',
+      start: 'A model describes one kind of record (like a participant or a sample). Start from a template — pick one below — or build it from scratch.',
       details: 'Give your model a name and a short description.',
       properties: 'Add the fields this model captures. Reuse common data elements wherever you can.',
       save: 'Review the model, then create it. Need finer control? Use Advanced to edit the raw JSON Schema first. (Templates are created later, from a saved model.)',
@@ -276,7 +260,6 @@ const stepIcon = computed(
   () =>
     ({
       start: IconGuide,
-      template: IconAddTemplate,
       details: IconDocument,
       properties: IconToolbarListBulleted,
       save: IconDoneCheckCircle,
@@ -337,17 +320,12 @@ const removeProperty = (i) => {
 }
 
 const next = () => {
-  if (!canAdvance.value || isLastStep.value) return
-  let i = stepIndex.value + 1
-  while (i < steps.value.length && stepSkipped(steps.value[i].key)) i += 1
-  if (i < steps.value.length) stepIndex.value = i
+  if (canAdvance.value && !isLastStep.value) stepIndex.value += 1
 }
 // Back also collapses Advanced when stepping back into the guided flow, so the
 // JSON re-derives fresh from properties next time Advanced is opened.
 const back = () => {
-  let i = stepIndex.value - 1
-  while (i > 0 && stepSkipped(steps.value[i].key)) i -= 1
-  if (i >= 0) stepIndex.value = i
+  if (stepIndex.value > 0) stepIndex.value -= 1
   if (advancedMode.value && currentKey.value !== 'advanced' && currentKey.value !== 'save') {
     advancedMode.value = false
     jsonContent.value = ''
@@ -527,13 +505,6 @@ function dedupe(name, taken) {
 @use "../../../../styles/theme" as theme;
 .cmw-steps {
   margin-bottom: 20px;
-}
-.cmw-step-skipped {
-  // Dim only the circle + label, not the connector line.
-  :deep(.el-step__icon),
-  :deep(.el-step__title) {
-    opacity: 0.45;
-  }
 }
 .cmw-instruction {
   text-align: center;
