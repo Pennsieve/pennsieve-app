@@ -798,7 +798,6 @@ function manualValueSchema() {
 .wiz-choices {
   display: flex;
   flex-direction: column;
-  gap: 12px;
   width: 100%;
 }
 :deep(.wiz-choice) {
@@ -806,19 +805,23 @@ function manualValueSchema() {
   align-items: flex-start;
   height: auto;
   margin: 0;
+  padding: 10px 0;
   white-space: normal;
-  .el-radio__label {
-    display: flex;
-    flex-direction: column;
-    padding-left: 8px;
-    line-height: 1.4;
-  }
+}
+:deep(.wiz-choice + .wiz-choice) {
+  border-top: 1px solid theme.$gray_1;
+}
+:deep(.wiz-choice .el-radio__label) {
+  white-space: normal;
+  line-height: 1.4;
 }
 .wiz-choice-label {
+  display: block;
   color: theme.$gray_6;
   font-weight: 500;
 }
 .wiz-choice-desc {
+  display: block;
   font-size: 12px;
   color: theme.$gray_5;
   margin-top: 2px;
