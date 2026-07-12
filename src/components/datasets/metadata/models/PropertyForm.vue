@@ -556,6 +556,7 @@ const buildSingleDef = () => {
   } else if (selectedCde.value) {
     Object.assign(schema, dataTypeSchema(selectedCde.value.cde_data_type))
     schema['x-pennsieve-cde'] = { persistent_id: selectedCde.value.persistent_id, strength: strength.value }
+    applyCdeValues(schema, selectedCde.value, strength.value)
   }
   if (options.isKey) schema['x-pennsieve-key'] = true
   if (options.isSensitive) schema['x-pennsieve-sensitive'] = true
@@ -573,6 +574,7 @@ const buildBundleDefs = () =>
     if (m.cde.cde_definition) schema.description = m.cde.cde_definition
     Object.assign(schema, dataTypeSchema(m.cde.cde_data_type))
     schema['x-pennsieve-cde'] = { persistent_id: m.cde.persistent_id, strength: strength.value }
+    applyCdeValues(schema, m.cde, strength.value)
     if (m.isKey) schema['x-pennsieve-key'] = true
     if (m.isSensitive) schema['x-pennsieve-sensitive'] = true
     return { propertyName: m.name, propertySchema: schema, required: m.required || m.isKey, oldPropertyName: null }
@@ -595,6 +597,31 @@ function dedupe(name, taken) {
   let i = 2
   while (taken.has(`${name}_${i}`)) i += 1
   return `${name}_${i}`
+}
+// Mirror the server's CDE materialization so the built schema (and the Advanced
+// JSON preview) shows the controlled values. required → enum + values; preferred
+// → advisory values only; example → nothing. The server re-materializes these
+// authoritatively on save, so this is a faithful preview (and a fallback when
+// the server resolver is off). Guardrail: skip very large value sets.
+const MAX_ENUM = 512
+function applyCdeValues(schema, cde, strength) {
+  const pvs = (cde && cde.permissible_values) || []
+  if (!pvs.length || pvs.length > MAX_ENUM) return
+  const details = pvs.map((pv) => {
+    const d = {}
+    if (pv.code) d.code = pv.code
+    if (pv.label) d.label = pv.label
+    if (pv.definition) d.definition = pv.definition
+    if (pv.code_system) d.code_system = pv.code_system
+    if (pv.concept_curie) d.concept_curie = pv.concept_curie
+    return d
+  })
+  if (strength === 'required') {
+    schema.enum = pvs.map((pv) => pv.code || pv.label).filter(Boolean)
+    schema['x-pennsieve-cde-values'] = details
+  } else if (strength === 'preferred') {
+    schema['x-pennsieve-cde-values'] = details
+  }
 }
 function dataTypeSchema(cdeType) {
   switch (cdeType) {
