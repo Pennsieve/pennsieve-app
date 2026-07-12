@@ -729,11 +729,20 @@ function manualValueSchema() {
   letter-spacing: 0.05em;
   color: theme.$gray_4;
   margin-bottom: 12px;
+  // Short, thick accent bar marks each section instead of a full-width rule.
+  &::before {
+    content: '';
+    display: block;
+    width: 28px;
+    height: 3px;
+    border-radius: 2px;
+    background: theme.$purple_2;
+    margin-bottom: 8px;
+  }
 }
-// Subtle divider above a section group (General / Data type / Options).
+// Extra breathing room between section groups (no divider line).
 .pf-divided {
-  border-top: 1px solid theme.$gray_2;
-  padding-top: 20px;
+  padding-top: 8px;
 }
 .pf-footer {
   display: flex;
