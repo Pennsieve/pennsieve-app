@@ -152,7 +152,7 @@
       >
         Create model
       </el-button>
-      <el-button v-else type="primary" :disabled="!canAdvance" @click="next">Continue</el-button>
+      <el-button v-else type="primary" :disabled="!canAdvance || addingProperty" @click="next">Continue</el-button>
     </template>
   </el-dialog>
 </template>
