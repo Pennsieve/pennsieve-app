@@ -521,7 +521,7 @@ function manualValueSchema() {
   margin-bottom: 20px;
 }
 .pf-label-strong {
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 500;
   color: theme.$gray_6;
   margin-bottom: 10px;
@@ -581,13 +581,13 @@ function manualValueSchema() {
   gap: 6px;
 }
 .wiz-card-desc {
-  font-size: 13px;
+  font-size: 14px;
   color: theme.$gray_4;
   margin-top: 4px;
   line-height: 1.4;
 }
 .wiz-rec {
-  font-size: 12px;
+  font-size: 13px;
   color: theme.$purple_2;
   background: theme.$purple_tint;
   padding: 2px 10px;
@@ -595,7 +595,7 @@ function manualValueSchema() {
 }
 .wiz-status {
   color: theme.$gray_4;
-  font-size: 13px;
+  font-size: 14px;
   margin-top: 8px;
 }
 .wiz-error {
@@ -607,7 +607,7 @@ function manualValueSchema() {
   overflow-y: auto;
 }
 .wiz-group {
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 500;
   color: theme.$gray_4;
   text-transform: uppercase;
@@ -640,7 +640,7 @@ function manualValueSchema() {
   color: theme.$gray_6;
 }
 .wiz-row-meta {
-  font-size: 12px;
+  font-size: 13px;
   color: theme.$gray_4;
   white-space: nowrap;
 }
@@ -654,12 +654,12 @@ function manualValueSchema() {
   color: theme.$gray_6;
 }
 .wiz-selected-sub {
-  font-size: 13px;
+  font-size: 14px;
   color: theme.$gray_5;
   margin-top: 2px;
 }
 .wiz-label {
-  font-size: 12px;
+  font-size: 13px;
   color: theme.$gray_5;
   margin-bottom: 6px;
 }
@@ -681,7 +681,7 @@ function manualValueSchema() {
 }
 .wiz-choice-desc {
   margin: 2px 0 0 24px;
-  font-size: 12px;
+  font-size: 13px;
   color: theme.$gray_5;
   line-height: 1.4;
 }
@@ -692,7 +692,7 @@ function manualValueSchema() {
   padding: 12px 14px;
 }
 .wiz-kv {
-  font-size: 13px;
+  font-size: 14px;
   color: theme.$gray_5;
   margin-bottom: 8px;
   b {
@@ -706,7 +706,7 @@ function manualValueSchema() {
   gap: 4px;
 }
 .wiz-chip {
-  font-size: 12px;
+  font-size: 13px;
   background: theme.$white;
   border: 1px solid theme.$gray_2;
   border-radius: 3px;
@@ -739,7 +739,7 @@ function manualValueSchema() {
   }
 }
 .wiz-option-desc {
-  font-size: 12px;
+  font-size: 13px;
   color: theme.$gray_5;
   line-height: 1.45;
   margin: 4px 0 0 24px;
@@ -749,7 +749,7 @@ function manualValueSchema() {
   margin: 0 0 16px;
   padding: 0;
   li {
-    font-size: 12px;
+    font-size: 13px;
     color: theme.$gray_5;
     line-height: 1.7;
     b {
@@ -775,7 +775,7 @@ function manualValueSchema() {
   background: theme.$white;
   padding: 4px 0 8px;
   border-bottom: 1px solid theme.$gray_2;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 500;
   color: theme.$gray_5;
 }
@@ -791,7 +791,7 @@ function manualValueSchema() {
   }
 }
 .wiz-member-sub {
-  font-size: 12px;
+  font-size: 13px;
   color: theme.$gray_4;
   margin-top: 4px;
   overflow: hidden;
