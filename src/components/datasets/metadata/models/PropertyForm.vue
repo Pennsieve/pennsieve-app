@@ -193,22 +193,25 @@
                 <el-input v-model="basics.description" type="textarea" :rows="2" />
               </el-form-item>
             </el-form>
+            <!-- Binding strength sits above the value preview (value lists only) -->
+            <div v-if="cdeValues.length" class="pf-strength">
+              <div class="wiz-label">Binding strength</div>
+              <el-radio-group v-model="strength" size="small">
+                <el-radio-button value="required">Required</el-radio-button>
+                <el-radio-button value="preferred">Preferred</el-radio-button>
+                <el-radio-button value="example">Example</el-radio-button>
+              </el-radio-group>
+              <div class="wiz-hint">{{ strengthHint }}</div>
+            </div>
+
             <div class="wiz-cde-preview">
               <div class="wiz-kv">Data type <b>{{ selectedCde && selectedCde.cde_data_type }}</b></div>
               <template v-if="cdeValues.length">
-                <div class="pf-values-head">
-                  <span class="wiz-label">Allowed values ({{ cdeValues.length }})</span>
-                  <el-radio-group v-model="strength" size="small">
-                    <el-radio-button value="required">Required</el-radio-button>
-                    <el-radio-button value="preferred">Preferred</el-radio-button>
-                    <el-radio-button value="example">Example</el-radio-button>
-                  </el-radio-group>
-                </div>
+                <div class="wiz-label">Allowed values ({{ cdeValues.length }})</div>
                 <div class="wiz-values">
                   <span v-for="(v, i) in cdeValues.slice(0, 8)" :key="i" class="wiz-chip">{{ v }}</span>
                   <span v-if="cdeValues.length > 8" class="wiz-chip more">+{{ cdeValues.length - 8 }} more</span>
                 </div>
-                <div class="wiz-hint">{{ strengthHint }}</div>
               </template>
             </div>
           </div>
@@ -904,16 +907,9 @@ function manualValueSchema() {
   color: theme.$gray_5;
   margin-bottom: 6px;
 }
-// Value-list header row: "Allowed values (N)" + compact strength control.
-.pf-values-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 8px;
-  .wiz-label {
-    margin: 0;
-  }
+// Compact binding-strength control, above the value preview.
+.pf-strength {
+  margin-bottom: 16px;
 }
 .wiz-hint {
   font-size: 13px;
