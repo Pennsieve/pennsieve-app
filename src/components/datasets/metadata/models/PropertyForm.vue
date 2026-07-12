@@ -72,7 +72,7 @@
               <el-tooltip
                 v-for="b in results.bundles"
                 :key="'b:' + b.bundle_name"
-                placement="right"
+                placement="top"
                 effect="light"
                 :show-after="350"
               >
@@ -103,7 +103,7 @@
               <el-tooltip
                 v-for="c in results.cdes"
                 :key="'c:' + c.persistent_id"
-                placement="right"
+                placement="top"
                 effect="light"
                 :show-after="350"
                 :disabled="!c.cde_definition && !cdeValuesPreview(c)"
