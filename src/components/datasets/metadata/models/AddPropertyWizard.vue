@@ -86,7 +86,11 @@
                 <el-radio-button value="preferred">Preferred</el-radio-button>
                 <el-radio-button value="example">Example</el-radio-button>
               </el-radio-group>
-              <div class="wiz-hint">{{ strengthHint }}</div>
+              <ul class="wiz-legend wiz-strength-legend">
+                <li><b>Required</b> — records must use these values; data type and allowed values are enforced.</li>
+                <li><b>Preferred</b> — recommended values shown as guidance; not enforced.</li>
+                <li><b>Example</b> — linked for reference only.</li>
+              </ul>
             </div>
           </div>
         </div>
@@ -396,15 +400,6 @@ const cdeValues = computed(() =>
 // A bundle is collected as a set — every member becomes a property (users can
 // still drop one afterward in the Advanced JSON editor if truly needed).
 const includedMembers = computed(() => memberRows.value)
-const strengthHint = computed(
-  () =>
-    ({
-      required: 'Default. Records must use these values — type and allowed values are enforced on save.',
-      preferred: 'Recommended values shown as guidance. Not enforced.',
-      example: 'Linked for reference only.',
-    }[strength.value] || '')
-)
-
 const setSource = (mode) => {
   sourceMode.value = mode
   if (mode === 'catalog' && !selectionKind.value) runSearch()
@@ -802,11 +797,8 @@ function manualValueSchema() {
   color: theme.$gray_5;
   margin-bottom: 6px;
 }
-.wiz-hint {
-  font-size: 12px;
-  color: theme.$gray_5;
-  margin-top: 6px;
-  line-height: 1.4;
+.wiz-strength-legend {
+  margin: 12px 0 0;
 }
 .wiz-cde-preview {
   background: theme.$purple_tint;
