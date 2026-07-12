@@ -50,6 +50,17 @@
           >
             <el-option v-for="d in facetValues.domains" :key="d" :label="d" :value="d" />
           </el-select>
+          <el-select
+            v-if="facetValues.tiers.length"
+            v-model="tier"
+            size="small"
+            clearable
+            placeholder="Any tier"
+            class="pf-facet-tier"
+            @change="runSearch"
+          >
+            <el-option v-for="t in facetValues.tiers" :key="t" :label="t" :value="t" />
+          </el-select>
         </div>
 
         <div v-if="searching" class="wiz-status">Searching…</div>
@@ -76,7 +87,7 @@
               </li>
             </ul>
           </template>
-          <div v-if="(term.trim() || disease || domain) && !results.bundles.length && !results.cdes.length" class="wiz-status">
+          <div v-if="(term.trim() || disease || domain || tier) && !results.bundles.length && !results.cdes.length" class="wiz-status">
             No matching common data elements
           </div>
         </div>
@@ -277,9 +288,10 @@ const searching = ref(false)
 const searchError = ref('')
 
 // Facets (disease + domain, from CDE classifications)
-const facetValues = ref({ diseases: [], domains: [] })
+const facetValues = ref({ diseases: [], domains: [], tiers: [] })
 const disease = ref('')
 const domain = ref('')
+const tier = ref('')
 
 // Selection
 const selectionKind = ref('') // '' | 'cde' | 'bundle'
@@ -375,7 +387,7 @@ const loadFacets = async () => {
   try {
     facetValues.value = await store.getFacetValues()
   } catch (e) {
-    facetValues.value = { diseases: [], domains: [] } // facets are optional
+    facetValues.value = { diseases: [], domains: [], tiers: [] } // facets are optional
   }
 }
 
@@ -383,7 +395,11 @@ const runSearch = async () => {
   searching.value = true
   searchError.value = ''
   try {
-    results.value = await store.searchCatalog(term.value, { disease: disease.value, domain: domain.value })
+    results.value = await store.searchCatalog(term.value, {
+      disease: disease.value,
+      domain: domain.value,
+      tier: tier.value,
+    })
   } catch (e) {
     searchError.value = e?.message || String(e)
     results.value = { bundles: [], cdes: [] }
@@ -649,6 +665,9 @@ function manualValueSchema() {
 }
 .pf-facet-domain {
   width: 220px;
+}
+.pf-facet-tier {
+  width: 150px;
 }
 .wiz-status {
   color: theme.$gray_4;
