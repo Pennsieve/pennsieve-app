@@ -82,6 +82,9 @@
                       bundle · {{ b.member_count }} element{{ b.member_count === 1 ? '' : 's' }}
                       <template v-if="b.domain"> · {{ b.domain }}</template>
                     </div>
+                    <div v-if="b.working_group" style="margin-top: 4px; font-size: 12px; opacity: 0.7">
+                      Origin: working group {{ b.working_group }}
+                    </div>
                     <div style="margin-top: 6px; font-size: 12px">
                       <template v-if="!bundlePreviews[b.bundle_name] || bundlePreviews[b.bundle_name].loading">
                         Loading members…
@@ -118,7 +121,11 @@
                       <template v-if="c.permissible_values && c.permissible_values.length">
                         · {{ c.permissible_values.length }} allowed value{{ c.permissible_values.length === 1 ? '' : 's' }}
                       </template>
-                      <template v-if="c.cde_source"> · {{ c.cde_source }}</template>
+                    </div>
+                    <div v-if="c.cde_source || c.steward_org || c.registration_status" style="margin-top: 4px; font-size: 12px; opacity: 0.7">
+                      Origin: {{ c.cde_source || c.steward_org }}
+                      <template v-if="c.steward_org && c.cde_source"> · {{ c.steward_org }}</template>
+                      <template v-if="c.registration_status"> · {{ c.registration_status }}</template>
                     </div>
                     <div v-if="cdeValuesPreview(c)" style="margin-top: 6px; font-size: 12px">
                       {{ cdeValuesPreview(c) }}
