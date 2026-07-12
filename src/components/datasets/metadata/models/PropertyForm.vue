@@ -30,6 +30,28 @@
         <el-input v-model="term" placeholder="Search common data elements" clearable @input="onSearchInput">
           <template #prefix><el-icon><Search /></el-icon></template>
         </el-input>
+
+        <div v-if="facetValues.diseases.length || facetValues.domains.length" class="pf-facets">
+          <div v-if="facetValues.diseases.length" class="pf-facet">
+            <span class="pf-facet-label">Disease</span>
+            <el-radio-group v-model="disease" size="small" @change="runSearch">
+              <el-radio-button value="">All</el-radio-button>
+              <el-radio-button v-for="d in facetValues.diseases" :key="d" :value="d">{{ d }}</el-radio-button>
+            </el-radio-group>
+          </div>
+          <el-select
+            v-if="facetValues.domains.length"
+            v-model="domain"
+            size="small"
+            clearable
+            placeholder="All domains"
+            class="pf-facet-domain"
+            @change="runSearch"
+          >
+            <el-option v-for="d in facetValues.domains" :key="d" :label="d" :value="d" />
+          </el-select>
+        </div>
+
         <div v-if="searching" class="wiz-status">Searching…</div>
         <div v-else-if="searchError" class="wiz-status wiz-error">{{ searchError }}</div>
         <div v-else class="wiz-results">
@@ -54,7 +76,7 @@
               </li>
             </ul>
           </template>
-          <div v-if="term.trim() && !results.bundles.length && !results.cdes.length" class="wiz-status">
+          <div v-if="(term.trim() || disease || domain) && !results.bundles.length && !results.cdes.length" class="wiz-status">
             No matching common data elements
           </div>
         </div>
@@ -254,6 +276,11 @@ const results = ref({ bundles: [], cdes: [] })
 const searching = ref(false)
 const searchError = ref('')
 
+// Facets (disease + domain, from CDE classifications)
+const facetValues = ref({ diseases: [], domains: [] })
+const disease = ref('')
+const domain = ref('')
+
 // Selection
 const selectionKind = ref('') // '' | 'cde' | 'bundle'
 const selectedCde = ref(null)
@@ -338,14 +365,25 @@ const addLabel = computed(() => {
 
 const setSource = (mode) => {
   sourceMode.value = mode
-  if (mode === 'catalog' && !selectionKind.value) runSearch()
+  if (mode === 'catalog' && !selectionKind.value) {
+    loadFacets()
+    runSearch()
+  }
+}
+
+const loadFacets = async () => {
+  try {
+    facetValues.value = await store.getFacetValues()
+  } catch (e) {
+    facetValues.value = { diseases: [], domains: [] } // facets are optional
+  }
 }
 
 const runSearch = async () => {
   searching.value = true
   searchError.value = ''
   try {
-    results.value = await store.searchCatalog(term.value, 25)
+    results.value = await store.searchCatalog(term.value, { disease: disease.value, domain: domain.value })
   } catch (e) {
     searchError.value = e?.message || String(e)
     results.value = { bundles: [], cdes: [] }
@@ -592,6 +630,25 @@ function manualValueSchema() {
   background: theme.$purple_tint;
   padding: 2px 10px;
   border-radius: 3px;
+}
+.pf-facets {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 20px;
+  margin-top: 12px;
+}
+.pf-facet {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.pf-facet-label {
+  font-size: 13px;
+  color: theme.$gray_5;
+}
+.pf-facet-domain {
+  width: 220px;
 }
 .wiz-status {
   color: theme.$gray_4;

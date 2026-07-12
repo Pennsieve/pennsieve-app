@@ -29,6 +29,10 @@ export const useCdeCatalogStore = defineStore('cdeCatalog', () => {
     let models = {} // model name -> published version, from the release manifest
     let bundlesLoaded = false
     let membershipCache = null // persistent_id -> [bundle_name, ...]
+    let relLoaded = false
+    let classificationsLoaded = false
+    let facetMap = null // persistent_id -> { diseases:Set, domains:Set }
+    let facetValuesCache = null
 
     const baseUrl = computed(() => (site.cdeCatalogUrl || '').replace(/\/+$/, ''))
     const isConfigured = computed(() => !!baseUrl.value)
@@ -117,13 +121,73 @@ export const useCdeCatalogStore = defineStore('cdeCatalog', () => {
     // bundle <-PART_OF- classification -CLASSIFIES-> cde. Load the bundle records
     // + relationship edges lazily (only when bundle features are used); the cde
     // table is already loaded by ensureLoaded.
+    // Relationship edges (CLASSIFIES / PART_OF / …) are shared by the bundle and
+    // classification (disease/domain) joins — load once.
+    const ensureRelationshipsLoaded = async () => {
+        await ensureLoaded()
+        if (relLoaded) return
+        await duck.loadFile(relationshipsUrl(), 'csv', 'cde_rel', {}, VIEWER_ID, `cde_rel_${catalogVersion.value}`)
+        relLoaded = true
+    }
     const ensureBundlesLoaded = async () => {
         await ensureLoaded()
         if (bundlesLoaded) return
-        const cv = catalogVersion.value
-        await duck.loadFile(modelRecordsUrl('bundle'), 'jsonl', 'cde_bundle', {}, VIEWER_ID, `cde_bundle_${cv}`)
-        await duck.loadFile(relationshipsUrl(), 'csv', 'cde_rel', {}, VIEWER_ID, `cde_rel_${cv}`)
+        await duck.loadFile(modelRecordsUrl('bundle'), 'jsonl', 'cde_bundle', {}, VIEWER_ID, `cde_bundle_${catalogVersion.value}`)
+        await ensureRelationshipsLoaded()
         bundlesLoaded = true
+    }
+    // cde_classification records carry the disease (`context`) and `domain` facets;
+    // they link to CDEs via CLASSIFIES edges.
+    const ensureClassificationsLoaded = async () => {
+        await ensureLoaded()
+        if (classificationsLoaded) return
+        await duck.loadFile(modelRecordsUrl('cde_classification'), 'jsonl', 'cde_cls', {}, VIEWER_ID, `cde_cls_${catalogVersion.value}`)
+        await ensureRelationshipsLoaded()
+        classificationsLoaded = true
+    }
+
+    // persistent_id -> { diseases:Set, domains:Set } from the classification edges.
+    const getFacetMap = async () => {
+        if (facetMap) return facetMap
+        await ensureClassificationsLoaded()
+        const query = `
+            SELECT to_json(cde.data) ->> 'persistent_id' AS pid,
+                   to_json(cls.data) ->> 'context' AS disease,
+                   to_json(cls.data) ->> 'domain' AS domain
+            FROM ${TABLE} cde
+            JOIN cde_rel cl ON cl.target_record_id = CAST(cde.id AS VARCHAR) AND cl.relationship_type = 'CLASSIFIES'
+            JOIN cde_cls cls ON CAST(cls.id AS VARCHAR) = cl.source_record_id`
+        const rows = await duck.executeQuery(query, connectionId)
+        const map = new Map()
+        for (const r of rows) {
+            if (!r.pid) continue
+            let e = map.get(r.pid)
+            if (!e) {
+                e = { diseases: new Set(), domains: new Set() }
+                map.set(r.pid, e)
+            }
+            if (r.disease) e.diseases.add(r.disease)
+            if (r.domain) e.domains.add(r.domain)
+        }
+        facetMap = map
+        return map
+    }
+
+    // Distinct facet values for the filter UI: { diseases:[...], domains:[...] }.
+    const getFacetValues = async () => {
+        if (facetValuesCache) return facetValuesCache
+        const map = await getFacetMap()
+        const diseases = new Set()
+        const domains = new Set()
+        for (const e of map.values()) {
+            e.diseases.forEach((d) => diseases.add(d))
+            e.domains.forEach((d) => domains.add(d))
+        }
+        facetValuesCache = {
+            diseases: [...diseases].sort(),
+            domains: [...domains].sort(),
+        }
+        return facetValuesCache
     }
 
     // List bundles that have at least one member CDE, with member counts.
@@ -193,16 +257,37 @@ export const useCdeCatalogStore = defineStore('cdeCatalog', () => {
     // Unified search returning both bundles and individual CDEs (each CDE
     // annotated with `_bundles`, the bundles it belongs to). With no term, lists
     // all bundles (browse) and no CDEs (type to search elements).
-    const searchCatalog = async (term, limit = 25) => {
+    const searchCatalog = async (term, opts = {}) => {
+        const { disease = '', domain = '', limit = 25 } = opts
         await ensureBundlesLoaded()
         const t = (term || '').trim()
+        const hasFacet = !!disease || !!domain
+
         const [allBundles, membership] = await Promise.all([listBundles(), getBundleMembership()])
-        const bundles = t
-            ? allBundles.filter((b) => b.bundle_name.toLowerCase().includes(t.toLowerCase()))
-            : allBundles
-        const cdes = t
-            ? (await search(t, limit)).map((c) => ({ ...c, _bundles: membership.get(c.persistent_id) || [] }))
-            : []
+        // Facets are CDE-level; when one is active we're doing targeted element
+        // search, so hide the (cross-disease) bundle groupings.
+        const bundles = hasFacet
+            ? []
+            : t
+              ? allBundles.filter((b) => b.bundle_name.toLowerCase().includes(t.toLowerCase()))
+              : allBundles
+
+        let cdes = []
+        if (t || hasFacet) {
+            const facets = hasFacet ? await getFacetMap() : null
+            // Search wide, then narrow by facet client-side (catalog is small).
+            const raw = await search(t, hasFacet ? 500 : limit)
+            cdes = raw
+                .filter((c) => {
+                    if (!hasFacet) return true
+                    const f = facets.get(c.persistent_id)
+                    if (disease && !(f && f.diseases.has(disease))) return false
+                    if (domain && !(f && f.domains.has(domain))) return false
+                    return true
+                })
+                .slice(0, limit)
+                .map((c) => ({ ...c, _bundles: membership.get(c.persistent_id) || [] }))
+        }
         return { bundles, cdes }
     }
 
@@ -218,6 +303,7 @@ export const useCdeCatalogStore = defineStore('cdeCatalog', () => {
         listBundles,
         getBundleMembers,
         getBundleMembership,
+        getFacetValues,
         searchCatalog,
     }
 })
