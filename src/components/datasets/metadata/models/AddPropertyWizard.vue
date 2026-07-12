@@ -80,18 +80,20 @@
               <template v-if="selectionKind === 'bundle'">bundle · {{ memberRows.length }} elements</template>
               <template v-else>{{ selectedCde && selectedCde.cde_data_type }}</template>
             </div>
-            <div class="wiz-strength">
-              <el-radio-group v-model="strength" size="small">
-                <el-radio-button value="required">Required</el-radio-button>
-                <el-radio-button value="preferred">Preferred</el-radio-button>
-                <el-radio-button value="example">Example</el-radio-button>
-              </el-radio-group>
-              <ul class="wiz-legend wiz-strength-legend">
-                <li><b>Required</b> — records must use these values; data type and allowed values are enforced.</li>
-                <li><b>Preferred</b> — recommended values shown as guidance; not enforced.</li>
-                <li><b>Example</b> — linked for reference only.</li>
-              </ul>
-            </div>
+            <el-radio-group v-model="strength" class="wiz-choices">
+              <el-radio value="required" class="wiz-choice">
+                <span class="wiz-choice-label">Required</span>
+                <span class="wiz-choice-desc">Records must use these values; data type and allowed values are enforced.</span>
+              </el-radio>
+              <el-radio value="preferred" class="wiz-choice">
+                <span class="wiz-choice-label">Preferred</span>
+                <span class="wiz-choice-desc">Recommended values shown as guidance; not enforced.</span>
+              </el-radio>
+              <el-radio value="example" class="wiz-choice">
+                <span class="wiz-choice-label">Example</span>
+                <span class="wiz-choice-desc">Linked for reference only.</span>
+              </el-radio>
+            </el-radio-group>
           </div>
         </div>
       </div>
@@ -769,12 +771,6 @@ function manualValueSchema() {
   color: theme.$gray_4;
   white-space: nowrap;
 }
-.wiz-selected {
-  border: 1px solid theme.$purple_0_7;
-  border-radius: 3px;
-  padding: 12px 14px;
-  background: theme.$purple_tint;
-}
 .wiz-selected-head {
   display: flex;
   align-items: center;
@@ -784,21 +780,48 @@ function manualValueSchema() {
   font-weight: 500;
   color: theme.$gray_6;
 }
+// Separates the picked-element summary from the strength choices below.
 .wiz-selected-sub {
   font-size: 13px;
   color: theme.$gray_5;
   margin-top: 2px;
-}
-.wiz-strength {
-  margin-top: 14px;
+  padding-bottom: 14px;
+  margin-bottom: 16px;
+  border-bottom: 1px solid theme.$gray_2;
 }
 .wiz-label {
   font-size: 12px;
   color: theme.$gray_5;
   margin-bottom: 6px;
 }
-.wiz-strength-legend {
-  margin: 12px 0 0;
+// Vertical single-select list: each option shows its label + description.
+.wiz-choices {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+}
+:deep(.wiz-choice) {
+  display: flex;
+  align-items: flex-start;
+  height: auto;
+  margin: 0;
+  white-space: normal;
+  .el-radio__label {
+    display: flex;
+    flex-direction: column;
+    padding-left: 8px;
+    line-height: 1.4;
+  }
+}
+.wiz-choice-label {
+  color: theme.$gray_6;
+  font-weight: 500;
+}
+.wiz-choice-desc {
+  font-size: 12px;
+  color: theme.$gray_5;
+  margin-top: 2px;
 }
 .wiz-cde-preview {
   background: theme.$purple_tint;
