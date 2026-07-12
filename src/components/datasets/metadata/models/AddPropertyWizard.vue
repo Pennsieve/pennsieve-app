@@ -197,14 +197,15 @@
           <el-checkbox v-model="options.required">
             Required on every record{{ isBundle ? ' (all members)' : '' }}
           </el-checkbox>
+          <el-checkbox v-model="options.isKey">
+            Part of key{{ isBundle ? ' (all members)' : '' }}
+          </el-checkbox>
           <el-checkbox v-model="options.isSensitive">
             Sensitive data / PHI{{ isBundle ? ' (all members)' : '' }}
           </el-checkbox>
-          <el-checkbox v-if="!isBundle" v-model="options.isKey">Part of key</el-checkbox>
         </div>
-        <p v-if="isBundle" class="wiz-hint">
-          “Part of key” is set per property, not for a whole bundle — add it to an individual
-          property afterward if a bundle member should be part of the record key.
+        <p v-if="isBundle && options.isKey" class="wiz-hint">
+          The record key becomes a hash of all bundle members’ values (each is also marked required).
         </p>
       </div>
     </dialog-body>
@@ -480,8 +481,9 @@ const buildBundleDefs = () =>
     if (m.cde.cde_definition) schema.description = m.cde.cde_definition
     Object.assign(schema, dataTypeSchema(m.cde.cde_data_type))
     schema['x-pennsieve-cde'] = { persistent_id: m.cde.persistent_id, strength: strength.value }
+    if (options.isKey) schema['x-pennsieve-key'] = true
     if (options.isSensitive) schema['x-pennsieve-sensitive'] = true
-    return { propertyName: m.name, propertySchema: schema, required: options.required, oldPropertyName: null }
+    return { propertyName: m.name, propertySchema: schema, required: options.required || options.isKey, oldPropertyName: null }
   })
 
 const collides = (name, index) => {
