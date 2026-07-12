@@ -169,7 +169,7 @@
         <div class="wiz-flags">
           <el-checkbox v-model="options.required">Required on every record</el-checkbox>
           <el-checkbox v-model="options.isKey">Part of key</el-checkbox>
-          <el-checkbox v-model="options.isSensitive">Sensitive data</el-checkbox>
+          <el-checkbox v-model="options.isSensitive">Sensitive data / PHI</el-checkbox>
         </div>
       </div>
 
@@ -194,12 +194,18 @@
         <div v-else class="wiz-summary">{{ basics.name }} · {{ summaryType }}</div>
 
         <div class="wiz-flags">
-          <el-checkbox v-model="options.required">Required on every record</el-checkbox>
-          <template v-if="!isBundle">
-            <el-checkbox v-model="options.isKey">Part of key</el-checkbox>
-            <el-checkbox v-model="options.isSensitive">Sensitive data</el-checkbox>
-          </template>
+          <el-checkbox v-model="options.required">
+            Required on every record{{ isBundle ? ' (all members)' : '' }}
+          </el-checkbox>
+          <el-checkbox v-model="options.isSensitive">
+            Sensitive data / PHI{{ isBundle ? ' (all members)' : '' }}
+          </el-checkbox>
+          <el-checkbox v-if="!isBundle" v-model="options.isKey">Part of key</el-checkbox>
         </div>
+        <p v-if="isBundle" class="wiz-hint">
+          “Part of key” is set per property, not for a whole bundle — add it to an individual
+          property afterward if a bundle member should be part of the record key.
+        </p>
       </div>
     </dialog-body>
 
@@ -474,6 +480,7 @@ const buildBundleDefs = () =>
     if (m.cde.cde_definition) schema.description = m.cde.cde_definition
     Object.assign(schema, dataTypeSchema(m.cde.cde_data_type))
     schema['x-pennsieve-cde'] = { persistent_id: m.cde.persistent_id, strength: strength.value }
+    if (options.isSensitive) schema['x-pennsieve-sensitive'] = true
     return { propertyName: m.name, propertySchema: schema, required: options.required, oldPropertyName: null }
   })
 

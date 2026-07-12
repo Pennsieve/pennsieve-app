@@ -185,7 +185,7 @@
 
                 <el-form-item>
                   <el-checkbox v-model="propertyForm.isSensitive">
-                    Sensitive Data
+                    Sensitive Data / PHI
                   </el-checkbox>
                   <div class="field-help">Mark this property as containing sensitive information</div>
                 </el-form-item>
