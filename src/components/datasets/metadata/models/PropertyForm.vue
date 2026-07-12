@@ -161,25 +161,18 @@
           </div>
         </div>
 
-        <!-- Binding strength — only meaningful when there's a value list to enforce -->
-        <div v-if="selectionKind === 'bundle' || selectedHasValues" class="pf-section">
-          <div class="wiz-label">Binding strength<span v-if="selectionKind === 'bundle'"> (applies to all members)</span></div>
-          <el-radio-group v-model="strength" class="wiz-choices">
-            <div class="wiz-choice">
-              <el-radio value="required">Required</el-radio>
-              <p class="wiz-choice-desc">Records must use these values; data type and allowed values are enforced.</p>
-            </div>
-            <div class="wiz-choice">
-              <el-radio value="preferred">Preferred</el-radio>
-              <p class="wiz-choice-desc">Recommended values shown as guidance; not enforced.</p>
-            </div>
-            <div class="wiz-choice">
-              <el-radio value="example">Example</el-radio>
-              <p class="wiz-choice-desc">Linked for reference only.</p>
-            </div>
+        <!-- Bundle strength: applies to all members (single-CDE strength sits
+             next to its value list, below). -->
+        <div v-if="selectionKind === 'bundle'" class="pf-section">
+          <div class="wiz-label">Binding strength (applies to all members)</div>
+          <el-radio-group v-model="strength" size="small">
+            <el-radio-button value="required">Required</el-radio-button>
+            <el-radio-button value="preferred">Preferred</el-radio-button>
+            <el-radio-button value="example">Example</el-radio-button>
           </el-radio-group>
+          <div class="wiz-hint">{{ strengthHint }}</div>
         </div>
-        <div v-else-if="selectionKind === 'cde'" class="pf-section pf-nobind">
+        <div v-else-if="selectionKind === 'cde' && !selectedHasValues" class="pf-section pf-nobind">
           This element has no controlled value list, so there’s nothing to enforce — linking sets the
           data type (<b>{{ selectedCde && selectedCde.cde_data_type }}</b>) and records that this field
           follows the standard.
@@ -201,12 +194,22 @@
               </el-form-item>
             </el-form>
             <div class="wiz-cde-preview">
-              <div class="wiz-label">Set by the CDE<span v-if="strength === 'required'"> — enforced on save</span></div>
               <div class="wiz-kv">Data type <b>{{ selectedCde && selectedCde.cde_data_type }}</b></div>
-              <div v-if="cdeValues.length" class="wiz-values">
-                <span v-for="(v, i) in cdeValues.slice(0, 8)" :key="i" class="wiz-chip">{{ v }}</span>
-                <span v-if="cdeValues.length > 8" class="wiz-chip more">+{{ cdeValues.length - 8 }} more</span>
-              </div>
+              <template v-if="cdeValues.length">
+                <div class="pf-values-head">
+                  <span class="wiz-label">Allowed values ({{ cdeValues.length }})</span>
+                  <el-radio-group v-model="strength" size="small">
+                    <el-radio-button value="required">Required</el-radio-button>
+                    <el-radio-button value="preferred">Preferred</el-radio-button>
+                    <el-radio-button value="example">Example</el-radio-button>
+                  </el-radio-group>
+                </div>
+                <div class="wiz-values">
+                  <span v-for="(v, i) in cdeValues.slice(0, 8)" :key="i" class="wiz-chip">{{ v }}</span>
+                  <span v-if="cdeValues.length > 8" class="wiz-chip more">+{{ cdeValues.length - 8 }} more</span>
+                </div>
+                <div class="wiz-hint">{{ strengthHint }}</div>
+              </template>
             </div>
           </div>
           <div class="pf-section pf-divided">
@@ -429,6 +432,14 @@ const cdeValues = computed(() =>
 )
 // Strength only matters when the CDE carries a value list to enforce.
 const selectedHasValues = computed(() => cdeValues.value.length > 0)
+const strengthHint = computed(
+  () =>
+    ({
+      required: 'Records must use these values (enforced on save).',
+      preferred: 'Recommended values, shown as guidance — not enforced.',
+      example: 'Linked for reference only.',
+    }[strength.value] || '')
+)
 // Short comma-joined preview of a CDE's allowed values, for the hover tooltip.
 const cdeValuesPreview = (c) => {
   const pvs = ((c && c.permissible_values) || []).map((pv) => pv.label || pv.code || '').filter(Boolean)
@@ -893,27 +904,22 @@ function manualValueSchema() {
   color: theme.$gray_5;
   margin-bottom: 6px;
 }
-.wiz-choices {
-  display: block;
-  width: 100%;
+// Value-list header row: "Allowed values (N)" + compact strength control.
+.pf-values-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+  .wiz-label {
+    margin: 0;
+  }
 }
-.wiz-choice {
-  padding: 10px 0;
-}
-.wiz-choice + .wiz-choice {
-  border-top: 1px solid theme.$gray_1;
-}
-:deep(.wiz-choice .el-radio) {
-  height: auto;
-  margin-right: 0;
-  font-weight: 500;
-  color: theme.$gray_6;
-}
-.wiz-choice-desc {
-  margin: 2px 0 0 24px;
+.wiz-hint {
   font-size: 13px;
   color: theme.$gray_5;
   line-height: 1.4;
+  margin-top: 8px;
 }
 .wiz-cde-preview {
   background: theme.$purple_tint;
