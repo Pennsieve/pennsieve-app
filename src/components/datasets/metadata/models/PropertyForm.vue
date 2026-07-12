@@ -161,8 +161,8 @@
           </div>
         </div>
 
-        <!-- Binding strength -->
-        <div class="pf-section">
+        <!-- Binding strength — only meaningful when there's a value list to enforce -->
+        <div v-if="selectionKind === 'bundle' || selectedHasValues" class="pf-section">
           <div class="wiz-label">Binding strength<span v-if="selectionKind === 'bundle'"> (applies to all members)</span></div>
           <el-radio-group v-model="strength" class="wiz-choices">
             <div class="wiz-choice">
@@ -178,6 +178,11 @@
               <p class="wiz-choice-desc">Linked for reference only.</p>
             </div>
           </el-radio-group>
+        </div>
+        <div v-else-if="selectionKind === 'cde'" class="pf-section pf-nobind">
+          This element has no controlled value list, so there’s nothing to enforce — linking sets the
+          data type (<b>{{ selectedCde && selectedCde.cde_data_type }}</b>) and records that this field
+          follows the standard.
         </div>
 
         <!-- Single CDE: name/description + options -->
@@ -413,6 +418,8 @@ const isManual = computed(() => sourceMode.value === 'manual')
 const cdeValues = computed(() =>
   ((selectedCde.value && selectedCde.value.permissible_values) || []).map((pv) => pv.label || pv.code || '')
 )
+// Strength only matters when the CDE carries a value list to enforce.
+const selectedHasValues = computed(() => cdeValues.value.length > 0)
 // Short comma-joined preview of a CDE's allowed values, for the hover tooltip.
 const cdeValuesPreview = (c) => {
   const pvs = ((c && c.permissible_values) || []).map((pv) => pv.label || pv.code || '').filter(Boolean)
@@ -696,6 +703,15 @@ function manualValueSchema() {
 }
 .pf-section {
   margin-bottom: 20px;
+}
+.pf-nobind {
+  font-size: 13px;
+  color: theme.$gray_5;
+  line-height: 1.5;
+  b {
+    color: theme.$gray_6;
+    font-weight: 600;
+  }
 }
 .pf-label-strong {
   font-size: 14px;
