@@ -81,7 +81,6 @@
               <template v-else>{{ selectedCde && selectedCde.cde_data_type }}</template>
             </div>
             <div class="wiz-strength">
-              <div class="wiz-label">Binding strength<span v-if="selectionKind === 'bundle'"> (applies to all members)</span></div>
               <el-radio-group v-model="strength" size="small">
                 <el-radio-button value="required">Required</el-radio-button>
                 <el-radio-button value="preferred">Preferred</el-radio-button>
@@ -357,9 +356,12 @@ const stepHelp = computed(() => {
   // tuning the picked element. Keep enforcement wording with the strength
   // control (below), not repeated here.
   if (currentKey.value === 'find') {
-    return selectionKind.value
-      ? 'Set how strongly records should follow this element, then continue — or pick a different one.'
-      : 'Search the catalog and pick a data element — or a bundle to add several related properties at once.'
+    if (!selectionKind.value) {
+      return 'Search the catalog and pick a data element — or a bundle to add several related properties at once.'
+    }
+    return selectionKind.value === 'bundle'
+      ? 'Set the binding strength — how strongly records must follow these elements. It applies to all members.'
+      : 'Set the binding strength — how strongly records must follow this element.'
   }
   return (
     {
