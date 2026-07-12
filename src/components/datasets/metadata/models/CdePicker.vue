@@ -286,7 +286,7 @@ watch(
   color: theme.$gray_4;
 }
 .cde-hint {
-  color: theme.$gray_4;
+  color: theme.$gray_5;
   font-size: 12px;
   margin-top: 6px;
   line-height: 1.4;

@@ -760,7 +760,7 @@ function manualValueSchema() {
 }
 .wiz-hint {
   font-size: 12px;
-  color: theme.$gray_4;
+  color: theme.$gray_5;
   margin-top: 6px;
   line-height: 1.4;
 }
