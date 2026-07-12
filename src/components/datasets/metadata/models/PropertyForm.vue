@@ -82,8 +82,8 @@
                       bundle · {{ b.member_count }} element{{ b.member_count === 1 ? '' : 's' }}
                       <template v-if="b.domain"> · {{ b.domain }}</template>
                     </div>
-                    <div v-if="b.working_group" style="margin-top: 4px; font-size: 12px; opacity: 0.7">
-                      Origin: working group {{ b.working_group }}
+                    <div v-if="bundleOrigin(b)" style="margin-top: 4px; font-size: 12px; opacity: 0.7">
+                      Origin: {{ bundleOrigin(b) }}
                     </div>
                     <div style="margin-top: 6px; font-size: 12px">
                       <template v-if="!bundlePreviews[b.bundle_name] || bundlePreviews[b.bundle_name].loading">
@@ -423,14 +423,20 @@ const cdeValuesPreview = (c) => {
 
 // Bundle member names, lazy-loaded + cached on hover (not in the search result).
 const bundlePreviews = reactive({})
+const uniq = (arr) => [...new Set(arr.filter(Boolean))]
 const loadBundlePreview = async (name) => {
   if (bundlePreviews[name]) return
-  bundlePreviews[name] = { loading: true, names: [] }
+  bundlePreviews[name] = { loading: true, names: [], sources: [], stewards: [] }
   try {
     const members = await store.getBundleMembers(name)
-    bundlePreviews[name] = { loading: false, names: members.map((m) => m.cde_name).filter(Boolean) }
+    bundlePreviews[name] = {
+      loading: false,
+      names: members.map((m) => m.cde_name).filter(Boolean),
+      sources: uniq(members.map((m) => m.cde_source)),
+      stewards: uniq(members.map((m) => m.steward_org)),
+    }
   } catch (e) {
-    bundlePreviews[name] = { loading: false, names: [] }
+    bundlePreviews[name] = { loading: false, names: [], sources: [], stewards: [] }
   }
 }
 const bundlePreview = (b) => {
@@ -438,6 +444,15 @@ const bundlePreview = (b) => {
   if (!p || !p.names.length) return 'No members'
   const head = p.names.slice(0, 8).join(', ')
   return p.names.length > 8 ? `${head} +${p.names.length - 8} more` : head
+}
+// Origin derived from the bundle's member CDEs (usually a single shared source).
+const bundleOrigin = (b) => {
+  const p = bundlePreviews[b.bundle_name]
+  if (!p || p.loading) return ''
+  const parts = []
+  if (p.sources.length) parts.push(p.sources.length === 1 ? p.sources[0] : `${p.sources.length} sources`)
+  if (p.stewards.length === 1) parts.push(p.stewards[0])
+  return parts.join(' · ')
 }
 
 const canAdd = computed(() => {
