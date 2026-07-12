@@ -175,15 +175,27 @@
 
       <!-- MEMBERS (bundle) -->
       <div v-show="currentKey === 'members'" class="wiz-step">
-        <div class="wiz-q">{{ memberRows.length }} properties will be created from “{{ selectedBundleName }}”</div>
+        <div class="wiz-q">{{ memberRows.length }} properties from “{{ selectedBundleName }}”</div>
+        <p class="wiz-subq">
+          These are added together as a set. Rename any if needed, and mark which ones are part of
+          the record key or hold sensitive / PHI data.
+        </p>
         <div class="wiz-members">
+          <div class="wiz-members-head">
+            <span>Property</span>
+            <span class="col-flag">Key</span>
+            <span class="col-flag">PHI</span>
+          </div>
           <div v-for="(m, i) in memberRows" :key="i" class="wiz-member">
-            <el-checkbox v-model="m.include" />
-            <el-input v-model="m.name" :disabled="!m.include" class="wiz-member-name" size="small" />
-            <span class="wiz-member-cde" :title="m.cde.cde_name">{{ m.cde.cde_name }}</span>
-            <span v-if="m.include && collides(m.name, i)" class="wiz-collision">name in use</span>
-            <el-checkbox v-model="m.isKey" :disabled="!m.include" size="small" class="wiz-member-flag">Key</el-checkbox>
-            <el-checkbox v-model="m.isSensitive" :disabled="!m.include" size="small" class="wiz-member-flag">PHI</el-checkbox>
+            <div class="wiz-member-prop">
+              <el-input v-model="m.name" size="small" />
+              <div class="wiz-member-sub">
+                <span class="wiz-member-cde" :title="m.cde.cde_name">{{ m.cde.cde_name }}</span>
+                <span v-if="collides(m.name, i)" class="wiz-collision"> · name in use</span>
+              </div>
+            </div>
+            <div class="col-flag"><el-checkbox v-model="m.isKey" /></div>
+            <div class="col-flag"><el-checkbox v-model="m.isSensitive" /></div>
           </div>
         </div>
       </div>
@@ -361,7 +373,9 @@ const summaryType = computed(() =>
 const cdeValues = computed(() =>
   ((selectedCde.value && selectedCde.value.permissible_values) || []).map((pv) => pv.label || pv.code || '')
 )
-const includedMembers = computed(() => memberRows.value.filter((m) => m.include))
+// A bundle is collected as a set — every member becomes a property (users can
+// still drop one afterward in the Advanced JSON editor if truly needed).
+const includedMembers = computed(() => memberRows.value)
 const strengthHint = computed(
   () =>
     ({
@@ -408,7 +422,7 @@ const chooseBundle = async (b) => {
     memberRows.value = members.map((cde) => {
       const name = dedupe(toPropName(cde.cde_name), taken)
       taken.add(name)
-      return { cde, name, include: true, isKey: false, isSensitive: false }
+      return { cde, name, isKey: false, isSensitive: false }
     })
   } catch (e) {
     ElMessage.error('Failed to load bundle members: ' + (e?.message || e))
@@ -489,7 +503,7 @@ const buildBundleDefs = () =>
 
 const collides = (name, index) => {
   if (props.existingProperties.includes(name)) return true
-  return memberRows.value.some((m, i) => i !== index && m.include && m.name === name)
+  return memberRows.value.some((m, i) => i !== index && m.name === name)
 }
 
 const cancel = () => {
@@ -822,36 +836,57 @@ function manualValueSchema() {
 .wiz-flags {
   margin-top: 8px;
 }
+.wiz-subq {
+  font-size: 13px;
+  color: theme.$gray_5;
+  line-height: 1.5;
+  margin: 0 0 16px;
+}
 .wiz-members {
-  max-height: 280px;
+  max-height: 340px;
   overflow-y: auto;
 }
+.wiz-members-head,
 .wiz-member {
-  display: flex;
+  display: grid;
+  grid-template-columns: 1fr 52px 52px;
   align-items: center;
   gap: 8px;
-  padding: 6px 0;
+}
+.wiz-members-head {
+  position: sticky;
+  top: 0;
+  background: theme.$white;
+  padding: 4px 0 8px;
+  border-bottom: 1px solid theme.$gray_2;
+  font-size: 12px;
+  font-weight: 500;
+  color: theme.$gray_5;
+}
+.wiz-member {
+  padding: 10px 0;
   border-bottom: 1px solid theme.$gray_1;
 }
-.wiz-member-name {
-  width: 200px;
+.col-flag {
+  display: flex;
+  justify-content: center;
+  :deep(.el-checkbox) {
+    margin-right: 0;
+  }
 }
-.wiz-member-cde {
-  flex: 1;
-  font-size: 13px;
+.wiz-member-sub {
+  font-size: 12px;
   color: theme.$gray_4;
+  margin-top: 4px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.wiz-collision {
-  font-size: 12px;
-  color: theme.$orange_2;
+.wiz-member-cde {
+  color: theme.$gray_4;
 }
-.wiz-member-flag {
-  flex-shrink: 0;
-  margin-right: 0;
-  --el-checkbox-font-size: 12px;
+.wiz-collision {
+  color: theme.$orange_2;
 }
 .wiz-summary {
   font-size: 14px;
