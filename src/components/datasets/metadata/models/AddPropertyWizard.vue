@@ -177,7 +177,6 @@
       <!-- MEMBERS (bundle) -->
       <div v-show="currentKey === 'members'" class="wiz-step">
         <div class="wiz-q">{{ memberRows.length }} properties from “{{ selectedBundleName }}”</div>
-        <p class="wiz-subq">Added together as a set. Rename any if needed, and optionally mark each:</p>
         <ul class="wiz-legend">
           <li><b>Required</b> — every record must include a value.</li>
           <li><b>Key</b> — its value helps identify a record (matching key values = the same record).</li>
@@ -361,7 +360,7 @@ const stepHelp = computed(
       details: 'Name the property and describe it. If you linked a CDE these are pre-filled — adjust as needed.',
       type: 'Pick the kind of value this property holds.',
       values: 'Set the allowed values and any limits. Only the options relevant to your type are shown.',
-      members: 'This bundle adds several properties — one per element. Review the names and uncheck any you don’t need.',
+      members: 'These properties are added together as a set. Rename any as needed, then use the columns to set each one’s behavior.',
       options: 'Choose how this property behaves on records.',
     }[currentKey.value] || '')
 )
@@ -867,12 +866,6 @@ function manualValueSchema() {
       font-weight: 600;
     }
   }
-}
-.wiz-subq {
-  font-size: 13px;
-  color: theme.$gray_5;
-  line-height: 1.5;
-  margin: 0 0 16px;
 }
 .wiz-members {
   max-height: 340px;
