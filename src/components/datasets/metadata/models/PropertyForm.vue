@@ -187,7 +187,8 @@
 
         <!-- Single CDE: name/description + options -->
         <template v-if="selectionKind === 'cde'">
-          <div class="pf-section">
+          <div class="pf-section pf-divided">
+            <div class="pf-section-title">General</div>
             <el-form label-position="top">
               <el-form-item label="Display name">
                 <el-input v-model="basics.displayName" @input="onDisplayNameInput" />
@@ -208,8 +209,8 @@
               </div>
             </div>
           </div>
-          <div class="pf-section">
-            <div class="pf-label-strong">Options</div>
+          <div class="pf-section pf-divided">
+            <div class="pf-section-title">Options</div>
             <div class="wiz-options">
               <div v-for="f in optionFlags" :key="f.key" class="wiz-option">
                 <el-checkbox v-model="options[f.key]">{{ f.label }}</el-checkbox>
@@ -255,6 +256,7 @@
     <!-- MANUAL PATH -->
     <template v-else-if="sourceMode === 'manual'">
       <div class="pf-section">
+        <div class="pf-section-title">General</div>
         <el-form label-position="top">
           <el-form-item label="Display name">
             <el-input v-model="basics.displayName" @input="onDisplayNameInput" />
@@ -265,6 +267,12 @@
           <el-form-item label="Description">
             <el-input v-model="basics.description" type="textarea" :rows="2" />
           </el-form-item>
+        </el-form>
+      </div>
+
+      <div class="pf-section pf-divided">
+        <div class="pf-section-title">Data type</div>
+        <el-form label-position="top">
           <el-form-item label="Data type">
             <el-select v-model="manual.type">
               <el-option v-for="t in manualTypes" :key="t.value" :label="t.label" :value="t.value" />
@@ -302,8 +310,9 @@
           </template>
         </el-form>
       </div>
-      <div class="pf-section">
-        <div class="pf-label-strong">Options</div>
+
+      <div class="pf-section pf-divided">
+        <div class="pf-section-title">Options</div>
         <div class="wiz-options">
           <div v-for="f in optionFlags" :key="f.key" class="wiz-option">
             <el-checkbox v-model="options[f.key]">{{ f.label }}</el-checkbox>
@@ -713,11 +722,18 @@ function manualValueSchema() {
     font-weight: 600;
   }
 }
-.pf-label-strong {
-  font-size: 14px;
-  font-weight: 500;
-  color: theme.$gray_6;
-  margin-bottom: 10px;
+.pf-section-title {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: theme.$gray_4;
+  margin-bottom: 12px;
+}
+// Subtle divider above a section group (General / Data type / Options).
+.pf-divided {
+  border-top: 1px solid theme.$gray_2;
+  padding-top: 20px;
 }
 .pf-footer {
   display: flex;
