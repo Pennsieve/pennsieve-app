@@ -2,7 +2,7 @@
   <el-dialog
     v-model="dialogVisible"
     :show-close="false"
-    width="720px"
+    width="820px"
     destroy-on-close
     class="add-property-wizard"
   >

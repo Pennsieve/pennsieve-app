@@ -78,13 +78,39 @@
           <template v-if="results.cdes.length">
             <div class="wiz-group">Common data elements</div>
             <ul class="wiz-list">
-              <li v-for="c in results.cdes" :key="'c:' + c.persistent_id" class="wiz-row" @click="chooseCde(c)">
-                <span class="wiz-row-name">{{ c.cde_name }}</span>
-                <span class="wiz-row-meta">
-                  {{ c.cde_data_type }}
-                  <template v-if="c._bundles && c._bundles.length"> · part of {{ c._bundles.join(', ') }}</template>
-                </span>
-              </li>
+              <el-tooltip
+                v-for="c in results.cdes"
+                :key="'c:' + c.persistent_id"
+                placement="right"
+                effect="light"
+                :show-after="350"
+                :disabled="!c.cde_definition && !cdeValuesPreview(c)"
+              >
+                <template #content>
+                  <div style="max-width: 340px">
+                    <div v-if="c.cde_definition" style="margin-bottom: 6px; line-height: 1.45">
+                      {{ c.cde_definition }}
+                    </div>
+                    <div style="font-size: 12px; opacity: 0.7">
+                      {{ c.cde_data_type }}
+                      <template v-if="c.permissible_values && c.permissible_values.length">
+                        · {{ c.permissible_values.length }} allowed value{{ c.permissible_values.length === 1 ? '' : 's' }}
+                      </template>
+                      <template v-if="c.cde_source"> · {{ c.cde_source }}</template>
+                    </div>
+                    <div v-if="cdeValuesPreview(c)" style="margin-top: 6px; font-size: 12px">
+                      {{ cdeValuesPreview(c) }}
+                    </div>
+                  </div>
+                </template>
+                <li class="wiz-row" @click="chooseCde(c)">
+                  <span class="wiz-row-name">{{ c.cde_name }}</span>
+                  <span class="wiz-row-meta">
+                    {{ c.cde_data_type }}
+                    <template v-if="c._bundles && c._bundles.length"> · part of {{ c._bundles.join(', ') }}</template>
+                  </span>
+                </li>
+              </el-tooltip>
             </ul>
           </template>
           <div v-if="(term.trim() || disease || domain || tier) && !results.bundles.length && !results.cdes.length" class="wiz-status">
@@ -358,6 +384,13 @@ const isManual = computed(() => sourceMode.value === 'manual')
 const cdeValues = computed(() =>
   ((selectedCde.value && selectedCde.value.permissible_values) || []).map((pv) => pv.label || pv.code || '')
 )
+// Short comma-joined preview of a CDE's allowed values, for the hover tooltip.
+const cdeValuesPreview = (c) => {
+  const pvs = ((c && c.permissible_values) || []).map((pv) => pv.label || pv.code || '').filter(Boolean)
+  if (!pvs.length) return ''
+  const head = pvs.slice(0, 6).join(', ')
+  return pvs.length > 6 ? `${head} +${pvs.length - 6} more` : head
+}
 
 const canAdd = computed(() => {
   if (sourceMode.value === 'manual') return !!basics.name

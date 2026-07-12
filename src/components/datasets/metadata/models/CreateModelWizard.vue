@@ -232,7 +232,7 @@ const currentKey = computed(() => (steps.value[stepIndex.value] || steps.value[0
 const isLastStep = computed(() => stepIndex.value >= steps.value.length - 1)
 
 // The raw JSON step wants more room than the guided steps.
-const dialogWidth = computed(() => (currentKey.value === 'advanced' ? 'min(1040px, 94vw)' : '720px'))
+const dialogWidth = computed(() => (currentKey.value === 'advanced' ? 'min(1040px, 94vw)' : '820px'))
 
 const canAdvance = computed(() => {
   switch (currentKey.value) {
