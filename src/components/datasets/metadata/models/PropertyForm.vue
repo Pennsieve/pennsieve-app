@@ -727,18 +727,8 @@ function manualValueSchema() {
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  color: theme.$gray_4;
+  color: theme.$purple_2;
   margin-bottom: 12px;
-  // Short, thick accent bar marks each section instead of a full-width rule.
-  &::before {
-    content: '';
-    display: block;
-    width: 28px;
-    height: 3px;
-    border-radius: 2px;
-    background: theme.$purple_2;
-    margin-bottom: 8px;
-  }
 }
 // Extra breathing room between section groups (no divider line).
 .pf-divided {
