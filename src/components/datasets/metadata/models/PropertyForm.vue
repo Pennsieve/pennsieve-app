@@ -187,11 +187,22 @@
                 <el-input v-model="basics.description" type="textarea" :rows="2" />
               </el-form-item>
             </el-form>
+            <div class="pf-field">
+              <div class="wiz-label">Common data element</div>
+              <div class="pf-field-value">{{ selectedCde && selectedCde.cde_name }}</div>
+            </div>
+            <div class="pf-field">
+              <div class="wiz-label">Data type</div>
+              <div class="pf-field-value">{{ selectedCde && selectedCde.cde_data_type }}</div>
+            </div>
+            <p v-if="!cdeValues.length" class="wiz-hint" style="margin-top: 0">
+              No controlled value list — linking sets the data type and records that this field follows the standard.
+            </p>
           </div>
 
-          <div class="pf-section pf-divided">
+          <div v-if="cdeValues.length" class="pf-section pf-divided">
             <div class="pf-section-title">Data values</div>
-            <div v-if="cdeValues.length" class="pf-field">
+            <div class="pf-field">
               <div class="wiz-label">Binding strength</div>
               <el-radio-group v-model="strength" size="small">
                 <el-radio-button value="required">Required</el-radio-button>
@@ -201,19 +212,12 @@
               <div class="wiz-hint">{{ strengthHint }}</div>
             </div>
             <div class="pf-field">
-              <div class="wiz-label">Data type</div>
-              <div class="pf-field-value">{{ selectedCde && selectedCde.cde_data_type }}</div>
-            </div>
-            <div v-if="cdeValues.length" class="pf-field">
               <div class="wiz-label">Allowed values ({{ cdeValues.length }})</div>
               <div class="wiz-values">
                 <span v-for="(v, i) in cdeValues.slice(0, 8)" :key="i" class="wiz-chip">{{ v }}</span>
                 <span v-if="cdeValues.length > 8" class="wiz-chip more">+{{ cdeValues.length - 8 }} more</span>
               </div>
             </div>
-            <p v-else class="wiz-hint" style="margin-top: 0">
-              No controlled value list — linking sets the data type and records that this field follows the standard.
-            </p>
           </div>
 
           <div class="pf-section pf-divided">
