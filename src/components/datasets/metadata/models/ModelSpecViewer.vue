@@ -176,6 +176,7 @@ const {
   formatValue,
   isRequired,
   isKey,
+  getCde,
   isDeprecated,
   isReadOnly,
   isWriteOnly,
@@ -1079,6 +1080,14 @@ const PropertyTree = defineComponent({
                   Sensitive
                 </el-tag>
                 <el-tag
+                  v-if="getCde(property)"
+                  size="small"
+                  effect="plain"
+                  class="tag-cde"
+                >
+                  CDE · {{ getCde(property).strength }}
+                </el-tag>
+                <el-tag
                   v-if="isDeprecated(property)"
                   size="small"
                   effect="plain"
@@ -1128,10 +1137,17 @@ const PropertyTree = defineComponent({
             </div>
             
             <!-- Property details -->
-            <div v-if="property.description || getConstraintInfo(property).length > 0 || getDefaultOrExample(property)" 
+            <div v-if="property.description || getConstraintInfo(property).length > 0 || getDefaultOrExample(property) || getCde(property)"
                  class="property-details">
               <div v-if="property.description" class="property-description">
                 {{ property.description }}
+              </div>
+              <div v-if="getCde(property)" class="property-cde">
+                <span class="cde-label">Common data element:</span>
+                <code class="cde-id">{{ getCde(property).persistent_id }}</code>
+                <span v-if="getCde(property).catalog_version" class="cde-anchor">
+                  · catalog {{ getCde(property).catalog_version }}
+                </span>
               </div>
               <div v-if="getConstraintInfo(property).length > 0" class="property-constraints">
                 <span class="constraint-label">Constraints:</span>
@@ -1436,7 +1452,13 @@ const PropertyTree = defineComponent({
             border-color: theme.$yellow_1;
             color: theme.$yellow_2;
           }
-          
+
+          :deep(.tag-cde) {
+            background-color: theme.$purple_2;
+            border-color: theme.$purple_2;
+            color: theme.$white;
+          }
+
           :deep(.tag-deprecated) {
             background-color: theme.$gray_2;
             border-color: theme.$gray_4;
@@ -1542,7 +1564,13 @@ const PropertyTree = defineComponent({
                 border-color: theme.$yellow_1 !important;
                 color: theme.$yellow_2 !important;
               }
-              
+
+              .tag-cde {
+                background-color: theme.$purple_2 !important;
+                border-color: theme.$purple_2 !important;
+                color: theme.$white !important;
+              }
+
               .tag-deprecated {
                 background-color: theme.$gray_2 !important;
                 border-color: theme.$gray_4 !important;
@@ -1583,7 +1611,26 @@ const PropertyTree = defineComponent({
           margin-bottom: 6px;
           line-height: 1.4;
         }
-        
+
+        .property-cde {
+          margin-bottom: 4px;
+
+          .cde-label {
+            font-weight: 500;
+            color: theme.$gray_5;
+            margin-right: 6px;
+          }
+          .cde-id {
+            color: theme.$purple_2;
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 12px;
+          }
+          .cde-anchor {
+            color: theme.$gray_4;
+            font-size: 12px;
+          }
+        }
+
         .property-constraints {
           margin-bottom: 4px;
           

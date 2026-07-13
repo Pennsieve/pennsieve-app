@@ -190,6 +190,15 @@ export function usePropertyFormatting() {
   }
 
   /**
+   * Return the CDE binding annotation on a property, or null.
+   * Shape: { persistent_id, strength, catalog_version? }
+   */
+  const getCde = (property) => {
+    const cde = property && property['x-pennsieve-cde']
+    return cde && typeof cde === 'object' ? cde : null
+  }
+
+  /**
    * Check if property is a nested object with sub-properties
    */
   const isNestedObject = (property) => {
@@ -263,6 +272,7 @@ export function usePropertyFormatting() {
     // Property checking functions
     isRequired,
     isKey,
+    getCde,
     isDeprecated,
     isReadOnly,
     isWriteOnly,
