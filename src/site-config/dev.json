@@ -2,6 +2,7 @@
   "app_domain": "pennsieve.net",
   "apiUrl": "https://api.pennsieve.net",
   "api2Url": "https://api2.pennsieve.net",
+  "cdeCatalogUrl": "https://d1es2ibvcs23vq.cloudfront.net",
   "discoverUrl": "https://api.pennsieve.net/discover",
   "discoverAppUrl": "https://discover.pennsieve.net",
   "zipitUrl": "https://api.pennsieve.net/zipit",
