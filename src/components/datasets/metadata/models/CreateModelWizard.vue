@@ -58,7 +58,17 @@
                 @click="chooseTemplate(t)"
               >
                 <span class="cmw-tpl-name">{{ t.display_name || t.name }}</span>
-                <span class="cmw-tpl-meta">{{ templatePropCount(t) }} properties</span>
+                <span class="cmw-tpl-meta">
+                  {{ templatePropCount(t) }} properties
+                  <a
+                    v-if="templateHref(t)"
+                    :href="templateHref(t)"
+                    target="_blank"
+                    rel="noopener"
+                    class="cmw-tpl-link"
+                    @click.stop
+                  >Details&nbsp;↗</a>
+                </span>
               </li>
             </el-tooltip>
           </ul>
@@ -176,6 +186,7 @@
 
 <script setup>
 import { ref, reactive, computed, watch } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { Plus, Close, Files, EditPen, Search } from '@element-plus/icons-vue'
 import BfDialogHeader from '@/components/shared/bf-dialog-header/BfDialogHeader.vue'
@@ -198,6 +209,18 @@ const props = defineProps({
 const emit = defineEmits(['update:visible', 'created', 'cancel'])
 
 const metadataStore = useMetadataStore()
+const router = useRouter()
+const route = useRoute()
+
+// Full URL to a template's detail view; opened in a new tab so the wizard
+// stays open.
+const templateHref = (t) => {
+  try {
+    return router.resolve({ name: 'template-details', params: { ...route.params, templateId: t.id } }).href
+  } catch {
+    return ''
+  }
+}
 
 const dialogVisible = computed({
   get: () => props.visible,
@@ -645,6 +668,17 @@ function dedupe(name, taken) {
 .cmw-tpl-meta {
   font-size: 12px;
   color: theme.$gray_4;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  white-space: nowrap;
+}
+.cmw-tpl-link {
+  color: theme.$purple_2;
+  text-decoration: none;
+  &:hover {
+    text-decoration: underline;
+  }
 }
 .cmw-props-head {
   display: flex;
