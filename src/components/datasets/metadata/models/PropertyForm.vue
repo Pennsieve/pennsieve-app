@@ -7,7 +7,6 @@
 
     <!-- SOURCE -->
     <div class="pf-section">
-      <div class="wiz-q">How are this property’s values defined?</div>
       <div class="wiz-cards">
         <div :class="['wiz-card', { active: sourceMode === 'catalog' }]" @click="setSource('catalog')">
           <div class="wiz-card-head">
@@ -765,12 +764,6 @@ function manualValueSchema() {
   font-weight: 500;
   padding-bottom: 4px;
   line-height: 1.4;
-}
-.wiz-q {
-  font-size: 15px;
-  font-weight: 500;
-  color: theme.$gray_6;
-  margin-bottom: 12px;
 }
 .wiz-cards {
   display: grid;
