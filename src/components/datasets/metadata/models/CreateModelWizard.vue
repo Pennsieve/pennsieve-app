@@ -36,15 +36,31 @@
           <div v-if="templatesLoading" class="cmw-status">Loading templates…</div>
           <div v-else-if="templatesError" class="cmw-status cmw-error">{{ templatesError }}</div>
           <ul v-else-if="filteredTemplates.length" class="cmw-tpl-list">
-            <li
+            <el-tooltip
               v-for="t in filteredTemplates"
               :key="t.id"
-              :class="['cmw-tpl', { active: selectedTemplateId === t.id }]"
-              @click="chooseTemplate(t)"
+              placement="top"
+              effect="light"
+              :show-after="350"
+              :disabled="!t.description && !templatePropNames(t).length"
             >
-              <span class="cmw-tpl-name">{{ t.display_name || t.name }}</span>
-              <span class="cmw-tpl-meta">{{ templatePropCount(t) }} properties</span>
-            </li>
+              <template #content>
+                <div style="max-width: 340px">
+                  <div v-if="t.description" style="margin-bottom: 6px; line-height: 1.45">{{ t.description }}</div>
+                  <div style="font-size: 12px; opacity: 0.7">{{ templatePropCount(t) }} properties</div>
+                  <div v-if="templatePropNames(t).length" style="margin-top: 6px; font-size: 12px">
+                    {{ templatePropPreview(t) }}
+                  </div>
+                </div>
+              </template>
+              <li
+                :class="['cmw-tpl', { active: selectedTemplateId === t.id }]"
+                @click="chooseTemplate(t)"
+              >
+                <span class="cmw-tpl-name">{{ t.display_name || t.name }}</span>
+                <span class="cmw-tpl-meta">{{ templatePropCount(t) }} properties</span>
+              </li>
+            </el-tooltip>
           </ul>
           <div v-else class="cmw-status">No templates available</div>
         </div>
@@ -486,7 +502,13 @@ const reset = () => {
   createError.value = ''
 }
 
-const templatePropCount = (t) => Object.keys(t.latest_version?.schema?.properties || t.schema?.properties || {}).length
+const templatePropNames = (t) => Object.keys(t.latest_version?.schema?.properties || t.schema?.properties || {})
+const templatePropCount = (t) => templatePropNames(t).length
+const templatePropPreview = (t) => {
+  const names = templatePropNames(t)
+  const head = names.slice(0, 8).join(', ')
+  return names.length > 8 ? `${head} +${names.length - 8} more` : head
+}
 
 const propMeta = (p) => {
   const s = p.propertySchema || {}
