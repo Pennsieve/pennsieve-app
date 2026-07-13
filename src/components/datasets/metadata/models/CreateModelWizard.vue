@@ -547,9 +547,9 @@ function dedupe(name, taken) {
   color: theme.$gray_6;
 }
 .cmw-cards {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
   margin: 12px 0;
 }
 .cmw-card {
