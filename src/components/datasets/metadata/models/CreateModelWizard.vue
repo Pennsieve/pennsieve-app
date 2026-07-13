@@ -60,14 +60,7 @@
                 <span class="cmw-tpl-name">{{ t.display_name || t.name }}</span>
                 <span class="cmw-tpl-meta">
                   {{ templatePropCount(t) }} properties
-                  <a
-                    v-if="templateHref(t)"
-                    :href="templateHref(t)"
-                    target="_blank"
-                    rel="noopener"
-                    class="cmw-tpl-link"
-                    @click.stop
-                  >Details&nbsp;↗</a>
+                  <a class="cmw-tpl-link" @click.stop.prevent="onTemplateDetails(t)">Details</a>
                 </span>
               </li>
             </el-tooltip>
@@ -182,6 +175,24 @@
       <el-button v-else type="primary" :disabled="!canAdvance || addingProperty" @click="next">Continue</el-button>
     </template>
   </el-dialog>
+
+  <!-- Warn before navigating away from the wizard to a template's details -->
+  <el-dialog v-model="leaveConfirmVisible" :show-close="false" width="440px" append-to-body class="cmw-leave-confirm">
+    <template #header>
+      <bf-dialog-header title="Leave the model wizard?" />
+    </template>
+    <dialog-body>
+      <p class="cmw-leave-text">
+        Opening template details will take you out of the create-model wizard, and anything you’ve
+        set up here won’t be saved.
+      </p>
+      <el-checkbox v-model="leaveDontWarn">Don’t show this again</el-checkbox>
+    </dialog-body>
+    <template #footer>
+      <el-button @click="leaveConfirmVisible = false">Stay</el-button>
+      <el-button type="primary" @click="confirmLeave">Open template details</el-button>
+    </template>
+  </el-dialog>
 </template>
 
 <script setup>
@@ -212,14 +223,43 @@ const metadataStore = useMetadataStore()
 const router = useRouter()
 const route = useRoute()
 
-// Full URL to a template's detail view; opened in a new tab so the wizard
-// stays open.
-const templateHref = (t) => {
+// Inspecting a template navigates away from the wizard, so warn first (unless
+// the user opted out). "Don't show again" is remembered in localStorage.
+const SKIP_LEAVE_WARN = 'cde:skip-leave-wizard-warning'
+const leaveConfirmVisible = ref(false)
+const leaveDontWarn = ref(false)
+let pendingTemplateId = null
+
+const readSkipWarn = () => {
   try {
-    return router.resolve({ name: 'template-details', params: { ...route.params, templateId: t.id } }).href
+    return localStorage.getItem(SKIP_LEAVE_WARN) === '1'
   } catch {
-    return ''
+    return false
   }
+}
+const onTemplateDetails = (t) => {
+  pendingTemplateId = t.id
+  if (readSkipWarn()) {
+    goToTemplateDetails()
+    return
+  }
+  leaveDontWarn.value = false
+  leaveConfirmVisible.value = true
+}
+const goToTemplateDetails = () => {
+  if (!pendingTemplateId) return
+  router.push({ name: 'template-details', params: { ...route.params, templateId: pendingTemplateId } })
+}
+const confirmLeave = () => {
+  if (leaveDontWarn.value) {
+    try {
+      localStorage.setItem(SKIP_LEAVE_WARN, '1')
+    } catch {
+      /* ignore */
+    }
+  }
+  leaveConfirmVisible.value = false
+  goToTemplateDetails()
 }
 
 const dialogVisible = computed({
@@ -676,9 +716,15 @@ function dedupe(name, taken) {
 .cmw-tpl-link {
   color: theme.$purple_2;
   text-decoration: none;
+  cursor: pointer;
   &:hover {
     text-decoration: underline;
   }
+}
+.cmw-leave-text {
+  color: theme.$gray_6;
+  line-height: 1.5;
+  margin: 0 0 16px;
 }
 .cmw-props-head {
   display: flex;
