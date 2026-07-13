@@ -186,7 +186,7 @@
                 <el-input v-model="basics.name" />
               </el-form-item>
               <el-form-item label="Description">
-                <el-input v-model="basics.description" type="textarea" :rows="2" />
+                <el-input v-model="basics.description" type="textarea" :rows="3" />
               </el-form-item>
             </el-form>
             <p v-if="!cdeValues.length" class="wiz-hint" style="margin-top: 0">
