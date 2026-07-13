@@ -10,10 +10,10 @@
       </div>
 
       <div class="cg-controls">
-        <el-input v-model="term" placeholder="Search common data elements" clearable class="cg-search" @input="onSearch">
+        <el-input v-model="term" placeholder="Search the catalog" clearable class="cg-search" @input="onSearch">
           <template #prefix><el-icon><Search /></el-icon></template>
         </el-input>
-        <div v-if="facetValues.diseases.length || facetValues.domains.length" class="cg-facets">
+        <div v-if="activeTab === 'cdes' && (facetValues.diseases.length || facetValues.domains.length)" class="cg-facets">
           <div v-if="facetValues.diseases.length" class="cg-facet">
             <span class="cg-facet-label">Disease</span>
             <el-radio-group v-model="disease" size="small" @change="runSearch">
@@ -47,44 +47,68 @@
       </div>
 
       <div v-if="store.error" class="cg-status cg-error">{{ store.error }}</div>
-      <div v-else-if="loading" class="cg-status">Loading catalog…</div>
-      <template v-else>
-        <section v-if="results.bundles.length" class="cg-section">
-          <h3 class="cg-section-title">Bundles</h3>
-          <div class="cg-grid">
-            <button v-for="b in results.bundles" :key="b.bundle_name" class="cg-bundle" @click="openBundle(b)">
-              <div class="cg-bundle-name">{{ b.bundle_name }}</div>
-              <div class="cg-bundle-meta">
-                {{ b.member_count }} element{{ b.member_count === 1 ? '' : 's' }}
-                <template v-if="b.domain"> · {{ b.domain }}</template>
-              </div>
-            </button>
-          </div>
-        </section>
 
-        <section class="cg-section">
-          <h3 class="cg-section-title">Common data elements</h3>
-          <div v-if="!results.cdes.length" class="cg-status">No matching common data elements.</div>
-          <ul v-else class="cg-list">
-            <li v-for="c in results.cdes" :key="c.persistent_id || c.canonical_key" class="cg-row" @click="openCde(c)">
-              <div class="cg-row-main">
-                <span class="cg-row-name">{{ c.cde_name }}</span>
-                <span v-if="c.cde_definition" class="cg-row-def">{{ c.cde_definition }}</span>
-              </div>
-              <span class="cg-row-meta">
-                {{ c.cde_data_type }}
-                <template v-if="c.permissible_values && c.permissible_values.length">
-                  · {{ c.permissible_values.length }} values
-                </template>
-              </span>
-            </li>
-          </ul>
-        </section>
-      </template>
+      <el-tabs v-else v-model="activeTab" class="cg-tabs">
+        <!-- Common data elements -->
+        <el-tab-pane name="cdes" :label="`Common data elements${cdeTotal ? ` (${cdeTotal})` : ''}`">
+          <div v-if="loading" class="cg-status">Loading…</div>
+          <template v-else>
+            <div v-if="!cdes.length" class="cg-status">No matching common data elements.</div>
+            <ul v-else class="cg-list">
+              <li v-for="c in cdes" :key="c.persistent_id || c.canonical_key" class="cg-row" @click="openCde(c)">
+                <div class="cg-row-main">
+                  <span class="cg-row-name">{{ c.cde_name }}</span>
+                  <span v-if="c.cde_definition" class="cg-row-def">{{ c.cde_definition }}</span>
+                </div>
+                <span class="cg-row-meta">
+                  {{ c.cde_data_type }}
+                  <template v-if="c.permissible_values && c.permissible_values.length">
+                    · {{ c.permissible_values.length }} values
+                  </template>
+                </span>
+              </li>
+            </ul>
+            <el-pagination
+              v-if="cdeTotal > PAGE_SIZE"
+              class="cg-pager"
+              layout="prev, pager, next"
+              :total="cdeTotal"
+              :page-size="PAGE_SIZE"
+              :current-page="cdePage"
+              @current-change="onCdePage"
+            />
+          </template>
+        </el-tab-pane>
+
+        <!-- Bundles -->
+        <el-tab-pane name="bundles" :label="`Bundles${allBundles.length ? ` (${allBundles.length})` : ''}`">
+          <div v-if="loading" class="cg-status">Loading…</div>
+          <template v-else>
+            <div v-if="!allBundles.length" class="cg-status">No matching bundles.</div>
+            <div v-else class="cg-grid">
+              <button v-for="b in pagedBundles" :key="b.bundle_name" class="cg-bundle" @click="openBundle(b)">
+                <div class="cg-bundle-name">{{ b.bundle_name }}</div>
+                <div class="cg-bundle-meta">
+                  {{ b.member_count }} element{{ b.member_count === 1 ? '' : 's' }}
+                  <template v-if="b.domain"> · {{ b.domain }}</template>
+                </div>
+              </button>
+            </div>
+            <el-pagination
+              v-if="allBundles.length > BUNDLE_PAGE_SIZE"
+              class="cg-pager"
+              layout="prev, pager, next"
+              :total="allBundles.length"
+              :page-size="BUNDLE_PAGE_SIZE"
+              :current-page="bundlePage"
+              @current-change="onBundlePage"
+            />
+          </template>
+        </el-tab-pane>
+      </el-tabs>
 
       <!-- Detail drawer -->
       <el-drawer v-model="detailVisible" :title="detailTitle" size="480px" direction="rtl">
-        <!-- CDE detail -->
         <div v-if="detail.kind === 'cde' && detail.cde" class="cg-detail">
           <p v-if="detail.cde.cde_definition" class="cg-def">{{ detail.cde.cde_definition }}</p>
 
@@ -123,7 +147,6 @@
           </div>
         </div>
 
-        <!-- Bundle detail -->
         <div v-else-if="detail.kind === 'bundle'" class="cg-detail">
           <div v-if="detail.loading" class="cg-status">Loading members…</div>
           <ul v-else class="cg-member-list">
@@ -151,11 +174,27 @@ const disease = ref('')
 const domain = ref('')
 const tier = ref('')
 const facetValues = ref({ diseases: [], domains: [], tiers: [] })
-const results = ref({ bundles: [], cdes: [] })
+
+const activeTab = ref('cdes')
+
+// CDEs — paginated in SQL.
+const PAGE_SIZE = 25
+const cdes = ref([])
+const cdeTotal = ref(0)
+const cdePage = ref(1)
+
+// Bundles — small, curation-bounded set: fetch all (term-filtered), page client-side.
+const BUNDLE_PAGE_SIZE = 24
+const allBundles = ref([])
+const bundlePage = ref(1)
+const pagedBundles = computed(() =>
+  allBundles.value.slice((bundlePage.value - 1) * BUNDLE_PAGE_SIZE, bundlePage.value * BUNDLE_PAGE_SIZE)
+)
+
 const loading = ref(true)
 
 const detailVisible = ref(false)
-const detail = reactive({ kind: '', cde: null, members: [], loading: false })
+const detail = reactive({ kind: '', cde: null, members: [], loading: false, bundleName: '' })
 const detailTitle = computed(() =>
   detail.kind === 'cde' ? (detail.cde && detail.cde.cde_name) || 'Element' : detail.bundleName || 'Bundle'
 )
@@ -164,23 +203,49 @@ const cdeValues = (c) =>
   ((c && c.permissible_values) || []).map((pv) => pv.label || pv.code || '').filter(Boolean)
 const xrefs = (c) => (Array.isArray(c && c.xrefs) ? c.xrefs : [])
 
+const loadCdes = async () => {
+  const res = await store.searchCdesPaged(term.value, {
+    disease: disease.value,
+    domain: domain.value,
+    tier: tier.value,
+    page: cdePage.value - 1,
+    pageSize: PAGE_SIZE,
+  })
+  cdes.value = res.cdes
+  cdeTotal.value = res.total
+}
+const loadBundles = async () => {
+  const t = term.value.trim().toLowerCase()
+  const all = await store.listBundles()
+  allBundles.value = t ? all.filter((b) => b.bundle_name.toLowerCase().includes(t)) : all
+  bundlePage.value = 1
+}
 const runSearch = async () => {
+  cdePage.value = 1
   loading.value = true
   try {
-    results.value = await store.searchCatalog(term.value, {
-      disease: disease.value,
-      domain: domain.value,
-      tier: tier.value,
-      limit: 100,
-    })
+    await Promise.all([loadCdes(), loadBundles()])
   } catch (e) {
-    results.value = { bundles: [], cdes: [] }
+    cdes.value = []
+    cdeTotal.value = 0
+    allBundles.value = []
     console.error('CDE gallery search failed:', e)
   } finally {
     loading.value = false
   }
 }
 const onSearch = debounce(runSearch, 300)
+const onCdePage = async (p) => {
+  cdePage.value = p
+  try {
+    await loadCdes()
+  } catch (e) {
+    console.error('CDE gallery page load failed:', e)
+  }
+}
+const onBundlePage = (p) => {
+  bundlePage.value = p
+}
 
 const openCde = (c) => {
   detail.kind = 'cde'
@@ -233,7 +298,7 @@ onMounted(async () => {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  margin-bottom: 24px;
+  margin-bottom: 12px;
 }
 .cg-search {
   max-width: 420px;
@@ -259,20 +324,10 @@ onMounted(async () => {
 .cg-facet-tier {
   width: 160px;
 }
-.cg-section {
-  margin-bottom: 28px;
-}
-.cg-section-title {
-  font-size: 12px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: theme.$purple_2;
-  margin: 0 0 12px;
-}
 .cg-status {
   color: theme.$gray_4;
   font-size: 14px;
+  padding: 8px 0;
 }
 .cg-error {
   color: theme.$status_red;
@@ -344,6 +399,10 @@ onMounted(async () => {
   font-size: 12px;
   color: theme.$gray_4;
   white-space: nowrap;
+}
+.cg-pager {
+  margin-top: 16px;
+  justify-content: center;
 }
 .cg-detail {
   padding: 0 4px;
