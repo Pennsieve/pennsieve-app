@@ -132,6 +132,18 @@
             </div>
           </div>
 
+          <div v-if="detail.bundles.length" class="cg-field">
+            <div class="cg-field-label">Part of bundle{{ detail.bundles.length === 1 ? '' : 's' }}</div>
+            <div class="cg-chips">
+              <button
+                v-for="(bn, i) in detail.bundles"
+                :key="i"
+                class="cg-chip cg-chip-link"
+                @click="showBundle(bn)"
+              >{{ bn }}</button>
+            </div>
+          </div>
+
           <div v-if="xrefs(detail.cde).length" class="cg-field">
             <div class="cg-field-label">Cross-references</div>
             <div class="cg-chips">
@@ -193,8 +205,9 @@ const pagedBundles = computed(() =>
 
 const loading = ref(true)
 
+const membership = ref(new Map()) // persistent_id -> [bundle_name, ...]
 const detailVisible = ref(false)
-const detail = reactive({ kind: '', cde: null, members: [], loading: false, bundleName: '' })
+const detail = reactive({ kind: '', cde: null, bundles: [], members: [], loading: false, bundleName: '' })
 const detailTitle = computed(() =>
   detail.kind === 'cde' ? (detail.cde && detail.cde.cde_name) || 'Element' : detail.bundleName || 'Bundle'
 )
@@ -250,28 +263,35 @@ const onBundlePage = (p) => {
 const openCde = (c) => {
   detail.kind = 'cde'
   detail.cde = c
+  detail.bundles = membership.value.get(c.persistent_id) || []
   detailVisible.value = true
 }
-const openBundle = async (b) => {
+const showBundle = async (name) => {
   detail.kind = 'bundle'
-  detail.bundleName = b.bundle_name
+  detail.bundleName = name
   detail.members = []
   detail.loading = true
   detailVisible.value = true
   try {
-    detail.members = await store.getBundleMembers(b.bundle_name)
+    detail.members = await store.getBundleMembers(name)
   } catch (e) {
     detail.members = []
   } finally {
     detail.loading = false
   }
 }
+const openBundle = (b) => showBundle(b.bundle_name)
 
 onMounted(async () => {
   try {
     facetValues.value = await store.getFacetValues()
   } catch {
     facetValues.value = { diseases: [], domains: [], tiers: [] }
+  }
+  try {
+    membership.value = await store.getBundleMembership()
+  } catch {
+    /* bundle cross-links are optional */
   }
   await runSearch()
 })
@@ -436,6 +456,14 @@ onMounted(async () => {
 }
 .cg-chip-ref {
   color: theme.$gray_4;
+}
+.cg-chip-link {
+  cursor: pointer;
+  color: theme.$purple_2;
+  border-color: theme.$purple_0_7;
+  &:hover {
+    background: theme.$purple_tint;
+  }
 }
 .cg-code {
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
