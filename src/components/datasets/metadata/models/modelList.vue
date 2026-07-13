@@ -30,7 +30,7 @@
             <bf-card
               :class="{ disabled: datasetLocked }"
               title="Template Gallery"
-              card-copy="Create a model based on a template"
+              card-copy="Browse and create models from templates"
             >
               <template #icon>
                 <IconOverview
@@ -39,6 +39,22 @@
                   :width="96"
                 />
 
+              </template>
+            </bf-card>
+          </button>
+          <button
+            @click="openCdeGallery"
+          >
+            <bf-card
+              title="CDE Gallery"
+              card-copy="Browse common data elements and bundles"
+            >
+              <template #icon>
+                <icon-collection
+                  class="card-icon"
+                  :height="48"
+                  :width="48"
+                />
               </template>
             </bf-card>
           </button>
@@ -111,6 +127,7 @@ import { useMetadataStore } from '@/stores/metadataStore.js'
 import IconOverview from "@/components/icons/IconOverview.vue";
 import BfCard from "@/components/shared/bf-card/BfCard.vue";
 import IconAddTemplate from "@/components/icons/IconAddTemplate.vue";
+import IconCollection from "@/components/icons/IconCollection.vue";
 import ModelListItem from "@/components/datasets/metadata/models/modelListItem.vue";
 import CreateModelWizard from "@/components/datasets/metadata/models/CreateModelWizard.vue";
 // Dynamic import to avoid circular dependency issues
@@ -174,6 +191,16 @@ const openModelGenerator = () => {
 const openTemplateGallery = () => {
   router.push({
     name: 'new-model-from-template',
+    params: {
+      datasetId: props.datasetId,
+      orgId: props.orgId,
+    }
+  })
+}
+
+const openCdeGallery = () => {
+  router.push({
+    name: 'cde-gallery',
     params: {
       datasetId: props.datasetId,
       orgId: props.orgId,

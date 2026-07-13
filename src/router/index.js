@@ -7,6 +7,7 @@ import ModelList from "@/components/datasets/metadata/models/modelList.vue";
 import ModelSpecViewer from "@/components/datasets/metadata/models/ModelSpecViewer.vue";
 import ModelSpecGenerator from "@/components/datasets/metadata/models/ModelSpecGenerator.vue";
 import TemplateGallery from "@/components/datasets/metadata/models/TemplateGallery.vue";
+import CdeGallery from "@/components/datasets/metadata/models/CdeGallery.vue";
 import ListRecords from "@/components/datasets/metadata/records/ListRecords.vue";
 import RecordSpecViewer from "@/components/datasets/metadata/records/RecordSpecViewer.vue";
 import RecordSpecGenerator from "@/components/datasets/metadata/records/RecordSpecGenerator.vue";
@@ -1352,6 +1353,22 @@ const router = createRouter({
                   },
                   components: {
                     stage: ModelList
+                  }
+                },
+                {
+                  path: 'cde-gallery',
+                  name: 'cde-gallery',
+                  props: true,
+                  meta: {
+                    backLink: { name: "Models", to: "models-list" },
+                    breadcrumbs: [
+                      { name: "Metadata", to: "metadata" },
+                      { name: "Models", to: "models-list" },
+                      { name: "CDE Gallery", current: true }
+                    ]
+                  },
+                  components: {
+                    stage: CdeGallery
                   }
                 },
                 {
