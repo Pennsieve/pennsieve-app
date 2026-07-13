@@ -67,27 +67,8 @@
 
       <!-- PROPERTIES -->
       <div v-show="currentKey === 'properties'" class="cmw-step">
-        <div class="cmw-props-head">
-          <span class="cmw-q">Properties</span>
-          <el-button v-if="!addingProperty" size="small" @click="addingProperty = true">
-            <el-icon><Plus /></el-icon> Add property
-          </el-button>
-        </div>
-
-        <div v-if="!properties.length && !addingProperty" class="cmw-empty">
-          No properties yet. Add common data elements, a bundle, or define them manually.
-        </div>
-        <ul v-else-if="properties.length" class="cmw-prop-list">
-          <li v-for="(p, i) in properties" :key="i" class="cmw-prop">
-            <div class="cmw-prop-main">
-              <span class="cmw-prop-name">{{ p.propertyName }}</span>
-              <span class="cmw-prop-meta">{{ propMeta(p) }}</span>
-            </div>
-            <el-button text size="small" @click="removeProperty(i)"><el-icon><Close /></el-icon></el-button>
-          </li>
-        </ul>
-
-        <!-- Add-property builder, inline (no nested dialog / second counter) -->
+        <!-- While adding, the inline builder takes over the step; the list
+             returns on Add/Cancel. -->
         <property-form
           v-if="addingProperty"
           inline
@@ -95,6 +76,26 @@
           @save="onPropsAdded"
           @cancel="addingProperty = false"
         />
+        <template v-else>
+          <div class="cmw-props-head">
+            <span class="cmw-q">Properties</span>
+            <el-button size="small" @click="addingProperty = true">
+              <el-icon><Plus /></el-icon> Add property
+            </el-button>
+          </div>
+          <div v-if="!properties.length" class="cmw-empty">
+            No properties yet. Add common data elements, a bundle, or define them manually.
+          </div>
+          <ul v-else class="cmw-prop-list">
+            <li v-for="(p, i) in properties" :key="i" class="cmw-prop">
+              <div class="cmw-prop-main">
+                <span class="cmw-prop-name">{{ p.propertyName }}</span>
+                <span class="cmw-prop-meta">{{ propMeta(p) }}</span>
+              </div>
+              <el-button text size="small" @click="removeProperty(i)"><el-icon><Close /></el-icon></el-button>
+            </li>
+          </ul>
+        </template>
       </div>
 
       <!-- REVIEW -->
