@@ -172,13 +172,7 @@
           </el-radio-group>
           <div class="wiz-hint">{{ strengthHint }}</div>
         </div>
-        <div v-else-if="selectionKind === 'cde' && !selectedHasValues" class="pf-section pf-nobind">
-          This element has no controlled value list, so there’s nothing to enforce — linking sets the
-          data type (<b>{{ selectedCde && selectedCde.cde_data_type }}</b>) and records that this field
-          follows the standard.
-        </div>
-
-        <!-- Single CDE: name/description + options -->
+        <!-- Single CDE -->
         <template v-if="selectionKind === 'cde'">
           <div class="pf-section pf-divided">
             <div class="pf-section-title">General</div>
@@ -193,8 +187,11 @@
                 <el-input v-model="basics.description" type="textarea" :rows="2" />
               </el-form-item>
             </el-form>
-            <!-- Binding strength sits above the value preview (value lists only) -->
-            <div v-if="cdeValues.length" class="pf-strength">
+          </div>
+
+          <div class="pf-section pf-divided">
+            <div class="pf-section-title">Data values</div>
+            <div v-if="cdeValues.length" class="pf-field">
               <div class="wiz-label">Binding strength</div>
               <el-radio-group v-model="strength" size="small">
                 <el-radio-button value="required">Required</el-radio-button>
@@ -203,18 +200,22 @@
               </el-radio-group>
               <div class="wiz-hint">{{ strengthHint }}</div>
             </div>
-
-            <div class="wiz-cde-preview">
-              <div class="wiz-kv">Data type <b>{{ selectedCde && selectedCde.cde_data_type }}</b></div>
-              <template v-if="cdeValues.length">
-                <div class="wiz-label">Allowed values ({{ cdeValues.length }})</div>
-                <div class="wiz-values">
-                  <span v-for="(v, i) in cdeValues.slice(0, 8)" :key="i" class="wiz-chip">{{ v }}</span>
-                  <span v-if="cdeValues.length > 8" class="wiz-chip more">+{{ cdeValues.length - 8 }} more</span>
-                </div>
-              </template>
+            <div class="pf-field">
+              <div class="wiz-label">Data type</div>
+              <div class="pf-field-value">{{ selectedCde && selectedCde.cde_data_type }}</div>
             </div>
+            <div v-if="cdeValues.length" class="pf-field">
+              <div class="wiz-label">Allowed values ({{ cdeValues.length }})</div>
+              <div class="wiz-values">
+                <span v-for="(v, i) in cdeValues.slice(0, 8)" :key="i" class="wiz-chip">{{ v }}</span>
+                <span v-if="cdeValues.length > 8" class="wiz-chip more">+{{ cdeValues.length - 8 }} more</span>
+              </div>
+            </div>
+            <p v-else class="wiz-hint" style="margin-top: 0">
+              No controlled value list — linking sets the data type and records that this field follows the standard.
+            </p>
           </div>
+
           <div class="pf-section pf-divided">
             <div class="pf-section-title">Options</div>
             <div class="wiz-options">
@@ -727,14 +728,15 @@ function manualValueSchema() {
 .pf-section {
   margin-bottom: 20px;
 }
-.pf-nobind {
-  font-size: 13px;
-  color: theme.$gray_5;
-  line-height: 1.5;
-  b {
-    color: theme.$gray_6;
-    font-weight: 600;
+.pf-field {
+  margin-bottom: 16px;
+  &:last-child {
+    margin-bottom: 0;
   }
+}
+.pf-field-value {
+  font-size: 14px;
+  color: theme.$gray_6;
 }
 .pf-section-title {
   font-size: 12px;
@@ -907,30 +909,11 @@ function manualValueSchema() {
   color: theme.$gray_5;
   margin-bottom: 6px;
 }
-// Compact binding-strength control, above the value preview.
-.pf-strength {
-  margin-bottom: 16px;
-}
 .wiz-hint {
   font-size: 13px;
   color: theme.$gray_5;
   line-height: 1.4;
   margin-top: 8px;
-}
-.wiz-cde-preview {
-  background: theme.$purple_tint;
-  border: 1px solid theme.$purple_0_7;
-  border-radius: 3px;
-  padding: 12px 14px;
-}
-.wiz-kv {
-  font-size: 14px;
-  color: theme.$gray_5;
-  margin-bottom: 8px;
-  b {
-    color: theme.$gray_6;
-    font-weight: 500;
-  }
 }
 .wiz-values {
   display: flex;
