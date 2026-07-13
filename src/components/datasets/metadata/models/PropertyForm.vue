@@ -26,7 +26,7 @@
     <!-- CATALOG PATH -->
     <template v-if="sourceMode === 'catalog'">
       <!-- Search (nothing selected yet) -->
-      <div v-if="!selectionKind" class="pf-section">
+      <div v-if="!selectionKind" class="pf-section pf-divided">
         <el-input v-model="term" placeholder="Search common data elements" clearable @input="onSearchInput">
           <template #prefix><el-icon><Search /></el-icon></template>
         </el-input>
@@ -150,7 +150,7 @@
 
       <!-- Selected element / bundle -->
       <template v-else>
-        <div class="pf-section">
+        <div class="pf-section pf-divided">
           <div class="wiz-selected-head">
             <span class="wiz-selected-name">
               {{ selectionKind === 'bundle' ? selectedBundleName : (selectedCde && selectedCde.cde_name) }}
@@ -773,9 +773,9 @@ function manualValueSchema() {
   margin-bottom: 12px;
 }
 .wiz-cards {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
 }
 .wiz-card {
   border: 1px solid theme.$gray_2;
