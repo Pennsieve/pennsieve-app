@@ -152,12 +152,14 @@
       <template v-else>
         <div class="pf-section">
           <div class="wiz-selected-head">
-            <span class="wiz-selected-name">{{ selectionKind === 'bundle' ? selectedBundleName : (selectedCde && selectedCde.cde_name) }}</span>
+            <span class="wiz-selected-name">
+              {{ selectionKind === 'bundle' ? selectedBundleName : (selectedCde && selectedCde.cde_name) }}
+              <span class="wiz-selected-meta">
+                <template v-if="selectionKind === 'bundle'">· bundle · {{ memberRows.length }} elements</template>
+                <template v-else>· {{ selectedCde && selectedCde.cde_data_type }}</template>
+              </span>
+            </span>
             <el-button text size="small" @click="clearSelection"><el-icon><Close /></el-icon> Change</el-button>
-          </div>
-          <div class="wiz-selected-sub">
-            <template v-if="selectionKind === 'bundle'">bundle · {{ memberRows.length }} elements</template>
-            <template v-else>{{ selectedCde && selectedCde.cde_data_type }}</template>
           </div>
         </div>
 
@@ -187,14 +189,6 @@
                 <el-input v-model="basics.description" type="textarea" :rows="2" />
               </el-form-item>
             </el-form>
-            <div class="pf-field">
-              <div class="wiz-label">Common data element</div>
-              <div class="pf-field-value">{{ selectedCde && selectedCde.cde_name }}</div>
-            </div>
-            <div class="pf-field">
-              <div class="wiz-label">Data type</div>
-              <div class="pf-field-value">{{ selectedCde && selectedCde.cde_data_type }}</div>
-            </div>
             <p v-if="!cdeValues.length" class="wiz-hint" style="margin-top: 0">
               No controlled value list — linking sets the data type and records that this field follows the standard.
             </p>
@@ -903,10 +897,9 @@ function manualValueSchema() {
   font-weight: 500;
   color: theme.$gray_6;
 }
-.wiz-selected-sub {
-  font-size: 14px;
-  color: theme.$gray_5;
-  margin-top: 2px;
+.wiz-selected-meta {
+  font-weight: 400;
+  color: theme.$gray_4;
 }
 .wiz-label {
   font-size: 13px;
