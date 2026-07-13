@@ -243,7 +243,30 @@
                 <div class="wiz-member-prop">
                   <el-input v-model="m.name" size="small" />
                   <div class="wiz-member-sub">
-                    <span class="wiz-member-cde" :title="m.cde.cde_name">{{ m.cde.cde_name }}</span>
+                    <el-tooltip
+                      placement="top"
+                      effect="light"
+                      :show-after="350"
+                      :disabled="!m.cde.cde_definition && !cdeValuesPreview(m.cde)"
+                    >
+                      <template #content>
+                        <div style="max-width: 340px">
+                          <div v-if="m.cde.cde_definition" style="margin-bottom: 6px; line-height: 1.45">
+                            {{ m.cde.cde_definition }}
+                          </div>
+                          <div style="font-size: 12px; opacity: 0.7">
+                            {{ m.cde.cde_data_type }}
+                            <template v-if="m.cde.permissible_values && m.cde.permissible_values.length">
+                              · {{ m.cde.permissible_values.length }} allowed value{{ m.cde.permissible_values.length === 1 ? '' : 's' }}
+                            </template>
+                          </div>
+                          <div v-if="cdeValuesPreview(m.cde)" style="margin-top: 6px; font-size: 12px">
+                            {{ cdeValuesPreview(m.cde) }}
+                          </div>
+                        </div>
+                      </template>
+                      <span class="wiz-member-cde">{{ m.cde.cde_name }} · {{ m.cde.cde_data_type }}</span>
+                    </el-tooltip>
                     <span v-if="collides(m.name, i)" class="wiz-collision"> · name in use</span>
                   </div>
                 </div>
