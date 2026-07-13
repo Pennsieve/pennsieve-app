@@ -45,8 +45,8 @@
               :disabled="!t.description && !templatePropNames(t).length"
             >
               <template #content>
-                <div style="max-width: 340px">
-                  <div v-if="t.description" style="margin-bottom: 6px; line-height: 1.45">{{ t.description }}</div>
+                <div style="max-width: 360px">
+                  <markdown-content v-if="t.description" :source="t.description" style="margin-bottom: 6px" />
                   <div style="font-size: 12px; opacity: 0.7">{{ templatePropCount(t) }} properties</div>
                   <div v-if="templatePropNames(t).length" style="margin-top: 6px; font-size: 12px">
                     {{ templatePropPreview(t) }}
@@ -182,6 +182,7 @@ import BfDialogHeader from '@/components/shared/bf-dialog-header/BfDialogHeader.
 import DialogBody from '@/components/shared/dialog-body/DialogBody.vue'
 import PropertyForm from '@/components/datasets/metadata/models/PropertyForm.vue'
 import JsonSchemaEditor from '@/components/datasets/metadata/models/JsonSchemaEditor.vue'
+import MarkdownContent from '@/components/Chat/MarkdownContent.vue'
 import IconGuide from '@/components/icons/IconGuide.vue'
 import IconDocument from '@/components/icons/IconDocument.vue'
 import IconToolbarListBulleted from '@/components/icons/IconToolbarListBulleted.vue'
