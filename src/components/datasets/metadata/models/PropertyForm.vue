@@ -269,7 +269,7 @@
             <el-input v-model="basics.name" />
           </el-form-item>
           <el-form-item label="Description">
-            <el-input v-model="basics.description" type="textarea" :rows="2" />
+            <el-input v-model="basics.description" type="textarea" :rows="3" />
           </el-form-item>
         </el-form>
       </div>
@@ -291,6 +291,12 @@
             <el-checkbox v-model="manual.isArray">List of values (array)</el-checkbox>
             <el-checkbox v-model="manual.allowNull">Allow null</el-checkbox>
           </div>
+        </el-form>
+      </div>
+
+      <div class="pf-section pf-divided">
+        <div class="pf-section-title">Data values</div>
+        <el-form label-position="top">
           <el-form-item label="Allowed values">
             <el-input v-model="manual.enumInput" placeholder="Comma-separated, e.g. Low, Medium, High" />
           </el-form-item>
