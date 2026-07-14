@@ -39,6 +39,11 @@
       :pkg="pkg"
       :asset="viewerAssets[parseInt(cmpViewer.split(':')[1])]"
     />
+    <ThumbnailViewer
+      v-else-if="cmpViewer === 'ThumbnailViewer'"
+      ref="viewer"
+      :asset="thumbnailAsset"
+    />
     <CSVViewer
       v-else-if="cmpViewer === 'CSVViewer'"
       ref="viewer"
@@ -127,6 +132,9 @@ export default {
     OmeViewer: defineAsyncComponent(() =>
       import("@pennsieve-viz/micro-ct").then((m) => m.OmeViewer),
     ),
+    ThumbnailViewer: defineAsyncComponent(() =>
+      import("../../viewers/ThumbnailViewer.vue"),
+    ),
   },
 
   mixins: [FileTypeMapper, GetFileProperty, ImportHref],
@@ -156,6 +164,7 @@ export default {
       cmpViewer: "",
       availableViewers: [],
       viewerAssets: [],
+      thumbnailAsset: null,
       isLoading: false,
       omeTiffSource: "",
       omeTiffSlowWarning: false,
@@ -259,6 +268,8 @@ export default {
           return ".Lay Viewer";
         case "TextViewer":
           return "Raw Text";
+        case "ThumbnailViewer":
+          return "Thumbnail";
         default:
           return viewer;
       }
@@ -286,6 +297,7 @@ export default {
       const pkgId = pathOr("", ["content", "id"], activeViewer);
       const datasetId = pathOr("", ["content", "datasetNodeId"], activeViewer);
       this.viewerAssets = [];
+      this.thumbnailAsset = null;
       this.timeseriesAsset = null;
       if (pkgId && datasetId) {
         try {
@@ -317,6 +329,15 @@ export default {
               );
               const filtered = viewers.filter((v) => v !== "UnknownViewer");
               viewers = [...ngViewerNames, ...filtered];
+            }
+
+            // Check for thumbnail asset
+            const thumbAsset = result.assets.find(
+              (a) => a.asset_type === "thumb" && a.status === "ready",
+            );
+            if (thumbAsset) {
+              this.thumbnailAsset = { ...thumbAsset, cloudfront: result.cloudfront };
+              viewers = [...viewers.filter((v) => v !== "UnknownViewer"), "ThumbnailViewer"];
             }
           }
         } catch (err) {
