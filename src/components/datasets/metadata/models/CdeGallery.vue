@@ -2,7 +2,7 @@
   <bf-stage>
     <div class="cde-gallery">
       <div class="cg-head">
-        <h2>CDE Gallery</h2>
+        <h2>CDE Catalog</h2>
         <p class="cg-sub">
           Browse the common data element catalog — standardized, reusable fields you can attach to
           model properties to keep data comparable across datasets.

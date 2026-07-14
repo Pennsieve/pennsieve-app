@@ -46,7 +46,7 @@
             @click="openCdeGallery"
           >
             <bf-card
-              title="CDE Gallery"
+              title="CDE Catalog"
               card-copy="Browse common data elements and bundles"
             >
               <template #icon>

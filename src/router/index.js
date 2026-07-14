@@ -1399,7 +1399,7 @@ const router = createRouter({
                     breadcrumbs: [
                       { name: "Metadata", to: "metadata" },
                       { name: "Models", to: "models-list" },
-                      { name: "CDE Gallery", current: true }
+                      { name: "CDE Catalog", current: true }
                     ]
                   },
                   components: {
