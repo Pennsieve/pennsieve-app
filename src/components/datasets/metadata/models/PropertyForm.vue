@@ -30,37 +30,7 @@
           <template #prefix><el-icon><Search /></el-icon></template>
         </el-input>
 
-        <div v-if="facetValues.diseases.length || facetValues.domains.length" class="pf-facets">
-          <div v-if="facetValues.diseases.length" class="pf-facet">
-            <span class="pf-facet-label">Disease</span>
-            <el-radio-group v-model="disease" size="small" @change="runSearch">
-              <el-radio-button value="">All</el-radio-button>
-              <el-radio-button v-for="d in facetValues.diseases" :key="d" :value="d">{{ d }}</el-radio-button>
-            </el-radio-group>
-          </div>
-          <el-select
-            v-if="facetValues.domains.length"
-            v-model="domain"
-            size="small"
-            clearable
-            placeholder="All domains"
-            class="pf-facet-domain"
-            @change="runSearch"
-          >
-            <el-option v-for="d in facetValues.domains" :key="d" :label="d" :value="d" />
-          </el-select>
-          <el-select
-            v-if="facetValues.tiers.length"
-            v-model="tier"
-            size="small"
-            clearable
-            placeholder="Any tier"
-            class="pf-facet-tier"
-            @change="runSearch"
-          >
-            <el-option v-for="t in facetValues.tiers" :key="t" :label="t" :value="t" />
-          </el-select>
-        </div>
+        <cde-facets :facet-values="facetValues" v-model="facets" @change="runSearch" />
 
         <div v-if="searching" class="wiz-status">Searching…</div>
         <div v-else-if="searchError" class="wiz-status wiz-error">{{ searchError }}</div>
@@ -141,7 +111,10 @@
               </el-tooltip>
             </ul>
           </template>
-          <div v-if="(term.trim() || disease || domain || tier) && !results.bundles.length && !results.cdes.length" class="wiz-status">
+          <div
+            v-if="(term.trim() || facets.disease.length || facets.domain.length || facets.tier.length) && !results.bundles.length && !results.cdes.length"
+            class="wiz-status"
+          >
             No matching common data elements
           </div>
         </div>
@@ -372,6 +345,7 @@ import { ElMessage } from 'element-plus'
 import { Link, EditPen, Search, Close } from '@element-plus/icons-vue'
 import debounce from 'lodash.debounce'
 import { useCdeCatalogStore } from '@/stores/cdeCatalogStore'
+import CdeFacets from './CdeFacets.vue'
 
 const props = defineProps({
   existingProperties: { type: Array, default: () => [] },
@@ -389,11 +363,9 @@ const results = ref({ bundles: [], cdes: [] })
 const searching = ref(false)
 const searchError = ref('')
 
-// Facets (disease + domain, from CDE classifications)
+// Facets (disease / domain / tier, from CDE classifications) — multi-select.
 const facetValues = ref({ diseases: [], domains: [], tiers: [] })
-const disease = ref('')
-const domain = ref('')
-const tier = ref('')
+const facets = ref({ disease: [], domain: [], tier: [] })
 
 // Selection
 const selectionKind = ref('') // '' | 'cde' | 'bundle'
@@ -554,9 +526,9 @@ const runSearch = async () => {
   searchError.value = ''
   try {
     results.value = await store.searchCatalog(term.value, {
-      disease: disease.value,
-      domain: domain.value,
-      tier: tier.value,
+      disease: facets.value.disease,
+      domain: facets.value.domain,
+      tier: facets.value.tier,
     })
   } catch (e) {
     searchError.value = e?.message || String(e)
@@ -841,28 +813,6 @@ function manualValueSchema() {
   background: theme.$purple_tint;
   padding: 2px 10px;
   border-radius: 3px;
-}
-.pf-facets {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 10px 20px;
-  margin-top: 12px;
-}
-.pf-facet {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.pf-facet-label {
-  font-size: 13px;
-  color: theme.$gray_5;
-}
-.pf-facet-domain {
-  width: 220px;
-}
-.pf-facet-tier {
-  width: 150px;
 }
 .wiz-status {
   color: theme.$gray_4;

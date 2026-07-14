@@ -368,10 +368,14 @@ export const useCdeCatalogStore = defineStore('cdeCatalog', () => {
     // it browses — all bundles + a sample of CDEs; a term filters both; a facet
     // narrows CDEs and hides the (cross-disease) bundles.
     const searchCatalog = async (term, opts = {}) => {
-        const { disease = '', domain = '', tier = '', limit = 25 } = opts
+        const { limit = 25 } = opts
+        // Facets are multi-select: OR within a dimension, AND across dimensions.
+        const diseases = asList(opts.disease)
+        const domains = asList(opts.domain)
+        const tiers = asList(opts.tier)
         await ensureBundlesLoaded()
         const t = (term || '').trim()
-        const hasFacet = !!disease || !!domain || !!tier
+        const hasFacet = diseases.length > 0 || domains.length > 0 || tiers.length > 0
 
         const [allBundles, membership] = await Promise.all([listBundles(), getBundleMembership()])
         // Facets are CDE-level; when one is active we're doing targeted element
@@ -391,12 +395,14 @@ export const useCdeCatalogStore = defineStore('cdeCatalog', () => {
                 if (!hasFacet) return true
                 const f = facets.get(c.persistent_id)
                 if (!f) return false
-                if (disease && !f.diseases.has(disease)) return false
-                if (domain && !f.domains.has(domain)) return false
-                if (tier) {
-                    // Tier is per (CDE × disease): within the selected disease if
-                    // one is chosen, otherwise the tier in any disease.
-                    const ok = disease ? f.pairs.has(`${disease} ${tier}`) : f.tiers.has(tier)
+                if (diseases.length && !diseases.some((d) => f.diseases.has(d))) return false
+                if (domains.length && !domains.some((d) => f.domains.has(d))) return false
+                if (tiers.length) {
+                    // Tier is per (CDE × disease): within a selected disease if any
+                    // are chosen, otherwise the tier in any disease.
+                    const ok = diseases.length
+                        ? tiers.some((tv) => diseases.some((d) => f.pairs.has(`${d} ${tv}`)))
+                        : tiers.some((tv) => f.tiers.has(tv))
                     if (!ok) return false
                 }
                 return true
@@ -407,13 +413,16 @@ export const useCdeCatalogStore = defineStore('cdeCatalog', () => {
     }
 
     // Paginated CDE search for the gallery — search + facet filtering + count all
-    // run in SQL (LIMIT/OFFSET) so it scales as the catalog grows. Facets match
-    // the searchCatalog semantics: disease/domain independent, tier within the
-    // selected disease if one is chosen. Returns { cdes, total }.
+    // run in SQL (LIMIT/OFFSET) so it scales as the catalog grows. Facets are
+    // multi-select: OR within a dimension, AND across dimensions; tier is matched
+    // within the selected disease(s) if any are chosen. Returns { cdes, total }.
     const searchCdesPaged = async (term, opts = {}) => {
-        const { disease = '', domain = '', tier = '', page = 0, pageSize = 25 } = opts
+        const { page = 0, pageSize = 25 } = opts
+        const diseases = asList(opts.disease)
+        const domains = asList(opts.domain)
+        const tiers = asList(opts.tier)
         await ensureLoaded()
-        if (disease || domain || tier) await ensureClassificationsLoaded()
+        if (diseases.length || domains.length || tiers.length) await ensureClassificationsLoaded()
 
         const clauses = []
         const t = (term || '').trim()
@@ -426,14 +435,14 @@ export const useCdeCatalogStore = defineStore('cdeCatalog', () => {
                 JOIN cde_cls cls ON CAST(cls.id AS VARCHAR) = cl.source_record_id
                 WHERE cl.target_record_id = CAST(${TABLE}.id AS VARCHAR)
                   AND cl.relationship_type = 'CLASSIFIES' AND ${cond})`
-        if (disease) clauses.push(classExists(`cls.context = '${escapeLiteral(disease)}'`))
-        if (domain) clauses.push(classExists(`cls.domain = '${escapeLiteral(domain)}'`))
-        if (tier) {
+        if (diseases.length) clauses.push(classExists(`cls.context IN (${sqlList(diseases)})`))
+        if (domains.length) clauses.push(classExists(`cls.domain IN (${sqlList(domains)})`))
+        if (tiers.length) {
             clauses.push(
                 classExists(
-                    disease
-                        ? `cls.context = '${escapeLiteral(disease)}' AND cls.tier = '${escapeLiteral(tier)}'`
-                        : `cls.tier = '${escapeLiteral(tier)}'`
+                    diseases.length
+                        ? `cls.context IN (${sqlList(diseases)}) AND cls.tier IN (${sqlList(tiers)})`
+                        : `cls.tier IN (${sqlList(tiers)})`
                 )
             )
         }
@@ -521,4 +530,15 @@ function mapListRow(row) {
 // Escape a value used inside a single-quoted SQL string literal.
 function escapeLiteral(s) {
     return String(s).replace(/'/g, "''")
+}
+
+// Normalize a facet arg (scalar, array, or empty) to a list of non-empty strings.
+function asList(v) {
+    const arr = Array.isArray(v) ? v : v == null ? [] : [v]
+    return arr.filter((x) => x != null && String(x).trim() !== '')
+}
+
+// Render a list of values as a SQL IN-list of quoted literals.
+function sqlList(vals) {
+    return vals.map((v) => `'${escapeLiteral(v)}'`).join(', ')
 }

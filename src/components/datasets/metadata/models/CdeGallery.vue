@@ -13,37 +13,12 @@
         <el-input v-model="term" placeholder="Search the catalog" clearable class="cg-search" @input="onSearch">
           <template #prefix><el-icon><Search /></el-icon></template>
         </el-input>
-        <div v-if="activeTab === 'cdes' && (facetValues.diseases.length || facetValues.domains.length)" class="cg-facets">
-          <div v-if="facetValues.diseases.length" class="cg-facet">
-            <span class="cg-facet-label">Disease</span>
-            <el-radio-group v-model="disease" size="small" @change="runSearch">
-              <el-radio-button value="">All</el-radio-button>
-              <el-radio-button v-for="d in facetValues.diseases" :key="d" :value="d">{{ d }}</el-radio-button>
-            </el-radio-group>
-          </div>
-          <el-select
-            v-if="facetValues.domains.length"
-            v-model="domain"
-            size="small"
-            clearable
-            placeholder="All domains"
-            class="cg-facet-select"
-            @change="runSearch"
-          >
-            <el-option v-for="d in facetValues.domains" :key="d" :label="d" :value="d" />
-          </el-select>
-          <el-select
-            v-if="facetValues.tiers.length"
-            v-model="tier"
-            size="small"
-            clearable
-            placeholder="Any tier"
-            class="cg-facet-select cg-facet-tier"
-            @change="runSearch"
-          >
-            <el-option v-for="t in facetValues.tiers" :key="t" :label="t" :value="t" />
-          </el-select>
-        </div>
+        <cde-facets
+          v-if="activeTab === 'cdes'"
+          :facet-values="facetValues"
+          v-model="facets"
+          @change="runSearch"
+        />
       </div>
 
       <div v-if="store.error" class="cg-status cg-error">{{ store.error }}</div>
@@ -208,13 +183,12 @@ import { ref, reactive, computed, onMounted } from 'vue'
 import { Search } from '@element-plus/icons-vue'
 import debounce from 'lodash.debounce'
 import { useCdeCatalogStore } from '@/stores/cdeCatalogStore'
+import CdeFacets from './CdeFacets.vue'
 
 const store = useCdeCatalogStore()
 
 const term = ref('')
-const disease = ref('')
-const domain = ref('')
-const tier = ref('')
+const facets = ref({ disease: [], domain: [], tier: [] }) // multi-select facet state
 const facetValues = ref({ diseases: [], domains: [], tiers: [] })
 
 const activeTab = ref('cdes')
@@ -254,9 +228,9 @@ const xrefs = (c) => (Array.isArray(c && c.xrefs) ? c.xrefs : [])
 
 const loadCdes = async () => {
   const res = await store.searchCdesPaged(term.value, {
-    disease: disease.value,
-    domain: domain.value,
-    tier: tier.value,
+    disease: facets.value.disease,
+    domain: facets.value.domain,
+    tier: facets.value.tier,
     page: cdePage.value - 1,
     pageSize: PAGE_SIZE,
   })
@@ -370,27 +344,6 @@ onMounted(async () => {
 }
 .cg-search {
   max-width: 420px;
-}
-.cg-facets {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 10px 20px;
-}
-.cg-facet {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.cg-facet-label {
-  font-size: 13px;
-  color: theme.$gray_5;
-}
-.cg-facet-select {
-  width: 220px;
-}
-.cg-facet-tier {
-  width: 160px;
 }
 .cg-status {
   color: theme.$gray_4;
