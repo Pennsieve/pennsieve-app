@@ -57,8 +57,8 @@
             <ul v-else class="cg-list">
               <li v-for="c in cdes" :key="c.persistent_id || c.canonical_key" class="cg-row" @click="openCde(c)">
                 <div class="cg-row-main">
-                  <span class="cg-row-name">{{ c.cde_name }}</span>
-                  <span v-if="c.cde_definition" class="cg-row-def">{{ c.cde_definition }}</span>
+                  <span class="cg-row-name">{{ cdeLabel(c) }}</span>
+                  <span v-if="c.cde_definition && c.cde_definition !== cdeLabel(c)" class="cg-row-def">{{ c.cde_definition }}</span>
                 </div>
                 <span class="cg-row-meta">
                   {{ c.cde_data_type }}
@@ -110,7 +110,12 @@
       <!-- Detail drawer -->
       <el-drawer v-model="detailVisible" :title="detailTitle" size="480px" direction="rtl">
         <div v-if="detail.kind === 'cde' && detail.cde" class="cg-detail">
-          <p v-if="detail.cde.cde_definition" class="cg-def">{{ detail.cde.cde_definition }}</p>
+          <p v-if="detail.cde.cde_definition && detail.cde.cde_definition !== detailTitle" class="cg-def">{{ detail.cde.cde_definition }}</p>
+
+          <div v-if="detail.cde.cde_name && detail.cde.cde_name !== detailTitle" class="cg-field">
+            <div class="cg-field-label">Name</div>
+            <div>{{ detail.cde.cde_name }}</div>
+          </div>
 
           <div class="cg-field">
             <div class="cg-field-label">Data type</div>
@@ -123,6 +128,10 @@
               <span v-for="(v, i) in cdeValues(detail.cde)" :key="i" class="cg-chip">{{ v }}</span>
             </div>
           </div>
+          <div v-else-if="detail.cde.cde_data_type === 'Value List'" class="cg-field">
+            <div class="cg-field-label">Allowed values</div>
+            <div style="opacity: 0.6">Not published for this element (values may be license-restricted at the source).</div>
+          </div>
 
           <div class="cg-field">
             <div class="cg-field-label">Origin</div>
@@ -130,6 +139,11 @@
               {{ detail.cde.cde_source || detail.cde.steward_org || '—' }}
               <template v-if="detail.cde.registration_status"> · {{ detail.cde.registration_status }}</template>
             </div>
+          </div>
+
+          <div v-if="detail.cde.copyright_status" class="cg-field">
+            <div class="cg-field-label">Copyright</div>
+            <div>{{ detail.cde.copyright_status }}</div>
           </div>
 
           <div v-if="detail.bundles.length" class="cg-field">
@@ -163,7 +177,7 @@
           <div v-if="detail.loading" class="cg-status">Loading members…</div>
           <ul v-else class="cg-member-list">
             <li v-for="(m, i) in detail.members" :key="i" class="cg-member">
-              <span class="cg-member-name">{{ m.cde_name }}</span>
+              <span class="cg-member-name">{{ cdeLabel(m) }}</span>
               <span class="cg-member-meta">{{ m.cde_data_type }}</span>
             </li>
           </ul>
@@ -208,8 +222,14 @@ const loading = ref(true)
 const membership = ref(new Map()) // persistent_id -> [bundle_name, ...]
 const detailVisible = ref(false)
 const detail = reactive({ kind: '', cde: null, bundles: [], members: [], loading: false, bundleName: '' })
+
+// Display label: the readable question text when present, else the (sometimes
+// cryptic) canonical name. NLM's cde_name can be a short code (e.g. PhenX
+// "# Ds miss school nRate PhenX"); preferred_question_text is the human phrasing.
+const cdeLabel = (c) => (c && (c.preferred_question_text || c.cde_name)) || 'Element'
+
 const detailTitle = computed(() =>
-  detail.kind === 'cde' ? (detail.cde && detail.cde.cde_name) || 'Element' : detail.bundleName || 'Bundle'
+  detail.kind === 'cde' ? cdeLabel(detail.cde) : detail.bundleName || 'Bundle'
 )
 
 const cdeValues = (c) =>

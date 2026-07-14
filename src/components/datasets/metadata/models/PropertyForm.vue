@@ -112,7 +112,7 @@
               >
                 <template #content>
                   <div style="max-width: 340px">
-                    <div v-if="c.cde_definition" style="margin-bottom: 6px; line-height: 1.45">
+                    <div v-if="c.cde_definition && c.cde_definition !== cdeLabel(c)" style="margin-bottom: 6px; line-height: 1.45">
                       {{ c.cde_definition }}
                     </div>
                     <div style="font-size: 12px; opacity: 0.7">
@@ -132,7 +132,7 @@
                   </div>
                 </template>
                 <li class="wiz-row" @click="chooseCde(c)">
-                  <span class="wiz-row-name">{{ c.cde_name }}</span>
+                  <span class="wiz-row-name">{{ cdeLabel(c) }}</span>
                   <span class="wiz-row-meta">
                     {{ c.cde_data_type }}
                     <template v-if="c._bundles && c._bundles.length"> · part of {{ c._bundles.join(', ') }}</template>
@@ -152,7 +152,7 @@
         <div class="pf-section pf-divided">
           <div class="wiz-selected-head">
             <span class="wiz-selected-name">
-              {{ selectionKind === 'bundle' ? selectedBundleName : (selectedCde && selectedCde.cde_name) }}
+              {{ selectionKind === 'bundle' ? selectedBundleName : cdeLabel(selectedCde) }}
               <span class="wiz-selected-meta">
                 <template v-if="selectionKind === 'bundle'">· bundle · {{ memberRows.length }} elements</template>
                 <template v-else>· {{ selectedCde && selectedCde.cde_data_type }}</template>
@@ -265,7 +265,7 @@
                           </div>
                         </div>
                       </template>
-                      <span class="wiz-member-cde">{{ m.cde.cde_name }} · {{ m.cde.cde_data_type }}</span>
+                      <span class="wiz-member-cde">{{ cdeLabel(m.cde) }} · {{ m.cde.cde_data_type }}</span>
                     </el-tooltip>
                     <span v-if="collides(m.name, i)" class="wiz-collision"> · name in use</span>
                   </div>
@@ -478,6 +478,11 @@ const cdeValuesPreview = (c) => {
   return pvs.length > 6 ? `${head} +${pvs.length - 6} more` : head
 }
 
+// Display label for a CDE: the readable question text when present, else the
+// (sometimes cryptic) canonical name. Used for list rows / headers only — the
+// derived property name still uses cde_name (a full question is a poor name).
+const cdeLabel = (c) => (c && (c.preferred_question_text || c.cde_name)) || ''
+
 // Bundle member names, lazy-loaded + cached on hover (not in the search result).
 const bundlePreviews = reactive({})
 const uniq = (arr) => [...new Set(arr.filter(Boolean))]
@@ -488,7 +493,7 @@ const loadBundlePreview = async (name) => {
     const members = await store.getBundleMembers(name)
     bundlePreviews[name] = {
       loading: false,
-      names: members.map((m) => m.cde_name).filter(Boolean),
+      names: members.map((m) => cdeLabel(m)).filter(Boolean),
       sources: uniq(members.map((m) => m.cde_source)),
       stewards: uniq(members.map((m) => m.steward_org)),
     }
