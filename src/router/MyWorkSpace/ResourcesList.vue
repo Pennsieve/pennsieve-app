@@ -38,6 +38,11 @@ export default {
 <style scoped lang="scss">
 @use '@/styles/theme';
 
+.resources-dashboard {
+  padding: 32px;
+  max-width: 1200px;
+}
+
 .info-section {
   margin-bottom: 24px;
 
