@@ -24,7 +24,7 @@
 import { computed, markRaw, onMounted } from 'vue'
 import { useStore } from 'vuex'
 import { pathOr } from 'ramda'
-import { PennsieveDashboard as StaticDashboard } from 'pennsieve-dashboard'
+import { StaticDashboard } from 'pennsieve-dashboard'
 import 'pennsieve-dashboard/style.css'
 import ChatWidget from '@/components/Chat/ChatWidget.vue'
 import LinksWidget from './widgets/LinksWidget.vue'
