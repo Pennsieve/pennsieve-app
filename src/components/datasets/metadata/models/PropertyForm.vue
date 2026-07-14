@@ -30,37 +30,7 @@
           <template #prefix><el-icon><Search /></el-icon></template>
         </el-input>
 
-        <div v-if="facetValues.diseases.length || facetValues.domains.length" class="pf-facets">
-          <div v-if="facetValues.diseases.length" class="pf-facet">
-            <span class="pf-facet-label">Disease</span>
-            <el-radio-group v-model="disease" size="small" @change="runSearch">
-              <el-radio-button value="">All</el-radio-button>
-              <el-radio-button v-for="d in facetValues.diseases" :key="d" :value="d">{{ d }}</el-radio-button>
-            </el-radio-group>
-          </div>
-          <el-select
-            v-if="facetValues.domains.length"
-            v-model="domain"
-            size="small"
-            clearable
-            placeholder="All domains"
-            class="pf-facet-domain"
-            @change="runSearch"
-          >
-            <el-option v-for="d in facetValues.domains" :key="d" :label="d" :value="d" />
-          </el-select>
-          <el-select
-            v-if="facetValues.tiers.length"
-            v-model="tier"
-            size="small"
-            clearable
-            placeholder="Any tier"
-            class="pf-facet-tier"
-            @change="runSearch"
-          >
-            <el-option v-for="t in facetValues.tiers" :key="t" :label="t" :value="t" />
-          </el-select>
-        </div>
+        <cde-facets :facet-values="facetValues" v-model="facets" @change="runSearch" />
 
         <div v-if="searching" class="wiz-status">Searching…</div>
         <div v-else-if="searchError" class="wiz-status wiz-error">{{ searchError }}</div>
@@ -112,7 +82,7 @@
               >
                 <template #content>
                   <div style="max-width: 340px">
-                    <div v-if="c.cde_definition" style="margin-bottom: 6px; line-height: 1.45">
+                    <div v-if="c.cde_definition && c.cde_definition !== cdeLabel(c)" style="margin-bottom: 6px; line-height: 1.45">
                       {{ c.cde_definition }}
                     </div>
                     <div style="font-size: 12px; opacity: 0.7">
@@ -132,7 +102,7 @@
                   </div>
                 </template>
                 <li class="wiz-row" @click="chooseCde(c)">
-                  <span class="wiz-row-name">{{ c.cde_name }}</span>
+                  <span class="wiz-row-name">{{ cdeLabel(c) }}</span>
                   <span class="wiz-row-meta">
                     {{ c.cde_data_type }}
                     <template v-if="c._bundles && c._bundles.length"> · part of {{ c._bundles.join(', ') }}</template>
@@ -141,7 +111,10 @@
               </el-tooltip>
             </ul>
           </template>
-          <div v-if="(term.trim() || disease || domain || tier) && !results.bundles.length && !results.cdes.length" class="wiz-status">
+          <div
+            v-if="(term.trim() || facets.disease.length || facets.domain.length || facets.tier.length) && !results.bundles.length && !results.cdes.length"
+            class="wiz-status"
+          >
             No matching common data elements
           </div>
         </div>
@@ -152,7 +125,7 @@
         <div class="pf-section pf-divided">
           <div class="wiz-selected-head">
             <span class="wiz-selected-name">
-              {{ selectionKind === 'bundle' ? selectedBundleName : (selectedCde && selectedCde.cde_name) }}
+              {{ selectionKind === 'bundle' ? selectedBundleName : cdeLabel(selectedCde) }}
               <span class="wiz-selected-meta">
                 <template v-if="selectionKind === 'bundle'">· bundle · {{ memberRows.length }} elements</template>
                 <template v-else>· {{ selectedCde && selectedCde.cde_data_type }}</template>
@@ -265,7 +238,7 @@
                           </div>
                         </div>
                       </template>
-                      <span class="wiz-member-cde">{{ m.cde.cde_name }} · {{ m.cde.cde_data_type }}</span>
+                      <span class="wiz-member-cde">{{ cdeLabel(m.cde) }} · {{ m.cde.cde_data_type }}</span>
                     </el-tooltip>
                     <span v-if="collides(m.name, i)" class="wiz-collision"> · name in use</span>
                   </div>
@@ -372,6 +345,7 @@ import { ElMessage } from 'element-plus'
 import { Link, EditPen, Search, Close } from '@element-plus/icons-vue'
 import debounce from 'lodash.debounce'
 import { useCdeCatalogStore } from '@/stores/cdeCatalogStore'
+import CdeFacets from './CdeFacets.vue'
 
 const props = defineProps({
   existingProperties: { type: Array, default: () => [] },
@@ -389,11 +363,9 @@ const results = ref({ bundles: [], cdes: [] })
 const searching = ref(false)
 const searchError = ref('')
 
-// Facets (disease + domain, from CDE classifications)
+// Facets (disease / domain / tier, from CDE classifications) — multi-select.
 const facetValues = ref({ diseases: [], domains: [], tiers: [] })
-const disease = ref('')
-const domain = ref('')
-const tier = ref('')
+const facets = ref({ disease: [], domain: [], tier: [] })
 
 // Selection
 const selectionKind = ref('') // '' | 'cde' | 'bundle'
@@ -478,6 +450,11 @@ const cdeValuesPreview = (c) => {
   return pvs.length > 6 ? `${head} +${pvs.length - 6} more` : head
 }
 
+// Display label for a CDE: the readable question text when present, else the
+// (sometimes cryptic) canonical name. Used for list rows / headers only — the
+// derived property name still uses cde_name (a full question is a poor name).
+const cdeLabel = (c) => (c && (c.preferred_question_text || c.cde_name)) || ''
+
 // Bundle member names, lazy-loaded + cached on hover (not in the search result).
 const bundlePreviews = reactive({})
 const uniq = (arr) => [...new Set(arr.filter(Boolean))]
@@ -488,7 +465,7 @@ const loadBundlePreview = async (name) => {
     const members = await store.getBundleMembers(name)
     bundlePreviews[name] = {
       loading: false,
-      names: members.map((m) => m.cde_name).filter(Boolean),
+      names: members.map((m) => cdeLabel(m)).filter(Boolean),
       sources: uniq(members.map((m) => m.cde_source)),
       stewards: uniq(members.map((m) => m.steward_org)),
     }
@@ -549,9 +526,9 @@ const runSearch = async () => {
   searchError.value = ''
   try {
     results.value = await store.searchCatalog(term.value, {
-      disease: disease.value,
-      domain: domain.value,
-      tier: tier.value,
+      disease: facets.value.disease,
+      domain: facets.value.domain,
+      tier: facets.value.tier,
     })
   } catch (e) {
     searchError.value = e?.message || String(e)
@@ -836,28 +813,6 @@ function manualValueSchema() {
   background: theme.$purple_tint;
   padding: 2px 10px;
   border-radius: 3px;
-}
-.pf-facets {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 10px 20px;
-  margin-top: 12px;
-}
-.pf-facet {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.pf-facet-label {
-  font-size: 13px;
-  color: theme.$gray_5;
-}
-.pf-facet-domain {
-  width: 220px;
-}
-.pf-facet-tier {
-  width: 150px;
 }
 .wiz-status {
   color: theme.$gray_4;

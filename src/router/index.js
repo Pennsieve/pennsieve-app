@@ -3,6 +3,7 @@ import { PublicationStatus, PublicationTabs } from '../utils/constants.js'
 
 import NotFound from './not-found/NotFound.vue'
 import MyCollectionsStage from "@/router/MyWorkSpace/MyCollectionsStage.vue";
+import ResourcesList from "@/router/MyWorkSpace/ResourcesList.vue";
 import ModelList from "@/components/datasets/metadata/models/modelList.vue";
 import ModelSpecViewer from "@/components/datasets/metadata/models/ModelSpecViewer.vue";
 import ModelSpecGenerator from "@/components/datasets/metadata/models/ModelSpecGenerator.vue";
@@ -380,6 +381,38 @@ const router = createRouter({
               props: true
             }
           ]
+        },
+        {
+          // Workspace-level catalog hub (org-independent — the CDE catalog is
+          // global). Landing page is a set of resource cards; each opens a
+          // specific catalog. Model templates can be added as a card later.
+          name: 'resources',
+          path: 'resources',
+          components: {
+            stage: ResourcesList,
+            navigation: UserNavigation,
+          },
+          props: true,
+          meta: {
+            hideSecondaryNav: true,
+            title: 'Resources',
+            description: 'Browse shared catalogs — common data elements (and model templates).'
+          }
+        },
+        {
+          name: 'cde-catalog',
+          path: 'resources/cde-catalog',
+          components: {
+            stage: CdeGallery,
+            navigation: UserNavigation,
+          },
+          props: true,
+          meta: {
+            hideSecondaryNav: true,
+            backLink: { name: 'resources' },
+            title: 'CDE Catalog',
+            description: 'Browse common data elements and bundles.'
+          }
         },
         {
           name: 'data-publishing',
@@ -1178,8 +1211,10 @@ const router = createRouter({
             stage: true,
             stageHeader: true
           },
+          // Metadata lands on Models (the schema/structure entry point) rather
+          // than Records (the deeper data-entry activity).
           redirect: {
-            name: 'records-list'
+            name: 'models-list'
           },
           children: [
             {
@@ -1364,7 +1399,7 @@ const router = createRouter({
                     breadcrumbs: [
                       { name: "Metadata", to: "metadata" },
                       { name: "Models", to: "models-list" },
-                      { name: "CDE Gallery", current: true }
+                      { name: "CDE Catalog", current: true }
                     ]
                   },
                   components: {

@@ -108,6 +108,16 @@
       <div class="nav-divider" />
 
       <user-navigation-item
+        :link="{ name: 'resources' }"
+        label="Resources"
+        :condensed="primaryNavCondensed"
+      >
+        <template v-slot:icon>
+          <IconDocumentation :width="20" :height="20" color="currentColor" />
+        </template>
+      </user-navigation-item>
+
+      <user-navigation-item
         :link="{ name: 'data-publishing' }"
         label="Data Publishing"
         :condensed="primaryNavCondensed"
@@ -156,6 +166,7 @@ import IconSettings from "@/components/icons/IconSettings.vue";
 import IconCollection from "@/components/icons/IconCollection.vue";
 import IconOrganization from "@/components/icons/IconOrganization.vue";
 import IconGlobeCheck from "@/components/icons/IconGlobeCheck.vue";
+import IconDocumentation from "@/components/icons/IconDocumentation.vue";
 
 export default {
   name: 'UserNavigation',
@@ -174,7 +185,8 @@ export default {
     IconGitHub,
     IconShare,
     IconOrganization,
-    IconGlobeCheck
+    IconGlobeCheck,
+    IconDocumentation
   },
 
   computed: {

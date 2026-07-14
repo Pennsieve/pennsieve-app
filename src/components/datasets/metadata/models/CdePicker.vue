@@ -15,11 +15,24 @@
       <div class="cde-field">
         <div class="cde-label">Binding strength</div>
         <el-radio-group v-model="strength" size="small" @change="emitBinding">
-          <el-radio-button value="required">Required</el-radio-button>
+          <el-radio-button value="required" :disabled="requiredBlocked">Required</el-radio-button>
           <el-radio-button value="preferred">Preferred</el-radio-button>
           <el-radio-button value="example">Example</el-radio-button>
         </el-radio-group>
         <div class="cde-hint">{{ strengthHint }}</div>
+        <div v-if="requiredBlocked" class="cde-hint cde-warn">
+          This element's allowed values aren't published (they may be license-restricted at the
+          source), so it can't be Required — the value list can't be enforced. Use Preferred or Example.
+        </div>
+        <a
+          v-if="requiredBlocked && selected.nlm_view_url"
+          :href="selected.nlm_view_url"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="cde-nlm-link"
+        >
+          Look up its value list on the NLM CDE Repository →
+        </a>
       </div>
 
       <div v-if="hasValues" class="cde-field">
@@ -120,11 +133,23 @@ const runSearch = async () => {
 }
 const onInput = debounce(runSearch, 300)
 
-const select = (cde) => {
-  selected.value = cde
+const select = async (cde) => {
+  // Search results are the slim list projection; fetch the full record so the
+  // preview (permissible values, xrefs) and the parent's value materialization
+  // get the complete data. Fall back to the slim result if it can't resolve.
+  let full = cde
+  try {
+    const resolved = await store.getByPersistentId(cde.persistent_id)
+    if (resolved) full = resolved
+  } catch (e) {
+    console.error('CDE resolve failed:', e)
+  }
+  selected.value = full
   if (!strength.value) strength.value = 'required'
+  // Can't require an element whose value set we don't have — fall back to preferred.
+  if (requiredBlocked.value && strength.value === 'required') strength.value = 'preferred'
   emitBinding()
-  emit('select', cde)
+  emit('select', full)
 }
 
 const detach = () => {
@@ -145,6 +170,13 @@ const emitBinding = () => {
 
 const hasValues = computed(
   () => Array.isArray(selected.value?.permissible_values) && selected.value.permissible_values.length > 0
+)
+// A Value List CDE whose permissible values aren't published can't be bound as
+// `required` — required materializes a strict enum from the value list, and we
+// don't have it. Other data types (Number/Text/Date) enforce type only, so they
+// can still be required.
+const requiredBlocked = computed(
+  () => selected.value?.cde_data_type === 'Value List' && !hasValues.value
 )
 const pvCount = computed(() => selected.value?.permissible_values?.length || 0)
 const previewValues = computed(() => (selected.value?.permissible_values || []).slice(0, 8))
@@ -290,6 +322,19 @@ watch(
   font-size: 12px;
   margin-top: 6px;
   line-height: 1.4;
+}
+.cde-warn {
+  color: theme.$status_orange;
+}
+.cde-nlm-link {
+  display: inline-block;
+  margin-top: 6px;
+  font-size: 12px;
+  color: theme.$purple_2;
+  text-decoration: none;
+  &:hover {
+    text-decoration: underline;
+  }
 }
 .cde-values,
 .cde-xrefs {

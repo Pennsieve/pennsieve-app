@@ -2,10 +2,12 @@
   <bf-stage>
     <div class="cde-gallery">
       <div class="cg-head">
-        <h2>CDE Gallery</h2>
+        <h2>CDE Catalog</h2>
         <p class="cg-sub">
-          Browse the common data element catalog — standardized, reusable fields you can attach to
-          model properties to keep data comparable across datasets.
+          Standardized, reusable fields you can attach to model properties to keep data comparable
+          across datasets. These common data elements are indexed from the U.S. National Library of
+          Medicine (NLM) CDE Repository and the standards organizations that steward them (NINDS,
+          NHLBI, PhenX, LOINC, and others) — they are not a Pennsieve-authored list.
         </p>
       </div>
 
@@ -13,37 +15,12 @@
         <el-input v-model="term" placeholder="Search the catalog" clearable class="cg-search" @input="onSearch">
           <template #prefix><el-icon><Search /></el-icon></template>
         </el-input>
-        <div v-if="activeTab === 'cdes' && (facetValues.diseases.length || facetValues.domains.length)" class="cg-facets">
-          <div v-if="facetValues.diseases.length" class="cg-facet">
-            <span class="cg-facet-label">Disease</span>
-            <el-radio-group v-model="disease" size="small" @change="runSearch">
-              <el-radio-button value="">All</el-radio-button>
-              <el-radio-button v-for="d in facetValues.diseases" :key="d" :value="d">{{ d }}</el-radio-button>
-            </el-radio-group>
-          </div>
-          <el-select
-            v-if="facetValues.domains.length"
-            v-model="domain"
-            size="small"
-            clearable
-            placeholder="All domains"
-            class="cg-facet-select"
-            @change="runSearch"
-          >
-            <el-option v-for="d in facetValues.domains" :key="d" :label="d" :value="d" />
-          </el-select>
-          <el-select
-            v-if="facetValues.tiers.length"
-            v-model="tier"
-            size="small"
-            clearable
-            placeholder="Any tier"
-            class="cg-facet-select cg-facet-tier"
-            @change="runSearch"
-          >
-            <el-option v-for="t in facetValues.tiers" :key="t" :label="t" :value="t" />
-          </el-select>
-        </div>
+        <cde-facets
+          v-if="activeTab === 'cdes'"
+          :facet-values="facetValues"
+          v-model="facets"
+          @change="runSearch"
+        />
       </div>
 
       <div v-if="store.error" class="cg-status cg-error">{{ store.error }}</div>
@@ -57,13 +34,13 @@
             <ul v-else class="cg-list">
               <li v-for="c in cdes" :key="c.persistent_id || c.canonical_key" class="cg-row" @click="openCde(c)">
                 <div class="cg-row-main">
-                  <span class="cg-row-name">{{ c.cde_name }}</span>
-                  <span v-if="c.cde_definition" class="cg-row-def">{{ c.cde_definition }}</span>
+                  <span class="cg-row-name">{{ cdeLabel(c) }}</span>
+                  <span v-if="c.cde_definition && c.cde_definition !== cdeLabel(c)" class="cg-row-def">{{ c.cde_definition }}</span>
                 </div>
                 <span class="cg-row-meta">
                   {{ c.cde_data_type }}
-                  <template v-if="c.permissible_values && c.permissible_values.length">
-                    · {{ c.permissible_values.length }} values
+                  <template v-if="c.permissible_values_count">
+                    · {{ c.permissible_values_count }} values
                   </template>
                 </span>
               </li>
@@ -110,17 +87,42 @@
       <!-- Detail drawer -->
       <el-drawer v-model="detailVisible" :title="detailTitle" size="480px" direction="rtl">
         <div v-if="detail.kind === 'cde' && detail.cde" class="cg-detail">
-          <p v-if="detail.cde.cde_definition" class="cg-def">{{ detail.cde.cde_definition }}</p>
+          <p v-if="detail.cde.cde_definition && detail.cde.cde_definition !== detailTitle" class="cg-def">{{ detail.cde.cde_definition }}</p>
+
+          <div v-if="detail.cde.cde_name && detail.cde.cde_name !== detailTitle" class="cg-field">
+            <div class="cg-field-label">Name</div>
+            <div>{{ detail.cde.cde_name }}</div>
+          </div>
 
           <div class="cg-field">
             <div class="cg-field-label">Data type</div>
             <div>{{ detail.cde.cde_data_type }}</div>
           </div>
 
-          <div v-if="cdeValues(detail.cde).length" class="cg-field">
+          <div v-if="detail.loading && detail.cde.permissible_values_count" class="cg-field">
+            <div class="cg-field-label">Allowed values</div>
+            <div style="opacity: 0.6">Loading…</div>
+          </div>
+          <div v-else-if="cdeValues(detail.cde).length" class="cg-field">
             <div class="cg-field-label">Allowed values ({{ cdeValues(detail.cde).length }})</div>
             <div class="cg-chips">
               <span v-for="(v, i) in cdeValues(detail.cde)" :key="i" class="cg-chip">{{ v }}</span>
+            </div>
+          </div>
+          <div v-else-if="detail.cde.cde_data_type === 'Value List'" class="cg-field">
+            <div class="cg-field-label">Allowed values</div>
+            <div style="opacity: 0.6">Not published for this element (values may be license-restricted at the source).</div>
+            <a
+              v-if="detail.cde.nlm_view_url"
+              :href="detail.cde.nlm_view_url"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="cg-nlm-link"
+            >
+              Look up its value list on the NLM CDE Repository →
+            </a>
+            <div v-if="detail.cde.nlm_view_url" class="cg-nlm-hint">
+              Open the element's <em>Permissible Values</em> tab there; licensed value sets may require an NLM login.
             </div>
           </div>
 
@@ -130,6 +132,11 @@
               {{ detail.cde.cde_source || detail.cde.steward_org || '—' }}
               <template v-if="detail.cde.registration_status"> · {{ detail.cde.registration_status }}</template>
             </div>
+          </div>
+
+          <div v-if="detail.cde.copyright_status" class="cg-field">
+            <div class="cg-field-label">Copyright</div>
+            <div>{{ detail.cde.copyright_status }}</div>
           </div>
 
           <div v-if="detail.bundles.length" class="cg-field">
@@ -163,7 +170,7 @@
           <div v-if="detail.loading" class="cg-status">Loading members…</div>
           <ul v-else class="cg-member-list">
             <li v-for="(m, i) in detail.members" :key="i" class="cg-member">
-              <span class="cg-member-name">{{ m.cde_name }}</span>
+              <span class="cg-member-name">{{ cdeLabel(m) }}</span>
               <span class="cg-member-meta">{{ m.cde_data_type }}</span>
             </li>
           </ul>
@@ -178,13 +185,12 @@ import { ref, reactive, computed, onMounted } from 'vue'
 import { Search } from '@element-plus/icons-vue'
 import debounce from 'lodash.debounce'
 import { useCdeCatalogStore } from '@/stores/cdeCatalogStore'
+import CdeFacets from './CdeFacets.vue'
 
 const store = useCdeCatalogStore()
 
 const term = ref('')
-const disease = ref('')
-const domain = ref('')
-const tier = ref('')
+const facets = ref({ disease: [], domain: [], tier: [] }) // multi-select facet state
 const facetValues = ref({ diseases: [], domains: [], tiers: [] })
 
 const activeTab = ref('cdes')
@@ -208,8 +214,14 @@ const loading = ref(true)
 const membership = ref(new Map()) // persistent_id -> [bundle_name, ...]
 const detailVisible = ref(false)
 const detail = reactive({ kind: '', cde: null, bundles: [], members: [], loading: false, bundleName: '' })
+
+// Display label: the readable question text when present, else the (sometimes
+// cryptic) canonical name. NLM's cde_name can be a short code (e.g. PhenX
+// "# Ds miss school nRate PhenX"); preferred_question_text is the human phrasing.
+const cdeLabel = (c) => (c && (c.preferred_question_text || c.cde_name)) || 'Element'
+
 const detailTitle = computed(() =>
-  detail.kind === 'cde' ? (detail.cde && detail.cde.cde_name) || 'Element' : detail.bundleName || 'Bundle'
+  detail.kind === 'cde' ? cdeLabel(detail.cde) : detail.bundleName || 'Bundle'
 )
 
 const cdeValues = (c) =>
@@ -218,9 +230,9 @@ const xrefs = (c) => (Array.isArray(c && c.xrefs) ? c.xrefs : [])
 
 const loadCdes = async () => {
   const res = await store.searchCdesPaged(term.value, {
-    disease: disease.value,
-    domain: domain.value,
-    tier: tier.value,
+    disease: facets.value.disease,
+    domain: facets.value.domain,
+    tier: facets.value.tier,
     page: cdePage.value - 1,
     pageSize: PAGE_SIZE,
   })
@@ -260,11 +272,23 @@ const onBundlePage = (p) => {
   bundlePage.value = p
 }
 
-const openCde = (c) => {
+const openCde = async (c) => {
   detail.kind = 'cde'
-  detail.cde = c
+  detail.cde = c // slim record renders immediately
   detail.bundles = membership.value.get(c.persistent_id) || []
   detailVisible.value = true
+  // Fetch the full record (permissible values, xrefs) on demand.
+  detail.loading = true
+  try {
+    const full = await store.getByPersistentId(c.persistent_id)
+    if (full && detail.kind === 'cde' && detail.cde && detail.cde.persistent_id === c.persistent_id) {
+      detail.cde = full
+    }
+  } catch (e) {
+    console.error('CDE detail load failed:', e)
+  } finally {
+    detail.loading = false
+  }
 }
 const showBundle = async (name) => {
   detail.kind = 'bundle'
@@ -322,27 +346,6 @@ onMounted(async () => {
 }
 .cg-search {
   max-width: 420px;
-}
-.cg-facets {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 10px 20px;
-}
-.cg-facet {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.cg-facet-label {
-  font-size: 13px;
-  color: theme.$gray_5;
-}
-.cg-facet-select {
-  width: 220px;
-}
-.cg-facet-tier {
-  width: 160px;
 }
 .cg-status {
   color: theme.$gray_4;
@@ -464,6 +467,22 @@ onMounted(async () => {
   &:hover {
     background: theme.$purple_tint;
   }
+}
+.cg-nlm-link {
+  display: inline-block;
+  margin-top: 8px;
+  font-size: 13px;
+  color: theme.$purple_2;
+  text-decoration: none;
+  &:hover {
+    text-decoration: underline;
+  }
+}
+.cg-nlm-hint {
+  margin-top: 4px;
+  font-size: 12px;
+  color: theme.$gray_4;
+  line-height: 1.4;
 }
 .cg-code {
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;

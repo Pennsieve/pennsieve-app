@@ -188,14 +188,23 @@ export const useDuckDBStore = defineStore('duckdb', () => {
             try {
                 let createTableQuery
                 if (fileType === 'csv') {
+                    // Pin quote/escape to the RFC 4180 defaults rather than let
+                    // the auto-detector guess. It samples the first rows and, when
+                    // quoted fields are rare, guesses quote=(empty) — then a later
+                    // properly-quoted field containing the delimiter (e.g. a
+                    // relationship key like "…, v1") is mis-split into an extra
+                    // column ("Expected 3 columns, Found 4"). The publisher writes
+                    // standard CSV (Go encoding/csv), so " / " is always correct.
                     const options = {
                         header: true,
                         delimiter: ',',
+                        quote: '"',
+                        escape: '"',
                         ...csvOptions
                     }
                     createTableQuery = `
             CREATE OR REPLACE TABLE ${tableName} AS
-            SELECT * FROM read_csv('${fileName}', header=${options.header}, delim='${options.delimiter}');
+            SELECT * FROM read_csv('${fileName}', header=${options.header}, delim='${options.delimiter}', quote='${options.quote}', escape='${options.escape}');
           `
                 } else if (fileType === 'parquet') {
                     createTableQuery = `
@@ -203,14 +212,19 @@ export const useDuckDBStore = defineStore('duckdb', () => {
             SELECT * FROM read_parquet('${fileName}');
           `
                 } else if (fileType === 'jsonl' || fileType === 'ndjson') {
+                    // sample_size=-1: infer the schema from ALL rows, not a
+                    // sample. Records have sparse nested keys (e.g. a permissible
+                    // value's code_system_version, or a classification's
+                    // population/descriptors) that a sampled inference misses,
+                    // then errors on ("unknown key …") when a later row has them.
                     createTableQuery = `
             CREATE OR REPLACE TABLE ${tableName} AS
-            SELECT * FROM read_json_auto('${fileName}', format='newline_delimited');
+            SELECT * FROM read_json_auto('${fileName}', format='newline_delimited', sample_size=-1);
           `
                 } else if (fileType === 'json') {
                     createTableQuery = `
             CREATE OR REPLACE TABLE ${tableName} AS
-            SELECT * FROM read_json_auto('${fileName}');
+            SELECT * FROM read_json_auto('${fileName}', sample_size=-1);
           `
                 } else {
                     throw new Error(`Unsupported file type: ${fileType}`)
@@ -253,6 +267,61 @@ export const useDuckDBStore = defineStore('duckdb', () => {
                 isLoading: false,
                 error: err.message
             })
+            throw err
+        }
+    }
+
+    // Load a Parquet file by URL using DuckDB's HTTP range requests: the URL is
+    // registered with DuckDB (not pre-fetched into a buffer), so DuckDB reads the
+    // footer then only the row groups / columns a query needs — transferring a
+    // fraction of the bytes. Columnar + zstd + projection pushdown make this far
+    // faster than downloading a whole JSONL/CSV.
+    //
+    // materialize=true (default) copies the parquet into an in-memory table once
+    // (best for a relation scanned repeatedly, e.g. full-text search); false
+    // creates a VIEW so each query pushes its predicates/projection down into the
+    // remote parquet scan (best for facet columns where most columns are untouched).
+    // columns: the SELECT projection (default '*'). Pass e.g. 'id, data::JSON AS
+    // data' when a record's JSON payload is stored as a VARCHAR column and must be
+    // parsed back to JSON for to_json(data)->>'field' access.
+    const loadParquetUrl = async (fileUrl, tableName = 'my_data', { materialize = true, columns = '*' } = {}, viewerId = null, fileId = null) => {
+        const stableKey = fileId || fileUrl
+
+        const existing = loadedFiles.value.get(stableKey)
+        if (existing && !existing.isLoading && !existing.error) {
+            if (viewerId) trackFileUsage(stableKey, viewerId)
+            return existing.tableName
+        }
+
+        if (!isReady.value) await initDuckDB()
+
+        loadedFiles.value.set(stableKey, { tableName, fileType: 'parquet', fileUrl, isLoading: true, error: null })
+
+        try {
+            const duckdb = await import('@duckdb/duckdb-wasm')
+            const fileName = `${fileId || tableName}.parquet`
+            // Register the remote URL so DuckDB owns the HTTP fetching (range requests).
+            await db.value.registerFileURL(fileName, fileUrl, duckdb.DuckDBDataProtocol.HTTP, false)
+
+            const tempConn = await db.value.connect()
+            try {
+                const relation = materialize ? 'TABLE' : 'VIEW'
+                await tempConn.query(
+                    `CREATE OR REPLACE ${relation} ${tableName} AS SELECT ${columns} FROM read_parquet('${fileName}');`
+                )
+                const result = await tempConn.query(`SELECT COUNT(*) as count FROM ${tableName};`)
+                const rowCount = result.toArray()[0].count
+                loadedFiles.value.set(stableKey, {
+                    tableName, fileType: 'parquet', fileUrl, isLoading: false, error: null, rowCount, loadedAt: new Date()
+                })
+                if (viewerId) trackFileUsage(stableKey, viewerId)
+                return tableName
+            } finally {
+                await tempConn.close()
+            }
+        } catch (err) {
+            console.error('Failed to load parquet file:', err)
+            loadedFiles.value.set(stableKey, { tableName, fileType: 'parquet', fileUrl, isLoading: false, error: err.message })
             throw err
         }
     }
@@ -303,7 +372,7 @@ export const useDuckDBStore = defineStore('duckdb', () => {
             const tempConn = await db.value.connect()
             try {
                 await tempConn.query(
-                    `CREATE OR REPLACE TABLE ${tableName} AS SELECT * FROM read_json_auto('${fileName}', format='newline_delimited');`
+                    `CREATE OR REPLACE TABLE ${tableName} AS SELECT * FROM read_json_auto('${fileName}', format='newline_delimited', sample_size=-1);`
                 )
                 const result = await tempConn.query(`SELECT COUNT(*) as count FROM ${tableName};`)
                 const rowCount = result.toArray()[0].count
@@ -584,6 +653,7 @@ export const useDuckDBStore = defineStore('duckdb', () => {
         trackFileUsage,
         unloadFile,
         loadFile,
+        loadParquetUrl,
         loadJsonlLenient,
         loadFiles,
         executeQuery,
