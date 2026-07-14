@@ -38,6 +38,8 @@ import IconPrivateEye from "@/components/icons/IconPrivateEye.vue";
 import IconRepository from '../../icons/IconRepository.vue'
 import IconProposals from '../../icons/IconProposals.vue'
 import IconIntegrations from '../../icons/IconIntegrations.vue'
+import IconCollection from '../../icons/IconCollection.vue'
+import IconOverview from '../../icons/IconOverview.vue'
 
 export default {
   name: 'UserDashboardCard',
@@ -57,6 +59,8 @@ export default {
     IconRepository,
     IconProposals,
     IconIntegrations,
+    IconCollection,
+    IconOverview,
   },
 
   props: {
@@ -97,7 +101,9 @@ export default {
         'icon-private-eye': 'IconPrivateEye',
         'repository': 'IconRepository',
         'proposals': 'IconProposals',
-        'integrations': 'IconIntegrations'
+        'integrations': 'IconIntegrations',
+        'cde-catalog': 'IconCollection',
+        'model-templates': 'IconOverview'
       }
       return iconMap[this.icon] || 'IconUser'
     }
