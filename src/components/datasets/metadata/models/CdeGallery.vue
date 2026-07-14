@@ -4,8 +4,10 @@
       <div class="cg-head">
         <h2>CDE Catalog</h2>
         <p class="cg-sub">
-          Browse the common data element catalog — standardized, reusable fields you can attach to
-          model properties to keep data comparable across datasets.
+          Standardized, reusable fields you can attach to model properties to keep data comparable
+          across datasets. These common data elements are indexed from the U.S. National Library of
+          Medicine (NLM) CDE Repository and the standards organizations that steward them (NINDS,
+          NHLBI, PhenX, LOINC, and others) — they are not a Pennsieve-authored list.
         </p>
       </div>
 
