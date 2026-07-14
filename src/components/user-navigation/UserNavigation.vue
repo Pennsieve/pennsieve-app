@@ -108,6 +108,16 @@
       <div class="nav-divider" />
 
       <user-navigation-item
+        :link="{ name: 'resources' }"
+        label="Resources"
+        :condensed="primaryNavCondensed"
+      >
+        <template v-slot:icon>
+          <IconCollection :width="20" :height="20" color="currentColor" />
+        </template>
+      </user-navigation-item>
+
+      <user-navigation-item
         :link="{ name: 'data-publishing' }"
         label="Data Publishing"
         :condensed="primaryNavCondensed"
