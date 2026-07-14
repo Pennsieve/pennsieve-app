@@ -120,11 +120,21 @@ const runSearch = async () => {
 }
 const onInput = debounce(runSearch, 300)
 
-const select = (cde) => {
-  selected.value = cde
+const select = async (cde) => {
+  // Search results are the slim list projection; fetch the full record so the
+  // preview (permissible values, xrefs) and the parent's value materialization
+  // get the complete data. Fall back to the slim result if it can't resolve.
+  let full = cde
+  try {
+    const resolved = await store.getByPersistentId(cde.persistent_id)
+    if (resolved) full = resolved
+  } catch (e) {
+    console.error('CDE resolve failed:', e)
+  }
+  selected.value = full
   if (!strength.value) strength.value = 'required'
   emitBinding()
-  emit('select', cde)
+  emit('select', full)
 }
 
 const detach = () => {

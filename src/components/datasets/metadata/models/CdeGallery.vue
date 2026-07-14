@@ -62,8 +62,8 @@
                 </div>
                 <span class="cg-row-meta">
                   {{ c.cde_data_type }}
-                  <template v-if="c.permissible_values && c.permissible_values.length">
-                    · {{ c.permissible_values.length }} values
+                  <template v-if="c.permissible_values_count">
+                    · {{ c.permissible_values_count }} values
                   </template>
                 </span>
               </li>
@@ -122,7 +122,11 @@
             <div>{{ detail.cde.cde_data_type }}</div>
           </div>
 
-          <div v-if="cdeValues(detail.cde).length" class="cg-field">
+          <div v-if="detail.loading && detail.cde.permissible_values_count" class="cg-field">
+            <div class="cg-field-label">Allowed values</div>
+            <div style="opacity: 0.6">Loading…</div>
+          </div>
+          <div v-else-if="cdeValues(detail.cde).length" class="cg-field">
             <div class="cg-field-label">Allowed values ({{ cdeValues(detail.cde).length }})</div>
             <div class="cg-chips">
               <span v-for="(v, i) in cdeValues(detail.cde)" :key="i" class="cg-chip">{{ v }}</span>
@@ -280,11 +284,23 @@ const onBundlePage = (p) => {
   bundlePage.value = p
 }
 
-const openCde = (c) => {
+const openCde = async (c) => {
   detail.kind = 'cde'
-  detail.cde = c
+  detail.cde = c // slim record renders immediately
   detail.bundles = membership.value.get(c.persistent_id) || []
   detailVisible.value = true
+  // Fetch the full record (permissible values, xrefs) on demand.
+  detail.loading = true
+  try {
+    const full = await store.getByPersistentId(c.persistent_id)
+    if (full && detail.kind === 'cde' && detail.cde && detail.cde.persistent_id === c.persistent_id) {
+      detail.cde = full
+    }
+  } catch (e) {
+    console.error('CDE detail load failed:', e)
+  } finally {
+    detail.loading = false
+  }
 }
 const showBundle = async (name) => {
   detail.kind = 'bundle'
