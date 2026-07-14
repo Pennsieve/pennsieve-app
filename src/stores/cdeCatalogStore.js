@@ -237,12 +237,17 @@ export const useCdeCatalogStore = defineStore('cdeCatalog', () => {
     const getFacetMap = async () => {
         if (facetMap) return facetMap
         await ensureClassificationsLoaded()
-        // cls.context/domain/tier are promoted parquet columns (projection pushdown).
+        // cls.context/domain/tier are promoted parquet columns. `context` is a real
+        // disease only when the classification is rooted under "Disease" (NINDS);
+        // other stewards root their trees under collection/domain names that aren't
+        // diseases. Take path[0] from the record blob and only treat Disease-rooted
+        // contexts as diseases (domain/tier are unaffected).
         const query = `
             SELECT cde.persistent_id AS pid,
                    cls.context AS disease,
                    cls.domain AS domain,
-                   cls.tier AS tier
+                   cls.tier AS tier,
+                   ((cls.data::JSON) -> 'path' ->> 0) AS path_root
             FROM ${TABLE} cde
             JOIN cde_rel cl ON cl.target_record_id = CAST(cde.id AS VARCHAR) AND cl.relationship_type = 'CLASSIFIES'
             JOIN cde_cls cls ON CAST(cls.id AS VARCHAR) = cl.source_record_id`
@@ -255,11 +260,12 @@ export const useCdeCatalogStore = defineStore('cdeCatalog', () => {
                 e = { diseases: new Set(), domains: new Set(), tiers: new Set(), pairs: new Set() }
                 map.set(r.pid, e)
             }
-            if (r.disease) e.diseases.add(r.disease)
+            const isDisease = r.path_root === 'Disease'
+            if (r.disease && isDisease) e.diseases.add(r.disease)
             if (r.domain) e.domains.add(r.domain)
             if (r.tier) {
                 e.tiers.add(r.tier)
-                if (r.disease) e.pairs.add(`${r.disease} ${r.tier}`)
+                if (r.disease && isDisease) e.pairs.add(`${r.disease} ${r.tier}`)
             }
         }
         facetMap = map
