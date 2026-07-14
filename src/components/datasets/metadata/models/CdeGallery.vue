@@ -135,6 +135,18 @@
           <div v-else-if="detail.cde.cde_data_type === 'Value List'" class="cg-field">
             <div class="cg-field-label">Allowed values</div>
             <div style="opacity: 0.6">Not published for this element (values may be license-restricted at the source).</div>
+            <a
+              v-if="detail.cde.nlm_view_url"
+              :href="detail.cde.nlm_view_url"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="cg-nlm-link"
+            >
+              Look up its value list on the NLM CDE Repository →
+            </a>
+            <div v-if="detail.cde.nlm_view_url" class="cg-nlm-hint">
+              Open the element's <em>Permissible Values</em> tab there; licensed value sets may require an NLM login.
+            </div>
           </div>
 
           <div class="cg-field">
@@ -500,6 +512,22 @@ onMounted(async () => {
   &:hover {
     background: theme.$purple_tint;
   }
+}
+.cg-nlm-link {
+  display: inline-block;
+  margin-top: 8px;
+  font-size: 13px;
+  color: theme.$purple_2;
+  text-decoration: none;
+  &:hover {
+    text-decoration: underline;
+  }
+}
+.cg-nlm-hint {
+  margin-top: 4px;
+  font-size: 12px;
+  color: theme.$gray_4;
+  line-height: 1.4;
 }
 .cg-code {
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;

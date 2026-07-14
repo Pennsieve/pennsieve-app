@@ -24,6 +24,15 @@
           This element's allowed values aren't published (they may be license-restricted at the
           source), so it can't be Required — the value list can't be enforced. Use Preferred or Example.
         </div>
+        <a
+          v-if="requiredBlocked && selected.nlm_view_url"
+          :href="selected.nlm_view_url"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="cde-nlm-link"
+        >
+          Look up its value list on the NLM CDE Repository →
+        </a>
       </div>
 
       <div v-if="hasValues" class="cde-field">
@@ -316,6 +325,16 @@ watch(
 }
 .cde-warn {
   color: theme.$status_orange;
+}
+.cde-nlm-link {
+  display: inline-block;
+  margin-top: 6px;
+  font-size: 12px;
+  color: theme.$purple_2;
+  text-decoration: none;
+  &:hover {
+    text-decoration: underline;
+  }
 }
 .cde-values,
 .cde-xrefs {
