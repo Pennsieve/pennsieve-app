@@ -5,6 +5,7 @@ import { ElRadioGroup, ElRadioButton, ElCard, ElForm, ElFormItem, ElInput, ElSel
 import { useMetadataStore } from '@/stores/metadataStore.js'
 import ModelSpecViewer from './ModelSpecViewer.vue'
 import PropertyDialog from './PropertyDialog.vue'
+import AddPropertyWizard from './AddPropertyWizard.vue'
 import BfButton from "@/components/shared/bf-button/BfButton.vue";
 import ViewToggle from '@/components/shared/ViewToggle/ViewToggle.vue';
 
@@ -100,6 +101,10 @@ const modelNameManuallyEdited = ref(false)
 
 // Property dialog
 const propertyDialogVisible = ref(false)
+const addWizardVisible = ref(false)
+const existingProperties = computed(() =>
+  Object.keys(modelData.value?.latest_version?.schema?.properties || {})
+)
 const editingProperty = ref(null)
 const propertyForm = ref({
   name: '',
@@ -404,7 +409,8 @@ const openPropertyDialog = (propertyName = null) => {
       default: property.default,
       isKey: property['x-pennsieve-key'] || false,
       isSensitive: property['x-pennsieve-sensitive'] || false,
-      allowNull: allowNull
+      allowNull: allowNull,
+      cde: property['x-pennsieve-cde'] || null
     }
   } else {
     // Add new property
@@ -425,10 +431,11 @@ const openPropertyDialog = (propertyName = null) => {
       default: undefined,
       isKey: false,
       isSensitive: false,
-      allowNull: false
+      allowNull: false,
+      cde: null
     }
   }
-  
+
   propertyDialogVisible.value = true
 }
 
@@ -608,62 +615,63 @@ const formatDate = (dateString) => {
   })
 }
 
-// Handle PropertyDialog save event
-const handlePropertySave = ({ propertyName, propertySchema, required, oldPropertyName }) => {
+// Merge one or more property definitions into the model schema in a single
+// update. A bundle expands to several definitions (one per member CDE); a single
+// property or edit is just a one-element batch.
+const applyPropertySaves = (defs) => {
   try {
-    // Validate Pennsieve-specific rules before saving
-    if (propertySchema['x-pennsieve-key'] === true && !required) {
-      ElMessage.error(`Property "${propertyName}" has x-pennsieve-key set but is not marked as required`)
-      return
-    }
+    const schema = modelData.value.latest_version.schema
+    const newProperties = { ...schema.properties }
+    const newRequired = [...(schema.required || [])]
 
-    // Note: Sensitive data properties (x-pennsieve-sensitive) are allowed to be optional
-    // Only key properties must be required
-
-    // Update schema
-    const newProperties = { ...modelData.value.latest_version.schema.properties }
-    const newRequired = [...(modelData.value.latest_version.schema.required || [])]
-
-    // Remove old property name if editing
-    if (oldPropertyName && oldPropertyName !== propertyName) {
-      delete newProperties[oldPropertyName]
-      const oldIndex = newRequired.indexOf(oldPropertyName)
-      if (oldIndex > -1) {
-        newRequired.splice(oldIndex, 1)
+    for (const { propertyName, propertySchema, required, oldPropertyName } of defs) {
+      // Validate Pennsieve-specific rules before saving. Only key properties
+      // must be required (sensitive properties may be optional).
+      if (propertySchema['x-pennsieve-key'] === true && !required) {
+        ElMessage.error(`Property "${propertyName}" has x-pennsieve-key set but is not marked as required`)
+        return
       }
+
+      // Remove old property name if editing (rename)
+      if (oldPropertyName && oldPropertyName !== propertyName) {
+        delete newProperties[oldPropertyName]
+        const oldIndex = newRequired.indexOf(oldPropertyName)
+        if (oldIndex > -1) newRequired.splice(oldIndex, 1)
+      }
+
+      newProperties[propertyName] = propertySchema
+
+      const requiredIndex = newRequired.indexOf(propertyName)
+      if (required && requiredIndex === -1) newRequired.push(propertyName)
+      else if (!required && requiredIndex > -1) newRequired.splice(requiredIndex, 1)
     }
 
-    // Add/update property
-    newProperties[propertyName] = propertySchema
-
-    // Handle required status
-    const requiredIndex = newRequired.indexOf(propertyName)
-    if (required && requiredIndex === -1) {
-      newRequired.push(propertyName)
-    } else if (!required && requiredIndex > -1) {
-      newRequired.splice(requiredIndex, 1)
-    }
-
-    // Update model
     modelData.value.latest_version.schema = {
-      ...modelData.value.latest_version.schema,
+      ...schema,
       properties: newProperties,
       required: newRequired
     }
 
-    // Update JSON content if in JSON mode
-    if (mode.value === 'json') {
-      updateJsonContent()
-    }
-
-    // Update shared JSON data for preview
+    if (mode.value === 'json') updateJsonContent()
     updateSharedJsonData()
 
-    ElMessage.success(oldPropertyName ? 'Property updated successfully' : 'Property added successfully')
+    const n = defs.length
+    ElMessage.success(
+      n > 1
+        ? `${n} properties added`
+        : (defs[0].oldPropertyName ? 'Property updated successfully' : 'Property added successfully')
+    )
   } catch (error) {
     ElMessage.error('Failed to save property: ' + error.message)
   }
 }
+
+// Handle PropertyDialog save event (single property)
+const handlePropertySave = (def) => applyPropertySaves([def])
+
+// Handle a batch save from the add-property/create-model wizard (e.g. a bundle
+// expanded to one property per member CDE)
+const handlePropertiesSave = (defs) => applyPropertySaves(defs)
 
 // Handle PropertyDialog cancel event
 const handlePropertyCancel = () => {
@@ -978,7 +986,7 @@ watch([() => modelData.value.name, () => modelData.value.display_name, () => mod
                 <span>Properties</span>
 
                 <div class="header-controls">
-                  <button type="primary" size="small" @click="openPropertyDialog()">
+                  <button type="primary" size="small" @click="addWizardVisible = true">
                     Add Property
                   </button>
                   <div class="mode-switcher-tabs">
@@ -1103,13 +1111,20 @@ watch([() => modelData.value.name, () => modelData.value.display_name, () => mod
     </div>
 
 
-    <!-- Property Dialog -->
+    <!-- Property Dialog (edit an existing property) -->
     <PropertyDialog
       v-model:visible="propertyDialogVisible"
       :editing-property="editingProperty"
       :initial-property-data="propertyFormData"
       @save="handlePropertySave"
       @cancel="handlePropertyCancel"
+    />
+
+    <!-- Add-property wizard (guided: CDE / bundle / manual) -->
+    <AddPropertyWizard
+      v-model:visible="addWizardVisible"
+      :existing-properties="existingProperties"
+      @save="handlePropertiesSave"
     />
   </div>
 </template>

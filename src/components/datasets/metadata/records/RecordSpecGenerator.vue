@@ -466,6 +466,21 @@ const updateRecord = async () => {
   }
 }
 
+// A required CDE binding whose value set was too large to inline (or has no
+// published values) carries `x-pennsieve-cde-valueset` instead of an `enum`.
+// Surface it so the field reads as controlled-by-a-CDE rather than free-form.
+const cdeValueSet = (property) => property?.property?.['x-pennsieve-cde-valueset'] || null
+const cdeValueSetHint = (property) => {
+  const vs = cdeValueSet(property)
+  if (!vs) return ''
+  if (vs.reason === 'values_unpublished') {
+    return 'Allowed values are defined by a linked CDE but not published (they may be license-restricted). Enter a value that conforms to the CDE.'
+  }
+  const count = typeof vs.count === 'number' ? vs.count.toLocaleString() : ''
+  const system = vs.code_system ? ` from ${vs.code_system}` : ''
+  return `Bound to a CDE value set (${count ? count + ' ' : ''}allowed values${system}) too large to list here — refer to the CDE for the allowed codes.`
+}
+
 // Helper function for rendering just the form input
 const renderFormFieldInput = (property) => {
   const { key, type, format, enum: enumValues } = property
@@ -1120,13 +1135,21 @@ onMounted(async () => {
                   >
                     Required
                   </el-tag>
-                  <el-tag 
+                  <el-tag
                     v-if="property.property && property.property['x-pennsieve-key']"
                     size="small"
                     effect="plain"
                     class="tag-key"
                   >
                     Key
+                  </el-tag>
+                  <el-tag
+                    v-if="cdeValueSet(property)"
+                    size="small"
+                    effect="plain"
+                    class="tag-valueset"
+                  >
+                    Value set
                   </el-tag>
                   <el-tag 
                     size="small"
@@ -1149,7 +1172,12 @@ onMounted(async () => {
               <!-- Form Input -->
               <div class="property-input">
                 <component :is="renderFormField(property)" />
-                
+
+                <!-- CDE value-set reference (too large to inline / unpublished) -->
+                <div v-if="cdeValueSet(property)" class="cde-valueset-hint">
+                  {{ cdeValueSetHint(property) }}
+                </div>
+
                 <!-- Validation Error Display -->
                 <div 
                   v-for="error in validationErrors.filter(err => err.instancePath && err.instancePath.includes(property.key))" 
@@ -1497,7 +1525,13 @@ onMounted(async () => {
                     border-color: theme.$gray_3;
                     color: theme.$gray_5;
                   }
-                  
+
+                  :deep(.tag-valueset) {
+                    background-color: theme.$purple_tint;
+                    border-color: theme.$purple_0_7;
+                    color: theme.$purple_2;
+                  }
+
                   :deep(.tag-array) {
                     background-color: theme.$purple_tint;
                     border-color: theme.$purple_0_7;
@@ -1580,6 +1614,16 @@ onMounted(async () => {
                   padding: 4px 8px;
                   background: theme.$red_tint;
                   border: 1px solid theme.$red_1;
+                }
+
+                .cde-valueset-hint {
+                  color: theme.$gray_5;
+                  font-size: 12px;
+                  margin-top: 6px;
+                  padding: 4px 8px;
+                  background: theme.$purple_tint;
+                  border: 1px solid theme.$purple_0_7;
+                  border-radius: 4px;
                 }
               }
             }

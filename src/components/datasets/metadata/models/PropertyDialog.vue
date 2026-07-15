@@ -140,6 +140,24 @@
 
             </div>
 
+            <!-- Common Data Element -->
+            <div class="form-section">
+              <h3 class="section-title">Common Data Element (optional)</h3>
+              <p class="section-help">
+                A <strong>Common Data Element (CDE)</strong> is a standardized, reusable field —
+                a curated name, data type, and set of allowed values — so the same concept
+                (e.g. “Birth sex”) is recorded the same way across datasets. Linking one sets
+                this property’s type and values from the catalog, making your records comparable
+                and mergeable with others.
+              </p>
+              <p class="section-help">
+                New links default to <strong>Required</strong>, meaning the catalog’s allowed
+                values and data type are enforced on your records. Switch to <em>Preferred</em>
+                to keep them as non-binding guidance, or <em>Example</em> for a reference-only link.
+              </p>
+              <CdePicker v-model="propertyForm.cde" @select="onCdeSelect" />
+            </div>
+
             <!-- Property Options -->
             <div class="property-options">
               <h4 class="options-title">Property Options</h4>
@@ -167,7 +185,7 @@
 
                 <el-form-item>
                   <el-checkbox v-model="propertyForm.isSensitive">
-                    Sensitive Data
+                    Sensitive Data / PHI
                   </el-checkbox>
                   <div class="field-help">Mark this property as containing sensitive information</div>
                 </el-form-item>
@@ -339,6 +357,7 @@ import { ElForm, ElFormItem, ElInput, ElSelect, ElOption, ElButton, ElCheckbox, 
 import BfButton from "@/components/shared/bf-button/BfButton.vue";
 import BfDialogHeader from "@/components/shared/bf-dialog-header/BfDialogHeader.vue";
 import DialogBody from "@/components/shared/dialog-body/DialogBody.vue";
+import CdePicker from "@/components/datasets/metadata/models/CdePicker.vue";
 
 // Props
 const props = defineProps({
@@ -389,7 +408,8 @@ const propertyForm = ref({
   isKey: false,
   isSensitive: false,
   allowNull: false,
-  isArray: false
+  isArray: false,
+  cde: null
 })
 
 // Object template state
@@ -598,6 +618,34 @@ const availableFormats = computed(() => {
   return []
 })
 
+// When a CDE is linked, let it drive the property's datatype (not always
+// string) — mirrors the wizard's dataTypeSchema and the server's applyDatatype.
+// Detach (null) leaves the current type untouched.
+const onCdeSelect = (cde) => {
+  if (!cde || !cde.cde_data_type) return
+  switch (cde.cde_data_type) {
+    case 'Number':
+      propertyForm.value.type = 'number'
+      propertyForm.value.format = ''
+      break
+    case 'Date':
+      propertyForm.value.type = 'string'
+      propertyForm.value.format = 'date'
+      break
+    case 'Datetime':
+      propertyForm.value.type = 'string'
+      propertyForm.value.format = 'date-time'
+      break
+    case 'Time':
+      propertyForm.value.type = 'string'
+      propertyForm.value.format = 'time'
+      break
+    default: // Text, Value List, and other/unknown → string
+      propertyForm.value.type = 'string'
+      propertyForm.value.format = ''
+  }
+}
+
 const constraintsSectionTitle = computed(() => {
   if (propertyForm.value.isArray) {
     return `${propertyForm.value.type} Array Constraints`
@@ -680,7 +728,8 @@ watch(() => props.initialPropertyData, (newData) => {
       isKey: false,
       isSensitive: false,
       allowNull: false,
-      isArray: false
+      isArray: false,
+      cde: null
     }
   }
 }, { deep: true, immediate: true })
@@ -1059,6 +1108,16 @@ const handleSave = () => {
     property['x-pennsieve-sensitive'] = true
   }
 
+  // Link to a catalog CDE. Store only the intent { persistent_id, strength } —
+  // for a "required" binding the metadata service materializes the authoritative
+  // allowed values / datatype from the published catalog on save.
+  if (propertyForm.value.cde && propertyForm.value.cde.persistent_id) {
+    property['x-pennsieve-cde'] = {
+      persistent_id: propertyForm.value.cde.persistent_id,
+      strength: propertyForm.value.cde.strength || 'required'
+    }
+  }
+
   // Emit save event with all the data needed
   emit('save', {
     propertyName: propertyForm.value.name,
@@ -1119,7 +1178,14 @@ const handleSave = () => {
         border-radius: 2px;
       }
     }
-    
+
+    .section-help {
+      font-size: 13px;
+      color: theme.$gray_5;
+      line-height: 1.5;
+      margin: -8px 0 16px 0;
+    }
+
     .form-grid {
       display: grid;
       grid-template-columns: 1fr 1fr;
