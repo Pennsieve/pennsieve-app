@@ -12,6 +12,7 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import * as site from '@/site-config/site.json'
 import { useDuckDBStore } from '@/stores/duckdbStore'
+import { SEARCH_COLS, RETRIEVE, COARSE, tokenize, rankCandidates } from '@/stores/cdeSuggestRanker'
 
 const VIEWER_ID = 'cde-catalog'
 const TABLE = 'cde_catalog' // slim list projection (browse/search/facets)
@@ -140,7 +141,8 @@ export const useCdeCatalogStore = defineStore('cdeCatalog', () => {
     //      name/question/aliases/definition + exact/prefix bonuses (precision).
     // Matches only the slim columns (name, question text, definition, source,
     // aliases) — not text buried in the heavy blobs, which aren't in the list file.
-    const SEARCH_COLS = ['cde_name', 'preferred_question_text', 'cde_definition', 'cde_source', 'aliases']
+    // SEARCH_COLS / RETRIEVE / COARSE / rankCandidates come from cdeSuggestRanker
+    // so this SQL and the offline eval harness score identically.
     // opts.dataType (optional): the property's chosen type; boosts type-compatible CDEs.
     const search = async (term, limit = 25, opts = {}) => {
         await ensureLoaded()
@@ -160,21 +162,21 @@ export const useCdeCatalogStore = defineStore('cdeCatalog', () => {
         const terms = tokens.length ? tokens : [t.toLowerCase()]
         const phrase = escapeLiteral(t)
 
-        // Coarse SQL score: phrase-in-name/question dominate; then per-token field hits.
-        const scoreParts = [
-            `(CASE WHEN cde_name ILIKE '%${phrase}%' THEN 200 ELSE 0 END)`,
-            `(CASE WHEN preferred_question_text ILIKE '%${phrase}%' THEN 80 ELSE 0 END)`,
-        ]
+        // Coarse SQL score: phrase-in-name/question dominate; then per-token field
+        // hits. Built from the shared COARSE weights (cdeSuggestRanker) so the SQL
+        // and the eval harness stay in lockstep.
+        const scoreParts = []
+        for (const [col, w] of Object.entries(COARSE.phrase)) {
+            scoreParts.push(`(CASE WHEN ${col} ILIKE '%${phrase}%' THEN ${w} ELSE 0 END)`)
+        }
         const ors = []
         for (const tok of terms) {
             const lt = escapeLiteral(tok)
             for (const c of SEARCH_COLS) ors.push(`${c} ILIKE '%${lt}%'`)
-            scoreParts.push(`(CASE WHEN cde_name ILIKE '%${lt}%' THEN 6 ELSE 0 END)`)
-            scoreParts.push(`(CASE WHEN preferred_question_text ILIKE '%${lt}%' THEN 4 ELSE 0 END)`)
-            scoreParts.push(`(CASE WHEN aliases ILIKE '%${lt}%' THEN 3 ELSE 0 END)`)
-            scoreParts.push(`(CASE WHEN cde_definition ILIKE '%${lt}%' THEN 1 ELSE 0 END)`)
+            for (const [col, w] of Object.entries(COARSE.token)) {
+                scoreParts.push(`(CASE WHEN ${col} ILIKE '%${lt}%' THEN ${w} ELSE 0 END)`)
+            }
         }
-        const RETRIEVE = 300
         const query =
             `SELECT * FROM ${TABLE} WHERE ${ors.join(' OR ')}` +
             ` ORDER BY (${scoreParts.join(' + ')}) DESC, length(cde_name) NULLS LAST LIMIT ${RETRIEVE}`
@@ -577,75 +579,5 @@ function sqlList(vals) {
     return vals.map((v) => `'${escapeLiteral(v)}'`).join(', ')
 }
 
-// --- Lexical suggest ranking (SUGGEST-1) --------------------------------------
-
-const SUGGEST_STOP = new Set([
-    'the', 'a', 'an', 'of', 'and', 'or', 'to', 'in', 'for', 'on', 'by', 'with',
-    'is', 'are', 'at', 'as', 'de', 'per',
-])
-
-function norm(s) {
-    return String(s ?? '').toLowerCase().replace(/\s+/g, ' ').trim()
-}
-
-// Split into meaningful lowercased tokens (drop 1-char + stopwords).
-function tokenize(s) {
-    return (norm(s).match(/[a-z0-9]+/g) || []).filter((t) => t.length > 1 && !SUGGEST_STOP.has(t))
-}
-
-// Map a property's chosen type to the CDE's cde_data_type vocabulary.
-function compatibleType(propType, cdeType) {
-    const p = norm(propType)
-    const c = norm(cdeType)
-    if (!p || !c) return false
-    if (p === 'number' || p === 'integer' || p === 'long' || p === 'double') return c === 'number'
-    if (p === 'date' || p === 'datetime') return c === 'date'
-    if (p === 'boolean' || p === 'enum') return c === 'value list'
-    if (p === 'string' || p === 'text') return c === 'text' || c === 'value list'
-    return false
-}
-
-// Score one candidate against the query. Higher = more relevant.
-function scoreCandidate(c, qNorm, qTokens, dataType) {
-    const name = norm(c.cde_name)
-    const question = norm(c.preferred_question_text)
-    const aliases = Array.isArray(c.aliases) ? c.aliases.map(norm).join(' · ') : ''
-    const def = norm(c.cde_definition)
-    const source = norm(c.cde_source)
-
-    let s = 0
-    // Exact / prefix / substring on the label fields.
-    if (name === qNorm || question === qNorm) s += 120
-    else if (name.startsWith(qNorm) || question.startsWith(qNorm)) s += 50
-    else if (name.includes(qNorm) || question.includes(qNorm)) s += 25
-
-    // Weighted token coverage: a token counts once, at its best-scoring field.
-    const fields = [[name, 6], [question, 4], [aliases, 3], [def, 1], [source, 0.5]]
-    let matched = 0
-    for (const t of qTokens) {
-        let best = 0
-        for (const [text, w] of fields) if (text.includes(t)) best = Math.max(best, w)
-        if (best > 0) {
-            s += best
-            matched++
-        }
-    }
-    // Reward covering more of the query (penalize 1-of-3-token matches).
-    const coverage = qTokens.length ? matched / qTokens.length : 0
-    s *= 0.4 + 0.6 * coverage
-
-    if (dataType && compatibleType(dataType, c.cde_data_type)) s += 5
-    // Prefer concise names on ties.
-    s -= Math.min(name.length, 80) * 0.03
-    return s
-}
-
-// Rank retrieved candidates by relevance to the query (stable, best first).
-function rankCandidates(cands, query, dataType) {
-    const qNorm = norm(query)
-    const qTokens = tokenize(query)
-    return cands
-        .map((c, i) => ({ c, i, s: scoreCandidate(c, qNorm, qTokens, dataType) }))
-        .sort((a, b) => b.s - a.s || a.i - b.i)
-        .map((x) => x.c)
-}
+// Lexical suggest ranking (SUGGEST-1) now lives in cdeSuggestRanker.js so the
+// picker and the offline eval harness score identically.

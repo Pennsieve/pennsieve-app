@@ -1,0 +1,159 @@
+{
+  "generated_at": "2026-07-15T22:04:08.770Z",
+  "catalog_version": "20260715T161304Z",
+  "catalog_records": 23350,
+  "candidates_with_pid": 23350,
+  "retrieve_depth": 300,
+  "sample_per_field": 1500,
+  "ks": [
+    1,
+    5,
+    10,
+    20
+  ],
+  "field_fill_rates": {
+    "cde_name": {
+      "filled": 23350,
+      "total": 23350,
+      "pct": 100
+    },
+    "preferred_question_text": {
+      "filled": 6909,
+      "total": 23350,
+      "pct": 29.6
+    },
+    "cde_definition": {
+      "filled": 23350,
+      "total": 23350,
+      "pct": 100
+    },
+    "cde_source": {
+      "filled": 23350,
+      "total": 23350,
+      "pct": 100
+    },
+    "aliases": {
+      "filled": 1811,
+      "total": 23350,
+      "pct": 7.8
+    },
+    "cde_data_type": {
+      "filled": 23350,
+      "total": 23350,
+      "pct": 100
+    }
+  },
+  "results": [
+    {
+      "field": "preferred_question_text",
+      "mode": "hot",
+      "n_queries": 1500,
+      "recall": {
+        "1": 0.9867,
+        "5": 1,
+        "10": 1,
+        "20": 1
+      },
+      "precision_at_1": 0.9867,
+      "mrr": 0.9927,
+      "retrieval_recall_at_RETRIEVE": 1,
+      "rank_recall_given_retrieved": {
+        "1": 0.9867,
+        "5": 1,
+        "10": 1,
+        "20": 1
+      },
+      "labeled_total": 6556
+    },
+    {
+      "field": "preferred_question_text",
+      "mode": "cold",
+      "n_queries": 1500,
+      "recall": {
+        "1": 0.6967,
+        "5": 0.794,
+        "10": 0.8113,
+        "20": 0.824
+      },
+      "precision_at_1": 0.6967,
+      "mrr": 0.74,
+      "retrieval_recall_at_RETRIEVE": 0.8453,
+      "rank_recall_given_retrieved": {
+        "1": 0.8241,
+        "5": 0.9393,
+        "10": 0.9598,
+        "20": 0.9748
+      },
+      "labeled_total": 6556
+    },
+    {
+      "field": "aliases",
+      "mode": "hot",
+      "n_queries": 1500,
+      "recall": {
+        "1": 0.8507,
+        "5": 0.9753,
+        "10": 0.9867,
+        "20": 0.992
+      },
+      "precision_at_1": 0.8507,
+      "mrr": 0.9094,
+      "retrieval_recall_at_RETRIEVE": 0.9973,
+      "rank_recall_given_retrieved": {
+        "1": 0.8529,
+        "5": 0.9779,
+        "10": 0.9893,
+        "20": 0.9947
+      },
+      "labeled_total": 1901
+    },
+    {
+      "field": "aliases",
+      "mode": "cold",
+      "n_queries": 1500,
+      "recall": {
+        "1": 0.6227,
+        "5": 0.82,
+        "10": 0.8587,
+        "20": 0.8947
+      },
+      "precision_at_1": 0.6227,
+      "mrr": 0.7114,
+      "retrieval_recall_at_RETRIEVE": 0.9533,
+      "rank_recall_given_retrieved": {
+        "1": 0.6531,
+        "5": 0.8601,
+        "10": 0.9007,
+        "20": 0.9385
+      },
+      "labeled_total": 1901
+    }
+  ],
+  "decision": {
+    "verdict": "LEXICAL DECENT — worth investing in the tail (SUGGEST-2 embeddings and/or SUGGEST-4 re-rank).",
+    "cold_recall_at_5": 0.807,
+    "cold_recall_at_20": 0.8594,
+    "cold_mrr": 0.7257,
+    "bottlenecks": [
+      {
+        "field": "preferred_question_text",
+        "kind": "retrieval",
+        "retrieval_recall": 0.8453,
+        "rank_recall_at_5_given_retrieved": 0.9393,
+        "hit_at_1": 0.6967
+      },
+      {
+        "field": "aliases",
+        "kind": "ranking",
+        "retrieval_recall": 0.9533,
+        "rank_recall_at_5_given_retrieved": 0.8601,
+        "hit_at_1": 0.6227
+      }
+    ],
+    "notes": [
+      "question: RETRIEVAL-limited — cold retrieval-recall@300=84.5% (target absent from candidates 15.5% of the time). Substring lexical misses paraphrase/synonymy → SUGGEST-2 embeddings.",
+      "aliases: RANKING-limited — target retrieved 95.3% of the time, but rank-recall@5|retrieved=86.0% and hit@1=62.3%. Candidates present, mis-ordered → SUGGEST-4 LLM re-rank of the top-N.",
+      "overall (cold, avg of field-sets): recall@5=80.7%  recall@20=85.9%  MRR=0.726"
+    ]
+  }
+}
