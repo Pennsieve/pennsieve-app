@@ -31,7 +31,7 @@ import StaticViewer from "../../mixins/static-viewer";
 import GetFileProperty from "../../mixins/get-file-property";
 import Request from "../../mixins/request";
 import Papa from "papaparse";
-import { read, utils } from "xlsx";
+import { read, utils } from "@e965/xlsx";
 import { forEach } from "ramda";
 
 export default {
