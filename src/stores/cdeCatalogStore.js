@@ -334,43 +334,59 @@ export const useCdeCatalogStore = defineStore('cdeCatalog', () => {
     }
 
     // List bundles that have at least one member CDE, with member counts.
+    // Membership is a DIRECT cde -> bundle PART_OF edge (source = cde, target = bundle).
     const listBundles = async () => {
         await ensureBundlesLoaded()
         const query = `
             SELECT to_json(b.data) ->> 'bundle_name' AS bundle_name,
+                   to_json(b.data) ->> 'display_name' AS display_name,
                    to_json(b.data) ->> 'domain' AS domain,
-                   COUNT(DISTINCT cl.target_record_id) AS member_count
+                   to_json(b.data) ->> 'steward_org' AS steward_org,
+                   COUNT(DISTINCT po.source_record_id) AS member_count
             FROM cde_bundle b
             LEFT JOIN cde_rel po ON po.target_record_id = CAST(b.id AS VARCHAR) AND po.relationship_type = 'PART_OF'
-            LEFT JOIN cde_rel cl ON cl.source_record_id = po.source_record_id AND cl.relationship_type = 'CLASSIFIES'
-            GROUP BY 1, 2
+            GROUP BY 1, 2, 3, 4
             HAVING member_count > 0
-            ORDER BY bundle_name`
+            ORDER BY lower(to_json(b.data) ->> 'display_name'), bundle_name`
         const rows = await duck.executeQuery(query, connectionId)
         return rows.map((r) => ({
             bundle_name: r.bundle_name,
+            display_name: r.display_name || r.bundle_name,
             domain: r.domain,
+            steward_org: r.steward_org,
             member_count: Number(r.member_count),
         }))
     }
 
-    // Resolve the member CDE records of a bundle (deduped; a CDE classified into
-    // the bundle under multiple contexts appears once).
+    // Resolve the member CDE records of a bundle (the cdes with a direct
+    // PART_OF edge to it).
     const getBundleMembers = async (bundleName) => {
         if (!bundleName) return []
         await ensureBundlesLoaded()
         const query = `
             SELECT * FROM ${TABLE}
             WHERE CAST(id AS VARCHAR) IN (
-                SELECT cl.target_record_id
+                SELECT po.source_record_id
                 FROM cde_bundle b
                 JOIN cde_rel po ON po.target_record_id = CAST(b.id AS VARCHAR) AND po.relationship_type = 'PART_OF'
-                JOIN cde_rel cl ON cl.source_record_id = po.source_record_id AND cl.relationship_type = 'CLASSIFIES'
                 WHERE (to_json(b.data) ->> 'bundle_name') = '${escapeLiteral(bundleName)}'
             )
             ORDER BY length(cde_name) NULLS LAST`
         const rows = await duck.executeQuery(query, connectionId)
         return rows.map(mapListRow).filter(Boolean)
+    }
+
+    // Full bundle record by name (definition, facets, contexts, num_questions,
+    // steward, nlm_view_url, …) — from the already-loaded cde_bundle table, for
+    // the detail panel. Members come separately from getBundleMembers.
+    const getBundle = async (bundleName) => {
+        if (!bundleName) return null
+        await ensureBundlesLoaded()
+        const query =
+            `SELECT to_json(data) AS data FROM cde_bundle` +
+            ` WHERE (to_json(data) ->> 'bundle_name') = '${escapeLiteral(bundleName)}' LIMIT 1`
+        const rows = await duck.executeQuery(query, connectionId)
+        return rows.length ? parseRow(rows[0]) : null
     }
 
     // persistent_id -> [bundle_name, ...] for every CDE that belongs to a bundle.
@@ -382,8 +398,7 @@ export const useCdeCatalogStore = defineStore('cdeCatalog', () => {
         const query = `
             SELECT cde.persistent_id AS pid, to_json(b.data) ->> 'bundle_name' AS bundle_name
             FROM ${TABLE} cde
-            JOIN cde_rel cl ON cl.target_record_id = CAST(cde.id AS VARCHAR) AND cl.relationship_type = 'CLASSIFIES'
-            JOIN cde_rel po ON po.source_record_id = cl.source_record_id AND po.relationship_type = 'PART_OF'
+            JOIN cde_rel po ON po.source_record_id = CAST(cde.id AS VARCHAR) AND po.relationship_type = 'PART_OF'
             JOIN cde_bundle b ON CAST(b.id AS VARCHAR) = po.target_record_id`
         const rows = await duck.executeQuery(query, connectionId)
         const map = new Map()
@@ -503,6 +518,7 @@ export const useCdeCatalogStore = defineStore('cdeCatalog', () => {
         search,
         getByPersistentId,
         listBundles,
+        getBundle,
         getBundleMembers,
         getBundleMembership,
         getFacetValues,
