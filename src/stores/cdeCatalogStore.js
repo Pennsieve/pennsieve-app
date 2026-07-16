@@ -341,17 +341,21 @@ export const useCdeCatalogStore = defineStore('cdeCatalog', () => {
         await ensureBundlesLoaded()
         const query = `
             SELECT to_json(b.data) ->> 'bundle_name' AS bundle_name,
+                   to_json(b.data) ->> 'display_name' AS display_name,
                    to_json(b.data) ->> 'domain' AS domain,
+                   to_json(b.data) ->> 'steward_org' AS steward_org,
                    COUNT(DISTINCT po.source_record_id) AS member_count
             FROM cde_bundle b
             LEFT JOIN cde_rel po ON po.target_record_id = CAST(b.id AS VARCHAR) AND po.relationship_type = 'PART_OF'
-            GROUP BY 1, 2
+            GROUP BY 1, 2, 3, 4
             HAVING member_count > 0
-            ORDER BY bundle_name`
+            ORDER BY lower(to_json(b.data) ->> 'display_name'), bundle_name`
         const rows = await duck.executeQuery(query, connectionId)
         return rows.map((r) => ({
             bundle_name: r.bundle_name,
+            display_name: r.display_name || r.bundle_name,
             domain: r.domain,
+            steward_org: r.steward_org,
             member_count: Number(r.member_count),
         }))
     }
@@ -372,6 +376,19 @@ export const useCdeCatalogStore = defineStore('cdeCatalog', () => {
             ORDER BY length(cde_name) NULLS LAST`
         const rows = await duck.executeQuery(query, connectionId)
         return rows.map(mapListRow).filter(Boolean)
+    }
+
+    // Full bundle record by name (definition, facets, contexts, num_questions,
+    // steward, nlm_view_url, …) — from the already-loaded cde_bundle table, for
+    // the detail panel. Members come separately from getBundleMembers.
+    const getBundle = async (bundleName) => {
+        if (!bundleName) return null
+        await ensureBundlesLoaded()
+        const query =
+            `SELECT to_json(data) AS data FROM cde_bundle` +
+            ` WHERE (to_json(data) ->> 'bundle_name') = '${escapeLiteral(bundleName)}' LIMIT 1`
+        const rows = await duck.executeQuery(query, connectionId)
+        return rows.length ? parseRow(rows[0]) : null
     }
 
     // persistent_id -> [bundle_name, ...] for every CDE that belongs to a bundle.
@@ -503,6 +520,7 @@ export const useCdeCatalogStore = defineStore('cdeCatalog', () => {
         search,
         getByPersistentId,
         listBundles,
+        getBundle,
         getBundleMembers,
         getBundleMembership,
         getFacetValues,

@@ -64,10 +64,11 @@
             <div v-if="!allBundles.length" class="cg-status">No matching bundles.</div>
             <div v-else class="cg-grid">
               <button v-for="b in pagedBundles" :key="b.bundle_name" class="cg-bundle" @click="openBundle(b)">
-                <div class="cg-bundle-name">{{ b.bundle_name }}</div>
+                <div class="cg-bundle-name">{{ b.display_name || b.bundle_name }}</div>
                 <div class="cg-bundle-meta">
                   {{ b.member_count }} element{{ b.member_count === 1 ? '' : 's' }}
-                  <template v-if="b.domain"> · {{ b.domain }}</template>
+                  <template v-if="b.steward_org"> · {{ b.steward_org }}</template>
+                  <template v-else-if="b.domain"> · {{ b.domain }}</template>
                 </div>
               </button>
             </div>
@@ -167,13 +168,65 @@
         </div>
 
         <div v-else-if="detail.kind === 'bundle'" class="cg-detail">
-          <div v-if="detail.loading" class="cg-status">Loading members…</div>
-          <ul v-else class="cg-member-list">
-            <li v-for="(m, i) in detail.members" :key="i" class="cg-member">
-              <span class="cg-member-name">{{ cdeLabel(m) }}</span>
-              <span class="cg-member-meta">{{ m.cde_data_type }}</span>
-            </li>
-          </ul>
+          <p v-if="detail.bundle && detail.bundle.definition && detail.bundle.definition !== detailTitle" class="cg-def">
+            {{ detail.bundle.definition }}
+          </p>
+
+          <div v-if="detail.bundle" class="cg-field">
+            <div class="cg-field-label">Steward</div>
+            <div>
+              {{ detail.bundle.steward_org || detail.bundle.working_group || '—' }}
+              <template v-if="detail.bundle.registration_status"> · {{ detail.bundle.registration_status }}</template>
+              <template v-if="detail.bundle.nih_endorsed"> · NIH-endorsed</template>
+            </div>
+          </div>
+
+          <div v-if="detail.bundle && detail.bundle.contexts && detail.bundle.contexts.length" class="cg-field">
+            <div class="cg-field-label">Context{{ detail.bundle.contexts.length === 1 ? '' : 's' }}</div>
+            <div class="cg-chips">
+              <span v-for="(c, i) in detail.bundle.contexts" :key="i" class="cg-chip">{{ c }}</span>
+            </div>
+          </div>
+
+          <div v-for="(vals, axis) in bundleFacets(detail.bundle)" :key="axis" class="cg-field">
+            <div class="cg-field-label">{{ axis }}</div>
+            <div class="cg-chips">
+              <span v-for="(v, i) in vals" :key="i" class="cg-chip">{{ v }}</span>
+            </div>
+          </div>
+
+          <div v-if="detail.bundle && detail.bundle.copyright_status" class="cg-field">
+            <div class="cg-field-label">Copyright</div>
+            <div>{{ detail.bundle.copyright_status }}</div>
+          </div>
+
+          <a
+            v-if="detail.bundle && detail.bundle.nlm_view_url"
+            :href="detail.bundle.nlm_view_url"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="cg-nlm-link"
+          >
+            View this form on the NLM CDE Repository →
+          </a>
+
+          <div v-if="detail.bundle && detail.bundle.persistent_id" class="cg-field">
+            <div class="cg-field-label">Persistent ID</div>
+            <code class="cg-code">{{ detail.bundle.persistent_id }}</code>
+          </div>
+
+          <div class="cg-field">
+            <div class="cg-field-label">
+              Member CDEs<template v-if="!detail.loading"> ({{ detail.members.length }})</template>
+            </div>
+            <div v-if="detail.loading" class="cg-status">Loading members…</div>
+            <ul v-else class="cg-member-list">
+              <li v-for="(m, i) in detail.members" :key="i" class="cg-member">
+                <span class="cg-member-name">{{ cdeLabel(m) }}</span>
+                <span class="cg-member-meta">{{ m.cde_data_type }}</span>
+              </li>
+            </ul>
+          </div>
         </div>
       </el-drawer>
     </div>
@@ -213,7 +266,7 @@ const loading = ref(true)
 
 const membership = ref(new Map()) // persistent_id -> [bundle_name, ...]
 const detailVisible = ref(false)
-const detail = reactive({ kind: '', cde: null, bundles: [], members: [], loading: false, bundleName: '' })
+const detail = reactive({ kind: '', cde: null, bundle: null, bundles: [], members: [], loading: false, bundleName: '' })
 
 // Display label: the readable question text when present, else the (sometimes
 // cryptic) canonical name. NLM's cde_name can be a short code (e.g. PhenX
@@ -221,8 +274,19 @@ const detail = reactive({ kind: '', cde: null, bundles: [], members: [], loading
 const cdeLabel = (c) => (c && (c.preferred_question_text || c.cde_name)) || 'Element'
 
 const detailTitle = computed(() =>
-  detail.kind === 'cde' ? cdeLabel(detail.cde) : detail.bundleName || 'Bundle'
+  detail.kind === 'cde'
+    ? cdeLabel(detail.cde)
+    : (detail.bundle && detail.bundle.display_name) || detail.bundleName || 'Bundle'
 )
+
+// Bundle facets ({axis: [[node,node],...]}) -> {axis: ["node › node", ...]} for display.
+const bundleFacets = (b) => {
+  const out = {}
+  for (const [axis, paths] of Object.entries((b && b.facets) || {})) {
+    out[axis] = (paths || []).map((p) => (Array.isArray(p) ? p.join(' › ') : String(p)))
+  }
+  return out
+}
 
 const cdeValues = (c) =>
   ((c && c.permissible_values) || []).map((pv) => pv.label || pv.code || '').filter(Boolean)
@@ -242,7 +306,13 @@ const loadCdes = async () => {
 const loadBundles = async () => {
   const t = term.value.trim().toLowerCase()
   const all = await store.listBundles()
-  allBundles.value = t ? all.filter((b) => b.bundle_name.toLowerCase().includes(t)) : all
+  allBundles.value = t
+    ? all.filter(
+        (b) =>
+          (b.display_name || '').toLowerCase().includes(t) ||
+          b.bundle_name.toLowerCase().includes(t)
+      )
+    : all
   bundlePage.value = 1
 }
 const runSearch = async () => {
@@ -293,11 +363,19 @@ const openCde = async (c) => {
 const showBundle = async (name) => {
   detail.kind = 'bundle'
   detail.bundleName = name
+  detail.bundle = null
   detail.members = []
   detail.loading = true
   detailVisible.value = true
   try {
-    detail.members = await store.getBundleMembers(name)
+    const [full, members] = await Promise.all([store.getBundle(name), store.getBundleMembers(name)])
+    detail.bundle = full
+    // Show members in the form's question order (member_keys) when available.
+    if (full && Array.isArray(full.member_keys) && full.member_keys.length) {
+      const order = new Map(full.member_keys.map((k, i) => [k, i]))
+      members.sort((a, b) => (order.get(a.canonical_key) ?? 1e9) - (order.get(b.canonical_key) ?? 1e9))
+    }
+    detail.members = members
   } catch (e) {
     detail.members = []
   } finally {
