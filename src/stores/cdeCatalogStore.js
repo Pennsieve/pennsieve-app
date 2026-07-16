@@ -273,17 +273,18 @@ export const useCdeCatalogStore = defineStore('cdeCatalog', () => {
     const getFacetMap = async () => {
         if (facetMap) return facetMap
         await ensureClassificationsLoaded()
-        // cls.context/domain/tier are promoted parquet columns. `context` is a real
-        // disease only when the classification is rooted under "Disease" (NINDS);
-        // other stewards root their trees under collection/domain names that aren't
-        // diseases. Take path[0] from the record blob and only treat Disease-rooted
-        // contexts as diseases (domain/tier are unaffected).
+        // cls.context/domain/tier/path_root are all promoted parquet columns, so
+        // this reads small columns via pushdown — never the ~13MB data blob.
+        // `context` is a real disease only when the classification is rooted under
+        // "Disease" (NINDS); other stewards root their trees under collection/domain
+        // names that aren't diseases, so only treat Disease-rooted contexts as
+        // diseases (domain/tier are unaffected).
         const query = `
             SELECT cde.persistent_id AS pid,
                    cls.context AS disease,
                    cls.domain AS domain,
                    cls.tier AS tier,
-                   ((cls.data::JSON) -> 'path' ->> 0) AS path_root
+                   cls.path_root AS path_root
             FROM ${TABLE} cde
             JOIN cde_rel cl ON cl.target_record_id = CAST(cde.id AS VARCHAR) AND cl.relationship_type = 'CLASSIFIES'
             JOIN cde_cls cls ON CAST(cls.id AS VARCHAR) = cl.source_record_id`
@@ -315,7 +316,10 @@ export const useCdeCatalogStore = defineStore('cdeCatalog', () => {
         return i === -1 ? 99 : i
     }
 
-    // Distinct facet values for the filter UI: { diseases, domains, tiers }.
+    // Distinct facet values for the filter UI: { diseases, domains, tiers, stewards }.
+    // stewards comes from the cde slim list's own steward_org column (promoted, and
+    // present on EVERY cde incl. unclassified ones) — the universal browse axis —
+    // so it needs neither the classification load nor the data blob.
     const getFacetValues = async () => {
         if (facetValuesCache) return facetValuesCache
         const map = await getFacetMap()
@@ -327,10 +331,16 @@ export const useCdeCatalogStore = defineStore('cdeCatalog', () => {
             e.domains.forEach((d) => domains.add(d))
             e.tiers.forEach((t) => tiers.add(t))
         }
+        const stewardRows = await duck.executeQuery(
+            `SELECT DISTINCT steward_org FROM ${TABLE}` +
+                ` WHERE steward_org IS NOT NULL AND steward_org <> '' ORDER BY steward_org`,
+            connectionId
+        )
         facetValuesCache = {
             diseases: [...diseases].sort(),
             domains: [...domains].sort(),
             tiers: [...tiers].sort((a, b) => tierRank(a) - tierRank(b)),
+            stewards: stewardRows.map((r) => r.steward_org).filter(Boolean),
         }
         return facetValuesCache
     }
@@ -409,9 +419,13 @@ export const useCdeCatalogStore = defineStore('cdeCatalog', () => {
         const diseases = asList(opts.disease)
         const domains = asList(opts.domain)
         const tiers = asList(opts.tier)
+        const stewards = asList(opts.steward)
         await ensureBundlesLoaded()
         const t = (term || '').trim()
-        const hasFacet = diseases.length > 0 || domains.length > 0 || tiers.length > 0
+        // steward filters on the cde's own column (no classification needed); the
+        // disease/domain/tier facets need the classification map.
+        const hasClassFacet = diseases.length > 0 || domains.length > 0 || tiers.length > 0
+        const hasFacet = hasClassFacet || stewards.length > 0
 
         const [allBundles, membership] = await Promise.all([listBundles(), getBundleMembership()])
         // Facets are CDE-level; when one is active we're doing targeted element
@@ -424,11 +438,12 @@ export const useCdeCatalogStore = defineStore('cdeCatalog', () => {
 
         // Always list CDEs — a sample when browsing (no term/facet), narrowed as
         // the user types or applies facets.
-        const facets = hasFacet ? await getFacetMap() : null
+        const facets = hasClassFacet ? await getFacetMap() : null
         const raw = await search(t, hasFacet ? 500 : limit)
         const cdes = raw
             .filter((c) => {
-                if (!hasFacet) return true
+                if (stewards.length && !stewards.includes(c.steward_org)) return false
+                if (!hasClassFacet) return true
                 const f = facets.get(c.persistent_id)
                 if (!f) return false
                 if (diseases.length && !diseases.some((d) => f.diseases.has(d))) return false
@@ -457,12 +472,16 @@ export const useCdeCatalogStore = defineStore('cdeCatalog', () => {
         const diseases = asList(opts.disease)
         const domains = asList(opts.domain)
         const tiers = asList(opts.tier)
+        const stewards = asList(opts.steward)
         await ensureLoaded()
         if (diseases.length || domains.length || tiers.length) await ensureClassificationsLoaded()
 
         const clauses = []
         const t = (term || '').trim()
         if (t) clauses.push(searchPredicate(t))
+        // steward_org is a promoted column on the slim list itself — filter directly
+        // (covers unclassified cdes too; no classification join, no data blob).
+        if (stewards.length) clauses.push(`${TABLE}.steward_org IN (${sqlList(stewards)})`)
 
         // Correlated EXISTS against the classification edges for this CDE.
         const classExists = (cond) =>
