@@ -294,36 +294,34 @@
         <div class="pf-section-title">Data values</div>
         <el-form label-position="top">
           <el-form-item label="Allowed values">
-            <el-input v-model="manual.enumInput" placeholder="Comma-separated, e.g. Low, Medium, High" />
-            <!-- Prototype: fill allowed values from an ontology subtree -->
-            <div style="margin-top: 8px; width: 100%">
-              <el-input
-                v-model="ontoTerm"
-                placeholder="…or fill from an ontology term's subtree — e.g. diabetes, seizure"
-                @input="runOntoSearch"
-              >
-                <template #prefix><el-icon><Search /></el-icon></template>
-              </el-input>
-              <ul
-                v-if="ontoResults.length"
-                style="list-style: none; margin: 8px 0 0; padding: 0; border: 1px solid var(--el-border-color); border-radius: 4px; max-height: 200px; overflow: auto"
-              >
-                <li
-                  v-for="c in ontoResults"
-                  :key="c.curie"
-                  style="display: flex; justify-content: space-between; gap: 8px; padding: 8px 16px; cursor: pointer"
-                  @click="selectSubtreeRoot(c)"
+            <!-- Type a list, or fill from an ontology term's subtree. -->
+            <template v-if="!subtreeRoot">
+              <el-input v-model="manual.enumInput" placeholder="Comma-separated, e.g. Low, Medium, High" />
+              <div style="margin-top: 8px; width: 100%">
+                <el-input
+                  v-model="ontoTerm"
+                  placeholder="…or fill from an ontology term's subtree — e.g. diabetes, seizure"
+                  @input="runOntoSearch"
                 >
-                  <span>{{ c.label }}</span>
-                  <span style="flex-shrink: 0; font-size: 12px; opacity: 0.6">{{ ontoMeta(c) }}</span>
-                </li>
-              </ul>
-              <!-- Granularity controls once a root is chosen -->
-              <div
-                v-if="subtreeRoot"
-                style="margin-top: 8px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap"
-              >
-                <span style="font-size: 12px">From <strong>{{ subtreeRoot.label }}</strong>:</span>
+                  <template #prefix><el-icon><Search /></el-icon></template>
+                </el-input>
+                <ul v-if="ontoResults.length" class="onto-results">
+                  <li v-for="c in ontoResults" :key="c.curie" @click="selectSubtreeRoot(c)">
+                    <span>{{ c.label }}</span>
+                    <span class="onto-results-meta">{{ ontoMeta(c) }}</span>
+                  </li>
+                </ul>
+              </div>
+            </template>
+
+            <!-- A term is chosen: granularity + a readable preview of the members. -->
+            <div v-else class="onto-subtree">
+              <div class="onto-subtree-head">
+                <span>From <strong>{{ subtreeRoot.label }}</strong>
+                  <span class="onto-subtree-code">{{ subtreeRoot.curie }}</span></span>
+                <el-button text @click="clearSubtree">change</el-button>
+              </div>
+              <div class="onto-subtree-controls">
                 <el-select v-model="subtreeDepth" style="width: 160px" @change="applySubtree">
                   <el-option label="All descendants" value="all" />
                   <el-option label="Direct children" value="1" />
@@ -331,7 +329,19 @@
                   <el-option label="3 levels" value="3" />
                 </el-select>
                 <el-checkbox v-model="subtreeLeaves" @change="applySubtree">Most specific only</el-checkbox>
-                <el-button text @click="clearSubtree">clear</el-button>
+              </div>
+              <div v-if="valueDomain" class="onto-subtree-count">
+                {{ valueDomain.count.toLocaleString() }}
+                value{{ valueDomain.count === 1 ? '' : 's' }} · {{ subtreeScopeLabel }}
+              </div>
+              <ul v-if="subtreePreview.length" class="onto-subtree-list">
+                <li v-for="m in subtreePreview" :key="m.curie">
+                  <span class="onto-subtree-item-label">{{ m.label }}</span>
+                  <span class="onto-subtree-code">{{ m.curie }}</span>
+                </li>
+              </ul>
+              <div v-if="valueDomain && valueDomain.count > subtreePreview.length" class="onto-subtree-more">
+                …and {{ (valueDomain.count - subtreePreview.length).toLocaleString() }} more
               </div>
               <div v-if="subtreeNote" class="wiz-hint" style="margin-top: 6px">{{ subtreeNote }}</div>
             </div>
@@ -410,6 +420,15 @@ const subtreeDepth = ref('all') // 'all' | '1' | '2' | '3'
 const subtreeLeaves = ref(false)
 const valueDomain = ref(null) // the materialized ontology-subtree value domain (or null)
 const SUBTREE_INLINE_CAP = 512
+const PREVIEW_CAP = 200 // rows rendered in the selection preview (large sets show a sample + count)
+const subtreePreview = ref([]) // [{ curie, label }] — a readable preview of the resolved members
+
+const subtreeScopeLabel = computed(() => {
+  const vd = valueDomain.value
+  if (!vd) return ''
+  const depth = vd.max_depth == null ? 'all descendants' : `depth ≤ ${vd.max_depth}`
+  return depth + (vd.leaves_only ? ', most-specific only' : '')
+})
 
 // A property's values are a controlled set when an ontology subtree is chosen or
 // an allowed-values list is typed in. Then length/pattern don't apply — the value
@@ -443,7 +462,10 @@ const selectSubtreeRoot = (term) => {
 const clearSubtree = () => {
   subtreeRoot.value = null
   valueDomain.value = null
+  subtreePreview.value = []
   subtreeNote.value = ''
+  ontoTerm.value = ''
+  ontoResults.value = []
 }
 
 // Resolve the value set from the chosen root + granularity (depth / leaves-only)
@@ -459,9 +481,6 @@ const applySubtree = async () => {
     const maxDepth = subtreeDepth.value === 'all' ? null : Number(subtreeDepth.value)
     const descs = await ontology.descendants(root.curie, { maxDepth, leavesOnly: subtreeLeaves.value, limit: 10000 })
     const memberTerms = subtreeLeaves.value ? descs : [{ curie: root.curie, label: root.label }, ...descs]
-    const scope =
-      (subtreeDepth.value === 'all' ? 'all descendants' : `depth ≤ ${subtreeDepth.value}`) +
-      (subtreeLeaves.value ? ', most-specific only' : '')
 
     const overCap = memberTerms.length > SUBTREE_INLINE_CAP
     valueDomain.value = {
@@ -476,19 +495,17 @@ const applySubtree = async () => {
       over_cap: overCap,
       members: overCap ? null : memberTerms.map((m) => ({ code: m.curie, label: m.label })),
     }
-
-    if (overCap) {
-      manual.enumInput = '' // don't inline; stored as a subtree reference at build
-      subtreeNote.value =
-        `${memberTerms.length} values from “${root.label}” (${scope}) — over the ${SUBTREE_INLINE_CAP} inline cap, ` +
-        `so this is stored as a subtree reference (root + version + granularity) enforced by a membership check, not an inline list. ` +
-        `Narrow the root or lower the depth to inline it.`
-    } else {
-      manual.enumInput = memberTerms.map((m) => m.curie).join(', ') // codes; labels attached at build
-      subtreeNote.value = `${memberTerms.length} values from “${root.label}” (${scope}) — inlined as an enum with display labels.`
-    }
+    // Readable preview (labels, not codes). enumInput stays empty — the schema is
+    // built from valueDomain, so we never dump raw curies into the visible box.
+    subtreePreview.value = memberTerms.slice(0, PREVIEW_CAP).map((m) => ({ curie: m.curie, label: m.label }))
+    manual.enumInput = ''
+    subtreeNote.value = overCap
+      ? `Over the ${SUBTREE_INLINE_CAP}-value inline cap — stored as a subtree reference (root + version + granularity) ` +
+        `and enforced by a membership check rather than an inline list. Narrow the root or lower the depth to inline it.`
+      : ''
   } catch (e) {
     valueDomain.value = null
+    subtreePreview.value = []
     subtreeNote.value = 'Could not load subtree: ' + (e?.message || e)
   }
 }
@@ -1085,6 +1102,90 @@ function manualValueSchema() {
   :deep(.el-form-item) {
     flex: 1;
   }
+}
+
+/* Ontology term search results */
+.onto-results {
+  list-style: none;
+  width: 100%;
+  margin: 8px 0 0;
+  padding: 0;
+  border: 1px solid theme.$gray_2;
+  border-radius: 4px;
+  max-height: 200px;
+  overflow: auto;
+  li {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 8px 12px;
+    cursor: pointer;
+    &:hover {
+      background: theme.$gray_1;
+    }
+  }
+}
+.onto-results-meta {
+  flex-shrink: 0;
+  font-size: 12px;
+  color: theme.$gray_4;
+}
+
+/* Selected-subtree preview */
+.onto-subtree {
+  width: 100%;
+  border: 1px solid theme.$gray_2;
+  border-radius: 4px;
+  padding: 12px;
+}
+.onto-subtree-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 13px;
+  color: theme.$gray_6;
+}
+.onto-subtree-code {
+  font-size: 11px;
+  color: theme.$gray_4;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+.onto-subtree-controls {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 8px;
+}
+.onto-subtree-count {
+  margin-top: 8px;
+  font-size: 12px;
+  color: theme.$gray_5;
+}
+.onto-subtree-list {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 6px 0 0;
+  border-top: 1px solid theme.$gray_1;
+  max-height: 180px;
+  overflow: auto;
+  li {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 3px 0;
+  }
+}
+.onto-subtree-item-label {
+  color: theme.$gray_6;
+  font-size: 13px;
+}
+.onto-subtree-more {
+  margin-top: 6px;
+  font-size: 12px;
+  color: theme.$gray_4;
 }
 .wiz-manual-flags {
   display: flex;
