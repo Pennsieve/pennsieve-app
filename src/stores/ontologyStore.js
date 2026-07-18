@@ -29,87 +29,111 @@ export const useOntologyStore = defineStore('ontology', () => {
     const duck = useDuckDBStore()
 
     const loading = ref(false)
-    const loaded = ref(false)
+    const loaded = ref(false) // every ontology loaded (ensureLoaded)
     const error = ref('')
-    const sources = ref([]) // [{ ontology, ontology_version, count, table }]
+    const available = ref([]) // registry entries [{ ontology, slug, build, path, edges_path, ... }]
+    const sources = ref([]) // loaded [{ ontology, ontology_version, count, table, edgesTable }]
 
     let connectionId = null
-    let loadPromise = null
+    let registryPromise = null
+    let loadAllPromise = null
+    const ontologyPromises = {} // ontology name -> in-flight load (single-flight per ontology)
 
     const baseUrl = computed(() => (site.cdeCatalogUrl || '').replace(/\/+$/, ''))
     const isConfigured = computed(() => !!baseUrl.value)
 
-    // Read the registry and load every listed ontology's current slice into its
-    // own DuckDB table (search UNIONs across them). Single-flight.
-    const ensureLoaded = async () => {
-        if (loaded.value) return
-        if (loadPromise) return loadPromise
+    // Fetch the registry (cheap: one small JSON) and open the DuckDB connection —
+    // but load NO slices. This is all the browser needs before it can list the
+    // ontologies and lazily load the selected one. Single-flight.
+    const ensureRegistry = async () => {
+        if (available.value.length) return
+        if (registryPromise) return registryPromise
         if (!baseUrl.value) {
             error.value = 'Catalog URL is not configured (site.cdeCatalogUrl).'
             throw new Error(error.value)
         }
-
-        loading.value = true
-        error.value = ''
-        loadPromise = (async () => {
+        registryPromise = (async () => {
             try {
                 const registry = await fetchJson(`${baseUrl.value}/ontology/sources.json`)
                 const ontologies = registry.ontologies || []
                 if (!ontologies.length) throw new Error('ontology registry is empty')
-
-                const loadedSources = []
-                for (const o of ontologies) {
-                    const table = 'onto_' + String(o.slug || '').replace(/[^a-z0-9_]/gi, '_')
-                    // Register each slice as a VIEW (materialize:false), not a table:
-                    // DuckDB reads the parquet footer and then range-fetches only the
-                    // row-groups/columns a query touches (and caches them), instead of
-                    // downloading every slice — incl. the large definition column — up
-                    // front. Registration is metadata-only, so keeping all ontologies
-                    // registered stays cheap while cross-ontology search still works.
-                    // Slice is immutable per build, so key the cached load by build.
-                    await duck.loadParquetUrl(
-                        `${baseUrl.value}/${o.path}`,
-                        table,
-                        { materialize: false },
-                        VIEWER_ID,
-                        `${table}_${o.build}`
-                    )
-                    // is_a edges sidecar (sorted by parent) — a fast children lookup
-                    // for the tree. Optional: older slices predate it, in which case
-                    // children() falls back to scanning the parents column.
-                    let edgesTable = null
-                    if (o.edges_path) {
-                        edgesTable = table + '_edges'
-                        await duck.loadParquetUrl(
-                            `${baseUrl.value}/${o.edges_path}`,
-                            edgesTable,
-                            { materialize: false },
-                            VIEWER_ID,
-                            `${edgesTable}_${o.build}`
-                        )
-                    }
-                    loadedSources.push({
-                        ontology: o.ontology,
-                        ontology_version: o.ontology_version,
-                        count: o.count,
-                        table,
-                        edgesTable,
-                    })
-                }
-                sources.value = loadedSources
-
+                available.value = ontologies
                 const { connectionId: cid } = await duck.createConnection(VIEWER_ID)
                 connectionId = cid
-                loaded.value = true
+            } catch (e) {
+                error.value = e?.message || String(e)
+                throw e
+            } finally {
+                registryPromise = null
+            }
+        })()
+        return registryPromise
+    }
+
+    // Load one ontology's term + edges views on demand (single-flight per ontology).
+    // Each is registered as a VIEW (materialize:false): DuckDB reads the parquet
+    // footer, then range-fetches only the row-groups/columns a query touches (and
+    // caches them) — no upfront full download. Loading just the selected ontology
+    // keeps the browser's first paint fast; the picker loads them all via
+    // ensureLoaded for cross-ontology search.
+    const ensureOntology = async (ontologyName) => {
+        await ensureRegistry()
+        if (sources.value.some((s) => s.ontology === ontologyName)) return
+        if (ontologyPromises[ontologyName]) return ontologyPromises[ontologyName]
+        const o = available.value.find((e) => e.ontology === ontologyName)
+        if (!o) return
+
+        loading.value = true
+        ontologyPromises[ontologyName] = (async () => {
+            try {
+                const table = 'onto_' + String(o.slug || '').replace(/[^a-z0-9_]/gi, '_')
+                // Slice is immutable per build, so key the cached load by build.
+                const loads = [
+                    duck.loadParquetUrl(`${baseUrl.value}/${o.path}`, table, { materialize: false }, VIEWER_ID, `${table}_${o.build}`),
+                ]
+                // is_a edges sidecar (sorted by parent) — a fast children lookup for
+                // the tree. Optional: older slices predate it, in which case children()
+                // falls back to scanning the parents column. Loaded in parallel.
+                let edgesTable = null
+                if (o.edges_path) {
+                    edgesTable = table + '_edges'
+                    loads.push(
+                        duck.loadParquetUrl(`${baseUrl.value}/${o.edges_path}`, edgesTable, { materialize: false }, VIEWER_ID, `${edgesTable}_${o.build}`)
+                    )
+                }
+                await Promise.all(loads)
+                if (!sources.value.some((s) => s.ontology === ontologyName)) {
+                    sources.value = [
+                        ...sources.value,
+                        { ontology: o.ontology, ontology_version: o.ontology_version, count: o.count, table, edgesTable },
+                    ]
+                }
             } catch (e) {
                 error.value = e?.message || String(e)
                 throw e
             } finally {
                 loading.value = false
-                loadPromise = null
+                delete ontologyPromises[ontologyName]
             }
         })()
-        return loadPromise
+        return ontologyPromises[ontologyName]
+    }
+
+    // Load every ontology (cross-ontology search). Single-flight; ontologies load
+    // in parallel rather than one blocking round-trip each.
+    const ensureLoaded = async () => {
+        if (loaded.value) return
+        if (loadAllPromise) return loadAllPromise
+        loadAllPromise = (async () => {
+            try {
+                await ensureRegistry()
+                await Promise.all(available.value.map((o) => ensureOntology(o.ontology)))
+                loaded.value = true
+            } finally {
+                loadAllPromise = null
+            }
+        })()
+        return loadAllPromise
     }
 
     // Search-as-you-type over label + synonyms (+ exact curie), across all (or a
@@ -119,7 +143,14 @@ export const useOntologyStore = defineStore('ontology', () => {
     const search = async (rawTerm, { limit = 20, ontologies = null } = {}) => {
         const term = String(rawTerm || '').trim()
         if (!term) return []
-        await ensureLoaded()
+        // Scoped search (the browser) loads only the named ontologies; an unscoped
+        // search (the picker) loads all for cross-ontology matching.
+        if (ontologies && ontologies.length) {
+            await ensureRegistry()
+            await Promise.all(ontologies.map((o) => ensureOntology(o)))
+        } else {
+            await ensureLoaded()
+        }
 
         const t = esc(term)
         const like = `'%${t}%'`
@@ -203,7 +234,7 @@ export const useOntologyStore = defineStore('ontology', () => {
     // is reached by tree/breadcrumb navigation (search already returns full rows).
     // Returns the normalized row or null.
     const getByCurie = async (curie) => {
-        await ensureLoaded()
+        await ensureRegistry()
         if (!sources.value.length) return null
         const c = esc(curie)
         const tables = sources.value.map((s) => `SELECT ${COLUMNS} FROM ${s.table}`)
@@ -229,7 +260,7 @@ export const useOntologyStore = defineStore('ontology', () => {
     // are in this ontology's slice (parents empty, or all point outside). Each row
     // carries has_children so the tree can decide whether to render an expand arrow.
     const roots = async (ontology, { limit = 300 } = {}) => {
-        await ensureLoaded()
+        await ensureOntology(ontology)
         const table = tableFor(ontology)
         if (!table) return []
         const query = `
@@ -254,7 +285,7 @@ export const useOntologyStore = defineStore('ontology', () => {
     // precomputed. Fall back to scanning the parents string column for slices
     // published before edges existed.
     const children = async (curie, { limit = 3000 } = {}) => {
-        await ensureLoaded()
+        await ensureRegistry()
         if (!sources.value.length) return []
         const c = esc(curie)
         const lim = Number(limit) || 3000
@@ -287,7 +318,7 @@ export const useOntologyStore = defineStore('ontology', () => {
     // from the start — the breadcrumb trail above the tree. Recursion is depth-capped
     // to stay bounded on diamond-shaped DAGs. Returns [{ curie, label, ontology, depth }].
     const lineage = async (curie, { limit = 100, maxDepth = 50 } = {}) => {
-        await ensureLoaded()
+        await ensureRegistry()
         if (!sources.value.length) return []
         const c = esc(curie)
         const query = `
@@ -333,7 +364,8 @@ export const useOntologyStore = defineStore('ontology', () => {
     }
 
     return {
-        loading, loaded, error, sources, isConfigured, ensureLoaded,
+        loading, loaded, error, available, sources, isConfigured,
+        ensureRegistry, ensureOntology, ensureLoaded,
         search, descendants, ancestors,
         getByCurie, roots, children, lineage,
     }

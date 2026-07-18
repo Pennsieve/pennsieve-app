@@ -18,7 +18,7 @@
           @change="onOntologyChange"
         >
           <el-option
-            v-for="s in store.sources"
+            v-for="s in browsableOntologies"
             :key="s.ontology"
             :label="ontologyOptionLabel(s)"
             :value="s.ontology"
@@ -71,7 +71,7 @@
           </template>
         </nav>
 
-        <div v-if="treeLoading" class="ob-status">Loading ontology…</div>
+        <div v-if="booting || ontologyLoading" class="ob-status">Loading ontology…</div>
         <el-tree
           v-else
           :key="treeKey"
@@ -185,7 +185,8 @@ const store = useOntologyStore()
 const CHILD_DISPLAY_CAP = 60 // chips in the drawer "narrower terms" list
 
 const selectedOntology = ref('')
-const treeLoading = ref(true)
+const booting = ref(true) // fetching the registry
+const ontologyLoading = ref(false) // loading the selected ontology's slice
 
 // Tree is rooted at `focus` (its direct children are the top level); when focus is
 // null the top level is the ontology's roots. Remounting on treeKey re-runs the
@@ -214,6 +215,8 @@ const treeProps = {
 const treeKey = computed(() => `${selectedOntology.value}::${focus.value ? focus.value.curie : 'roots'}`)
 const defaultExpandedKeys = computed(() => []) // top level is loaded directly; nothing to pre-expand
 
+// UCUM is a flat unit list (no is_a hierarchy) — not a browsable tree.
+const browsableOntologies = computed(() => store.available.filter((o) => o.ontology !== 'UCUM'))
 const ontologyOptionLabel = (s) =>
   s.ontology_version ? `${s.ontology} · ${s.ontology_version}` : s.ontology
 const focusableSel = computed(() => sel.curie && (!focus.value || focus.value.curie !== sel.curie))
@@ -329,20 +332,38 @@ const selectResult = async (r) => {
   openTerm(r) // and open its detail
 }
 
-const onOntologyChange = () => {
+// Load only the selected ontology's slice (+edges) — not every ontology.
+const loadSelected = async () => {
+  if (!selectedOntology.value) return
+  ontologyLoading.value = true
+  try {
+    await store.ensureOntology(selectedOntology.value)
+  } catch (e) {
+    console.error('Ontology load failed:', e)
+  } finally {
+    ontologyLoading.value = false
+  }
+}
+
+const onOntologyChange = async () => {
   clearFocus()
   term.value = ''
   results.value = []
+  await loadSelected()
 }
 
 onMounted(async () => {
   try {
-    await store.ensureLoaded()
-    if (store.sources.length) selectedOntology.value = store.sources[0].ontology
+    await store.ensureRegistry()
+    const first = browsableOntologies.value[0] || store.available[0]
+    if (first) {
+      selectedOntology.value = first.ontology
+      await loadSelected()
+    }
   } catch (e) {
     console.error('Ontology browser load failed:', e)
   } finally {
-    treeLoading.value = false
+    booting.value = false
   }
 })
 </script>
