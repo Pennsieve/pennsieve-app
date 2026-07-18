@@ -54,7 +54,10 @@
           </span>
           <span class="ob-onto-title">{{ ontologyMeta(o.ontology).title }}</span>
           <span class="ob-onto-desc">{{ ontologyMeta(o.ontology).desc }}</span>
-          <span class="ob-onto-count">{{ formatCount(o.count) }} terms</span>
+          <span class="ob-onto-meta">
+            <span class="ob-onto-count"><el-icon><List /></el-icon>{{ formatCount(o.count) }} terms</span>
+            <span class="ob-onto-rel" :title="releaseTitle(o)"><el-icon><Calendar /></el-icon>{{ releaseDate(o) }}</span>
+          </span>
         </button>
       </div>
 
@@ -247,7 +250,7 @@
 
 <script setup>
 import { ref, reactive, computed, onMounted } from 'vue'
-import { Search, Check, PriceTag, Collection, QuestionFilled, InfoFilled } from '@element-plus/icons-vue'
+import { Search, Check, PriceTag, Collection, QuestionFilled, InfoFilled, Calendar, List } from '@element-plus/icons-vue'
 import debounce from 'lodash.debounce'
 import { useOntologyStore } from '@/stores/ontologyStore'
 
@@ -305,6 +308,21 @@ const ONTOLOGY_META = {
 }
 const ontologyMeta = (name) => ONTOLOGY_META[name] || { title: name, desc: '' }
 const formatCount = (n) => Number(n || 0).toLocaleString()
+
+// The upstream release date is embedded in most ontology_version strings
+// (e.g. "releases/2026-07-06"); fall back to our sync date when it isn't
+// (e.g. ChEBI's "chebi/253"). The tooltip carries the exact version + sync.
+const syncedDate = (o) => String(o.built_at || '').slice(0, 10)
+const releaseDate = (o) => {
+  const m = String(o.ontology_version || '').match(/\d{4}-\d{2}-\d{2}/)
+  return m ? m[0] : syncedDate(o)
+}
+const releaseTitle = (o) => {
+  const parts = []
+  if (o.ontology_version) parts.push(`Version ${o.ontology_version}`)
+  if (syncedDate(o)) parts.push(`synced ${syncedDate(o)}`)
+  return parts.join(' · ')
+}
 
 // Preferred card order (and default landing = first). Anything not listed sorts
 // after, alphabetically. UCUM is a flat unit list — not a browsable tree.
@@ -583,11 +601,26 @@ onMounted(async () => {
   font-size: 12px;
   color: theme.$gray_5;
   line-height: 1.4;
+  min-height: 4.2em; /* reserve 3 lines so the meta row aligns across cards */
 }
-.ob-onto-count {
-  margin-top: 2px;
+.ob-onto-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between; /* count on the left, release date on the right */
+  gap: 12px;
+  margin-top: auto; /* pin the count + date to the bottom of the card */
+  padding-top: 4px;
+}
+.ob-onto-count,
+.ob-onto-rel {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   font-size: 11px;
   color: theme.$gray_4;
+  .el-icon {
+    font-size: 12px;
+  }
 }
 .ob-request-row {
   margin: 0 0 24px;
