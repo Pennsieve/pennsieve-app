@@ -2,15 +2,39 @@
   <bf-stage>
     <div class="ontology-browser">
       <div class="ob-head">
-        <h2>Ontology Browser</h2>
-        <p class="ob-sub">
-          Standard biomedical vocabularies you can reuse across your workspace. Pick a vocabulary,
-          then search or browse its hierarchy to find the right term.
-        </p>
-        <div class="ob-uses">
-          <span class="ob-use"><el-icon><PriceTag /></el-icon> Tag datasets with standard terms</span>
-          <span class="ob-use"><el-icon><Collection /></el-icon> Use a term’s subtree as a value set in metadata models</span>
+        <div class="ob-title-row">
+          <h2>Ontology Browser</h2>
+          <el-popover placement="bottom-start" :width="380" trigger="click" popper-class="ob-help-popper">
+            <template #reference>
+              <button type="button" class="ob-help-link">
+                <el-icon><QuestionFilled /></el-icon> How it works
+              </button>
+            </template>
+            <div class="ob-help">
+              <p class="ob-help-lead">
+                An <strong>ontology</strong> is a standard, shared vocabulary — biomedical terms with
+                agreed meanings, stable IDs, and <code>is_a</code> relationships that place each term
+                in a hierarchy (e.g. <em>type 2 diabetes</em> is a kind of <em>diabetes</em>).
+              </p>
+              <div class="ob-help-item">
+                <div class="ob-help-h"><el-icon><PriceTag /></el-icon> Tag datasets</div>
+                <p>Attach a term to a dataset so it's described in a standard way — making it easier
+                  to find and compare datasets across the platform.</p>
+              </div>
+              <div class="ob-help-item">
+                <div class="ob-help-h"><el-icon><Collection /></el-icon> Value sets in metadata</div>
+                <p>Pick a term and use its subtree (all narrower terms) as the allowed values for a
+                  property in a metadata model — so records are filled in with consistent, standardized
+                  codes.</p>
+              </div>
+            </div>
+          </el-popover>
         </div>
+        <p class="ob-sub">
+          Standard biomedical vocabularies you can reuse across your workspace — <strong>tag
+          datasets</strong> with standard terms and define <strong>value sets</strong> for metadata
+          properties. Pick a vocabulary, then search or browse its hierarchy to find the right term.
+        </p>
       </div>
 
       <!-- Vocabulary chooser -->
@@ -32,6 +56,22 @@
           <span class="ob-onto-desc">{{ ontologyMeta(o.ontology).desc }}</span>
           <span class="ob-onto-count">{{ formatCount(o.count) }} terms</span>
         </button>
+      </div>
+
+      <div v-if="!booting && browsableOntologies.length" class="ob-request-row">
+        <el-popover placement="top-start" :width="240" trigger="hover" popper-class="ob-help-popper">
+          <template #reference>
+            <span class="ob-request-icon" tabindex="0" role="button" aria-label="Request a different vocabulary">
+              <el-icon><InfoFilled /></el-icon> Missing a vocabulary?
+            </span>
+          </template>
+          <div class="ob-help ob-help-sm">
+            Don't see the vocabulary you need?
+            <a href="https://discover.pennsieve.io/support" target="_blank" rel="noopener noreferrer">
+              Contact our team →
+            </a>
+          </div>
+        </el-popover>
       </div>
 
       <div class="ob-controls">
@@ -187,7 +227,7 @@
 
 <script setup>
 import { ref, reactive, computed, onMounted } from 'vue'
-import { Search, Check, PriceTag, Collection } from '@element-plus/icons-vue'
+import { Search, Check, PriceTag, Collection, QuestionFilled, InfoFilled } from '@element-plus/icons-vue'
 import debounce from 'lodash.debounce'
 import { useOntologyStore } from '@/stores/ontologyStore'
 
@@ -400,10 +440,32 @@ onMounted(async () => {
 .ontology-browser {
   min-height: 500px;
 }
+.ob-title-row {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+}
 .ob-head h2 {
   font-size: 20px;
   line-height: 24px;
   margin: 0;
+}
+.ob-help-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  font-size: 13px;
+  color: theme.$purple_2;
+  &:hover {
+    text-decoration: underline;
+  }
+  .el-icon {
+    font-size: 15px;
+  }
 }
 .ob-sub {
   color: theme.$gray_5;
@@ -415,24 +477,6 @@ onMounted(async () => {
     font-size: 12px;
   }
 }
-.ob-uses {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px 20px;
-  margin-bottom: 24px;
-}
-.ob-use {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 13px;
-  color: theme.$gray_5;
-  .el-icon {
-    color: theme.$purple_2;
-    font-size: 15px;
-  }
-}
-
 /* Vocabulary chooser — a row of selectable cards */
 .ob-onto-cards {
   display: grid;
@@ -493,6 +537,23 @@ onMounted(async () => {
   margin-top: 2px;
   font-size: 11px;
   color: theme.$gray_4;
+}
+.ob-request-row {
+  margin: 0 0 24px;
+}
+.ob-request-icon {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  color: theme.$gray_4;
+  cursor: default;
+  .el-icon {
+    font-size: 14px;
+  }
+  &:hover {
+    color: theme.$purple_2;
+  }
 }
 .ob-controls {
   display: flex;
@@ -674,6 +735,58 @@ onMounted(async () => {
   text-decoration: none;
   &:hover {
     text-decoration: underline;
+  }
+}
+</style>
+
+<!-- Popover content is teleported to <body>, so it can't be styled by the scoped
+     block above; namespace it via popper-class instead. -->
+<style lang="scss">
+@use '../../../../styles/theme' as theme;
+
+.ob-help-popper.el-popover {
+  .ob-help-lead {
+    margin: 0 0 12px;
+    font-size: 13px;
+    line-height: 1.5;
+    color: theme.$gray_6;
+    code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 12px;
+    }
+  }
+  .ob-help-item {
+    margin-top: 12px;
+    p {
+      margin: 4px 0 0;
+      font-size: 12px;
+      line-height: 1.5;
+      color: theme.$gray_5;
+    }
+  }
+  .ob-help-h {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    font-weight: 500;
+    color: theme.$gray_6;
+    .el-icon {
+      color: theme.$purple_2;
+      font-size: 15px;
+    }
+  }
+  .ob-help-sm {
+    font-size: 13px;
+    line-height: 1.5;
+    color: theme.$gray_6;
+    a {
+      color: theme.$purple_2;
+      text-decoration: none;
+      &:hover {
+        text-decoration: underline;
+      }
+    }
   }
 }
 </style>
