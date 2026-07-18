@@ -297,14 +297,20 @@
             <!-- Type a list, or fill from an ontology term's subtree. -->
             <template v-if="!subtreeRoot">
               <el-input v-model="manual.enumInput" placeholder="Comma-separated, e.g. Low, Medium, High" />
-              <div style="margin-top: 8px; width: 100%">
+              <div style="margin-top: 8px; width: 100%; display: flex; gap: 8px">
+                <el-select v-model="ontoScope" style="width: 150px" @change="runOntoSearch">
+                  <el-option v-for="o in ontoOptions" :key="o.ontology" :label="o.ontology" :value="o.ontology" />
+                </el-select>
                 <el-input
                   v-model="ontoTerm"
-                  placeholder="…or fill from an ontology term's subtree — e.g. diabetes, seizure"
+                  style="flex: 1"
+                  :placeholder="`…or fill from a ${ontoScope || 'an ontology'} term's subtree — e.g. diabetes`"
                   @input="runOntoSearch"
                 >
                   <template #prefix><el-icon><Search /></el-icon></template>
                 </el-input>
+              </div>
+              <div style="width: 100%">
                 <ul v-if="ontoResults.length" class="onto-results">
                   <li v-for="c in ontoResults" :key="c.curie" @click="selectSubtreeRoot(c)">
                     <span>{{ c.label }}</span>
@@ -392,7 +398,7 @@
 // Single-screen property builder (progressive disclosure — no inner steps).
 // Rendered inline in the create-model Properties step, and inside a dialog by
 // AddPropertyWizard. Emits `save` with an array of property defs.
-import { ref, reactive, computed } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Link, EditPen, Search, Close } from '@element-plus/icons-vue'
 import debounce from 'lodash.debounce'
@@ -436,11 +442,30 @@ const hasControlledValues = computed(
   () => !!valueDomain.value || !!(manual.enumInput && manual.enumInput.trim())
 )
 
+// Scope the term search to one ontology: searching every ontology at once scans
+// ~600k+ terms (NCiT + ChEBI + …) and is slow; a single ontology loads only that
+// slice and scans only its columns.
+const ontoScope = ref('')
+const ontoOptions = computed(() => (ontology.available || []).filter((o) => o.ontology !== 'UCUM'))
+
+onMounted(async () => {
+  try {
+    await ontology.ensureRegistry()
+    if (!ontoScope.value && ontoOptions.value.length) {
+      const pref = ontoOptions.value.find((o) => o.ontology === 'MONDO') || ontoOptions.value[0]
+      ontoScope.value = pref.ontology
+    }
+  } catch {
+    /* registry unavailable — search falls back to all loaded ontologies */
+  }
+})
+
 const runOntoSearch = debounce(async () => {
   const q = ontoTerm.value.trim()
   if (!q) { ontoResults.value = []; return }
   try {
-    ontoResults.value = (await ontology.search(q, { limit: 6 })).filter((r) => r.ontology !== 'UCUM')
+    const ontologies = ontoScope.value ? [ontoScope.value] : null
+    ontoResults.value = (await ontology.search(q, { limit: 8, ontologies })).filter((r) => r.ontology !== 'UCUM')
   } catch (e) {
     ontoResults.value = []
   }
