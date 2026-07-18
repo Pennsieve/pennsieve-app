@@ -324,25 +324,28 @@
                 style="margin-top: 8px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap"
               >
                 <span style="font-size: 12px">From <strong>{{ subtreeRoot.label }}</strong>:</span>
-                <el-select v-model="subtreeDepth" size="small" style="width: 160px" @change="applySubtree">
+                <el-select v-model="subtreeDepth" style="width: 160px" @change="applySubtree">
                   <el-option label="All descendants" value="all" />
                   <el-option label="Direct children" value="1" />
                   <el-option label="2 levels" value="2" />
                   <el-option label="3 levels" value="3" />
                 </el-select>
-                <el-checkbox v-model="subtreeLeaves" size="small" @change="applySubtree">Most specific only</el-checkbox>
-                <el-button text size="small" @click="clearSubtree">clear</el-button>
+                <el-checkbox v-model="subtreeLeaves" @change="applySubtree">Most specific only</el-checkbox>
+                <el-button text @click="clearSubtree">clear</el-button>
               </div>
               <div v-if="subtreeNote" class="wiz-hint" style="margin-top: 6px">{{ subtreeNote }}</div>
             </div>
           </el-form-item>
-          <template v-if="manual.type === 'string'">
+          <template v-if="manual.type === 'string' && !hasControlledValues">
             <div class="wiz-two">
               <el-form-item label="Min length"><el-input v-model="manual.minLength" /></el-form-item>
               <el-form-item label="Max length"><el-input v-model="manual.maxLength" /></el-form-item>
             </div>
             <el-form-item label="Pattern (regex)"><el-input v-model="manual.pattern" /></el-form-item>
           </template>
+          <p v-else-if="manual.type === 'string'" class="wiz-hint" style="margin-top: 0">
+            Values come from the allowed list above, so length and pattern don't apply.
+          </p>
           <div v-if="manual.type === 'number' || manual.type === 'integer'" class="wiz-two">
             <el-form-item label="Minimum"><el-input v-model="manual.minimum" /></el-form-item>
             <el-form-item label="Maximum"><el-input v-model="manual.maximum" /></el-form-item>
@@ -407,6 +410,13 @@ const subtreeDepth = ref('all') // 'all' | '1' | '2' | '3'
 const subtreeLeaves = ref(false)
 const valueDomain = ref(null) // the materialized ontology-subtree value domain (or null)
 const SUBTREE_INLINE_CAP = 512
+
+// A property's values are a controlled set when an ontology subtree is chosen or
+// an allowed-values list is typed in. Then length/pattern don't apply — the value
+// is validated by membership, and a stray constraint would reject valid codes.
+const hasControlledValues = computed(
+  () => !!valueDomain.value || !!(manual.enumInput && manual.enumInput.trim())
+)
 
 const runOntoSearch = debounce(async () => {
   const q = ontoTerm.value.trim()
@@ -844,9 +854,14 @@ function manualValueSchema() {
   const withConstraints = (obj) => {
     if (t === 'string') {
       if (manual.format && manual.format !== 'plain') obj.format = manual.format
-      if (isNum(manual.minLength)) obj.minLength = parseInt(manual.minLength, 10)
-      if (isNum(manual.maxLength)) obj.maxLength = parseInt(manual.maxLength, 10)
-      if (manual.pattern) obj.pattern = manual.pattern
+      // Skip length/pattern when the value is drawn from a controlled set — they'd
+      // be redundant and could reject valid codes (and may be stale from before the
+      // value set was chosen).
+      if (!hasControlledValues.value) {
+        if (isNum(manual.minLength)) obj.minLength = parseInt(manual.minLength, 10)
+        if (isNum(manual.maxLength)) obj.maxLength = parseInt(manual.maxLength, 10)
+        if (manual.pattern) obj.pattern = manual.pattern
+      }
     }
     if (t === 'number' || t === 'integer') {
       if (isNum(manual.minimum)) obj.minimum = parseFloat(manual.minimum)
