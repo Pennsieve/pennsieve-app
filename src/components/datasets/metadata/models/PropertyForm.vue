@@ -295,6 +295,47 @@
         <el-form label-position="top">
           <el-form-item label="Allowed values">
             <el-input v-model="manual.enumInput" placeholder="Comma-separated, e.g. Low, Medium, High" />
+            <!-- Prototype: fill allowed values from an ontology subtree -->
+            <div style="margin-top: 8px; width: 100%">
+              <el-input
+                v-model="ontoTerm"
+                size="small"
+                placeholder="…or fill from an ontology term's subtree — e.g. diabetes, seizure"
+                @input="runOntoSearch"
+              >
+                <template #prefix><el-icon><Search /></el-icon></template>
+              </el-input>
+              <ul
+                v-if="ontoResults.length"
+                style="list-style: none; margin: 8px 0 0; padding: 0; border: 1px solid var(--el-border-color); border-radius: 4px; max-height: 200px; overflow: auto"
+              >
+                <li
+                  v-for="c in ontoResults"
+                  :key="c.curie"
+                  style="display: flex; justify-content: space-between; gap: 8px; padding: 8px 16px; cursor: pointer"
+                  @click="selectSubtreeRoot(c)"
+                >
+                  <span>{{ c.label }}</span>
+                  <span style="flex-shrink: 0; font-size: 12px; opacity: 0.6">{{ ontoMeta(c) }}</span>
+                </li>
+              </ul>
+              <!-- Granularity controls once a root is chosen -->
+              <div
+                v-if="subtreeRoot"
+                style="margin-top: 8px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap"
+              >
+                <span style="font-size: 12px">From <strong>{{ subtreeRoot.label }}</strong>:</span>
+                <el-select v-model="subtreeDepth" size="small" style="width: 160px" @change="applySubtree">
+                  <el-option label="All descendants" value="all" />
+                  <el-option label="Direct children" value="1" />
+                  <el-option label="2 levels" value="2" />
+                  <el-option label="3 levels" value="3" />
+                </el-select>
+                <el-checkbox v-model="subtreeLeaves" size="small" @change="applySubtree">Most specific only</el-checkbox>
+                <el-button text size="small" @click="clearSubtree">clear</el-button>
+              </div>
+              <div v-if="subtreeNote" class="wiz-hint" style="margin-top: 6px">{{ subtreeNote }}</div>
+            </div>
           </el-form-item>
           <template v-if="manual.type === 'string'">
             <div class="wiz-two">
@@ -345,6 +386,7 @@ import { ElMessage } from 'element-plus'
 import { Link, EditPen, Search, Close } from '@element-plus/icons-vue'
 import debounce from 'lodash.debounce'
 import { useCdeCatalogStore } from '@/stores/cdeCatalogStore'
+import { useOntologyStore } from '@/stores/ontologyStore'
 import CdeFacets from './CdeFacets.vue'
 
 const props = defineProps({
@@ -354,6 +396,122 @@ const props = defineProps({
 const emit = defineEmits(['save', 'cancel'])
 
 const store = useCdeCatalogStore()
+const ontology = useOntologyStore()
+
+// Prototype: fill a custom property's allowed values from an open-ontology
+// subtree (all is_a descendants of a term) — the ontology → value-set bridge.
+const ontoTerm = ref('')
+const ontoResults = ref([])
+const subtreeNote = ref('')
+const subtreeRoot = ref(null) // { curie, label, ontology, ontology_version }
+const subtreeDepth = ref('all') // 'all' | '1' | '2' | '3'
+const subtreeLeaves = ref(false)
+const valueDomain = ref(null) // the materialized ontology-subtree value domain (or null)
+const SUBTREE_INLINE_CAP = 512
+
+const runOntoSearch = debounce(async () => {
+  const q = ontoTerm.value.trim()
+  if (!q) { ontoResults.value = []; return }
+  try {
+    ontoResults.value = (await ontology.search(q, { limit: 6 })).filter((r) => r.ontology !== 'UCUM')
+  } catch (e) {
+    ontoResults.value = []
+  }
+}, 200)
+const ontoMeta = (c) => (c.curie.startsWith(c.ontology + ':') ? c.curie : `${c.ontology} · ${c.curie}`)
+
+const selectSubtreeRoot = (term) => {
+  subtreeRoot.value = {
+    curie: term.curie,
+    label: term.label,
+    ontology: term.ontology,
+    ontology_version: term.ontology_version,
+  }
+  ontoResults.value = []
+  ontoTerm.value = ''
+  applySubtree()
+}
+const clearSubtree = () => {
+  subtreeRoot.value = null
+  valueDomain.value = null
+  subtreeNote.value = ''
+}
+
+// Resolve the value set from the chosen root + granularity (depth / leaves-only)
+// and hold it as a materialized value_domain. Under the inline cap it carries the
+// {code,label} members (materialized to an enum + labels at build); over the cap
+// it's a subtree REFERENCE (root + version + granularity) enforced by a membership
+// check — never an inline dump. Value-set members are the ontology CODES (curies).
+const applySubtree = async () => {
+  const root = subtreeRoot.value
+  if (!root) return
+  subtreeNote.value = 'Loading…'
+  try {
+    const maxDepth = subtreeDepth.value === 'all' ? null : Number(subtreeDepth.value)
+    const descs = await ontology.descendants(root.curie, { maxDepth, leavesOnly: subtreeLeaves.value, limit: 10000 })
+    const memberTerms = subtreeLeaves.value ? descs : [{ curie: root.curie, label: root.label }, ...descs]
+    const scope =
+      (subtreeDepth.value === 'all' ? 'all descendants' : `depth ≤ ${subtreeDepth.value}`) +
+      (subtreeLeaves.value ? ', most-specific only' : '')
+
+    const overCap = memberTerms.length > SUBTREE_INLINE_CAP
+    valueDomain.value = {
+      kind: 'subtree',
+      ontology: root.ontology,
+      root_curie: root.curie,
+      root_label: root.label,
+      ontology_version: root.ontology_version,
+      max_depth: maxDepth,
+      leaves_only: subtreeLeaves.value,
+      count: memberTerms.length,
+      over_cap: overCap,
+      members: overCap ? null : memberTerms.map((m) => ({ code: m.curie, label: m.label })),
+    }
+
+    if (overCap) {
+      manual.enumInput = '' // don't inline; stored as a subtree reference at build
+      subtreeNote.value =
+        `${memberTerms.length} values from “${root.label}” (${scope}) — over the ${SUBTREE_INLINE_CAP} inline cap, ` +
+        `so this is stored as a subtree reference (root + version + granularity) enforced by a membership check, not an inline list. ` +
+        `Narrow the root or lower the depth to inline it.`
+    } else {
+      manual.enumInput = memberTerms.map((m) => m.curie).join(', ') // codes; labels attached at build
+      subtreeNote.value = `${memberTerms.length} values from “${root.label}” (${scope}) — inlined as an enum with display labels.`
+    }
+  } catch (e) {
+    valueDomain.value = null
+    subtreeNote.value = 'Could not load subtree: ' + (e?.message || e)
+  }
+}
+
+// Materialize the chosen ontology value domain onto a property schema: the concept
+// anchor always; under the cap an enum (codes) + display labels; over the cap the
+// subtree reference (membership-enforced at record write, VALSET-style).
+const applyValueDomain = (schema, vd) => {
+  schema['x-pennsieve-concept'] = {
+    curie: vd.root_curie,
+    label: vd.root_label,
+    ontology: vd.ontology,
+    ontology_version: vd.ontology_version,
+  }
+  if (vd.over_cap) {
+    delete schema.enum
+    const ref = {
+      tier: 'subtree',
+      ontology: vd.ontology,
+      root: vd.root_curie,
+      ontology_version: vd.ontology_version,
+      count: vd.count,
+    }
+    if (vd.max_depth != null) ref.max_depth = vd.max_depth
+    if (vd.leaves_only) ref.leaves_only = true
+    schema['x-pennsieve-concept-valueset'] = ref
+  } else {
+    schema.type = schema.type || 'string'
+    schema.enum = vd.members.map((m) => m.code)
+    schema['x-pennsieve-concept-values'] = vd.members
+  }
+}
 
 const sourceMode = ref('') // '' | 'catalog' | 'manual'
 
@@ -587,6 +745,7 @@ const buildSingleDef = () => {
   if (basics.description) schema.description = basics.description
   if (isManual.value) {
     Object.assign(schema, manualValueSchema())
+    if (valueDomain.value) applyValueDomain(schema, valueDomain.value)
   } else if (selectedCde.value) {
     Object.assign(schema, dataTypeSchema(selectedCde.value.cde_data_type))
     schema['x-pennsieve-cde'] = { persistent_id: selectedCde.value.persistent_id, strength: strength.value }

@@ -470,6 +470,23 @@ const updateRecord = async () => {
 // published values) carries `x-pennsieve-cde-valueset` instead of an `enum`.
 // Surface it so the field reads as controlled-by-a-CDE rather than free-form.
 const cdeValueSet = (property) => property?.property?.['x-pennsieve-cde-valueset'] || null
+
+// code -> display label for an enum, from a materialized value-list annotation
+// (ontology `x-pennsieve-concept-values` or CDE `x-pennsieve-cde-values`). Empty
+// map when none — the enum then shows the raw codes.
+const enumOptionLabels = (property) => {
+  const vals =
+    property?.property?.['x-pennsieve-concept-values'] ||
+    property?.property?.['x-pennsieve-cde-values'] ||
+    []
+  const map = {}
+  for (const v of vals) {
+    const code = v?.code ?? v?.value
+    if (code != null) map[code] = v.label || String(code)
+  }
+  return map
+}
+
 const cdeValueSetHint = (property) => {
   const vs = cdeValueSet(property)
   if (!vs) return ''
@@ -486,6 +503,10 @@ const renderFormFieldInput = (property) => {
   const { key, type, format, enum: enumValues } = property
   
   if (enumValues && enumValues.length > 0) {
+    // Enum stores codes; show human labels when a values annotation carries them
+    // (CDE-materialized or ontology value domains), so the dropdown reads
+    // "type 2 diabetes mellitus" while the record stores "MONDO:0005148".
+    const labels = enumOptionLabels(property)
     return h(ElSelect, {
       modelValue: formData.value[key],
       'onUpdate:modelValue': (value) => {
@@ -497,9 +518,10 @@ const renderFormFieldInput = (property) => {
       },
       placeholder: `Select ${property.label}`,
       clearable: true,
+      filterable: true,
       size: 'default'
-    }, () => enumValues.map(option => 
-      h(ElOption, { key: option, label: option, value: option })
+    }, () => enumValues.map(option =>
+      h(ElOption, { key: option, label: labels[option] || option, value: option })
     ))
   }
   

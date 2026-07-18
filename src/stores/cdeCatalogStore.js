@@ -12,6 +12,7 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import * as site from '@/site-config/site.json'
 import { useDuckDBStore } from '@/stores/duckdbStore'
+import { SEARCH_COLS, RETRIEVE, COARSE, tokenize, rankCandidates } from '@/stores/cdeSuggestRanker'
 
 const VIEWER_ID = 'cde-catalog'
 const TABLE = 'cde_catalog' // slim list projection (browse/search/facets)
@@ -140,7 +141,8 @@ export const useCdeCatalogStore = defineStore('cdeCatalog', () => {
     //      name/question/aliases/definition + exact/prefix bonuses (precision).
     // Matches only the slim columns (name, question text, definition, source,
     // aliases) — not text buried in the heavy blobs, which aren't in the list file.
-    const SEARCH_COLS = ['cde_name', 'preferred_question_text', 'cde_definition', 'cde_source', 'aliases']
+    // SEARCH_COLS / RETRIEVE / COARSE / rankCandidates come from cdeSuggestRanker
+    // so this SQL and the offline eval harness score identically.
     // opts.dataType (optional): the property's chosen type; boosts type-compatible CDEs.
     const search = async (term, limit = 25, opts = {}) => {
         await ensureLoaded()
@@ -160,21 +162,21 @@ export const useCdeCatalogStore = defineStore('cdeCatalog', () => {
         const terms = tokens.length ? tokens : [t.toLowerCase()]
         const phrase = escapeLiteral(t)
 
-        // Coarse SQL score: phrase-in-name/question dominate; then per-token field hits.
-        const scoreParts = [
-            `(CASE WHEN cde_name ILIKE '%${phrase}%' THEN 200 ELSE 0 END)`,
-            `(CASE WHEN preferred_question_text ILIKE '%${phrase}%' THEN 80 ELSE 0 END)`,
-        ]
+        // Coarse SQL score: phrase-in-name/question dominate; then per-token field
+        // hits. Built from the shared COARSE weights (cdeSuggestRanker) so the SQL
+        // and the eval harness stay in lockstep.
+        const scoreParts = []
+        for (const [col, w] of Object.entries(COARSE.phrase)) {
+            scoreParts.push(`(CASE WHEN ${col} ILIKE '%${phrase}%' THEN ${w} ELSE 0 END)`)
+        }
         const ors = []
         for (const tok of terms) {
             const lt = escapeLiteral(tok)
             for (const c of SEARCH_COLS) ors.push(`${c} ILIKE '%${lt}%'`)
-            scoreParts.push(`(CASE WHEN cde_name ILIKE '%${lt}%' THEN 6 ELSE 0 END)`)
-            scoreParts.push(`(CASE WHEN preferred_question_text ILIKE '%${lt}%' THEN 4 ELSE 0 END)`)
-            scoreParts.push(`(CASE WHEN aliases ILIKE '%${lt}%' THEN 3 ELSE 0 END)`)
-            scoreParts.push(`(CASE WHEN cde_definition ILIKE '%${lt}%' THEN 1 ELSE 0 END)`)
+            for (const [col, w] of Object.entries(COARSE.token)) {
+                scoreParts.push(`(CASE WHEN ${col} ILIKE '%${lt}%' THEN ${w} ELSE 0 END)`)
+            }
         }
-        const RETRIEVE = 300
         const query =
             `SELECT * FROM ${TABLE} WHERE ${ors.join(' OR ')}` +
             ` ORDER BY (${scoreParts.join(' + ')}) DESC, length(cde_name) NULLS LAST LIMIT ${RETRIEVE}`
@@ -271,17 +273,18 @@ export const useCdeCatalogStore = defineStore('cdeCatalog', () => {
     const getFacetMap = async () => {
         if (facetMap) return facetMap
         await ensureClassificationsLoaded()
-        // cls.context/domain/tier are promoted parquet columns. `context` is a real
-        // disease only when the classification is rooted under "Disease" (NINDS);
-        // other stewards root their trees under collection/domain names that aren't
-        // diseases. Take path[0] from the record blob and only treat Disease-rooted
-        // contexts as diseases (domain/tier are unaffected).
+        // cls.context/domain/tier/path_root are all promoted parquet columns, so
+        // this reads small columns via pushdown — never the ~13MB data blob.
+        // `context` is a real disease only when the classification is rooted under
+        // "Disease" (NINDS); other stewards root their trees under collection/domain
+        // names that aren't diseases, so only treat Disease-rooted contexts as
+        // diseases (domain/tier are unaffected).
         const query = `
             SELECT cde.persistent_id AS pid,
                    cls.context AS disease,
                    cls.domain AS domain,
                    cls.tier AS tier,
-                   ((cls.data::JSON) -> 'path' ->> 0) AS path_root
+                   cls.path_root AS path_root
             FROM ${TABLE} cde
             JOIN cde_rel cl ON cl.target_record_id = CAST(cde.id AS VARCHAR) AND cl.relationship_type = 'CLASSIFIES'
             JOIN cde_cls cls ON CAST(cls.id AS VARCHAR) = cl.source_record_id`
@@ -313,7 +316,10 @@ export const useCdeCatalogStore = defineStore('cdeCatalog', () => {
         return i === -1 ? 99 : i
     }
 
-    // Distinct facet values for the filter UI: { diseases, domains, tiers }.
+    // Distinct facet values for the filter UI: { diseases, domains, tiers, stewards }.
+    // stewards comes from the cde slim list's own steward_org column (promoted, and
+    // present on EVERY cde incl. unclassified ones) — the universal browse axis —
+    // so it needs neither the classification load nor the data blob.
     const getFacetValues = async () => {
         if (facetValuesCache) return facetValuesCache
         const map = await getFacetMap()
@@ -325,10 +331,16 @@ export const useCdeCatalogStore = defineStore('cdeCatalog', () => {
             e.domains.forEach((d) => domains.add(d))
             e.tiers.forEach((t) => tiers.add(t))
         }
+        const stewardRows = await duck.executeQuery(
+            `SELECT DISTINCT steward_org FROM ${TABLE}` +
+                ` WHERE steward_org IS NOT NULL AND steward_org <> '' ORDER BY steward_org`,
+            connectionId
+        )
         facetValuesCache = {
             diseases: [...diseases].sort(),
             domains: [...domains].sort(),
             tiers: [...tiers].sort((a, b) => tierRank(a) - tierRank(b)),
+            stewards: stewardRows.map((r) => r.steward_org).filter(Boolean),
         }
         return facetValuesCache
     }
@@ -422,9 +434,13 @@ export const useCdeCatalogStore = defineStore('cdeCatalog', () => {
         const diseases = asList(opts.disease)
         const domains = asList(opts.domain)
         const tiers = asList(opts.tier)
+        const stewards = asList(opts.steward)
         await ensureBundlesLoaded()
         const t = (term || '').trim()
-        const hasFacet = diseases.length > 0 || domains.length > 0 || tiers.length > 0
+        // steward filters on the cde's own column (no classification needed); the
+        // disease/domain/tier facets need the classification map.
+        const hasClassFacet = diseases.length > 0 || domains.length > 0 || tiers.length > 0
+        const hasFacet = hasClassFacet || stewards.length > 0
 
         const [allBundles, membership] = await Promise.all([listBundles(), getBundleMembership()])
         // Facets are CDE-level; when one is active we're doing targeted element
@@ -437,11 +453,12 @@ export const useCdeCatalogStore = defineStore('cdeCatalog', () => {
 
         // Always list CDEs — a sample when browsing (no term/facet), narrowed as
         // the user types or applies facets.
-        const facets = hasFacet ? await getFacetMap() : null
+        const facets = hasClassFacet ? await getFacetMap() : null
         const raw = await search(t, hasFacet ? 500 : limit)
         const cdes = raw
             .filter((c) => {
-                if (!hasFacet) return true
+                if (stewards.length && !stewards.includes(c.steward_org)) return false
+                if (!hasClassFacet) return true
                 const f = facets.get(c.persistent_id)
                 if (!f) return false
                 if (diseases.length && !diseases.some((d) => f.diseases.has(d))) return false
@@ -470,12 +487,16 @@ export const useCdeCatalogStore = defineStore('cdeCatalog', () => {
         const diseases = asList(opts.disease)
         const domains = asList(opts.domain)
         const tiers = asList(opts.tier)
+        const stewards = asList(opts.steward)
         await ensureLoaded()
         if (diseases.length || domains.length || tiers.length) await ensureClassificationsLoaded()
 
         const clauses = []
         const t = (term || '').trim()
         if (t) clauses.push(searchPredicate(t))
+        // steward_org is a promoted column on the slim list itself — filter directly
+        // (covers unclassified cdes too; no classification join, no data blob).
+        if (stewards.length) clauses.push(`${TABLE}.steward_org IN (${sqlList(stewards)})`)
 
         // Correlated EXISTS against the classification edges for this CDE.
         const classExists = (cond) =>
@@ -593,75 +614,5 @@ function sqlList(vals) {
     return vals.map((v) => `'${escapeLiteral(v)}'`).join(', ')
 }
 
-// --- Lexical suggest ranking (SUGGEST-1) --------------------------------------
-
-const SUGGEST_STOP = new Set([
-    'the', 'a', 'an', 'of', 'and', 'or', 'to', 'in', 'for', 'on', 'by', 'with',
-    'is', 'are', 'at', 'as', 'de', 'per',
-])
-
-function norm(s) {
-    return String(s ?? '').toLowerCase().replace(/\s+/g, ' ').trim()
-}
-
-// Split into meaningful lowercased tokens (drop 1-char + stopwords).
-function tokenize(s) {
-    return (norm(s).match(/[a-z0-9]+/g) || []).filter((t) => t.length > 1 && !SUGGEST_STOP.has(t))
-}
-
-// Map a property's chosen type to the CDE's cde_data_type vocabulary.
-function compatibleType(propType, cdeType) {
-    const p = norm(propType)
-    const c = norm(cdeType)
-    if (!p || !c) return false
-    if (p === 'number' || p === 'integer' || p === 'long' || p === 'double') return c === 'number'
-    if (p === 'date' || p === 'datetime') return c === 'date'
-    if (p === 'boolean' || p === 'enum') return c === 'value list'
-    if (p === 'string' || p === 'text') return c === 'text' || c === 'value list'
-    return false
-}
-
-// Score one candidate against the query. Higher = more relevant.
-function scoreCandidate(c, qNorm, qTokens, dataType) {
-    const name = norm(c.cde_name)
-    const question = norm(c.preferred_question_text)
-    const aliases = Array.isArray(c.aliases) ? c.aliases.map(norm).join(' · ') : ''
-    const def = norm(c.cde_definition)
-    const source = norm(c.cde_source)
-
-    let s = 0
-    // Exact / prefix / substring on the label fields.
-    if (name === qNorm || question === qNorm) s += 120
-    else if (name.startsWith(qNorm) || question.startsWith(qNorm)) s += 50
-    else if (name.includes(qNorm) || question.includes(qNorm)) s += 25
-
-    // Weighted token coverage: a token counts once, at its best-scoring field.
-    const fields = [[name, 6], [question, 4], [aliases, 3], [def, 1], [source, 0.5]]
-    let matched = 0
-    for (const t of qTokens) {
-        let best = 0
-        for (const [text, w] of fields) if (text.includes(t)) best = Math.max(best, w)
-        if (best > 0) {
-            s += best
-            matched++
-        }
-    }
-    // Reward covering more of the query (penalize 1-of-3-token matches).
-    const coverage = qTokens.length ? matched / qTokens.length : 0
-    s *= 0.4 + 0.6 * coverage
-
-    if (dataType && compatibleType(dataType, c.cde_data_type)) s += 5
-    // Prefer concise names on ties.
-    s -= Math.min(name.length, 80) * 0.03
-    return s
-}
-
-// Rank retrieved candidates by relevance to the query (stable, best first).
-function rankCandidates(cands, query, dataType) {
-    const qNorm = norm(query)
-    const qTokens = tokenize(query)
-    return cands
-        .map((c, i) => ({ c, i, s: scoreCandidate(c, qNorm, qTokens, dataType) }))
-        .sort((a, b) => b.s - a.s || a.i - b.i)
-        .map((x) => x.c)
-}
+// Lexical suggest ranking (SUGGEST-1) now lives in cdeSuggestRanker.js so the
+// picker and the offline eval harness score identically.
