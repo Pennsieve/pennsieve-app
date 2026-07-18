@@ -60,11 +60,17 @@ export const useOntologyStore = defineStore('ontology', () => {
                 const loadedSources = []
                 for (const o of ontologies) {
                     const table = 'onto_' + String(o.slug || '').replace(/[^a-z0-9_]/gi, '_')
+                    // Register each slice as a VIEW (materialize:false), not a table:
+                    // DuckDB reads the parquet footer and then range-fetches only the
+                    // row-groups/columns a query touches (and caches them), instead of
+                    // downloading every slice — incl. the large definition column — up
+                    // front. Registration is metadata-only, so keeping all ontologies
+                    // registered stays cheap while cross-ontology search still works.
                     // Slice is immutable per build, so key the cached load by build.
                     await duck.loadParquetUrl(
                         `${baseUrl.value}/${o.path}`,
                         table,
-                        { materialize: true },
+                        { materialize: false },
                         VIEWER_ID,
                         `${table}_${o.build}`
                     )
