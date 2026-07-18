@@ -403,9 +403,13 @@ const pickSubtree = async (term) => {
   ontoTerm.value = ''
   subtreeNote.value = 'Loading subtypes…'
   try {
-    const descs = await ontology.descendants(term.curie, { limit: 2000 })
-    manual.enumInput = [term.label, ...descs.map((d) => d.label)].join(', ')
-    subtreeNote.value = `Loaded ${descs.length} subtypes of “${term.label}” (${term.curie}) as allowed values.`
+    const descs = await ontology.descendants(term.curie, { limit: 5000 })
+    // A value set's members are the ontology CODES (curies) — comma-free and
+    // stable — not the labels (which contain commas and aren't identifiers). The
+    // labels are display only; a full value_domain materialization carries them.
+    const curies = [term.curie, ...descs.map((d) => d.curie)]
+    manual.enumInput = curies.join(', ')
+    subtreeNote.value = `Loaded ${curies.length} coded values from the “${term.label}” (${term.curie}) subtree — the codes are the value set; display labels come with a full value-domain materialization.`
   } catch (e) {
     subtreeNote.value = 'Could not load subtree: ' + (e?.message || e)
   }
