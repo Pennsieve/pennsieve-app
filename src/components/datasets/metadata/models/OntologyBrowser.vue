@@ -4,27 +4,37 @@
       <div class="ob-head">
         <h2>Ontology Browser</h2>
         <p class="ob-sub">
-          Explore the standard biomedical ontologies published to the catalog (MONDO diseases, HPO
-          phenotypes, UBERON anatomy, NCIt, and more). Browse the <code>is_a</code> hierarchy as a
-          tree, or search for a term — the detail panel shows where a concept sits in the ontology.
+          Standard biomedical vocabularies you can reuse across your workspace. Pick a vocabulary,
+          then search or browse its hierarchy to find the right term.
         </p>
+        <div class="ob-uses">
+          <span class="ob-use"><el-icon><PriceTag /></el-icon> Tag datasets with standard terms</span>
+          <span class="ob-use"><el-icon><Collection /></el-icon> Use a term’s subtree as a value set in metadata models</span>
+        </div>
+      </div>
+
+      <!-- Vocabulary chooser -->
+      <div v-if="booting" class="ob-status">Loading vocabularies…</div>
+      <div v-else class="ob-onto-cards">
+        <button
+          v-for="o in browsableOntologies"
+          :key="o.ontology"
+          type="button"
+          class="ob-onto-card"
+          :class="{ 'is-active': o.ontology === selectedOntology }"
+          @click="selectOntology(o.ontology)"
+        >
+          <span class="ob-onto-card-top">
+            <span class="ob-onto-code">{{ o.ontology }}</span>
+            <el-icon v-if="o.ontology === selectedOntology" class="ob-onto-check"><Check /></el-icon>
+          </span>
+          <span class="ob-onto-title">{{ ontologyMeta(o.ontology).title }}</span>
+          <span class="ob-onto-desc">{{ ontologyMeta(o.ontology).desc }}</span>
+          <span class="ob-onto-count">{{ formatCount(o.count) }} terms</span>
+        </button>
       </div>
 
       <div class="ob-controls">
-        <el-select
-          v-model="selectedOntology"
-          class="ob-onto"
-          placeholder="Ontology"
-          @change="onOntologyChange"
-        >
-          <el-option
-            v-for="s in browsableOntologies"
-            :key="s.ontology"
-            :label="ontologyOptionLabel(s)"
-            :value="s.ontology"
-          />
-        </el-select>
-
         <div class="ob-search-wrap">
           <el-input
             v-model="term"
@@ -177,7 +187,7 @@
 
 <script setup>
 import { ref, reactive, computed, onMounted } from 'vue'
-import { Search } from '@element-plus/icons-vue'
+import { Search, Check, PriceTag, Collection } from '@element-plus/icons-vue'
 import debounce from 'lodash.debounce'
 import { useOntologyStore } from '@/stores/ontologyStore'
 
@@ -216,10 +226,19 @@ const treeProps = {
 const treeKey = computed(() => `${selectedOntology.value}::${focus.value ? focus.value.curie : 'roots'}`)
 const defaultExpandedKeys = computed(() => []) // top level is loaded directly; nothing to pre-expand
 
+// Plain-language descriptions so users don't need to know the acronyms.
+const ONTOLOGY_META = {
+  MONDO: { title: 'Diseases & disorders', desc: 'Harmonized disease definitions merged from many disease resources.' },
+  HPO: { title: 'Phenotypes & signs', desc: 'Human phenotypic abnormalities — symptoms and clinical findings.' },
+  UBERON: { title: 'Anatomy', desc: 'Anatomical structures across species — organs, tissues, body parts.' },
+  NCIT: { title: 'Cancer & biomedical', desc: 'NCI Thesaurus — broad cancer and biomedical reference concepts.' },
+  UCUM: { title: 'Units of measure', desc: 'Standard units for measurements.' },
+}
+const ontologyMeta = (name) => ONTOLOGY_META[name] || { title: name, desc: '' }
+const formatCount = (n) => Number(n || 0).toLocaleString()
+
 // UCUM is a flat unit list (no is_a hierarchy) — not a browsable tree.
 const browsableOntologies = computed(() => store.available.filter((o) => o.ontology !== 'UCUM'))
-const ontologyOptionLabel = (s) =>
-  s.ontology_version ? `${s.ontology} · ${s.ontology_version}` : s.ontology
 const focusableSel = computed(() => sel.curie && (!focus.value || focus.value.curie !== sel.curie))
 const synonymList = computed(() =>
   String(sel.synonyms || '')
@@ -353,6 +372,12 @@ const onOntologyChange = async () => {
   await loadSelected()
 }
 
+const selectOntology = async (name) => {
+  if (name === selectedOntology.value) return
+  selectedOntology.value = name
+  await onOntologyChange()
+}
+
 onMounted(async () => {
   try {
     await store.ensureRegistry()
@@ -383,12 +408,91 @@ onMounted(async () => {
 .ob-sub {
   color: theme.$gray_5;
   max-width: 680px;
-  margin: 8px 0 20px;
+  margin: 8px 0 12px;
   line-height: 1.5;
   code {
     font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
     font-size: 12px;
   }
+}
+.ob-uses {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+  margin-bottom: 24px;
+}
+.ob-use {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: theme.$gray_5;
+  .el-icon {
+    color: theme.$purple_2;
+    font-size: 15px;
+  }
+}
+
+/* Vocabulary chooser — a row of selectable cards */
+.ob-onto-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px;
+  margin-bottom: 24px;
+  max-width: 940px;
+}
+.ob-onto-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  text-align: left;
+  padding: 14px 16px;
+  background: theme.$white;
+  border: 1px solid theme.$gray_2;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease, background 0.15s ease;
+  &:hover {
+    border-color: theme.$purple_0_7;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.06);
+    transform: translateY(-1px);
+  }
+  &.is-active {
+    border-color: theme.$purple_2;
+    background: theme.$purple_tint;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.07);
+  }
+}
+.ob-onto-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 18px;
+}
+.ob-onto-code {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: theme.$purple_2;
+}
+.ob-onto-check {
+  color: theme.$purple_2;
+  font-size: 16px;
+}
+.ob-onto-title {
+  font-size: 15px;
+  font-weight: 500;
+  color: theme.$gray_6;
+}
+.ob-onto-desc {
+  font-size: 12px;
+  color: theme.$gray_5;
+  line-height: 1.4;
+}
+.ob-onto-count {
+  margin-top: 2px;
+  font-size: 11px;
+  color: theme.$gray_4;
 }
 .ob-controls {
   display: flex;
@@ -396,9 +500,6 @@ onMounted(async () => {
   align-items: flex-start;
   gap: 12px;
   margin-bottom: 16px;
-}
-.ob-onto {
-  width: 200px;
 }
 .ob-search-wrap {
   position: relative;
