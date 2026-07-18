@@ -299,7 +299,6 @@
             <div style="margin-top: 8px; width: 100%">
               <el-input
                 v-model="ontoTerm"
-                size="small"
                 placeholder="…or fill from an ontology term's subtree — e.g. diabetes, seizure"
                 @input="runOntoSearch"
               >
