@@ -405,10 +405,56 @@ export const useOntologyStore = defineStore('ontology', () => {
         return mapRows(await duck.executeQuery(query, connectionId))
     }
 
+    // Bounded subtree membership for building a value set. BFS the is_a edges
+    // level-by-level from the root (one pruned query per level) and STOP as soon as
+    // the count passes `cap` — a broad root (e.g. a whole disease branch) resolves
+    // in a few queries instead of enumerating the entire ontology via the recursive
+    // descendants CTE (which ignores LIMIT and can take seconds). Over-cap sets are
+    // stored as a subtree reference anyway, so the full list isn't needed. Returns
+    // { members: [{ curie, label }], overCap } (members holds cap+1 when overCap).
+    const subtreeMembers = async (rootCurie, rootLabel, { maxDepth = null, leavesOnly = false, cap = 512 } = {}) => {
+        await ensureRegistry()
+        const edgeTables = sources.value.map((s) => s.edgesTable).filter(Boolean)
+        if (!edgeTables.length) {
+            // No edges sidecar — fall back to the (slower) recursive descendants, capped.
+            const descs = await descendants(rootCurie, { maxDepth, leavesOnly, limit: cap + 1 })
+            const mapped = descs.map((d) => ({ curie: d.curie, label: d.label }))
+            const members = leavesOnly ? mapped : [{ curie: rootCurie, label: rootLabel }, ...mapped]
+            return { members, overCap: members.length > cap }
+        }
+
+        const members = []
+        const seen = new Set([rootCurie])
+        if (!leavesOnly) members.push({ curie: rootCurie, label: rootLabel })
+
+        let frontier = [rootCurie]
+        let depth = 0
+        while (frontier.length && members.length <= cap) {
+            if (maxDepth != null && depth >= maxDepth) break
+            const inList = frontier.map((c) => `'${esc(c)}'`).join(', ')
+            const union = edgeTables
+                .map((t) => `SELECT child AS curie, child_label AS label, child_has_children AS has_children FROM ${t} WHERE parent IN (${inList})`)
+                .join(' UNION ALL ')
+            const rows = await duck.executeQuery(`SELECT DISTINCT curie, label, has_children FROM (${union})`, connectionId)
+            const next = []
+            for (const r of rows || []) {
+                const curie = r.curie == null ? '' : String(r.curie)
+                if (!curie || seen.has(curie)) continue
+                seen.add(curie)
+                if (!leavesOnly || !r.has_children) members.push({ curie, label: r.label == null ? '' : String(r.label) })
+                next.push(curie)
+                if (members.length > cap) break
+            }
+            frontier = next
+            depth++
+        }
+        return { members, overCap: members.length > cap }
+    }
+
     return {
         loading, loaded, error, available, sources, isConfigured,
         ensureRegistry, ensureOntology, ensureLoaded,
-        search, descendants, ancestors,
+        search, descendants, ancestors, subtreeMembers,
         getByCurie, roots, children, lineage, labelsFor,
     }
 })

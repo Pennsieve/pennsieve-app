@@ -340,8 +340,11 @@
                 <el-checkbox v-model="subtreeLeaves" @change="applySubtree">Most specific only</el-checkbox>
               </div>
               <div v-if="valueDomain" class="onto-subtree-count">
-                {{ valueDomain.count.toLocaleString() }}
-                value{{ valueDomain.count === 1 ? '' : 's' }} · {{ subtreeScopeLabel }}
+                <template v-if="valueDomain.over_cap">More than {{ SUBTREE_INLINE_CAP }} values</template>
+                <template v-else
+                  >{{ valueDomain.count.toLocaleString() }} value{{ valueDomain.count === 1 ? '' : 's' }}</template
+                >
+                · {{ subtreeScopeLabel }}
               </div>
               <ul v-if="subtreePreview.length" class="onto-subtree-list">
                 <li v-for="m in subtreePreview" :key="m.curie">
@@ -349,7 +352,13 @@
                   <span class="onto-subtree-code">{{ m.curie }}</span>
                 </li>
               </ul>
-              <div v-if="valueDomain && valueDomain.count > subtreePreview.length" class="onto-subtree-more">
+              <div v-if="valueDomain && valueDomain.over_cap" class="onto-subtree-more">
+                Showing a sample — the full set is enforced by reference, not listed.
+              </div>
+              <div
+                v-else-if="valueDomain && valueDomain.count > subtreePreview.length"
+                class="onto-subtree-more"
+              >
                 …and {{ (valueDomain.count - subtreePreview.length).toLocaleString() }} more
               </div>
               <div v-if="subtreeNote" class="wiz-hint" style="margin-top: 6px">{{ subtreeNote }}</div>
@@ -510,10 +519,14 @@ const applySubtree = async () => {
   subtreeNote.value = 'Loading…'
   try {
     const maxDepth = subtreeDepth.value === 'all' ? null : Number(subtreeDepth.value)
-    const descs = await ontology.descendants(root.curie, { maxDepth, leavesOnly: subtreeLeaves.value, limit: 10000 })
-    const memberTerms = subtreeLeaves.value ? descs : [{ curie: root.curie, label: root.label }, ...descs]
+    // Bounded resolution: stops once it passes the inline cap, so a broad root
+    // doesn't enumerate the whole ontology (over-cap becomes a reference anyway).
+    const { members, overCap } = await ontology.subtreeMembers(root.curie, root.label, {
+      maxDepth,
+      leavesOnly: subtreeLeaves.value,
+      cap: SUBTREE_INLINE_CAP,
+    })
 
-    const overCap = memberTerms.length > SUBTREE_INLINE_CAP
     valueDomain.value = {
       kind: 'subtree',
       ontology: root.ontology,
@@ -522,16 +535,16 @@ const applySubtree = async () => {
       ontology_version: root.ontology_version,
       max_depth: maxDepth,
       leaves_only: subtreeLeaves.value,
-      count: memberTerms.length,
+      count: overCap ? null : members.length, // exact only when inlined; unknown over-cap
       over_cap: overCap,
-      members: overCap ? null : memberTerms.map((m) => ({ code: m.curie, label: m.label })),
+      members: overCap ? null : members.map((m) => ({ code: m.curie, label: m.label })),
     }
     // Readable preview (labels, not codes). enumInput stays empty — the schema is
     // built from valueDomain, so we never dump raw curies into the visible box.
-    subtreePreview.value = memberTerms.slice(0, PREVIEW_CAP).map((m) => ({ curie: m.curie, label: m.label }))
+    subtreePreview.value = members.slice(0, PREVIEW_CAP).map((m) => ({ curie: m.curie, label: m.label }))
     manual.enumInput = ''
     subtreeNote.value = overCap
-      ? `Over the ${SUBTREE_INLINE_CAP}-value inline cap — stored as a subtree reference (root + version + granularity) ` +
+      ? `More than ${SUBTREE_INLINE_CAP} values — stored as a subtree reference (root + version + granularity) ` +
         `and enforced by a membership check rather than an inline list. Narrow the root or lower the depth to inline it.`
       : ''
   } catch (e) {
@@ -558,8 +571,8 @@ const applyValueDomain = (schema, vd) => {
       ontology: vd.ontology,
       root: vd.root_curie,
       ontology_version: vd.ontology_version,
-      count: vd.count,
     }
+    if (vd.count != null) ref.count = vd.count // unknown for a broad (bounded) subtree
     if (vd.max_depth != null) ref.max_depth = vd.max_depth
     if (vd.leaves_only) ref.leaves_only = true
     schema['x-pennsieve-concept-valueset'] = ref
