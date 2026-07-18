@@ -404,6 +404,8 @@ onMounted(async () => {
 
 .cde-gallery {
   min-height: 500px;
+  /* bf-stage gives only 8px top vs 32px sides; add 24px so the top inset matches. */
+  padding-top: 24px;
 }
 .cg-head h2 {
   font-size: 20px;
