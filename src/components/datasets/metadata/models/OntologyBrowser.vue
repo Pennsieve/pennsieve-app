@@ -27,6 +27,8 @@
                   property in a metadata model — so records are filled in with consistent, standardized
                   codes.</p>
               </div>
+              <p class="ob-help-note">Pennsieve refreshes these vocabularies from their sources
+                quarterly — each card shows the version it's on.</p>
             </div>
           </el-popover>
         </div>
@@ -859,6 +861,14 @@ onMounted(async () => {
       color: theme.$purple_2;
       font-size: 15px;
     }
+  }
+  .ob-help-note {
+    margin: 14px 0 0;
+    padding-top: 12px;
+    border-top: 1px solid theme.$gray_2;
+    font-size: 12px;
+    line-height: 1.5;
+    color: theme.$gray_5;
   }
   .ob-help-sm {
     font-size: 13px;
