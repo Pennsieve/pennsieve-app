@@ -72,7 +72,7 @@
                   @click="addConceptTag(c)"
                 >
                   <span class="concept-label">{{ c.label }}</span>
-                  <span class="concept-meta">{{ c.ontology }} · {{ c.curie }}</span>
+                  <span class="concept-meta">{{ conceptMeta(c) }}</span>
                 </li>
               </ul>
               <div v-if="form.tags.length > 0" class="tag-wrap">
@@ -565,6 +565,17 @@ export default {
       this.inputTag = term.label
       this.conceptResults = []
       this.addTag()
+    },
+
+    /**
+     * The meta line for a suggestion. The curie already carries the ontology as
+     * its prefix (UBERON:…), so only prepend the friendly ontology name when it
+     * differs from that prefix (e.g. "HPO" for HP:… terms) — avoids "UBERON · UBERON:…".
+     */
+    conceptMeta: function(term) {
+      return term.curie.startsWith(term.ontology + ':')
+        ? term.curie
+        : `${term.ontology} · ${term.curie}`
     }
   }
 }
