@@ -254,25 +254,42 @@ export const useOntologyStore = defineStore('ontology', () => {
             has_children: !!r.has_children,
         }))
 
-    const tableFor = (ontology) => (sources.value.find((s) => s.ontology === ontology) || {}).table
-
     // Top-level terms of one ontology — a tree root = a term none of whose parents
-    // are in this ontology's slice (parents empty, or all point outside). Each row
-    // carries has_children so the tree can decide whether to render an expand arrow.
+    // are in this ontology's slice. Each row carries has_children so the tree can
+    // decide whether to render an expand arrow.
+    //
+    // Computed as hash semi/anti-joins (a root is a term that is never an in-slice
+    // child; has_children = it appears as an in-slice parent), NOT the O(n²)
+    // correlated scan over the parents string — which took ~5s on a 20k-term slice.
+    // Prefers the edges sidecar; falls back to unnesting the parents column.
     const roots = async (ontology, { limit = 300 } = {}) => {
         await ensureOntology(ontology)
-        const table = tableFor(ontology)
-        if (!table) return []
-        const query = `
-            WITH all_terms AS (SELECT curie, label, ontology, parents FROM ${table} WHERE COALESCE(obsolete, false) = false)
-            SELECT r.curie, r.label, r.ontology,
-                EXISTS (SELECT 1 FROM all_terms t WHERE list_contains(string_split(t.parents, '|'), r.curie)) AS has_children
-            FROM all_terms r
-            WHERE r.parents IS NULL OR r.parents = ''
-                OR NOT EXISTS (SELECT 1 FROM all_terms p WHERE list_contains(string_split(r.parents, '|'), p.curie))
-            ORDER BY lower(r.label)
-            LIMIT ${Number(limit) || 300}
-        `
+        const src = sources.value.find((s) => s.ontology === ontology)
+        if (!src) return []
+        const lim = Number(limit) || 300
+
+        let query
+        if (src.edgesTable) {
+            query = `
+                WITH t AS (SELECT curie, label, ontology FROM ${src.table} WHERE COALESCE(obsolete, false) = false),
+                e AS (SELECT parent, child FROM ${src.edgesTable} WHERE parent IN (SELECT curie FROM t))
+                SELECT t.curie, t.label, t.ontology, (t.curie IN (SELECT parent FROM e)) AS has_children
+                FROM t
+                WHERE t.curie NOT IN (SELECT child FROM e)
+                ORDER BY lower(t.label)
+                LIMIT ${lim}
+            `
+        } else {
+            query = `
+                WITH t AS (SELECT curie, label, ontology, parents FROM ${src.table} WHERE COALESCE(obsolete, false) = false),
+                e AS (SELECT a.curie AS child, u.p AS parent FROM t a, unnest(string_split(a.parents, '|')) AS u(p) WHERE u.p <> '' AND u.p IN (SELECT curie FROM t))
+                SELECT t.curie, t.label, t.ontology, (t.curie IN (SELECT parent FROM e)) AS has_children
+                FROM t
+                WHERE t.curie NOT IN (SELECT child FROM e)
+                ORDER BY lower(t.label)
+                LIMIT ${lim}
+            `
+        }
         return mapTree(await duck.executeQuery(query, connectionId))
     }
 

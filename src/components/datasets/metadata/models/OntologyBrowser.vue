@@ -84,6 +84,7 @@
           :default-expanded-keys="defaultExpandedKeys"
           :expand-on-click-node="false"
           highlight-current
+          empty-text="No terms"
           @node-click="onNodeClick"
         >
           <template #default="{ data }">
