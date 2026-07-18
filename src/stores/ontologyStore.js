@@ -123,7 +123,53 @@ export const useOntologyStore = defineStore('ontology', () => {
         return (rows || []).map(normalizeRow)
     }
 
-    return { loading, loaded, error, sources, isConfigured, ensureLoaded, search }
+    // Walk the is_a hierarchy from a term via a recursive CTE over the `parents`
+    // edges. dir='down' = descendants (subtree), dir='up' = ancestors (toward the
+    // roots). Returns [{ curie, label, ontology }].
+    const walk = async (curie, dir, limit) => {
+        await ensureLoaded()
+        if (!sources.value.length) return []
+        const c = esc(curie)
+        const union = sources.value
+            .map((s) => `SELECT curie, label, ontology, parents FROM ${s.table}`)
+            .join(' UNION ALL ')
+        // down: keep terms whose parents include a node already in the set (children);
+        // up: keep terms that are a parent of a node already in the set.
+        const step =
+            dir === 'down'
+                ? `JOIN acc ON list_contains(string_split(t.parents, '|'), acc.curie)`
+                : `JOIN acc ON list_contains(string_split(acc.parents, '|'), t.curie)`
+        const query = `
+            WITH RECURSIVE all_terms AS (${union}),
+            acc AS (
+                SELECT curie, label, ontology, parents FROM all_terms WHERE curie = '${c}'
+                UNION
+                SELECT t.curie, t.label, t.ontology, t.parents FROM all_terms t ${step}
+            )
+            SELECT DISTINCT curie, label, ontology FROM acc LIMIT ${Number(limit) || 5000}
+        `
+        const rows = await duck.executeQuery(query, connectionId)
+        return (rows || []).map((r) => ({
+            curie: r.curie == null ? '' : String(r.curie),
+            label: r.label == null ? '' : String(r.label),
+            ontology: r.ontology == null ? '' : String(r.ontology),
+        }))
+    }
+
+    // All descendants of a term (the subtree) — the enumerable set an "ontology
+    // subtree value set" is built from. Excludes the term itself unless includeSelf.
+    const descendants = async (curie, { includeSelf = false, limit = 5000 } = {}) => {
+        const rows = await walk(curie, 'down', limit)
+        return includeSelf ? rows : rows.filter((r) => r.curie !== curie)
+    }
+
+    // All ancestors of a term (path toward the roots) — for breadcrumb context /
+    // broadening a search. Excludes the term itself.
+    const ancestors = async (curie, { limit = 200 } = {}) => {
+        return (await walk(curie, 'up', limit)).filter((r) => r.curie !== curie)
+    }
+
+    return { loading, loaded, error, sources, isConfigured, ensureLoaded, search, descendants, ancestors }
 })
 
 // DuckDB rows come back as Arrow rows; normalize to plain objects/strings.

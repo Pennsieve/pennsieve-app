@@ -295,6 +295,32 @@
         <el-form label-position="top">
           <el-form-item label="Allowed values">
             <el-input v-model="manual.enumInput" placeholder="Comma-separated, e.g. Low, Medium, High" />
+            <!-- Prototype: fill allowed values from an ontology subtree -->
+            <div style="margin-top: 8px; width: 100%">
+              <el-input
+                v-model="ontoTerm"
+                size="small"
+                placeholder="…or fill from an ontology term's subtree — e.g. diabetes, seizure"
+                @input="runOntoSearch"
+              >
+                <template #prefix><el-icon><Search /></el-icon></template>
+              </el-input>
+              <ul
+                v-if="ontoResults.length"
+                style="list-style: none; margin: 8px 0 0; padding: 0; border: 1px solid var(--el-border-color); border-radius: 4px; max-height: 200px; overflow: auto"
+              >
+                <li
+                  v-for="c in ontoResults"
+                  :key="c.curie"
+                  style="display: flex; justify-content: space-between; gap: 8px; padding: 8px 16px; cursor: pointer"
+                  @click="pickSubtree(c)"
+                >
+                  <span>{{ c.label }}</span>
+                  <span style="flex-shrink: 0; font-size: 12px; opacity: 0.6">{{ ontoMeta(c) }}</span>
+                </li>
+              </ul>
+              <div v-if="subtreeNote" class="wiz-hint" style="margin-top: 6px">{{ subtreeNote }}</div>
+            </div>
           </el-form-item>
           <template v-if="manual.type === 'string'">
             <div class="wiz-two">
@@ -345,6 +371,7 @@ import { ElMessage } from 'element-plus'
 import { Link, EditPen, Search, Close } from '@element-plus/icons-vue'
 import debounce from 'lodash.debounce'
 import { useCdeCatalogStore } from '@/stores/cdeCatalogStore'
+import { useOntologyStore } from '@/stores/ontologyStore'
 import CdeFacets from './CdeFacets.vue'
 
 const props = defineProps({
@@ -354,6 +381,35 @@ const props = defineProps({
 const emit = defineEmits(['save', 'cancel'])
 
 const store = useCdeCatalogStore()
+const ontology = useOntologyStore()
+
+// Prototype: fill a custom property's allowed values from an open-ontology
+// subtree (all is_a descendants of a term) — the ontology → value-set bridge.
+const ontoTerm = ref('')
+const ontoResults = ref([])
+const subtreeNote = ref('')
+const runOntoSearch = debounce(async () => {
+  const q = ontoTerm.value.trim()
+  if (!q) { ontoResults.value = []; return }
+  try {
+    ontoResults.value = (await ontology.search(q, { limit: 6 })).filter((r) => r.ontology !== 'UCUM')
+  } catch (e) {
+    ontoResults.value = []
+  }
+}, 200)
+const ontoMeta = (c) => (c.curie.startsWith(c.ontology + ':') ? c.curie : `${c.ontology} · ${c.curie}`)
+const pickSubtree = async (term) => {
+  ontoResults.value = []
+  ontoTerm.value = ''
+  subtreeNote.value = 'Loading subtypes…'
+  try {
+    const descs = await ontology.descendants(term.curie, { limit: 2000 })
+    manual.enumInput = [term.label, ...descs.map((d) => d.label)].join(', ')
+    subtreeNote.value = `Loaded ${descs.length} subtypes of “${term.label}” (${term.curie}) as allowed values.`
+  } catch (e) {
+    subtreeNote.value = 'Could not load subtree: ' + (e?.message || e)
+  }
+}
 
 const sourceMode = ref('') // '' | 'catalog' | 'manual'
 
