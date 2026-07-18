@@ -297,28 +297,31 @@
             <!-- Type a list, or fill from an ontology term's subtree. -->
             <template v-if="!subtreeRoot">
               <el-input v-model="manual.enumInput" placeholder="Comma-separated, e.g. Low, Medium, High" />
-              <div style="margin-top: 8px; width: 100%; display: flex; gap: 8px">
-                <el-select v-model="ontoScope" style="width: 150px" @change="runOntoSearch">
-                  <el-option v-for="o in ontoOptions" :key="o.ontology" :label="o.ontology" :value="o.ontology" />
-                </el-select>
-                <el-input
-                  v-model="ontoTerm"
-                  style="flex: 1"
-                  :placeholder="`…or fill from a ${ontoScope || 'an ontology'} term's subtree — e.g. diabetes`"
-                  @input="runOntoSearch"
-                >
-                  <template #prefix><el-icon><Search /></el-icon></template>
-                </el-input>
-                <el-button @click="pickerOpen = true">Browse…</el-button>
-              </div>
-              <div style="width: 100%">
-                <ul v-if="ontoResults.length" class="onto-results">
-                  <li v-for="c in ontoResults" :key="c.curie" @click="selectSubtreeRoot(c)">
-                    <span>{{ c.label }}</span>
-                    <span class="onto-results-meta">{{ ontoMeta(c) }}</span>
-                  </li>
-                </ul>
-              </div>
+              <!-- Ontology value sets are string codes, so only for Text. -->
+              <template v-if="manual.type === 'string'">
+                <div style="margin-top: 8px; width: 100%; display: flex; gap: 8px">
+                  <el-select v-model="ontoScope" style="width: 150px" @change="runOntoSearch">
+                    <el-option v-for="o in ontoOptions" :key="o.ontology" :label="o.ontology" :value="o.ontology" />
+                  </el-select>
+                  <el-input
+                    v-model="ontoTerm"
+                    style="flex: 1"
+                    :placeholder="`…or fill from a ${ontoScope || 'an ontology'} term's subtree — e.g. diabetes`"
+                    @input="runOntoSearch"
+                  >
+                    <template #prefix><el-icon><Search /></el-icon></template>
+                  </el-input>
+                  <el-button @click="pickerOpen = true">Browse…</el-button>
+                </div>
+                <div style="width: 100%">
+                  <ul v-if="ontoResults.length" class="onto-results">
+                    <li v-for="c in ontoResults" :key="c.curie" @click="selectSubtreeRoot(c)">
+                      <span>{{ c.label }}</span>
+                      <span class="onto-results-meta">{{ ontoMeta(c) }}</span>
+                    </li>
+                  </ul>
+                </div>
+              </template>
             </template>
 
             <!-- A term is chosen: granularity + a readable preview of the members. -->
@@ -400,7 +403,7 @@
 // Single-screen property builder (progressive disclosure — no inner steps).
 // Rendered inline in the create-model Properties step, and inside a dialog by
 // AddPropertyWizard. Emits `save` with an array of property defs.
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Link, EditPen, Search, Close } from '@element-plus/icons-vue'
 import debounce from 'lodash.debounce'
@@ -495,6 +498,14 @@ const clearSubtree = () => {
   ontoTerm.value = ''
   ontoResults.value = []
 }
+
+// An ontology subtree is string codes — drop it if the type leaves Text.
+watch(
+  () => manual.type,
+  (t) => {
+    if (t !== 'string') clearSubtree()
+  }
+)
 
 // Resolve the value set from the chosen root + granularity (depth / leaves-only)
 // and hold it as a materialized value_domain. Under the inline cap it carries the
