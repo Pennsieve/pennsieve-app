@@ -499,14 +499,6 @@ const clearSubtree = () => {
   ontoResults.value = []
 }
 
-// An ontology subtree is string codes — drop it if the type leaves Text.
-watch(
-  () => manual.type,
-  (t) => {
-    if (t !== 'string') clearSubtree()
-  }
-)
-
 // Resolve the value set from the chosen root + granularity (depth / leaves-only)
 // and hold it as a materialized value_domain. Under the inline cap it carries the
 // {code,label} members (materialized to an enum + labels at build); over the cap
@@ -614,6 +606,16 @@ const manual = reactive({
   maxItems: '',
   uniqueItems: false,
 })
+
+// An ontology subtree is string codes — drop it if the type leaves Text.
+// (Defined after `manual` so its getter doesn't hit the TDZ at setup.)
+watch(
+  () => manual.type,
+  (t) => {
+    if (t !== 'string') clearSubtree()
+  }
+)
+
 const options = reactive({ required: false, isKey: false, isSensitive: false })
 
 const optionFlags = [
