@@ -123,50 +123,71 @@ export const useOntologyStore = defineStore('ontology', () => {
         return (rows || []).map(normalizeRow)
     }
 
-    // Walk the is_a hierarchy from a term via a recursive CTE over the `parents`
-    // edges. dir='down' = descendants (subtree), dir='up' = ancestors (toward the
-    // roots). Returns [{ curie, label, ontology }].
-    const walk = async (curie, dir, limit) => {
-        await ensureLoaded()
-        if (!sources.value.length) return []
-        const c = esc(curie)
-        const union = sources.value
-            .map((s) => `SELECT curie, label, ontology, parents FROM ${s.table}`)
-            .join(' UNION ALL ')
-        // down: keep terms whose parents include a node already in the set (children);
-        // up: keep terms that are a parent of a node already in the set.
-        const step =
-            dir === 'down'
-                ? `JOIN acc ON list_contains(string_split(t.parents, '|'), acc.curie)`
-                : `JOIN acc ON list_contains(string_split(acc.parents, '|'), t.curie)`
-        const query = `
-            WITH RECURSIVE all_terms AS (${union}),
-            acc AS (
-                SELECT curie, label, ontology, parents FROM all_terms WHERE curie = '${c}'
-                UNION
-                SELECT t.curie, t.label, t.ontology, t.parents FROM all_terms t ${step}
-            )
-            SELECT DISTINCT curie, label, ontology FROM acc LIMIT ${Number(limit) || 5000}
-        `
-        const rows = await duck.executeQuery(query, connectionId)
-        return (rows || []).map((r) => ({
+    const unionAll = () =>
+        sources.value.map((s) => `SELECT curie, label, ontology, parents FROM ${s.table}`).join(' UNION ALL ')
+
+    const mapRows = (rows) =>
+        (rows || []).map((r) => ({
             curie: r.curie == null ? '' : String(r.curie),
             label: r.label == null ? '' : String(r.label),
             ontology: r.ontology == null ? '' : String(r.ontology),
         }))
+
+    // Descendants of a term (the subtree) — the enumerable set an "ontology subtree
+    // value set" is built from. Two granularity controls:
+    //   maxDepth   — include only terms within N is_a levels of the root (null = all).
+    //   leavesOnly — keep only the most-specific terms in scope (no child in the set).
+    // Excludes the root itself unless includeSelf. Returns [{ curie, label, ontology }].
+    const descendants = async (curie, { includeSelf = false, maxDepth = null, leavesOnly = false, limit = 5000 } = {}) => {
+        await ensureLoaded()
+        if (!sources.value.length) return []
+        const c = esc(curie)
+        // Bound recursion by depth when set: only expand a node's children while its
+        // own depth is below the cap (root = depth 0).
+        const depthGuard =
+            maxDepth != null && maxDepth >= 0 ? `WHERE s.depth < ${Math.floor(Number(maxDepth))}` : ''
+
+        const filters = []
+        if (!includeSelf) filters.push(`curie <> '${c}'`)
+        if (leavesOnly) {
+            // A leaf in scope = a subtree node that no other subtree node lists as a
+            // parent (i.e. it has no in-scope children).
+            filters.push(
+                `curie NOT IN (SELECT DISTINCT p FROM sub, unnest(string_split(sub.parents, '|')) AS u(p) WHERE p <> '')`
+            )
+        }
+        const where = filters.length ? `WHERE ${filters.join(' AND ')}` : ''
+
+        const query = `
+            WITH RECURSIVE all_terms AS (${unionAll()}),
+            sub AS (
+                SELECT curie, label, ontology, parents, 0 AS depth FROM all_terms WHERE curie = '${c}'
+                UNION
+                SELECT t.curie, t.label, t.ontology, t.parents, s.depth + 1
+                FROM all_terms t JOIN sub s ON list_contains(string_split(t.parents, '|'), s.curie)
+                ${depthGuard}
+            )
+            SELECT DISTINCT curie, label, ontology FROM sub ${where} LIMIT ${Number(limit) || 5000}
+        `
+        return mapRows(await duck.executeQuery(query, connectionId))
     }
 
-    // All descendants of a term (the subtree) — the enumerable set an "ontology
-    // subtree value set" is built from. Excludes the term itself unless includeSelf.
-    const descendants = async (curie, { includeSelf = false, limit = 5000 } = {}) => {
-        const rows = await walk(curie, 'down', limit)
-        return includeSelf ? rows : rows.filter((r) => r.curie !== curie)
-    }
-
-    // All ancestors of a term (path toward the roots) — for breadcrumb context /
-    // broadening a search. Excludes the term itself.
+    // Ancestors of a term (path toward the roots) — breadcrumb context / broadening.
     const ancestors = async (curie, { limit = 200 } = {}) => {
-        return (await walk(curie, 'up', limit)).filter((r) => r.curie !== curie)
+        await ensureLoaded()
+        if (!sources.value.length) return []
+        const c = esc(curie)
+        const query = `
+            WITH RECURSIVE all_terms AS (${unionAll()}),
+            acc AS (
+                SELECT curie, label, ontology, parents FROM all_terms WHERE curie = '${c}'
+                UNION
+                SELECT t.curie, t.label, t.ontology, t.parents
+                FROM all_terms t JOIN acc ON list_contains(string_split(acc.parents, '|'), t.curie)
+            )
+            SELECT DISTINCT curie, label, ontology FROM acc WHERE curie <> '${c}' LIMIT ${Number(limit) || 200}
+        `
+        return mapRows(await duck.executeQuery(query, connectionId))
     }
 
     return { loading, loaded, error, sources, isConfigured, ensureLoaded, search, descendants, ancestors }

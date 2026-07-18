@@ -313,12 +313,27 @@
                   v-for="c in ontoResults"
                   :key="c.curie"
                   style="display: flex; justify-content: space-between; gap: 8px; padding: 8px 16px; cursor: pointer"
-                  @click="pickSubtree(c)"
+                  @click="selectSubtreeRoot(c)"
                 >
                   <span>{{ c.label }}</span>
                   <span style="flex-shrink: 0; font-size: 12px; opacity: 0.6">{{ ontoMeta(c) }}</span>
                 </li>
               </ul>
+              <!-- Granularity controls once a root is chosen -->
+              <div
+                v-if="subtreeRoot"
+                style="margin-top: 8px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap"
+              >
+                <span style="font-size: 12px">From <strong>{{ subtreeRoot.label }}</strong>:</span>
+                <el-select v-model="subtreeDepth" size="small" style="width: 160px" @change="applySubtree">
+                  <el-option label="All descendants" value="all" />
+                  <el-option label="Direct children" value="1" />
+                  <el-option label="2 levels" value="2" />
+                  <el-option label="3 levels" value="3" />
+                </el-select>
+                <el-checkbox v-model="subtreeLeaves" size="small" @change="applySubtree">Most specific only</el-checkbox>
+                <el-button text size="small" @click="clearSubtree">clear</el-button>
+              </div>
               <div v-if="subtreeNote" class="wiz-hint" style="margin-top: 6px">{{ subtreeNote }}</div>
             </div>
           </el-form-item>
@@ -388,6 +403,11 @@ const ontology = useOntologyStore()
 const ontoTerm = ref('')
 const ontoResults = ref([])
 const subtreeNote = ref('')
+const subtreeRoot = ref(null) // { curie, label }
+const subtreeDepth = ref('all') // 'all' | '1' | '2' | '3'
+const subtreeLeaves = ref(false)
+const SUBTREE_INLINE_CAP = 512
+
 const runOntoSearch = debounce(async () => {
   const q = ontoTerm.value.trim()
   if (!q) { ontoResults.value = []; return }
@@ -398,18 +418,43 @@ const runOntoSearch = debounce(async () => {
   }
 }, 200)
 const ontoMeta = (c) => (c.curie.startsWith(c.ontology + ':') ? c.curie : `${c.ontology} · ${c.curie}`)
-const pickSubtree = async (term) => {
+
+const selectSubtreeRoot = (term) => {
+  subtreeRoot.value = { curie: term.curie, label: term.label }
   ontoResults.value = []
   ontoTerm.value = ''
-  subtreeNote.value = 'Loading subtypes…'
+  applySubtree()
+}
+const clearSubtree = () => {
+  subtreeRoot.value = null
+  subtreeNote.value = ''
+}
+
+// Build the value set from the chosen root + granularity (depth / leaves-only).
+// Value-set members are the ontology CODES (curies) — comma-free + stable; labels
+// are display only. Over the inline cap, don't bloat the schema — that's the
+// subtree-reference + membership-check case (a real value_domain).
+const applySubtree = async () => {
+  const root = subtreeRoot.value
+  if (!root) return
+  subtreeNote.value = 'Loading…'
   try {
-    const descs = await ontology.descendants(term.curie, { limit: 5000 })
-    // A value set's members are the ontology CODES (curies) — comma-free and
-    // stable — not the labels (which contain commas and aren't identifiers). The
-    // labels are display only; a full value_domain materialization carries them.
-    const curies = [term.curie, ...descs.map((d) => d.curie)]
-    manual.enumInput = curies.join(', ')
-    subtreeNote.value = `Loaded ${curies.length} coded values from the “${term.label}” (${term.curie}) subtree — the codes are the value set; display labels come with a full value-domain materialization.`
+    const maxDepth = subtreeDepth.value === 'all' ? null : Number(subtreeDepth.value)
+    const descs = await ontology.descendants(root.curie, { maxDepth, leavesOnly: subtreeLeaves.value, limit: 10000 })
+    const members = subtreeLeaves.value ? descs : [{ curie: root.curie, label: root.label }, ...descs]
+    const scope =
+      (subtreeDepth.value === 'all' ? 'all descendants' : `depth ≤ ${subtreeDepth.value}`) +
+      (subtreeLeaves.value ? ', most-specific only' : '')
+
+    if (members.length > SUBTREE_INLINE_CAP) {
+      subtreeNote.value =
+        `${members.length} values from “${root.label}” (${scope}) — over the ${SUBTREE_INLINE_CAP} inline cap. ` +
+        `A full value_domain would store this as a subtree reference (root + version) enforced by a membership check, not an inline list. ` +
+        `Narrow the root or lower the depth to inline it.`
+    } else {
+      manual.enumInput = members.map((m) => m.curie).join(', ')
+      subtreeNote.value = `Filled ${members.length} coded values from “${root.label}” (${scope}). Codes are the value set; labels are display.`
+    }
   } catch (e) {
     subtreeNote.value = 'Could not load subtree: ' + (e?.message || e)
   }
