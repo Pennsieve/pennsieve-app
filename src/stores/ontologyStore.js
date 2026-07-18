@@ -74,11 +74,26 @@ export const useOntologyStore = defineStore('ontology', () => {
                         VIEWER_ID,
                         `${table}_${o.build}`
                     )
+                    // is_a edges sidecar (sorted by parent) — a fast children lookup
+                    // for the tree. Optional: older slices predate it, in which case
+                    // children() falls back to scanning the parents column.
+                    let edgesTable = null
+                    if (o.edges_path) {
+                        edgesTable = table + '_edges'
+                        await duck.loadParquetUrl(
+                            `${baseUrl.value}/${o.edges_path}`,
+                            edgesTable,
+                            { materialize: false },
+                            VIEWER_ID,
+                            `${edgesTable}_${o.build}`
+                        )
+                    }
                     loadedSources.push({
                         ontology: o.ontology,
                         ontology_version: o.ontology_version,
                         count: o.count,
                         table,
+                        edgesTable,
                     })
                 }
                 sources.value = loadedSources
@@ -233,10 +248,29 @@ export const useOntologyStore = defineStore('ontology', () => {
     // Direct is_a children of a term (one level) — the lazy-load unit for the tree
     // and the "narrower terms" list in the detail panel. has_children lets the tree
     // show an expand arrow without a follow-up query.
+    //
+    // Prefer the per-ontology edges sidecar (sorted by parent): `WHERE parent = X`
+    // prunes to a few row groups over range requests, and child_has_children is
+    // precomputed. Fall back to scanning the parents string column for slices
+    // published before edges existed.
     const children = async (curie, { limit = 3000 } = {}) => {
         await ensureLoaded()
         if (!sources.value.length) return []
         const c = esc(curie)
+        const lim = Number(limit) || 3000
+
+        const edgeTables = sources.value.map((s) => s.edgesTable).filter(Boolean)
+        if (edgeTables.length) {
+            const union = edgeTables
+                .map(
+                    (t) =>
+                        `SELECT child AS curie, child_label AS label, child_ontology AS ontology, child_has_children AS has_children FROM ${t} WHERE parent = '${c}'`
+                )
+                .join(' UNION ALL ')
+            const query = `SELECT curie, label, ontology, has_children FROM (${union}) ORDER BY lower(label) LIMIT ${lim}`
+            return mapTree(await duck.executeQuery(query, connectionId))
+        }
+
         const query = `
             WITH all_terms AS (${unionAll()})
             SELECT k.curie, k.label, k.ontology,
@@ -244,7 +278,7 @@ export const useOntologyStore = defineStore('ontology', () => {
             FROM all_terms k
             WHERE list_contains(string_split(k.parents, '|'), '${c}')
             ORDER BY lower(k.label)
-            LIMIT ${Number(limit) || 3000}
+            LIMIT ${lim}
         `
         return mapTree(await duck.executeQuery(query, connectionId))
     }
