@@ -21,6 +21,8 @@ const VIEWER_ID = 'ontology'
 
 // The columns every slice shares (see cde-service ONT-1).
 const COLUMNS = 'curie, iri, label, synonyms, definition, ontology, ontology_version'
+// Extra columns fetched only for the detail panel (cross-refs, partonomy, merged ids).
+const DETAIL_COLUMNS = COLUMNS + ', xrefs, part_of, alt_ids'
 
 // Escape a user term for inlining into a single-quoted SQL literal.
 const esc = (s) => String(s || '').replace(/'/g, "''")
@@ -237,13 +239,36 @@ export const useOntologyStore = defineStore('ontology', () => {
         await ensureRegistry()
         if (!sources.value.length) return null
         const c = esc(curie)
-        const tables = sources.value.map((s) => `SELECT ${COLUMNS} FROM ${s.table}`)
+        const tables = sources.value.map((s) => `SELECT ${DETAIL_COLUMNS} FROM ${s.table}`)
+        // Match the curie, or an alt_id that folds into it (so a merged/retired id
+        // still resolves to the current term). Exact curie wins.
         const query = `
             WITH terms AS (${tables.join(' UNION ALL ')})
-            SELECT ${COLUMNS} FROM terms WHERE curie = '${c}' LIMIT 1
+            SELECT ${DETAIL_COLUMNS} FROM terms
+            WHERE curie = '${c}' OR list_contains(string_split(alt_ids, '|'), '${c}')
+            ORDER BY (curie = '${c}') DESC
+            LIMIT 1
         `
         const rows = await duck.executeQuery(query, connectionId)
         return rows && rows.length ? normalizeRow(rows[0]) : null
+    }
+
+    // Resolve display labels for a set of curies in one query (e.g. part_of targets).
+    // Returns a Map curie -> label.
+    const labelsFor = async (curies) => {
+        await ensureRegistry()
+        const list = (curies || []).map((c) => `'${esc(c)}'`)
+        const out = new Map()
+        if (!list.length || !sources.value.length) return out
+        const tables = sources.value.map((s) => `SELECT curie, label FROM ${s.table}`)
+        const query = `
+            WITH terms AS (${tables.join(' UNION ALL ')})
+            SELECT curie, label FROM terms WHERE curie IN (${list.join(', ')})
+        `
+        for (const r of (await duck.executeQuery(query, connectionId)) || []) {
+            out.set(String(r.curie), r.label == null ? '' : String(r.label))
+        }
+        return out
     }
 
     const mapTree = (rows) =>
@@ -384,7 +409,7 @@ export const useOntologyStore = defineStore('ontology', () => {
         loading, loaded, error, available, sources, isConfigured,
         ensureRegistry, ensureOntology, ensureLoaded,
         search, descendants, ancestors,
-        getByCurie, roots, children, lineage,
+        getByCurie, roots, children, lineage, labelsFor,
     }
 })
 
@@ -402,6 +427,9 @@ function normalizeRow(r) {
         definition: g('definition'),
         ontology: g('ontology'),
         ontology_version: g('ontology_version'),
+        xrefs: g('xrefs'),
+        part_of: g('part_of'),
+        alt_ids: g('alt_ids'),
     }
 }
 

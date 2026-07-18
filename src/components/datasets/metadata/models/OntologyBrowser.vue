@@ -210,6 +210,26 @@
             <div v-else class="ob-muted">No narrower terms (leaf).</div>
           </div>
 
+          <div v-if="sel.partOf.length" class="ob-field">
+            <div class="ob-field-label">Part of</div>
+            <div class="ob-chips">
+              <button
+                v-for="p in sel.partOf"
+                :key="p.curie"
+                class="ob-chip ob-chip-link"
+                :title="p.curie"
+                @click="openTerm({ curie: p.curie, label: p.label })"
+              >{{ p.label }}</button>
+            </div>
+          </div>
+
+          <div v-if="sel.xrefs.length" class="ob-field">
+            <div class="ob-field-label">Cross-references</div>
+            <div class="ob-chips">
+              <span v-for="(x, i) in sel.xrefs" :key="i" class="ob-chip ob-chip-ref">{{ x }}</span>
+            </div>
+          </div>
+
           <a
             v-if="sel.iri"
             :href="sel.iri"
@@ -255,8 +275,14 @@ const showResults = computed(() => resultsOpen.value && term.value.trim() !== ''
 const detailVisible = ref(false)
 const sel = reactive({
   curie: '', label: '', ontology: '', ontology_version: '', definition: '', synonyms: '', iri: '',
-  lineage: [], children: [], childrenTruncated: false, loading: false,
+  lineage: [], children: [], childrenTruncated: false, xrefs: [], partOf: [], loading: false,
 })
+
+const splitPipe = (s) =>
+  String(s || '')
+    .split('|')
+    .map((x) => x.trim())
+    .filter(Boolean)
 
 const treeProps = {
   label: 'label',
@@ -335,6 +361,8 @@ const openTerm = async (node) => {
   sel.lineage = []
   sel.children = []
   sel.childrenTruncated = false
+  sel.xrefs = []
+  sel.partOf = []
   sel.loading = true
   detailVisible.value = true
   try {
@@ -345,11 +373,20 @@ const openTerm = async (node) => {
     ])
     if (sel.curie !== curie) return // a newer selection won the race
     if (full) {
+      if (full.label) sel.label = full.label // corrects the title when navigated by curie
       sel.ontology = full.ontology || sel.ontology
       sel.ontology_version = full.ontology_version || ''
       sel.definition = full.definition || ''
       sel.synonyms = full.synonyms || ''
       sel.iri = full.iri || ''
+      sel.xrefs = splitPipe(full.xrefs)
+      // Resolve part_of target labels (curies -> readable names) in one query.
+      const partCuries = splitPipe(full.part_of)
+      if (partCuries.length) {
+        const labels = await store.labelsFor(partCuries)
+        if (sel.curie !== curie) return
+        sel.partOf = partCuries.map((c) => ({ curie: c, label: labels.get(c) || c }))
+      }
     }
     sel.lineage = lineage
     sel.childrenTruncated = kids.length > CHILD_DISPLAY_CAP
