@@ -6,9 +6,12 @@
 // search-as-you-type over label/synonyms — zero-API-latency, offline, the same
 // read path as the CDE catalog. Slices are public, so no auth.
 //
-// Used by the property editor to link a standard ontology term to a custom-model
-// property (an `x-pennsieve-concept` annotation). Read-only; the term is
-// snapshotted onto the property at pick time.
+// Each ontology is published + versioned independently: a single registry
+// (ontology/sources.json) points at each ontology's current slice
+// (ontology/<slug>/versions/<build>/<slug>.parquet), so ontologies can be added
+// or refreshed one at a time.
+//
+// Used to link a standard ontology term to a dataset tag / custom-model property.
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import * as site from '@/site-config/site.json'
@@ -16,7 +19,7 @@ import { useDuckDBStore } from '@/stores/duckdbStore'
 
 const VIEWER_ID = 'ontology'
 
-// One value-list of the columns every slice shares (see cde-service ONT-1).
+// The columns every slice shares (see cde-service ONT-1).
 const COLUMNS = 'curie, iri, label, synonyms, definition, ontology, ontology_version'
 
 // Escape a user term for inlining into a single-quoted SQL literal.
@@ -28,7 +31,6 @@ export const useOntologyStore = defineStore('ontology', () => {
     const loading = ref(false)
     const loaded = ref(false)
     const error = ref('')
-    const version = ref('') // our slice-build version
     const sources = ref([]) // [{ ontology, ontology_version, count, table }]
 
     let connectionId = null
@@ -37,10 +39,8 @@ export const useOntologyStore = defineStore('ontology', () => {
     const baseUrl = computed(() => (site.cdeCatalogUrl || '').replace(/\/+$/, ''))
     const isConfigured = computed(() => !!baseUrl.value)
 
-    const sliceUrl = (path) => `${baseUrl.value}/ontology/versions/${version.value}/${path}`
-
-    // Resolve the current slice build and load every slice into DuckDB (one table
-    // per ontology; search UNIONs across them). Single-flight.
+    // Read the registry and load every listed ontology's current slice into its
+    // own DuckDB table (search UNIONs across them). Single-flight.
     const ensureLoaded = async () => {
         if (loaded.value) return
         if (loadPromise) return loadPromise
@@ -53,19 +53,21 @@ export const useOntologyStore = defineStore('ontology', () => {
         error.value = ''
         loadPromise = (async () => {
             try {
-                const latest = await fetchJson(`${baseUrl.value}/ontology/latest.json`)
-                const v = latest.version
-                if (!v) throw new Error('ontology latest.json has no version')
-                version.value = v
-
-                const manifest = await fetchJson(`${baseUrl.value}/ontology/versions/${v}/manifest.json`)
-                const ontologies = manifest.ontologies || []
-                if (!ontologies.length) throw new Error('ontology manifest is empty')
+                const registry = await fetchJson(`${baseUrl.value}/ontology/sources.json`)
+                const ontologies = registry.ontologies || []
+                if (!ontologies.length) throw new Error('ontology registry is empty')
 
                 const loadedSources = []
                 for (const o of ontologies) {
-                    const table = 'onto_' + o.path.replace(/\.parquet$/i, '').replace(/[^a-z0-9_]/gi, '_')
-                    await duck.loadParquetUrl(sliceUrl(o.path), table, { materialize: true }, VIEWER_ID, `${table}_${v}`)
+                    const table = 'onto_' + String(o.slug || '').replace(/[^a-z0-9_]/gi, '_')
+                    // Slice is immutable per build, so key the cached load by build.
+                    await duck.loadParquetUrl(
+                        `${baseUrl.value}/${o.path}`,
+                        table,
+                        { materialize: true },
+                        VIEWER_ID,
+                        `${table}_${o.build}`
+                    )
                     loadedSources.push({
                         ontology: o.ontology,
                         ontology_version: o.ontology_version,
@@ -121,7 +123,7 @@ export const useOntologyStore = defineStore('ontology', () => {
         return (rows || []).map(normalizeRow)
     }
 
-    return { loading, loaded, error, version, sources, isConfigured, ensureLoaded, search }
+    return { loading, loaded, error, sources, isConfigured, ensureLoaded, search }
 })
 
 // DuckDB rows come back as Arrow rows; normalize to plain objects/strings.
