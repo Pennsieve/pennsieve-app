@@ -403,9 +403,10 @@ const ontology = useOntologyStore()
 const ontoTerm = ref('')
 const ontoResults = ref([])
 const subtreeNote = ref('')
-const subtreeRoot = ref(null) // { curie, label }
+const subtreeRoot = ref(null) // { curie, label, ontology, ontology_version }
 const subtreeDepth = ref('all') // 'all' | '1' | '2' | '3'
 const subtreeLeaves = ref(false)
+const valueDomain = ref(null) // the materialized ontology-subtree value domain (or null)
 const SUBTREE_INLINE_CAP = 512
 
 const runOntoSearch = debounce(async () => {
@@ -420,20 +421,27 @@ const runOntoSearch = debounce(async () => {
 const ontoMeta = (c) => (c.curie.startsWith(c.ontology + ':') ? c.curie : `${c.ontology} · ${c.curie}`)
 
 const selectSubtreeRoot = (term) => {
-  subtreeRoot.value = { curie: term.curie, label: term.label }
+  subtreeRoot.value = {
+    curie: term.curie,
+    label: term.label,
+    ontology: term.ontology,
+    ontology_version: term.ontology_version,
+  }
   ontoResults.value = []
   ontoTerm.value = ''
   applySubtree()
 }
 const clearSubtree = () => {
   subtreeRoot.value = null
+  valueDomain.value = null
   subtreeNote.value = ''
 }
 
-// Build the value set from the chosen root + granularity (depth / leaves-only).
-// Value-set members are the ontology CODES (curies) — comma-free + stable; labels
-// are display only. Over the inline cap, don't bloat the schema — that's the
-// subtree-reference + membership-check case (a real value_domain).
+// Resolve the value set from the chosen root + granularity (depth / leaves-only)
+// and hold it as a materialized value_domain. Under the inline cap it carries the
+// {code,label} members (materialized to an enum + labels at build); over the cap
+// it's a subtree REFERENCE (root + version + granularity) enforced by a membership
+// check — never an inline dump. Value-set members are the ontology CODES (curies).
 const applySubtree = async () => {
   const root = subtreeRoot.value
   if (!root) return
@@ -441,22 +449,67 @@ const applySubtree = async () => {
   try {
     const maxDepth = subtreeDepth.value === 'all' ? null : Number(subtreeDepth.value)
     const descs = await ontology.descendants(root.curie, { maxDepth, leavesOnly: subtreeLeaves.value, limit: 10000 })
-    const members = subtreeLeaves.value ? descs : [{ curie: root.curie, label: root.label }, ...descs]
+    const memberTerms = subtreeLeaves.value ? descs : [{ curie: root.curie, label: root.label }, ...descs]
     const scope =
       (subtreeDepth.value === 'all' ? 'all descendants' : `depth ≤ ${subtreeDepth.value}`) +
       (subtreeLeaves.value ? ', most-specific only' : '')
 
-    if (members.length > SUBTREE_INLINE_CAP) {
+    const overCap = memberTerms.length > SUBTREE_INLINE_CAP
+    valueDomain.value = {
+      kind: 'subtree',
+      ontology: root.ontology,
+      root_curie: root.curie,
+      root_label: root.label,
+      ontology_version: root.ontology_version,
+      max_depth: maxDepth,
+      leaves_only: subtreeLeaves.value,
+      count: memberTerms.length,
+      over_cap: overCap,
+      members: overCap ? null : memberTerms.map((m) => ({ code: m.curie, label: m.label })),
+    }
+
+    if (overCap) {
+      manual.enumInput = '' // don't inline; stored as a subtree reference at build
       subtreeNote.value =
-        `${members.length} values from “${root.label}” (${scope}) — over the ${SUBTREE_INLINE_CAP} inline cap. ` +
-        `A full value_domain would store this as a subtree reference (root + version) enforced by a membership check, not an inline list. ` +
+        `${memberTerms.length} values from “${root.label}” (${scope}) — over the ${SUBTREE_INLINE_CAP} inline cap, ` +
+        `so this is stored as a subtree reference (root + version + granularity) enforced by a membership check, not an inline list. ` +
         `Narrow the root or lower the depth to inline it.`
     } else {
-      manual.enumInput = members.map((m) => m.curie).join(', ')
-      subtreeNote.value = `Filled ${members.length} coded values from “${root.label}” (${scope}). Codes are the value set; labels are display.`
+      manual.enumInput = memberTerms.map((m) => m.curie).join(', ') // codes; labels attached at build
+      subtreeNote.value = `${memberTerms.length} values from “${root.label}” (${scope}) — inlined as an enum with display labels.`
     }
   } catch (e) {
+    valueDomain.value = null
     subtreeNote.value = 'Could not load subtree: ' + (e?.message || e)
+  }
+}
+
+// Materialize the chosen ontology value domain onto a property schema: the concept
+// anchor always; under the cap an enum (codes) + display labels; over the cap the
+// subtree reference (membership-enforced at record write, VALSET-style).
+const applyValueDomain = (schema, vd) => {
+  schema['x-pennsieve-concept'] = {
+    curie: vd.root_curie,
+    label: vd.root_label,
+    ontology: vd.ontology,
+    ontology_version: vd.ontology_version,
+  }
+  if (vd.over_cap) {
+    delete schema.enum
+    const ref = {
+      tier: 'subtree',
+      ontology: vd.ontology,
+      root: vd.root_curie,
+      ontology_version: vd.ontology_version,
+      count: vd.count,
+    }
+    if (vd.max_depth != null) ref.max_depth = vd.max_depth
+    if (vd.leaves_only) ref.leaves_only = true
+    schema['x-pennsieve-concept-valueset'] = ref
+  } else {
+    schema.type = schema.type || 'string'
+    schema.enum = vd.members.map((m) => m.code)
+    schema['x-pennsieve-concept-values'] = vd.members
   }
 }
 
@@ -692,6 +745,7 @@ const buildSingleDef = () => {
   if (basics.description) schema.description = basics.description
   if (isManual.value) {
     Object.assign(schema, manualValueSchema())
+    if (valueDomain.value) applyValueDomain(schema, valueDomain.value)
   } else if (selectedCde.value) {
     Object.assign(schema, dataTypeSchema(selectedCde.value.cde_data_type))
     schema['x-pennsieve-cde'] = { persistent_id: selectedCde.value.persistent_id, strength: strength.value }
