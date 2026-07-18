@@ -123,8 +123,14 @@ export const useOntologyStore = defineStore('ontology', () => {
         return (rows || []).map(normalizeRow)
     }
 
+    // Union of every loaded slice, obsolete terms excluded. Excluding them here
+    // keeps the whole is_a graph (roots/children/lineage/descendants/ancestors)
+    // free of deprecated concepts — which matters because obsolete OBO terms have
+    // their is_a parents stripped, so they would otherwise surface as spurious roots.
     const unionAll = () =>
-        sources.value.map((s) => `SELECT curie, label, ontology, parents FROM ${s.table}`).join(' UNION ALL ')
+        sources.value
+            .map((s) => `SELECT curie, label, ontology, parents FROM ${s.table} WHERE COALESCE(obsolete, false) = false`)
+            .join(' UNION ALL ')
 
     const mapRows = (rows) =>
         (rows || []).map((r) => ({
@@ -206,7 +212,7 @@ export const useOntologyStore = defineStore('ontology', () => {
         const table = tableFor(ontology)
         if (!table) return []
         const query = `
-            WITH all_terms AS (SELECT curie, label, ontology, parents FROM ${table})
+            WITH all_terms AS (SELECT curie, label, ontology, parents FROM ${table} WHERE COALESCE(obsolete, false) = false)
             SELECT r.curie, r.label, r.ontology,
                 EXISTS (SELECT 1 FROM all_terms t WHERE list_contains(string_split(t.parents, '|'), r.curie)) AS has_children
             FROM all_terms r
