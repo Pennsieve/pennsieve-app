@@ -309,6 +309,7 @@
                 >
                   <template #prefix><el-icon><Search /></el-icon></template>
                 </el-input>
+                <el-button @click="pickerOpen = true">Browse…</el-button>
               </div>
               <div style="width: 100%">
                 <ul v-if="ontoResults.length" class="onto-results">
@@ -350,6 +351,7 @@
               </div>
               <div v-if="subtreeNote" class="wiz-hint" style="margin-top: 6px">{{ subtreeNote }}</div>
             </div>
+            <OntologyTreePicker v-model="pickerOpen" @select="selectSubtreeRoot" />
           </el-form-item>
           <template v-if="manual.type === 'string' && !hasControlledValues">
             <div class="wiz-two">
@@ -405,6 +407,7 @@ import debounce from 'lodash.debounce'
 import { useCdeCatalogStore } from '@/stores/cdeCatalogStore'
 import { useOntologyStore } from '@/stores/ontologyStore'
 import CdeFacets from './CdeFacets.vue'
+import OntologyTreePicker from './OntologyTreePicker.vue'
 
 const props = defineProps({
   existingProperties: { type: Array, default: () => [] },
@@ -447,6 +450,7 @@ const hasControlledValues = computed(
 // slice and scans only its columns.
 const ontoScope = ref('')
 const ontoOptions = computed(() => (ontology.available || []).filter((o) => o.ontology !== 'UCUM'))
+const pickerOpen = ref(false) // the browse-the-tree dialog
 
 onMounted(async () => {
   try {
