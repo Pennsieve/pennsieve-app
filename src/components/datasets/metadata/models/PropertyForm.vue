@@ -317,8 +317,7 @@
             <!-- A term is chosen: granularity + a readable preview of the members. -->
             <div v-else class="onto-subtree">
               <div class="onto-subtree-head">
-                <span>From <strong>{{ subtreeRoot.label }}</strong>
-                  <span class="onto-subtree-code">{{ subtreeRoot.curie }}</span></span>
+                <span>From <strong>{{ subtreeRoot.label }}</strong> <span class="onto-subtree-code">{{ subtreeRoot.curie }}</span></span>
                 <el-button text @click="clearSubtree">change</el-button>
               </div>
               <div class="onto-subtree-controls">
