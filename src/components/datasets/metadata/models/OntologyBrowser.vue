@@ -271,14 +271,28 @@ const ONTOLOGY_META = {
   MONDO: { title: 'Diseases & disorders', desc: 'Harmonized disease definitions merged from many disease resources.' },
   HPO: { title: 'Phenotypes & signs', desc: 'Human phenotypic abnormalities — symptoms and clinical findings.' },
   UBERON: { title: 'Anatomy', desc: 'Anatomical structures across species — organs, tissues, body parts.' },
+  CL: { title: 'Cell types', desc: 'Types of cells across organisms — neurons, glia, immune cells, and more.' },
+  NCBITaxon: { title: 'Organisms & species', desc: 'Taxonomy of species and higher groups — tag the organism a dataset studies.' },
+  CHEBI: { title: 'Chemicals & drugs', desc: 'Chemical entities of biological interest — compounds, drugs, metabolites.' },
   NCIT: { title: 'Cancer & biomedical', desc: 'NCI Thesaurus — broad cancer and biomedical reference concepts.' },
   UCUM: { title: 'Units of measure', desc: 'Standard units for measurements.' },
 }
 const ontologyMeta = (name) => ONTOLOGY_META[name] || { title: name, desc: '' }
 const formatCount = (n) => Number(n || 0).toLocaleString()
 
-// UCUM is a flat unit list (no is_a hierarchy) — not a browsable tree.
-const browsableOntologies = computed(() => store.available.filter((o) => o.ontology !== 'UCUM'))
+// Preferred card order (and default landing = first). Anything not listed sorts
+// after, alphabetically. UCUM is a flat unit list — not a browsable tree.
+const ONTOLOGY_ORDER = ['MONDO', 'HPO', 'UBERON', 'CL', 'NCBITaxon', 'CHEBI', 'NCIT']
+const browsableOntologies = computed(() => {
+  const rank = (o) => {
+    const i = ONTOLOGY_ORDER.indexOf(o.ontology)
+    return i === -1 ? ONTOLOGY_ORDER.length : i
+  }
+  return store.available
+    .filter((o) => o.ontology !== 'UCUM')
+    .slice()
+    .sort((a, b) => rank(a) - rank(b) || a.ontology.localeCompare(b.ontology))
+})
 const focusableSel = computed(() => sel.curie && (!focus.value || focus.value.curie !== sel.curie))
 const synonymList = computed(() =>
   String(sel.synonyms || '')
