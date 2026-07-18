@@ -50,14 +50,31 @@
               <el-input
                 ref="inputTags"
                 v-model="inputTag"
-                placeholder="Add tags and press Enter"
+                placeholder="Add a tag and press Enter, or search standard ontology terms"
                 :disabled="datasetLocked"
                 @keyup.enter.native.stop="addTag"
+                @input="onTagInput"
               >
                 <template #prefix>
                   <IconTag :height="16" :width="16" />
                 </template>
               </el-input>
+              <!-- Ontology term suggestions (MONDO/HPO/UBERON/NCIt): pick one to add a
+                   standardized tag. Silently empty until slices are published / when
+                   offline, so free-text tagging always works. -->
+              <ul
+                v-if="conceptResults.length && inputTag.trim()"
+                class="concept-suggestions"
+              >
+                <li
+                  v-for="c in conceptResults"
+                  :key="c.curie"
+                  @click="addConceptTag(c)"
+                >
+                  <span class="concept-label">{{ c.label }}</span>
+                  <span class="concept-meta">{{ c.ontology }} · {{ c.curie }}</span>
+                </li>
+              </ul>
               <div v-if="form.tags.length > 0" class="tag-wrap">
                 <bf-tag
                   v-for="tag in form.tags"
@@ -119,6 +136,7 @@
   import SanitizeName from '../../../mixins/sanitize-name'
   import BfEmptyPageState from '../../shared/bf-empty-page-state/BfEmptyPageState.vue'
   import BfTag from '../../shared/BfTag/BfTag.vue'
+  import { useOntologyStore } from '@/stores/ontologyStore'
 
 
   import licenses from './dataset-licenses'
@@ -173,6 +191,7 @@ export default {
         tags: []
       },
       inputTag: '',
+      conceptResults: [],
       rules: {
         name: [
           {
@@ -487,6 +506,7 @@ export default {
 
       if (tag) {
         this.inputTag = ''
+        this.conceptResults = []
 
         const tagExists = this.checkIfTagExists(tag)
         if (tagExists === false) {
@@ -504,6 +524,47 @@ export default {
       const idx = this.form.tags.indexOf(tag)
       this.form.tags.splice(idx, 1)
       this.submitUpdateDatasetRequest()
+    },
+
+    /**
+     * As the user types a tag, search the published ontology slices for standard
+     * terms to suggest (debounced). Degrades silently to free-text tagging when
+     * the slices aren't published or the browser is offline.
+     */
+    onTagInput: function() {
+      if (!this.inputTag.trim()) {
+        this.conceptResults = []
+        return
+      }
+      if (!this.debouncedConceptSearch) {
+        this.debouncedConceptSearch = debounce(this.doConceptSearch, 200)
+      }
+      this.debouncedConceptSearch()
+    },
+
+    doConceptSearch: async function() {
+      const q = this.inputTag.trim()
+      if (!q) {
+        this.conceptResults = []
+        return
+      }
+      try {
+        const rows = await useOntologyStore().search(q, { limit: 8 })
+        // Dataset tags: drop UCUM units (irrelevant for describing a dataset).
+        this.conceptResults = (rows || []).filter((r) => r.ontology !== 'UCUM')
+      } catch (e) {
+        this.conceptResults = [] // slices unpublished / offline — free-text still works
+      }
+    },
+
+    /**
+     * Add a standardized tag from a picked ontology term (reuses addTag's
+     * normalization + dedup + save; Level 1 stores the label string).
+     */
+    addConceptTag: function(term) {
+      this.inputTag = term.label
+      this.conceptResults = []
+      this.addTag()
     }
   }
 }
@@ -515,6 +576,44 @@ export default {
 
 .details-container {
   max-width: 640px;
+}
+
+// Ontology term suggestions under the tags input (ONT-2).
+.concept-suggestions {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  border: 1px solid theme.$gray_2;
+  border-radius: 4px;
+  max-height: 240px;
+  overflow-y: auto;
+
+  li {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 8px 16px;
+    cursor: pointer;
+
+    &:hover {
+      background: theme.$gray_1;
+    }
+
+    & + li {
+      border-top: 1px solid theme.$gray_1;
+    }
+  }
+
+  .concept-label {
+    font-size: 14px;
+  }
+
+  .concept-meta {
+    flex-shrink: 0;
+    font-size: 12px;
+    color: theme.$gray_5;
+  }
 }
 
 .settings-section {
