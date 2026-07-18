@@ -16,6 +16,13 @@
       />
 
       <user-dashboard-card
+        title="Ontology Browser"
+        description="Explore standard biomedical ontologies (MONDO, HPO, UBERON, NCIt) and their hierarchy"
+        :route="{ name: 'ontology-browser' }"
+        icon="ontology-browser"
+      />
+
+      <user-dashboard-card
         title="Model Templates"
         description="Browse reusable model templates"
         :route="{ name: 'resources' }"

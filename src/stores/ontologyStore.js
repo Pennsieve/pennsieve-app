@@ -172,6 +172,102 @@ export const useOntologyStore = defineStore('ontology', () => {
         return mapRows(await duck.executeQuery(query, connectionId))
     }
 
+    // One full term record by exact curie — hydrates the detail panel when a term
+    // is reached by tree/breadcrumb navigation (search already returns full rows).
+    // Returns the normalized row or null.
+    const getByCurie = async (curie) => {
+        await ensureLoaded()
+        if (!sources.value.length) return null
+        const c = esc(curie)
+        const tables = sources.value.map((s) => `SELECT ${COLUMNS} FROM ${s.table}`)
+        const query = `
+            WITH terms AS (${tables.join(' UNION ALL ')})
+            SELECT ${COLUMNS} FROM terms WHERE curie = '${c}' LIMIT 1
+        `
+        const rows = await duck.executeQuery(query, connectionId)
+        return rows && rows.length ? normalizeRow(rows[0]) : null
+    }
+
+    const mapTree = (rows) =>
+        (rows || []).map((r) => ({
+            curie: r.curie == null ? '' : String(r.curie),
+            label: r.label == null ? '' : String(r.label),
+            ontology: r.ontology == null ? '' : String(r.ontology),
+            has_children: !!r.has_children,
+        }))
+
+    const tableFor = (ontology) => (sources.value.find((s) => s.ontology === ontology) || {}).table
+
+    // Top-level terms of one ontology — a tree root = a term none of whose parents
+    // are in this ontology's slice (parents empty, or all point outside). Each row
+    // carries has_children so the tree can decide whether to render an expand arrow.
+    const roots = async (ontology, { limit = 300 } = {}) => {
+        await ensureLoaded()
+        const table = tableFor(ontology)
+        if (!table) return []
+        const query = `
+            WITH all_terms AS (SELECT curie, label, ontology, parents FROM ${table})
+            SELECT r.curie, r.label, r.ontology,
+                EXISTS (SELECT 1 FROM all_terms t WHERE list_contains(string_split(t.parents, '|'), r.curie)) AS has_children
+            FROM all_terms r
+            WHERE r.parents IS NULL OR r.parents = ''
+                OR NOT EXISTS (SELECT 1 FROM all_terms p WHERE list_contains(string_split(r.parents, '|'), p.curie))
+            ORDER BY lower(r.label)
+            LIMIT ${Number(limit) || 300}
+        `
+        return mapTree(await duck.executeQuery(query, connectionId))
+    }
+
+    // Direct is_a children of a term (one level) — the lazy-load unit for the tree
+    // and the "narrower terms" list in the detail panel. has_children lets the tree
+    // show an expand arrow without a follow-up query.
+    const children = async (curie, { limit = 3000 } = {}) => {
+        await ensureLoaded()
+        if (!sources.value.length) return []
+        const c = esc(curie)
+        const query = `
+            WITH all_terms AS (${unionAll()})
+            SELECT k.curie, k.label, k.ontology,
+                EXISTS (SELECT 1 FROM all_terms t WHERE list_contains(string_split(t.parents, '|'), k.curie)) AS has_children
+            FROM all_terms k
+            WHERE list_contains(string_split(k.parents, '|'), '${c}')
+            ORDER BY lower(k.label)
+            LIMIT ${Number(limit) || 3000}
+        `
+        return mapTree(await duck.executeQuery(query, connectionId))
+    }
+
+    // Ancestors ordered general→specific (root first) with each term's min distance
+    // from the start — the breadcrumb trail above the tree. Recursion is depth-capped
+    // to stay bounded on diamond-shaped DAGs. Returns [{ curie, label, ontology, depth }].
+    const lineage = async (curie, { limit = 100, maxDepth = 50 } = {}) => {
+        await ensureLoaded()
+        if (!sources.value.length) return []
+        const c = esc(curie)
+        const query = `
+            WITH RECURSIVE all_terms AS (${unionAll()}),
+            acc AS (
+                SELECT curie, label, ontology, parents, 0 AS depth FROM all_terms WHERE curie = '${c}'
+                UNION ALL
+                SELECT t.curie, t.label, t.ontology, t.parents, a.depth + 1
+                FROM all_terms t JOIN acc a ON list_contains(string_split(a.parents, '|'), t.curie)
+                WHERE a.depth < ${Math.floor(Number(maxDepth)) || 50}
+            )
+            SELECT curie, label, ontology, min(depth) AS depth
+            FROM acc WHERE curie <> '${c}'
+            GROUP BY curie, label, ontology
+            ORDER BY depth DESC
+            LIMIT ${Number(limit) || 100}
+        `
+        const rows = await duck.executeQuery(query, connectionId)
+        return (rows || []).map((r) => ({
+            curie: r.curie == null ? '' : String(r.curie),
+            label: r.label == null ? '' : String(r.label),
+            ontology: r.ontology == null ? '' : String(r.ontology),
+            depth: r.depth == null ? 0 : Number(r.depth),
+        }))
+    }
+
     // Ancestors of a term (path toward the roots) — breadcrumb context / broadening.
     const ancestors = async (curie, { limit = 200 } = {}) => {
         await ensureLoaded()
@@ -190,7 +286,11 @@ export const useOntologyStore = defineStore('ontology', () => {
         return mapRows(await duck.executeQuery(query, connectionId))
     }
 
-    return { loading, loaded, error, sources, isConfigured, ensureLoaded, search, descendants, ancestors }
+    return {
+        loading, loaded, error, sources, isConfigured, ensureLoaded,
+        search, descendants, ancestors,
+        getByCurie, roots, children, lineage,
+    }
 })
 
 // DuckDB rows come back as Arrow rows; normalize to plain objects/strings.

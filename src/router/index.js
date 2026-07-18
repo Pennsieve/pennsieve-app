@@ -9,6 +9,7 @@ import ModelSpecViewer from "@/components/datasets/metadata/models/ModelSpecView
 import ModelSpecGenerator from "@/components/datasets/metadata/models/ModelSpecGenerator.vue";
 import TemplateGallery from "@/components/datasets/metadata/models/TemplateGallery.vue";
 import CdeGallery from "@/components/datasets/metadata/models/CdeGallery.vue";
+import OntologyBrowser from "@/components/datasets/metadata/models/OntologyBrowser.vue";
 import ListRecords from "@/components/datasets/metadata/records/ListRecords.vue";
 import RecordSpecViewer from "@/components/datasets/metadata/records/RecordSpecViewer.vue";
 import RecordSpecGenerator from "@/components/datasets/metadata/records/RecordSpecGenerator.vue";
@@ -412,6 +413,21 @@ const router = createRouter({
             backLink: { name: 'resources' },
             title: 'CDE Catalog',
             description: 'Browse common data elements and bundles.'
+          }
+        },
+        {
+          name: 'ontology-browser',
+          path: 'resources/ontology-browser',
+          components: {
+            stage: OntologyBrowser,
+            navigation: UserNavigation,
+          },
+          props: true,
+          meta: {
+            hideSecondaryNav: true,
+            backLink: { name: 'resources' },
+            title: 'Ontology Browser',
+            description: 'Explore standard biomedical ontologies and their hierarchy.'
           }
         },
         {
