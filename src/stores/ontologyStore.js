@@ -177,6 +177,38 @@ export const useOntologyStore = defineStore('ontology', () => {
         return (rows || []).map(normalizeRow)
     }
 
+    // Search restricted to a subtree — the interactive entry path for an over-cap
+    // "ontology subtree value set" (records validate against subtree membership, so a
+    // free search would surface out-of-set terms that then fail on save). Over-searches
+    // within the ontology, then keeps only hits that descend from (or equal) the root,
+    // via one batched upward is_a walk. Returns [{ curie, label, ontology, ... }].
+    const searchSubtree = async (rootCurie, rawTerm, { ontology = null, limit = 20 } = {}) => {
+        const root = String(rootCurie || '').trim()
+        const term = String(rawTerm || '').trim()
+        if (!root || !term) return []
+        const lim = Number(limit) || 20
+        const hits = await search(term, { limit: lim * 3, ontologies: ontology ? [ontology] : null })
+        if (!hits.length) return []
+
+        const inList = hits.map((h) => `'${esc(h.curie)}'`).join(', ')
+        const r = esc(root)
+        // Walk parents up from every candidate at once; a candidate is in-subtree when
+        // its ancestor closure reaches the root (or it IS the root).
+        const query = `
+            WITH RECURSIVE all_terms AS (${unionAll()}),
+            walk AS (
+                SELECT curie AS seed, curie AS node, parents FROM all_terms WHERE curie IN (${inList})
+                UNION
+                SELECT w.seed, t.curie AS node, t.parents
+                FROM all_terms t JOIN walk w ON list_contains(string_split(w.parents, '|'), t.curie)
+            )
+            SELECT DISTINCT seed FROM walk WHERE node = '${r}'
+        `
+        const rows = await duck.executeQuery(query, connectionId)
+        const keep = new Set((rows || []).map((x) => String(x.seed)))
+        return hits.filter((h) => keep.has(h.curie)).slice(0, lim)
+    }
+
     // Union of every loaded slice, obsolete terms excluded. Excluding them here
     // keeps the whole is_a graph (roots/children/lineage/descendants/ancestors)
     // free of deprecated concepts — which matters because obsolete OBO terms have
@@ -454,7 +486,7 @@ export const useOntologyStore = defineStore('ontology', () => {
     return {
         loading, loaded, error, available, sources, isConfigured,
         ensureRegistry, ensureOntology, ensureLoaded,
-        search, descendants, ancestors, subtreeMembers,
+        search, searchSubtree, descendants, ancestors, subtreeMembers,
         getByCurie, roots, children, lineage, labelsFor,
     }
 })
