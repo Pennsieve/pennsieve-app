@@ -428,7 +428,9 @@ const resolveSubtreeLabels = async () => {
   }
 }
 
-watch(recordData, () => { resolveSubtreeLabels() })
+// Watch both: the record and the schema load from separate (parallel) fetches, so
+// either can win the race — resolve once whichever lands last is in place.
+watch([recordData, modelSchema], () => { resolveSubtreeLabels() })
 
 const getPropertyTypeDisplay = (property) => {
   let type = property.type || 'string'
@@ -990,7 +992,10 @@ watch([() => props.modelId, () => props.recordId], async () => {
 // Initialize
 onMounted(async () => {
   await Promise.all([fetchModel(), fetchRecord(), fetchPackages(), fetchRelationships(), fetchRecordHistory()])
-  
+  // Both model + record are now loaded — resolve subtree labels regardless of which
+  // fetch won the race (the watcher may have fired too early to see both).
+  resolveSubtreeLabels()
+
   // If we have an as_of parameter, set up preview state to match
   if (props.as_of) {
     previewTimestamp.value = props.as_of
