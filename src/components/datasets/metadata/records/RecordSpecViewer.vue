@@ -3,6 +3,7 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { ElCard, ElTag, ElMessage, ElButton, ElPagination, ElMessageBox } from 'element-plus'
 import { useRouter, useRoute } from 'vue-router'
 import { useMetadataStore } from '@/stores/metadataStore.js'
+import { useOntologyStore } from '@/stores/ontologyStore.js'
 import { useRecordData } from '@/composables/useRecordData.js'
 
 // Import components
@@ -40,8 +41,13 @@ const props = defineProps({
 })
 
 const metadataStore = useMetadataStore()
+const ontologyStore = useOntologyStore()
 const router = useRouter()
 const route = useRoute()
+
+// Code→label lookup for over-cap (subtree) value sets, which carry no inline labels
+// in the schema — resolved lazily from the ontology slices for the loaded record.
+const subtreeLabels = ref({})
 
 // Reactive data
 const record = ref(null)
@@ -323,11 +329,36 @@ const goToUpdateRecord = () => {
 }
 
 
+// { code: label } lookup for a property's inline value set (ontology / CDE), or null.
+const inlineValueLabels = (property) => {
+  const vals = property['x-pennsieve-concept-values'] || property['x-pennsieve-cde-values']
+  if (!Array.isArray(vals) || !vals.length) return null
+  const map = {}
+  for (const v of vals) {
+    const code = v?.code ?? v?.value
+    if (code != null) map[code] = v.label || String(code)
+  }
+  return Object.keys(map).length ? map : null
+}
+
 const formatPropertyValue = (value, property) => {
   if (value === null || value === undefined) {
     return { display: 'N/A', isNull: true }
   }
-  
+
+  // Controlled value set (ontology / CDE): show the label, not the stored code.
+  // Inline sets carry labels in the schema; over-cap subtree sets resolve async
+  // via the ontology slices. Falls back to the code until/unless resolved.
+  const inline = inlineValueLabels(property)
+  const isSubtree = !!property['x-pennsieve-concept-valueset']
+  if (inline || isSubtree) {
+    const toLabel = (v) => (inline && inline[v]) || subtreeLabels.value[v] || v
+    if (Array.isArray(value)) {
+      return { display: value.map(toLabel).join(', '), isNull: false }
+    }
+    return { display: toLabel(value), isNull: false }
+  }
+
   // Handle different property types
   if (property.type === 'boolean') {
     return { display: value ? 'Yes' : 'No', isNull: false }
@@ -363,6 +394,41 @@ const formatPropertyValue = (value, property) => {
   
   return { display: String(value), isNull: false }
 }
+
+// Resolve labels for the record's subtree value-set codes (no inline labels in the
+// schema). Fail-open: codes stay shown as-is on any error.
+const resolveSubtreeLabels = async () => {
+  const schema = modelSchema.value
+  const data = recordData.value
+  if (!schema?.properties || !data) return
+  const props = Object.entries(schema.properties).filter(([, p]) => p['x-pennsieve-concept-valueset'])
+  if (!props.length) return
+
+  const needed = new Set()
+  const onts = new Set()
+  for (const [key, p] of props) {
+    const v = data[key]
+    if (v == null) continue
+    for (const code of Array.isArray(v) ? v : [v]) {
+      if (typeof code === 'string' && !subtreeLabels.value[code]) needed.add(code)
+    }
+    const o = p['x-pennsieve-concept-valueset']?.ontology
+    if (o) onts.add(o)
+  }
+  if (!needed.size) return
+
+  try {
+    await Promise.all([...onts].map((o) => ontologyStore.ensureOntology(o)))
+    const map = await ontologyStore.labelsFor([...needed])
+    const next = { ...subtreeLabels.value }
+    for (const [code, label] of map) if (label) next[code] = label
+    subtreeLabels.value = next
+  } catch {
+    /* leave codes as-is */
+  }
+}
+
+watch(recordData, () => { resolveSubtreeLabels() })
 
 const getPropertyTypeDisplay = (property) => {
   let type = property.type || 'string'
