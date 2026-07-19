@@ -278,7 +278,7 @@
               <el-option v-for="t in manualTypes" :key="t.value" :label="t.label" :value="t.value" />
             </el-select>
           </el-form-item>
-          <el-form-item v-if="manual.type === 'string'" label="Format">
+          <el-form-item v-if="manual.type === 'string' && !subtreeRoot" label="Format">
             <el-select v-model="manual.format">
               <el-option v-for="f in stringFormats" :key="f.value" :label="f.label" :value="f.value" />
             </el-select>
@@ -564,6 +564,9 @@ const applyValueDomain = (schema, vd) => {
     ontology: vd.ontology,
     ontology_version: vd.ontology_version,
   }
+  // The values are ontology codes, not a formatted string — a date/email/uri
+  // format would contradict the value set.
+  delete schema.format
   if (vd.over_cap) {
     delete schema.enum
     const ref = {
