@@ -278,7 +278,7 @@
               <el-option v-for="t in manualTypes" :key="t.value" :label="t.label" :value="t.value" />
             </el-select>
           </el-form-item>
-          <el-form-item v-if="manual.type === 'string' && !subtreeRoot" label="Format">
+          <el-form-item v-if="manual.type === 'string' && !hasControlledValues" label="Format">
             <el-select v-model="manual.format">
               <el-option v-for="f in stringFormats" :key="f.value" :label="f.label" :value="f.value" />
             </el-select>
@@ -927,11 +927,12 @@ function manualValueSchema() {
   const en = parseCsv(manual.enumInput)
   const withConstraints = (obj) => {
     if (t === 'string') {
-      if (manual.format && manual.format !== 'plain') obj.format = manual.format
-      // Skip length/pattern when the value is drawn from a controlled set — they'd
-      // be redundant and could reject valid codes (and may be stale from before the
-      // value set was chosen).
+      // Skip format/length/pattern when the value is drawn from a controlled set
+      // (a manual enum or an ontology value set) — the enum already fixes the exact
+      // allowed values, so these are redundant and can be contradictory (an enum value
+      // that doesn't satisfy the format leaves the field unsatisfiable).
       if (!hasControlledValues.value) {
+        if (manual.format && manual.format !== 'plain') obj.format = manual.format
         if (isNum(manual.minLength)) obj.minLength = parseInt(manual.minLength, 10)
         if (isNum(manual.maxLength)) obj.maxLength = parseInt(manual.maxLength, 10)
         if (manual.pattern) obj.pattern = manual.pattern
