@@ -1,7 +1,7 @@
 <script setup>
 import { ref, computed, onMounted, watch, nextTick } from 'vue'
-import { ElTable, ElTableColumn, ElCard, ElButton, ElSelect, ElOption, ElMessage, ElDropdown, ElDropdownMenu, ElDropdownItem, ElIcon, ElTag, ElDivider } from 'element-plus'
-import { ArrowDown, View } from '@element-plus/icons-vue'
+import { ElTable, ElTableColumn, ElCard, ElButton, ElSelect, ElOption, ElMessage, ElDropdown, ElDropdownMenu, ElDropdownItem, ElIcon, ElTag, ElDivider, ElTooltip } from 'element-plus'
+import { ArrowDown, View, InfoFilled } from '@element-plus/icons-vue'
 import { useRouter } from 'vue-router'
 import { useMetadataStore } from '@/stores/metadataStore.js'
 import { useOntologyStore } from '@/stores/ontologyStore.js'
@@ -85,9 +85,29 @@ const tableColumns = computed(() => {
     // the human label (e.g. "epilepsy") instead of the stored code ("MONDO:0005027").
     valueLabels: buildValueLabels(property),
     // Over-cap value sets ship no inline labels — resolve them from this ontology.
-    subtreeOntology: property['x-pennsieve-concept-valueset']?.ontology || null
+    subtreeOntology: property['x-pennsieve-concept-valueset']?.ontology || null,
+    // Tooltip text when this column holds coded values (null when it doesn't).
+    codedTip: codedColumnTip(property)
   }))
 })
+
+// Describe a column's coded-value source for a header tooltip, or null if it isn't
+// backed by an ontology / CDE value set.
+const codedColumnTip = (property) => {
+  const cde =
+    property['x-pennsieve-cde-values'] || property['x-pennsieve-cde-valueset'] || property['x-pennsieve-cde']
+  const system =
+    property['x-pennsieve-concept-valueset']?.ontology ||
+    property['x-pennsieve-concept']?.ontology ||
+    null
+  const isConcept =
+    property['x-pennsieve-concept-values'] ||
+    property['x-pennsieve-concept-valueset'] ||
+    property['x-pennsieve-concept']
+  if (!isConcept && !cde) return null
+  const source = system ? `the ${system} ontology` : cde ? 'a linked CDE value set' : 'a controlled value set'
+  return `Coded values — each entry is a term from ${source}, stored as a code (e.g. MONDO:0015005) and shown here by its label.`
+}
 
 // Build a { code: label } lookup from a property's materialized value annotation.
 // Returns null when the property has no controlled value labels.
@@ -961,6 +981,14 @@ onMounted(async () => {
             :min-width="120"
             show-overflow-tooltip
           >
+            <template #header>
+              <span class="column-header">
+                {{ column.label }}
+                <el-tooltip v-if="column.codedTip" :content="column.codedTip" placement="top" :show-after="200">
+                  <el-icon class="coded-indicator"><InfoFilled /></el-icon>
+                </el-tooltip>
+              </span>
+            </template>
             <template #default="{ row }">
               {{ formatCellValue(row.value[column.key], column) }}
             </template>
@@ -1335,7 +1363,19 @@ onMounted(async () => {
       border: none;
       //box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
       //border-radius: 8px;
-      
+
+      .column-header {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+
+        .coded-indicator {
+          font-size: 13px;
+          color: theme.$gray_4;
+          cursor: help;
+        }
+      }
+
       :deep(.el-card__body) {
         padding: 0;
       }
