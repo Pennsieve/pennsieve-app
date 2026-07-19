@@ -4,6 +4,7 @@ import { ElTable, ElTableColumn, ElCard, ElButton, ElSelect, ElOption, ElMessage
 import { ArrowDown, View } from '@element-plus/icons-vue'
 import { useRouter } from 'vue-router'
 import { useMetadataStore } from '@/stores/metadataStore.js'
+import { useOntologyStore } from '@/stores/ontologyStore.js'
 import MultiModelFilter from '../../explore/GraphExplorer/MultiModelFilter.vue'
 import IconPlus from '@/components/icons/IconPlus.vue'
 import StageActions from "@/components/shared/StageActions/StageActions.vue";
@@ -27,7 +28,12 @@ const props = defineProps({
 
 // Store and router
 const metadataStore = useMetadataStore()
+const ontologyStore = useOntologyStore()
 const router = useRouter()
+
+// Code→label lookup for over-cap ontology value sets (tier:"subtree"), which carry
+// no inline labels in the schema — resolved lazily from the ontology slices.
+const subtreeLabels = ref({})
 
 // Reactive data
 const records = ref([])
@@ -74,9 +80,27 @@ const tableColumns = computed(() => {
     key,
     label: property.title || key,
     type: property.type,
-    format: property.format
+    format: property.format,
+    // Code→label map for controlled value sets (ontology / CDE), so cells render
+    // the human label (e.g. "epilepsy") instead of the stored code ("MONDO:0005027").
+    valueLabels: buildValueLabels(property),
+    // Over-cap value sets ship no inline labels — resolve them from this ontology.
+    subtreeOntology: property['x-pennsieve-concept-valueset']?.ontology || null
   }))
 })
+
+// Build a { code: label } lookup from a property's materialized value annotation.
+// Returns null when the property has no controlled value labels.
+const buildValueLabels = (property) => {
+  const vals = property['x-pennsieve-concept-values'] || property['x-pennsieve-cde-values']
+  if (!Array.isArray(vals) || !vals.length) return null
+  const map = {}
+  for (const v of vals) {
+    const code = v?.code ?? v?.value
+    if (code != null) map[code] = v.label || String(code)
+  }
+  return Object.keys(map).length ? map : null
+}
 
 const hasRecords = computed(() => records.value.length > 0)
 
@@ -551,11 +575,55 @@ const selectModel = (command) => {
   })
 }
 
+// Resolve labels for over-cap (subtree) value-set codes on the current page. Inline
+// value sets already carry their labels in the schema; this only covers columns whose
+// codes aren't in the schema. Fail-open: on any error the codes stay shown as-is.
+const resolveSubtreeLabels = async () => {
+  const cols = tableColumns.value.filter(c => c.subtreeOntology)
+  if (!cols.length || !records.value.length) return
+
+  const needed = new Set()
+  for (const c of cols) {
+    for (const rec of records.value) {
+      const v = rec.value?.[c.key]
+      if (v == null) continue
+      for (const code of Array.isArray(v) ? v : [v]) {
+        if (typeof code === 'string' && !subtreeLabels.value[code]) needed.add(code)
+      }
+    }
+  }
+  if (!needed.size) return
+
+  try {
+    const onts = [...new Set(cols.map(c => c.subtreeOntology))]
+    await Promise.all(onts.map(o => ontologyStore.ensureOntology(o)))
+    const map = await ontologyStore.labelsFor([...needed])
+    const next = { ...subtreeLabels.value }
+    for (const [code, label] of map) if (label) next[code] = label
+    subtreeLabels.value = next
+  } catch {
+    /* leave codes as-is */
+  }
+}
+
+watch([records, modelSchema], () => { resolveSubtreeLabels() })
+
 const formatCellValue = (value, column) => {
   if (value === null || value === undefined) {
     return ''
   }
-  
+
+  // Controlled value set (ontology / CDE): show the label, fall back to the code
+  // when a value isn't resolved yet (subtree labels load async) or isn't in the
+  // set (e.g. a code from a since-narrowed value set).
+  if (column.valueLabels || column.subtreeOntology) {
+    const toLabel = v => (column.valueLabels && column.valueLabels[v]) || subtreeLabels.value[v] || v
+    if (Array.isArray(value)) {
+      return value.map(toLabel).join(', ')
+    }
+    return toLabel(value)
+  }
+
   // Format based on column type
   if (column.type === 'number' || column.type === 'integer') {
     return Number(value).toLocaleString()
