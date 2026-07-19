@@ -557,6 +557,19 @@ const PropertyTree = defineComponent({
       return baseType
     }
     
+    // code -> display label from a materialized value-list annotation (ontology
+    // `x-pennsieve-concept-values` or CDE `x-pennsieve-cde-values`). Empty when
+    // none — the enum then shows the raw codes.
+    const enumLabels = (property) => {
+      const vals = property['x-pennsieve-concept-values'] || property['x-pennsieve-cde-values'] || []
+      const map = {}
+      for (const v of vals) {
+        const code = v?.code ?? v?.value
+        if (code != null) map[code] = v.label || String(code)
+      }
+      return map
+    }
+
     const getNestedConstraints = (property) => {
       const constraints = []
       
@@ -593,9 +606,14 @@ const PropertyTree = defineComponent({
         constraints.push('unique')
       }
       
-      // Enum values
+      // Enum values — show labels (not raw codes like MONDO:xxx) and cap the list.
       if (property.enum) {
-        constraints.push(`values: [${property.enum.join(', ')}]`)
+        const labels = enumLabels(property)
+        const display = property.enum.map((v) => labels[v] || v)
+        const CAP = 10
+        const shown = display.slice(0, CAP).join(', ')
+        const more = display.length - CAP
+        constraints.push(`values: [${shown}${more > 0 ? `, +${more} more` : ''}]`)
       }
       
       return constraints

@@ -3,6 +3,7 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { ElCard, ElTag, ElMessage, ElButton, ElPagination, ElMessageBox } from 'element-plus'
 import { useRouter, useRoute } from 'vue-router'
 import { useMetadataStore } from '@/stores/metadataStore.js'
+import { useOntologyStore } from '@/stores/ontologyStore.js'
 import { useRecordData } from '@/composables/useRecordData.js'
 
 // Import components
@@ -40,8 +41,13 @@ const props = defineProps({
 })
 
 const metadataStore = useMetadataStore()
+const ontologyStore = useOntologyStore()
 const router = useRouter()
 const route = useRoute()
+
+// Code→label lookup for over-cap (subtree) value sets, which carry no inline labels
+// in the schema — resolved lazily from the ontology slices for the loaded record.
+const subtreeLabels = ref({})
 
 // Reactive data
 const record = ref(null)
@@ -109,7 +115,8 @@ const recordProperties = computed(() => {
     format: property.format,
     description: property.description,
     value: recordData.value[key],
-    property: property
+    property: property,
+    formatted: formatPropertyValue(recordData.value[key], property)
   }))
 })
 
@@ -323,11 +330,37 @@ const goToUpdateRecord = () => {
 }
 
 
+// { code: label } lookup for a property's inline value set (ontology / CDE), or null.
+const inlineValueLabels = (property) => {
+  const vals = property['x-pennsieve-concept-values'] || property['x-pennsieve-cde-values']
+  if (!Array.isArray(vals) || !vals.length) return null
+  const map = {}
+  for (const v of vals) {
+    const code = v?.code ?? v?.value
+    if (code != null) map[code] = v.label || String(code)
+  }
+  return Object.keys(map).length ? map : null
+}
+
 const formatPropertyValue = (value, property) => {
   if (value === null || value === undefined) {
     return { display: 'N/A', isNull: true }
   }
-  
+
+  // Controlled value set (ontology / CDE): show the label, not the stored code.
+  // Inline sets carry labels in the schema; over-cap subtree sets resolve async
+  // via the ontology slices. Falls back to the code until/unless resolved.
+  const inline = inlineValueLabels(property)
+  const isSubtree = !!property['x-pennsieve-concept-valueset']
+  if (inline || isSubtree) {
+    const toLabel = (v) => (inline && inline[v]) || subtreeLabels.value[v] || v
+    const codeStr = Array.isArray(value) ? value.join(', ') : String(value)
+    const display = Array.isArray(value) ? value.map(toLabel).join(', ') : toLabel(value)
+    // Surface the underlying code alongside the label so it's clear the stored value
+    // is a coded term — but only once a label actually resolved (else it's redundant).
+    return { display, isNull: false, code: display !== codeStr ? codeStr : null }
+  }
+
   // Handle different property types
   if (property.type === 'boolean') {
     return { display: value ? 'Yes' : 'No', isNull: false }
@@ -363,6 +396,43 @@ const formatPropertyValue = (value, property) => {
   
   return { display: String(value), isNull: false }
 }
+
+// Resolve labels for the record's subtree value-set codes (no inline labels in the
+// schema). Fail-open: codes stay shown as-is on any error.
+const resolveSubtreeLabels = async () => {
+  const schema = modelSchema.value
+  const data = recordData.value
+  if (!schema?.properties || !data) return
+  const props = Object.entries(schema.properties).filter(([, p]) => p['x-pennsieve-concept-valueset'])
+  if (!props.length) return
+
+  const needed = new Set()
+  const onts = new Set()
+  for (const [key, p] of props) {
+    const v = data[key]
+    if (v == null) continue
+    for (const code of Array.isArray(v) ? v : [v]) {
+      if (typeof code === 'string' && !subtreeLabels.value[code]) needed.add(code)
+    }
+    const o = p['x-pennsieve-concept-valueset']?.ontology
+    if (o) onts.add(o)
+  }
+  if (!needed.size) return
+
+  try {
+    await Promise.all([...onts].map((o) => ontologyStore.ensureOntology(o)))
+    const map = await ontologyStore.labelsFor([...needed])
+    const next = { ...subtreeLabels.value }
+    for (const [code, label] of map) if (label) next[code] = label
+    subtreeLabels.value = next
+  } catch {
+    /* leave codes as-is */
+  }
+}
+
+// Watch both: the record and the schema load from separate (parallel) fetches, so
+// either can win the race — resolve once whichever lands last is in place.
+watch([recordData, modelSchema], () => { resolveSubtreeLabels() })
 
 const getPropertyTypeDisplay = (property) => {
   let type = property.type || 'string'
@@ -924,7 +994,10 @@ watch([() => props.modelId, () => props.recordId], async () => {
 // Initialize
 onMounted(async () => {
   await Promise.all([fetchModel(), fetchRecord(), fetchPackages(), fetchRelationships(), fetchRecordHistory()])
-  
+  // Both model + record are now loaded — resolve subtree labels regardless of which
+  // fetch won the race (the watcher may have fired too early to see both).
+  resolveSubtreeLabels()
+
   // If we have an as_of parameter, set up preview state to match
   if (props.as_of) {
     previewTimestamp.value = props.as_of
@@ -1030,8 +1103,9 @@ onMounted(async () => {
               class="attribute-item"
             >
               <span class="attribute-name">{{ prop.label }}:</span>
-              <span class="attribute-value" :class="{ 'is-null': formatPropertyValue(prop.value, prop.property).isNull }">
-                {{ formatPropertyValue(prop.value, prop.property).display }}
+              <span class="attribute-value" :class="{ 'is-null': prop.formatted.isNull }">
+                {{ prop.formatted.display }}
+                <span v-if="prop.formatted.code" class="attribute-code" :title="`Stored value: ${prop.formatted.code}`">{{ prop.formatted.code }}</span>
               </span>
             </div>
           </div>
@@ -1654,10 +1728,21 @@ onMounted(async () => {
               color: theme.$gray_6;
               font-size: 14px;
               line-height: 1.4;
-              
+
               &.is-null {
                 color: theme.$gray_4;
                 font-style: italic;
+              }
+
+              .attribute-code {
+                margin-left: 8px;
+                padding: 1px 6px;
+                border-radius: 3px;
+                background: theme.$gray_1;
+                color: theme.$gray_4;
+                font-size: 11px;
+                font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+                vertical-align: middle;
               }
             }
           }

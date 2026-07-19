@@ -3,6 +3,7 @@ import { ref, computed, onMounted, watch, h } from 'vue'
 import { ElCard, ElForm, ElFormItem, ElInput, ElInputNumber, ElSelect, ElOption, ElDatePicker, ElMessage, ElButton } from 'element-plus'
 import { useRouter, useRoute } from 'vue-router'
 import { useMetadataStore } from '@/stores/metadataStore.js'
+import { useOntologyStore } from '@/stores/ontologyStore.js'
 import Ajv from 'ajv'
 import addFormats from 'ajv-formats'
 
@@ -30,8 +31,16 @@ const props = defineProps({
 })
 
 const metadataStore = useMetadataStore()
+const ontologyStore = useOntologyStore()
 const router = useRouter()
 const route = useRoute()
+
+// Over-cap ontology value sets (tier:"subtree") have no inline enum — the field is a
+// remote search over the value set's ontology, restricted to the subtree. These hold
+// the per-field search results, loading flags, and resolved labels for current values.
+const subtreeOptions = ref({})     // key -> [{ code, label }]
+const subtreeSearching = ref({})   // key -> bool
+const subtreeValueLabels = ref({}) // code -> label (to display already-stored values)
 
 // Reactive data
 const model = ref(null)
@@ -471,6 +480,22 @@ const updateRecord = async () => {
 // Surface it so the field reads as controlled-by-a-CDE rather than free-form.
 const cdeValueSet = (property) => property?.property?.['x-pennsieve-cde-valueset'] || null
 
+// An over-cap ontology value set carries `x-pennsieve-concept-valueset` (tier:"subtree",
+// with `ontology` + `root`) instead of an enum. It's browsable/searchable, so the field
+// becomes a subtree-restricted remote search rather than a plain text box.
+const conceptValueSet = (property) => {
+  const vs = property?.property?.['x-pennsieve-concept-valueset']
+  return vs && vs.ontology && vs.root ? vs : null
+}
+
+const conceptValueSetHint = (property) => {
+  const vs = conceptValueSet(property)
+  if (!vs) return ''
+  const anchor = property?.property?.['x-pennsieve-concept']
+  const rootLabel = anchor?.label || vs.root
+  return `Search ${vs.ontology} for a term under “${rootLabel}”.`
+}
+
 // code -> display label for an enum, from a materialized value-list annotation
 // (ontology `x-pennsieve-concept-values` or CDE `x-pennsieve-cde-values`). Empty
 // map when none — the enum then shows the raw codes.
@@ -498,10 +523,63 @@ const cdeValueSetHint = (property) => {
   return `Bound to a CDE value set (${count ? count + ' ' : ''}allowed values${system}) too large to list here — refer to the CDE for the allowed codes.`
 }
 
+// Remote search within a subtree value set, storing the code + showing the label.
+const runSubtreeSearch = async (key, vs, query) => {
+  const term = String(query || '').trim()
+  if (!term) {
+    subtreeOptions.value = { ...subtreeOptions.value, [key]: [] }
+    return
+  }
+  subtreeSearching.value = { ...subtreeSearching.value, [key]: true }
+  try {
+    const hits = await ontologyStore.searchSubtree(vs.root, term, { ontology: vs.ontology, limit: 25 })
+    subtreeOptions.value = {
+      ...subtreeOptions.value,
+      [key]: hits.map((h) => ({ code: h.curie, label: h.label || h.curie }))
+    }
+  } catch {
+    subtreeOptions.value = { ...subtreeOptions.value, [key]: [] }
+  } finally {
+    subtreeSearching.value = { ...subtreeSearching.value, [key]: false }
+  }
+}
+
+const renderSubtreeSelect = (property, vs) => {
+  const { key } = property
+  const current = formData.value[key]
+  const opts = subtreeOptions.value[key] || []
+  // Always keep the current value selectable so its label shows even before searching.
+  const merged = [...opts]
+  if (current != null && current !== '' && !merged.some((o) => o.code === current)) {
+    merged.unshift({ code: current, label: subtreeValueLabels.value[current] || current })
+  }
+  return h(ElSelect, {
+    modelValue: current,
+    'onUpdate:modelValue': (value) => {
+      formData.value[key] = value
+      if (nullKeyFields.value[key]) nullKeyFields.value[key] = false
+    },
+    placeholder: `Search ${vs.ontology}…`,
+    clearable: true,
+    filterable: true,
+    remote: true,
+    remoteMethod: (q) => runSubtreeSearch(key, vs, q),
+    loading: !!subtreeSearching.value[key],
+    reserveKeyword: false,
+    size: 'default'
+  }, () => merged.map((o) => h(ElOption, { key: o.code, label: o.label, value: o.code })))
+}
+
 // Helper function for rendering just the form input
 const renderFormFieldInput = (property) => {
   const { key, type, format, enum: enumValues } = property
-  
+
+  // Over-cap ontology value set → subtree-restricted remote search (no inline enum).
+  const conceptVs = conceptValueSet(property)
+  if (conceptVs) {
+    return renderSubtreeSelect(property, conceptVs)
+  }
+
   if (enumValues && enumValues.length > 0) {
     // Enum stores codes; show human labels when a values annotation carries them
     // (CDE-materialized or ontology value domains), so the dropdown reads
@@ -1020,11 +1098,40 @@ const getSuggestion = (error) => {
   }
 }
 
+// Resolve labels for subtree value-set codes already stored on the record, so an
+// edited field shows "epilepsy" rather than the raw "MONDO:0015005" on load.
+const resolveSubtreeValueLabels = async () => {
+  const cols = schemaProperties.value.filter((p) => conceptValueSet(p))
+  if (!cols.length) return
+  const needed = new Set()
+  const onts = new Set()
+  for (const p of cols) {
+    const vs = conceptValueSet(p)
+    const v = formData.value[p.key]
+    if (v == null || v === '') continue
+    for (const code of Array.isArray(v) ? v : [v]) {
+      if (typeof code === 'string' && !subtreeValueLabels.value[code]) needed.add(code)
+    }
+    if (vs?.ontology) onts.add(vs.ontology)
+  }
+  if (!needed.size) return
+  try {
+    await Promise.all([...onts].map((o) => ontologyStore.ensureOntology(o)))
+    const map = await ontologyStore.labelsFor([...needed])
+    const next = { ...subtreeValueLabels.value }
+    for (const [code, label] of map) if (label) next[code] = label
+    subtreeValueLabels.value = next
+  } catch {
+    /* leave codes as-is */
+  }
+}
+
 // Initialize
 onMounted(async () => {
   await fetchModel()
   if (isUpdateMode.value) {
     await fetchExistingRecord()
+    await resolveSubtreeValueLabels()
   }
 })
 </script>
@@ -1166,7 +1273,7 @@ onMounted(async () => {
                     Key
                   </el-tag>
                   <el-tag
-                    v-if="cdeValueSet(property)"
+                    v-if="cdeValueSet(property) || conceptValueSet(property)"
                     size="small"
                     effect="plain"
                     class="tag-valueset"
@@ -1198,6 +1305,11 @@ onMounted(async () => {
                 <!-- CDE value-set reference (too large to inline / unpublished) -->
                 <div v-if="cdeValueSet(property)" class="cde-valueset-hint">
                   {{ cdeValueSetHint(property) }}
+                </div>
+
+                <!-- Ontology subtree value set — searchable, restricted to the branch -->
+                <div v-if="conceptValueSet(property)" class="cde-valueset-hint">
+                  {{ conceptValueSetHint(property) }}
                 </div>
 
                 <!-- Validation Error Display -->

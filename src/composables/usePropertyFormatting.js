@@ -95,11 +95,21 @@ export function usePropertyFormatting() {
       constraints.push('unique')
     }
     
-    // Enum values
+    // Enum values — show display labels (not raw codes like MONDO:xxx) from the
+    // materialized value annotation, and cap the list at 10 with "+N more".
     if (property.enum) {
-      constraints.push(`values: [${property.enum.join(', ')}]`)
+      const vals = property['x-pennsieve-concept-values'] || property['x-pennsieve-cde-values'] || []
+      const labels = {}
+      for (const v of vals) {
+        const code = v?.code ?? v?.value
+        if (code != null) labels[code] = v.label || String(code)
+      }
+      const CAP = 10
+      const display = property.enum.map((v) => labels[v] || v)
+      const more = display.length - CAP
+      constraints.push(`values: [${display.slice(0, CAP).join(', ')}${more > 0 ? `, +${more} more` : ''}]`)
     }
-    
+
     return constraints
   }
 
