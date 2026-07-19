@@ -115,7 +115,8 @@ const recordProperties = computed(() => {
     format: property.format,
     description: property.description,
     value: recordData.value[key],
-    property: property
+    property: property,
+    formatted: formatPropertyValue(recordData.value[key], property)
   }))
 })
 
@@ -353,10 +354,11 @@ const formatPropertyValue = (value, property) => {
   const isSubtree = !!property['x-pennsieve-concept-valueset']
   if (inline || isSubtree) {
     const toLabel = (v) => (inline && inline[v]) || subtreeLabels.value[v] || v
-    if (Array.isArray(value)) {
-      return { display: value.map(toLabel).join(', '), isNull: false }
-    }
-    return { display: toLabel(value), isNull: false }
+    const codeStr = Array.isArray(value) ? value.join(', ') : String(value)
+    const display = Array.isArray(value) ? value.map(toLabel).join(', ') : toLabel(value)
+    // Surface the underlying code alongside the label so it's clear the stored value
+    // is a coded term — but only once a label actually resolved (else it's redundant).
+    return { display, isNull: false, code: display !== codeStr ? codeStr : null }
   }
 
   // Handle different property types
@@ -1101,8 +1103,9 @@ onMounted(async () => {
               class="attribute-item"
             >
               <span class="attribute-name">{{ prop.label }}:</span>
-              <span class="attribute-value" :class="{ 'is-null': formatPropertyValue(prop.value, prop.property).isNull }">
-                {{ formatPropertyValue(prop.value, prop.property).display }}
+              <span class="attribute-value" :class="{ 'is-null': prop.formatted.isNull }">
+                {{ prop.formatted.display }}
+                <span v-if="prop.formatted.code" class="attribute-code" :title="`Stored value: ${prop.formatted.code}`">{{ prop.formatted.code }}</span>
               </span>
             </div>
           </div>
@@ -1725,10 +1728,21 @@ onMounted(async () => {
               color: theme.$gray_6;
               font-size: 14px;
               line-height: 1.4;
-              
+
               &.is-null {
                 color: theme.$gray_4;
                 font-style: italic;
+              }
+
+              .attribute-code {
+                margin-left: 8px;
+                padding: 1px 6px;
+                border-radius: 3px;
+                background: theme.$gray_1;
+                color: theme.$gray_4;
+                font-size: 11px;
+                font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+                vertical-align: middle;
               }
             }
           }
