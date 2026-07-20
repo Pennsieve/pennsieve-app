@@ -300,6 +300,7 @@ const defaultExpandedKeys = computed(() => []) // top level is loaded directly; 
 // Plain-language descriptions so users don't need to know the acronyms.
 const ONTOLOGY_META = {
   MONDO: { title: 'Diseases & disorders', desc: 'Harmonized disease definitions merged from many disease resources.' },
+  EPSO: { title: 'Epilepsy & seizures', desc: 'Epilepsy-specific terms — seizure types, syndromes, and ILAE classification.' },
   HPO: { title: 'Phenotypes & signs', desc: 'Human phenotypic abnormalities — symptoms and clinical findings.' },
   UBERON: { title: 'Anatomy', desc: 'Anatomical structures across species — organs, tissues, body parts.' },
   CL: { title: 'Cell types', desc: 'Types of cells across organisms — neurons, glia, immune cells, and more.' },
@@ -328,7 +329,7 @@ const releaseTitle = (o) => {
 
 // Preferred card order (and default landing = first). Anything not listed sorts
 // after, alphabetically. UCUM is a flat unit list — not a browsable tree.
-const ONTOLOGY_ORDER = ['MONDO', 'HPO', 'UBERON', 'CL', 'NCBITaxon', 'CHEBI', 'NCIT']
+const ONTOLOGY_ORDER = ['MONDO', 'EPSO', 'HPO', 'UBERON', 'CL', 'NCBITaxon', 'CHEBI', 'NCIT']
 const browsableOntologies = computed(() => {
   const rank = (o) => {
     const i = ONTOLOGY_ORDER.indexOf(o.ontology)
