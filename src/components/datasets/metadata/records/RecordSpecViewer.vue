@@ -5,6 +5,7 @@ import { useRouter, useRoute } from 'vue-router'
 import { useMetadataStore } from '@/stores/metadataStore.js'
 import { useOntologyStore } from '@/stores/ontologyStore.js'
 import { useRecordData } from '@/composables/useRecordData.js'
+import { summarizeObject } from '@/utils/objectSummary.js'
 
 // Import components
 import BfStage from '@/components/layout/BfStage/BfStage.vue'
@@ -387,11 +388,18 @@ const formatPropertyValue = (value, property) => {
   }
   
   if (Array.isArray(value)) {
+    // Arrays of objects: one summary pill per item instead of "[object Object]".
+    if (value.some((v) => v != null && typeof v === 'object')) {
+      const items = value.map((v) =>
+        v != null && typeof v === 'object' ? summarizeObject(v) : String(v)
+      )
+      return { display: '', items, isNull: false }
+    }
     return { display: value.join(', '), isNull: false }
   }
-  
+
   if (typeof value === 'object') {
-    return { display: JSON.stringify(value, null, 2), isNull: false }
+    return { display: summarizeObject(value), isNull: false }
   }
   
   return { display: String(value), isNull: false }
@@ -1104,7 +1112,14 @@ onMounted(async () => {
             >
               <span class="attribute-name">{{ prop.label }}:</span>
               <span class="attribute-value" :class="{ 'is-null': prop.formatted.isNull }">
-                {{ prop.formatted.display }}
+                <template v-if="prop.formatted.items">
+                  <span
+                    v-for="(item, idx) in prop.formatted.items"
+                    :key="idx"
+                    class="attribute-object-item"
+                  >{{ item }}</span>
+                </template>
+                <template v-else>{{ prop.formatted.display }}</template>
                 <span v-if="prop.formatted.code" class="attribute-code" :title="`Stored value: ${prop.formatted.code}`">{{ prop.formatted.code }}</span>
               </span>
             </div>
@@ -1743,6 +1758,25 @@ onMounted(async () => {
                 font-size: 11px;
                 font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
                 vertical-align: middle;
+              }
+
+              .attribute-object-item {
+                display: inline-block;
+                margin: 0 8px 4px 0;
+                padding: 2px 8px;
+                border-radius: 4px;
+                background: theme.$gray_1;
+                color: theme.$gray_6;
+                font-size: 13px;
+                white-space: nowrap;
+                max-width: 400px;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                vertical-align: middle;
+
+                &:last-child {
+                  margin-right: 0;
+                }
               }
             }
           }
