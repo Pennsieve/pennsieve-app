@@ -558,6 +558,11 @@ const applySubtree = async () => {
 // anchor always; under the cap an enum (codes) + display labels; over the cap the
 // subtree reference (membership-enforced at record write, VALSET-style).
 const applyValueDomain = (schema, vd) => {
+  // For an array property the constraint applies per item, so enum/format land
+  // on `items` (a property-level enum would require the whole array to equal one
+  // code and always fail). The x-pennsieve-* annotations stay on the property,
+  // where the rest of the app reads them.
+  const target = schema.type === 'array' && schema.items ? schema.items : schema
   schema['x-pennsieve-concept'] = {
     curie: vd.root_curie,
     label: vd.root_label,
@@ -566,9 +571,9 @@ const applyValueDomain = (schema, vd) => {
   }
   // The values are ontology codes, not a formatted string — a date/email/uri
   // format would contradict the value set.
-  delete schema.format
+  delete target.format
   if (vd.over_cap) {
-    delete schema.enum
+    delete target.enum
     const ref = {
       tier: 'subtree',
       ontology: vd.ontology,
@@ -580,8 +585,8 @@ const applyValueDomain = (schema, vd) => {
     if (vd.leaves_only) ref.leaves_only = true
     schema['x-pennsieve-concept-valueset'] = ref
   } else {
-    schema.type = schema.type || 'string'
-    schema.enum = vd.members.map((m) => m.code)
+    target.type = target.type || 'string'
+    target.enum = vd.members.map((m) => m.code)
     schema['x-pennsieve-concept-values'] = vd.members
   }
 }
