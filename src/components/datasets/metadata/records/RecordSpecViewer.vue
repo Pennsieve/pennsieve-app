@@ -12,6 +12,7 @@ import BfStage from '@/components/layout/BfStage/BfStage.vue'
 import StageActions from '@/components/shared/StageActions/StageActions.vue'
 import BfButton from '@/components/shared/bf-button/BfButton.vue'
 import IconArrowRight from '@/components/icons/IconArrowRight.vue'
+import IconArrowLeft from '@/components/icons/IconArrowLeft.vue'
 import IconPencil from '@/components/icons/IconPencil.vue'
 import PsButtonDropdown from '@/components/shared/ps-button-dropdown/PsButtonDropdown.vue'
 import IconTrash from "@/components/icons/IconTrash.vue"
@@ -1071,12 +1072,10 @@ onMounted(async () => {
     <template #actions>
       <stage-actions>
         <template #left>
-<!--          <bf-button @click="goBackToRecords" size="small">-->
-<!--            <template #prefix>-->
-<!--              <IconArrowLeft class="mr-8" :height="16" :width="16" />-->
-<!--            </template>-->
-<!--            Back to Records-->
-<!--          </bf-button>-->
+          <a class="back-to-records-link" @click="goBackToRecords">
+            <IconArrowLeft :height="12" :width="12" />
+            {{ model?.display_name || model?.name || 'Model' }} Records
+          </a>
         </template>
         <template #right>
           <template v-if="quickActionsVisible">
@@ -2228,6 +2227,20 @@ onMounted(async () => {
 
   .mr-8 {
     margin-right: 8px;
+  }
+
+  .back-to-records-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    color: theme.$purple_3;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+
+    &:hover {
+      text-decoration: underline;
+    }
   }
 }
 </style>
