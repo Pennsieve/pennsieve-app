@@ -158,6 +158,19 @@
       </bf-navigation-item>
 
       <bf-navigation-item
+        v-if="!(pageNotFound || isWelcomeOrg) && !isWorkspaceGuest"
+        id="nav-resources"
+        :link="{ name: 'workspace-resources', params: { orgId: activeOrganizationId } }"
+        label="Resources"
+        :condensed="primaryNavCondensed"
+        :styleColor="navStyleColor"
+      >
+        <template v-slot:icon>
+          <IconCollection :width="20" :height="20" color="currentColor" />
+        </template>
+      </bf-navigation-item>
+
+      <bf-navigation-item
         v-if="hasAdminRights && !pageNotFound && !isWorkspaceGuest"
         :link="{ name: 'workspace-settings-overview', params: { orgId: activeOrganizationId } }"
         label="Settings"
@@ -204,6 +217,7 @@ import IconPublic from "../icons/IconPublic.vue";
 import IconSPARCLogo from "../icons/IconSPARCLogo.vue";
 import IconI3HLogo from "../icons/IconI3HLogo.vue";
 import IconHealInitiative from "../icons/IconHealInitiative.vue";
+import IconCollection from "../icons/IconCollection.vue";
 import CustomTheme from "../../mixins/custom-theme";
 
 export default {
@@ -239,6 +253,7 @@ export default {
     IconTeam,
     IconIntegrations,
     IconHealInitiative,
+    IconCollection,
   },
   mixins: [CustomTheme],
 

@@ -1,5 +1,16 @@
 <template>
   <bf-stage>
+    <template #actions>
+      <stage-actions>
+        <template #left>
+          <a class="back-to-resources-link" @click="goBackToResources">
+            <IconArrowLeft :height="12" :width="12" />
+            Resources
+          </a>
+        </template>
+      </stage-actions>
+    </template>
+
     <div class="ontology-browser">
       <div class="ob-head">
         <div class="ob-title-row">
@@ -252,11 +263,23 @@
 
 <script setup>
 import { ref, reactive, computed, onMounted } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import { Search, Check, PriceTag, Collection, QuestionFilled, InfoFilled, Calendar, List } from '@element-plus/icons-vue'
 import debounce from 'lodash.debounce'
 import { useOntologyStore } from '@/stores/ontologyStore'
+import StageActions from '@/components/shared/StageActions/StageActions.vue'
+import IconArrowLeft from '@/components/icons/IconArrowLeft.vue'
 
 const store = useOntologyStore()
+
+const router = useRouter()
+const route = useRoute()
+
+// Reachable from MyWorkspace and org workspaces — back within the same context.
+const goBackToResources = () => {
+  const orgId = route.params.orgId
+  router.push(orgId ? { name: 'workspace-resources', params: { orgId } } : { name: 'resources' })
+}
 
 const CHILD_DISPLAY_CAP = 60 // chips in the drawer "narrower terms" list
 
@@ -508,10 +531,25 @@ onMounted(async () => {
 <style scoped lang="scss">
 @use '../../../../styles/theme' as theme;
 
+.back-to-resources-link {
+  display: inline-flex;
+  align-items: center;
+  align-self: center;
+  gap: 4px;
+  color: theme.$purple_3;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+
+  &:hover {
+    text-decoration: underline;
+  }
+}
+
 .ontology-browser {
   min-height: 500px;
-  /* bf-stage gives only 8px top vs 32px sides; add 24px so the top inset matches. */
-  padding-top: 24px;
+  /* The stage-actions bar (back link) above already provides the top inset. */
+  padding-top: 0;
 }
 .ob-title-row {
   display: flex;
