@@ -23,6 +23,7 @@ import IconPencil from "@/components/icons/IconPencil.vue";
 import IconAddTemplate from "@/components/icons/IconAddTemplate.vue";
 import IconPlus from "@/components/icons/IconPlus.vue";
 import IconTrash from "@/components/icons/IconTrash.vue";
+import IconArrowLeft from "@/components/icons/IconArrowLeft.vue";
 
 const props = defineProps({
   datasetId: {
@@ -100,6 +101,19 @@ const templateData = ref()
 
 // Computed to determine if we're viewing a template
 const isTemplate = computed(() => props.isTemplate || !!props.templateId)
+
+// Back link to the list this detail page belongs to
+const backLinkLabel = computed(() => (isTemplate.value ? 'Template Gallery' : 'Models'))
+
+const goBackToList = () => {
+  router.push({
+    name: isTemplate.value ? 'new-model-from-template' : 'models-list',
+    params: {
+      orgId: router.currentRoute.value.params.orgId,
+      datasetId: router.currentRoute.value.params.datasetId
+    }
+  })
+}
 
 // Use composablesOKay
 const {
@@ -874,6 +888,11 @@ const PropertyTree = defineComponent({
     <template v-if="!hideSelector" #actions>
       <stage-actions>
         <template #left>
+          <a class="back-to-list-link" @click="goBackToList">
+            <IconArrowLeft :height="12" :width="12" />
+            {{ backLinkLabel }}
+          </a>
+
           <!-- Version selector -->
           <div v-if="!hideSelector" class="version-controls">
             <!-- Model version selector -->
@@ -1685,28 +1704,38 @@ const PropertyTree = defineComponent({
   }
 }
 
+.back-to-list-link {
+  display: inline-flex;
+  align-items: center;
+  align-self: center;
+  gap: 4px;
+  margin-right: 16px;
+  color: theme.$purple_3;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+
+  &:hover {
+    text-decoration: underline;
+  }
+}
+
 // Version controls styling
 .version-controls {
   display: flex;
   align-items: center;
+  align-self: center;
   gap: 12px;
   
   .version-dropdown {
     width: 160px;
-    height: 32px;
-    
-    :deep(.el-input__wrapper) {
-      height: 32px;
+
+    // Element Plus 2.5+ select renders .el-select__wrapper (no .el-input__*)
+    :deep(.el-select__wrapper) {
+      min-height: 32px;
       border-radius: 4px;
-      border: 1px solid theme.$gray_2;
       background-color: theme.$white;
-    }
-    
-    :deep(.el-input__inner) {
-      height: 32px;
-      line-height: 32px;
       font-size: 14px;
-      color: theme.$gray_6;
     }
   }
 }
