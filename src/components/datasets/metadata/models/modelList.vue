@@ -42,22 +42,11 @@
               </template>
             </bf-card>
           </button>
-          <button
-            @click="openCdeGallery"
-          >
-            <bf-card
-              title="CDE Catalog"
-              card-copy="Browse common data elements and bundles"
-            >
-              <template #icon>
-                <icon-collection
-                  class="card-icon"
-                  :height="48"
-                  :width="48"
-                />
-              </template>
-            </bf-card>
-          </button>
+        </div>
+
+        <div class="resources-hint">
+          Looking for reference catalogs?
+          <a @click="openResources">Browse CDEs and ontologies →</a>
         </div>
 
         <div >
@@ -127,7 +116,6 @@ import { useMetadataStore } from '@/stores/metadataStore.js'
 import IconOverview from "@/components/icons/IconOverview.vue";
 import BfCard from "@/components/shared/bf-card/BfCard.vue";
 import IconAddTemplate from "@/components/icons/IconAddTemplate.vue";
-import IconCollection from "@/components/icons/IconCollection.vue";
 import ModelListItem from "@/components/datasets/metadata/models/modelListItem.vue";
 import CreateModelWizard from "@/components/datasets/metadata/models/CreateModelWizard.vue";
 // Dynamic import to avoid circular dependency issues
@@ -198,15 +186,15 @@ const openTemplateGallery = () => {
   })
 }
 
-const openCdeGallery = () => {
+const openResources = () => {
   router.push({
-    name: 'cde-gallery',
+    name: 'workspace-resources',
     params: {
-      datasetId: props.datasetId,
       orgId: props.orgId,
     }
   })
 }
+
 
 </script>
 
@@ -233,8 +221,23 @@ const openCdeGallery = () => {
 
   .graph-management-cards {
     display: flex;
-    margin-bottom: 48px;
+    margin-bottom: 16px;
+  }
 
+  .resources-hint {
+    margin-bottom: 48px;
+    font-size: 13px;
+    color: theme.$gray_5;
+
+    a {
+      color: theme.$purple_3;
+      font-weight: 500;
+      cursor: pointer;
+
+      &:hover {
+        text-decoration: underline;
+      }
+    }
   }
 
   .gallery-link {
