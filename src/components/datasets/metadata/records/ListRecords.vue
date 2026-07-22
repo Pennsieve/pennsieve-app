@@ -368,12 +368,12 @@ const fetchModel = async () => {
     
     if (model.value?.latest_version?.schema) {
       modelSchema.value = model.value.latest_version.schema
-      // Initialize selected version based on route param or default to all versions
+      // Initialize selected version based on route param or default to latest
       if (!selectedVersion.value) {
         if (props.versionId) {
           selectedVersion.value = props.versionId
         } else {
-          selectedVersion.value = 'all'
+          selectedVersion.value = 'latest'
         }
       }
       
