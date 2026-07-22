@@ -1,4 +1,12 @@
 /**
+ * Strip literal HTML tags from source text (e.g. "<br />" in NLM reference
+ * fields) for plain-text display. Leaves non-tag uses of "<" alone.
+ */
+export function stripHtml(s) {
+  return s.includes('<') ? s.replace(/<\/?[a-z][^>]*>/gi, ' ').replace(/\s+/g, ' ').trim() : s
+}
+
+/**
  * One-line human summary for an object value (e.g. an xref entry). Prefers a
  * name-ish + value-ish key pair ("NINDS: C57136"), falling back to the first
  * few primitive fields as "key: value" pairs.

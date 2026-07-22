@@ -5,7 +5,7 @@ import { ArrowDown, View, InfoFilled } from '@element-plus/icons-vue'
 import { useRouter } from 'vue-router'
 import { useMetadataStore } from '@/stores/metadataStore.js'
 import { useOntologyStore } from '@/stores/ontologyStore.js'
-import { summarizeObject } from '@/utils/objectSummary.js'
+import { summarizeObject, stripHtml } from '@/utils/objectSummary.js'
 import MultiModelFilter from '../../explore/GraphExplorer/MultiModelFilter.vue'
 import IconPlus from '@/components/icons/IconPlus.vue'
 import StageActions from "@/components/shared/StageActions/StageActions.vue";
@@ -698,11 +698,6 @@ const resolveSubtreeLabels = async () => {
 }
 
 watch([records, modelSchema], () => { resolveSubtreeLabels() })
-
-// Source text can carry literal HTML (e.g. "<br />" in NLM reference fields) —
-// strip tags for the one-line cell display.
-const stripHtml = (s) =>
-  s.includes('<') ? s.replace(/<\/?[a-z][^>]*>/gi, ' ').replace(/\s+/g, ' ').trim() : s
 
 const formatCellValue = (value, column) => {
   if (value === null || value === undefined) {
