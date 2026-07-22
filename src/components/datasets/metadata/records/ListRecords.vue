@@ -1,10 +1,11 @@
 <script setup>
-import { ref, computed, onMounted, watch, nextTick } from 'vue'
-import { ElTable, ElTableColumn, ElCard, ElButton, ElSelect, ElOption, ElMessage, ElDropdown, ElDropdownMenu, ElDropdownItem, ElIcon, ElTag, ElDivider, ElTooltip } from 'element-plus'
+import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
+import { ElTable, ElTableColumn, ElCard, ElButton, ElSelect, ElOption, ElMessage, ElDropdown, ElDropdownMenu, ElDropdownItem, ElIcon, ElTag, ElDivider, ElTooltip, ElCheckbox } from 'element-plus'
 import { ArrowDown, View, InfoFilled } from '@element-plus/icons-vue'
 import { useRouter } from 'vue-router'
 import { useMetadataStore } from '@/stores/metadataStore.js'
 import { useOntologyStore } from '@/stores/ontologyStore.js'
+import { summarizeObject } from '@/utils/objectSummary.js'
 import MultiModelFilter from '../../explore/GraphExplorer/MultiModelFilter.vue'
 import IconPlus from '@/components/icons/IconPlus.vue'
 import StageActions from "@/components/shared/StageActions/StageActions.vue";
@@ -90,6 +91,76 @@ const tableColumns = computed(() => {
     codedTip: codedColumnTip(property)
   }))
 })
+
+// Sparse schemas (e.g. CDE models) carry many properties with no values on a
+// given page — hide those columns by default, with a toggle to show them.
+const showEmptyColumns = ref(false)
+
+const columnHasData = (column) => records.value.some(r => {
+  const v = r.value?.[column.key]
+  if (v == null || v === '') return false
+  if (Array.isArray(v)) return v.length > 0
+  if (typeof v === 'object') return Object.keys(v).length > 0
+  return true
+})
+
+const emptyColumnCount = computed(() =>
+  records.value.length ? tableColumns.value.filter(c => !columnHasData(c)).length : 0
+)
+
+const visibleColumns = computed(() =>
+  showEmptyColumns.value || !emptyColumnCount.value
+    ? tableColumns.value
+    : tableColumns.value.filter(columnHasData)
+)
+
+// --- Column resize ----------------------------------------------------------
+// Custom drag-resize via a handle element on each header cell's right edge:
+// Element Plus's built-in version only applies the new width on mouseup (and
+// requires border mode), so widths here are applied live while dragging. The
+// handle carries cursor: col-resize in CSS, so the browser resolves the hover
+// cursor natively. Widths persist by column key.
+const columnWidths = ref({})
+const MIN_COLUMN_WIDTH = 80
+
+let resizeState = null
+
+const startColumnResize = (column, e) => {
+  const th = e.target.closest('th')
+  if (!th) return
+  resizeState = {
+    key: column.key,
+    startX: e.clientX,
+    startWidth: th.getBoundingClientRect().width,
+    raf: null
+  }
+  document.body.style.cursor = 'col-resize'
+  document.body.style.userSelect = 'none'
+  document.addEventListener('mousemove', onResizing)
+  document.addEventListener('mouseup', endResize)
+}
+
+const onResizing = (e) => {
+  if (!resizeState || resizeState.raf) return
+  const { clientX } = e
+  resizeState.raf = requestAnimationFrame(() => {
+    if (!resizeState) return
+    resizeState.raf = null
+    const width = Math.max(MIN_COLUMN_WIDTH, resizeState.startWidth + (clientX - resizeState.startX))
+    columnWidths.value = { ...columnWidths.value, [resizeState.key]: width }
+  })
+}
+
+const endResize = () => {
+  if (resizeState?.raf) cancelAnimationFrame(resizeState.raf)
+  resizeState = null
+  document.body.style.cursor = ''
+  document.body.style.userSelect = ''
+  document.removeEventListener('mousemove', onResizing)
+  document.removeEventListener('mouseup', endResize)
+}
+
+onBeforeUnmount(endResize)
 
 // Describe a column's coded-value source for a header tooltip, or null if it isn't
 // backed by an ontology / CDE value set.
@@ -628,6 +699,11 @@ const resolveSubtreeLabels = async () => {
 
 watch([records, modelSchema], () => { resolveSubtreeLabels() })
 
+// Source text can carry literal HTML (e.g. "<br />" in NLM reference fields) —
+// strip tags for the one-line cell display.
+const stripHtml = (s) =>
+  s.includes('<') ? s.replace(/<\/?[a-z][^>]*>/gi, ' ').replace(/\s+/g, ' ').trim() : s
+
 const formatCellValue = (value, column) => {
   if (value === null || value === undefined) {
     return ''
@@ -665,46 +741,28 @@ const formatCellValue = (value, column) => {
     }
   }
   
-  // Handle arrays
-  if (column.type === 'array' || Array.isArray(value)) {
-    if (Array.isArray(value)) {
-      if (value.length === 0) {
-        return '[]'
+  // Handle arrays: one-line summary per item, capped at 3 items
+  if (Array.isArray(value)) {
+    if (value.length === 0) {
+      return ''
+    }
+    const preview = value.slice(0, 3).map(item => {
+      if (typeof item === 'object' && item !== null) {
+        return summarizeObject(item)
       }
-      // For arrays, show count and preview of first few items
-      const preview = value.slice(0, 3).map(item => {
-        if (typeof item === 'object' && item !== null) {
-          return '{...}'
-        }
-        return JSON.stringify(item)
-      }).join(', ')
-      
-      const suffix = value.length > 3 ? `, ... +${value.length - 3} more` : ''
-      return `[${preview}${suffix}]`
-    }
-    return String(value)
+      return stripHtml(String(item))
+    }).join(' · ')
+
+    const suffix = value.length > 3 ? ` · +${value.length - 3} more` : ''
+    return `${preview}${suffix}`
   }
-  
+
   // Handle objects
-  if (column.type === 'object' || (typeof value === 'object' && value !== null && !Array.isArray(value))) {
-    const keys = Object.keys(value)
-    if (keys.length === 0) {
-      return '{}'
-    }
-    // For objects, show key count and preview of first few keys
-    const preview = keys.slice(0, 2).map(key => {
-      const val = value[key]
-      const displayVal = val === null ? 'null' : 
-                        typeof val === 'object' ? '{...}' : 
-                        JSON.stringify(val)
-      return `${key}: ${displayVal}`
-    }).join(', ')
-    
-    const suffix = keys.length > 2 ? `, ... +${keys.length - 2} more` : ''
-    return `{${preview}${suffix}}`
+  if (typeof value === 'object' && value !== null) {
+    return summarizeObject(value)
   }
-  
-  return String(value)
+
+  return stripHtml(String(value))
 }
 
 // Helper function to get a record display name
@@ -943,8 +1001,15 @@ onMounted(async () => {
       <div class="records-controls">
         <div class="records-controls-left">
           <span class="records-count">{{ recordsHeading }}</span>
+          <el-checkbox
+            v-if="emptyColumnCount > 0"
+            v-model="showEmptyColumns"
+            class="empty-columns-toggle"
+          >
+            Show empty columns ({{ emptyColumnCount }})
+          </el-checkbox>
         </div>
-        
+
         <div v-if="hasNextPage || hasPreviousPage" class="pagination-controls">
           <el-button
             :disabled="!hasPreviousPage"
@@ -974,10 +1039,11 @@ onMounted(async () => {
         >
           <!-- Dynamic columns from model schema -->
           <el-table-column
-            v-for="column in tableColumns"
+            v-for="column in visibleColumns"
             :key="column.key"
             :prop="`value.${column.key}`"
             :label="column.label"
+            :width="columnWidths[column.key]"
             :min-width="120"
             show-overflow-tooltip
           >
@@ -988,6 +1054,11 @@ onMounted(async () => {
                   <el-icon class="coded-indicator"><InfoFilled /></el-icon>
                 </el-tooltip>
               </span>
+              <span
+                class="col-resize-handle"
+                @mousedown.prevent.stop="startColumnResize(column, $event)"
+                @click.stop
+              />
             </template>
             <template #default="{ row }">
               {{ formatCellValue(row.value[column.key], column) }}
@@ -1322,10 +1393,23 @@ onMounted(async () => {
       }
       
       .records-controls-left {
+        display: flex;
+        align-items: center;
+
         .records-count {
           color: theme.$gray_5;
           font-size: 14px;
           font-weight: 500;
+        }
+
+        .empty-columns-toggle {
+          margin-left: 24px;
+
+          :deep(.el-checkbox__label) {
+            color: theme.$gray_5;
+            font-size: 14px;
+            font-weight: 400;
+          }
         }
         
         .page-size-selector {
@@ -1383,20 +1467,33 @@ onMounted(async () => {
       :deep(.el-table) {
         .el-table__header {
           background-color: theme.$gray_1;
-          
+
           th {
             background-color: theme.$gray_1 !important;
             color: theme.$gray_6;
             font-weight: 600;
             border-bottom: 1px solid theme.$gray_2;
+            position: relative;
           }
         }
-        
+
+        // Drag handle on the header cell's right edge. Kept fully inside its
+        // own cell — an overhang into the neighbor gets covered by that th.
+        .col-resize-handle {
+          position: absolute;
+          top: 0;
+          bottom: 0;
+          right: 0;
+          width: 8px;
+          cursor: col-resize;
+          z-index: 1;
+        }
+
         .el-table__row {
           &:hover {
             background-color: theme.$gray_1;
           }
-          
+
           td {
             border-bottom: 1px solid theme.$gray_2;
             color: theme.$gray_6;
