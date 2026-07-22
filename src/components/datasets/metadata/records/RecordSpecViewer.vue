@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
-import { ElCard, ElTag, ElMessage, ElButton, ElPagination, ElMessageBox } from 'element-plus'
+import { ElCard, ElTag, ElMessage, ElButton, ElPagination, ElMessageBox, ElPopover } from 'element-plus'
 import { useRouter, useRoute } from 'vue-router'
 import { useMetadataStore } from '@/stores/metadataStore.js'
 import { useOntologyStore } from '@/stores/ontologyStore.js'
@@ -544,6 +544,54 @@ const getRecordDisplayValue = (record) => {
   
   // Fall back to record ID
   return `Record ${record.id.slice(0, 8)}...`
+}
+
+// --- Related-record hover preview -------------------------------------------
+// The relationships payload includes each linked record's full value and
+// model_id, so the hover card is built from data already loaded — no fetch.
+const relatedModelName = (record) => {
+  const m = metadataStore.modelById(record?.model_id)
+  return m?.display_name || m?.name || 'Record'
+}
+
+const previewFieldValue = (v) => {
+  if (Array.isArray(v)) {
+    const items = v.slice(0, 2).map((x) =>
+      x != null && typeof x === 'object' ? summarizeObject(x) : stripHtml(String(x))
+    )
+    return items.join(' · ') + (v.length > 2 ? ` · +${v.length - 2} more` : '')
+  }
+  if (v != null && typeof v === 'object') return summarizeObject(v)
+  if (typeof v === 'boolean') return v ? 'Yes' : 'No'
+  return stripHtml(String(v))
+}
+
+// First few non-empty fields of the linked record, in schema order when the
+// related model's schema is loaded (with property titles as labels).
+const recordPreviewFields = (record, max = 6) => {
+  const data = record?.value
+  if (!data) return { fields: [], more: 0 }
+
+  const schemaProps = metadataStore.modelById(record.model_id)?.latest_version?.schema?.properties
+  const keys = schemaProps
+    ? Object.keys(schemaProps).filter((k) => k in data)
+    : Object.keys(data)
+
+  const nonEmpty = keys.filter((k) => {
+    const v = data[k]
+    if (v == null || v === '') return false
+    if (Array.isArray(v) && !v.length) return false
+    return true
+  })
+
+  return {
+    fields: nonEmpty.slice(0, max).map((k) => ({
+      key: k,
+      label: schemaProps?.[k]?.title || k,
+      value: previewFieldValue(data[k])
+    })),
+    more: Math.max(0, nonEmpty.length - max)
+  }
 }
 
 // Pagination methods
@@ -1179,11 +1227,30 @@ onMounted(async () => {
                     :key="`inbound-${index}`"
                     class="relationship-item"
                   >
-                    <div class="relationship-content clickable" @click="goToRelatedRecord(relationship.record)" :title="'Click to view record'">
-                      <el-tag size="small" class="relationship-type inbound">{{ relationship.relationship_type }}</el-tag>
-                      <span class="record-title">{{ getRecordDisplayValue(relationship.record) }}</span>
-                      <IconArrowRight class="nav-icon" :width="12" :height="12" />
-                    </div>
+                    <el-popover placement="top-start" :width="340" trigger="hover" :show-after="350" popper-class="record-preview-popover">
+                      <template #reference>
+                        <div class="relationship-content clickable" @click="goToRelatedRecord(relationship.record)">
+                          <el-tag size="small" class="relationship-type inbound">{{ relationship.relationship_type }}</el-tag>
+                          <span class="record-title">{{ getRecordDisplayValue(relationship.record) }}</span>
+                          <IconArrowRight class="nav-icon" :width="12" :height="12" />
+                        </div>
+                      </template>
+                      <div class="record-preview">
+                        <div class="record-preview-header">
+                          <span class="record-preview-model">{{ relatedModelName(relationship.record) }}</span>
+                          <span class="record-preview-title">{{ getRecordDisplayValue(relationship.record) }}</span>
+                        </div>
+                        <div class="record-preview-fields">
+                          <div v-for="f in recordPreviewFields(relationship.record).fields" :key="f.key" class="record-preview-field">
+                            <span class="field-label">{{ f.label }}</span>
+                            <span class="field-value">{{ f.value }}</span>
+                          </div>
+                        </div>
+                        <div v-if="recordPreviewFields(relationship.record).more" class="record-preview-more">
+                          +{{ recordPreviewFields(relationship.record).more }} more fields — click to open
+                        </div>
+                      </div>
+                    </el-popover>
                     <el-button
                       @click.stop="deleteRelationship(relationship, 'inbound')"
                       link
@@ -1220,11 +1287,30 @@ onMounted(async () => {
                     :key="`outbound-${index}`"
                     class="relationship-item"
                   >
-                    <div class="relationship-content clickable" @click="goToRelatedRecord(relationship.record)" :title="'Click to view record'">
-                      <el-tag size="small" class="relationship-type outbound">{{ relationship.relationship_type }}</el-tag>
-                      <span class="record-title">{{ getRecordDisplayValue(relationship.record) }}</span>
-                      <IconArrowRight class="nav-icon" :width="12" :height="12" />
-                    </div>
+                    <el-popover placement="top-start" :width="340" trigger="hover" :show-after="350" popper-class="record-preview-popover">
+                      <template #reference>
+                        <div class="relationship-content clickable" @click="goToRelatedRecord(relationship.record)">
+                          <el-tag size="small" class="relationship-type outbound">{{ relationship.relationship_type }}</el-tag>
+                          <span class="record-title">{{ getRecordDisplayValue(relationship.record) }}</span>
+                          <IconArrowRight class="nav-icon" :width="12" :height="12" />
+                        </div>
+                      </template>
+                      <div class="record-preview">
+                        <div class="record-preview-header">
+                          <span class="record-preview-model">{{ relatedModelName(relationship.record) }}</span>
+                          <span class="record-preview-title">{{ getRecordDisplayValue(relationship.record) }}</span>
+                        </div>
+                        <div class="record-preview-fields">
+                          <div v-for="f in recordPreviewFields(relationship.record).fields" :key="f.key" class="record-preview-field">
+                            <span class="field-label">{{ f.label }}</span>
+                            <span class="field-value">{{ f.value }}</span>
+                          </div>
+                        </div>
+                        <div v-if="recordPreviewFields(relationship.record).more" class="record-preview-more">
+                          +{{ recordPreviewFields(relationship.record).more }} more fields — click to open
+                        </div>
+                      </div>
+                    </el-popover>
                     <el-button
                       @click.stop="deleteRelationship(relationship, 'outbound')"
                       link
@@ -2142,6 +2228,67 @@ onMounted(async () => {
 
   .mr-8 {
     margin-right: 8px;
+  }
+}
+</style>
+
+<!-- Unscoped: the popover popper is teleported to <body>. -->
+<style lang="scss">
+@use '../../../../styles/theme';
+
+.record-preview-popover {
+  .record-preview-header {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding-bottom: 8px;
+    margin-bottom: 8px;
+    border-bottom: 1px solid theme.$gray_2;
+
+    .record-preview-model {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+      color: theme.$gray_4;
+    }
+
+    .record-preview-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: theme.$gray_6;
+    }
+  }
+
+  .record-preview-field {
+    display: flex;
+    gap: 8px;
+    font-size: 13px;
+    line-height: 1.5;
+    margin-bottom: 4px;
+
+    .field-label {
+      flex: 0 0 112px;
+      color: theme.$gray_4;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .field-value {
+      flex: 1;
+      color: theme.$gray_6;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+  }
+
+  .record-preview-more {
+    margin-top: 8px;
+    font-size: 12px;
+    color: theme.$gray_4;
   }
 }
 </style>
