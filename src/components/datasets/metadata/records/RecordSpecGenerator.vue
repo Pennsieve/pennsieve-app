@@ -478,13 +478,19 @@ const updateRecord = async () => {
 // A required CDE binding whose value set was too large to inline (or has no
 // published values) carries `x-pennsieve-cde-valueset` instead of an `enum`.
 // Surface it so the field reads as controlled-by-a-CDE rather than free-form.
-const cdeValueSet = (property) => property?.property?.['x-pennsieve-cde-valueset'] || null
+// For array-typed properties the value-set annotations/enum may sit on `items`.
+const cdeValueSet = (property) =>
+  property?.property?.['x-pennsieve-cde-valueset'] ||
+  property?.property?.items?.['x-pennsieve-cde-valueset'] ||
+  null
 
 // An over-cap ontology value set carries `x-pennsieve-concept-valueset` (tier:"subtree",
 // with `ontology` + `root`) instead of an enum. It's browsable/searchable, so the field
 // becomes a subtree-restricted remote search rather than a plain text box.
 const conceptValueSet = (property) => {
-  const vs = property?.property?.['x-pennsieve-concept-valueset']
+  const vs =
+    property?.property?.['x-pennsieve-concept-valueset'] ||
+    property?.property?.items?.['x-pennsieve-concept-valueset']
   return vs && vs.ontology && vs.root ? vs : null
 }
 
@@ -503,6 +509,8 @@ const enumOptionLabels = (property) => {
   const vals =
     property?.property?.['x-pennsieve-concept-values'] ||
     property?.property?.['x-pennsieve-cde-values'] ||
+    property?.property?.items?.['x-pennsieve-concept-values'] ||
+    property?.property?.items?.['x-pennsieve-cde-values'] ||
     []
   const map = {}
   for (const v of vals) {
@@ -546,15 +554,21 @@ const runSubtreeSearch = async (key, vs, query) => {
 
 const renderSubtreeSelect = (property, vs) => {
   const { key } = property
-  const current = formData.value[key]
+  // Array-typed properties take multiple codes from the same value set.
+  const isMulti = property.type === 'array'
+  const raw = formData.value[key]
+  const currentCodes = Array.isArray(raw) ? raw : raw != null && raw !== '' ? [raw] : []
   const opts = subtreeOptions.value[key] || []
-  // Always keep the current value selectable so its label shows even before searching.
+  // Always keep the current value(s) selectable so their labels show even before searching.
   const merged = [...opts]
-  if (current != null && current !== '' && !merged.some((o) => o.code === current)) {
-    merged.unshift({ code: current, label: subtreeValueLabels.value[current] || current })
+  for (const code of currentCodes) {
+    if (!merged.some((o) => o.code === code)) {
+      merged.unshift({ code, label: subtreeValueLabels.value[code] || code })
+    }
   }
   return h(ElSelect, {
-    modelValue: current,
+    modelValue: isMulti ? currentCodes : raw,
+    multiple: isMulti,
     'onUpdate:modelValue': (value) => {
       formData.value[key] = value
       if (nullKeyFields.value[key]) nullKeyFields.value[key] = false
@@ -580,13 +594,21 @@ const renderFormFieldInput = (property) => {
     return renderSubtreeSelect(property, conceptVs)
   }
 
-  if (enumValues && enumValues.length > 0) {
+  // Arrays of enum items (e.g. multi-value coded fields) carry the enum on `items`.
+  const itemsEnum = type === 'array' ? property.property?.items?.enum : null
+  const effectiveEnum = enumValues && enumValues.length > 0 ? enumValues : itemsEnum
+
+  if (effectiveEnum && effectiveEnum.length > 0) {
     // Enum stores codes; show human labels when a values annotation carries them
     // (CDE-materialized or ontology value domains), so the dropdown reads
     // "type 2 diabetes mellitus" while the record stores "MONDO:0005148".
+    const isMulti = type === 'array'
     const labels = enumOptionLabels(property)
     return h(ElSelect, {
-      modelValue: formData.value[key],
+      modelValue: isMulti
+        ? (Array.isArray(formData.value[key]) ? formData.value[key] : [])
+        : formData.value[key],
+      multiple: isMulti,
       'onUpdate:modelValue': (value) => {
         formData.value[key] = value
         // If user selects a value, uncheck the null checkbox
@@ -598,7 +620,7 @@ const renderFormFieldInput = (property) => {
       clearable: true,
       filterable: true,
       size: 'default'
-    }, () => enumValues.map(option =>
+    }, () => effectiveEnum.map(option =>
       h(ElOption, { key: option, label: labels[option] || option, value: option })
     ))
   }
@@ -1046,11 +1068,30 @@ const cleanSchemaForValidation = (schema) => {
     return cleaned
   }
   
+  // Some models (built before the PropertyForm fix) carry a value-set enum on an
+  // array property itself; JSON Schema applies enum to the whole array value, so
+  // every record fails with "must be equal to one of the allowed values". Move
+  // the enum onto items, where it was always meant to apply.
+  const fixArrayEnums = (obj) => {
+    if (!obj || typeof obj !== 'object') return obj
+    if (Array.isArray(obj)) return obj.map(fixArrayEnums)
+
+    const processed = {}
+    for (const [key, value] of Object.entries(obj)) {
+      processed[key] = typeof value === 'object' && value !== null ? fixArrayEnums(value) : value
+    }
+    if (processed.type === 'array' && Array.isArray(processed.enum)) {
+      processed.items = { ...(processed.items || {}), enum: processed.enum }
+      delete processed.enum
+    }
+    return processed
+  }
+
   // First add x-pennsieve-key properties to required arrays
   const schemaWithPennsieveKeys = addPennsieveKeysToRequired(cleanedSchema)
-  
+
   // Then remove problematic references
-  return removeRefs(schemaWithPennsieveKeys)
+  return fixArrayEnums(removeRefs(schemaWithPennsieveKeys))
 }
 
 // Validation helper functions
