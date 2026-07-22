@@ -9,6 +9,7 @@ import ModelSpecViewer from "@/components/datasets/metadata/models/ModelSpecView
 import ModelSpecGenerator from "@/components/datasets/metadata/models/ModelSpecGenerator.vue";
 import TemplateGallery from "@/components/datasets/metadata/models/TemplateGallery.vue";
 import CdeGallery from "@/components/datasets/metadata/models/CdeGallery.vue";
+import OntologyBrowser from "@/components/datasets/metadata/models/OntologyBrowser.vue";
 import ListRecords from "@/components/datasets/metadata/records/ListRecords.vue";
 import RecordSpecViewer from "@/components/datasets/metadata/records/RecordSpecViewer.vue";
 import RecordSpecGenerator from "@/components/datasets/metadata/records/RecordSpecGenerator.vue";
@@ -90,6 +91,7 @@ const Settings = () => import('./OrgSettings/Settings.vue')
 const OrgSettings = () => import('../components/OrgSettings/OrgSettings.vue')
 
 const People = () => import('./people/People.vue')
+const WorkspaceResources = () => import('./resources/WorkspaceResources.vue')
 const PeopleList = () => import('../components/people/list/PeopleList.vue')
 
 const Teams = () => import('./teams/Teams.vue')
@@ -412,6 +414,21 @@ const router = createRouter({
             backLink: { name: 'resources' },
             title: 'CDE Catalog',
             description: 'Browse common data elements and bundles.'
+          }
+        },
+        {
+          name: 'ontology-browser',
+          path: 'resources/ontology-browser',
+          components: {
+            stage: OntologyBrowser,
+            navigation: UserNavigation,
+          },
+          props: true,
+          meta: {
+            hideSecondaryNav: true,
+            backLink: { name: 'resources' },
+            title: 'Ontology Browser',
+            description: 'Explore standard biomedical ontologies and their hierarchy.'
           }
         },
         {
@@ -1391,22 +1408,6 @@ const router = createRouter({
                   }
                 },
                 {
-                  path: 'cde-gallery',
-                  name: 'cde-gallery',
-                  props: true,
-                  meta: {
-                    backLink: { name: "Models", to: "models-list" },
-                    breadcrumbs: [
-                      { name: "Metadata", to: "metadata" },
-                      { name: "Models", to: "models-list" },
-                      { name: "CDE Catalog", current: true }
-                    ]
-                  },
-                  components: {
-                    stage: CdeGallery
-                  }
-                },
-                {
                   path: 'details/:modelId',
                   name: 'model-details',
                   props: true,
@@ -1623,6 +1624,42 @@ const router = createRouter({
             },
           ]
         },
+      ]
+    },
+    {
+      // Org-level resources hub — same shared catalogs as the MyWorkspace
+      // version (the content is global), reachable from the workspace nav.
+      path: '/:orgId/resources',
+      components: {
+        page: WorkspaceResources,
+        navigation: BfNavigation
+      },
+      props: true,
+      children: [
+        {
+          name: 'workspace-resources',
+          path: '',
+          components: {
+            stage: ResourcesList
+          },
+          props: true
+        },
+        {
+          name: 'workspace-cde-catalog',
+          path: 'cde-catalog',
+          components: {
+            stage: CdeGallery
+          },
+          props: true
+        },
+        {
+          name: 'workspace-ontology-browser',
+          path: 'ontology-browser',
+          components: {
+            stage: OntologyBrowser
+          },
+          props: true
+        }
       ]
     },
     {

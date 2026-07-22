@@ -40,6 +40,7 @@ import IconProposals from '../../icons/IconProposals.vue'
 import IconIntegrations from '../../icons/IconIntegrations.vue'
 import IconCollection from '../../icons/IconCollection.vue'
 import IconOverview from '../../icons/IconOverview.vue'
+import IconGraph from '../../icons/IconGraph.vue'
 
 export default {
   name: 'UserDashboardCard',
@@ -61,6 +62,7 @@ export default {
     IconIntegrations,
     IconCollection,
     IconOverview,
+    IconGraph,
   },
 
   props: {
@@ -103,7 +105,8 @@ export default {
         'proposals': 'IconProposals',
         'integrations': 'IconIntegrations',
         'cde-catalog': 'IconCollection',
-        'model-templates': 'IconOverview'
+        'model-templates': 'IconOverview',
+        'ontology-browser': 'IconGraph'
       }
       return iconMap[this.icon] || 'IconUser'
     }

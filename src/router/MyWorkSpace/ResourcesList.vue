@@ -11,16 +11,15 @@
       <user-dashboard-card
         title="CDE Catalog"
         description="Browse common data elements and bundles indexed from the NLM CDE Repository"
-        :route="{ name: 'cde-catalog' }"
+        :route="cdeCatalogRoute"
         icon="cde-catalog"
       />
 
       <user-dashboard-card
-        title="Model Templates"
-        description="Browse reusable model templates"
-        :route="{ name: 'resources' }"
-        icon="model-templates"
-        :coming-soon="true"
+        title="Ontology Browser"
+        description="Explore standard biomedical ontologies (MONDO, HPO, UBERON, NCIt) and their hierarchy"
+        :route="ontologyBrowserRoute"
+        icon="ontology-browser"
       />
     </div>
   </div>
@@ -31,7 +30,24 @@ import UserDashboardCard from "@/components/user/dashboard/UserDashboardCard.vue
 
 export default {
   name: "ResourcesList",
-  components: { UserDashboardCard }
+  components: { UserDashboardCard },
+  computed: {
+    // Rendered both in MyWorkspace (/my-workspace/resources) and in an org
+    // workspace (/:orgId/resources) — route the cards within the same context.
+    orgId() {
+      return this.$route.params.orgId || null;
+    },
+    cdeCatalogRoute() {
+      return this.orgId
+        ? { name: "workspace-cde-catalog", params: { orgId: this.orgId } }
+        : { name: "cde-catalog" };
+    },
+    ontologyBrowserRoute() {
+      return this.orgId
+        ? { name: "workspace-ontology-browser", params: { orgId: this.orgId } }
+        : { name: "ontology-browser" };
+    }
+  }
 };
 </script>
 

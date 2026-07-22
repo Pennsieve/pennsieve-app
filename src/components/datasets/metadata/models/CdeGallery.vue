@@ -1,5 +1,16 @@
 <template>
   <bf-stage>
+    <template #actions>
+      <stage-actions>
+        <template #left>
+          <a class="back-to-resources-link" @click="goBackToResources">
+            <IconArrowLeft :height="12" :width="12" />
+            Resources
+          </a>
+        </template>
+      </stage-actions>
+    </template>
+
     <div class="cde-gallery">
       <div class="cg-head">
         <h2>CDE Catalog</h2>
@@ -235,12 +246,24 @@
 
 <script setup>
 import { ref, reactive, computed, onMounted } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import { Search } from '@element-plus/icons-vue'
 import debounce from 'lodash.debounce'
 import { useCdeCatalogStore } from '@/stores/cdeCatalogStore'
 import CdeFacets from './CdeFacets.vue'
+import StageActions from '@/components/shared/StageActions/StageActions.vue'
+import IconArrowLeft from '@/components/icons/IconArrowLeft.vue'
 
 const store = useCdeCatalogStore()
+
+const router = useRouter()
+const route = useRoute()
+
+// Reachable from MyWorkspace and org workspaces — back within the same context.
+const goBackToResources = () => {
+  const orgId = route.params.orgId
+  router.push(orgId ? { name: 'workspace-resources', params: { orgId } } : { name: 'resources' })
+}
 
 const term = ref('')
 const facets = ref({ disease: [], domain: [], tier: [] }) // multi-select facet state
@@ -402,8 +425,25 @@ onMounted(async () => {
 <style scoped lang="scss">
 @use '../../../../styles/theme' as theme;
 
+.back-to-resources-link {
+  display: inline-flex;
+  align-items: center;
+  align-self: center;
+  gap: 4px;
+  color: theme.$purple_3;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+
+  &:hover {
+    text-decoration: underline;
+  }
+}
+
 .cde-gallery {
   min-height: 500px;
+  /* The stage-actions bar (back link) above already provides the top inset. */
+  padding-top: 0;
 }
 .cg-head h2 {
   font-size: 20px;

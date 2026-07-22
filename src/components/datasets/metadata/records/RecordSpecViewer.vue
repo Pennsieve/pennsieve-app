@@ -1,15 +1,18 @@
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
-import { ElCard, ElTag, ElMessage, ElButton, ElPagination, ElMessageBox } from 'element-plus'
+import { ElCard, ElTag, ElMessage, ElButton, ElPagination, ElMessageBox, ElPopover } from 'element-plus'
 import { useRouter, useRoute } from 'vue-router'
 import { useMetadataStore } from '@/stores/metadataStore.js'
+import { useOntologyStore } from '@/stores/ontologyStore.js'
 import { useRecordData } from '@/composables/useRecordData.js'
+import { summarizeObject, stripHtml } from '@/utils/objectSummary.js'
 
 // Import components
 import BfStage from '@/components/layout/BfStage/BfStage.vue'
 import StageActions from '@/components/shared/StageActions/StageActions.vue'
 import BfButton from '@/components/shared/bf-button/BfButton.vue'
 import IconArrowRight from '@/components/icons/IconArrowRight.vue'
+import IconArrowLeft from '@/components/icons/IconArrowLeft.vue'
 import IconPencil from '@/components/icons/IconPencil.vue'
 import PsButtonDropdown from '@/components/shared/ps-button-dropdown/PsButtonDropdown.vue'
 import IconTrash from "@/components/icons/IconTrash.vue"
@@ -40,8 +43,13 @@ const props = defineProps({
 })
 
 const metadataStore = useMetadataStore()
+const ontologyStore = useOntologyStore()
 const router = useRouter()
 const route = useRoute()
+
+// Code→label lookup for over-cap (subtree) value sets, which carry no inline labels
+// in the schema — resolved lazily from the ontology slices for the loaded record.
+const subtreeLabels = ref({})
 
 // Reactive data
 const record = ref(null)
@@ -109,7 +117,8 @@ const recordProperties = computed(() => {
     format: property.format,
     description: property.description,
     value: recordData.value[key],
-    property: property
+    property: property,
+    formatted: formatPropertyValue(recordData.value[key], property)
   }))
 })
 
@@ -323,11 +332,37 @@ const goToUpdateRecord = () => {
 }
 
 
+// { code: label } lookup for a property's inline value set (ontology / CDE), or null.
+const inlineValueLabels = (property) => {
+  const vals = property['x-pennsieve-concept-values'] || property['x-pennsieve-cde-values']
+  if (!Array.isArray(vals) || !vals.length) return null
+  const map = {}
+  for (const v of vals) {
+    const code = v?.code ?? v?.value
+    if (code != null) map[code] = v.label || String(code)
+  }
+  return Object.keys(map).length ? map : null
+}
+
 const formatPropertyValue = (value, property) => {
   if (value === null || value === undefined) {
     return { display: 'N/A', isNull: true }
   }
-  
+
+  // Controlled value set (ontology / CDE): show the label, not the stored code.
+  // Inline sets carry labels in the schema; over-cap subtree sets resolve async
+  // via the ontology slices. Falls back to the code until/unless resolved.
+  const inline = inlineValueLabels(property)
+  const isSubtree = !!property['x-pennsieve-concept-valueset']
+  if (inline || isSubtree) {
+    const toLabel = (v) => (inline && inline[v]) || subtreeLabels.value[v] || v
+    const codeStr = Array.isArray(value) ? value.join(', ') : String(value)
+    const display = Array.isArray(value) ? value.map(toLabel).join(', ') : toLabel(value)
+    // Surface the underlying code alongside the label so it's clear the stored value
+    // is a coded term — but only once a label actually resolved (else it's redundant).
+    return { display, isNull: false, code: display !== codeStr ? codeStr : null }
+  }
+
   // Handle different property types
   if (property.type === 'boolean') {
     return { display: value ? 'Yes' : 'No', isNull: false }
@@ -354,15 +389,59 @@ const formatPropertyValue = (value, property) => {
   }
   
   if (Array.isArray(value)) {
-    return { display: value.join(', '), isNull: false }
+    // Arrays of objects: one summary pill per item instead of "[object Object]".
+    if (value.some((v) => v != null && typeof v === 'object')) {
+      const items = value.map((v) =>
+        v != null && typeof v === 'object' ? summarizeObject(v) : stripHtml(String(v))
+      )
+      return { display: '', items, isNull: false }
+    }
+    return { display: value.map((v) => stripHtml(String(v))).join(', '), isNull: false }
   }
-  
+
   if (typeof value === 'object') {
-    return { display: JSON.stringify(value, null, 2), isNull: false }
+    return { display: summarizeObject(value), isNull: false }
   }
-  
-  return { display: String(value), isNull: false }
+
+  return { display: stripHtml(String(value)), isNull: false }
 }
+
+// Resolve labels for the record's subtree value-set codes (no inline labels in the
+// schema). Fail-open: codes stay shown as-is on any error.
+const resolveSubtreeLabels = async () => {
+  const schema = modelSchema.value
+  const data = recordData.value
+  if (!schema?.properties || !data) return
+  const props = Object.entries(schema.properties).filter(([, p]) => p['x-pennsieve-concept-valueset'])
+  if (!props.length) return
+
+  const needed = new Set()
+  const onts = new Set()
+  for (const [key, p] of props) {
+    const v = data[key]
+    if (v == null) continue
+    for (const code of Array.isArray(v) ? v : [v]) {
+      if (typeof code === 'string' && !subtreeLabels.value[code]) needed.add(code)
+    }
+    const o = p['x-pennsieve-concept-valueset']?.ontology
+    if (o) onts.add(o)
+  }
+  if (!needed.size) return
+
+  try {
+    await Promise.all([...onts].map((o) => ontologyStore.ensureOntology(o)))
+    const map = await ontologyStore.labelsFor([...needed])
+    const next = { ...subtreeLabels.value }
+    for (const [code, label] of map) if (label) next[code] = label
+    subtreeLabels.value = next
+  } catch {
+    /* leave codes as-is */
+  }
+}
+
+// Watch both: the record and the schema load from separate (parallel) fetches, so
+// either can win the race — resolve once whichever lands last is in place.
+watch([recordData, modelSchema], () => { resolveSubtreeLabels() })
 
 const getPropertyTypeDisplay = (property) => {
   let type = property.type || 'string'
@@ -466,6 +545,54 @@ const getRecordDisplayValue = (record) => {
   
   // Fall back to record ID
   return `Record ${record.id.slice(0, 8)}...`
+}
+
+// --- Related-record hover preview -------------------------------------------
+// The relationships payload includes each linked record's full value and
+// model_id, so the hover card is built from data already loaded — no fetch.
+const relatedModelName = (record) => {
+  const m = metadataStore.modelById(record?.model_id)
+  return m?.display_name || m?.name || 'Record'
+}
+
+const previewFieldValue = (v) => {
+  if (Array.isArray(v)) {
+    const items = v.slice(0, 2).map((x) =>
+      x != null && typeof x === 'object' ? summarizeObject(x) : stripHtml(String(x))
+    )
+    return items.join(' · ') + (v.length > 2 ? ` · +${v.length - 2} more` : '')
+  }
+  if (v != null && typeof v === 'object') return summarizeObject(v)
+  if (typeof v === 'boolean') return v ? 'Yes' : 'No'
+  return stripHtml(String(v))
+}
+
+// First few non-empty fields of the linked record, in schema order when the
+// related model's schema is loaded (with property titles as labels).
+const recordPreviewFields = (record, max = 6) => {
+  const data = record?.value
+  if (!data) return { fields: [], more: 0 }
+
+  const schemaProps = metadataStore.modelById(record.model_id)?.latest_version?.schema?.properties
+  const keys = schemaProps
+    ? Object.keys(schemaProps).filter((k) => k in data)
+    : Object.keys(data)
+
+  const nonEmpty = keys.filter((k) => {
+    const v = data[k]
+    if (v == null || v === '') return false
+    if (Array.isArray(v) && !v.length) return false
+    return true
+  })
+
+  return {
+    fields: nonEmpty.slice(0, max).map((k) => ({
+      key: k,
+      label: schemaProps?.[k]?.title || k,
+      value: previewFieldValue(data[k])
+    })),
+    more: Math.max(0, nonEmpty.length - max)
+  }
 }
 
 // Pagination methods
@@ -924,7 +1051,10 @@ watch([() => props.modelId, () => props.recordId], async () => {
 // Initialize
 onMounted(async () => {
   await Promise.all([fetchModel(), fetchRecord(), fetchPackages(), fetchRelationships(), fetchRecordHistory()])
-  
+  // Both model + record are now loaded — resolve subtree labels regardless of which
+  // fetch won the race (the watcher may have fired too early to see both).
+  resolveSubtreeLabels()
+
   // If we have an as_of parameter, set up preview state to match
   if (props.as_of) {
     previewTimestamp.value = props.as_of
@@ -942,12 +1072,10 @@ onMounted(async () => {
     <template #actions>
       <stage-actions>
         <template #left>
-<!--          <bf-button @click="goBackToRecords" size="small">-->
-<!--            <template #prefix>-->
-<!--              <IconArrowLeft class="mr-8" :height="16" :width="16" />-->
-<!--            </template>-->
-<!--            Back to Records-->
-<!--          </bf-button>-->
+          <a class="back-to-records-link" @click="goBackToRecords">
+            <IconArrowLeft :height="12" :width="12" />
+            {{ model?.display_name || model?.name || 'Model' }} Records
+          </a>
         </template>
         <template #right>
           <template v-if="quickActionsVisible">
@@ -1030,8 +1158,16 @@ onMounted(async () => {
               class="attribute-item"
             >
               <span class="attribute-name">{{ prop.label }}:</span>
-              <span class="attribute-value" :class="{ 'is-null': formatPropertyValue(prop.value, prop.property).isNull }">
-                {{ formatPropertyValue(prop.value, prop.property).display }}
+              <span class="attribute-value" :class="{ 'is-null': prop.formatted.isNull }">
+                <template v-if="prop.formatted.items">
+                  <span
+                    v-for="(item, idx) in prop.formatted.items"
+                    :key="idx"
+                    class="attribute-object-item"
+                  >{{ item }}</span>
+                </template>
+                <template v-else>{{ prop.formatted.display }}</template>
+                <span v-if="prop.formatted.code" class="attribute-code" :title="`Stored value: ${prop.formatted.code}`">{{ prop.formatted.code }}</span>
               </span>
             </div>
           </div>
@@ -1090,11 +1226,30 @@ onMounted(async () => {
                     :key="`inbound-${index}`"
                     class="relationship-item"
                   >
-                    <div class="relationship-content clickable" @click="goToRelatedRecord(relationship.record)" :title="'Click to view record'">
-                      <el-tag size="small" class="relationship-type inbound">{{ relationship.relationship_type }}</el-tag>
-                      <span class="record-title">{{ getRecordDisplayValue(relationship.record) }}</span>
-                      <IconArrowRight class="nav-icon" :width="12" :height="12" />
-                    </div>
+                    <el-popover placement="top-start" :width="340" trigger="hover" :show-after="350" popper-class="record-preview-popover">
+                      <template #reference>
+                        <div class="relationship-content clickable" @click="goToRelatedRecord(relationship.record)">
+                          <el-tag size="small" class="relationship-type inbound">{{ relationship.relationship_type }}</el-tag>
+                          <span class="record-title">{{ getRecordDisplayValue(relationship.record) }}</span>
+                          <IconArrowRight class="nav-icon" :width="12" :height="12" />
+                        </div>
+                      </template>
+                      <div class="record-preview">
+                        <div class="record-preview-header">
+                          <span class="record-preview-model">{{ relatedModelName(relationship.record) }}</span>
+                          <span class="record-preview-title">{{ getRecordDisplayValue(relationship.record) }}</span>
+                        </div>
+                        <div class="record-preview-fields">
+                          <div v-for="f in recordPreviewFields(relationship.record).fields" :key="f.key" class="record-preview-field">
+                            <span class="field-label">{{ f.label }}</span>
+                            <span class="field-value">{{ f.value }}</span>
+                          </div>
+                        </div>
+                        <div v-if="recordPreviewFields(relationship.record).more" class="record-preview-more">
+                          +{{ recordPreviewFields(relationship.record).more }} more fields — click to open
+                        </div>
+                      </div>
+                    </el-popover>
                     <el-button
                       @click.stop="deleteRelationship(relationship, 'inbound')"
                       link
@@ -1131,11 +1286,30 @@ onMounted(async () => {
                     :key="`outbound-${index}`"
                     class="relationship-item"
                   >
-                    <div class="relationship-content clickable" @click="goToRelatedRecord(relationship.record)" :title="'Click to view record'">
-                      <el-tag size="small" class="relationship-type outbound">{{ relationship.relationship_type }}</el-tag>
-                      <span class="record-title">{{ getRecordDisplayValue(relationship.record) }}</span>
-                      <IconArrowRight class="nav-icon" :width="12" :height="12" />
-                    </div>
+                    <el-popover placement="top-start" :width="340" trigger="hover" :show-after="350" popper-class="record-preview-popover">
+                      <template #reference>
+                        <div class="relationship-content clickable" @click="goToRelatedRecord(relationship.record)">
+                          <el-tag size="small" class="relationship-type outbound">{{ relationship.relationship_type }}</el-tag>
+                          <span class="record-title">{{ getRecordDisplayValue(relationship.record) }}</span>
+                          <IconArrowRight class="nav-icon" :width="12" :height="12" />
+                        </div>
+                      </template>
+                      <div class="record-preview">
+                        <div class="record-preview-header">
+                          <span class="record-preview-model">{{ relatedModelName(relationship.record) }}</span>
+                          <span class="record-preview-title">{{ getRecordDisplayValue(relationship.record) }}</span>
+                        </div>
+                        <div class="record-preview-fields">
+                          <div v-for="f in recordPreviewFields(relationship.record).fields" :key="f.key" class="record-preview-field">
+                            <span class="field-label">{{ f.label }}</span>
+                            <span class="field-value">{{ f.value }}</span>
+                          </div>
+                        </div>
+                        <div v-if="recordPreviewFields(relationship.record).more" class="record-preview-more">
+                          +{{ recordPreviewFields(relationship.record).more }} more fields — click to open
+                        </div>
+                      </div>
+                    </el-popover>
                     <el-button
                       @click.stop="deleteRelationship(relationship, 'outbound')"
                       link
@@ -1654,10 +1828,40 @@ onMounted(async () => {
               color: theme.$gray_6;
               font-size: 14px;
               line-height: 1.4;
-              
+
               &.is-null {
                 color: theme.$gray_4;
                 font-style: italic;
+              }
+
+              .attribute-code {
+                margin-left: 8px;
+                padding: 1px 6px;
+                border-radius: 3px;
+                background: theme.$gray_1;
+                color: theme.$gray_4;
+                font-size: 11px;
+                font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+                vertical-align: middle;
+              }
+
+              .attribute-object-item {
+                display: inline-block;
+                margin: 0 8px 4px 0;
+                padding: 2px 8px;
+                border-radius: 4px;
+                background: theme.$gray_1;
+                color: theme.$gray_6;
+                font-size: 13px;
+                white-space: nowrap;
+                max-width: 400px;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                vertical-align: middle;
+
+                &:last-child {
+                  margin-right: 0;
+                }
               }
             }
           }
@@ -2023,6 +2227,81 @@ onMounted(async () => {
 
   .mr-8 {
     margin-right: 8px;
+  }
+
+  .back-to-records-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    color: theme.$purple_3;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+
+    &:hover {
+      text-decoration: underline;
+    }
+  }
+}
+</style>
+
+<!-- Unscoped: the popover popper is teleported to <body>. -->
+<style lang="scss">
+@use '../../../../styles/theme';
+
+.record-preview-popover {
+  .record-preview-header {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding-bottom: 8px;
+    margin-bottom: 8px;
+    border-bottom: 1px solid theme.$gray_2;
+
+    .record-preview-model {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+      color: theme.$gray_4;
+    }
+
+    .record-preview-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: theme.$gray_6;
+    }
+  }
+
+  .record-preview-field {
+    display: flex;
+    gap: 8px;
+    font-size: 13px;
+    line-height: 1.5;
+    margin-bottom: 4px;
+
+    .field-label {
+      flex: 0 0 112px;
+      color: theme.$gray_4;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .field-value {
+      flex: 1;
+      color: theme.$gray_6;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+  }
+
+  .record-preview-more {
+    margin-top: 8px;
+    font-size: 12px;
+    color: theme.$gray_4;
   }
 }
 </style>

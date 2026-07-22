@@ -1,9 +1,11 @@
 <script setup>
-import { ref, computed, onMounted, watch, nextTick } from 'vue'
-import { ElTable, ElTableColumn, ElCard, ElButton, ElSelect, ElOption, ElMessage, ElDropdown, ElDropdownMenu, ElDropdownItem, ElIcon, ElTag, ElDivider } from 'element-plus'
-import { ArrowDown, View } from '@element-plus/icons-vue'
+import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
+import { ElTable, ElTableColumn, ElCard, ElButton, ElSelect, ElOption, ElMessage, ElDropdown, ElDropdownMenu, ElDropdownItem, ElIcon, ElTag, ElDivider, ElTooltip, ElCheckbox } from 'element-plus'
+import { ArrowDown, View, InfoFilled } from '@element-plus/icons-vue'
 import { useRouter } from 'vue-router'
 import { useMetadataStore } from '@/stores/metadataStore.js'
+import { useOntologyStore } from '@/stores/ontologyStore.js'
+import { summarizeObject, stripHtml } from '@/utils/objectSummary.js'
 import MultiModelFilter from '../../explore/GraphExplorer/MultiModelFilter.vue'
 import IconPlus from '@/components/icons/IconPlus.vue'
 import StageActions from "@/components/shared/StageActions/StageActions.vue";
@@ -27,7 +29,12 @@ const props = defineProps({
 
 // Store and router
 const metadataStore = useMetadataStore()
+const ontologyStore = useOntologyStore()
 const router = useRouter()
+
+// Code→label lookup for over-cap ontology value sets (tier:"subtree"), which carry
+// no inline labels in the schema — resolved lazily from the ontology slices.
+const subtreeLabels = ref({})
 
 // Reactive data
 const records = ref([])
@@ -74,9 +81,117 @@ const tableColumns = computed(() => {
     key,
     label: property.title || key,
     type: property.type,
-    format: property.format
+    format: property.format,
+    // Code→label map for controlled value sets (ontology / CDE), so cells render
+    // the human label (e.g. "epilepsy") instead of the stored code ("MONDO:0005027").
+    valueLabels: buildValueLabels(property),
+    // Over-cap value sets ship no inline labels — resolve them from this ontology.
+    subtreeOntology: property['x-pennsieve-concept-valueset']?.ontology || null,
+    // Tooltip text when this column holds coded values (null when it doesn't).
+    codedTip: codedColumnTip(property)
   }))
 })
+
+// Sparse schemas (e.g. CDE models) carry many properties with no values on a
+// given page — hide those columns by default, with a toggle to show them.
+const showEmptyColumns = ref(false)
+
+const columnHasData = (column) => records.value.some(r => {
+  const v = r.value?.[column.key]
+  if (v == null || v === '') return false
+  if (Array.isArray(v)) return v.length > 0
+  if (typeof v === 'object') return Object.keys(v).length > 0
+  return true
+})
+
+const emptyColumnCount = computed(() =>
+  records.value.length ? tableColumns.value.filter(c => !columnHasData(c)).length : 0
+)
+
+const visibleColumns = computed(() =>
+  showEmptyColumns.value || !emptyColumnCount.value
+    ? tableColumns.value
+    : tableColumns.value.filter(columnHasData)
+)
+
+// --- Column resize ----------------------------------------------------------
+// Custom drag-resize via a handle element on each header cell's right edge:
+// Element Plus's built-in version only applies the new width on mouseup (and
+// requires border mode), so widths here are applied live while dragging. The
+// handle carries cursor: col-resize in CSS, so the browser resolves the hover
+// cursor natively. Widths persist by column key.
+const columnWidths = ref({})
+const MIN_COLUMN_WIDTH = 80
+
+let resizeState = null
+
+const startColumnResize = (column, e) => {
+  const th = e.target.closest('th')
+  if (!th) return
+  resizeState = {
+    key: column.key,
+    startX: e.clientX,
+    startWidth: th.getBoundingClientRect().width,
+    raf: null
+  }
+  document.body.style.cursor = 'col-resize'
+  document.body.style.userSelect = 'none'
+  document.addEventListener('mousemove', onResizing)
+  document.addEventListener('mouseup', endResize)
+}
+
+const onResizing = (e) => {
+  if (!resizeState || resizeState.raf) return
+  const { clientX } = e
+  resizeState.raf = requestAnimationFrame(() => {
+    if (!resizeState) return
+    resizeState.raf = null
+    const width = Math.max(MIN_COLUMN_WIDTH, resizeState.startWidth + (clientX - resizeState.startX))
+    columnWidths.value = { ...columnWidths.value, [resizeState.key]: width }
+  })
+}
+
+const endResize = () => {
+  if (resizeState?.raf) cancelAnimationFrame(resizeState.raf)
+  resizeState = null
+  document.body.style.cursor = ''
+  document.body.style.userSelect = ''
+  document.removeEventListener('mousemove', onResizing)
+  document.removeEventListener('mouseup', endResize)
+}
+
+onBeforeUnmount(endResize)
+
+// Describe a column's coded-value source for a header tooltip, or null if it isn't
+// backed by an ontology / CDE value set.
+const codedColumnTip = (property) => {
+  const cde =
+    property['x-pennsieve-cde-values'] || property['x-pennsieve-cde-valueset'] || property['x-pennsieve-cde']
+  const system =
+    property['x-pennsieve-concept-valueset']?.ontology ||
+    property['x-pennsieve-concept']?.ontology ||
+    null
+  const isConcept =
+    property['x-pennsieve-concept-values'] ||
+    property['x-pennsieve-concept-valueset'] ||
+    property['x-pennsieve-concept']
+  if (!isConcept && !cde) return null
+  const source = system ? `the ${system} ontology` : cde ? 'a linked CDE value set' : 'a controlled value set'
+  return `Coded values — each entry is a term from ${source}, stored as a code (e.g. MONDO:0015005) and shown here by its label.`
+}
+
+// Build a { code: label } lookup from a property's materialized value annotation.
+// Returns null when the property has no controlled value labels.
+const buildValueLabels = (property) => {
+  const vals = property['x-pennsieve-concept-values'] || property['x-pennsieve-cde-values']
+  if (!Array.isArray(vals) || !vals.length) return null
+  const map = {}
+  for (const v of vals) {
+    const code = v?.code ?? v?.value
+    if (code != null) map[code] = v.label || String(code)
+  }
+  return Object.keys(map).length ? map : null
+}
 
 const hasRecords = computed(() => records.value.length > 0)
 
@@ -253,12 +368,12 @@ const fetchModel = async () => {
     
     if (model.value?.latest_version?.schema) {
       modelSchema.value = model.value.latest_version.schema
-      // Initialize selected version based on route param or default to all versions
+      // Initialize selected version based on route param or default to latest
       if (!selectedVersion.value) {
         if (props.versionId) {
           selectedVersion.value = props.versionId
         } else {
-          selectedVersion.value = 'all'
+          selectedVersion.value = 'latest'
         }
       }
       
@@ -551,11 +666,55 @@ const selectModel = (command) => {
   })
 }
 
+// Resolve labels for over-cap (subtree) value-set codes on the current page. Inline
+// value sets already carry their labels in the schema; this only covers columns whose
+// codes aren't in the schema. Fail-open: on any error the codes stay shown as-is.
+const resolveSubtreeLabels = async () => {
+  const cols = tableColumns.value.filter(c => c.subtreeOntology)
+  if (!cols.length || !records.value.length) return
+
+  const needed = new Set()
+  for (const c of cols) {
+    for (const rec of records.value) {
+      const v = rec.value?.[c.key]
+      if (v == null) continue
+      for (const code of Array.isArray(v) ? v : [v]) {
+        if (typeof code === 'string' && !subtreeLabels.value[code]) needed.add(code)
+      }
+    }
+  }
+  if (!needed.size) return
+
+  try {
+    const onts = [...new Set(cols.map(c => c.subtreeOntology))]
+    await Promise.all(onts.map(o => ontologyStore.ensureOntology(o)))
+    const map = await ontologyStore.labelsFor([...needed])
+    const next = { ...subtreeLabels.value }
+    for (const [code, label] of map) if (label) next[code] = label
+    subtreeLabels.value = next
+  } catch {
+    /* leave codes as-is */
+  }
+}
+
+watch([records, modelSchema], () => { resolveSubtreeLabels() })
+
 const formatCellValue = (value, column) => {
   if (value === null || value === undefined) {
     return ''
   }
-  
+
+  // Controlled value set (ontology / CDE): show the label, fall back to the code
+  // when a value isn't resolved yet (subtree labels load async) or isn't in the
+  // set (e.g. a code from a since-narrowed value set).
+  if (column.valueLabels || column.subtreeOntology) {
+    const toLabel = v => (column.valueLabels && column.valueLabels[v]) || subtreeLabels.value[v] || v
+    if (Array.isArray(value)) {
+      return value.map(toLabel).join(', ')
+    }
+    return toLabel(value)
+  }
+
   // Format based on column type
   if (column.type === 'number' || column.type === 'integer') {
     return Number(value).toLocaleString()
@@ -577,46 +736,28 @@ const formatCellValue = (value, column) => {
     }
   }
   
-  // Handle arrays
-  if (column.type === 'array' || Array.isArray(value)) {
-    if (Array.isArray(value)) {
-      if (value.length === 0) {
-        return '[]'
+  // Handle arrays: one-line summary per item, capped at 3 items
+  if (Array.isArray(value)) {
+    if (value.length === 0) {
+      return ''
+    }
+    const preview = value.slice(0, 3).map(item => {
+      if (typeof item === 'object' && item !== null) {
+        return summarizeObject(item)
       }
-      // For arrays, show count and preview of first few items
-      const preview = value.slice(0, 3).map(item => {
-        if (typeof item === 'object' && item !== null) {
-          return '{...}'
-        }
-        return JSON.stringify(item)
-      }).join(', ')
-      
-      const suffix = value.length > 3 ? `, ... +${value.length - 3} more` : ''
-      return `[${preview}${suffix}]`
-    }
-    return String(value)
+      return stripHtml(String(item))
+    }).join(' · ')
+
+    const suffix = value.length > 3 ? ` · +${value.length - 3} more` : ''
+    return `${preview}${suffix}`
   }
-  
+
   // Handle objects
-  if (column.type === 'object' || (typeof value === 'object' && value !== null && !Array.isArray(value))) {
-    const keys = Object.keys(value)
-    if (keys.length === 0) {
-      return '{}'
-    }
-    // For objects, show key count and preview of first few keys
-    const preview = keys.slice(0, 2).map(key => {
-      const val = value[key]
-      const displayVal = val === null ? 'null' : 
-                        typeof val === 'object' ? '{...}' : 
-                        JSON.stringify(val)
-      return `${key}: ${displayVal}`
-    }).join(', ')
-    
-    const suffix = keys.length > 2 ? `, ... +${keys.length - 2} more` : ''
-    return `{${preview}${suffix}}`
+  if (typeof value === 'object' && value !== null) {
+    return summarizeObject(value)
   }
-  
-  return String(value)
+
+  return stripHtml(String(value))
 }
 
 // Helper function to get a record display name
@@ -855,8 +996,15 @@ onMounted(async () => {
       <div class="records-controls">
         <div class="records-controls-left">
           <span class="records-count">{{ recordsHeading }}</span>
+          <el-checkbox
+            v-if="emptyColumnCount > 0"
+            v-model="showEmptyColumns"
+            class="empty-columns-toggle"
+          >
+            Show empty columns ({{ emptyColumnCount }})
+          </el-checkbox>
         </div>
-        
+
         <div v-if="hasNextPage || hasPreviousPage" class="pagination-controls">
           <el-button
             :disabled="!hasPreviousPage"
@@ -886,13 +1034,27 @@ onMounted(async () => {
         >
           <!-- Dynamic columns from model schema -->
           <el-table-column
-            v-for="column in tableColumns"
+            v-for="column in visibleColumns"
             :key="column.key"
             :prop="`value.${column.key}`"
             :label="column.label"
+            :width="columnWidths[column.key]"
             :min-width="120"
             show-overflow-tooltip
           >
+            <template #header>
+              <span class="column-header">
+                {{ column.label }}
+                <el-tooltip v-if="column.codedTip" :content="column.codedTip" placement="top" :show-after="200">
+                  <el-icon class="coded-indicator"><InfoFilled /></el-icon>
+                </el-tooltip>
+              </span>
+              <span
+                class="col-resize-handle"
+                @mousedown.prevent.stop="startColumnResize(column, $event)"
+                @click.stop
+              />
+            </template>
             <template #default="{ row }">
               {{ formatCellValue(row.value[column.key], column) }}
             </template>
@@ -1226,10 +1388,23 @@ onMounted(async () => {
       }
       
       .records-controls-left {
+        display: flex;
+        align-items: center;
+
         .records-count {
           color: theme.$gray_5;
           font-size: 14px;
           font-weight: 500;
+        }
+
+        .empty-columns-toggle {
+          margin-left: 24px;
+
+          :deep(.el-checkbox__label) {
+            color: theme.$gray_5;
+            font-size: 14px;
+            font-weight: 400;
+          }
         }
         
         .page-size-selector {
@@ -1267,7 +1442,19 @@ onMounted(async () => {
       border: none;
       //box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
       //border-radius: 8px;
-      
+
+      .column-header {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+
+        .coded-indicator {
+          font-size: 13px;
+          color: theme.$gray_4;
+          cursor: help;
+        }
+      }
+
       :deep(.el-card__body) {
         padding: 0;
       }
@@ -1275,20 +1462,33 @@ onMounted(async () => {
       :deep(.el-table) {
         .el-table__header {
           background-color: theme.$gray_1;
-          
+
           th {
             background-color: theme.$gray_1 !important;
             color: theme.$gray_6;
             font-weight: 600;
             border-bottom: 1px solid theme.$gray_2;
+            position: relative;
           }
         }
-        
+
+        // Drag handle on the header cell's right edge. Kept fully inside its
+        // own cell — an overhang into the neighbor gets covered by that th.
+        .col-resize-handle {
+          position: absolute;
+          top: 0;
+          bottom: 0;
+          right: 0;
+          width: 8px;
+          cursor: col-resize;
+          z-index: 1;
+        }
+
         .el-table__row {
           &:hover {
             background-color: theme.$gray_1;
           }
-          
+
           td {
             border-bottom: 1px solid theme.$gray_2;
             color: theme.$gray_6;
