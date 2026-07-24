@@ -204,28 +204,48 @@ export default {
      *     represents the parent package of those files
      */
     triggerDownload: async function (packageDTOs, fileDTOs) {
-      // Block optimistic upload rows and packages still being processed
-      // server-side. Selection is already gated (FilesTable.isRowSelectable),
-      // but the toolbar + keyboard paths can still route a placeholder
-      // here, and a package freshly finalized may briefly sit in
-      // UPLOADED/PROCESSING before hitting READY.
-      const notReady = (packageDTOs || []).filter(
+      // A package is downloadable only when its source data actually exists
+      // in storage and is retrievable. Deny by default: gating on READY
+      // alone was wrong (an uploaded package rests in UPLOADED indefinitely
+      // and only reaches READY when explicitly processed), but so is
+      // allowing anything that isn't a known-bad state — an unrecognized or
+      // future state (an ARCHIVED / SCANNING / quarantine-like state) must
+      // not silently become downloadable. Failing safe with a visible "not
+      // available yet" beats handing out a broken presigned URL or data
+      // that isn't meant to leave storage.
+      //
+      // Downloadable states (see PackageState.scala):
+      //   UPLOADED            - resting state of an uploaded, unprocessed package
+      //   READY               - processed
+      //   PROCESSING, RUNNING - source is uploaded and present during processing
+      // Everything else is blocked, including placeholders (optimistic
+      // upload rows) and UNAVAILABLE / PENDING / RESTORING / DELETING /
+      // DELETED / INFECTED / ERROR (UPLOAD_FAILED and PROCESSING_FAILED are
+      // serialized to ERROR in DTOs, so the frontend only ever sees ERROR).
+      const DOWNLOADABLE_STATES = new Set([
+        "UPLOADED",
+        "READY",
+        "PROCESSING",
+        "RUNNING",
+      ]);
+      const notDownloadable = (packageDTOs || []).filter(
         (p) =>
           (p && p._placeholder) ||
-          (pathOr("", ["content", "state"], p) &&
-            pathOr("", ["content", "state"], p) !== "READY")
+          !DOWNLOADABLE_STATES.has(pathOr("", ["content", "state"], p))
       );
-      if (notReady.length > 0) {
+      if (notDownloadable.length > 0) {
         EventBus.$emit("toast", {
           detail: {
             type: "info",
             msg:
-              notReady.length === (packageDTOs || []).length
-                ? "Files are still being processed. Download will be available once they're ready."
-                : "Some selected files are still being processed and were skipped.",
+              notDownloadable.length === (packageDTOs || []).length
+                ? "The selected file(s) aren't available for download yet."
+                : "Some selected files aren't available for download and were skipped.",
           },
         });
-        packageDTOs = (packageDTOs || []).filter((p) => !notReady.includes(p));
+        packageDTOs = (packageDTOs || []).filter(
+          (p) => !notDownloadable.includes(p)
+        );
         if (packageDTOs.length === 0) return;
       }
 
