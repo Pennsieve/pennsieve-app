@@ -38,6 +38,12 @@
                   property in a metadata model — so records are filled in with consistent, standardized
                   codes.</p>
               </div>
+              <div class="ob-help-item">
+                <div class="ob-help-h"><el-icon><Collection /></el-icon> Ontologies vs. termsets</div>
+                <p>An <strong>ontology</strong> is a full source vocabulary (MONDO, UBERON…). A
+                  <strong>termset</strong> is a curated list for a specific project or consortium
+                  (e.g. SPARC, REJOIN) that pulls terms from several ontologies.</p>
+              </div>
               <p class="ob-help-note">Pennsieve refreshes these vocabularies from their sources
                 quarterly — each card shows the version it's on.</p>
             </div>
@@ -50,29 +56,66 @@
         </p>
       </div>
 
-      <!-- Vocabulary chooser -->
+      <!-- Vocabulary chooser: a kind filter above one horizontal-scrolling row -->
       <div v-if="booting" class="ob-status">Loading vocabularies…</div>
-      <div v-else class="ob-onto-cards">
-        <button
-          v-for="o in browsableOntologies"
-          :key="o.ontology"
-          type="button"
-          class="ob-onto-card"
-          :class="{ 'is-active': o.ontology === selectedOntology }"
-          @click="selectOntology(o.ontology)"
-        >
-          <span class="ob-onto-card-top">
-            <span class="ob-onto-code">{{ o.ontology }}</span>
-            <el-icon v-if="o.ontology === selectedOntology" class="ob-onto-check"><Check /></el-icon>
-          </span>
-          <span class="ob-onto-title">{{ ontologyMeta(o.ontology).title }}</span>
-          <span class="ob-onto-desc">{{ ontologyMeta(o.ontology).desc }}</span>
-          <span class="ob-onto-meta">
-            <span class="ob-onto-count"><el-icon><List /></el-icon>{{ formatCount(o.count) }} terms</span>
-            <span class="ob-onto-rel" :title="releaseTitle(o)"><el-icon><Calendar /></el-icon>{{ releaseDate(o) }}</span>
-          </span>
-        </button>
-      </div>
+      <template v-else>
+        <div v-if="hasTermsets" class="ob-onto-filter" role="tablist" aria-label="Filter vocabularies by kind">
+          <button
+            v-for="f in kindFilters"
+            :key="f.key"
+            type="button"
+            role="tab"
+            :aria-selected="kindFilter === f.key"
+            class="ob-onto-filter-btn"
+            :class="{ 'is-active': kindFilter === f.key }"
+            @click="kindFilter = f.key"
+          >
+            {{ f.label }}<span class="ob-onto-filter-count">{{ f.count }}</span>
+          </button>
+        </div>
+        <div class="ob-onto-row-wrap">
+          <button
+            v-if="canScrollLeft"
+            type="button"
+            class="ob-onto-arrow ob-onto-arrow-left"
+            aria-label="Scroll left"
+            @click="scrollByCards(-1)"
+          >
+            <el-icon><ArrowLeft /></el-icon>
+          </button>
+          <div class="ob-onto-row" ref="rowEl" :style="fadeStyle" @scroll="updateScroll">
+          <button
+            v-for="o in filteredOntologies"
+            :key="o.ontology"
+            type="button"
+            class="ob-onto-card"
+            :class="{ 'is-active': o.ontology === selectedOntology, 'is-termset': o.kind === 'termset' }"
+            @click="selectOntology(o.ontology)"
+          >
+            <span class="ob-onto-card-top">
+              <span v-if="o.kind === 'termset'" class="ob-onto-badge">Termset</span>
+              <span v-else class="ob-onto-code">{{ o.ontology }}</span>
+              <el-icon v-if="o.ontology === selectedOntology" class="ob-onto-check"><Check /></el-icon>
+            </span>
+            <span class="ob-onto-title">{{ metaTitle(o) }}</span>
+            <span class="ob-onto-desc">{{ metaDesc(o) }}</span>
+            <span class="ob-onto-meta">
+              <span class="ob-onto-count"><el-icon><List /></el-icon>{{ formatCount(o.count) }} terms</span>
+              <span class="ob-onto-rel" :title="releaseTitle(o)"><el-icon><Calendar /></el-icon>{{ releaseDate(o) }}</span>
+            </span>
+          </button>
+          </div>
+          <button
+            v-if="canScrollRight"
+            type="button"
+            class="ob-onto-arrow ob-onto-arrow-right"
+            aria-label="Scroll right"
+            @click="scrollByCards(1)"
+          >
+            <el-icon><ArrowRight /></el-icon>
+          </button>
+        </div>
+      </template>
 
       <div v-if="!booting && browsableOntologies.length" class="ob-request-row">
         <el-popover placement="top-start" :width="240" trigger="hover" popper-class="ob-help-popper">
@@ -262,9 +305,9 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { Search, Check, PriceTag, Collection, QuestionFilled, InfoFilled, Calendar, List } from '@element-plus/icons-vue'
+import { Search, Check, PriceTag, Collection, QuestionFilled, InfoFilled, Calendar, List, ArrowLeft, ArrowRight } from '@element-plus/icons-vue'
 import debounce from 'lodash.debounce'
 import { useOntologyStore } from '@/stores/ontologyStore'
 import StageActions from '@/components/shared/StageActions/StageActions.vue'
@@ -332,6 +375,10 @@ const ONTOLOGY_META = {
   UCUM: { title: 'Units of measure', desc: 'Standard units for measurements.' },
 }
 const ontologyMeta = (name) => ONTOLOGY_META[name] || { title: name, desc: '' }
+// Prefer the registry's own name/summary (sources.json now carries display_name +
+// summary); fall back to the curated ONTOLOGY_META for any entry that predates it.
+const metaTitle = (o) => o.display_name || ontologyMeta(o.ontology).title
+const metaDesc = (o) => o.summary || ontologyMeta(o.ontology).desc
 const formatCount = (n) => Number(n || 0).toLocaleString()
 
 // The upstream release date is embedded in most ontology_version strings
@@ -362,6 +409,58 @@ const browsableOntologies = computed(() => {
     .slice()
     .sort((a, b) => rank(a) - rank(b) || a.ontology.localeCompare(b.ontology))
 })
+// Split the chooser into two sections so ontologies and termsets read as distinct
+// kinds. Core = anything not explicitly a termset (covers entries with no kind).
+const coreOntologies = computed(() => browsableOntologies.value.filter((o) => o.kind !== 'termset'))
+const termsets = computed(() => browsableOntologies.value.filter((o) => o.kind === 'termset'))
+const hasTermsets = computed(() => termsets.value.length > 0)
+// One scrollable row, narrowed by a kind filter (All / Ontologies / Termsets).
+const kindFilter = ref('all')
+const kindFilters = computed(() => [
+  { key: 'all', label: 'All', count: browsableOntologies.value.length },
+  { key: 'core', label: 'Ontologies', count: coreOntologies.value.length },
+  { key: 'termset', label: 'Termsets', count: termsets.value.length },
+])
+const filteredOntologies = computed(() => {
+  if (kindFilter.value === 'core') return coreOntologies.value
+  if (kindFilter.value === 'termset') return termsets.value
+  return browsableOntologies.value
+})
+
+// Horizontal-scroll affordance for the vocabulary row: fade the scrollable edges
+// and show a scroll arrow on each side, only when there's overflow in that
+// direction. The fade is a mask (background-agnostic), toggled with the arrows.
+const rowEl = ref(null)
+const canScrollLeft = ref(false)
+const canScrollRight = ref(false)
+const FADE = '36px'
+const fadeStyle = computed(() => {
+  const l = canScrollLeft.value
+  const r = canScrollRight.value
+  let mask = 'none'
+  if (l && r) mask = `linear-gradient(to right, transparent 0, #000 ${FADE}, #000 calc(100% - ${FADE}), transparent 100%)`
+  else if (r) mask = `linear-gradient(to right, #000 calc(100% - ${FADE}), transparent 100%)`
+  else if (l) mask = `linear-gradient(to right, transparent 0, #000 ${FADE})`
+  return { maskImage: mask, WebkitMaskImage: mask }
+})
+const updateScroll = () => {
+  const el = rowEl.value
+  if (!el) return
+  canScrollLeft.value = el.scrollLeft > 1
+  canScrollRight.value = el.scrollLeft + el.clientWidth < el.scrollWidth - 1
+}
+const scrollByCards = (dir) => {
+  const el = rowEl.value
+  if (!el) return
+  el.scrollBy({ left: dir * Math.max(el.clientWidth * 0.8, 292), behavior: 'smooth' })
+}
+// Recompute when the list changes (filter/data load) and on viewport resize.
+watch([filteredOntologies, booting], () => nextTick(updateScroll))
+onMounted(() => {
+  window.addEventListener('resize', updateScroll)
+  nextTick(updateScroll)
+})
+onBeforeUnmount(() => window.removeEventListener('resize', updateScroll))
 const focusableSel = computed(() => sel.curie && (!focus.value || focus.value.curie !== sel.curie))
 const synonymList = computed(() =>
   String(sel.synonyms || '')
@@ -588,29 +687,116 @@ onMounted(async () => {
     font-size: 12px;
   }
 }
-/* Vocabulary chooser — a row of selectable cards */
-.ob-onto-cards {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: 12px;
-  margin-bottom: 24px;
-  max-width: 940px;
+/* Vocabulary chooser — a kind filter above one horizontal-scrolling row */
+.ob-onto-filter {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 12px;
 }
+.ob-onto-filter-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: theme.$gray_5;
+  background: theme.$white;
+  border: 1px solid theme.$gray_2;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: color 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+  &:hover {
+    border-color: theme.$purple_0_7;
+  }
+  &.is-active {
+    color: theme.$purple_2;
+    background: theme.$purple_tint;
+    border-color: theme.$purple_2;
+  }
+}
+.ob-onto-filter-count {
+  font-size: 11px;
+  color: theme.$gray_4;
+}
+.ob-onto-filter-btn.is-active .ob-onto-filter-count {
+  color: theme.$purple_2;
+}
+.ob-onto-row-wrap {
+  position: relative;
+  margin-bottom: 24px;
+}
+.ob-onto-row {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  /* overflow-x:auto forces overflow-y:auto, which would clip the cards' hover
+     shadow — pad the scrollport so it isn't cut off. */
+  padding: 4px 0 10px;
+}
+/* Scroll affordance: an arrow on each side, shown only when scrollable that way. */
+.ob-onto-arrow {
+  position: absolute;
+  top: calc(50% - 3px);
+  transform: translateY(-50%);
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  background: theme.$white;
+  border: 1px solid theme.$gray_2;
+  border-radius: 4px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  color: theme.$gray_6;
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease;
+  &:hover {
+    border-color: theme.$purple_0_7;
+    color: theme.$purple_2;
+  }
+  .el-icon {
+    font-size: 16px;
+  }
+}
+.ob-onto-arrow-left {
+  left: -8px;
+}
+.ob-onto-arrow-right {
+  right: -8px;
+}
+/* Termset badge — distinguishes a curated list from a full ontology */
+.ob-onto-badge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 18px;
+  color: theme.$teal_2;
+  background: theme.$teal_tint;
+  border: 1px solid theme.$teal_1;
+  border-radius: 4px;
+  padding: 0 7px;
+}
+
 .ob-onto-card {
+  flex: 0 0 auto;
+  width: 280px;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
   text-align: left;
-  padding: 14px 16px;
+  padding: 16px 18px;
   background: theme.$white;
   border: 1px solid theme.$gray_2;
   border-radius: 8px;
   cursor: pointer;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease, background 0.15s ease;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
   &:hover {
     border-color: theme.$purple_0_7;
     box-shadow: 0 2px 10px rgba(0, 0, 0, 0.06);
-    transform: translateY(-1px);
   }
   &.is-active {
     border-color: theme.$purple_2;
@@ -644,6 +830,11 @@ onMounted(async () => {
   color: theme.$gray_5;
   line-height: 1.4;
   min-height: 4.2em; /* reserve 3 lines so the meta row aligns across cards */
+  display: -webkit-box;
+  -webkit-line-clamp: 3; /* truncate longer summaries with an ellipsis */
+  line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 .ob-onto-meta {
   display: flex;
