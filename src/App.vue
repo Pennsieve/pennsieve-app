@@ -114,6 +114,9 @@ export default {
 
       // Bound handler reference so we can removeEventListener on unmount.
       _spotlightKeyHandler: null,
+
+      // Bound beforeunload handler guarding in-flight uploads.
+      _uploadUnloadHandler: null,
     };
   },
   mounted() {
@@ -121,6 +124,20 @@ export default {
       this.getActiveOrganization,
       this.onActiveOrgChange.bind(this)
     );
+
+    // Warn before navigating away mid-upload. Files whose S3 PUT has finished
+    // but whose finalize call hasn't been confirmed are invisible in the app
+    // until either the recovery replay below or the upload-service's daily
+    // reconcile sweep picks them up — so leaving here has a real cost the user
+    // can't see. Browsers ignore custom text and show their own prompt; the
+    // returnValue assignment is what triggers it.
+    this._uploadUnloadHandler = (e) => {
+      if (!this.$store.getters["uploadModule/getHasUnfinalizedWork"]()) return;
+      e.preventDefault();
+      e.returnValue = "";
+      return "";
+    };
+    window.addEventListener("beforeunload", this._uploadUnloadHandler);
 
     // Keep the document title in sync with the current route (org-less areas
     // like My Workspace rely on the route's meta.title, not the active org).
@@ -167,6 +184,9 @@ export default {
   beforeUnmount() {
     if (this._spotlightKeyHandler) {
       document.removeEventListener("keydown", this._spotlightKeyHandler);
+    }
+    if (this._uploadUnloadHandler) {
+      window.removeEventListener("beforeunload", this._uploadUnloadHandler);
     }
     EventBus.$off("open-chat-spotlight");
   },
@@ -309,6 +329,17 @@ export default {
      */
     onActiveOrgChange: function (activeOrg) {
       this.setPageMeta(activeOrg);
+
+      // First point in the app lifecycle where we know the user is
+      // authenticated, which the finalize endpoint requires. Replays any
+      // uploads whose S3 PUT completed in a previous session but never got
+      // finalized (tab refreshed/closed mid-upload). The action is a no-op
+      // when there's nothing journaled and guards itself against repeat runs.
+      if (activeOrg?.organization?.id) {
+        this.$store
+          .dispatch("uploadModule/recoverPendingFinalizes")
+          .catch((e) => console.warn("upload recovery failed", e));
+      }
     },
 
     /**

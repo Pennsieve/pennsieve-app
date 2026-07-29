@@ -7,6 +7,7 @@ import { v4 as uuidv4 } from 'uuid';
 import router from '@/router'
 import EventBus from '../utils/event-bus'
 import { useGetToken } from "@/composables/useGetToken";
+import finalizeJournal from '../utils/finalizeJournal'
 
 // Finalize batching matches the agent (pennsieve-agent/pkg/server/upload.go):
 // server accepts up to 250 files per POST /upload/manifest/files/finalize call
@@ -28,12 +29,37 @@ const FINALIZE_FLUSH_MS = 1000;
 // over-subscribing CPU on the checksum-per-part work.
 const UPLOAD_CONCURRENCY = 4;
 
-// Module-level guard to serialize finalize POSTs. Without this, the
-// batch-size trigger and the timer-based flush can both capture the same
-// pendingFinalize entries and fire duplicate requests — the second POST
-// would arrive with an empty batch (CLEAR_FINALIZE_QUEUE already ran) or,
-// worse, race on the `batch` snapshot. Not reactive — just a mutex.
-let finalizeInFlight = false;
+// Module-level mutex serializing finalize POSTs. Without it, the batch-size
+// trigger and the timer-based flush can both capture the same pendingFinalize
+// entries and fire duplicate requests — the second POST would arrive with an
+// empty batch (CLEAR_FINALIZE_QUEUE already ran) or, worse, race on the
+// `batch` snapshot.
+//
+// This is a promise chain rather than a boolean because a boolean forces
+// contending callers to choose between blocking and *dropping their work*.
+// The previous implementation returned early when the flag was set, relying on
+// "the next timer tick will pick it up" — which silently strands the tail of
+// every batch that loses this race at the end of the run, when the timer has
+// already been cleared and no next tick is coming. Chaining makes a contending
+// caller wait its turn instead, so `await flushFinalizeBatch()` is a real
+// guarantee that the queue was drained.
+let finalizeChain = Promise.resolve();
+
+// runExclusive queues fn behind any in-flight finalize POST and resolves with
+// fn's result. A rejection is surfaced to that caller but deliberately does not
+// poison the chain for subsequent callers.
+const runExclusive = (fn) => {
+    const result = finalizeChain.then(fn, fn);
+    finalizeChain = result.then(
+        () => undefined,
+        () => undefined
+    );
+    return result;
+};
+
+// Guards recoverPendingFinalizes so the replay runs at most once per app load,
+// even though the org watcher that kicks it can fire repeatedly.
+let recoveryRan = false;
 
 // Refresh storage credentials when the remaining TTL drops below 5 minutes —
 // same headroom the agent uses. STS returns ~1h creds.
@@ -192,7 +218,13 @@ export const mutations = {
         state.uploadFileMap = uploadFileMap
     },
     SET_FILE_STATUS(state, statusInfo) {
-        let curMap = state.uploadFileMap.get(statusInfo.key)
+        // Entry may already have been cleared (REMOVE_COMPLETED_FILE /
+        // CLEAR_COMPLETED_FILES / a new batch) by the time a late finalize
+        // response lands. Throwing here would reject flushFinalizeBatch and
+        // abort the drain loop with files still owed, so treat a missing row
+        // as nothing to update.
+        const curMap = state.uploadFileMap.get(statusInfo.key)
+        if (!curMap) return
         curMap.status = statusInfo.status
     },
     UPDATE_UPLOAD_PROGRESS(state, progressInfo) {
@@ -574,6 +606,21 @@ export const actions = {
                 }
 
                 commit('SET_FILE_STATUS', { key, status: "processing" })
+
+                // Journal before enqueueing. From here until the server
+                // confirms this uploadId, the bytes exist in S3 but the file
+                // is invisible in the app; the journal is what lets a
+                // refreshed/crashed tab replay the finalize instead of
+                // leaving the file for the next daily reconcile sweep.
+                finalizeJournal.add([{
+                    manifestNodeId: state.manifestNodeId,
+                    datasetId,
+                    uploadId: value.config.upload_id,
+                    size: value.file.size,
+                    sha256,
+                    onConflict: state.onConflict || 'keepBoth',
+                }])
+
                 commit('ENQUEUE_FINALIZE', {
                     uploadId: value.config.upload_id,
                     size: value.file.size,
@@ -617,8 +664,17 @@ export const actions = {
             clearInterval(flushTimer)
         }
 
-        // Final flush for any remainder below the batch threshold.
-        if (state.pendingFinalize.length > 0) {
+        // Drain whatever is left below the batch threshold.
+        //
+        // A loop, not a single call: the timer may have been mid-POST when we
+        // cleared it, and files that finished while that POST was in flight are
+        // still sitting in pendingFinalize. runExclusive makes each iteration
+        // wait for the previous POST rather than bail out, and with the workers
+        // finished and the timer stopped nothing new can be enqueued — so this
+        // terminates. flushFinalizeBatch clears the queue unconditionally
+        // before its POST, so every iteration removes at least one entry even
+        // when the request itself fails.
+        while (state.pendingFinalize.length > 0) {
             await dispatch('flushFinalizeBatch')
         }
 
@@ -635,15 +691,11 @@ export const actions = {
     // Per-file failure -> SET_FILE_STATUS=failed so the user sees which
     // file didn't make it. Request-level failures mark every queued file
     // as failed so the UI never silently "forgets" them.
-    flushFinalizeBatch: async ({ rootState, state, commit }) => {
-        // Serialize concurrent callers (timer-based flush + batch-size
-        // trigger + final post-loop flush). The second caller returns
-        // immediately; whatever accumulated while the first POST was
-        // in flight gets picked up by the next timer tick or the final
-        // flush after the worker pool drains.
-        if (finalizeInFlight) return
+    flushFinalizeBatch: ({ rootState, state, commit }) => runExclusive(async () => {
+        // Serializes against the other two callers (timer-based flush and the
+        // batch-size trigger) by queueing behind them rather than bailing out,
+        // so an awaited call is a real guarantee the queue was drained.
         if (state.pendingFinalize.length === 0) return
-        finalizeInFlight = true
         const batch = state.pendingFinalize.slice()
         commit('CLEAR_FINALIZE_QUEUE')
 
@@ -679,9 +731,14 @@ export const actions = {
             }
             const data = await resp.json()
             const byUploadId = new Map(batch.map(b => [b.uploadId, b.mapKey]))
+            const decided = []
             for (const r of data.results || []) {
                 const mapKey = byUploadId.get(r.uploadId)
                 if (!mapKey) continue
+                // The server reached a verdict on this uploadId, so replaying it
+                // later can't change the outcome — drop it from the journal
+                // whether it succeeded or was rejected.
+                decided.push(r.uploadId)
                 if (r.status === 'finalized') {
                     commit('SET_FILE_STATUS', { key: mapKey, status: 'finalized' })
                 } else {
@@ -694,7 +751,10 @@ export const actions = {
                     })
                 }
             }
+            finalizeJournal.remove(decided)
         } catch (e) {
+            // Request-level failure — no per-file verdict, so the journal
+            // entries stay put and get replayed on the next app load.
             console.error(e)
             for (const b of batch) {
                 commit('SET_FILE_STATUS', { key: b.mapKey, status: 'failed' })
@@ -705,8 +765,86 @@ export const actions = {
                     type: 'error',
                 },
             })
-        } finally {
-            finalizeInFlight = false
+        }
+    }),
+
+    // Replay finalize calls for files whose S3 PUT completed in a previous
+    // session but that were never confirmed by the server — the tab was
+    // refreshed, closed, or crashed in the gap between PUT and finalize.
+    //
+    // Runs once per app load. Deliberately does not touch uploadFileMap: the
+    // UI rows for those files are long gone, and the point here is purely to
+    // stop the file being invisible until the server-side reconcile sweep
+    // notices it a day or two later. Finalize is idempotent per uploadId, so
+    // re-sending one the server already handled is a no-op.
+    //
+    // Failures are swallowed: this is opportunistic repair on a code path the
+    // user didn't ask for, and the daily sweep is still the backstop.
+    recoverPendingFinalizes: async ({ rootState }) => {
+        if (recoveryRan) return
+        recoveryRan = true
+
+        finalizeJournal.prune()
+        const pending = finalizeJournal.groups()
+        if (pending.length === 0) return
+
+        let apiKey
+        try {
+            apiKey = await useGetToken()
+        } catch (e) {
+            // Not authenticated (yet) — leave the journal alone so a later
+            // load can retry.
+            recoveryRan = false
+            return
+        }
+
+        const endpoint = `${rootState.config.api2Url}/upload/manifest/files/finalize`
+        let recovered = 0
+
+        for (const group of pending) {
+            const url = `${endpoint}?${toQueryParams({ dataset_id: group.datasetId })}`
+            // Respect the server's per-request cap.
+            for (let i = 0; i < group.files.length; i += FINALIZE_BATCH_SIZE) {
+                const chunk = group.files.slice(i, i + FINALIZE_BATCH_SIZE)
+                try {
+                    const resp = await fetch(url, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${apiKey}`,
+                        },
+                        body: JSON.stringify({
+                            manifestNodeId: group.manifestNodeId,
+                            onConflict: group.onConflict,
+                            files: chunk,
+                        }),
+                    })
+                    if (!resp.ok) {
+                        // 403/404 means the manifest or dataset is gone (deleted,
+                        // or permissions changed) — nothing to recover, so clear
+                        // these rather than retrying on every load forever.
+                        if (resp.status === 403 || resp.status === 404) {
+                            finalizeJournal.remove(chunk.map(f => f.uploadId))
+                        }
+                        continue
+                    }
+                    const data = await resp.json()
+                    const decided = (data.results || []).map(r => r.uploadId)
+                    recovered += (data.results || []).filter(r => r.status === 'finalized').length
+                    finalizeJournal.remove(decided)
+                } catch (e) {
+                    console.warn('recoverPendingFinalizes: chunk failed', e)
+                }
+            }
+        }
+
+        if (recovered > 0) {
+            EventBus.$emit('toast', {
+                detail: {
+                    msg: `Resumed ${recovered} file${recovered === 1 ? '' : 's'} from an interrupted upload. They will appear shortly.`,
+                    type: 'info',
+                },
+            })
         }
     },
 
@@ -933,6 +1071,14 @@ export const getters = {
     },
     getOnConflict: state => () => {
         return state.onConflict
+    },
+    // True while leaving the page would strand files: either PUTs are still
+    // running, or bytes have landed in S3 but the server hasn't confirmed the
+    // finalize yet. Drives the beforeunload guard in App.vue. Reads the
+    // journal rather than pendingFinalize alone so files whose finalize POST
+    // is mid-flight still count.
+    getHasUnfinalizedWork: state => () => {
+        return state.isUploading || finalizeJournal.count() > 0
     },
     // Returns a Map<existingPackageId, uploadEntry> for replace-conflict
     // uploads targeting `folderId`. The DatasetFiles displayFiles walks
