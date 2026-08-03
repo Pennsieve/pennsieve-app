@@ -25,17 +25,21 @@
           <IconLockFilled :width="40" :height="40" color="currentColor" />
         </div>
         <h2 class="publishers-only-heading">Available to the Publishers team</h2>
-        <p>
+        <p class="publishers-only-copy">
           Reviewing datasets and proposals submitted to this workspace is
           limited to members of the Publishers team. A workspace administrator
           can add you to it.
         </p>
-        <p>
-          Your own dataset proposals are under
+        <p class="publishers-only-copy">
+          To request publication of a dataset, or to follow a request you have
+          already made, open that dataset and go to its
+          <strong>Publishing</strong> tab.
+        </p>
+        <p class="publishers-only-copy">
+          Proposals you have submitted to open repositories are under
           <router-link :to="{ name: 'dataset-proposals' }">
             My Workspace &rsaquo; Data Publishing
-          </router-link>. To check whether one of your datasets has been
-          published, open that dataset and see Settings &rsaquo; Publishing.
+          </router-link>.
         </p>
       </bf-empty-page-state>
     </template>
@@ -84,8 +88,8 @@ export default {
     /**
      * Reviewing datasets and proposals submitted to the workspace is a
      * Publishers-team function, and publishing-service enforces it server-side.
-     * Members follow their own submissions from My Workspace > Data Publishing
-     * and each dataset's Settings > Publishing page instead.
+     * Members request publication from a dataset's own Publishing tab, and
+     * track proposals from My Workspace > Data Publishing.
      */
     canReviewPublishing: function () {
       return this.isUserPublisher;
@@ -278,5 +282,10 @@ export default {
   font-size: 20px;
   font-weight: 500;
   margin: 0 0 8px;
+}
+
+.publishers-only-copy {
+  margin: 0 0 8px;
+  max-width: 480px;
 }
 </style>
