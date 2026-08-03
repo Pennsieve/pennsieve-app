@@ -433,7 +433,7 @@ export const useProposalStore = defineStore('proposalStore', () => {
           result: acceptedProposal
         }
       } else {
-        throw new Error(response.statusText)
+        throw new Error(`Failed to accept proposal: ${response.status} ${response.statusText}`)
       }
     } catch (err) {
       console.error('Failed to accept proposal:', err)
@@ -472,7 +472,7 @@ export const useProposalStore = defineStore('proposalStore', () => {
           result: rejectedProposal
         }
       } else {
-        throw new Error(response.statusText)
+        throw new Error(`Failed to reject proposal: ${response.status} ${response.statusText}`)
       }
     } catch (err) {
       console.error('Failed to reject proposal:', err)
