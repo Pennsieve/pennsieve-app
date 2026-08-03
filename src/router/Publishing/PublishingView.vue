@@ -65,7 +65,7 @@ export default {
     ...mapState("publishingModule", ["totalCounts"]),
 
     tabs: function () {
-      return [
+      const tabs = [
         {
           name: this.isUserPublisher
             ? "Ready for Review "
@@ -84,12 +84,19 @@ export default {
             "Rejected (" + this.getTotalCount(PublicationTabs.REJECTED) + ")",
           to: PublicationTabs.REJECTED,
         },
-        {
+      ];
+
+      // The workspace proposal review queue is publisher-only. Members track
+      // their own proposals under My Workspace → Data Publishing instead.
+      if (this.isUserPublisher) {
+        tabs.push({
           name:
             "Proposed (" + this.getTotalCount(PublicationTabs.PROPOSED) + ")",
           to: PublicationTabs.PROPOSED,
-        },
-      ];
+        });
+      }
+
+      return tabs;
     },
 
     /**
@@ -190,7 +197,11 @@ export default {
 
       this.getDatasetCount(PublicationTabs.REJECTED);
 
-      this.getDatasetProposalCount(PublicationTabs.PROPOSED);
+      // Proposal counts come from a publisher-only endpoint; asking as a
+      // non-publisher only earns a 401.
+      if (this.isUserPublisher) {
+        this.getDatasetProposalCount(PublicationTabs.PROPOSED);
+      }
     },
   },
 };
