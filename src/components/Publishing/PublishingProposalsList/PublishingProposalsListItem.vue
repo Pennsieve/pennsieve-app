@@ -42,7 +42,7 @@
 
       <el-col :span="4">
         <div class="bf-dataset-list-item-stat-align">
-          <div class="dataset-actions">
+          <div v-if="isUserPublisher" class="dataset-actions">
             <div class="button-wrapper">
               <p>
                 <a
@@ -68,6 +68,7 @@
   </div>
 </template>
 <script>
+import { mapGetters } from "vuex";
 import FormatDate from "../../../mixins/format-date";
 import { DatasetProposalAction } from "../../../utils/constants";
 
@@ -84,6 +85,8 @@ export default {
   },
 
   computed: {
+    ...mapGetters(["isUserPublisher"]),
+
     /**
      * Compute title of dataset proposl
      */

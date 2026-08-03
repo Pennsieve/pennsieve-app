@@ -100,7 +100,7 @@
         :proposal="selectedRequest"
         :repository="selectedRepository"
         :read-only="true"
-        :show-review-actions="true"
+        :show-review-actions="isUserPublisher"
         @accept="acceptDatasetProposalRequest"
         @reject="rejectDatasetProposalRequest"
         @close="closeProposalDialog"
@@ -205,6 +205,10 @@ export default {
     ...mapState('publishingModule', [
       'publishingSearchParams',
       'isLoadingDatasets'
+    ]),
+
+    ...mapGetters([
+      'isUserPublisher'
     ]),
 
     ...mapGetters('publishingModule', [
