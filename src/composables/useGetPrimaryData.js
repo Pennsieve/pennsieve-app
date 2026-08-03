@@ -64,7 +64,12 @@ export async function useGetPrimaryData() {
                 return useSendXhr(publisherTeamMembersUrl)
                     .then(publisherTeamMembers => store.dispatch('updatePublishers', publisherTeamMembers))
             })
-            .catch(err => console.warn('Failed to load teams or publishers:', err))
+            .catch(err => {
+                console.warn('Failed to load teams or publishers:', err)
+                // Resolve publishersLoading either way; leaving it pending
+                // strands anything that waits on publisher membership.
+                return store.dispatch('updatePublishers', [])
+            })
 
         const orgMembersUrl = `${siteConfig.apiUrl}/organizations/${activeOrgId}/members?api_key=${token}`
         let orgMembersPromise
