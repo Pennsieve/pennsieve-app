@@ -21,14 +21,10 @@
               Submitted on
               <strong>{{ updated }}</strong>
             </p>
-            <template>
-              <div v-if="email">
-                <p class="dataset-meta">
-                  Email address
-                  <strong>{{ email }}</strong>
-                </p>
-              </div>
-            </template>
+            <p v-if="email" class="dataset-meta">
+              Email address
+              <strong>{{ email }}</strong>
+            </p>
           </div>
         </div>
       </el-col>
@@ -74,20 +70,11 @@
 <script>
 import FormatDate from "../../../mixins/format-date";
 import { DatasetProposalAction } from "../../../utils/constants";
-import { useProposalStore } from '@/stores/proposalStore'
 
 export default {
   name: "PublishingProposalsListItem",
 
   mixins: [FormatDate],
-
-  setup() {
-    const proposalStore = useProposalStore()
-    
-    return {
-      proposalStore
-    }
-  },
 
   props: {
     proposal: {
@@ -126,14 +113,7 @@ export default {
     },
     //proposer's email will render if the email is provided adn not an empty string
     email() {
-      if (
-        this.proposal.emailAddress.length &&
-        this.proposal.emailAddress.trim().length
-      ) {
-        return this.proposal.emailAddress;
-      } else {
-        return "";
-      }
+      return this.proposal.emailAddress?.trim() || "";
     },
 
     storage: function () {
@@ -157,12 +137,8 @@ export default {
     },
 
     triggerRequest: function (request) {
-      if (request === "accept") {
-        this.proposalStore.acceptProposal(this.proposal);
-      }
-      if (request === "reject") {
-        this.proposalStore.rejectProposal(this.proposal);
-      }
+      // The parent raises a confirmation dialog and performs the action from
+      // there; acting here as well would accept/reject twice, unconfirmed.
       this.$emit(request, this.proposal);
     },
   },

@@ -97,14 +97,17 @@
 
       <request-survey
         :dialog-visible="requestModalVisible"
-        :dataset-request="selectedRequest"
-        :role="role"
+        :proposal="selectedRequest"
+        :repository="selectedRepository"
+        :read-only="true"
+        :show-review-actions="true"
         @accept="acceptDatasetProposalRequest"
         @reject="rejectDatasetProposalRequest"
+        @close="closeProposalDialog"
       />
 
       <confirmation-dialog
-        :visible="confirmationDialogVisible"
+        :dialog-visible="confirmationDialogVisible"
         :action="confirmationDialog.action"
         :action-message="confirmationDialog.actionMessage"
         :resource="confirmationDialog.resource"
@@ -134,6 +137,7 @@ import RequestSurvey from "../../user/publishing/ProposalSurvey.vue";
 import ConfirmationDialog from "../../shared/ConfirmationDialog/ConfirmationDialog.vue";
 import IconMagnifyingGlass from "../../icons/IconMagnifyingGlass.vue";
 import IconSort from "../../icons/IconSort.vue";
+import EventBus from "../../../utils/event-bus";
 
 export default {
   name: 'PublishingProposalsList',
@@ -179,10 +183,10 @@ export default {
 
   data() {
     return {
-      role: 'publisher',
       isLoadingDatasetsError: false,
       searchQuery: '',
-      selectedRequest: {},
+      selectedRequest: null,
+      selectedRepository: {},
       confirmationDialogVisible: false,
       confirmationDialog: {
         action: '',
@@ -311,18 +315,28 @@ export default {
     },
 
     viewProposal: function(proposal) {
+      if (!proposal) {
+        return
+      }
       // set selected proposal
-      if (proposal) {
-        this.selectedRequest = proposal
-        this.proposalStore.setSelectedProposal(proposal)
-      }
-      // set selected repo
-      if (proposal && proposal.organizationNodeId) {
-        let repository = this.getRepositoryByNodeId(proposal.organizationNodeId)
-        this.proposalStore.setSelectedRepo(repository)
-      }
+      this.selectedRequest = proposal
+      this.proposalStore.setSelectedProposal(proposal)
+
+      // set selected repo, so the repository questions render alongside
+      // the submitted survey responses
+      this.selectedRepository = proposal.organizationNodeId
+        ? this.getRepositoryByNodeId(proposal.organizationNodeId)
+        : {}
+      this.proposalStore.setSelectedRepo(this.selectedRepository)
+
       // enable modal visibility
       this.proposalStore.updateRequestModalVisible(true)
+    },
+
+    closeProposalDialog: function() {
+      this.proposalStore.updateRequestModalVisible(false)
+      this.selectedRequest = null
+      this.selectedRepository = {}
     },
 
     resetConfirmation: function() {
@@ -340,24 +354,48 @@ export default {
     },
 
     confirmedAction: async function(event) {
-      this.proposalStore.updateRequestModalVisible(false)
+      this.closeProposalDialog()
+      const { action, resource } = event
       this.resetConfirmation()
-      if (event.action && event.resource) {
-        switch (event.action) {
+      if (!action || !resource) {
+        return
+      }
+
+      try {
+        switch (action) {
           case "accept":
-            this.acceptDatasetProposal(event.resource)
-              .catch(err => console.error(err))
+            await this.acceptDatasetProposal(resource)
+            EventBus.$emit('toast', {
+              detail: {
+                type: 'success',
+                msg: `"${resource.name}" has been accepted.`
+              }
+            })
             break;
           case "reject":
-            this.rejectDatasetProposal(event.resource)
-              .catch(err => console.error(err))
+            await this.rejectDatasetProposal(resource)
+            EventBus.$emit('toast', {
+              detail: {
+                type: 'success',
+                msg: `"${resource.name}" has been rejected.`
+              }
+            })
             break;
         }
+      } catch (err) {
+        console.error(err)
+        EventBus.$emit('toast', {
+          detail: {
+            type: 'error',
+            msg: `Failed to ${action} "${resource.name}". Please try again.`
+          }
+        })
       }
     },
 
     acceptDatasetProposalRequest: function(proposal) {
       // raise Confirmation Dialog
+      this.closeProposalDialog()
       this.resetConfirmation()
       this.confirmationDialog = {
         action: 'accept',
@@ -371,14 +409,13 @@ export default {
     },
 
     acceptDatasetProposal: async function(proposal) {
-      // invoke repositoryModule::acceptProposal()
       await this.proposalStore.acceptProposal(proposal)
-      await this.fetchDatasetProposals()
-        .catch(err => console.error(err))
+      await this.refreshProposals()
     },
 
     rejectDatasetProposalRequest: function(proposal) {
       // raise Confirmation Dialog
+      this.closeProposalDialog()
       this.resetConfirmation()
       this.confirmationDialog = {
         action: 'reject',
@@ -392,10 +429,13 @@ export default {
     },
 
     rejectDatasetProposal: async function(proposal) {
-      // invoke repositoryModule::rejectProposal()
       await this.proposalStore.rejectProposal(proposal)
+      await this.refreshProposals()
+    },
+
+    // Reloads the list; the same response also refreshes the "Proposed" tab count
+    refreshProposals: async function() {
       await this.fetchDatasetProposals()
-        .catch(err => console.error(err))
     },
 
   },
