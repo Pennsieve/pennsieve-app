@@ -217,13 +217,15 @@ export const formatMetricValue = (key, value) => {
 };
 
 // Fargate resources
-export const FARGATE_CPU_OPTIONS = ["256", "512", "1024", "2048", "4096"];
+export const FARGATE_CPU_OPTIONS = ["256", "512", "1024", "2048", "4096", "8192"];
 export const FARGATE_MEMORY_MAP = {
   "256": ["512", "1024", "2048"],
   "512": ["1024", "2048", "3072", "4096"],
   "1024": ["2048", "3072", "4096", "5120", "6144", "7168", "8192"],
   "2048": ["4096", "5120", "6144", "7168", "8192", "9216", "10240", "11264", "12288", "13312", "14336", "15360", "16384"],
   "4096": ["8192", "9216", "10240", "11264", "12288", "13312", "14336", "15360", "16384", "17408", "18432", "19456", "20480", "21504", "22528", "23552", "24576", "25600", "26624", "27648", "28672", "29696", "30720"],
+  // 8 vCPU: 16 GB – 60 GB in 4 GB increments
+  "8192": ["16384", "20480", "24576", "28672", "32768", "36864", "40960", "45056", "49152", "53248", "57344", "61440"],
 };
 export const getMemoryOptionsForCpu = (cpu) => FARGATE_MEMORY_MAP[cpu] || [];
 
@@ -237,23 +239,27 @@ export const LAMBDA_MEMORY_OPTIONS = [
 export const getCpuForMemory = (memory) => {
   const mem = parseInt(memory, 10);
   if (!mem) return "";
+  // A CPU tier only supports memory that falls inside its own range — the
+  // larger tiers have a floor as well as a ceiling (8 vCPU starts at 16 GB).
+  const supportsMemory = (cpu) => {
+    const supported = FARGATE_MEMORY_MAP[cpu] || [];
+    const minMem = parseInt(supported[0], 10) || 0;
+    const maxMem = parseInt(supported[supported.length - 1], 10) || 0;
+    return mem >= minMem && mem <= maxMem;
+  };
   // Target CPU is memory / 2, then find the closest CPU option >= that target
   const targetCpu = mem / 2;
   for (const cpu of FARGATE_CPU_OPTIONS) {
-    if (parseInt(cpu, 10) >= targetCpu) {
-      // Verify this CPU actually supports the memory value
-      const supported = FARGATE_MEMORY_MAP[cpu] || [];
-      const maxMem = parseInt(supported[supported.length - 1], 10) || 0;
-      if (mem <= maxMem) return cpu;
-    }
+    if (parseInt(cpu, 10) >= targetCpu && supportsMemory(cpu)) return cpu;
   }
-  // Fallback: find smallest CPU that supports this memory
-  for (const cpu of FARGATE_CPU_OPTIONS) {
-    const supported = FARGATE_MEMORY_MAP[cpu] || [];
-    const maxMem = parseInt(supported[supported.length - 1], 10) || 0;
-    if (mem <= maxMem) return cpu;
+  // Fallback: largest CPU that supports this memory outright...
+  for (let i = FARGATE_CPU_OPTIONS.length - 1; i >= 0; i--) {
+    if (supportsMemory(FARGATE_CPU_OPTIONS[i])) return FARGATE_CPU_OPTIONS[i];
   }
-  return FARGATE_CPU_OPTIONS[FARGATE_CPU_OPTIONS.length - 1];
+  // ...otherwise the memory sits outside every tier, so clamp to an end.
+  const largest = FARGATE_CPU_OPTIONS[FARGATE_CPU_OPTIONS.length - 1];
+  const ceiling = FARGATE_MEMORY_MAP[largest].slice(-1)[0];
+  return mem > parseInt(ceiling, 10) ? largest : FARGATE_CPU_OPTIONS[0];
 };
 
 // Standard (Fargate) CPU/memory selection for workflow processors.
