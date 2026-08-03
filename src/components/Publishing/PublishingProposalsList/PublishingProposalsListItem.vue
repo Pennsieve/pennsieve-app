@@ -21,14 +21,10 @@
               Submitted on
               <strong>{{ updated }}</strong>
             </p>
-            <template>
-              <div v-if="email">
-                <p class="dataset-meta">
-                  Email address
-                  <strong>{{ email }}</strong>
-                </p>
-              </div>
-            </template>
+            <p v-if="email" class="dataset-meta">
+              Email address
+              <strong>{{ email }}</strong>
+            </p>
           </div>
         </div>
       </el-col>
@@ -46,7 +42,7 @@
 
       <el-col :span="4">
         <div class="bf-dataset-list-item-stat-align">
-          <div class="dataset-actions">
+          <div v-if="isUserPublisher" class="dataset-actions">
             <div class="button-wrapper">
               <p>
                 <a
@@ -72,22 +68,14 @@
   </div>
 </template>
 <script>
+import { mapGetters } from "vuex";
 import FormatDate from "../../../mixins/format-date";
 import { DatasetProposalAction } from "../../../utils/constants";
-import { useProposalStore } from '@/stores/proposalStore'
 
 export default {
   name: "PublishingProposalsListItem",
 
   mixins: [FormatDate],
-
-  setup() {
-    const proposalStore = useProposalStore()
-    
-    return {
-      proposalStore
-    }
-  },
 
   props: {
     proposal: {
@@ -97,6 +85,8 @@ export default {
   },
 
   computed: {
+    ...mapGetters(["isUserPublisher"]),
+
     /**
      * Compute title of dataset proposl
      */
@@ -126,14 +116,7 @@ export default {
     },
     //proposer's email will render if the email is provided adn not an empty string
     email() {
-      if (
-        this.proposal.emailAddress.length &&
-        this.proposal.emailAddress.trim().length
-      ) {
-        return this.proposal.emailAddress;
-      } else {
-        return "";
-      }
+      return this.proposal.emailAddress?.trim() || "";
     },
 
     storage: function () {
@@ -157,12 +140,8 @@ export default {
     },
 
     triggerRequest: function (request) {
-      if (request === "accept") {
-        this.proposalStore.acceptProposal(this.proposal);
-      }
-      if (request === "reject") {
-        this.proposalStore.rejectProposal(this.proposal);
-      }
+      // The parent raises a confirmation dialog and performs the action from
+      // there; acting here as well would accept/reject twice, unconfirmed.
       this.$emit(request, this.proposal);
     },
   },

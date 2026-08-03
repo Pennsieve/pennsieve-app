@@ -24,6 +24,11 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
+  // Publisher reviewing a submitted proposal: offer Accept / Reject
+  showReviewActions: {
+    type: Boolean,
+    default: false,
+  },
 });
 
 const emit = defineEmits([
@@ -32,6 +37,8 @@ const emit = defineEmits([
   "submit-proposal",
   "recreate-proposal",
   "recreate-and-submit-proposal",
+  "accept",
+  "reject",
   "update:dialogVisible",
 ]);
 
@@ -41,7 +48,7 @@ const proposalStore = useProposalStore();
 const proposal = ref({
   name: "",
   description: "",
-  survey: [],
+  survey: {},
 });
 
 const selectedRepository = ref({});
@@ -59,6 +66,70 @@ const currentRepository = computed(() =>
 const repositoryQuestions = computed(() => {
   return currentRepository.value?.questions || [];
 });
+
+// When reviewing a submitted proposal, render every response we have, even if
+// its question is no longer part of the repository's question set.
+const displayedQuestions = computed(() => {
+  const questions = repositoryQuestions.value;
+  if (!props.readOnly) {
+    return questions;
+  }
+
+  const knownIds = new Set(questions.map((question) => String(question.id)));
+  const orphanedResponses = Object.keys(proposal.value.survey || {})
+    .filter((id) => !knownIds.has(String(id)) && proposal.value.survey[id])
+    .map((id) => ({ id, question: "Response" }));
+
+  return [...questions, ...orphanedResponses];
+});
+
+const dialogTitle = computed(() =>
+  props.readOnly ? "Dataset Proposal" : "Submit Dataset Proposal"
+);
+
+const submitterName = computed(() => props.proposal?.ownerName || "");
+
+const submitterEmail = computed(() => props.proposal?.emailAddress || "");
+
+const proposalStatus = computed(() => {
+  const statusMap = {
+    DRAFT: "Draft",
+    SUBMITTED: "Submitted",
+    ACCEPTED: "Accepted",
+    REJECTED: "Rejected",
+    WITHDRAWN: "Withdrawn",
+  };
+  const status = props.proposal?.proposalStatus;
+  return status ? statusMap[status] || status : "";
+});
+
+const submittedOn = computed(() => {
+  const timestamp = props.proposal?.submittedAt || props.proposal?.updatedAt;
+  if (!timestamp) {
+    return "";
+  }
+  // Timestamps come back as epoch seconds
+  const date =
+    timestamp > 1000000000000
+      ? new Date(timestamp)
+      : new Date(timestamp * 1000);
+  return date.toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
+});
+
+const hasSubmissionSummary = computed(
+  () =>
+    props.readOnly &&
+    Boolean(
+      submitterName.value ||
+        submitterEmail.value ||
+        proposalStatus.value ||
+        submittedOn.value
+    )
+);
 
 const readyToSave = computed(() => {
   // For updating existing proposals, allow saving even if incomplete
@@ -132,6 +203,10 @@ watch(
 watch(
   () => selectedRepository.value.organizationNodeId,
   (newNodeId, oldNodeId) => {
+    // Read-only reviews never switch repositories; re-running this on open
+    // would clear the responses we just populated
+    if (props.readOnly) return;
+
     if (oldNodeId && newNodeId !== oldNodeId) {
       // Save current survey answers before switching
       if (oldNodeId) {
@@ -167,7 +242,7 @@ function clearForm() {
   proposal.value = {
     name: "",
     description: "",
-    survey: [],
+    survey: {},
   };
 }
 
@@ -197,7 +272,7 @@ function populateForm() {
     };
 
     // Convert survey array to object format for the form
-    if (props.proposal.survey && Array.isArray(props.proposal.survey)) {
+    if (Array.isArray(props.proposal.survey)) {
       const surveyObject = {};
       props.proposal.survey.forEach((item) => {
         if (item.questionId !== undefined && item.response) {
@@ -205,11 +280,22 @@ function populateForm() {
         }
       });
       proposal.value.survey = surveyObject;
+    } else if (props.proposal.survey && typeof props.proposal.survey === "object") {
+      // Already keyed by question id
+      proposal.value.survey = { ...props.proposal.survey };
     }
   } else {
     // New proposal - clear form
     clearForm();
   }
+}
+
+function acceptProposal() {
+  emit("accept", props.proposal);
+}
+
+function rejectProposal() {
+  emit("reject", props.proposal);
 }
 
 function handleRepositoryChange(repository) {
@@ -341,16 +427,50 @@ function submitProposal() {
       class="proposal-dialog"
     >
       <template #header>
-        <bf-dialog-header
-          title="Submit Dataset Proposal"
-          class="dialog-header"
-        />
+        <bf-dialog-header :title="dialogTitle" class="dialog-header" />
       </template>
 
       <div class="proposal-content">
-        <!-- Read-only Close Button -->
+        <!-- Submission Summary (review) -->
+        <div class="submission-summary" v-if="hasSubmissionSummary">
+          <div class="summary-fields">
+            <p v-if="submitterName">
+              Submitted by <strong>{{ submitterName }}</strong>
+            </p>
+            <p v-if="submitterEmail">
+              Email <strong>{{ submitterEmail }}</strong>
+            </p>
+            <p v-if="submittedOn">
+              Submitted on <strong>{{ submittedOn }}</strong>
+            </p>
+            <p v-if="proposalStatus">
+              Status <strong>{{ proposalStatus }}</strong>
+            </p>
+          </div>
+        </div>
+
+        <!-- Read-only Actions -->
         <div class="read-only-actions" v-if="readOnly">
-          <bf-button @click="closeDialog" class="primary"> Close </bf-button>
+          <bf-button
+            v-if="showReviewActions"
+            class="secondary"
+            @click="rejectProposal"
+          >
+            Reject Proposal
+          </bf-button>
+          <bf-button
+            v-if="showReviewActions"
+            class="primary"
+            @click="acceptProposal"
+          >
+            Accept Proposal
+          </bf-button>
+          <bf-button
+            @click="closeDialog"
+            :class="showReviewActions ? 'secondary' : 'primary'"
+          >
+            Close
+          </bf-button>
         </div>
 
         <!-- Progress Indicator -->
@@ -481,14 +601,17 @@ function submitProposal() {
           </div>
 
           <!-- Repository-specific Questions -->
-          <div class="form-section" v-if="repositoryQuestions.length > 0">
+          <div class="form-section" v-if="displayedQuestions.length > 0">
             <div class="section-header">
               <h4>
                 <span class="field-number">3</span>
                 Repository Requirements
                 <span class="required-indicator">*</span>
               </h4>
-              <p class="field-description">
+              <p class="field-description" v-if="readOnly">
+                Responses to the repository's questions
+              </p>
+              <p class="field-description" v-else>
                 Answer the following questions specific to
                 {{ currentRepository.displayName }}
               </p>
@@ -496,7 +619,7 @@ function submitProposal() {
 
             <div class="questions-grid">
               <div
-                v-for="(question, index) in repositoryQuestions"
+                v-for="question in displayedQuestions"
                 :key="question.id"
                 class="question-item"
                 :class="{ 'field-completed': proposal.survey[question.id] }"
@@ -1111,7 +1234,28 @@ function submitProposal() {
 .read-only-actions {
   display: flex;
   justify-content: flex-end;
+  gap: 8px;
   padding: 0 0 24px 0;
   margin-top: 24px;
+}
+
+.submission-summary {
+  margin-top: 24px;
+
+  .summary-fields {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 32px;
+
+    p {
+      margin: 0;
+      color: theme.$gray_5;
+      font-size: 14px;
+
+      strong {
+        color: theme.$gray_6;
+      }
+    }
+  }
 }
 </style>

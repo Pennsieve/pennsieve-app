@@ -266,36 +266,33 @@ export const actions = {
     const types = PublicationTabsTypes[type]
     const isOnPublishedTab = statuses.includes(PublicationStatus.COMPLETED)
 
-    useGetToken()
-        .then(token => {
-          const queryParams = toQueryParams({
-            publicationStatus: statuses,
-            publicationType: types,
-            api_key: token,
-            limit: 0
-          })
+    try {
+      const token = await useGetToken()
 
-          const url = isOnPublishedTab
-              ? `${rootState.config.apiUrl}/datasets/published/paginated?${queryParams}`
-              : `${rootState.config.apiUrl}/datasets/paginated?${queryParams}`
-          try {
-            fetch(url)
-                .then(resp => {
-                  if (resp.ok) {
-                    resp.json()
-                        .then(json => {
-                          commit('UPDATE_PUBLISHING_TOTAL_COUNT', { type, count: json.totalCount })
-                        })
-                  } else {
-                    throw new Error(resp.statusText)
-                  }
-                })
+      const queryParams = toQueryParams({
+        publicationStatus: statuses,
+        publicationType: types,
+        api_key: token,
+        limit: 0
+      })
 
-          } catch (err) {
-            EventBus.$emit('ajaxError', err)
-          }
+      const url = isOnPublishedTab
+          ? `${rootState.config.apiUrl}/datasets/published/paginated?${queryParams}`
+          : `${rootState.config.apiUrl}/datasets/paginated?${queryParams}`
 
-        })
+      const resp = await fetch(url)
+      if (!resp.ok) {
+        throw new Error(`Failed to fetch ${type} count: ${resp.status} ${resp.statusText}`)
+      }
+
+      const json = await resp.json()
+      commit('UPDATE_PUBLISHING_TOTAL_COUNT', { type, count: json.totalCount })
+    } catch (err) {
+      // the throw used to happen inside a .then(), surfacing as an
+      // unhandled rejection instead of reaching this handler
+      console.error(err)
+      EventBus.$emit('ajaxError', err)
+    }
   },
 
   getDatasetProposalCount: async ({ commit, rootState }, type) => {
@@ -337,12 +334,15 @@ export const actions = {
     // }
    
     let url = `${rootState.config.api2Url}/publishing/submission`
-    const apiKey = await useGetToken()
+    commit('UPDATE_IS_LOADING_DATASETS', true);
 
-    const myHeaders = new Headers();
-    myHeaders.append('Authorization', 'Bearer ' + apiKey)
-    myHeaders.append('Accept', 'application/json')
     try {
+      const apiKey = await useGetToken()
+
+      const myHeaders = new Headers();
+      myHeaders.append('Authorization', 'Bearer ' + apiKey)
+      myHeaders.append('Accept', 'application/json')
+
       const response = await fetch(url, {
         method: "GET",
         headers: myHeaders,
@@ -350,14 +350,15 @@ export const actions = {
       if (response.ok) {
         const { proposals, totalCount } = await response.json()
         commit('UPDATE_PUBLISHING_SEARCH_TOTAL_COUNT', totalCount);
+        commit('UPDATE_PUBLISHING_TOTAL_COUNT', { type: PublicationTabs.PROPOSED, count: totalCount });
         commit('UPDATE_DATASETS', { type: router.currentRoute.value.name, datasets: proposals });
-        commit('UPDATE_IS_LOADING_DATASETS', false);
-
       } else {
-        throw new Error(response.statusText)
+        throw new Error(`Failed to fetch dataset proposals: ${response.status} ${response.statusText}`)
       }
     } catch (err) {
       EventBus.$emit('ajaxError', err)
+    } finally {
+      commit('UPDATE_IS_LOADING_DATASETS', false);
     }
   },
 

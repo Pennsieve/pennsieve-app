@@ -144,8 +144,14 @@
         </template>
       </bf-navigation-item>
 
+      <!--
+        Publishing is the Publishers team's review queue end to end; members
+        request publication from a dataset's own Publishing tab. Showing the
+        entry to everyone means a click that can only land on "you can't use
+        this" -- the section still explains itself when reached by URL.
+      -->
       <bf-navigation-item
-        v-if="!(pageNotFound || isWelcomeOrg) && !isWorkspaceGuest"
+        v-if="!(pageNotFound || isWelcomeOrg) && !isWorkspaceGuest && isUserPublisher"
         id="nav-publishing"
         :link="{ name: 'publishing', params: { orgId: activeOrganizationId } }"
         label="Publishing"

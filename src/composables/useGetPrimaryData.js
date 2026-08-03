@@ -49,13 +49,26 @@ export async function useGetPrimaryData() {
         const activeOrgId = activeOrganization.organization.id
         const teamUrl = `${siteConfig.apiUrl}/organizations/${activeOrgId}/teams?api_key=${token}`
 
+        // Publisher membership drives what the Publishing section offers, so a
+        // failure here must not take the rest of the primary data down with it —
+        // an empty publishers list silently demotes every publisher instead.
         const teamAndPublishersPromise = useSendXhr(teamUrl)
             .then(response => store.dispatch('updateTeams', response))
             .then(() => {
                 const publisherTeam = store.getters.publisherTeam
+                if (!publisherTeam) {
+                    // Workspace has no system publishers team
+                    return store.dispatch('updatePublishers', [])
+                }
                 const publisherTeamMembersUrl = `${siteConfig.apiUrl}/organizations/${activeOrgId}/teams/${publisherTeam.id}/members?api_key=${token}`
                 return useSendXhr(publisherTeamMembersUrl)
                     .then(publisherTeamMembers => store.dispatch('updatePublishers', publisherTeamMembers))
+            })
+            .catch(err => {
+                console.warn('Failed to load teams or publishers:', err)
+                // Resolve publishersLoading either way; leaving it pending
+                // strands anything that waits on publisher membership.
+                return store.dispatch('updatePublishers', [])
             })
 
         const orgMembersUrl = `${siteConfig.apiUrl}/organizations/${activeOrgId}/members?api_key=${token}`
