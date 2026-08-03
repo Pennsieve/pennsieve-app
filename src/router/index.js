@@ -1765,18 +1765,6 @@ const router = createRouter({
             stage: {
               publicationStatus: [PublicationStatus.PROPOSED],
             }
-          },
-          // Reviewing workspace proposals is publisher-only server-side
-          // (publishing-service authorizes on IsPublisher), so keep
-          // non-publishers off the tab rather than showing them a queue
-          // that can only 401.
-          beforeEnter: async (to, from, next) => {
-            const { default: store } = await import('@/store')
-            if (store.getters.isUserPublisher) {
-              next()
-            } else {
-              next({ name: PublicationTabs.REVIEW, params: to.params })
-            }
           }
         }
       ],

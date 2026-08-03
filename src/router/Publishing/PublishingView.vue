@@ -6,13 +6,38 @@
           <org-breadcrumb page-name="Publishing" :sub-page-name="currentTabName" :page-route="{ name: 'review' }" />
         </template>
       </bf-rafter>
-      <div class="content-tabs">
+      <div
+        v-if="canReviewPublishing"
+        class="content-tabs"
+      >
         <router-tabs :tabs="tabs" />
       </div>
     </template>
 
     <template #stage>
-      <router-view name="stage" />
+      <router-view
+        v-if="canReviewPublishing"
+        name="stage"
+      />
+
+      <bf-empty-page-state v-else-if="!isLoadingPublishers">
+        <div class="publishers-only-illustration">
+          <IconLockFilled :width="40" :height="40" color="currentColor" />
+        </div>
+        <h2 class="publishers-only-heading">Available to the Publishers team</h2>
+        <p>
+          Reviewing datasets and proposals submitted to this workspace is
+          limited to members of the Publishers team. A workspace administrator
+          can add you to it.
+        </p>
+        <p>
+          Your own dataset proposals are under
+          <router-link :to="{ name: 'dataset-proposals' }">
+            My Workspace &rsaquo; Data Publishing
+          </router-link>. To check whether one of your datasets has been
+          published, open that dataset and see Settings &rsaquo; Publishing.
+        </p>
+      </bf-empty-page-state>
     </template>
   </bf-page>
 </template>
@@ -22,6 +47,8 @@ import { mapActions, mapGetters, mapState } from "vuex";
 
 import BfPage from "../../components/layout/BfPage/BfPage.vue";
 import BfStage from "../../components/layout/BfStage/BfStage.vue";
+import BfEmptyPageState from "../../components/shared/bf-empty-page-state/BfEmptyPageState.vue";
+import IconLockFilled from "../../components/icons/IconLockFilled.vue";
 import BfRafter from "../../components/shared/bf-rafter/BfRafter.vue";
 import BfButton from "../../components/shared/bf-button/BfButton.vue";
 import OrgBreadcrumb from "../../components/shared/OrgBreadcrumb/OrgBreadcrumb.vue";
@@ -40,6 +67,8 @@ export default {
     BfPage,
     BfStage,
     BfRafter,
+    BfEmptyPageState,
+    IconLockFilled,
     OrgBreadcrumb,
   },
 
@@ -50,7 +79,26 @@ export default {
 
     ...mapGetters("publishingModule", ["getTotalCount"]),
 
-    ...mapState(["config", "activeOrganization", "primaryNavOpen"]),
+    ...mapState(["config", "activeOrganization", "primaryNavOpen", "publishersLoading"]),
+
+    /**
+     * Reviewing datasets and proposals submitted to the workspace is a
+     * Publishers-team function, and publishing-service enforces it server-side.
+     * Members follow their own submissions from My Workspace > Data Publishing
+     * and each dataset's Settings > Publishing page instead.
+     */
+    canReviewPublishing: function () {
+      return this.isUserPublisher;
+    },
+
+    /**
+     * Publisher membership arrives with the workspace's primary data, so hold
+     * the gate until it has resolved rather than flashing the empty state at
+     * an actual publisher.
+     */
+    isLoadingPublishers: function () {
+      return this.publishersLoading;
+    },
 
     currentTabName() {
       const routeToTab = {
@@ -65,13 +113,9 @@ export default {
     ...mapState("publishingModule", ["totalCounts"]),
 
     tabs: function () {
-      const tabs = [
+      return [
         {
-          name: this.isUserPublisher
-            ? "Ready for Review "
-            : "Pending Review (" +
-              this.getTotalCount(PublicationTabs.REVIEW) +
-              ")",
+          name: "Ready for Review ",
           to: PublicationTabs.REVIEW,
         },
         {
@@ -84,19 +128,12 @@ export default {
             "Rejected (" + this.getTotalCount(PublicationTabs.REJECTED) + ")",
           to: PublicationTabs.REJECTED,
         },
-      ];
-
-      // The workspace proposal review queue is publisher-only. Members track
-      // their own proposals under My Workspace → Data Publishing instead.
-      if (this.isUserPublisher) {
-        tabs.push({
+        {
           name:
             "Proposed (" + this.getTotalCount(PublicationTabs.PROPOSED) + ")",
           to: PublicationTabs.PROPOSED,
-        });
-      }
-
-      return tabs;
+        },
+      ];
     },
 
     /**
@@ -138,10 +175,22 @@ export default {
   },
 
   mounted: function () {
-    this.getPublishingData();
+    if (this.canReviewPublishing) {
+      this.getPublishingData();
+    }
     if (this.$route.params.datasetSettingsPage) {
       this.togglePrimaryNav(true);
     }
+  },
+
+  watch: {
+    // Publisher membership can land after this view mounts, on a hard refresh
+    // straight onto /publishing or on a workspace switch.
+    canReviewPublishing: function (canReview) {
+      if (canReview) {
+        this.getPublishingData();
+      }
+    },
   },
 
   beforeRouteEnter(to, from, next) {
@@ -197,11 +246,7 @@ export default {
 
       this.getDatasetCount(PublicationTabs.REJECTED);
 
-      // Proposal counts come from a publisher-only endpoint; asking as a
-      // non-publisher only earns a 401.
-      if (this.isUserPublisher) {
-        this.getDatasetProposalCount(PublicationTabs.PROPOSED);
-      }
+      this.getDatasetProposalCount(PublicationTabs.PROPOSED);
     },
   },
 };
@@ -214,5 +259,24 @@ export default {
   background: white;
   border-bottom: 1px solid theme.$gray_2;
   padding: 0 32px;
+}
+
+.publishers-only-illustration {
+  align-items: center;
+  background: theme.$purple_tint;
+  border-radius: 50%;
+  color: theme.$purple_2;
+  display: flex;
+  height: 80px;
+  justify-content: center;
+  margin-bottom: 24px;
+  width: 80px;
+}
+
+.publishers-only-heading {
+  color: theme.$gray_6;
+  font-size: 20px;
+  font-weight: 500;
+  margin: 0 0 8px;
 }
 </style>
