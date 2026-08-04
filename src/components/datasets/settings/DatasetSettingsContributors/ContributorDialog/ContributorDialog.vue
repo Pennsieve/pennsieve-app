@@ -321,7 +321,7 @@ export default {
       } else {
        const result = this.orgContributors.filter(contributor => value === contributor.email );
        if (result.length !== 0 && !this.isEditing) {
-          callback(new Error('Contributor with this email already exists'));
+          callback(new Error('This user is already an org member with this email and can be added from the dropdown outside of the dialog'));
        } else {
          callback()
        }
