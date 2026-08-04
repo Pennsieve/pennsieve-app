@@ -66,7 +66,7 @@
 
       <bf-button
         :disabled="datasetLocked"
-        @click="isContributorDialogVisible = true"
+        @click="onCreateContributorClick"
       >
         Create Contributor
       </bf-button>
@@ -87,7 +87,7 @@
 
       <contributor-dialog
         :dialog-visible="isContributorDialogVisible"
-        :contributor.sync="editingContributor"
+        v-model:contributor="editingContributor"
         :org-contributors="orgContributors"
         @close-dialog = "closeContributorDialog"
         @add-contributor="createContributor"
@@ -371,6 +371,10 @@ export default {
 
     },
 
+    onCreateContributorClick: function() {
+      this.editingContributor = {}
+      this.isContributorDialogVisible = true
+    },
     onEditContributorClick: function(contributor) {
       this.editingContributor = contributor
       this.isContributorDialogVisible = true;
