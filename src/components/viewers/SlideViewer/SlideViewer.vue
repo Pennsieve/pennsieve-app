@@ -6,6 +6,7 @@
       :style="{ height: `${wrapperStyle}` }"
     />
 
+    <!-- TODO: leftover Vue 2 `.sync` modifiers below, dead in Vue 3 (no onUpdate:is-creating/onUpdate:annotation listeners are generated) - verify any bugs caused by this outdated code and update to v-model:is-creating / v-model:annotation -->
     <slide-annotation-dialog
       :dialog-visible="isSlideAnnotationDialogVisible"
       :is-creating.sync="isCreatingAnnotation"
@@ -22,6 +23,7 @@
       @cancel="cancelDeleteAnnotation"
     />
 
+    <!-- TODO: leftover Vue 2 `.sync` modifiers below, dead in Vue 3 (no onUpdate:layer/onUpdate:is-creating listeners are generated) - verify any bugs caused by this outdated code and update to v-model:layer / v-model:is-creating -->
     <slide-layer-dialog
       :dialog-visible="isSlideLayerDialogVisible"
       :layer.sync="layer"
@@ -31,6 +33,7 @@
       @edit-layer="editLayer"
     />
 
+    <!-- TODO: leftover Vue 2 `.sync` modifier below, dead in Vue 3 (no onUpdate:layer listener is generated) - verify any bugs caused by this outdated code and update to v-model:layer -->
     <slide-layer-delete-dialog
       :dialog-visible="isSlideLayerDeleteDialogVisible"
       :layer.sync="layerDelete"

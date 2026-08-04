@@ -173,6 +173,7 @@
              ref="modelsList"
              class="models-list-scroll"
            >
+             <!-- TODO: leftover Vue 2 `.sync` modifier below, dead in Vue 3 (no onUpdate:should-reset listener is generated) - verify any bugs caused by this outdated code and update to v-model:should-reset -->
              <models-list
                :show-heading="false"
                :is-link="false"

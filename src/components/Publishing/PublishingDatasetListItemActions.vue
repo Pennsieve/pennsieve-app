@@ -246,6 +246,7 @@
       </a>
     </template>
 
+    <!-- TODO: leftover Vue 2 `.sync` modifier below, dead in Vue 3 (no onUpdate:is-signing-agreement listener is generated) - verify any bugs caused by this outdated code and update to v-model:is-signing-agreement -->
     <data-use-agreement-sign-dialog
       :visible="isDataUseAgreementSignDialogVisible"
       :data-use-agreement="dataUseAgreement"
@@ -255,6 +256,7 @@
       @download="downloadAgreement"
     />
 
+    <!-- TODO: leftover Vue 2 `.sync` modifier below, dead in Vue 3 (no onUpdate:visible listener is generated) - verify any bugs caused by this outdated code and update to v-model:visible -->
     <reject-request-dialog
       :visible.sync="isRejectRequestDialogVisible"
       @rejectRequest="rejectPublishingRequest"

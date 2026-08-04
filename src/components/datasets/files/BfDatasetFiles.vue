@@ -197,6 +197,7 @@
       @close="onClosePackageDialog"
     />
 
+    <!-- TODO: leftover Vue 2 `.sync` modifier below, dead in Vue 3 (no onUpdate:open listener is generated) - verify any bugs caused by this outdated code and update to v-model:open -->
     <deleted-files
       :open.sync="deletedDialogOpen"
       @close-deleted-dialog="closeDeletedDialog"
