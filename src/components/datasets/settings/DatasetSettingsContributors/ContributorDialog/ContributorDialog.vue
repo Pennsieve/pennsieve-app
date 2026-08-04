@@ -16,6 +16,9 @@
       </template>
 
       <dialog-body>
+        <p class="required-field-note">
+          <span class="required-asterisk">*</span> indicates a required field
+        </p>
         <el-form
           ref="form"
           label-position="top"
@@ -31,13 +34,8 @@
               <el-form-item
                 class="mb-16"
                 prop="firstName"
+                label="First Name"
               >
-                <template #label>
-                  First Name
-                  <span class="label-helper">
-                  required
-                </span>
-                </template>
                 <el-input
                   id="firstName"
                   v-model="form.firstName"
@@ -73,13 +71,8 @@
           <el-form-item
             class="mb-16"
             prop="lastName"
+            label="Last Name"
           >
-            <template #label>
-              Last Name
-              <span class="label-helper">
-              required
-            </span>
-            </template>
             <el-input
               id="lastName"
               v-model="form.lastName"
@@ -90,13 +83,8 @@
           <el-form-item
             class="mb-16"
             prop="email"
+            label="Email"
           >
-            <template #label>
-              Email
-              <span class="label-helper">
-              required
-            </span>
-            </template>
             <el-input
               id="email"
               v-model="form.email"
@@ -119,13 +107,8 @@
           <el-form-item
             class="mb-16"
             prop="orcid"
+            label="ORCID iD"
           >
-            <template #label>
-              ORCID iD
-              <span class="label-helper">
-              optional
-            </span>
-            </template>
             <el-input
               id="orcid"
               v-model="form.orcid"
@@ -434,11 +417,21 @@ export default {
 <style lang="scss" scoped>
 
 @use '../../../../../styles/element/dialog';
+@use '../../../../../styles/theme';
 
 p {
   font-size: 12px;
   margin: 4px 0 0;
   line-height: 14px;
+}
+
+.required-field-note {
+  color: theme.$gray_4;
+  margin: 0 0 16px;
+}
+
+.required-asterisk {
+  color: theme.$red_1;
 }
 
 </style>
