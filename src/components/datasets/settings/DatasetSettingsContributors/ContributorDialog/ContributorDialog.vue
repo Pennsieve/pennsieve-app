@@ -27,12 +27,10 @@
           @keyup.enter.native="validateForm"
         >
           <el-row
-            class="mb-24"
             :gutter="8"
           >
             <el-col :span="18">
               <el-form-item
-                class="mb-16"
                 prop="firstName"
                 label="First Name"
               >
@@ -47,7 +45,6 @@
             </el-col>
             <el-col :span="6">
               <el-form-item
-                class="mb-16"
                 prop="middleInitial"
                 label="Middle Initial"
               >
@@ -69,7 +66,6 @@
             </el-col>
           </el-row>
           <el-form-item
-            class="mb-16"
             prop="lastName"
             label="Last Name"
           >
@@ -81,7 +77,6 @@
             />
           </el-form-item>
           <el-form-item
-            class="mb-16"
             prop="email"
             label="Email"
           >
@@ -96,7 +91,6 @@
             </p>
           </el-form-item>
           <el-form-item
-            class="mb-16"
             prop="degree"
           >
             <template #label>
@@ -105,7 +99,6 @@
             <degree-select v-model="form.degree" />
           </el-form-item>
           <el-form-item
-            class="mb-16"
             prop="orcid"
             label="ORCID iD"
           >
@@ -418,6 +411,10 @@ export default {
 
 @use '../../../../../styles/element/dialog';
 @use '../../../../../styles/theme';
+
+:deep(.el-dialog .el-dialog__body) {
+  padding-top: 0px;
+}
 
 p {
   font-size: 12px;
