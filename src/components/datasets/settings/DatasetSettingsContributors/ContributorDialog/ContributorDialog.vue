@@ -364,6 +364,9 @@ export default {
       if (Object.keys(this.contributor).length) {
         this.form = { ...this.contributor }
         this.isEditing = true
+      } else {
+        this.form = defaultForm()
+        this.isEditing = false
       }
     },
 
