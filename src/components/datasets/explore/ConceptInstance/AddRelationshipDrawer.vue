@@ -129,6 +129,7 @@
 
             <template #content>
               <div>
+                <!-- TODO: leftover Vue 2 `.sync` modifier below, dead in Vue 3 (no onUpdate:inverse-direction listener is generated) - verify any bugs caused by this outdated code and update to v-model:inverse-direction -->
                 <relationship-input
                   ref="relationshipInput"
                   v-model="relationshipVal"

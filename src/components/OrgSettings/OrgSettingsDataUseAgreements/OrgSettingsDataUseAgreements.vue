@@ -25,6 +25,7 @@
       />
     </div>
 
+    <!-- TODO: leftover Vue 2 `.sync` modifier below, dead in Vue 3 (no onUpdate:data-use-agreement listener is generated) - verify any bugs caused by this outdated code and update to v-model:data-use-agreement -->
     <data-use-agreement-update-dialog
       :dialog-visible="isDialogVisible"
       :data-use-agreement.sync="editableDataUseAgreement"
