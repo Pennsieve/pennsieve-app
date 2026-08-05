@@ -294,8 +294,8 @@
         <div class="pf-section-title">Data values</div>
         <el-form label-position="top">
           <el-form-item label="Allowed values">
-            <!-- Type a list, or fill from an ontology term's subtree. -->
-            <template v-if="!subtreeRoot">
+            <!-- Type a list, or fill from an ontology term's subtree / a whole termset / picked terms. -->
+            <template v-if="!subtreeRoot && !termsetSource && !selectedTerms">
               <el-input v-model="manual.enumInput" placeholder="Comma-separated, e.g. Low, Medium, High" />
               <!-- Ontology value sets are string codes, so only for Text. -->
               <template v-if="manual.type === 'string'">
@@ -323,6 +323,42 @@
                 </div>
               </template>
             </template>
+
+            <!-- Hand-picked terms: the value set is exactly these, no expansion. -->
+            <div v-else-if="selectedTerms" class="onto-subtree">
+              <div class="onto-subtree-head">
+                <span>{{ selectedTerms.length }} selected term{{ selectedTerms.length === 1 ? '' : 's' }}</span>
+                <el-button text @click="clearPickedTerms">change</el-button>
+              </div>
+              <ul v-if="subtreePreview.length" class="onto-subtree-list">
+                <li v-for="m in subtreePreview" :key="m.curie">
+                  <span class="onto-subtree-item-label">{{ m.label }}</span>
+                  <span class="onto-subtree-code">{{ m.curie }}</span>
+                </li>
+              </ul>
+            </div>
+
+            <!-- A whole termset is chosen: a flat member list, no granularity. -->
+            <div v-else-if="termsetSource" class="onto-subtree">
+              <div class="onto-subtree-head">
+                <span>Entire termset <strong>{{ termsetSource.label }}</strong></span>
+                <el-button text @click="clearTermset">change</el-button>
+              </div>
+              <div v-if="valueDomain" class="onto-subtree-count">
+                <template v-if="valueDomain.over_cap">{{ valueDomain.count != null ? valueDomain.count.toLocaleString() + ' values' : 'All members' }}</template>
+                <template v-else>{{ valueDomain.count.toLocaleString() }} value{{ valueDomain.count === 1 ? '' : 's' }}</template>
+              </div>
+              <ul v-if="subtreePreview.length" class="onto-subtree-list">
+                <li v-for="m in subtreePreview" :key="m.curie">
+                  <span class="onto-subtree-item-label">{{ m.label }}</span>
+                  <span class="onto-subtree-code">{{ m.curie }}</span>
+                </li>
+              </ul>
+              <div v-if="valueDomain && valueDomain.over_cap" class="onto-subtree-more">
+                Showing a sample — the full set is enforced by reference, not listed.
+              </div>
+              <div v-if="subtreeNote" class="wiz-hint" style="margin-top: 6px">{{ subtreeNote }}</div>
+            </div>
 
             <!-- A term is chosen: granularity + a readable preview of the members. -->
             <div v-else class="onto-subtree">
@@ -363,7 +399,7 @@
               </div>
               <div v-if="subtreeNote" class="wiz-hint" style="margin-top: 6px">{{ subtreeNote }}</div>
             </div>
-            <OntologyTreePicker v-model="pickerOpen" @select="selectSubtreeRoot" />
+            <OntologyTreePicker v-model="pickerOpen" @select="onPickerSelect" />
           </el-form-item>
           <template v-if="manual.type === 'string' && !hasControlledValues">
             <div class="wiz-two">
@@ -436,6 +472,8 @@ const ontoTerm = ref('')
 const ontoResults = ref([])
 const subtreeNote = ref('')
 const subtreeRoot = ref(null) // { curie, label, ontology, ontology_version }
+const termsetSource = ref(null) // { ontology, slug, label, ontology_version } — a whole-termset value set
+const selectedTerms = ref(null) // [{ code, label }] — a value set composed of hand-picked terms
 const subtreeDepth = ref('all') // 'all' | '1' | '2' | '3'
 const subtreeLeaves = ref(false)
 const valueDomain = ref(null) // the materialized ontology-subtree value domain (or null)
@@ -489,6 +527,8 @@ const runOntoSearch = debounce(async () => {
 const ontoMeta = (c) => (c.curie.startsWith(c.ontology + ':') ? c.curie : `${c.ontology} · ${c.curie}`)
 
 const selectSubtreeRoot = (term) => {
+  termsetSource.value = null
+  selectedTerms.value = null
   subtreeRoot.value = {
     curie: term.curie,
     label: term.label,
@@ -506,6 +546,96 @@ const clearSubtree = () => {
   subtreeNote.value = ''
   ontoTerm.value = ''
   ontoResults.value = []
+}
+
+// The picker emits a whole termset, a list of hand-picked terms, or a single
+// term (subtree root).
+const onPickerSelect = (payload) => {
+  if (payload && payload.termset) selectTermset(payload)
+  else if (payload && payload.terms) selectTerms(payload.terms)
+  else selectSubtreeRoot(payload)
+}
+
+const selectTermset = (ts) => {
+  subtreeRoot.value = null
+  selectedTerms.value = null
+  termsetSource.value = {
+    ontology: ts.ontology,
+    slug: ts.slug,
+    label: ts.label,
+    ontology_version: ts.ontology_version,
+  }
+  ontoResults.value = []
+  ontoTerm.value = ''
+  applyTermset()
+}
+const clearTermset = () => {
+  termsetSource.value = null
+  valueDomain.value = null
+  subtreePreview.value = []
+  subtreeNote.value = ''
+}
+
+// A value set composed of exactly the hand-picked terms (materialized, no subtree
+// expansion). Terms may span ontologies — the anchor ontology is left blank then.
+const selectTerms = (terms) => {
+  subtreeRoot.value = null
+  termsetSource.value = null
+  const onts = [...new Set(terms.map((t) => t.ontology).filter(Boolean))]
+  selectedTerms.value = terms.map((t) => ({ code: t.curie, label: t.label }))
+  valueDomain.value = {
+    kind: 'terms',
+    ontology: onts.length === 1 ? onts[0] : '',
+    ontology_version: onts.length === 1 ? terms[0].ontology_version || '' : '',
+    count: terms.length,
+    over_cap: false,
+    members: terms.map((t) => ({ code: t.curie, label: t.label })),
+  }
+  subtreePreview.value = terms.slice(0, PREVIEW_CAP).map((t) => ({ curie: t.curie, label: t.label }))
+  manual.enumInput = ''
+  subtreeNote.value = ''
+  ontoResults.value = []
+  ontoTerm.value = ''
+}
+const clearPickedTerms = () => {
+  selectedTerms.value = null
+  valueDomain.value = null
+  subtreePreview.value = []
+  subtreeNote.value = ''
+}
+
+// Resolve a whole termset as the value domain: a flat list of all its members
+// (no is_a walk). Under the inline cap it carries {code,label} members; over the
+// cap it's a termset REFERENCE (ontology + slug) resolved at record time.
+const applyTermset = async () => {
+  const src = termsetSource.value
+  if (!src) return
+  subtreeNote.value = 'Loading…'
+  try {
+    const { members, overCap } = await ontology.allMembers(src.ontology, { cap: SUBTREE_INLINE_CAP })
+    // The registry knows the exact total; use it for the over-cap count display.
+    const total = (ontology.available || []).find((o) => o.ontology === src.ontology)?.count ?? null
+    valueDomain.value = {
+      kind: 'termset',
+      ontology: src.ontology,
+      slug: src.slug,
+      label: src.label,
+      ontology_version: src.ontology_version,
+      count: overCap ? total : members.length,
+      over_cap: overCap,
+      members: overCap ? null : members.map((m) => ({ code: m.curie, label: m.label })),
+    }
+    subtreePreview.value = members.slice(0, PREVIEW_CAP).map((m) => ({ curie: m.curie, label: m.label }))
+    manual.enumInput = ''
+    subtreeNote.value = overCap
+      ? `More than ${SUBTREE_INLINE_CAP} values — stored as a termset reference and enforced by a ` +
+        `membership check rather than an inline list.`
+      : ''
+  } catch (e) {
+    valueDomain.value = null
+    subtreePreview.value = []
+    subtreeNote.value = 'Could not load termset: ' + (e?.message || e)
+  }
 }
 
 // Resolve the value set from the chosen root + granularity (depth / leaves-only)
@@ -563,26 +693,27 @@ const applyValueDomain = (schema, vd) => {
   // code and always fail). The x-pennsieve-* annotations stay on the property,
   // where the rest of the app reads them.
   const target = schema.type === 'array' && schema.items ? schema.items : schema
+  const isTermset = vd.kind === 'termset'
+  const isTerms = vd.kind === 'terms'
+  // The concept anchor names the value set. A termset / hand-picked set has no
+  // single root term, so its curie is blank and the label describes the set.
   schema['x-pennsieve-concept'] = {
-    curie: vd.root_curie,
-    label: vd.root_label,
-    ontology: vd.ontology,
-    ontology_version: vd.ontology_version,
+    curie: isTermset || isTerms ? '' : vd.root_curie,
+    label: isTermset ? vd.label : isTerms ? `${vd.count} selected terms` : vd.root_label,
+    ontology: vd.ontology || '',
+    ontology_version: vd.ontology_version || '',
   }
   // The values are ontology codes, not a formatted string — a date/email/uri
   // format would contradict the value set.
   delete target.format
   if (vd.over_cap) {
     delete target.enum
-    const ref = {
-      tier: 'subtree',
-      ontology: vd.ontology,
-      root: vd.root_curie,
-      ontology_version: vd.ontology_version,
-    }
+    const ref = isTermset
+      ? { tier: 'termset', ontology: vd.ontology, slug: vd.slug, ontology_version: vd.ontology_version }
+      : { tier: 'subtree', ontology: vd.ontology, root: vd.root_curie, ontology_version: vd.ontology_version }
     if (vd.count != null) ref.count = vd.count // unknown for a broad (bounded) subtree
-    if (vd.max_depth != null) ref.max_depth = vd.max_depth
-    if (vd.leaves_only) ref.leaves_only = true
+    if (!isTermset && vd.max_depth != null) ref.max_depth = vd.max_depth
+    if (!isTermset && vd.leaves_only) ref.leaves_only = true
     schema['x-pennsieve-concept-valueset'] = ref
   } else {
     target.type = target.type || 'string'

@@ -483,10 +483,30 @@ export const useOntologyStore = defineStore('ontology', () => {
         return { members, overCap: members.length > cap }
     }
 
+    // All non-obsolete terms of an ontology/termset slice, as a flat value set.
+    // Termsets are flat (every member is a root with no in-slice is_a parent), so
+    // subtreeMembers can't enumerate them — this just reads the whole slice.
+    // Ordered by label, capped at cap+1 so a large slice becomes an over-cap
+    // reference rather than materializing thousands of options. Returns
+    // { members: [{ curie, label }], overCap }.
+    const allMembers = async (ontology, { cap = 512 } = {}) => {
+        await ensureOntology(ontology)
+        const src = sources.value.find((s) => s.ontology === ontology)
+        if (!src) return { members: [], overCap: false }
+        const rows = await duck.executeQuery(
+            `SELECT curie, label FROM ${src.table} WHERE COALESCE(obsolete, false) = false ORDER BY lower(label) LIMIT ${cap + 1}`,
+            connectionId,
+        )
+        const members = (rows || [])
+            .map((r) => ({ curie: r.curie == null ? '' : String(r.curie), label: r.label == null ? '' : String(r.label) }))
+            .filter((m) => m.curie)
+        return { members, overCap: members.length > cap }
+    }
+
     return {
         loading, loaded, error, available, sources, isConfigured,
         ensureRegistry, ensureOntology, ensureLoaded,
-        search, searchSubtree, descendants, ancestors, subtreeMembers,
+        search, searchSubtree, descendants, ancestors, subtreeMembers, allMembers,
         getByCurie, roots, children, lineage, labelsFor,
     }
 })
