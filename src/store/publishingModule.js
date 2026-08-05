@@ -1,7 +1,7 @@
 import Cookies from 'js-cookie'
 
 import toQueryParams from '../utils/toQueryParams.js'
-import { PublicationTabs, PublicationTabsStatuses, PublicationTabsTypes, StatusActions, PublicationStatus } from '../utils/constants.js'
+import { PublicationTabs, PublicationTabsStatuses, PublicationTabsTypes, StatusActions, PublicationStatus, ProposalStatus } from '../utils/constants.js'
 
 import EventBus from '../utils/event-bus'
 import router from '@/router'
@@ -327,13 +327,18 @@ export const actions = {
   
 
 
-  fetchDatasetProposals: async ({state, commit, rootState}) => {
+  // status is one of SUBMITTED (the API default), ACCEPTED or REJECTED
+  fetchDatasetProposals: async ({state, commit, rootState}, status) => {
     // const publicationStatus = PublicationTabsStatuses[rootState.route.name]
     // if(!publicationStatus) {
     //   return
     // }
-   
+
+    const isReviewQueue = !status || status === ProposalStatus.SUBMITTED
     let url = `${rootState.config.api2Url}/publishing/submission`
+    if (status) {
+      url += `?status=${status}`
+    }
     commit('UPDATE_IS_LOADING_DATASETS', true);
 
     try {
@@ -350,7 +355,11 @@ export const actions = {
       if (response.ok) {
         const { proposals, totalCount } = await response.json()
         commit('UPDATE_PUBLISHING_SEARCH_TOTAL_COUNT', totalCount);
-        commit('UPDATE_PUBLISHING_TOTAL_COUNT', { type: PublicationTabs.PROPOSED, count: totalCount });
+        // The Proposed tab badge counts the review queue, so leave it alone
+        // when the publisher is looking at already-decided proposals.
+        if (isReviewQueue) {
+          commit('UPDATE_PUBLISHING_TOTAL_COUNT', { type: PublicationTabs.PROPOSED, count: totalCount });
+        }
         commit('UPDATE_DATASETS', { type: router.currentRoute.value.name, datasets: proposals });
       } else {
         throw new Error(`Failed to fetch dataset proposals: ${response.status} ${response.statusText}`)
