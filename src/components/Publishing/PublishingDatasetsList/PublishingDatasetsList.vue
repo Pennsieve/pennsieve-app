@@ -108,7 +108,6 @@ import PaginationPageMenu from "../../shared/PaginationPageMenu/PaginationPageMe
 import Request from "../../../mixins/request/index";
 import DatasetPublishedData from "../../../mixins/dataset-published-data";
 
-import toQueryParams from "../../../utils/toQueryParams.js";
 import { PublicationStatus } from "../../../utils/constants";
 import IconMagnifyingGlass from "../../icons/IconMagnifyingGlass.vue";
 import IconSort from "../../icons/IconSort.vue";
@@ -193,24 +192,6 @@ export default {
       return this.getDatasets(this.$route.name);
     },
 
-    /**
-     * Compute endpoint URL to get datasets
-     * @return {String}
-     */
-    getDatasetsUrl: function () {
-      useGetToken().then((token) => {
-        const queryParams = toQueryParams({
-          publicationStatus: this.publicationStatus,
-          publicationType: this.publicationType,
-          api_key: token,
-          includeBannerUrl: true,
-          includePublishStatus: true,
-          ...this.datasetSearchParams,
-        });
-
-        return `${this.config.apiUrl}/datasets/paginated?${queryParams}`;
-      });
-    },
 
     hasDatasets: function () {
       return this.datasets.length > 0;
