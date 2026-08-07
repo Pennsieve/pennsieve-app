@@ -410,6 +410,14 @@ export default {
             this.timeseriesAsset = tsAsset
               ? { ...tsAsset, cloudfront: result.cloudfront }
               : null;
+
+            if (zarrAsset && !viewers.includes("TimeseriesViewer")) {
+              viewers = [
+                "TimeseriesViewer",
+                ...viewers.filter((v) => v !== "UnknownViewer"),
+              ];
+            }
+
             const neuroglancerTypes = ["ome-zarr", "neuroglancer-precomputed"];
             const seen = new Set();
             const ngAssets = result.assets.filter((a) => {
