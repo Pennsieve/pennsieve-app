@@ -9,7 +9,14 @@
         class="heading-wrap"
         :style="{ backgroundColor: `${secNavHeaderCollapsedStyle}` }"
       >
-        <template v-if="!secondaryNavCondensed">
+        <template v-if="secondaryNavCondensed">
+          <div
+            :style="{ 'background-color': condensedMarkerColor }"
+            class="dot condensed-status"
+            :title="datasetName"
+          />
+        </template>
+        <template v-else>
           <div>
             <el-dropdown
               class="dataset-status-dropdown"
@@ -303,6 +310,15 @@ export default {
       }
       return '';
     },
+    // The condensed header is the darkened primary theme colour, so the
+    // marker uses the secondary - the one the header is not already using -
+    // to stay visible against it. Deliberately not the dataset status colour:
+    // most statuses are greys, which disappeared into the header.
+    condensedMarkerColor: function () {
+      const themeColors = this.getThemeColors;
+      return themeColors && themeColors.length >= 2 ? themeColors[1] : "";
+    },
+
     tertiaryNavColor: function () {
       if (this.secondaryNavCondensed) {
         const themeColors = this.getThemeColors;
@@ -534,6 +550,9 @@ hr {
   .condensed & {
     background: theme.$purple_0_7;
     height: 56px;
+    // Centred: flex-start suits the expanded dropdown, but leaves the lone
+    // marker against the left edge of a 56px rail.
+    justify-content: center;
     padding: 10px;
   }
 
@@ -581,6 +600,14 @@ hr {
   margin-right: 4px;
   border-radius: 50%;
   display: inline-block;
+
+  // Alone in the condensed heading, so no trailing gap and slightly larger to
+  // stay legible as the only thing in a 56px rail.
+  &.condensed-status {
+    height: 14px;
+    margin-right: 0;
+    width: 14px;
+  }
 
   &.main-status {
     margin-right: 2px;

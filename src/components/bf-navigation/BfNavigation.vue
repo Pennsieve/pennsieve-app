@@ -312,10 +312,14 @@ export default {
     // The expanded rail is 230px and .logo-wrap pads 20px each side, leaving
     // 190px. A wordmark is only legible if it can use that width — held to a
     // 24px square it renders a few pixels tall.
-    // Must match the condensed class on the root exactly. It did not: with
-    // the secondary nav open the rail narrows to 56px, but this said
-    // otherwise, so the logo kept natural fit at up to 190px and was then
-    // shrunk to fit by max-width - rendering a few pixels tall.
+    // Must match the condensed class on the root exactly, or the logo sizes
+    // itself for a width the rail does not have.
+    //
+    // secondaryNavOpen belongs here: it is set when a secondary nav mounts,
+    // and primaryNavOpen is a separate flag, so both rails are on screen
+    // together in the normal dataset view - primary at 56px beside the
+    // secondary. This rail is only absent when primaryNavOpen is false, which
+    // is a different thing entirely.
     isRailCondensed: function () {
       return (
         this.primaryNavCondensed || this.pageNotFound || this.secondaryNavOpen
