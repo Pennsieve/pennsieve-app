@@ -75,13 +75,32 @@
       </template>
 
       <dialog-body>
-        <div v-loading="isLoadingImage" class="cropper-wrap">
+        <div
+          v-loading="isLoadingImage"
+          class="cropper-wrap"
+          :class="{ 'is-previewing-white': renderWhite }"
+        >
           <img ref="img" src="" alt="" />
         </div>
         <p class="cropper-hint">
           The whole image is selected by default. Drag to crop if you want to
           trim surrounding whitespace — any shape is fine.
         </p>
+
+        <!-- Offered only for images that actually carry transparency. The
+             knockout paints every opaque pixel, so on a JPEG - which has no
+             alpha at all - it would return a plain white rectangle rather than
+             a silhouette. -->
+        <div v-if="sourceHasAlpha" class="white-option">
+          <el-checkbox v-model="renderWhite">
+            Render this logo in white
+          </el-checkbox>
+          <p class="cropper-hint">
+            Logos are shown on the coloured nav rail and workspace cards, so a
+            white mark reads on every surface. Colour and interior detail in the
+            original are lost — best for single-colour marks and wordmarks.
+          </p>
+        </div>
       </dialog-body>
 
       <template #footer>
@@ -129,6 +148,10 @@ const SVG_RASTER_DIMENSION = MAX_LOGO_DIMENSION * 2;
 // this only exists to stop FileReader chewing on something absurd.
 const MAX_SOURCE_BYTES = 25 * 1024 * 1024;
 
+// Longest side used when sampling for transparency. Only decides whether to
+// offer the white option, so there is no reason to scan a full-size image.
+const ALPHA_SAMPLE_DIMENSION = 128;
+
 export default {
   name: "WorkspaceLogoForm",
 
@@ -148,6 +171,10 @@ export default {
       cropper: null,
       selectedImageFile: null,
       errorMessage: "",
+      // Whether the selected image has an alpha channel, which is what decides
+      // if the white option is offered at all.
+      sourceHasAlpha: false,
+      renderWhite: false,
       validImageTypes: [
         { type: "image/png", name: "PNG" },
         { type: "image/jpeg", name: "JPEG" },
@@ -201,6 +228,8 @@ export default {
       this.$refs.img.src = "";
       this.$refs.inputFile.value = "";
       this.selectedImageFile = null;
+      this.sourceHasAlpha = false;
+      this.renderWhite = false;
       if (this.cropper) {
         this.cropper.destroy();
         this.cropper = null;
@@ -381,9 +410,70 @@ export default {
         // ratio there is no longer any reason to select beyond its edges.
         viewMode: 1,
         autoCropArea: 1,
+        // ready fires once the image has decoded, which is when its pixels can
+        // actually be sampled.
+        ready: () => {
+          this.sourceHasAlpha = this.detectAlpha(this.$refs.img);
+        },
       });
 
       this.isLoadingImage = false;
+    },
+
+    // Reports whether any pixel is less than fully opaque.
+    //
+    // Deliberately gated on transparency rather than on the file the user
+    // picked. By this point an SVG has already been rasterised, so an
+    // SVG-derived PNG and an uploaded PNG are the same thing and there is
+    // nothing left to tell apart. Alpha is the property the knockout actually
+    // depends on: it is what carries the mark's shape once the colour is
+    // replaced. It also excludes JPEG for free, since JPEG cannot be
+    // transparent and a knockout there would yield a solid white rectangle.
+    //
+    // Sampled at a reduced size: the result only gates a checkbox, and any
+    // transparency in the source still reads as sub-255 alpha once downscaled.
+    // The image is a data or object URL from the user's own file, so the canvas
+    // is same-origin and getImageData cannot taint.
+    detectAlpha(img) {
+      const width = img.naturalWidth;
+      const height = img.naturalHeight;
+      if (!width || !height) {
+        return false;
+      }
+
+      const scale = Math.min(1, ALPHA_SAMPLE_DIMENSION / Math.max(width, height));
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.max(1, Math.round(width * scale));
+      canvas.height = Math.max(1, Math.round(height * scale));
+
+      const context = canvas.getContext("2d");
+      context.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+      try {
+        const { data } = context.getImageData(0, 0, canvas.width, canvas.height);
+        for (let i = 3; i < data.length; i += 4) {
+          if (data[i] < 255) {
+            return true;
+          }
+        }
+      } catch {
+        // Not reachable with same-origin sources, but failing closed only hides
+        // the option rather than offering one that would misbehave.
+        return false;
+      }
+
+      return false;
+    },
+
+    // Repaints the mark white while leaving its alpha alone. source-in keeps
+    // the destination's alpha and takes the source's colour, so anti-aliased
+    // edges survive intact instead of hardening into a jagged silhouette.
+    applyWhiteKnockout(canvas) {
+      const context = canvas.getContext("2d");
+      context.globalCompositeOperation = "source-in";
+      context.fillStyle = "#ffffff";
+      context.fillRect(0, 0, canvas.width, canvas.height);
+      context.globalCompositeOperation = "source-over";
     },
 
     saveLogo() {
@@ -396,13 +486,20 @@ export default {
 
       // No fillColor: the canvas stays transparent outside the image, which is
       // what keeps a logo from picking up a white box against the nav.
-      this.cropper
-        .getCroppedCanvas({
-          width: Math.max(1, Math.round(crop.width * scale)),
-          height: Math.max(1, Math.round(crop.height * scale)),
-          imageSmoothingQuality: "high",
-        })
-        .toBlob(
+      const canvas = this.cropper.getCroppedCanvas({
+        width: Math.max(1, Math.round(crop.width * scale)),
+        height: Math.max(1, Math.round(crop.height * scale)),
+        imageSmoothingQuality: "high",
+      });
+
+      // Baked into the upload rather than applied at render time, so the stored
+      // asset is what every surface shows and no consumer has to know about the
+      // choice. Reversible by re-uploading with the box unticked.
+      if (this.renderWhite) {
+        this.applyWhiteKnockout(canvas);
+      }
+
+      canvas.toBlob(
           async (blob) => {
             // This is the size that matters — the server sees this blob, not
             // the file the user picked. A bounded PNG is comfortably under the
@@ -531,6 +628,22 @@ export default {
 
 .cropper-wrap img {
   max-width: 100%;
+}
+
+/* Previews the knockout on the cropper's own image, so the flattening is
+   visible before saving rather than discovered afterwards in the nav.
+   brightness(0) crushes every colour to black and invert(1) lifts it to white;
+   alpha is untouched, so only the mark itself changes.
+
+   Applied to the image elements rather than the container: filtering the whole
+   cropper would take the crop handles and the mask overlay with it. */
+.cropper-wrap.is-previewing-white :deep(.cropper-canvas img),
+.cropper-wrap.is-previewing-white :deep(.cropper-view-box img) {
+  filter: brightness(0) invert(1);
+}
+
+.white-option {
+  margin-top: 16px;
 }
 
 .cropper-hint {
