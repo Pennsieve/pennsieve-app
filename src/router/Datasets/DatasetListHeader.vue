@@ -1,7 +1,6 @@
 <template >
   <bf-rafter
     class="primary"
-    show-workspace-logo
   >
     <template #breadcrumb>
       <org-breadcrumb page-name="Datasets" />

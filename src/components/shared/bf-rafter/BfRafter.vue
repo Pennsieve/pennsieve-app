@@ -196,12 +196,6 @@ let route = useRoute();
           <div v-if="$slots['buttons']" class="col bf-rafter-buttons">
             <slot name="buttons" />
           </div>
-
-          <!-- Opt-in: BfRafter is shared by many pages, so the workspace mark
-               only appears where a page asks for it. -->
-          <div v-if="showWorkspaceLogo" class="col bf-rafter-workspace-logo">
-            <workspace-logo fit="natural" :size="48" :max-width="280" />
-          </div>
         </div>
 
         <div v-if="$slots['bottom']" class="row bf-rafter-bottom">
@@ -242,7 +236,6 @@ import IconUpload from "../../../components/icons/IconUpload.vue";
 import IconArrowUp from "../../icons/IconArrowUp.vue";
 import IconHelp from "../../icons/IconHelp.vue";
 import IconCopyDocument from "../../icons/IconCopyDocument.vue";
-import WorkspaceLogo from '../WorkspaceLogo/WorkspaceLogo.vue'
 import ReadmeDoc from "../readme-doc/ReadmeDoc.vue";
 import {useGetToken} from "@/composables/useGetToken";
 
@@ -250,12 +243,6 @@ export default {
   name: 'BfRafter',
 
   props: {
-    // Shows the workspace logo at the top right. Off by default: BfRafter is
-    // shared across many pages and most of them do not want it.
-    showWorkspaceLogo: {
-      type: Boolean,
-      default: false
-    },
     title: {
       type: String,
       default: ''
@@ -305,8 +292,7 @@ export default {
     IconArrowUp,
     IconHelp,
     IconCopyDocument,
-    ReadmeDoc,
-    WorkspaceLogo
+    ReadmeDoc
   },
 
   mixins: [Request, CustomTheme],
@@ -850,16 +836,6 @@ export default {
   .condensed &.no-breadcrumb {
     display: none;
   }
-}
-.bf-rafter-workspace-logo {
-  align-items: flex-start;
-  display: flex;
-  flex: 0 0 auto;
-  justify-content: flex-end;
-  // Sits alongside the buttons column; margin-left auto pins it right even
-  // when there are no buttons.
-  margin-left: auto;
-  padding-left: 16px;
 }
 
 .bf-rafter-buttons {
