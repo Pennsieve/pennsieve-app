@@ -96,7 +96,12 @@ export default {
   },
 
   beforeUnmount() {
+    // Restore the primary rail on the way out. Collapsing this one sets
+    // primaryNavOpen false, and App.vue renders the primary behind
+    // v-if="primaryNavOpen" - so leaving it false meant navigating away from a
+    // collapsed rail landed on a page with no navigation at all.
     this.toggleSecondaryNav(false)
+    this.togglePrimaryNav(true)
   },
 
   computed: {
