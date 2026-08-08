@@ -185,10 +185,16 @@
       :aria-expanded="!primaryNavCondensed"
       @click="toggleMenu"
     >
-      <component
-        :is="primaryNavCondensed ? 'IconArrowRight' : 'IconArrowLeft'"
-        :width="9"
-        :height="9"
+      <!-- One icon rotated, never two swapped: IconArrowLeft is a 6x10
+           viewBox and IconArrowRight a 24x24, so the same width/height
+           rendered them at visibly different sizes. Rotating keeps the
+           geometry identical by construction. 6x10 matches the viewBox
+           ratio, so the chevron is not stretched. -->
+      <IconArrowLeft
+        class="collapse-chevron"
+        :class="{ 'is-flipped': primaryNavCondensed }"
+        :width="6"
+        :height="10"
         color="currentColor"
       />
     </button>
@@ -218,7 +224,6 @@ import IconOrganization from "../icons/IconOrganization.vue";
 import IconDocument from "../icons/IconDocument.vue";
 import IconPublic from "../icons/IconPublic.vue";
 import IconArrowLeft from "../icons/IconArrowLeft.vue";
-import IconArrowRight from "../icons/IconArrowRight.vue";
 import WorkspaceLogo from "../shared/WorkspaceLogo/WorkspaceLogo.vue";
 import IconSPARCLogo from "../icons/IconSPARCLogo.vue";
 import IconI3HLogo from "../icons/IconI3HLogo.vue";
@@ -243,7 +248,6 @@ export default {
   components: {
     WorkspaceLogo,
     IconArrowLeft,
-    IconArrowRight,
     IconSPARCLogo,
     IconI3HLogo,
     IconPublic,

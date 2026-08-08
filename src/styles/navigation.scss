@@ -80,6 +80,14 @@
     outline: none;
   }
 }
+
+.collapse-chevron {
+  transition: transform 0.15s ease-out;
+
+  &.is-flipped {
+    transform: rotate(180deg);
+  }
+}
 .logo {
   display: block;
   min-height: 20px;
