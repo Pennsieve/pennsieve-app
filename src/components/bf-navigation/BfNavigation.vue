@@ -306,9 +306,14 @@ export default {
     // The expanded rail is 230px and .logo-wrap pads 20px each side, leaving
     // 190px. A wordmark is only legible if it can use that width — held to a
     // 24px square it renders a few pixels tall.
-    // The rail is condensed unless the secondary nav is holding it open.
+    // Must match the condensed class on the root exactly. It did not: with
+    // the secondary nav open the rail narrows to 56px, but this said
+    // otherwise, so the logo kept natural fit at up to 190px and was then
+    // shrunk to fit by max-width - rendering a few pixels tall.
     isRailCondensed: function () {
-      return this.primaryNavCondensed && !this.secondaryNavOpen;
+      return (
+        this.primaryNavCondensed || this.pageNotFound || this.secondaryNavOpen
+      );
     },
 
     navLogoMaxWidth: function () {

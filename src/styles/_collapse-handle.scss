@@ -54,4 +54,14 @@
   &:focus {
     outline: none;
   }
+
+  // The icon. One chevron rotated rather than two swapped: the arrow icons
+  // have different viewBoxes, so swapping them changed the glyph's size.
+  .collapse-chevron {
+    transition: transform 0.15s ease-out;
+
+    &.is-flipped {
+      transform: rotate(180deg);
+    }
+  }
 }

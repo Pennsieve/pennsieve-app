@@ -238,13 +238,6 @@ export default {
   @include collapse-handle.collapse-handle(".user-navigation");
 }
 
-.collapse-chevron {
-  transition: transform 0.15s ease-out;
-
-  &.is-flipped {
-    transform: rotate(180deg);
-  }
-}
 
 .user-navigation {
   background: linear-gradient(160deg, theme.$purple_2 0%, theme.$purple_3 100%);

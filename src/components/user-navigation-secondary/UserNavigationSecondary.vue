@@ -11,26 +11,6 @@
           </div>
         </template>
         
-        <button
-          class="btn-expand-collapse"
-          name="Toggle Secondary Menu"
-          @click="toggleSecondaryMenu"
-        >
-          <IconNavCollapse
-            :is-visible="!secondaryNavCondensed"
-            :width="secondaryNavCondensed ? 32 : 24"
-            :height="secondaryNavCondensed ? 32 : 24"
-            color="#404040"
-            class="collapse"
-          />
-          <IconNavExpand
-            :is-visible="secondaryNavCondensed"
-            :width="secondaryNavCondensed ? 32 : 24"
-            :height="secondaryNavCondensed ? 32 : 24"
-            color="#404040"
-            class="collapse"
-          />
-        </button>
       </div>
 
       <div class="nav-items">
@@ -66,7 +46,21 @@
       </div>
     </div>
     
-    <span class="collapse-handle" @click="toggleSecondaryMenu" />
+    <button
+      type="button"
+      class="collapse-handle"
+      :aria-label="secondaryNavCondensed ? 'Expand secondary navigation' : 'Collapse secondary navigation'"
+      :aria-expanded="!secondaryNavCondensed"
+      @click="toggleSecondaryMenu"
+    >
+      <IconArrowLeft
+        class="collapse-chevron"
+        :class="{ 'is-flipped': secondaryNavCondensed }"
+        :width="6"
+        :height="10"
+        color="currentColor"
+      />
+    </button>
     <bf-navigation-tertiary
       v-if="secondaryNavCondensed"
       :bkColor="'#4d628c'"
@@ -80,8 +74,7 @@
 import { mapState, mapActions } from 'vuex'
 import UserNavigationSecondaryItem from './UserNavigationSecondaryItem.vue'
 import BfNavigationTertiary from '../bf-navigation-tertiary/BfNavigationTertiary.vue'
-import IconNavCollapse from '../icons/IconNavCollapse.vue'
-import IconNavExpand from '../icons/IconNavExpand.vue'
+import IconArrowLeft from '../icons/IconArrowLeft.vue'
 import IconOrcid from '../icons/IconOrcid.vue'
 import IconGitHub from '../icons/IconGitHub.vue'
 import IconApi from '../icons/IconApi.vue'
@@ -92,8 +85,7 @@ export default {
   components: {
     UserNavigationSecondaryItem,
     BfNavigationTertiary,
-    IconNavCollapse,
-    IconNavExpand,
+    IconArrowLeft,
     IconOrcid,
     IconGitHub,
     IconApi
@@ -131,6 +123,7 @@ export default {
 
 <style scoped lang="scss">
 @use '../../styles/_theme.scss';
+@use '../../styles/collapse-handle';
 
 .user-navigation {
   background: theme.$white;
@@ -194,32 +187,12 @@ export default {
     overflow-y: auto;
   }
 
-  .collapse-handle {
-    position: absolute;
-    right: -8px;
-    top: 50%;
-    transform: translateY(-50%);
-    width: 16px;
-    height: 40px;
-    background: theme.$gray_3;
-    border-radius: 0 8px 8px 0;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: background 150ms ease-out;
+}
 
-    &:hover {
-      background: theme.$gray_4;
-    }
-
-    &::after {
-      content: '';
-      width: 2px;
-      height: 12px;
-      background: theme.$white;
-      border-radius: 1px;
-    }
-  }
+// Top level, not nested: the mixin's reveal selector is
+// ".user-navigation:hover &", so nesting would resolve to
+// ".user-navigation:hover .user-navigation .collapse-handle".
+.collapse-handle {
+  @include collapse-handle.collapse-handle(".user-navigation");
 }
 </style>

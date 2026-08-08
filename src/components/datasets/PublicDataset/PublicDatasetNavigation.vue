@@ -6,6 +6,22 @@
       </span>
     </div>
 
+    <button
+      type="button"
+      class="collapse-handle"
+      :aria-label="secondaryNavCondensed ? 'Expand secondary navigation' : 'Collapse secondary navigation'"
+      :aria-expanded="!secondaryNavCondensed"
+      @click="toggleMenu"
+    >
+      <IconArrowLeft
+        class="collapse-chevron"
+        :class="{ 'is-flipped': secondaryNavCondensed }"
+        :width="6"
+        :height="10"
+        color="currentColor"
+      />
+    </button>
+
     <div class="menu-wrap">
       <div class="heading-wrap">
         <template v-if="!secondaryNavCondensed">
@@ -13,22 +29,6 @@
             <IconArrowLeft :width="16" :height="16" color="currentColor" />
             <span>Public Datasets</span>
           </router-link>
-          <button
-            class="btn-expand-collapse"
-            name="Collapse Secondary Menu"
-            @click="toggleMenu"
-          >
-            <IconNavCollapse color="#71747C" />
-          </button>
-        </template>
-        <template v-else>
-          <button
-            class="btn-expand-collapse"
-            name="Expand Secondary Menu"
-            @click="toggleMenu"
-          >
-            <IconNavExpand color="#fff" :height="32" :width="32" />
-          </button>
         </template>
       </div>
 
@@ -77,8 +77,6 @@ import IconOverview from "@/components/icons/IconOverview.vue";
 import IconFiles from "@/components/icons/IconFiles.vue";
 import IconGraph from "@/components/icons/IconGraph.vue";
 import IconArrowLeft from "@/components/icons/IconArrowLeft.vue";
-import IconNavCollapse from "@/components/icons/IconNavCollapse.vue";
-import IconNavExpand from "@/components/icons/IconNavExpand.vue";
 import { useReadOnlyDatasetStore } from "@/stores/readOnlyDatasetStore.js";
 
 const SOURCE_META = {
@@ -95,8 +93,6 @@ export default {
     IconFiles,
     IconGraph,
     IconArrowLeft,
-    IconNavCollapse,
-    IconNavExpand,
   },
 
   setup() {
