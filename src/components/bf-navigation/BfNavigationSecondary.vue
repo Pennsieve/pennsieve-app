@@ -553,6 +553,10 @@ hr {
     // Centred: flex-start suits the expanded dropdown, but leaves the lone
     // marker against the left edge of a 56px rail.
     justify-content: center;
+    // Cancels the -6px that navigation.scss puts on .menu-wrap when
+    // condensed. That shift aligns the nav item icons below, but this row
+    // inherits it too, so centring here landed 6px left of the rail's middle.
+    margin-left: 6px;
     padding: 10px;
   }
 
