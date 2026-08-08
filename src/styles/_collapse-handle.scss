@@ -58,10 +58,19 @@
   // The icon. One chevron rotated rather than two swapped: the arrow icons
   // have different viewBoxes, so swapping them changed the glyph's size.
   .collapse-chevron {
+    // Nudged 1px toward its point. A chevron's ink is weighted to the open
+    // side - apex one end, two arm-ends the other - so centring it
+    // geometrically makes it read as offset. The button box itself is exactly
+    // centred on the seam (right: -9px against an 18px width).
+    //
+    // The rotation carries the nudge: translateX applies in the rotated
+    // frame, so the flipped chevron shifts the opposite way on screen and
+    // stays pointing-side-weighted.
+    transform: translateX(-1px);
     transition: transform 0.15s ease-out;
 
     &.is-flipped {
-      transform: rotate(180deg);
+      transform: rotate(180deg) translateX(-1px);
     }
   }
 }
