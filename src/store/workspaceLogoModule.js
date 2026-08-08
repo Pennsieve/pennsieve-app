@@ -84,14 +84,23 @@ export const actions = {
 
     try {
       const token = await useGetToken();
-      const response = await fetch(`${rootState.config.api2Url}/workspaces/logo`, {
+      // organization_id names the target explicitly. Without it the service
+      // resolved the workspace from the session claim, which can lag the
+      // workspace the UI is showing - so an upload could land on a different
+      // workspace than the one being edited, and be cached under this one.
+      const response = await fetch(
+        `${rootState.config.api2Url}/workspaces/logo?organization_id=${encodeURIComponent(
+          organizationId
+        )}`,
+        {
         method: "PUT",
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": contentType,
         },
         body: blob,
-      });
+        }
+      );
 
       if (!response.ok) {
         const body = await response.json().catch(() => ({}));
@@ -111,10 +120,17 @@ export const actions = {
 
     try {
       const token = await useGetToken();
-      const response = await fetch(`${rootState.config.api2Url}/workspaces/logo`, {
-        method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      // Named explicitly, for the same reason as upload: deleting from the
+      // session claim's workspace could remove the wrong workspace's logo.
+      const response = await fetch(
+        `${rootState.config.api2Url}/workspaces/logo?organization_id=${encodeURIComponent(
+          organizationId
+        )}`,
+        {
+          method: "DELETE",
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
 
       if (!response.ok && response.status !== 404) {
         throw new Error(response.statusText);

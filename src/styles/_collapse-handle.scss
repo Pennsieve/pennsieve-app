@@ -1,0 +1,57 @@
+@use "theme";
+
+// Collapse control: a small round button pinned to the rail's edge, revealed
+// when the nav is hovered or focused.
+//
+// Replaces a full-height edge strip. That shape conventionally means
+// drag-to-resize, but this toggles on click - the affordance promised one
+// interaction and delivered another, which no amount of styling fixed. It also
+// sat above the nav items in document order, so every pixel of its width was a
+// dead zone on their trailing edge; a small button anchored in the gap beside
+// the logo has no such conflict and can afford a comfortable target.
+@mixin collapse-handle($nav-selector) {
+  align-items: center;
+  // Still filled, not a bare glyph: the button straddles the seam, so half of
+  // it sits over light page content. A chevron alone would be legible on one
+  // side and vanish on the other. Kept translucent and borderless so it reads
+  // as a hint rather than a control competing with the nav.
+  // Falls back to the default purple when a workspace has no theme colour.
+  background: var(--chevron-bg, #{rgba(theme.$purple_3, 0.85)});
+  border: 0;
+  border-radius: 50%;
+  color: rgba(theme.$white, 0.8);
+  cursor: pointer;
+  display: flex;
+  height: 18px;
+  justify-content: center;
+  opacity: 0;
+  padding: 0;
+  position: absolute;
+  // Centred on the seam, level with the logo row rather than the full height.
+  right: -9px;
+  top: 29px;
+  transition: opacity 0.15s ease-out, background-color 0.15s ease-out,
+    color 0.15s ease-out;
+  width: 18px;
+  z-index: 2;
+
+  // Revealed on nav hover, and whenever it is focused so keyboard users can
+  // see what they have landed on.
+  // Also revealed by hovering the button itself: at opacity 0 it is invisible
+  // but still clickable, so approaching from the content side would otherwise
+  // hit a control that cannot be seen.
+  #{$nav-selector}:hover &,
+  &:hover,
+  &:focus-visible {
+    opacity: 1;
+  }
+
+  &:hover {
+    background: var(--chevron-bg-hover, #{theme.$purple_3});
+    color: theme.$white;
+  }
+
+  &:focus {
+    outline: none;
+  }
+}
