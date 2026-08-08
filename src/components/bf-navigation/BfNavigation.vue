@@ -18,11 +18,10 @@
           :initials-only="isRailCondensed"
           plain-initials
         />
-        <component
+        <pennsieve-mark
           v-else
-          :is="MarkComponent"
           v-show="!primaryNavCondensed || secondaryNavOpen"
-          :class="logoClass"
+          class="logo"
           color="currentColor"
         />
       </router-link>
@@ -35,11 +34,10 @@
           :initials-only="isRailCondensed"
           plain-initials
         />
-        <component
+        <pennsieve-mark
           v-else
-          :is="MarkComponent"
           v-show="!primaryNavCondensed || secondaryNavOpen"
-          :class="logoClass"
+          class="logo"
           color="currentColor"
         />
       </button>
@@ -225,9 +223,6 @@ import IconDocument from "../icons/IconDocument.vue";
 import IconPublic from "../icons/IconPublic.vue";
 import IconArrowLeft from "../icons/IconArrowLeft.vue";
 import WorkspaceLogo from "../shared/WorkspaceLogo/WorkspaceLogo.vue";
-import IconSPARCLogo from "../icons/IconSPARCLogo.vue";
-import IconI3HLogo from "../icons/IconI3HLogo.vue";
-import IconHealInitiative from "../icons/IconHealInitiative.vue";
 import IconCollection from "../icons/IconCollection.vue";
 import CustomTheme from "../../mixins/custom-theme";
 
@@ -248,8 +243,6 @@ export default {
   components: {
     WorkspaceLogo,
     IconArrowLeft,
-    IconSPARCLogo,
-    IconI3HLogo,
     IconPublic,
     IconDocument,
     IconOrganization,
@@ -263,7 +256,6 @@ export default {
     IconResearch,
     IconTeam,
     IconIntegrations,
-    IconHealInitiative,
     IconCollection,
   },
   mixins: [CustomTheme],
@@ -285,6 +277,10 @@ export default {
 
     ...mapGetters("workspaceLogoModule", ["activeWorkspaceLogo"]),
 
+    activeOrgId: function () {
+      return pathOr(null, ["organization", "id"], this.activeOrganization);
+    },
+
     // Drives whether the uploaded logo replaces the hard-coded mark. Falls
     // back rather than showing initials here: the nav previously rendered a
     // real logo for SPARC, I3H and HEAL, and initials would be a regression
@@ -305,42 +301,7 @@ export default {
       return this.isRailCondensed ? 28 : 190;
     },
     
-    logoClass: function () {
-      // Use the orgID parameter passed by router for quick switching of theme instead of the activeOrganization that is defined later.
-      if (
-        this.orgId === "N:organization:db5e88f3-9986-452f-aaab-b677f4fd9b80"
-      ) {
-        return "I3H-logo";
-      } else {
-        return "logo";
-      }
-    },
     
-    // Fallback only: used when the workspace has not uploaded a logo. These
-    // hard-coded node ids can be deleted once SPARC, I3H and HEAL have each
-    // uploaded one through workspace settings — removing them before that
-    // would drop live branding for those three workspaces.
-    MarkComponent: function () {
-      // Use the orgID parameter passed by router for quick switching of theme instead of the activeOrganization that is defined later.
-      let name = "PennsieveMark";
-      if (
-        this.orgId === "N:organization:050fae39-4412-43ef-a514-703ed8e299d5" ||
-        this.orgId === "N:organization:618e8dd9-f8d2-4dc4-9abb-c6aaab2e78a0"
-      ) {
-        name = "IconSPARCLogo";
-      } else if (
-        this.orgId === "N:organization:db5e88f3-9986-452f-aaab-b677f4fd9b80" ||
-        this.orgId === "N:organization:aab5058e-25a4-43f9-bdb1-18396b6920f2"
-      ) {
-        name = "IconI3HLogo";
-      } else if (
-        this.orgId === "N:organization:98d6e84c-9a27-48f8-974f-93c0cca15aae" ||
-        this.orgId === "N:organization:f08e188e-2316-4668-ae2c-8a20dc88502f"
-      ) {
-        name = "IconHealInitiative";
-      }
-      return name;
-    },
     
     hasCustomTheme: function () {
       return true;
@@ -470,8 +431,26 @@ export default {
     },
   },
 
+  watch: {
+    // The nav has to fetch this itself. It renders WorkspaceLogo only when a
+    // logo exists, but WorkspaceLogo is what dispatches the fetch - so gating
+    // on the store while relying on the component to populate it meant the
+    // nav could never discover a logo, and fell back forever. It only appeared
+    // to work on the datasets list, where the rafter's copy renders
+    // unconditionally and populated the store as a side effect.
+    activeOrgId: {
+      handler(orgId) {
+        if (orgId) {
+          this.fetchLogo({ orgId });
+        }
+      },
+      immediate: true,
+    },
+  },
+
   methods: {
     ...mapActions(["togglePrimaryNav", "condensePrimaryNav"]),
+    ...mapActions("workspaceLogoModule", ["fetchLogo"]),
 
     /**
      * Toggles primary nav open and closed
@@ -565,14 +544,6 @@ export default {
 .logo {
   color: theme.$white;
   fill: theme.$white;
-}
-.I3H-logo {
-  height: 30px;
-
-  .condensed & {
-    width: 24px;
-    height: auto;
-  }
 }
 .logo-wrap {
   margin: 20px 0;
