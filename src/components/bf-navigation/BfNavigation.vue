@@ -18,17 +18,18 @@
           :initials-only="isRailCondensed"
           plain-initials
         />
-        <!-- Explicit dimensions: IconPennsieveMark declares no width/height
-             props, so without these the svg has nothing to size from. White
-             rather than .logo's fill, which is the dark app primary colour and
-             all but disappears against the rail. Matches the monogram. -->
-        <pennsieve-mark
+        <!-- Referenced by its import identifier, not as <pennsieve-mark>.
+             Two components declare name: "PennsieveMark" - the real mark in
+             IconPennsieveMark.vue and an unused placeholder shield in
+             PennsieveMark.vue - and the kebab-case tag resolved to the
+             placeholder despite the local registration pointing here. -->
+        <IconPennsieveMark
           v-else
           v-show="!primaryNavCondensed || secondaryNavOpen"
           class="logo-fallback-mark"
           :width="24"
           :height="24"
-          color="#fff"
+          color="currentColor"
         />
       </router-link>
       <button v-else-if="!pageNotFound && isWorkspaceGuest" @click.prevent>
@@ -40,28 +41,28 @@
           :initials-only="isRailCondensed"
           plain-initials
         />
-        <!-- Explicit dimensions: IconPennsieveMark declares no width/height
-             props, so without these the svg has nothing to size from. White
-             rather than .logo's fill, which is the dark app primary colour and
-             all but disappears against the rail. Matches the monogram. -->
-        <pennsieve-mark
+        <!-- Referenced by its import identifier, not as <pennsieve-mark>.
+             Two components declare name: "PennsieveMark" - the real mark in
+             IconPennsieveMark.vue and an unused placeholder shield in
+             PennsieveMark.vue - and the kebab-case tag resolved to the
+             placeholder despite the local registration pointing here. -->
+        <IconPennsieveMark
           v-else
           v-show="!primaryNavCondensed || secondaryNavOpen"
           class="logo-fallback-mark"
           :width="24"
           :height="24"
-          color="#fff"
+          color="currentColor"
         />
       </button>
       <a v-else :href="logoLink">
-        <pennsieve-mark
+        <IconPennsieveMark
           v-show="!primaryNavCondensed || secondaryNavOpen"
-          class="logo"
+          class="logo-fallback-mark"
           :width="24"
           :height="24"
           color="currentColor"
-        >
-        </pennsieve-mark>
+        />
       </a>
     </div>
 
@@ -222,7 +223,7 @@ import BfNavigationTertiary from "../bf-navigation-tertiary/BfNavigationTertiary
 import { mapActions, mapGetters, mapState } from "vuex";
 import { pathOr, propOr } from "ramda";
 import { PublicationTabs } from "../../utils/constants";
-import PennsieveMark from "../icons/IconPennsieveMark.vue";
+import IconPennsieveMark from "../icons/IconPennsieveMark.vue";
 import IconDatasets from "../icons/IconDatasets.vue";
 import IconOverview from "../icons/IconOverview.vue";
 import IconResearch from "../icons/IconResearch.vue";
@@ -260,7 +261,7 @@ export default {
     IconOrganization,
     IconSettings,
     IconPerson,
-    PennsieveMark,
+    IconPennsieveMark,
     BfNavigationItem,
     BfNavigationTertiary,
     IconDatasets,
@@ -483,6 +484,10 @@ export default {
 @use "../../styles/navigation";
 
 .logo-fallback-mark {
+  // White via currentColor. Deliberately not .logo, whose fill is the dark
+  // app primary colour and would override the svg's fill="currentColor",
+  // leaving the mark near-invisible against the rail.
+  color: theme.$white;
   display: block;
   height: 24px;
   width: 24px;
