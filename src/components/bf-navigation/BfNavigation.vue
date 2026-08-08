@@ -10,54 +10,66 @@
   >
     <div class="logo-wrap">
       <router-link v-if="!pageNotFound && !isWorkspaceGuest" tag="button" :to="logoRoute">
-        <component
-          :is="MarkComponent"
-          v-show="!primaryNavCondensed || secondaryNavOpen"
-          :class="logoClass"
+        <!-- Condensed always shows something, logo or not: at 56px the
+             monogram identifies the workspace, which is the whole job of this
+             slot. Only the expanded, logo-less case falls through to the
+             Pennsieve mark. -->
+        <workspace-logo
+          v-if="hasUploadedLogo || isRailCondensed"
+          :fit="isRailCondensed ? 'square' : 'natural'"
+          :size="isRailCondensed ? 28 : 30"
+          :max-width="navLogoMaxWidth"
+          :initials-only="isRailCondensed"
+          plain-initials
+        />
+        <!-- Referenced by its import identifier, not as <pennsieve-mark>.
+             Two components declare name: "PennsieveMark" - the real mark in
+             IconPennsieveMark.vue and an unused placeholder shield in
+             PennsieveMark.vue - and the kebab-case tag resolved to the
+             placeholder despite the local registration pointing here. -->
+        <IconPennsieveMark
+          v-else
+          class="logo-fallback-mark"
+          :width="24"
+          :height="24"
           color="currentColor"
         />
       </router-link>
       <button v-else-if="!pageNotFound && isWorkspaceGuest" @click.prevent>
-        <component
-          :is="MarkComponent"
-          v-show="!primaryNavCondensed || secondaryNavOpen"
-          :class="logoClass"
+        <!-- Condensed always shows something, logo or not: at 56px the
+             monogram identifies the workspace, which is the whole job of this
+             slot. Only the expanded, logo-less case falls through to the
+             Pennsieve mark. -->
+        <workspace-logo
+          v-if="hasUploadedLogo || isRailCondensed"
+          :fit="isRailCondensed ? 'square' : 'natural'"
+          :size="isRailCondensed ? 28 : 30"
+          :max-width="navLogoMaxWidth"
+          :initials-only="isRailCondensed"
+          plain-initials
+        />
+        <!-- Referenced by its import identifier, not as <pennsieve-mark>.
+             Two components declare name: "PennsieveMark" - the real mark in
+             IconPennsieveMark.vue and an unused placeholder shield in
+             PennsieveMark.vue - and the kebab-case tag resolved to the
+             placeholder despite the local registration pointing here. -->
+        <IconPennsieveMark
+          v-else
+          class="logo-fallback-mark"
+          :width="24"
+          :height="24"
           color="currentColor"
         />
       </button>
       <a v-else :href="logoLink">
-        <pennsieve-mark
+        <IconPennsieveMark
           v-show="!primaryNavCondensed || secondaryNavOpen"
-          class="logo"
+          class="logo-fallback-mark"
           :width="24"
           :height="24"
           color="currentColor"
-        >
-        </pennsieve-mark>
+        />
       </a>
-      <button
-        v-show="!secondaryNavOpen && !pageNotFound"
-        class="btn-expand-collapse"
-        name="Toggle Primary Menu"
-        @click="toggleMenu"
-      >
-        <IconNavCollapse
-          :is-visible="!primaryNavCondensed"
-          :width="primaryNavCondensed ? 32 : 24"
-          :height="primaryNavCondensed ? 32 : 24"
-          color="#fff"
-          class="collapse"
-        >
-        </IconNavCollapse>
-        <IconNavExpand
-          :is-visible="primaryNavCondensed"
-          :width="primaryNavCondensed ? 32 : 24"
-          :height="primaryNavCondensed ? 32 : 24"
-          color="#fff"
-          class="collapse"
-        >
-        </IconNavExpand>
-      </button>
     </div>
 
     <div class="menu-wrap">
@@ -188,11 +200,31 @@
         </template>
       </bf-navigation-item>
     </div>
-    <span
+    <button
       v-if="!secondaryNavOpen && !pageNotFound"
+      type="button"
       class="collapse-handle"
+      :aria-label="primaryNavCondensed ? 'Expand navigation' : 'Collapse navigation'"
+      :aria-expanded="!primaryNavCondensed"
+      :style="{
+        '--chevron-bg': chevronBackground,
+        '--chevron-bg-hover': chevronHoverBackground,
+      }"
       @click="toggleMenu"
-    />
+    >
+      <!-- One icon rotated, never two swapped: IconArrowLeft is a 6x10
+           viewBox and IconArrowRight a 24x24, so the same width/height
+           rendered them at visibly different sizes. Rotating keeps the
+           geometry identical by construction. 6x10 matches the viewBox
+           ratio, so the chevron is not stretched. -->
+      <IconArrowLeft
+        class="collapse-chevron"
+        :class="{ 'is-flipped': primaryNavCondensed }"
+        :width="6"
+        :height="10"
+        color="currentColor"
+      />
+    </button>
     <bf-navigation-tertiary
       :bkColor="userMenuBackgroundColor"
       :org-id="orgId"
@@ -207,9 +239,7 @@ import BfNavigationTertiary from "../bf-navigation-tertiary/BfNavigationTertiary
 import { mapActions, mapGetters, mapState } from "vuex";
 import { pathOr, propOr } from "ramda";
 import { PublicationTabs } from "../../utils/constants";
-import PennsieveMark from "../icons/IconPennsieveMark.vue";
-import IconNavCollapse from "../icons/IconNavCollapse.vue";
-import IconNavExpand from "../icons/IconNavExpand.vue";
+import IconPennsieveMark from "../icons/IconPennsieveMark.vue";
 import IconDatasets from "../icons/IconDatasets.vue";
 import IconOverview from "../icons/IconOverview.vue";
 import IconResearch from "../icons/IconResearch.vue";
@@ -220,9 +250,8 @@ import IconIntegrations from "../icons/IconIntegrations.vue";
 import IconOrganization from "../icons/IconOrganization.vue";
 import IconDocument from "../icons/IconDocument.vue";
 import IconPublic from "../icons/IconPublic.vue";
-import IconSPARCLogo from "../icons/IconSPARCLogo.vue";
-import IconI3HLogo from "../icons/IconI3HLogo.vue";
-import IconHealInitiative from "../icons/IconHealInitiative.vue";
+import IconArrowLeft from "../icons/IconArrowLeft.vue";
+import WorkspaceLogo from "../shared/WorkspaceLogo/WorkspaceLogo.vue";
 import IconCollection from "../icons/IconCollection.vue";
 import CustomTheme from "../../mixins/custom-theme";
 
@@ -241,16 +270,14 @@ export default {
   },
 
   components: {
-    IconSPARCLogo,
-    IconI3HLogo,
+    WorkspaceLogo,
+    IconArrowLeft,
     IconPublic,
     IconDocument,
     IconOrganization,
     IconSettings,
     IconPerson,
-    IconNavExpand,
-    IconNavCollapse,
-    PennsieveMark,
+    IconPennsieveMark,
     BfNavigationItem,
     BfNavigationTertiary,
     IconDatasets,
@@ -258,7 +285,6 @@ export default {
     IconResearch,
     IconTeam,
     IconIntegrations,
-    IconHealInitiative,
     IconCollection,
   },
   mixins: [CustomTheme],
@@ -277,39 +303,40 @@ export default {
       "primaryNavCondensed",
       "pageNotFound",
     ]),
-    
-    logoClass: function () {
-      // Use the orgID parameter passed by router for quick switching of theme instead of the activeOrganization that is defined later.
-      if (
-        this.orgId === "N:organization:db5e88f3-9986-452f-aaab-b677f4fd9b80"
-      ) {
-        return "I3H-logo";
-      } else {
-        return "logo";
-      }
+
+    ...mapGetters("workspaceLogoModule", ["activeWorkspaceLogo"]),
+
+    activeOrgId: function () {
+      return pathOr(null, ["organization", "id"], this.activeOrganization);
+    },
+
+    // Drives whether the uploaded logo replaces the Pennsieve mark.
+    hasUploadedLogo: function () {
+      return Boolean(this.activeWorkspaceLogo);
+    },
+
+    // The expanded rail is 230px and .logo-wrap pads 20px each side, leaving
+    // 190px. A wordmark is only legible if it can use that width — held to a
+    // 24px square it renders a few pixels tall.
+    // Must match the condensed class on the root exactly, or the logo sizes
+    // itself for a width the rail does not have.
+    //
+    // secondaryNavOpen belongs here: it is set when a secondary nav mounts,
+    // and primaryNavOpen is a separate flag, so both rails are on screen
+    // together in the normal dataset view - primary at 56px beside the
+    // secondary. This rail is only absent when primaryNavOpen is false, which
+    // is a different thing entirely.
+    isRailCondensed: function () {
+      return (
+        this.primaryNavCondensed || this.pageNotFound || this.secondaryNavOpen
+      );
+    },
+
+    navLogoMaxWidth: function () {
+      return this.isRailCondensed ? 28 : 190;
     },
     
-    MarkComponent: function () {
-      // Use the orgID parameter passed by router for quick switching of theme instead of the activeOrganization that is defined later.
-      let name = "PennsieveMark";
-      if (
-        this.orgId === "N:organization:050fae39-4412-43ef-a514-703ed8e299d5" ||
-        this.orgId === "N:organization:618e8dd9-f8d2-4dc4-9abb-c6aaab2e78a0"
-      ) {
-        name = "IconSPARCLogo";
-      } else if (
-        this.orgId === "N:organization:db5e88f3-9986-452f-aaab-b677f4fd9b80" ||
-        this.orgId === "N:organization:aab5058e-25a4-43f9-bdb1-18396b6920f2"
-      ) {
-        name = "IconI3HLogo";
-      } else if (
-        this.orgId === "N:organization:98d6e84c-9a27-48f8-974f-93c0cca15aae" ||
-        this.orgId === "N:organization:f08e188e-2316-4668-ae2c-8a20dc88502f"
-      ) {
-        name = "IconHealInitiative";
-      }
-      return name;
-    },
+    
     
     hasCustomTheme: function () {
       return true;
@@ -343,6 +370,25 @@ export default {
       return "";
     },
     
+    // The chevron sits on the seam near the top of the rail, where the
+    // gradient is at its darkened upper stop. Matching that rather than a
+    // fixed purple keeps it part of the rail on any workspace theme.
+    chevronBackground: function () {
+      if (this.hasCustomTheme) {
+        return this.pSBC(-0.25, this.getThemeColors[1]) || this.getThemeColors[1];
+      }
+      return "";
+    },
+
+    // A touch lighter on hover, derived from the same colour so the
+    // relationship holds whatever the workspace theme is.
+    chevronHoverBackground: function () {
+      if (this.hasCustomTheme) {
+        return this.pSBC(-0.1, this.getThemeColors[1]) || this.getThemeColors[1];
+      }
+      return "";
+    },
+
     userMenuBackgroundColor: function () {
       if (this.hasCustomTheme) {
         return this.getThemeColors[0]; // color1
@@ -439,8 +485,26 @@ export default {
     },
   },
 
+  watch: {
+    // The nav has to fetch this itself. It renders WorkspaceLogo only when a
+    // logo exists, but WorkspaceLogo is what dispatches the fetch - so gating
+    // on the store while relying on the component to populate it meant the
+    // nav could never discover a logo, and fell back forever. It only appeared
+    // to work on the datasets list, where the rafter's copy renders
+    // unconditionally and populated the store as a side effect.
+    activeOrgId: {
+      handler(orgId) {
+        if (orgId) {
+          this.fetchLogo({ orgId });
+        }
+      },
+      immediate: true,
+    },
+  },
+
   methods: {
     ...mapActions(["togglePrimaryNav", "condensePrimaryNav"]),
+    ...mapActions("workspaceLogoModule", ["fetchLogo"]),
 
     /**
      * Toggles primary nav open and closed
@@ -463,6 +527,16 @@ export default {
 @use "../../styles/theme";
 @use "../../styles/navigation";
 
+.logo-fallback-mark {
+  // White via currentColor. Deliberately not .logo, whose fill is the dark
+  // app primary colour and would override the svg's fill="currentColor",
+  // leaving the mark near-invisible against the rail.
+  color: theme.$white;
+  display: block;
+  height: 24px;
+  width: 24px;
+}
+
 .logo {
   color: theme.$purple_1;
   display: block;
@@ -479,16 +553,23 @@ export default {
 .logo-wrap {
   align-items: center;
   display: flex;
-  height: 20px;
+  // min-height, not a fixed 20px: that was sized for the old 20px mark, and a
+  // 30px logo overflowed it, quietly eating into the margins below. Letting
+  // the row size to its content makes the spacing mean what it says.
+  min-height: 30px;
   flex-direction: row;
-  padding: 0 20px;
-  justify-content: space-between;
+  padding: 4px 20px;
+  // Centred: this row is branding only now that the collapse control lives on
+  // the rail's edge handle, so the logo is not competing with an icon.
+  justify-content: center;
 
   .condensed & {
     justify-content: center;
-    padding: 0;
+    // Keep the vertical breathing room; only the horizontal gutter goes.
+    padding: 4px 0;
   }
 }
+
 
 .logo-arrow {
   color: theme.$app-primary-color;
@@ -528,16 +609,8 @@ export default {
   color: theme.$white;
   fill: theme.$white;
 }
-.I3H-logo {
-  height: 30px;
-
-  .condensed & {
-    width: 24px;
-    height: auto;
-  }
-}
 .logo-wrap {
-  margin: 18px 0;
+  margin: 20px 0;
 }
 .logo-arrow {
   color: theme.$white;

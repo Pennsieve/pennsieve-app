@@ -837,6 +837,7 @@ export default {
     display: none;
   }
 }
+
 .bf-rafter-buttons {
   align-self: end;
 

@@ -6,29 +6,36 @@
       </span>
     </div>
 
+    <button
+      type="button"
+      class="collapse-handle"
+      :aria-label="secondaryNavCondensed ? 'Expand secondary navigation' : 'Collapse secondary navigation'"
+      :aria-expanded="!secondaryNavCondensed"
+      @click="toggleMenu"
+    >
+      <IconArrowLeft
+        class="collapse-chevron"
+        :class="{ 'is-flipped': secondaryNavCondensed }"
+        :width="6"
+        :height="10"
+        color="currentColor"
+      />
+    </button>
+
     <div class="menu-wrap">
       <div class="heading-wrap">
-        <template v-if="!secondaryNavCondensed">
+        <template v-if="secondaryNavCondensed">
+          <div
+            class="dot condensed-status"
+            :class="`condensed-status--${sourceType}`"
+            :title="`${sourceMeta.label} · Read-only`"
+          />
+        </template>
+        <template v-else>
           <router-link :to="{ name: 'public-datasets' }" class="back-link">
             <IconArrowLeft :width="16" :height="16" color="currentColor" />
             <span>Public Datasets</span>
           </router-link>
-          <button
-            class="btn-expand-collapse"
-            name="Collapse Secondary Menu"
-            @click="toggleMenu"
-          >
-            <IconNavCollapse color="#71747C" />
-          </button>
-        </template>
-        <template v-else>
-          <button
-            class="btn-expand-collapse"
-            name="Expand Secondary Menu"
-            @click="toggleMenu"
-          >
-            <IconNavExpand color="#fff" :height="32" :width="32" />
-          </button>
         </template>
       </div>
 
@@ -77,8 +84,6 @@ import IconOverview from "@/components/icons/IconOverview.vue";
 import IconFiles from "@/components/icons/IconFiles.vue";
 import IconGraph from "@/components/icons/IconGraph.vue";
 import IconArrowLeft from "@/components/icons/IconArrowLeft.vue";
-import IconNavCollapse from "@/components/icons/IconNavCollapse.vue";
-import IconNavExpand from "@/components/icons/IconNavExpand.vue";
 import { useReadOnlyDatasetStore } from "@/stores/readOnlyDatasetStore.js";
 
 const SOURCE_META = {
@@ -95,8 +100,6 @@ export default {
     IconFiles,
     IconGraph,
     IconArrowLeft,
-    IconNavCollapse,
-    IconNavExpand,
   },
 
   setup() {
@@ -124,7 +127,12 @@ export default {
   },
 
   beforeUnmount() {
+    // Restore the primary rail on the way out. Collapsing this one sets
+    // primaryNavOpen false, and App.vue renders the primary behind
+    // v-if="primaryNavOpen" - so leaving it false meant navigating away from a
+    // collapsed rail landed on a page with no navigation at all.
     this.toggleSecondaryNav(false);
+    this.togglePrimaryNav(true);
   },
 
   methods: {
@@ -245,9 +253,32 @@ hr {
   font-size: 14px;
 
   .condensed & {
+    // Cancels the -6px navigation.scss puts on .menu-wrap when condensed.
+    // That offset aligns icons in the standard 56px rail; this one is 74px
+    // with an 18px source strip, so inheriting it left the marker 6px off
+    // centre of the area beside the strip.
+    margin-left: 6px;
     padding: 16px 0;
     justify-content: center;
   }
+}
+
+// Marks the context in the condensed rail, where the back link cannot fit.
+// Coloured per source, matching the strip down the edge, since a public
+// dataset has no workspace theme to draw from.
+.dot.condensed-status {
+  border-radius: 50%;
+  display: inline-block;
+  height: 14px;
+  width: 14px;
+}
+
+.condensed-status--discover {
+  background: theme.$teal_1;
+}
+
+.condensed-status--view {
+  background: theme.$purple_1;
 }
 
 .back-link {

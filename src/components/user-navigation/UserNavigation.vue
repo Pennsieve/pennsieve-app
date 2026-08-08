@@ -15,28 +15,26 @@
           color="currentColor"
         />
       </router-link>
-      <button
-        v-show="!secondaryNavOpen"
-        class="btn-expand-collapse"
-        name="Toggle Primary Menu"
-        @click="toggleMenu"
-      >
-        <IconNavCollapse
-          :is-visible="!primaryNavCondensed"
-          :width="primaryNavCondensed ? 32 : 24"
-          :height="primaryNavCondensed ? 32 : 24"
-          color="#fff"
-          class="collapse"
-        />
-        <IconNavExpand
-          :is-visible="primaryNavCondensed"
-          :width="primaryNavCondensed ? 32 : 24"
-          :height="primaryNavCondensed ? 32 : 24"
-          color="#fff"
-          class="collapse"
-        />
-      </button>
     </div>
+
+    <!-- Same control as the workspace nav: a hover-revealed chevron on the
+         rail seam rather than a button sharing the logo row. -->
+    <button
+      v-show="!secondaryNavOpen"
+      type="button"
+      class="collapse-handle"
+      :aria-label="primaryNavCondensed ? 'Expand navigation' : 'Collapse navigation'"
+      :aria-expanded="!primaryNavCondensed"
+      @click="toggleMenu"
+    >
+      <IconArrowLeft
+        class="collapse-chevron"
+        :class="{ 'is-flipped': primaryNavCondensed }"
+        :width="6"
+        :height="10"
+        color="currentColor"
+      />
+    </button>
 
     <div class="menu-wrap">
 
@@ -155,8 +153,7 @@ import { mapGetters, mapState, mapActions } from 'vuex'
 import UserNavigationItem from './UserNavigationItem.vue'
 import BfNavigationTertiary from '../bf-navigation-tertiary/BfNavigationTertiary.vue'
 import IconPennsieveMark from '../icons/IconPennsieveMark.vue'
-import IconNavCollapse from '../icons/IconNavCollapse.vue'
-import IconNavExpand from '../icons/IconNavExpand.vue'
+import IconArrowLeft from '../icons/IconArrowLeft.vue'
 import IconUser from '../icons/IconUser.vue'
 import IconUpload from '../icons/IconUpload.vue'
 import IconAnalysis from '../icons/IconAnalysis.vue'
@@ -177,8 +174,7 @@ export default {
     UserNavigationItem,
     BfNavigationTertiary,
     IconPennsieveMark,
-    IconNavCollapse,
-    IconNavExpand,
+    IconArrowLeft,
     IconUser,
     IconUpload,
     IconAnalysis,
@@ -236,6 +232,12 @@ export default {
 
 <style scoped lang="scss">
 @use '../../styles/_theme.scss';
+@use '../../styles/collapse-handle';
+
+.collapse-handle {
+  @include collapse-handle.collapse-handle(".user-navigation");
+}
+
 
 .user-navigation {
   background: linear-gradient(160deg, theme.$purple_2 0%, theme.$purple_3 100%);
@@ -275,24 +277,11 @@ export default {
     padding: 20px 16px;
     display: flex;
     align-items: center;
-    justify-content: space-between;
+    // Branding only now that the collapse control lives on the rail seam.
+    justify-content: center;
 
     .logo {
       color: #fff;
-    }
-
-    .btn-expand-collapse {
-      background: none;
-      border: none;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 4px;
-      
-      &:hover, &:focus {
-        opacity: .75;
-      }
     }
   }
 
