@@ -24,7 +24,14 @@
 
     <div class="menu-wrap">
       <div class="heading-wrap">
-        <template v-if="!secondaryNavCondensed">
+        <template v-if="secondaryNavCondensed">
+          <div
+            class="dot condensed-status"
+            :class="`condensed-status--${sourceType}`"
+            :title="`${sourceMeta.label} · Read-only`"
+          />
+        </template>
+        <template v-else>
           <router-link :to="{ name: 'public-datasets' }" class="back-link">
             <IconArrowLeft :width="16" :height="16" color="currentColor" />
             <span>Public Datasets</span>
@@ -244,6 +251,24 @@ hr {
     padding: 16px 0;
     justify-content: center;
   }
+}
+
+// Marks the context in the condensed rail, where the back link cannot fit.
+// Coloured per source, matching the strip down the edge, since a public
+// dataset has no workspace theme to draw from.
+.dot.condensed-status {
+  border-radius: 50%;
+  display: inline-block;
+  height: 14px;
+  width: 14px;
+}
+
+.condensed-status--discover {
+  background: theme.$teal_1;
+}
+
+.condensed-status--view {
+  background: theme.$purple_1;
 }
 
 .back-link {
