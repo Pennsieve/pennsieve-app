@@ -41,7 +41,8 @@
   // it sits over light page content. A chevron alone would be legible on one
   // side and vanish on the other. Kept translucent and borderless so it reads
   // as a hint rather than a control competing with the nav.
-  background: rgba(theme.$purple_3, 0.85);
+  // Falls back to the default purple when a workspace has no theme colour.
+  background: var(--chevron-bg, #{rgba(theme.$purple_3, 0.85)});
   border: 0;
   border-radius: 50%;
   color: rgba(theme.$white, 0.8);
@@ -72,7 +73,7 @@
   }
 
   &:hover {
-    background: theme.$purple_3;
+    background: var(--chevron-bg-hover, #{theme.$purple_3});
     color: theme.$white;
   }
 

@@ -194,6 +194,10 @@
       class="collapse-handle"
       :aria-label="primaryNavCondensed ? 'Expand navigation' : 'Collapse navigation'"
       :aria-expanded="!primaryNavCondensed"
+      :style="{
+        '--chevron-bg': chevronBackground,
+        '--chevron-bg-hover': chevronHoverBackground,
+      }"
       @click="toggleMenu"
     >
       <!-- One icon rotated, never two swapped: IconArrowLeft is a 6x10
@@ -345,6 +349,25 @@ export default {
       return "";
     },
     
+    // The chevron sits on the seam near the top of the rail, where the
+    // gradient is at its darkened upper stop. Matching that rather than a
+    // fixed purple keeps it part of the rail on any workspace theme.
+    chevronBackground: function () {
+      if (this.hasCustomTheme) {
+        return this.pSBC(-0.25, this.getThemeColors[1]) || this.getThemeColors[1];
+      }
+      return "";
+    },
+
+    // A touch lighter on hover, derived from the same colour so the
+    // relationship holds whatever the workspace theme is.
+    chevronHoverBackground: function () {
+      if (this.hasCustomTheme) {
+        return this.pSBC(-0.1, this.getThemeColors[1]) || this.getThemeColors[1];
+      }
+      return "";
+    },
+
     userMenuBackgroundColor: function () {
       if (this.hasCustomTheme) {
         return this.getThemeColors[0]; // color1
