@@ -184,7 +184,14 @@
       :aria-label="primaryNavCondensed ? 'Expand navigation' : 'Collapse navigation'"
       :aria-expanded="!primaryNavCondensed"
       @click="toggleMenu"
-    ></button>
+    >
+      <component
+        :is="primaryNavCondensed ? 'IconArrowRight' : 'IconArrowLeft'"
+        :width="12"
+        :height="12"
+        color="currentColor"
+      />
+    </button>
     <bf-navigation-tertiary
       :bkColor="userMenuBackgroundColor"
       :org-id="orgId"
@@ -210,6 +217,8 @@ import IconIntegrations from "../icons/IconIntegrations.vue";
 import IconOrganization from "../icons/IconOrganization.vue";
 import IconDocument from "../icons/IconDocument.vue";
 import IconPublic from "../icons/IconPublic.vue";
+import IconArrowLeft from "../icons/IconArrowLeft.vue";
+import IconArrowRight from "../icons/IconArrowRight.vue";
 import WorkspaceLogo from "../shared/WorkspaceLogo/WorkspaceLogo.vue";
 import IconSPARCLogo from "../icons/IconSPARCLogo.vue";
 import IconI3HLogo from "../icons/IconI3HLogo.vue";
@@ -233,6 +242,8 @@ export default {
 
   components: {
     WorkspaceLogo,
+    IconArrowLeft,
+    IconArrowRight,
     IconSPARCLogo,
     IconI3HLogo,
     IconPublic,
