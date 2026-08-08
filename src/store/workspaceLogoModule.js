@@ -44,9 +44,16 @@ export const actions = {
 
     try {
       const token = await useGetToken();
-      const response = await fetch(`${rootState.config.api2Url}/workspaces/logo`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      // organization_id is required, not optional: it is an identity source
+      // for the authorizer, which resolves the claim against that workspace
+      // and rejects non-members. Omitting it makes API Gateway reject the
+      // request before the service is reached.
+      const response = await fetch(
+        `${rootState.config.api2Url}/workspaces/logo?organization_id=${encodeURIComponent(
+          organizationId
+        )}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
 
       if (response.status === 404) {
         commit("SET_LOGO", { orgId: organizationId, logo: null });

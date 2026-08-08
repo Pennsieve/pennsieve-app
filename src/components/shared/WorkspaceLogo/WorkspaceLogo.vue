@@ -1,5 +1,10 @@
 <template>
-  <div class="workspace-logo" :class="{ 'is-natural': isNaturalFit }" :style="sizeStyle">
+  <div
+    v-if="!hideWhenMissing || logoUrl"
+    class="workspace-logo"
+    :class="{ 'is-natural': isNaturalFit }"
+    :style="sizeStyle"
+  >
     <img
       v-if="logoUrl && !hasFailed"
       class="workspace-logo-img"
@@ -9,7 +14,7 @@
       @error="hasFailed = true"
     />
     <div
-      v-else
+      v-else-if="!hideWhenMissing"
       class="workspace-logo-initials"
       :class="{ 'is-plain': plainInitials }"
       :aria-label="workspaceName"
@@ -74,6 +79,13 @@ export default {
     // Not the default: the same monogram renders on the settings page over a
     // light background, where bare white letters would be invisible.
     plainInitials: {
+      type: Boolean,
+      default: false,
+    },
+    // Renders nothing when the workspace has no logo, instead of falling back
+    // to an initials monogram. For surfaces that already name the workspace,
+    // where a monogram just repeats it.
+    hideWhenMissing: {
       type: Boolean,
       default: false,
     },
@@ -192,9 +204,16 @@ export default {
 
 /* In natural fit the container's width is driven by its content, so the image
    cannot also be sized from the container — it would be circular. Height
-   leads and width follows the image's own proportions. */
+   leads and width follows the image's own proportions.
+
+   max-width caps it once the container hits its own maxWidth: without it a
+   logo wider than that limit overflowed and was clipped by overflow: hidden,
+   which is the one thing a logo must never be. object-fit then fits the image
+   inside whatever box remains. */
 .workspace-logo.is-natural .workspace-logo-img {
   height: 100%;
+  max-width: 100%;
+  object-fit: contain;
   width: auto;
 }
 

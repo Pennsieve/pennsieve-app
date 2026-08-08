@@ -119,6 +119,10 @@ const MAX_UPLOAD_BYTES = 2 * 1024 * 1024;
 // Bounds the longer side of the uploaded logo. Matches the service's canonical
 // rendition, so the server does not have to resize what we send.
 const MAX_LOGO_DIMENSION = 512;
+// SVG is rasterised at twice the canonical dimension before it reaches the
+// cropper, so cropping and the server's own downscale both work from detail
+// the vector actually has rather than from a 512px approximation.
+const SVG_RASTER_DIMENSION = MAX_LOGO_DIMENSION * 2;
 
 // A far looser bound on the file the user picks. The cropper re-encodes to a
 // bounded PNG before upload, so a large source does not mean a large upload —
@@ -148,6 +152,7 @@ export default {
         { type: "image/png", name: "PNG" },
         { type: "image/jpeg", name: "JPEG" },
         { type: "image/webp", name: "WebP" },
+        { type: "image/svg+xml", name: "SVG" },
       ],
     };
   },
@@ -234,6 +239,24 @@ export default {
       this.isLoadingImage = true;
       this.isDialogVisible = true;
 
+      // SVG is converted to a raster here, so everything downstream - the
+      // cropper and the API - only ever handles PNG. The service never
+      // receives SVG, so it needs no sanitiser and no rasteriser.
+      if (image.type === "image/svg+xml") {
+        this.rasterizeSvg(image)
+          .then((dataUrl) => {
+            this.$refs.img.src = dataUrl;
+            this.initCropper();
+          })
+          .catch(() => {
+            this.errorMessage =
+              "That SVG could not be read. Try exporting it as PNG instead.";
+            this.isDialogVisible = false;
+            this.isLoadingImage = false;
+          });
+        return;
+      }
+
       const reader = new FileReader();
       reader.addEventListener(
         "load",
@@ -244,6 +267,103 @@ export default {
         false
       );
       reader.readAsDataURL(image);
+    },
+
+    // Reads an SVG's intrinsic aspect ratio. naturalWidth is unreliable here:
+    // many logos carry only a viewBox, and browsers disagree on what to report
+    // for those - Chrome commonly gives 300x150. DOMParser only parses; it
+    // does not execute scripts or fetch anything.
+    svgAspect(svgText) {
+      const doc = new DOMParser().parseFromString(svgText, "image/svg+xml");
+      const svg = doc.querySelector("svg");
+      if (!svg || doc.querySelector("parsererror")) {
+        return null;
+      }
+
+      const asPixels = (value) => {
+        const parsed = parseFloat(value);
+        // Reject percentages and other relative units; they say nothing about
+        // the intrinsic ratio.
+        if (!Number.isFinite(parsed) || parsed <= 0 || /%$/.test(value || "")) {
+          return null;
+        }
+        return parsed;
+      };
+
+      const width = asPixels(svg.getAttribute("width"));
+      const height = asPixels(svg.getAttribute("height"));
+      if (width && height) {
+        return { width, height };
+      }
+
+      const viewBox = (svg.getAttribute("viewBox") || "").split(/[\s,]+/);
+      if (viewBox.length === 4) {
+        const vbWidth = parseFloat(viewBox[2]);
+        const vbHeight = parseFloat(viewBox[3]);
+        if (vbWidth > 0 && vbHeight > 0) {
+          return { width: vbWidth, height: vbHeight };
+        }
+      }
+
+      return null;
+    },
+
+    // Renders an SVG to a PNG data url.
+    //
+    // Drawing through an <img> is deliberate: that is the browser's secure
+    // static mode, where scripts do not run and external references are not
+    // fetched. Injecting the markup into the document instead would execute it.
+    rasterizeSvg(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onerror = () => reject(new Error("could not read file"));
+        reader.onload = () => {
+          const svgText = reader.result;
+          const aspect = this.svgAspect(svgText);
+          if (!aspect) {
+            reject(new Error("no intrinsic dimensions"));
+            return;
+          }
+
+          const scale = SVG_RASTER_DIMENSION / Math.max(aspect.width, aspect.height);
+          const width = Math.max(1, Math.round(aspect.width * scale));
+          const height = Math.max(1, Math.round(aspect.height * scale));
+
+          const url = URL.createObjectURL(
+            new Blob([svgText], { type: "image/svg+xml" })
+          );
+          const img = new Image();
+
+          img.onload = () => {
+            const canvas = document.createElement("canvas");
+            canvas.width = width;
+            canvas.height = height;
+            // No fill: the canvas stays transparent, so a logo with an alpha
+            // background does not gain a white box.
+            canvas
+              .getContext("2d")
+              .drawImage(img, 0, 0, width, height);
+            URL.revokeObjectURL(url);
+            try {
+              resolve(canvas.toDataURL("image/png"));
+            } catch (err) {
+              // Tainted canvas: the svg pulled in something cross-origin.
+              reject(err);
+            }
+          };
+          img.onerror = () => {
+            URL.revokeObjectURL(url);
+            reject(new Error("could not render svg"));
+          };
+
+          // Explicit dimensions so an SVG with only a viewBox still renders at
+          // the size we want rather than a browser default.
+          img.width = width;
+          img.height = height;
+          img.src = url;
+        };
+        reader.readAsText(file);
+      });
     },
 
     initCropper() {
@@ -327,6 +447,26 @@ export default {
 <style scoped lang="scss">
 @use "../../../styles/_theme.scss";
 
+/* Checkerboard rather than a flat fill. Uploads really are transparent -
+   nothing in the pipeline fills a background - but a solid backdrop makes a
+   transparent logo look identical to one with that colour baked in.
+
+   Mid greys, not the usual white-on-light: workspace logos are frequently
+   white, designed for the dark nav rail, and a light checker renders those
+   invisible. This pair keeps both white and dark marks legible. */
+@mixin transparency-checkerboard($size) {
+  $half: $size * 0.5;
+
+  background-color: theme.$gray_4;
+  background-image: linear-gradient(45deg, theme.$gray_3 25%, transparent 25%),
+    linear-gradient(-45deg, theme.$gray_3 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, theme.$gray_3 75%),
+    linear-gradient(-45deg, transparent 75%, theme.$gray_3 75%);
+  background-position: 0 0, 0 $half, $half (-$half), (-$half) 0;
+  background-size: $size $size;
+}
+
+
 .form-section {
   margin-bottom: 32px;
 }
@@ -347,6 +487,7 @@ export default {
 }
 
 .logo-drop {
+  @include transparency-checkerboard(10px);
   align-items: center;
   border: 1px dashed theme.$gray_3;
   border-radius: 6px;
@@ -358,7 +499,7 @@ export default {
   width: 128px;
 
   &.is-dragging {
-    background: theme.$gray_1;
+    background-color: theme.$gray_2;
     border-color: theme.$purple_2;
   }
 
@@ -383,7 +524,7 @@ export default {
 }
 
 .cropper-wrap {
-  background: theme.$gray_1;
+  @include transparency-checkerboard(16px);
   height: 420px;
   width: 100%;
 }
