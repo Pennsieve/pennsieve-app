@@ -43,8 +43,15 @@
   width: 24px;
   z-index: 1;
 
-  // Drawn on the hit area's left edge, which is exactly the rail seam, so the
-  // indicator lands on the boundary without the hit area crossing it.
+  // The indicator is centred on the rail seam - translateX(-50%) from the hit
+  // area's left edge, which sits exactly on the boundary - so the bar
+  // straddles it evenly.
+  //
+  // The hit area itself deliberately does not straddle: when it did, its inner
+  // half covered the nav items' right edge and stole their hover, which made
+  // the cursor flicker as the pointer crossed them. Separating the two gets
+  // the centred look without the interaction bug.
+  //
   // Transparent at rest so the rail keeps a clean edge.
   &::after {
     background: transparent;
@@ -53,6 +60,7 @@
     left: 0;
     position: absolute;
     top: 0;
+    transform: translateX(-50%);
     transition: background-color 0.15s ease-out, width 0.15s ease-out;
     width: 2px;
   }

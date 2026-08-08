@@ -214,7 +214,9 @@ export default {
 .workspace-logo-initials.is-plain {
   background: none;
   border-radius: 0;
-  color: currentColor;
+  // Explicit white, not currentColor: the nav sets its own colour and the
+  // monogram must stay legible against the solid rail regardless.
+  color: theme.$white;
   line-height: 1;
   user-select: none;
   width: 100%;
