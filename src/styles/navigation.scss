@@ -35,32 +35,31 @@
   cursor: pointer;
   padding: 0;
   position: absolute;
-  // Sits entirely in the gutter, flush against the rail. Straddling the
-  // boundary put half the hit area on top of the nav items, which stole their
-  // hover as the pointer crossed their right edge and made the cursor flicker.
-  right: -24px;
+  // Sits inside the rail, right edge flush with the boundary, so nothing
+  // bleeds into the content area.
+  //
+  // Kept narrow on purpose: this strip is above the nav items in document
+  // order, so whatever it covers belongs to it. At 12px the dead zone on each
+  // item's trailing edge is small; widening it would start swallowing clicks
+  // meant for navigation.
+  right: 0;
   top: 0;
-  width: 24px;
+  width: 12px;
   z-index: 1;
 
-  // The indicator is centred on the rail seam - translateX(-50%) from the hit
-  // area's left edge, which sits exactly on the boundary - so the bar
-  // straddles it evenly.
-  //
-  // The hit area itself deliberately does not straddle: when it did, its inner
-  // half covered the nav items' right edge and stole their hover, which made
-  // the cursor flicker as the pointer crossed them. Separating the two gets
-  // the centred look without the interaction bug.
+  // Centred on the rail seam: translateX(50%) from the hit area's right edge,
+  // which is the boundary, so the bar straddles it evenly without the hit
+  // area itself leaving the rail.
   //
   // Transparent at rest so the rail keeps a clean edge.
   &::after {
     background: transparent;
     bottom: 0;
     content: "";
-    left: 0;
     position: absolute;
+    right: 0;
     top: 0;
-    transform: translateX(-50%);
+    transform: translateX(50%);
     transition: background-color 0.15s ease-out, width 0.15s ease-out;
     width: 2px;
   }
