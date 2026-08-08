@@ -187,8 +187,8 @@
     >
       <component
         :is="primaryNavCondensed ? 'IconArrowRight' : 'IconArrowLeft'"
-        :width="12"
-        :height="12"
+        :width="9"
+        :height="9"
         color="currentColor"
       />
     </button>
