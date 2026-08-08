@@ -10,8 +10,12 @@
   >
     <div class="logo-wrap">
       <router-link v-if="!pageNotFound && !isWorkspaceGuest" tag="button" :to="logoRoute">
+        <!-- Condensed always shows something, logo or not: at 56px the
+             monogram identifies the workspace, which is the whole job of this
+             slot. Only the expanded, logo-less case falls through to the
+             Pennsieve mark. -->
         <workspace-logo
-          v-if="hasUploadedLogo"
+          v-if="hasUploadedLogo || isRailCondensed"
           :fit="isRailCondensed ? 'square' : 'natural'"
           :size="isRailCondensed ? 28 : 30"
           :max-width="navLogoMaxWidth"
@@ -25,7 +29,6 @@
              placeholder despite the local registration pointing here. -->
         <IconPennsieveMark
           v-else
-          v-show="!primaryNavCondensed || secondaryNavOpen"
           class="logo-fallback-mark"
           :width="24"
           :height="24"
@@ -33,8 +36,12 @@
         />
       </router-link>
       <button v-else-if="!pageNotFound && isWorkspaceGuest" @click.prevent>
+        <!-- Condensed always shows something, logo or not: at 56px the
+             monogram identifies the workspace, which is the whole job of this
+             slot. Only the expanded, logo-less case falls through to the
+             Pennsieve mark. -->
         <workspace-logo
-          v-if="hasUploadedLogo"
+          v-if="hasUploadedLogo || isRailCondensed"
           :fit="isRailCondensed ? 'square' : 'natural'"
           :size="isRailCondensed ? 28 : 30"
           :max-width="navLogoMaxWidth"
@@ -48,7 +55,6 @@
              placeholder despite the local registration pointing here. -->
         <IconPennsieveMark
           v-else
-          v-show="!primaryNavCondensed || secondaryNavOpen"
           class="logo-fallback-mark"
           :width="24"
           :height="24"
