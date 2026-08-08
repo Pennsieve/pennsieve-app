@@ -248,6 +248,11 @@ hr {
   font-size: 14px;
 
   .condensed & {
+    // Cancels the -6px navigation.scss puts on .menu-wrap when condensed.
+    // That offset aligns icons in the standard 56px rail; this one is 74px
+    // with an 18px source strip, so inheriting it left the marker 6px off
+    // centre of the area beside the strip.
+    margin-left: 6px;
     padding: 16px 0;
     justify-content: center;
   }
