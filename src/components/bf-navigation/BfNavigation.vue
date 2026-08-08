@@ -18,11 +18,17 @@
           :initials-only="isRailCondensed"
           plain-initials
         />
+        <!-- Explicit dimensions: IconPennsieveMark declares no width/height
+             props, so without these the svg has nothing to size from. White
+             rather than .logo's fill, which is the dark app primary colour and
+             all but disappears against the rail. Matches the monogram. -->
         <pennsieve-mark
           v-else
           v-show="!primaryNavCondensed || secondaryNavOpen"
-          class="logo"
-          color="currentColor"
+          class="logo-fallback-mark"
+          :width="24"
+          :height="24"
+          color="#fff"
         />
       </router-link>
       <button v-else-if="!pageNotFound && isWorkspaceGuest" @click.prevent>
@@ -34,11 +40,17 @@
           :initials-only="isRailCondensed"
           plain-initials
         />
+        <!-- Explicit dimensions: IconPennsieveMark declares no width/height
+             props, so without these the svg has nothing to size from. White
+             rather than .logo's fill, which is the dark app primary colour and
+             all but disappears against the rail. Matches the monogram. -->
         <pennsieve-mark
           v-else
           v-show="!primaryNavCondensed || secondaryNavOpen"
-          class="logo"
-          color="currentColor"
+          class="logo-fallback-mark"
+          :width="24"
+          :height="24"
+          color="#fff"
         />
       </button>
       <a v-else :href="logoLink">
@@ -281,10 +293,7 @@ export default {
       return pathOr(null, ["organization", "id"], this.activeOrganization);
     },
 
-    // Drives whether the uploaded logo replaces the hard-coded mark. Falls
-    // back rather than showing initials here: the nav previously rendered a
-    // real logo for SPARC, I3H and HEAL, and initials would be a regression
-    // for them until they upload one.
+    // Drives whether the uploaded logo replaces the Pennsieve mark.
     hasUploadedLogo: function () {
       return Boolean(this.activeWorkspaceLogo);
     },
@@ -472,6 +481,12 @@ export default {
 <style scoped lang="scss">
 @use "../../styles/theme";
 @use "../../styles/navigation";
+
+.logo-fallback-mark {
+  display: block;
+  height: 24px;
+  width: 24px;
+}
 
 .logo {
   color: theme.$purple_1;
