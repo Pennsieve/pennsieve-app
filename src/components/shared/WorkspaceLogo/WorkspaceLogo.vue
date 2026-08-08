@@ -18,6 +18,7 @@
       class="workspace-logo-initials"
       :class="{ 'is-plain': plainInitials }"
       :aria-label="workspaceName"
+      :title="workspaceName"
     >
       {{ initials }}
     </div>
