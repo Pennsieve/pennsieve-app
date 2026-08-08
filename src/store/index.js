@@ -13,6 +13,7 @@ import uploadModule from "./uploadModule";
 import analysisModule from "./analysisModule";
 import codeReposModule from "./codeReposModule";
 import collectionsModule from "./collectionsModule";
+import workspaceLogoModule from "./workspaceLogoModule";
 
 const hashFunction = (key, list) => {
   const obj = {};
@@ -1063,7 +1064,8 @@ export default createStore({
     uploadModule,
     analysisModule,
     codeReposModule,
-    collectionsModule
+    collectionsModule,
+    workspaceLogoModule
   }
 
 });

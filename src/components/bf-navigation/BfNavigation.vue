@@ -10,7 +10,16 @@
   >
     <div class="logo-wrap">
       <router-link v-if="!pageNotFound && !isWorkspaceGuest" tag="button" :to="logoRoute">
+        <workspace-logo
+          v-if="hasUploadedLogo"
+          :fit="isRailCondensed ? 'square' : 'natural'"
+          :size="isRailCondensed ? 28 : 30"
+          :max-width="navLogoMaxWidth"
+          :initials-only="isRailCondensed"
+          plain-initials
+        />
         <component
+          v-else
           :is="MarkComponent"
           v-show="!primaryNavCondensed || secondaryNavOpen"
           :class="logoClass"
@@ -18,7 +27,16 @@
         />
       </router-link>
       <button v-else-if="!pageNotFound && isWorkspaceGuest" @click.prevent>
+        <workspace-logo
+          v-if="hasUploadedLogo"
+          :fit="isRailCondensed ? 'square' : 'natural'"
+          :size="isRailCondensed ? 28 : 30"
+          :max-width="navLogoMaxWidth"
+          :initials-only="isRailCondensed"
+          plain-initials
+        />
         <component
+          v-else
           :is="MarkComponent"
           v-show="!primaryNavCondensed || secondaryNavOpen"
           :class="logoClass"
@@ -35,29 +53,6 @@
         >
         </pennsieve-mark>
       </a>
-      <button
-        v-show="!secondaryNavOpen && !pageNotFound"
-        class="btn-expand-collapse"
-        name="Toggle Primary Menu"
-        @click="toggleMenu"
-      >
-        <IconNavCollapse
-          :is-visible="!primaryNavCondensed"
-          :width="primaryNavCondensed ? 32 : 24"
-          :height="primaryNavCondensed ? 32 : 24"
-          color="#fff"
-          class="collapse"
-        >
-        </IconNavCollapse>
-        <IconNavExpand
-          :is-visible="primaryNavCondensed"
-          :width="primaryNavCondensed ? 32 : 24"
-          :height="primaryNavCondensed ? 32 : 24"
-          color="#fff"
-          class="collapse"
-        >
-        </IconNavExpand>
-      </button>
     </div>
 
     <div class="menu-wrap">
@@ -182,11 +177,14 @@
         </template>
       </bf-navigation-item>
     </div>
-    <span
+    <button
       v-if="!secondaryNavOpen && !pageNotFound"
+      type="button"
       class="collapse-handle"
+      :aria-label="primaryNavCondensed ? 'Expand navigation' : 'Collapse navigation'"
+      :aria-expanded="!primaryNavCondensed"
       @click="toggleMenu"
-    />
+    ></button>
     <bf-navigation-tertiary
       :bkColor="userMenuBackgroundColor"
       :org-id="orgId"
@@ -202,8 +200,6 @@ import { mapActions, mapGetters, mapState } from "vuex";
 import { pathOr, propOr } from "ramda";
 import { PublicationTabs } from "../../utils/constants";
 import PennsieveMark from "../icons/IconPennsieveMark.vue";
-import IconNavCollapse from "../icons/IconNavCollapse.vue";
-import IconNavExpand from "../icons/IconNavExpand.vue";
 import IconDatasets from "../icons/IconDatasets.vue";
 import IconOverview from "../icons/IconOverview.vue";
 import IconResearch from "../icons/IconResearch.vue";
@@ -214,6 +210,7 @@ import IconIntegrations from "../icons/IconIntegrations.vue";
 import IconOrganization from "../icons/IconOrganization.vue";
 import IconDocument from "../icons/IconDocument.vue";
 import IconPublic from "../icons/IconPublic.vue";
+import WorkspaceLogo from "../shared/WorkspaceLogo/WorkspaceLogo.vue";
 import IconSPARCLogo from "../icons/IconSPARCLogo.vue";
 import IconI3HLogo from "../icons/IconI3HLogo.vue";
 import IconHealInitiative from "../icons/IconHealInitiative.vue";
@@ -235,6 +232,7 @@ export default {
   },
 
   components: {
+    WorkspaceLogo,
     IconSPARCLogo,
     IconI3HLogo,
     IconPublic,
@@ -242,8 +240,6 @@ export default {
     IconOrganization,
     IconSettings,
     IconPerson,
-    IconNavExpand,
-    IconNavCollapse,
     PennsieveMark,
     BfNavigationItem,
     BfNavigationTertiary,
@@ -271,6 +267,28 @@ export default {
       "primaryNavCondensed",
       "pageNotFound",
     ]),
+
+    ...mapGetters("workspaceLogoModule", ["activeWorkspaceLogo"]),
+
+    // Drives whether the uploaded logo replaces the hard-coded mark. Falls
+    // back rather than showing initials here: the nav previously rendered a
+    // real logo for SPARC, I3H and HEAL, and initials would be a regression
+    // for them until they upload one.
+    hasUploadedLogo: function () {
+      return Boolean(this.activeWorkspaceLogo);
+    },
+
+    // The expanded rail is 230px and .logo-wrap pads 20px each side, leaving
+    // 190px. A wordmark is only legible if it can use that width — held to a
+    // 24px square it renders a few pixels tall.
+    // The rail is condensed unless the secondary nav is holding it open.
+    isRailCondensed: function () {
+      return this.primaryNavCondensed && !this.secondaryNavOpen;
+    },
+
+    navLogoMaxWidth: function () {
+      return this.isRailCondensed ? 28 : 190;
+    },
     
     logoClass: function () {
       // Use the orgID parameter passed by router for quick switching of theme instead of the activeOrganization that is defined later.
@@ -283,6 +301,10 @@ export default {
       }
     },
     
+    // Fallback only: used when the workspace has not uploaded a logo. These
+    // hard-coded node ids can be deleted once SPARC, I3H and HEAL have each
+    // uploaded one through workspace settings — removing them before that
+    // would drop live branding for those three workspaces.
     MarkComponent: function () {
       // Use the orgID parameter passed by router for quick switching of theme instead of the activeOrganization that is defined later.
       let name = "PennsieveMark";
@@ -473,16 +495,23 @@ export default {
 .logo-wrap {
   align-items: center;
   display: flex;
-  height: 20px;
+  // min-height, not a fixed 20px: that was sized for the old 20px mark, and a
+  // 30px logo overflowed it, quietly eating into the margins below. Letting
+  // the row size to its content makes the spacing mean what it says.
+  min-height: 30px;
   flex-direction: row;
-  padding: 0 20px;
-  justify-content: space-between;
+  padding: 4px 20px;
+  // Centred: this row is branding only now that the collapse control lives on
+  // the rail's edge handle, so the logo is not competing with an icon.
+  justify-content: center;
 
   .condensed & {
     justify-content: center;
-    padding: 0;
+    // Keep the vertical breathing room; only the horizontal gutter goes.
+    padding: 4px 0;
   }
 }
+
 
 .logo-arrow {
   color: theme.$app-primary-color;
@@ -531,7 +560,7 @@ export default {
   }
 }
 .logo-wrap {
-  margin: 18px 0;
+  margin: 20px 0;
 }
 .logo-arrow {
   color: theme.$white;
