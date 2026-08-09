@@ -170,6 +170,12 @@ export default {
         )(ancestors);
       }
 
+      // At the dataset root there is no containing folder to name — appending
+      // the dataset's own name would read as a folder that doesn't exist.
+      if (this.folder.content.packageType === "DataSet") {
+        return path;
+      }
+
       return path + "/" + this.folder.content.name;
     },
 
@@ -186,8 +192,13 @@ export default {
         return this.selectedFiles.length + " files selected";
       }
     },
+    // Dataset-level info is the fallback for "nothing selected at the root".
+    // It previously ignored selectedFiles entirely, which pinned the panel to
+    // dataset info at the dataset root no matter what the user selected —
+    // selection only appeared to work inside a Collection.
     showDatasetInfo: function () {
       return (
+        this.selectedFiles.length == 0 &&
         this.folder.content.packageType &&
         this.folder.content.packageType == "DataSet"
       );
@@ -196,8 +207,14 @@ export default {
       return this.selectedFiles.length == 1;
     },
     showFileFolderInfo: function () {
+      // A single selected file wins wherever we are, including the dataset
+      // root. With nothing selected, describe the containing folder — unless
+      // that folder is the dataset itself, which showDatasetInfo covers.
+      if (this.selectedFiles.length == 1) {
+        return true;
+      }
       return (
-        (this.selectedFiles.length == 1 || this.selectedFiles.length == 0) &&
+        this.selectedFiles.length == 0 &&
         this.folder.content.packageType &&
         this.folder.content.packageType != "DataSet"
       );
