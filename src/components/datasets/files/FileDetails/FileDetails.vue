@@ -106,6 +106,18 @@
       @close="onCloseMoveDialog"
     />
 
+    <div
+      v-if="showScanBanner"
+      class="scan-banner"
+      :class="`scan-banner--${scanStatusDisplay.severity}`"
+      role="alert"
+    >
+      <strong>{{ scanStatusDisplay.label }}</strong>
+      <span v-if="scanStatusDisplay.secondary">
+        {{ scanStatusDisplay.secondary }}
+      </span>
+    </div>
+
     <div class="concept-instance-section">
       <div files-section class="file-list">
         <concept-instance-static-property
@@ -122,6 +134,18 @@
 
         <concept-instance-static-property :label="fileStatusLabel">
           {{ getDisplayFileStatus }}
+        </concept-instance-static-property>
+
+        <concept-instance-static-property
+          v-if="scanStatusDisplay"
+          label="Virus scan"
+        >
+          <span class="scan-status" :class="`scan-${scanStatusDisplay.severity}`">
+            <span class="scan-headline">{{ scanStatusDisplay.label }}</span>
+            <span v-if="scanStatusDisplay.secondary" class="scan-secondary">
+              · {{ scanStatusDisplay.secondary }}
+            </span>
+          </span>
         </concept-instance-static-property>
 
         <concept-instance-static-property label="Location">
@@ -369,7 +393,12 @@ import StageActions from "../../../shared/StageActions/StageActions.vue";
 import SourceFilesTable from "./SourceFilesTable.vue";
 import ViewerPane from "../../../viewer/ViewerPane/ViewerPane.vue";
 import FileTypeMapper from "../../../../mixins/FileTypeMapper";
+import FormatDate from "../../../../mixins/format-date";
 import { viewerToolTypes } from "../../../../utils/constants";
+import {
+  aggregateScanStatus,
+  getScanStatusDisplay,
+} from "../../../../utils/scan-status";
 import { useGetToken } from "@/composables/useGetToken";
 import {
   useHandleXhrError,
@@ -399,7 +428,16 @@ export default {
     AddRelationshipDrawer,
   },
 
-  mixins: [Request, StorageMetrics, FileIcon, GetFileProperty, FileTypeMapper],
+  // FormatDate supplies formatDate, which this component already called in
+  // fileCreatedAt without the mixin registered.
+  mixins: [
+    Request,
+    StorageMetrics,
+    FileIcon,
+    GetFileProperty,
+    FileTypeMapper,
+    FormatDate,
+  ],
 
   props: {
     datasetId: {
@@ -665,6 +703,48 @@ export default {
      */
     hasMultipleSourceFiles: function () {
       return this.packageSourceFiles.length > 1 ? true : false;
+    },
+
+    /**
+     * Malware-scan verdict for this package, derived from the source files
+     * already loaded for the sources table — no extra request.
+     *
+     * Packages are 1:1 with source files for anything uploaded through the
+     * current path; the aggregation only matters for legacy multi-source
+     * packages, where the worst verdict wins.
+     *
+     * @returns {Object|null} null when no source file carries a recognized
+     *   status, so the row is omitted rather than showing a placeholder
+     */
+    scanStatusDisplay: function () {
+      const sources = Array.isArray(this.packageSourceFiles)
+        ? this.packageSourceFiles
+        : [];
+      const info = aggregateScanStatus(sources);
+
+      if (!info) {
+        return null;
+      }
+
+      return getScanStatusDisplay(info.status, {
+        skipReason: info.skipReason,
+        engine: info.engine,
+        scannedAtLabel: info.scannedAt ? this.formatDate(info.scannedAt) : "",
+      });
+    },
+
+    /**
+     * Only infected / failed warrant interrupting the user with a banner —
+     * they are also the only statuses the API refuses to issue a download
+     * URL for.
+     * @returns {Boolean}
+     */
+    showScanBanner: function () {
+      return (
+        !!this.scanStatusDisplay &&
+        (this.scanStatusDisplay.severity === "danger" ||
+          this.scanStatusDisplay.severity === "warning")
+      );
     },
 
     /**
@@ -2938,6 +3018,62 @@ export default {
 @use "../../../../styles/element/dialog";
 @use "../../../../styles/spacing";
 
+
+// Status and its detail read as one sentence on this page, which has the
+// width for it. The narrow browser sidebar stacks them instead.
+.scan-status {
+  display: inline;
+}
+
+.scan-headline {
+  font-weight: 400;
+}
+
+.scan-secondary {
+  color: theme.$gray_4;
+}
+
+.scan-ok .scan-headline {
+  color: theme.$green_1;
+}
+
+.scan-muted .scan-headline {
+  color: theme.$gray_5;
+}
+
+.scan-warning .scan-headline {
+  color: theme.$status_yellow;
+}
+
+// The only status worth extra emphasis — it also blocks download.
+.scan-danger .scan-headline {
+  color: theme.$red_1;
+  font-weight: 600;
+}
+
+.scan-banner {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 16px;
+  margin-bottom: 16px;
+  border-radius: 4px;
+  border-left: 4px solid transparent;
+  font-size: 13px;
+  line-height: 1.4;
+
+  &--danger {
+    background: rgba(theme.$red_1, 0.08);
+    border-left-color: theme.$red_1;
+    color: theme.$red_1;
+  }
+
+  &--warning {
+    background: rgba(theme.$status_yellow, 0.1);
+    border-left-color: theme.$status_yellow;
+    color: theme.$gray_5;
+  }
+}
 
 #file-name-header {
   font-size: 20px;
