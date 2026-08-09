@@ -19,6 +19,31 @@
           <div class="info-label">Kind</div>
           <div class="info-value">{{ getFileInfo.Kind }}</div>
         </div>
+        <div v-if="scanStatusDisplay" class="info-field">
+          <div class="info-label">Virus Scan</div>
+          <div class="info-value scan-status" :class="`scan-${scanStatusDisplay.severity}`">
+            <span class="scan-headline">
+              <IconDoneCheckCircle
+                v-if="scanStatusDisplay.icon === 'check'"
+                class="scan-icon"
+                :width="14"
+                :height="14"
+              />
+              <IconWarningCircle
+                v-else-if="scanStatusDisplay.icon === 'warning'"
+                class="scan-icon"
+                :width="14"
+                :height="14"
+              />
+              <span v-else class="scan-icon scan-icon-dash">&ndash;</span>
+              <span>{{ scanStatusDisplay.label }}</span>
+            </span>
+            <span v-if="scanStatusDetail" class="scan-detail">{{ scanStatusDetail }}</span>
+            <span v-if="scanStatusDisplay.secondary" class="scan-secondary">
+              {{ scanStatusDisplay.secondary }}
+            </span>
+          </div>
+        </div>
         <div class="info-field">
           <div class="info-label">Created</div>
           <div class="info-value">{{ getFileInfo.CreatedAt }}</div>
@@ -103,19 +128,33 @@ import EventBus from "../../../../utils/event-bus";
 import { mapGetters, mapActions, mapState } from "vuex";
 import BfStorageMetrics from "../../../../mixins/bf-storage-metrics";
 import FormatDate from "../../../../mixins/format-date";
-import { compose, map, join, prepend, reverse } from "ramda";
+import { compose, map, join, prepend, reverse, pathOr } from "ramda";
 import IconAnnotation from "../../../icons/IconAnnotation.vue";
 import IconInfo from "../../../icons/IconInfo.vue";
 import IconCopyDocument from "../../../icons/IconCopyDocument.vue";
+import IconDoneCheckCircle from "../../../icons/IconDoneCheckCircle.vue";
+import IconWarningCircle from "../../../icons/IconWarningCircle.vue";
 import { copyText } from "vue3-clipboard";
 import { ref } from "vue";
 import { useMetadataStore } from "../../../../stores/metadataStore";
 import { useRecordKeyProperties } from "../../../../composables/useRecordKeyProperties";
+import { useGetToken } from "@/composables/useGetToken";
+import { useSendXhr } from "@/mixins/request/request_composable";
+import {
+  aggregateScanStatus,
+  getScanStatusDisplay,
+} from "../../../../utils/scan-status";
 
 export default {
   name: "FileMetadataInfo",
 
-  components: { IconInfo, IconAnnotation, IconCopyDocument },
+  components: {
+    IconInfo,
+    IconAnnotation,
+    IconCopyDocument,
+    IconDoneCheckCircle,
+    IconWarningCircle,
+  },
 
   mixins: [BfStorageMetrics, FormatDate],
 
@@ -148,11 +187,43 @@ export default {
     return {
       connectedRecords: [],
       loadingRecords: false,
+      scanInfo: null,
+      scanSourceCount: 0,
     };
   },
 
   computed: {
     ...mapGetters(["dataset"]),
+    ...mapState(["config"]),
+
+    /**
+     * Renderable scan status for the selected package, or null when there is
+     * nothing meaningful to show (folder selected, multi-select, or an API
+     * that predates scanStatus on FileContent).
+     */
+    scanStatusDisplay: function () {
+      if (!this.singleFileSelected || !this.scanInfo) {
+        return null;
+      }
+      return getScanStatusDisplay(this.scanInfo.status, {
+        skipReason: this.scanInfo.skipReason,
+        engine: this.scanInfo.engine,
+        scannedAtLabel: this.scanInfo.scannedAt
+          ? this.formatDate(this.scanInfo.scannedAt)
+          : "",
+      });
+    },
+
+    /**
+     * For multi-file packages the row reports the worst status across the
+     * sources, so say how many files that covers.
+     */
+    scanStatusDetail: function () {
+      if (!this.scanStatusDisplay || this.scanSourceCount <= 1) {
+        return "";
+      }
+      return `Worst status across ${this.scanSourceCount} files in this package.`;
+    },
 
     fileLocation: function () {
       const ancestors = this.folder.ancestors;
@@ -301,6 +372,7 @@ export default {
       } else if (newSelectedFiles.length == 0) {
         this.fetchConnectedRecords(this.folder.content.id);
       }
+      this.fetchScanStatus(newSelectedFiles);
     },
   },
 
@@ -309,6 +381,58 @@ export default {
   unmounted: function () {},
 
   methods: {
+
+    /**
+     * Fetch the virus-scan status for the selected package.
+     *
+     * scan_status lives on individual source files, not on the package, so
+     * this pulls the package's sources and reduces them worst-wins. Only
+     * runs for a single selected non-folder package — the sidebar is the one
+     * place in the browser where a per-package fetch is cheap enough to be
+     * worth it.
+     *
+     * @param {Array} selection - the current selectedFiles
+     */
+    async fetchScanStatus(selection = []) {
+      this.scanInfo = null;
+      this.scanSourceCount = 0;
+
+      if (selection.length !== 1) {
+        return;
+      }
+
+      const file = selection[0];
+      const packageId = pathOr("", ["content", "id"], file);
+      const packageType = pathOr("", ["content", "packageType"], file);
+
+      if (!packageId || packageType === "Collection") {
+        return;
+      }
+
+      try {
+        const token = await useGetToken();
+        const url = `${this.config.apiUrl}/packages/${packageId}?include=sources&includeAncestors=false&api_key=${token}`;
+        const response = await useSendXhr(url);
+
+        // Guard against a slower response for a package the user has since
+        // navigated away from.
+        const stillSelected =
+          this.selectedFiles.length === 1 &&
+          pathOr("", ["content", "id"], this.selectedFiles[0]) === packageId;
+        if (!stillSelected) {
+          return;
+        }
+
+        const sources = pathOr([], ["objects", "source"], response);
+        this.scanSourceCount = sources.length;
+        this.scanInfo = aggregateScanStatus(sources);
+      } catch (error) {
+        // A missing scan status is not worth interrupting the user for — the
+        // row simply doesn't render.
+        this.scanInfo = null;
+        this.scanSourceCount = 0;
+      }
+    },
 
     /**
      * Fetch connected records for a package
@@ -562,6 +686,12 @@ export default {
     word-break: break-all;
   }
 
+  &.scan-status {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
   &.info-id {
     display: flex;
     align-items: center;
@@ -577,6 +707,46 @@ export default {
       min-width: 0;
     }
   }
+}
+
+.scan-headline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.scan-icon {
+  flex-shrink: 0;
+}
+
+.scan-icon-dash {
+  width: 14px;
+  text-align: center;
+  color: theme.$gray_4;
+}
+
+.scan-detail,
+.scan-secondary {
+  font-size: 12px;
+  color: theme.$gray_4;
+  line-height: 1.4;
+}
+
+.scan-ok .scan-headline {
+  color: theme.$green_1;
+}
+
+.scan-muted .scan-headline {
+  color: theme.$gray_5;
+}
+
+.scan-warning .scan-headline {
+  color: theme.$status_yellow;
+}
+
+.scan-danger .scan-headline {
+  color: theme.$red_1;
+  font-weight: 600;
 }
 
 .copy-btn {
