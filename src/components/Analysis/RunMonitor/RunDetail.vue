@@ -22,6 +22,11 @@ import { useGetToken } from "@/composables/useGetToken";
 import { useSendXhr } from "@/mixins/request/request_composable";
 import toQueryParams from "@/utils/toQueryParams";
 import LayerNameSelector from "./LayerNameSelector.vue";
+
+const ASSET_TYPE_OPTIONS = ["timeseries-zarr","ome-zarr", "thumb"];
+const ASSET_TYPE_CUSTOM = "__custom__";
+const customAssetTypeNodes = reactive(new Set());
+
 import {
   statusClass,
   statusBorderColor,
@@ -1700,6 +1705,49 @@ onUnmounted(() => {
                         :value="v"
                       />
                     </el-select>
+                    <template v-else-if="param.name === 'ASSET_TYPE'">
+                      <el-select
+                        :model-value="
+                          ASSET_TYPE_OPTIONS.includes(param.value) || (!param.value && !customAssetTypeNodes.has(selectedNode.id))
+                            ? (param.value ?? '')
+                            : ASSET_TYPE_CUSTOM
+                        "
+                        size="small"
+                        placeholder="Select asset type..."
+                        clearable
+                        style="width: 100%"
+                        @update:model-value="
+                          (val) => {
+                            if (val === ASSET_TYPE_CUSTOM) {
+                              customAssetTypeNodes.add(selectedNode.id);
+                              param.value = '';
+                            } else {
+                              customAssetTypeNodes.delete(selectedNode.id);
+                              param.value = val;
+                            }
+                          }
+                        "
+                      >
+                        <el-option
+                          v-for="v in ASSET_TYPE_OPTIONS"
+                          :key="v"
+                          :label="v"
+                          :value="v"
+                        />
+                        <el-option
+                          :key="ASSET_TYPE_CUSTOM"
+                          label="Other (custom)"
+                          :value="ASSET_TYPE_CUSTOM"
+                        />
+                      </el-select>
+                      <el-input
+                        v-if="customAssetTypeNodes.has(selectedNode.id) || (param.value && !ASSET_TYPE_OPTIONS.includes(param.value))"
+                        v-model="param.value"
+                        size="small"
+                        placeholder="Enter custom asset type..."
+                        style="margin-top: 4px"
+                      />
+                    </template>
                     <el-input
                       v-else
                       v-model="param.value"
@@ -1791,6 +1839,49 @@ onUnmounted(() => {
                       v-model="param.value"
                       :compute-node-id="initiateForm.computeNodeId"
                     />
+                    <template v-else-if="param.name === 'ASSET_TYPE'">
+                      <el-select
+                        :model-value="
+                          ASSET_TYPE_OPTIONS.includes(param.value) || (!param.value && !customAssetTypeNodes.has(selectedNode.id))
+                            ? (param.value ?? '')
+                            : ASSET_TYPE_CUSTOM
+                        "
+                        size="small"
+                        placeholder="Select asset type..."
+                        clearable
+                        style="width: 100%"
+                        @update:model-value="
+                          (val) => {
+                            if (val === ASSET_TYPE_CUSTOM) {
+                              customAssetTypeNodes.add(selectedNode.id);
+                              param.value = '';
+                            } else {
+                              customAssetTypeNodes.delete(selectedNode.id);
+                              param.value = val;
+                            }
+                          }
+                        "
+                      >
+                        <el-option
+                          v-for="v in ASSET_TYPE_OPTIONS"
+                          :key="v"
+                          :label="v"
+                          :value="v"
+                        />
+                        <el-option
+                          :key="ASSET_TYPE_CUSTOM"
+                          label="Other (custom)"
+                          :value="ASSET_TYPE_CUSTOM"
+                        />
+                      </el-select>
+                      <el-input
+                        v-if="customAssetTypeNodes.has(selectedNode.id) || (param.value && !ASSET_TYPE_OPTIONS.includes(param.value))"
+                        v-model="param.value"
+                        size="small"
+                        placeholder="Enter custom asset type..."
+                        style="margin-top: 4px"
+                      />
+                    </template>
                     <el-input
                       v-else
                       v-model="param.value"
