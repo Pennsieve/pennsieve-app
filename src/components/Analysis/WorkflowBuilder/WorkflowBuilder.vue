@@ -9,7 +9,7 @@ import { useVueFlow, VueFlow, Handle, Position } from "@vue-flow/core";
 import { Background } from "@vue-flow/background";
 import { Controls } from "@vue-flow/controls";
 import dagre from "@dagrejs/dagre";
-import { ElMessageBox } from "element-plus";
+import { ElMessage, ElMessageBox } from "element-plus";
 import EventBus from "../../../utils/event-bus";
 import IconFile from "../../icons/IconFile.vue";
 import IconCollection from "../../icons/IconCollection.vue";
@@ -26,6 +26,11 @@ import {
 } from "../RunMonitor/runHelpers";
 import BfButton from "../../shared/bf-button/BfButton.vue";
 import MetricsDashboard from "../Metrics/MetricsDashboard.vue";
+import {
+  toParamSchema,
+  validateAppConnection,
+} from "../Applications/applicationSchema";
+import { useAppManifest } from "@/composables/useAppManifest";
 
 const { onNodeClick, onPaneClick, onConnect, screenToFlowCoordinate, fitView } =
   useVueFlow();
@@ -267,6 +272,58 @@ const getComputeTypesForTarget = (targetType) => {
 const getComputeTypesForApplication = (application) => {
   const types = application?.runtimeConfig?.computeTypes;
   return types && types.length ? withGpu(types) : DEFAULT_COMPUTE_TYPES;
+};
+
+/*
+  app.yml defaults
+  ----------------
+  An application dropped on the canvas comes from the applications *list*, which
+  carries no `assets` — so the manifest has to be fetched per application. The
+  node is created immediately on its existing defaults and patched in place when
+  the manifest arrives; the user is never blocked on the request.
+
+  Only fields the user has not already set are touched, and only compute types
+  the builder actually offers are applied.
+*/
+const { loadManifest } = useAppManifest();
+
+const applyManifestDefaults = async (nodeId, application) => {
+  const uuid = application?.uuid;
+  if (!uuid) return;
+
+  const parsed = await loadManifest(uuid);
+  if (!parsed) return;
+
+  // The node may have been deleted while the request was in flight.
+  const node = nodes.value.find((n) => n.id === nodeId);
+  if (!node) return;
+
+  const { schema } = parsed;
+
+  // computeType — first declared type that the builder actually supports.
+  const declared = schema.runtime?.computeTypes || [];
+  const supported = declared.find((t) => DEFAULT_COMPUTE_TYPES.includes(t));
+  if (supported) node.data.computeType = supported;
+
+  // cpu / memory — only when the manifest declares them and the node has none.
+  if (!node.data.cpu && schema.resources?.cpu != null) {
+    node.data.cpu = String(schema.resources.cpu);
+  }
+  if (!node.data.memory && schema.resources?.memory != null) {
+    node.data.memory = String(schema.resources.memory);
+  }
+
+  // Parameters — feeds both the parameter list and its editable defaults.
+  const paramSchema = toParamSchema(schema.parameters);
+  if (paramSchema.length) node.data.paramSchema = paramSchema;
+
+  // Ports, kept on the node so connection checks stay synchronous.
+  node.data.manifestPorts = {
+    inputs: schema.inputs || [],
+    outputs: schema.outputs || [],
+  };
+
+  node.data.hasManifest = true;
 };
 
 const getTargetTypeParams = (targetType) => {
@@ -743,14 +800,20 @@ const onDrop = (event) => {
         cpu: "",
         memory: "",
         defaultParams: {},
+        paramSchema: [],
+        hasManifest: false,
         tag: latestVersion(draggedApp.value)?.version || "",
       },
       position,
     };
   }
 
+  const droppedApp = draggedApp.value;
+
   if (newNode) {
     nodes.value.push(newNode);
+    // Fire-and-forget: patches the node in place once app.yml is read.
+    if (droppedApp) applyManifestDefaults(newNode.id, droppedApp);
   }
 
   draggedApp.value = null;
@@ -776,6 +839,8 @@ onConnect((params) => {
   if (duplicate) return;
 
   const srcNode = nodes.value.find((n) => n.id === params.source);
+  const tgtNode = nodes.value.find((n) => n.id === params.target);
+
   edges.value.push({
     id: `e${params.source}-${params.target}`,
     source: params.source,
@@ -783,7 +848,37 @@ onConnect((params) => {
     animated: false,
     style: { stroke: nodeTypeColor(srcNode?.type) },
   });
+
+  warnOnIncompatibleConnection(srcNode, tgtNode);
 });
+
+/*
+  Connection validation
+  ---------------------
+  Both applications must declare their ports in app.yml for this to say
+  anything: without a manifest we have no port information and stay silent
+  rather than guessing. The connection is always made — per the ticket, a
+  mismatch is a warning the user can proceed past, not a block.
+*/
+const warnOnIncompatibleConnection = (srcNode, tgtNode) => {
+  const source = srcNode?.data?.manifestPorts;
+  const target = tgtNode?.data?.manifestPorts;
+  if (!source || !target) return;
+
+  const { compatible, unmetInputs } = validateAppConnection(source, target);
+  if (compatible) return;
+
+  const names = unmetInputs.map((i) => i.name).filter(Boolean).join(", ");
+  ElMessage({
+    type: "warning",
+    duration: 6000,
+    showClose: true,
+    message:
+      `${tgtNode.data.label} declares required input${unmetInputs.length > 1 ? "s" : ""}` +
+      `${names ? ` (${names})` : ""} that ${srcNode.data.label} does not produce. ` +
+      "The connection was made — check it before running.",
+  });
+};
 
 const removeNode = (nodeId) => {
   const nodeIndex = nodes.value.findIndex((n) => n.id === nodeId);
