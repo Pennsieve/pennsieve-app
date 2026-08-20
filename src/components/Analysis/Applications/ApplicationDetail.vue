@@ -3,7 +3,9 @@ import { computed, ref, watch } from "vue";
 import { useStore } from "vuex";
 import { marked } from "marked";
 import DOMPurify from "dompurify";
+import { load as loadYaml } from "js-yaml";
 
+import IconInfoSmall from "../../icons/IconInfoSmall.vue";
 import MetricsDashboard from "../Metrics/MetricsDashboard.vue";
 import AppPermissions from "../../user/code/AppPermissions.vue";
 import AppArchiveToggle from "../../user/code/AppArchiveToggle.vue";
@@ -216,6 +218,102 @@ const renderReadme = (markdown) => {
   readmeHtml.value = DOMPurify.sanitize(doc.body.innerHTML);
 };
 
+/*
+  app.yml manifest
+  ----------------
+  The detail endpoint returns recognized repository files in `assets`, keyed by
+  filename — `README.md` and, when the author has committed one, `app.yml`. The
+  manifest is optional: most applications don't have one, so every branch here
+  has to tolerate its absence.
+
+  We parse the YAML locally rather than through applicationSchema's
+  parseManifest() because the two disagree on shape — see the note on
+  manifestSummary below.
+*/
+const getManifestContent = (assets) => {
+  if (!assets) return "";
+  const key = Object.keys(assets).find((k) => /^app\.ya?ml$/i.test(k));
+  return key ? assets[key] : "";
+};
+
+const manifestRaw = computed(() => getManifestContent(detail.value?.assets));
+
+const hasManifest = computed(() => !!manifestRaw.value.trim());
+
+// Parse once; the panel reports both the success and the failure case so a
+// malformed manifest doesn't silently read as "no manifest".
+const manifestParsed = computed(() => {
+  if (!hasManifest.value) return { ok: false, data: null, error: "" };
+  try {
+    const data = loadYaml(manifestRaw.value);
+    if (!data || typeof data !== "object") {
+      return { ok: false, data: null, error: "Manifest is empty or not a YAML mapping" };
+    }
+    return { ok: true, data, error: "" };
+  } catch (err) {
+    return { ok: false, data: null, error: err?.reason || err?.message || "Could not parse YAML" };
+  }
+});
+
+/*
+  Summarize the manifest for display.
+
+  Two manifest shapes exist in the wild and this reads both:
+    - the shape the backend serves, nesting metadata under `application` and
+      putting cpu/memory on `runtime`
+    - the flatter shape AppManifestBuilder emits (top-level `name`/`description`,
+      cpu/memory under `resources`)
+  Fields absent from a given shape simply come back null and are not rendered.
+*/
+const manifestSummary = computed(() => {
+  const m = manifestParsed.value.data;
+  if (!m) return null;
+  const app = m.application && typeof m.application === "object" ? m.application : {};
+  const runtime = m.runtime && typeof m.runtime === "object" ? m.runtime : {};
+  const resources = m.resources && typeof m.resources === "object" ? m.resources : {};
+  const countOf = (v) => (Array.isArray(v) ? v.length : 0);
+  const cpu = runtime.cpu ?? resources.cpu ?? null;
+  const memory = runtime.memory ?? resources.memory ?? null;
+  return {
+    schemaVersion: m.schemaVersion ?? null,
+    type: app.type || m.applicationType || null,
+    version: app.version || null,
+    compute: cpu != null || memory != null
+      ? [cpu != null ? `${cpu} CPU` : null, memory != null ? `${memory} MB` : null]
+          .filter(Boolean)
+          .join(" · ")
+      : null,
+    parameters: countOf(m.parameters),
+    inputs: countOf(m.inputs),
+    outputs: countOf(m.outputs),
+  };
+});
+
+const manifestTooltip = computed(() => {
+  if (manifestParsed.value.ok) {
+    return (
+      "app.yml is the manifest committed to the root of this repository. It " +
+      "declares the application's runtime, compute resources, run parameters, " +
+      "and input/output ports. Pennsieve read it from the repository and is " +
+      "using it to configure this application."
+    );
+  }
+  if (hasManifest.value) {
+    return (
+      "This repository has an app.yml, but Pennsieve could not parse it, so the " +
+      "application falls back to defaults. Fix the YAML and commit it, or " +
+      "regenerate the file with the manifest builder."
+    );
+  }
+  return (
+    "app.yml is an optional manifest file committed to the root of your " +
+    "repository. It declares the application's runtime, compute resources, run " +
+    "parameters, and input/output ports so Pennsieve can configure runs without " +
+    "manual setup. Without one, this application falls back to defaults. " +
+    "Generate a manifest with the builder, then commit it to your repository."
+  );
+});
+
 // Members and teams power friendly-name resolution for the owner badge.
 // They are not always preloaded when navigating directly to this page;
 // fall back to fetching them here.
@@ -418,6 +516,97 @@ watch(
                   {{ detail.sourceUrl }}
                 </a>
               </div>
+            </div>
+
+            <!-- app.yml manifest -->
+            <div class="manifest-card">
+              <div class="manifest-header">
+                <span class="info-label manifest-title">Manifest</span>
+                <el-tooltip
+                  :content="manifestTooltip"
+                  placement="left"
+                  effect="dark"
+                  popper-class="manifest-tooltip"
+                >
+                  <span class="manifest-info-icon">
+                    <IconInfoSmall :width="16" :height="16" color="#9ca3af" />
+                  </span>
+                </el-tooltip>
+              </div>
+
+              <!-- Present and parsed -->
+              <template v-if="manifestParsed.ok">
+                <div class="manifest-status manifest-status-ok">
+                  <span class="manifest-dot" />
+                  <span class="manifest-filename">app.yml</span>
+                  <span class="manifest-status-text">Read successfully</span>
+                </div>
+                <div v-if="manifestSummary" class="manifest-summary">
+                  <div v-if="manifestSummary.type" class="manifest-summary-row">
+                    <span class="manifest-summary-label">Type</span>
+                    <span class="manifest-summary-value">{{ manifestSummary.type }}</span>
+                  </div>
+                  <div v-if="manifestSummary.version" class="manifest-summary-row">
+                    <span class="manifest-summary-label">Version</span>
+                    <span class="manifest-summary-value">{{ manifestSummary.version }}</span>
+                  </div>
+                  <div v-if="manifestSummary.compute" class="manifest-summary-row">
+                    <span class="manifest-summary-label">Resources</span>
+                    <span class="manifest-summary-value">{{ manifestSummary.compute }}</span>
+                  </div>
+                  <div class="manifest-summary-row">
+                    <span class="manifest-summary-label">Parameters</span>
+                    <span class="manifest-summary-value">{{ manifestSummary.parameters }}</span>
+                  </div>
+                  <div class="manifest-summary-row">
+                    <span class="manifest-summary-label">Inputs / Outputs</span>
+                    <span class="manifest-summary-value">
+                      {{ manifestSummary.inputs }} / {{ manifestSummary.outputs }}
+                    </span>
+                  </div>
+                </div>
+              </template>
+
+              <!-- Present but malformed -->
+              <template v-else-if="hasManifest">
+                <div class="manifest-status manifest-status-error">
+                  <span class="manifest-dot" />
+                  <span class="manifest-filename">app.yml</span>
+                  <span class="manifest-status-text">Could not be read</span>
+                </div>
+                <p class="manifest-error-detail">{{ manifestParsed.error }}</p>
+                <router-link
+                  :to="{ name: 'application-manifest-builder' }"
+                  class="manifest-cta"
+                >
+                  Rebuild with the manifest builder
+                </router-link>
+              </template>
+
+              <!-- Absent -->
+              <template v-else>
+                <div class="manifest-status manifest-status-none">
+                  <span class="manifest-dot" />
+                  <span class="manifest-status-text">No app.yml in this repository</span>
+                </div>
+                <p class="manifest-empty-copy">
+                  This application runs on defaults. Add an
+                  <code>app.yml</code> to declare its runtime, resources,
+                  parameters, and inputs/outputs.
+                </p>
+                <router-link
+                  :to="{ name: 'application-manifest-builder' }"
+                  class="manifest-cta manifest-cta-primary"
+                >
+                  Generate an app.yml
+                </router-link>
+                <router-link
+                  :to="{ name: 'application-manifest-guide' }"
+                  class="manifest-cta-secondary"
+                >
+                  Read the manifest guide
+                </router-link>
+              </template>
             </div>
 
             <div class="info-actions archive-actions">
@@ -847,6 +1036,159 @@ watch(
   }
 }
 
+/* app.yml manifest card */
+.manifest-card {
+  background: theme.$gray_1;
+  border: 1px solid theme.$gray_2;
+  padding: 12px;
+  margin-bottom: 12px;
+}
+
+.manifest-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.manifest-title {
+  min-width: 0;
+}
+
+.manifest-info-icon {
+  display: inline-flex;
+  align-items: center;
+  cursor: help;
+}
+
+.manifest-status {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-size: 12px;
+}
+
+.manifest-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.manifest-status-ok .manifest-dot {
+  background: #29b355;
+}
+
+.manifest-status-error .manifest-dot {
+  background: #e94b4b;
+}
+
+.manifest-status-none .manifest-dot {
+  background: theme.$gray_4;
+}
+
+.manifest-filename {
+  font-family: monospace;
+  font-size: 11px;
+  color: theme.$black;
+}
+
+.manifest-status-text {
+  color: theme.$gray_5;
+}
+
+.manifest-summary {
+  margin-top: 8px;
+  border-top: 1px solid theme.$gray_2;
+  padding-top: 6px;
+}
+
+.manifest-summary-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 3px 0;
+}
+
+.manifest-summary-label {
+  font-size: 11px;
+  color: theme.$gray_5;
+  flex-shrink: 0;
+}
+
+.manifest-summary-value {
+  font-size: 11px;
+  color: theme.$black;
+  text-align: right;
+  word-break: break-word;
+  text-transform: capitalize;
+}
+
+.manifest-error-detail {
+  margin: 6px 0 0;
+  font-size: 11px;
+  font-family: monospace;
+  color: #b3261e;
+  word-break: break-word;
+}
+
+.manifest-empty-copy {
+  margin: 6px 0 10px;
+  font-size: 11px;
+  line-height: 1.5;
+  color: theme.$gray_5;
+
+  code {
+    font-family: monospace;
+    font-size: 10px;
+    background: theme.$gray_2;
+    padding: 1px 4px;
+  }
+}
+
+.manifest-cta {
+  display: inline-block;
+  margin-top: 8px;
+  font-size: 12px;
+  color: theme.$purple_3;
+  text-decoration: none;
+
+  &:hover {
+    text-decoration: underline;
+  }
+}
+
+.manifest-cta-primary {
+  display: block;
+  margin-top: 0;
+  padding: 6px 12px;
+  background: theme.$purple_3;
+  color: theme.$white;
+  text-align: center;
+  font-weight: 500;
+
+  &:hover {
+    background: theme.$purple_2;
+    text-decoration: none;
+  }
+}
+
+.manifest-cta-secondary {
+  display: block;
+  margin-top: 8px;
+  font-size: 11px;
+  text-align: center;
+  color: theme.$gray_5;
+  text-decoration: none;
+
+  &:hover {
+    text-decoration: underline;
+  }
+}
+
 .info-actions {
   display: flex;
   flex-direction: column;
@@ -976,5 +1318,16 @@ watch(
   justify-content: center;
   margin-top: 12px;
   --el-pagination-hover-color: #{theme.$purple_3};
+}
+</style>
+
+<!--
+  The manifest tooltip is teleported outside this component, so its width has to
+  be set from an unscoped block.
+-->
+<style lang="scss">
+.manifest-tooltip.el-popper {
+  max-width: 320px;
+  line-height: 1.5;
 }
 </style>
