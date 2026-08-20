@@ -3,8 +3,11 @@ import { computed, ref, watch } from "vue";
 import { useStore } from "vuex";
 import { marked } from "marked";
 import DOMPurify from "dompurify";
+import { load as loadYaml } from "js-yaml";
 
+import IconInfoSmall from "../../icons/IconInfoSmall.vue";
 import MetricsDashboard from "../Metrics/MetricsDashboard.vue";
+import { parseManifest } from "./applicationSchema";
 import AppPermissions from "../../user/code/AppPermissions.vue";
 import AppArchiveToggle from "../../user/code/AppArchiveToggle.vue";
 import { useGetToken } from "@/composables/useGetToken";
@@ -216,6 +219,130 @@ const renderReadme = (markdown) => {
   readmeHtml.value = DOMPurify.sanitize(doc.body.innerHTML);
 };
 
+/*
+  app.yml manifest
+  ----------------
+  The detail endpoint returns recognized repository files in `assets`, keyed by
+  filename — `README.md` and, when the author has committed one, `app.yml`. The
+  manifest is optional: most applications don't have one, so every branch here
+  has to tolerate its absence.
+
+  Parsing goes through applicationSchema's parseManifest(), which reads both the
+  nested shape the backend serves and the flat shape the manifest builder emits.
+*/
+const getManifestContent = (assets) => {
+  if (!assets) return "";
+  const key = Object.keys(assets).find((k) => /^app\.ya?ml$/i.test(k));
+  return key ? assets[key] : "";
+};
+
+const manifestRaw = computed(() => getManifestContent(detail.value?.assets));
+
+const hasManifest = computed(() => !!manifestRaw.value.trim());
+
+/*
+  Parse once. We load the YAML here rather than handing the raw text straight to
+  parseManifest() so that a file which is valid YAML but not a mapping (a bare
+  string, a list) is reported as malformed instead of quietly parsing to an
+  empty manifest.
+*/
+const manifestParsed = computed(() => {
+  const empty = { ok: false, meta: null, schema: null, error: "" };
+  if (!hasManifest.value) return empty;
+  try {
+    const doc = loadYaml(manifestRaw.value);
+    if (!doc || typeof doc !== "object" || Array.isArray(doc)) {
+      return { ...empty, error: "Manifest is empty or not a YAML mapping" };
+    }
+    const { meta, schema } = parseManifest(doc);
+    return { ok: true, meta, schema, error: "" };
+  } catch (err) {
+    return {
+      ...empty,
+      error: err?.reason || err?.message || "Could not parse YAML",
+    };
+  }
+});
+
+const manifestMeta = computed(() => manifestParsed.value.meta);
+const manifestSchema = computed(() => manifestParsed.value.schema);
+
+/** Compact figures for the sidebar card. */
+const manifestSummary = computed(() => {
+  const s = manifestSchema.value;
+  const m = manifestMeta.value;
+  if (!s || !m) return null;
+  const { cpu, memory } = s.resources || {};
+  return {
+    type: m.applicationType || null,
+    version: m.version || null,
+    compute:
+      cpu != null || memory != null
+        ? [cpu != null ? `${cpu} CPU` : null, memory != null ? `${memory} MB` : null]
+            .filter(Boolean)
+            .join(" · ")
+        : null,
+    parameters: (s.parameters || []).length,
+    inputs: (s.inputs || []).length,
+    outputs: (s.outputs || []).length,
+  };
+});
+
+/** Human-readable port descriptor: media types if present, else the dataType. */
+const portTypeLabel = (port) => {
+  if (port?.mediaTypes?.length) return port.mediaTypes.join(", ");
+  return port?.dataType || "any";
+};
+
+const computeTypeLabels = computed(() => {
+  const types = manifestSchema.value?.runtime?.computeTypes || [];
+  return types.map((t) => (t === "gpu" ? "GPU" : t.charAt(0).toUpperCase() + t.slice(1)));
+});
+
+const formatDefaultValue = (value) => {
+  if (value == null || value === "") return "—";
+  if (typeof value === "boolean") return value ? "true" : "false";
+  return String(value);
+};
+
+const manifestTooltip = computed(() => {
+  if (manifestParsed.value.ok) {
+    return (
+      "app.yml is the manifest committed to the root of this repository. It " +
+      "declares the application's runtime, compute resources, run parameters, " +
+      "and input/output ports. Pennsieve read it from the repository and is " +
+      "using it to configure this application."
+    );
+  }
+  if (hasManifest.value) {
+    return (
+      "This repository has an app.yml, but Pennsieve could not parse it, so the " +
+      "application falls back to defaults. Fix the YAML and commit it, or " +
+      "regenerate the file with the manifest builder."
+    );
+  }
+  return (
+    "app.yml is an optional manifest file committed to the root of your " +
+    "repository. It declares the application's runtime, compute resources, run " +
+    "parameters, and input/output ports so Pennsieve can configure runs without " +
+    "manual setup. Without one, this application falls back to defaults. " +
+    "Generate a manifest with the builder, then commit it to your repository."
+  );
+});
+
+/*
+  Main-panel tabs. The manifest tab only exists when there is something to show;
+  if the active tab disappears (navigating to an app without a manifest) fall
+  back to the README.
+*/
+const activeTab = ref("readme");
+const showRawManifest = ref(false);
+
+watch(hasManifest, (has) => {
+  if (!has && activeTab.value === "manifest") activeTab.value = "readme";
+});
+
+
 // Members and teams power friendly-name resolution for the owner badge.
 // They are not always preloaded when navigating directly to this page;
 // fall back to fetching them here.
@@ -336,7 +463,29 @@ watch(
         <!-- README Section -->
         <div class="readme-section">
           <div class="readme-header">
-            <span class="readme-title">README</span>
+            <div class="detail-tabs" role="tablist">
+              <button
+                type="button"
+                role="tab"
+                class="detail-tab"
+                :class="{ 'detail-tab-active': activeTab === 'readme' }"
+                :aria-selected="activeTab === 'readme'"
+                @click="activeTab = 'readme'"
+              >
+                README
+              </button>
+              <button
+                v-if="hasManifest"
+                type="button"
+                role="tab"
+                class="detail-tab"
+                :class="{ 'detail-tab-active': activeTab === 'manifest' }"
+                :aria-selected="activeTab === 'manifest'"
+                @click="activeTab = 'manifest'"
+              >
+                app.yml
+              </button>
+            </div>
             <el-tooltip
               v-if="githubRepoUrl"
               :content="canViewOnGitHub ? '' : 'This repo is private. Request permission from repo owner to view on Github.'"
@@ -363,22 +512,234 @@ watch(
               </span>
             </el-tooltip>
           </div>
-          <div v-if="isPrivateRepo" class="readme-empty readme-private">
-            <p>README preview isn't available for private repositories.</p>
-            <a
-              v-if="githubRepoUrl"
-              :href="githubRepoUrl"
-              target="_blank"
-              rel="noopener noreferrer"
-              class="readme-github-link"
-            >
-              View README on GitHub
-            </a>
-          </div>
-          <div v-else-if="!readmeHtml" class="readme-empty">
-            No README available
-          </div>
-          <div v-else class="readme-content" v-html="readmeHtml" />
+          <!-- README tab -->
+          <template v-if="activeTab === 'readme'">
+            <div v-if="isPrivateRepo" class="readme-empty readme-private">
+              <p>README preview isn't available for private repositories.</p>
+              <a
+                v-if="githubRepoUrl"
+                :href="githubRepoUrl"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="readme-github-link"
+              >
+                View README on GitHub
+              </a>
+            </div>
+            <div v-else-if="!readmeHtml" class="readme-empty">
+              No README available
+            </div>
+            <div v-else class="readme-content" v-html="readmeHtml" />
+          </template>
+
+          <!-- app.yml tab -->
+          <template v-else>
+            <div v-if="!manifestParsed.ok" class="readme-empty">
+              <p>This app.yml could not be read.</p>
+              <p class="manifest-error-detail">{{ manifestParsed.error }}</p>
+            </div>
+            <div v-else class="manifest-detail">
+              <!-- Overview -->
+              <section class="manifest-block">
+                <h4 class="manifest-block-title">Overview</h4>
+                <div class="manifest-grid">
+                  <div v-if="manifestMeta.name" class="manifest-field">
+                    <span class="manifest-field-label">Name</span>
+                    <span class="manifest-field-value">{{ manifestMeta.name }}</span>
+                  </div>
+                  <div v-if="manifestMeta.version" class="manifest-field">
+                    <span class="manifest-field-label">Version</span>
+                    <span class="manifest-field-value">{{ manifestMeta.version }}</span>
+                  </div>
+                  <div class="manifest-field">
+                    <span class="manifest-field-label">Type</span>
+                    <span class="manifest-field-value">{{ manifestMeta.applicationType }}</span>
+                  </div>
+                  <div v-if="manifestMeta.schemaVersion" class="manifest-field">
+                    <span class="manifest-field-label">Schema version</span>
+                    <span class="manifest-field-value">{{ manifestMeta.schemaVersion }}</span>
+                  </div>
+                </div>
+                <p v-if="manifestMeta.description" class="manifest-description">
+                  {{ manifestMeta.description }}
+                </p>
+                <div v-if="manifestSchema.tags.length" class="manifest-chips">
+                  <span
+                    v-for="tag in manifestSchema.tags"
+                    :key="tag"
+                    class="manifest-chip"
+                  >
+                    {{ tag }}
+                  </span>
+                </div>
+              </section>
+
+              <!-- Runtime -->
+              <section class="manifest-block">
+                <h4 class="manifest-block-title">Runtime</h4>
+                <div class="manifest-grid">
+                  <div class="manifest-field">
+                    <span class="manifest-field-label">Compute types</span>
+                    <span class="manifest-field-value">
+                      {{ computeTypeLabels.join(", ") || "—" }}
+                    </span>
+                  </div>
+                  <div v-if="manifestSchema.resources.cpu != null" class="manifest-field">
+                    <span class="manifest-field-label">CPU</span>
+                    <span class="manifest-field-value">{{ manifestSchema.resources.cpu }}</span>
+                  </div>
+                  <div v-if="manifestSchema.resources.memory != null" class="manifest-field">
+                    <span class="manifest-field-label">Memory</span>
+                    <span class="manifest-field-value">
+                      {{ manifestSchema.resources.memory }} MB
+                    </span>
+                  </div>
+                  <div v-if="manifestMeta.timeoutSeconds != null" class="manifest-field">
+                    <span class="manifest-field-label">Timeout</span>
+                    <span class="manifest-field-value">
+                      {{ manifestMeta.timeoutSeconds }}s
+                    </span>
+                  </div>
+                  <div v-if="manifestSchema.runtime.gpu.enabled" class="manifest-field">
+                    <span class="manifest-field-label">GPU</span>
+                    <span class="manifest-field-value">
+                      {{ manifestSchema.runtime.gpu.count }}&times;
+                      {{ manifestSchema.runtime.gpu.type || "GPU" }}
+                    </span>
+                  </div>
+                </div>
+              </section>
+
+              <!-- Maintainers -->
+              <section v-if="manifestMeta.maintainers.length" class="manifest-block">
+                <h4 class="manifest-block-title">Maintainers</h4>
+                <ul class="manifest-list">
+                  <li
+                    v-for="(person, i) in manifestMeta.maintainers"
+                    :key="`${person.name}-${i}`"
+                    class="manifest-list-item"
+                  >
+                    <span class="manifest-field-value">{{ person.name }}</span>
+                    <a
+                      v-if="person.email"
+                      :href="`mailto:${person.email}`"
+                      class="manifest-link"
+                    >
+                      {{ person.email }}
+                    </a>
+                  </li>
+                </ul>
+              </section>
+
+              <!-- Parameters -->
+              <section v-if="manifestSchema.parameters.length" class="manifest-block">
+                <h4 class="manifest-block-title">
+                  Parameters ({{ manifestSchema.parameters.length }})
+                </h4>
+                <div class="manifest-table-scroll">
+                  <table class="manifest-table">
+                    <thead>
+                      <tr>
+                        <th>Name</th>
+                        <th>Type</th>
+                        <th>Default</th>
+                        <th>Allowed values</th>
+                        <th>Description</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr v-for="param in manifestSchema.parameters" :key="param.name">
+                        <td class="manifest-mono">{{ param.name }}</td>
+                        <td>{{ param.type }}</td>
+                        <td class="manifest-mono">
+                          {{ formatDefaultValue(param.defaultValue) }}
+                        </td>
+                        <td class="manifest-mono">
+                          {{ param.allowedValues.length ? param.allowedValues.join(", ") : "—" }}
+                        </td>
+                        <td>{{ param.description || "—" }}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </section>
+
+              <!-- Inputs / Outputs -->
+              <section
+                v-if="manifestSchema.inputs.length || manifestSchema.outputs.length"
+                class="manifest-block"
+              >
+                <h4 class="manifest-block-title">Inputs &amp; outputs</h4>
+                <div class="manifest-ports">
+                  <div class="manifest-port-column">
+                    <span class="manifest-port-heading">
+                      Inputs ({{ manifestSchema.inputs.length }})
+                    </span>
+                    <div v-if="!manifestSchema.inputs.length" class="manifest-port-empty">
+                      None declared
+                    </div>
+                    <div
+                      v-for="port in manifestSchema.inputs"
+                      :key="`in-${port.name}`"
+                      class="manifest-port"
+                    >
+                      <div class="manifest-port-name">
+                        <span class="manifest-mono">{{ port.name }}</span>
+                        <span v-if="port.required" class="manifest-required">required</span>
+                      </div>
+                      <div class="manifest-port-meta">
+                        {{ portTypeLabel(port) }}
+                        <template v-if="port.cardinality">
+                          &middot; {{ port.cardinality }}
+                        </template>
+                      </div>
+                      <div v-if="port.description" class="manifest-port-desc">
+                        {{ port.description }}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="manifest-port-column">
+                    <span class="manifest-port-heading">
+                      Outputs ({{ manifestSchema.outputs.length }})
+                    </span>
+                    <div v-if="!manifestSchema.outputs.length" class="manifest-port-empty">
+                      None declared
+                    </div>
+                    <div
+                      v-for="port in manifestSchema.outputs"
+                      :key="`out-${port.name}`"
+                      class="manifest-port"
+                    >
+                      <div class="manifest-port-name">
+                        <span class="manifest-mono">{{ port.name }}</span>
+                      </div>
+                      <div class="manifest-port-meta">
+                        {{ portTypeLabel(port) }}
+                        <template v-if="port.cardinality">
+                          &middot; {{ port.cardinality }}
+                        </template>
+                      </div>
+                      <div v-if="port.description" class="manifest-port-desc">
+                        {{ port.description }}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              <!-- Raw file -->
+              <section class="manifest-block">
+                <div class="manifest-raw-header">
+                  <h4 class="manifest-block-title">Raw app.yml</h4>
+                  <button type="button" class="manifest-raw-toggle" @click="showRawManifest = !showRawManifest">
+                    {{ showRawManifest ? "Hide" : "Show" }}
+                  </button>
+                </div>
+                <pre v-if="showRawManifest" class="manifest-raw"><code>{{ manifestRaw }}</code></pre>
+              </section>
+            </div>
+          </template>
         </div>
       </div>
 
@@ -418,6 +779,97 @@ watch(
                   {{ detail.sourceUrl }}
                 </a>
               </div>
+            </div>
+
+            <!-- app.yml manifest -->
+            <div class="manifest-card">
+              <div class="manifest-header">
+                <span class="info-label manifest-title">Manifest</span>
+                <el-tooltip
+                  :content="manifestTooltip"
+                  placement="left"
+                  effect="dark"
+                  popper-class="manifest-tooltip"
+                >
+                  <span class="manifest-info-icon">
+                    <IconInfoSmall :width="16" :height="16" color="#9ca3af" />
+                  </span>
+                </el-tooltip>
+              </div>
+
+              <!-- Present and parsed -->
+              <template v-if="manifestParsed.ok">
+                <div class="manifest-status manifest-status-ok">
+                  <span class="manifest-dot" />
+                  <span class="manifest-filename">app.yml</span>
+                  <span class="manifest-status-text">Read successfully</span>
+                </div>
+                <div v-if="manifestSummary" class="manifest-summary">
+                  <div v-if="manifestSummary.type" class="manifest-summary-row">
+                    <span class="manifest-summary-label">Type</span>
+                    <span class="manifest-summary-value">{{ manifestSummary.type }}</span>
+                  </div>
+                  <div v-if="manifestSummary.version" class="manifest-summary-row">
+                    <span class="manifest-summary-label">Version</span>
+                    <span class="manifest-summary-value">{{ manifestSummary.version }}</span>
+                  </div>
+                  <div v-if="manifestSummary.compute" class="manifest-summary-row">
+                    <span class="manifest-summary-label">Resources</span>
+                    <span class="manifest-summary-value">{{ manifestSummary.compute }}</span>
+                  </div>
+                  <div class="manifest-summary-row">
+                    <span class="manifest-summary-label">Parameters</span>
+                    <span class="manifest-summary-value">{{ manifestSummary.parameters }}</span>
+                  </div>
+                  <div class="manifest-summary-row">
+                    <span class="manifest-summary-label">Inputs / Outputs</span>
+                    <span class="manifest-summary-value">
+                      {{ manifestSummary.inputs }} / {{ manifestSummary.outputs }}
+                    </span>
+                  </div>
+                </div>
+              </template>
+
+              <!-- Present but malformed -->
+              <template v-else-if="hasManifest">
+                <div class="manifest-status manifest-status-error">
+                  <span class="manifest-dot" />
+                  <span class="manifest-filename">app.yml</span>
+                  <span class="manifest-status-text">Could not be read</span>
+                </div>
+                <p class="manifest-error-detail">{{ manifestParsed.error }}</p>
+                <router-link
+                  :to="{ name: 'application-manifest-builder' }"
+                  class="manifest-cta"
+                >
+                  Rebuild with the manifest builder
+                </router-link>
+              </template>
+
+              <!-- Absent -->
+              <template v-else>
+                <div class="manifest-status manifest-status-none">
+                  <span class="manifest-dot" />
+                  <span class="manifest-status-text">No app.yml in this repository</span>
+                </div>
+                <p class="manifest-empty-copy">
+                  This application runs on defaults. Add an
+                  <code>app.yml</code> to declare its runtime, resources,
+                  parameters, and inputs/outputs.
+                </p>
+                <router-link
+                  :to="{ name: 'application-manifest-builder' }"
+                  class="manifest-cta manifest-cta-primary"
+                >
+                  Generate an app.yml
+                </router-link>
+                <router-link
+                  :to="{ name: 'application-manifest-guide' }"
+                  class="manifest-cta-secondary"
+                >
+                  Read the manifest guide
+                </router-link>
+              </template>
             </div>
 
             <div class="info-actions archive-actions">
@@ -847,6 +1299,394 @@ watch(
   }
 }
 
+/* Main-panel tabs */
+.detail-tabs {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.detail-tab {
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  padding: 4px 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: theme.$gray_5;
+  cursor: pointer;
+
+  &:hover {
+    color: theme.$purple_3;
+  }
+}
+
+.detail-tab-active {
+  color: theme.$purple_3;
+  border-bottom-color: theme.$purple_3;
+}
+
+/* app.yml tab body */
+.manifest-detail {
+  padding: 16px;
+  overflow-y: auto;
+}
+
+.manifest-block {
+  margin-bottom: 24px;
+
+  &:last-child {
+    margin-bottom: 0;
+  }
+}
+
+.manifest-block-title {
+  margin: 0 0 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: theme.$black;
+}
+
+.manifest-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 8px 16px;
+}
+
+.manifest-field {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.manifest-field-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: theme.$gray_5;
+}
+
+.manifest-field-value {
+  font-size: 13px;
+  color: theme.$black;
+  word-break: break-word;
+}
+
+.manifest-description {
+  margin: 10px 0 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: theme.$gray_5;
+}
+
+.manifest-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.manifest-chip {
+  font-size: 11px;
+  padding: 2px 8px;
+  background: theme.$gray_1;
+  border: 1px solid theme.$gray_2;
+  color: theme.$gray_5;
+}
+
+.manifest-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.manifest-list-item {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 3px 0;
+}
+
+.manifest-link {
+  font-size: 12px;
+  color: theme.$purple_3;
+  text-decoration: none;
+
+  &:hover {
+    text-decoration: underline;
+  }
+}
+
+.manifest-table-scroll {
+  overflow-x: auto;
+}
+
+.manifest-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+
+  th,
+  td {
+    text-align: left;
+    padding: 6px 10px;
+    border-bottom: 1px solid theme.$gray_2;
+    vertical-align: top;
+  }
+
+  th {
+    font-size: 11px;
+    font-weight: 600;
+    color: theme.$gray_5;
+    white-space: nowrap;
+    background: theme.$gray_1;
+  }
+}
+
+.manifest-mono {
+  font-family: monospace;
+  font-size: 11px;
+}
+
+.manifest-ports {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+}
+
+.manifest-port-column {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.manifest-port-heading {
+  font-size: 11px;
+  font-weight: 600;
+  color: theme.$gray_5;
+}
+
+.manifest-port {
+  border: 1px solid theme.$gray_2;
+  background: theme.$gray_1;
+  padding: 8px 10px;
+}
+
+.manifest-port-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.manifest-required {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: theme.$purple_3;
+}
+
+.manifest-port-meta {
+  margin-top: 2px;
+  font-size: 11px;
+  color: theme.$gray_5;
+  word-break: break-word;
+}
+
+.manifest-port-desc {
+  margin-top: 4px;
+  font-size: 12px;
+  color: theme.$gray_5;
+}
+
+.manifest-port-empty {
+  font-size: 12px;
+  color: theme.$gray_4;
+}
+
+.manifest-raw-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.manifest-raw-toggle {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 12px;
+  color: theme.$purple_3;
+  cursor: pointer;
+
+  &:hover {
+    text-decoration: underline;
+  }
+}
+
+.manifest-raw {
+  margin: 8px 0 0;
+  padding: 12px;
+  background: theme.$gray_1;
+  border: 1px solid theme.$gray_2;
+  overflow-x: auto;
+  font-family: monospace;
+  font-size: 11px;
+  line-height: 1.5;
+  white-space: pre;
+}
+
+/* app.yml manifest card */
+.manifest-card {
+  background: theme.$gray_1;
+  border: 1px solid theme.$gray_2;
+  padding: 12px;
+  margin-bottom: 12px;
+}
+
+.manifest-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.manifest-title {
+  min-width: 0;
+}
+
+.manifest-info-icon {
+  display: inline-flex;
+  align-items: center;
+  cursor: help;
+}
+
+.manifest-status {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-size: 12px;
+}
+
+.manifest-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.manifest-status-ok .manifest-dot {
+  background: #29b355;
+}
+
+.manifest-status-error .manifest-dot {
+  background: #e94b4b;
+}
+
+.manifest-status-none .manifest-dot {
+  background: theme.$gray_4;
+}
+
+.manifest-filename {
+  font-family: monospace;
+  font-size: 11px;
+  color: theme.$black;
+}
+
+.manifest-status-text {
+  color: theme.$gray_5;
+}
+
+.manifest-summary {
+  margin-top: 8px;
+  border-top: 1px solid theme.$gray_2;
+  padding-top: 6px;
+}
+
+.manifest-summary-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 3px 0;
+}
+
+.manifest-summary-label {
+  font-size: 11px;
+  color: theme.$gray_5;
+  flex-shrink: 0;
+}
+
+.manifest-summary-value {
+  font-size: 11px;
+  color: theme.$black;
+  text-align: right;
+  word-break: break-word;
+  text-transform: capitalize;
+}
+
+.manifest-error-detail {
+  margin: 6px 0 0;
+  font-size: 11px;
+  font-family: monospace;
+  color: #b3261e;
+  word-break: break-word;
+}
+
+.manifest-empty-copy {
+  margin: 6px 0 10px;
+  font-size: 11px;
+  line-height: 1.5;
+  color: theme.$gray_5;
+
+  code {
+    font-family: monospace;
+    font-size: 10px;
+    background: theme.$gray_2;
+    padding: 1px 4px;
+  }
+}
+
+.manifest-cta {
+  display: inline-block;
+  margin-top: 8px;
+  font-size: 12px;
+  color: theme.$purple_3;
+  text-decoration: none;
+
+  &:hover {
+    text-decoration: underline;
+  }
+}
+
+.manifest-cta-primary {
+  display: block;
+  margin-top: 0;
+  padding: 6px 12px;
+  background: theme.$purple_3;
+  color: theme.$white;
+  text-align: center;
+  font-weight: 500;
+
+  &:hover {
+    background: theme.$purple_2;
+    text-decoration: none;
+  }
+}
+
+.manifest-cta-secondary {
+  display: block;
+  margin-top: 8px;
+  font-size: 11px;
+  text-align: center;
+  color: theme.$gray_5;
+  text-decoration: none;
+
+  &:hover {
+    text-decoration: underline;
+  }
+}
+
 .info-actions {
   display: flex;
   flex-direction: column;
@@ -976,5 +1816,16 @@ watch(
   justify-content: center;
   margin-top: 12px;
   --el-pagination-hover-color: #{theme.$purple_3};
+}
+</style>
+
+<!--
+  The manifest tooltip is teleported outside this component, so its width has to
+  be set from an unscoped block.
+-->
+<style lang="scss">
+.manifest-tooltip.el-popper {
+  max-width: 320px;
+  line-height: 1.5;
 }
 </style>

@@ -19,6 +19,8 @@ import {
   parseManifest,
   createPort,
   MANIFEST_SCHEMA_URL,
+  MANIFEST_SHAPES,
+  detectManifestShape,
 } from './applicationSchema'
 
 describe('applicationSchema', () => {
@@ -224,6 +226,53 @@ describe('applicationSchema', () => {
       )
       expect(ok.compatible).toBe(true)
     })
+
+    it('compares media types when both ports declare them', () => {
+      // The backend manifest describes ports by mediaTypes, not dataType, so
+      // without this both sides would fall back to `any` and always match.
+      const nifti = { mediaTypes: ['application/x-nifti'] }
+      const zarr = { mediaTypes: ['application/zarr'] }
+      expect(arePortsCompatible(nifti, nifti)).toBe(true)
+      expect(arePortsCompatible(nifti, zarr)).toBe(false)
+      expect(
+        arePortsCompatible({ mediaTypes: ['a/b', 'application/zarr'] }, zarr),
+      ).toBe(true)
+    })
+
+    it('treats octet-stream and */* as wildcards', () => {
+      // The generic pipeline port real manifests use — must not warn.
+      expect(
+        arePortsCompatible(
+          { mediaTypes: ['application/octet-stream'] },
+          { mediaTypes: ['application/x-nifti'] },
+        ),
+      ).toBe(true)
+      expect(
+        arePortsCompatible({ mediaTypes: ['image/png'] }, { mediaTypes: ['*/*'] }),
+      ).toBe(true)
+    })
+
+    it('falls back to dataType when only one side declares media types', () => {
+      expect(
+        arePortsCompatible({ mediaTypes: ['image/png'] }, { dataType: 'any' }),
+      ).toBe(true)
+      expect(
+        arePortsCompatible({ dataType: 'image' }, { mediaTypes: ['image/png'] }),
+      ).toBe(true)
+    })
+
+    it('flags unmet inputs across two real manifest-shaped apps', () => {
+      const source = { outputs: [{ name: 'out', mediaTypes: ['application/zarr'] }] }
+      const target = {
+        inputs: [
+          { name: 'scan', mediaTypes: ['application/x-nifti'], required: true },
+          { name: 'opt', mediaTypes: ['application/zarr'], required: false },
+        ],
+      }
+      const res = validateAppConnection(source, target)
+      expect(res.compatible).toBe(false)
+      expect(res.unmetInputs.map((i) => i.name)).toEqual(['scan'])
+    })
   })
 
   describe('buildManifest', () => {
@@ -329,10 +378,11 @@ describe('applicationSchema', () => {
       ].join('\n')
 
       const { meta, schema } = parseManifest(yaml)
-      expect(meta).toEqual({
+      expect(meta).toMatchObject({
         name: 'Spike Sorter',
         description: 'Sorts spikes.',
         applicationType: 'preprocessor',
+        shape: MANIFEST_SHAPES.FLAT,
       })
       expect(schema.resources).toEqual({ cpu: 4096, memory: 16384 })
       expect(schema.runtime.computeTypes).toEqual(['standard'])
@@ -379,7 +429,7 @@ describe('applicationSchema', () => {
       const yaml = serializeManifestYaml(original, meta)
       const parsed = parseManifest(yaml)
 
-      expect(parsed.meta).toEqual(meta)
+      expect(parsed.meta).toMatchObject(meta)
       // The re-serialized manifest object should be identical to the first.
       expect(buildManifest(parsed.schema, parsed.meta)).toEqual(
         buildManifest(original, meta),
@@ -388,13 +438,122 @@ describe('applicationSchema', () => {
 
     it('accepts an already-parsed object and falls back to defaults on partial input', () => {
       const { meta, schema } = parseManifest({ name: 'Only A Name' })
-      expect(meta).toEqual({
+      expect(meta).toMatchObject({
         name: 'Only A Name',
         description: '',
         applicationType: 'processor',
       })
       expect(schema.runtime.computeTypes).toEqual(['standard'])
       expect(schema.parameters).toEqual([])
+    })
+  })
+  /*
+    The shape the backend actually serves in assets["app.yml"]. Verbatim from
+    GET /applications/store/3da0ad0a-9cc0-4c22-94aa-2204eb41a77a so the fixture
+    stays honest about what we have to read.
+  */
+  describe('parseManifest (nested backend shape)', () => {
+    const NESTED_YAML = [
+      '# yaml-language-server: $schema=./pennsieve-app-schema.json',
+      'schemaVersion: 1.0.0',
+      'application:',
+      '  id: test-private-repo-3',
+      '  name: test-private-repo-3',
+      '  description: A private test app.',
+      '  version: 1.0.1',
+      '  type: processor',
+      '  maintainers:',
+      '    - name: edmore',
+      '  tags:',
+      '    - demo',
+      'runtime:',
+      '  cpu: 1024',
+      '  memory: 2048',
+      '  computeTypes:',
+      '    - standard',
+      '  timeoutSeconds: 300',
+      'parameters:',
+      '  - name: threshold',
+      '    type: number',
+      '    description: Detection threshold.',
+      '    defaultValue: "0.5"',
+      '    validValues:',
+      '      - "0.1"',
+      '      - "0.5"',
+      '      - "0.9"',
+      'commandArguments: []',
+      'inputs:',
+      '  - name: package_file',
+      '    description: Pipeline package file.',
+      '    mediaTypes:',
+      '      - application/octet-stream',
+      '    cardinality: one',
+      '    required: true',
+      'outputs:',
+      '  - name: package_file',
+      '    description: Pipeline package file.',
+      '    mediaTypes:',
+      '      - application/octet-stream',
+    ].join('\n')
+
+    it('detects the shape from the presence of an `application` mapping', () => {
+      expect(detectManifestShape({ application: { name: 'x' } })).toBe(MANIFEST_SHAPES.NESTED)
+      expect(detectManifestShape({ name: 'x' })).toBe(MANIFEST_SHAPES.FLAT)
+      // An `application` that isn't a mapping must not be treated as nested.
+      expect(detectManifestShape({ application: ['x'] })).toBe(MANIFEST_SHAPES.FLAT)
+      expect(detectManifestShape(null)).toBe(MANIFEST_SHAPES.FLAT)
+    })
+
+    it('lifts metadata out of `application`', () => {
+      const { meta } = parseManifest(NESTED_YAML)
+      expect(meta).toMatchObject({
+        name: 'test-private-repo-3',
+        description: 'A private test app.',
+        applicationType: 'processor',
+        id: 'test-private-repo-3',
+        version: '1.0.1',
+        schemaVersion: '1.0.0',
+        timeoutSeconds: 300,
+        shape: MANIFEST_SHAPES.NESTED,
+      })
+      expect(meta.maintainers).toEqual([{ name: 'edmore', email: '' }])
+    })
+
+    it('reads cpu/memory off `runtime` rather than `resources`', () => {
+      const { schema } = parseManifest(NESTED_YAML)
+      expect(schema.resources).toEqual({ cpu: 1024, memory: 2048 })
+      expect(schema.runtime.computeTypes).toEqual(['standard'])
+    })
+
+    it('honours `defaultValue` and `validValues` on parameters', () => {
+      const { schema } = parseManifest(NESTED_YAML)
+      expect(schema.parameters).toHaveLength(1)
+      expect(schema.parameters[0]).toMatchObject({
+        name: 'threshold',
+        type: 'number',
+        defaultValue: '0.5',
+        allowedValues: ['0.1', '0.5', '0.9'],
+      })
+    })
+
+    it('retains mediaTypes and cardinality on ports', () => {
+      const { schema } = parseManifest(NESTED_YAML)
+      expect(schema.inputs[0]).toMatchObject({
+        name: 'package_file',
+        mediaTypes: ['application/octet-stream'],
+        cardinality: 'one',
+        required: true,
+      })
+      expect(schema.outputs[0]).toMatchObject({
+        name: 'package_file',
+        mediaTypes: ['application/octet-stream'],
+        required: false,
+      })
+    })
+
+    it('takes tags from `application`', () => {
+      const { schema } = parseManifest(NESTED_YAML)
+      expect(schema.tags).toEqual(['demo'])
     })
   })
 })

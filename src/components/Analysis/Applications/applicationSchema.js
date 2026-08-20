@@ -177,6 +177,11 @@ export const createPort = (overrides = {}) => ({
   description: "",
   dataType: "any",
   required: false,
+  // Manifest-only descriptors. The backend's app.yml describes ports by media
+  // type and cardinality rather than by `dataType`; we retain them for display
+  // and validation. buildManifest() does not emit them.
+  mediaTypes: [],
+  cardinality: "",
   ...overrides,
 });
 
@@ -300,6 +305,10 @@ const parsePort = (raw) =>
     description: raw?.description ?? "",
     dataType: raw?.dataType ?? "any",
     required: Boolean(raw?.required),
+    // Carried through so port compatibility can compare media types when a
+    // manifest describes ports that way.
+    mediaTypes: asArray(raw?.mediaTypes).map(String),
+    cardinality: typeof raw?.cardinality === "string" ? raw.cardinality : "",
   });
 
 /* ──────────────────────────────────────────────────────────────────────────
@@ -545,6 +554,57 @@ export const manifestToYaml = (manifest) => {
 export const serializeManifestYaml = (schema, meta) =>
   manifestToYaml(buildManifest(schema, meta));
 
+/* ──────────────────────────────────────────────────────────────────────────
+ * Manifest shapes
+ *
+ * Two `app.yml` shapes exist in the wild and reading must tolerate both:
+ *
+ *   nested — what the backend serves in `assets["app.yml"]`. Application
+ *            metadata sits under `application:` and cpu/memory under
+ *            `runtime:`; parameter defaults are keyed `defaultValue`.
+ *
+ *   flat   — what buildManifest() emits and what the JSON Schema at
+ *            MANIFEST_SCHEMA_URL documents. Metadata is top-level, cpu/memory
+ *            live under `resources:`, and defaults are keyed `default`.
+ *
+ * Which one is canonical is an open question with the backend team
+ * (ClickUp 868kf8e27). Until it is settled, parseManifest() reads both and
+ * buildManifest() is deliberately left emitting the flat shape — changing what
+ * authors commit should follow that decision, not precede it.
+ * ────────────────────────────────────────────────────────────────────────── */
+
+export const MANIFEST_SHAPES = Object.freeze({
+  NESTED: "nested",
+  FLAT: "flat",
+});
+
+/**
+ * A manifest is nested when it carries an `application` mapping; everything
+ * else is treated as flat.
+ * @returns {"nested"|"flat"}
+ */
+export const detectManifestShape = (manifest) =>
+  manifest &&
+  typeof manifest.application === "object" &&
+  manifest.application !== null &&
+  !Array.isArray(manifest.application)
+    ? MANIFEST_SHAPES.NESTED
+    : MANIFEST_SHAPES.FLAT;
+
+/**
+ * Maintainers are `[{name, email?}]` in the manifest, but tolerate bare
+ * strings so a hand-written `maintainers: [alice]` still reads.
+ * @returns {{name: string, email: string}[]}
+ */
+const parseMaintainers = (raw) =>
+  asArray(raw)
+    .map((m) =>
+      typeof m === "string"
+        ? { name: m.trim(), email: "" }
+        : { name: (m?.name ?? "").trim(), email: (m?.email ?? "").trim() },
+    )
+    .filter((m) => m.name || m.email);
+
 /**
  * Parse a committed `app.yml` manifest — either raw YAML text or an
  * already-parsed object — back into the top-level metadata and the editable
@@ -563,25 +623,39 @@ export const parseManifest = (source) => {
   const manifest =
     typeof source === "string" ? loadYaml(source) || {} : source || {};
 
+  const nested = detectManifestShape(manifest) === MANIFEST_SHAPES.NESTED;
+  // In the nested shape the application metadata lives under `application`
+  // and cpu/memory sit on `runtime`; in the flat shape both are top-level.
+  const app = nested ? manifest.application || {} : manifest;
+  const runtime = manifest.runtime || {};
+  const resources = nested ? runtime : manifest.resources || {};
+
+  const rawType = nested ? app.type : app.applicationType;
+
   const meta = {
-    name: typeof manifest.name === "string" ? manifest.name : "",
-    description:
-      typeof manifest.description === "string" ? manifest.description : "",
-    applicationType: APPLICATION_TYPES.some(
-      (t) => t.value === manifest.applicationType,
-    )
-      ? manifest.applicationType
+    name: typeof app.name === "string" ? app.name : "",
+    description: typeof app.description === "string" ? app.description : "",
+    applicationType: APPLICATION_TYPES.some((t) => t.value === rawType)
+      ? rawType
       : "processor",
+    // Present in the nested shape only; empty strings/arrays otherwise so
+    // callers never have to branch on shape.
+    id: typeof app.id === "string" ? app.id : "",
+    version: app.version == null ? "" : String(app.version),
+    maintainers: parseMaintainers(app.maintainers),
+    schemaVersion:
+      manifest.schemaVersion == null ? "" : String(manifest.schemaVersion),
+    timeoutSeconds:
+      typeof runtime.timeoutSeconds === "number" ? runtime.timeoutSeconds : null,
+    shape: nested ? MANIFEST_SHAPES.NESTED : MANIFEST_SHAPES.FLAT,
   };
 
-  const runtime = manifest.runtime || {};
   const computeTypes =
     Array.isArray(runtime.computeTypes) && runtime.computeTypes.length
       ? runtime.computeTypes.map((t) =>
           t === "ecs" ? COMPUTE_TYPES.STANDARD : t,
         )
       : [...DEFAULT_COMPUTE_TYPES];
-  const resources = manifest.resources || {};
 
   const schema = createApplicationSchema({
     resources: {
@@ -589,15 +663,15 @@ export const parseManifest = (source) => {
       memory: resources.memory ?? null,
     },
     runtime: { computeTypes, gpu: parseGpu(runtime) },
-    // Manifest parameters key the default as `default`; the editable schema
-    // (and parseParameter) expect `defaultValue`.
+    // The flat manifest keys a parameter's default as `default`; the nested
+    // one uses `defaultValue`, which is also what the editable schema expects.
     parameters: asArray(manifest.parameters).map((p) =>
-      parseParameter({ ...p, defaultValue: p?.default }),
+      parseParameter({ ...p, defaultValue: p?.defaultValue ?? p?.default }),
     ),
     inputs: asArray(manifest.inputs).map(parsePort),
     outputs: asArray(manifest.outputs).map(parsePort),
-    tags: asArray(manifest.tags),
-    categories: asArray(manifest.categories),
+    tags: asArray(nested ? app.tags : manifest.tags),
+    categories: asArray(nested ? app.categories : manifest.categories),
   });
 
   return { meta, schema };
@@ -750,6 +824,18 @@ export function validateParameters(parameters) {
  */
 export function arePortsCompatible(output, input) {
   if (!output || !input) return false;
+
+  // The backend's manifest describes ports by media type rather than by
+  // `dataType`. When both sides declare media types, compare those — otherwise
+  // every nested-manifest port would read as `any` and match everything.
+  const outMedia = asArray(output.mediaTypes);
+  const inMedia = asArray(input.mediaTypes);
+  if (outMedia.length && inMedia.length) {
+    const wildcard = (t) => t === "*/*" || t === "application/octet-stream";
+    if (outMedia.some(wildcard) || inMedia.some(wildcard)) return true;
+    return outMedia.some((o) => inMedia.includes(o));
+  }
+
   const a = output.dataType || "any";
   const b = input.dataType || "any";
   return a === "any" || b === "any" || a === b;
