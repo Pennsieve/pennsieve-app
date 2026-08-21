@@ -176,6 +176,7 @@ const saveWorkflowChanges = async () => {
     nodes.value = result.nodes;
     edges.value = result.edges;
     snapshotDefaultParams();
+    hydrateManifestPorts();
   } catch (err) {
     EventBus.$emit("toast", {
       detail: { type: "error", msg: "Failed to save workflow changes." },
@@ -317,13 +318,46 @@ const applyManifestDefaults = async (nodeId, application) => {
   const paramSchema = toParamSchema(schema.parameters);
   if (paramSchema.length) node.data.paramSchema = paramSchema;
 
-  // Ports, kept on the node so connection checks stay synchronous.
-  node.data.manifestPorts = {
-    inputs: schema.inputs || [],
-    outputs: schema.outputs || [],
-  };
+  setManifestPorts(node, parsed);
+};
 
+// Ports live on the node so connection checks stay synchronous.
+const setManifestPorts = (node, parsed) => {
+  node.data.manifestPorts = {
+    inputs: parsed.schema.inputs || [],
+    outputs: parsed.schema.outputs || [],
+  };
   node.data.hasManifest = true;
+  // A manifest can land after the user has already drawn the edge — the
+  // connection was made against no port information at all, so re-check
+  // everything now that we have some.
+  revalidateEdges();
+};
+
+/*
+  Ports for nodes that were not dropped in this session
+  -----------------------------------------------------
+  definitionToNodesAndEdges builds its nodes from a saved definition, which
+  carries no manifest — so an opened workflow had nothing to validate against
+  until every node was re-dropped by hand. Manifests are memoized per uuid, so
+  this costs at most one request per distinct application, once.
+*/
+const hydrateManifestPorts = async () => {
+  const pending = nodes.value.filter(
+    (n) => isAppNode(n) && n.data?.application?.uuid && !n.data.manifestPorts,
+  );
+  if (!pending.length) return;
+
+  await Promise.all(
+    pending.map(async (n) => {
+      const parsed = await loadManifest(n.data.application.uuid);
+      // The node may have been removed while the request was in flight.
+      const node = nodes.value.find((x) => x.id === n.id);
+      if (node && parsed) setManifestPorts(node, parsed);
+    }),
+  );
+
+  revalidateEdges();
 };
 
 const getTargetTypeParams = (targetType) => {
@@ -705,6 +739,8 @@ const selectWorkflow = (workflow) => {
   nodes.value = result.nodes;
   edges.value = result.edges;
   snapshotDefaultParams();
+  // Fire-and-forget: the manifests patch the nodes and re-run the check.
+  hydrateManifestPorts();
 
   if (result.needsAutoLayout) {
     autoLayout();
@@ -849,17 +885,116 @@ onConnect((params) => {
     style: { stroke: nodeTypeColor(srcNode?.type) },
   });
 
+  // Immediate feedback: a toast for this connection, plus the persistent
+  // marks (red edge / canvas summary) that outlive it.
   warnOnIncompatibleConnection(srcNode, tgtNode);
+  revalidateEdges();
 });
 
 /*
   Connection validation
   ---------------------
-  Both applications must declare their ports in app.yml for this to say
-  anything: without a manifest we have no port information and stay silent
-  rather than guessing. The connection is always made — per the ticket, a
-  mismatch is a warning the user can proceed past, not a block.
+  Every edge between two application nodes is classified from the ports the
+  two app.yml manifests declare. The connection is always made — per the
+  ticket a mismatch is a warning the user can proceed past, not a block — but
+  the verdict is *persistent*: the edge is restyled and the canvas keeps a
+  running list, so the check is still visible after the toast has gone and
+  after the workflow is reopened.
+
+  A missing manifest is reported as "not checked" rather than silently passing.
+  Staying quiet there was the main reason the validation looked absent: an app
+  without app.yml produced exactly the same canvas as a clean bill of health.
 */
+const INVALID_EDGE_COLOR = "#e94b4b";
+
+// Edges the manifests say are wrong, and edges we had no manifest to judge.
+const edgeIssues = ref([]);
+const uncheckedEdgeCount = ref(0);
+
+const isAppNode = (node) => node?.type === "default";
+
+const classifyEdge = (edge) => {
+  const src = nodes.value.find((n) => n.id === edge.source);
+  const tgt = nodes.value.find((n) => n.id === edge.target);
+  if (!src || !tgt) return { state: "skip", src, tgt };
+
+  // Only application-to-application links carry port information; a data
+  // source or target has no manifest to compare against.
+  if (!isAppNode(src) || !isAppNode(tgt)) return { state: "skip", src, tgt };
+
+  const source = src.data?.manifestPorts;
+  const target = tgt.data?.manifestPorts;
+  if (!source || !target) return { state: "unchecked", src, tgt };
+
+  const { compatible, unmetInputs } = validateAppConnection(source, target);
+  return compatible
+    ? { state: "ok", src, tgt }
+    : { state: "invalid", src, tgt, unmetInputs };
+};
+
+const unmetInputNames = (unmetInputs) =>
+  (unmetInputs || []).map((i) => i.name).filter(Boolean);
+
+/*
+  Re-derive every edge's appearance from the current nodes. Cheap (a handful of
+  edges, ports already in memory) and idempotent, so it can be called from
+  anywhere the graph changes rather than trying to patch single edges.
+*/
+const revalidateEdges = () => {
+  const issues = [];
+  let unchecked = 0;
+
+  edges.value = edges.value.map((edge) => {
+    const result = classifyEdge(edge);
+    const stroke = nodeTypeColor(result.src?.type);
+    // Spread the existing edge so anything VueFlow put on it (handles,
+    // selection) survives; the label fields are always restated so a
+    // connection that stops being invalid loses its marker.
+    const next = {
+      ...edge,
+      style: { stroke },
+      label: undefined,
+      labelShowBg: undefined,
+      labelBgStyle: undefined,
+      labelStyle: undefined,
+    };
+
+    if (result.state === "invalid") {
+      const names = unmetInputNames(result.unmetInputs);
+      issues.push({
+        id: edge.id,
+        source: result.src.data.label,
+        target: result.tgt.data.label,
+        names,
+      });
+      return {
+        ...next,
+        style: {
+          stroke: INVALID_EDGE_COLOR,
+          strokeWidth: 2,
+          strokeDasharray: "6 4",
+        },
+        label: names.length ? `\u26A0 ${names.join(", ")}` : "\u26A0 incompatible",
+        labelShowBg: true,
+        labelBgPadding: [6, 3],
+        labelBgBorderRadius: 2,
+        labelBgStyle: { fill: "#fdecec", stroke: INVALID_EDGE_COLOR },
+        labelStyle: { fill: INVALID_EDGE_COLOR, fontSize: 11, fontWeight: 600 },
+      };
+    }
+
+    if (result.state === "unchecked") {
+      unchecked += 1;
+      return { ...next, style: { stroke, strokeDasharray: "2 4" } };
+    }
+
+    return next;
+  });
+
+  edgeIssues.value = issues;
+  uncheckedEdgeCount.value = unchecked;
+};
+
 const warnOnIncompatibleConnection = (srcNode, tgtNode) => {
   const source = srcNode?.data?.manifestPorts;
   const target = tgtNode?.data?.manifestPorts;
@@ -868,7 +1003,7 @@ const warnOnIncompatibleConnection = (srcNode, tgtNode) => {
   const { compatible, unmetInputs } = validateAppConnection(source, target);
   if (compatible) return;
 
-  const names = unmetInputs.map((i) => i.name).filter(Boolean).join(", ");
+  const names = unmetInputNames(unmetInputs).join(", ");
   ElMessage({
     type: "warning",
     duration: 6000,
@@ -891,11 +1026,14 @@ const removeNode = (nodeId) => {
 
   // Remove node
   nodes.value.splice(nodeIndex, 1);
+  revalidateEdges();
 };
 
 const clearWorkflow = () => {
   nodes.value = [];
   edges.value = [];
+  edgeIssues.value = [];
+  uncheckedEdgeCount.value = 0;
   workflowName.value = "";
   workflowDescription.value = "";
 };
@@ -1188,6 +1326,38 @@ const openNodeSettings = (id) => {
               <h3>No workflow loaded</h3>
               <p>Return to the workflows gallery to select a workflow</p>
             </template>
+          </div>
+
+          <!--
+            Persistent verdict for the whole canvas. The per-connection toast
+            is gone in six seconds; this stays, and survives reopening the
+            workflow, so "did it validate?" has a visible answer.
+          -->
+          <div
+            v-if="edgeIssues.length || uncheckedEdgeCount"
+            class="compat-panel"
+            :class="{ 'compat-panel--invalid': edgeIssues.length > 0 }"
+          >
+            <div class="compat-panel-title">
+              <template v-if="edgeIssues.length">
+                {{ edgeIssues.length }} incompatible
+                {{ edgeIssues.length === 1 ? "connection" : "connections" }}
+              </template>
+              <template v-else>Connections not checked</template>
+            </div>
+            <ul v-if="edgeIssues.length" class="compat-panel-list">
+              <li v-for="issue in edgeIssues" :key="issue.id">
+                {{ issue.source }} &rarr; {{ issue.target }}
+                <span v-if="issue.names.length" class="compat-panel-detail">
+                  needs {{ issue.names.join(", ") }}
+                </span>
+              </li>
+            </ul>
+            <div v-if="uncheckedEdgeCount" class="compat-panel-note">
+              {{ uncheckedEdgeCount }}
+              {{ uncheckedEdgeCount === 1 ? "connection" : "connections" }} not
+              checked &mdash; no app.yml on one of the applications.
+            </div>
           </div>
 
           <div class="workflow-builder-flow">
@@ -2698,6 +2868,51 @@ const openNodeSettings = (id) => {
   top: 10px;
   right: 10px;
   z-index: 10;
+}
+
+/* Sits under the Auto Layout button, which owns the top-right corner. */
+.compat-panel {
+  position: absolute;
+  top: 52px;
+  right: 10px;
+  z-index: 10;
+  max-width: 300px;
+  padding: 8px 10px;
+  border: 1px solid theme.$gray_3;
+  border-left: 3px solid theme.$gray_4;
+  border-radius: 4px;
+  background: theme.$white;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+  font-size: 11px;
+  color: theme.$gray_5;
+}
+
+.compat-panel--invalid {
+  border-left-color: #e94b4b;
+}
+
+.compat-panel-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: theme.$black;
+}
+
+.compat-panel-list {
+  margin: 6px 0 0;
+  padding-left: 14px;
+
+  li {
+    margin-bottom: 2px;
+  }
+}
+
+.compat-panel-detail {
+  color: #b45309;
+}
+
+.compat-panel-note {
+  margin-top: 6px;
+  color: theme.$gray_4;
 }
 
 .auto-layout-btn {
