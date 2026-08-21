@@ -42,6 +42,11 @@ const initialState = () => ({
   workflowsNextCursor: "",
   targetTypes: [],
   targetTypesLoaded: false,
+  // Package types an application's input/output ports can declare. Served by
+  // the packages endpoint so the vocabulary follows the platform rather than
+  // a list maintained in the front end.
+  packageTypes: [],
+  packageTypesLoaded: false,
   analyticsChannel: null,
   pendingRunConfig: null,
 });
@@ -180,6 +185,10 @@ export const mutations = {
   UPDATE_TARGET_TYPES(state, targetTypes) {
     state.targetTypes = targetTypes;
     state.targetTypesLoaded = true;
+  },
+  UPDATE_PACKAGE_TYPES(state, packageTypes) {
+    state.packageTypes = packageTypes;
+    state.packageTypesLoaded = true;
   },
   UPDATE_WORKFLOW_ACTIVE_STATUS(state, { uuid, isActive }) {
     const workflow = state.workflows.find((w) => w.uuid === uuid);
@@ -1036,6 +1045,43 @@ export const actions = {
       return Promise.reject(err);
     }
   },
+  /*
+    Package types for application input/output ports.
+
+    Fetched once per session. A failure resolves rather than rejects: callers
+    fall back to the built-in vocabulary in applicationSchema, so a port
+    dropdown still works offline — it just isn't authoritative.
+  */
+  fetchPackageTypes: async ({ state, commit, rootState }, { force } = {}) => {
+    if (!force && state.packageTypesLoaded) return state.packageTypes;
+    try {
+      const userToken = await useGetToken();
+      const url = `${rootState.config.api2Url}/packages/types`;
+      const resp = await fetch(url, {
+        method: "GET",
+        headers: { Authorization: `Bearer ${userToken}` },
+      });
+      if (!resp.ok) throw new Error(`packages/types responded ${resp.status}`);
+
+      // Tolerate either a bare list of names or a list of objects.
+      const raw = await resp.json();
+      const list = Array.isArray(raw) ? raw : raw?.packageTypes || [];
+      const result = list
+        .map((t) =>
+          typeof t === "string"
+            ? { value: t, label: t }
+            : { value: t?.value ?? t?.name ?? "", label: t?.label ?? t?.displayName ?? t?.name ?? t?.value ?? "" },
+        )
+        .filter((t) => t.value);
+
+      commit("UPDATE_PACKAGE_TYPES", result);
+      return result;
+    } catch (err) {
+      console.warn("Unable to load package types; using built-in list.", err);
+      commit("UPDATE_PACKAGE_TYPES", []);
+      return [];
+    }
+  },
   fetchWorkflowDefinition: async ({ rootState }, uuid) => {
     const userToken = await useGetToken();
     const url = `${rootState.config.api2Url}/compute/workflows/definitions/${uuid}`;
@@ -1107,6 +1153,7 @@ export const getters = {
   applications: (state) => state.applications,
   computeNodes: (state) => state.computeNodes,
   targetTypes: (state) => state.targetTypes,
+  packageTypes: (state) => state.packageTypes,
   analyticsChannel: (state) => state.analyticsChannel,
 };
 

@@ -64,6 +64,9 @@ export const PARAM_TYPE_OPTIONS = Object.freeze([
 export const COMPUTE_TYPES = Object.freeze({
   STANDARD: "standard",
   LAMBDA: "lambda",
+  // GPU is a compute type, not a separate capability block. Older manifests
+  // wrote `runtime.gpu: {enabled: true}`; that is read as this value.
+  GPU: "gpu",
 });
 
 export const DEFAULT_COMPUTE_TYPES = Object.freeze([COMPUTE_TYPES.STANDARD]);
@@ -72,17 +75,40 @@ export const DEFAULT_COMPUTE_TYPES = Object.freeze([COMPUTE_TYPES.STANDARD]);
  * Data types a port (input/output) can carry. Used to validate that an
  * upstream application's outputs are compatible with a downstream
  * application's inputs when wiring a workflow. `any` matches everything.
+ *
+ * The authoritative vocabulary is the platform's package types, served by
+ * `GET {api2Url}/packages/types` (analysisModule/fetchPackageTypes). This list
+ * is only the fallback used before that call lands or when it fails — pass the
+ * fetched list to portDataTypeOptions() instead of reading this directly.
  */
-export const PORT_DATA_TYPES = Object.freeze([
+export const FALLBACK_PORT_DATA_TYPES = Object.freeze([
   { value: "any", label: "Any" },
-  { value: "file", label: "File" },
-  { value: "directory", label: "Directory" },
-  { value: "package", label: "Pennsieve Package" },
-  { value: "dataset", label: "Pennsieve Dataset" },
-  { value: "tabular", label: "Tabular / CSV" },
-  { value: "image", label: "Image" },
-  { value: "timeseries", label: "Time Series" },
 ]);
+
+/**
+ * Options for a port's `dataType` control: "Any" first, then the package types
+ * the platform reports. Anything the manifest already declares but the server
+ * does not list is kept as well, so opening an older app.yml never silently
+ * drops its port types.
+ *
+ * @param {Array<{value: string, label: string}>} [packageTypes]  from the store
+ * @param {string[]} [declared]  dataTypes already present in the manifest
+ */
+export const portDataTypeOptions = (packageTypes, declared = []) => {
+  const options = [...FALLBACK_PORT_DATA_TYPES];
+  const seen = new Set(options.map((o) => o.value));
+  for (const t of asArray(packageTypes)) {
+    if (!t?.value || seen.has(t.value)) continue;
+    seen.add(t.value);
+    options.push({ value: t.value, label: t.label || t.value });
+  }
+  for (const value of asArray(declared)) {
+    if (!value || seen.has(value)) continue;
+    seen.add(value);
+    options.push({ value, label: value });
+  }
+  return options;
+};
 
 /**
  * Controlled vocabulary for application categories. Free-form values are
@@ -114,7 +140,8 @@ export const APPLICATION_CATEGORIES = Object.freeze([
  * @property {("string"|"number"|"boolean"|"enum")} type
  * @property {boolean} required            Must a value exist before a run?
  * @property {(string|number|boolean|null)} defaultValue  App-provided default.
- * @property {Array<string|number>} [allowedValues]  Choices for `enum`.
+ * @property {Array<string|number>} [validValues]  Permitted choices. Presence
+ *           means "render a dropdown", whatever the declared type.
  * @property {number} [min]                Inclusive min for `number`.
  * @property {number} [max]                Inclusive max for `number`.
  */
@@ -123,21 +150,15 @@ export const APPLICATION_CATEGORIES = Object.freeze([
  * @typedef {Object} PortSchema
  * @property {string} name
  * @property {string} [description]
- * @property {string} dataType            One of PORT_DATA_TYPES values.
+ * @property {string} dataType            A package type from GET /packages/types,
+ *                                       or "any".
  * @property {boolean} [required]         Inputs only: must be connected.
- */
-
-/**
- * @typedef {Object} GpuConfig
- * @property {boolean} enabled
- * @property {number} [count]             Number of GPUs (>=1 when enabled).
- * @property {string} [type]              Accelerator type, e.g. "nvidia-t4".
  */
 
 /**
  * @typedef {Object} ApplicationSchema
  * @property {{cpu: (number|null), memory: (number|null)}} resources
- * @property {{computeTypes: string[], gpu: GpuConfig}} runtime
+ * @property {{computeTypes: string[]}} runtime
  * @property {ParameterSchema[]} parameters
  * @property {PortSchema[]} inputs
  * @property {PortSchema[]} outputs
@@ -149,14 +170,6 @@ export const APPLICATION_CATEGORIES = Object.freeze([
  * Factories — produce well-formed empty/default building blocks
  * ────────────────────────────────────────────────────────────────────────── */
 
-/** @returns {GpuConfig} */
-export const createGpuConfig = (overrides = {}) => ({
-  enabled: false,
-  count: 1,
-  type: "",
-  ...overrides,
-});
-
 /** @returns {ParameterSchema} */
 export const createParameter = (overrides = {}) => ({
   name: "",
@@ -165,7 +178,7 @@ export const createParameter = (overrides = {}) => ({
   type: PARAM_TYPES.STRING,
   required: false,
   defaultValue: null,
-  allowedValues: [],
+  validValues: [],
   min: null,
   max: null,
   ...overrides,
@@ -177,6 +190,11 @@ export const createPort = (overrides = {}) => ({
   description: "",
   dataType: "any",
   required: false,
+  // Manifest-only descriptors. The backend's app.yml describes ports by media
+  // type and cardinality rather than by `dataType`; we retain them for display
+  // and validation. buildManifest() does not emit them.
+  mediaTypes: [],
+  cardinality: "",
   ...overrides,
 });
 
@@ -186,10 +204,7 @@ export const createPort = (overrides = {}) => ({
  */
 export const createApplicationSchema = (overrides = {}) => ({
   resources: { cpu: null, memory: null },
-  runtime: {
-    computeTypes: [...DEFAULT_COMPUTE_TYPES],
-    gpu: createGpuConfig(),
-  },
+  runtime: { computeTypes: [...DEFAULT_COMPUTE_TYPES] },
   parameters: [],
   inputs: [],
   outputs: [],
@@ -211,20 +226,37 @@ const asArray = (v) => (Array.isArray(v) ? v : []);
  */
 const parseParameter = (raw) => {
   if (raw == null) return createParameter();
-  const type = Object.values(PARAM_TYPES).includes(raw.type)
+
+  // `validValues` / `defaultValue` are the keys app.yml and the API both use;
+  // `allowedValues` / `default` are read as legacy aliases only.
+  const validValues = asArray(raw.validValues ?? raw.allowedValues);
+  const defaultValue = raw.defaultValue ?? raw.default ?? null;
+
+  // A manifest has no separate "enum" type — a choice parameter is written as
+  // `type: string` with `validValues`, so an explicit string type does not
+  // out-vote the choices. A number or boolean keeps its declared type and
+  // still offers its choices.
+  const declared = Object.values(PARAM_TYPES).includes(raw.type)
     ? raw.type
-    : raw.allowedValues?.length || raw.validValues?.length
+    : null;
+  const type =
+    validValues.length && (declared === null || declared === PARAM_TYPES.STRING)
       ? PARAM_TYPES.ENUM
-      : PARAM_TYPES.STRING;
+      : declared || PARAM_TYPES.STRING;
+
   return createParameter({
     name: raw.name ?? "",
     label: raw.label ?? "",
     description: raw.description ?? "",
     type,
-    required: Boolean(raw.required),
-    defaultValue: raw.defaultValue ?? null,
-    // `validValues` is the legacy key the Workflow Builder already reads.
-    allowedValues: asArray(raw.allowedValues ?? raw.validValues),
+    // A parameter with no default has nothing to pre-populate the run form
+    // with, so it is treated as required unless it says otherwise explicitly.
+    required:
+      raw.required == null
+        ? defaultValue == null || defaultValue === ""
+        : Boolean(raw.required),
+    defaultValue,
+    validValues,
     min: raw.min ?? null,
     max: raw.max ?? null,
   });
@@ -253,20 +285,31 @@ export const parseParameters = (app) => {
   return [];
 };
 
-/** @returns {GpuConfig} */
-const parseGpu = (rc) => {
-  const gpu = rc?.gpu;
-  if (!gpu) return createGpuConfig();
-  // Accept either a structured object or a bare positive number/boolean.
-  if (typeof gpu === "number") {
-    return createGpuConfig({ enabled: gpu > 0, count: gpu || 1 });
-  }
-  if (typeof gpu === "boolean") return createGpuConfig({ enabled: gpu });
-  return createGpuConfig({
-    enabled: Boolean(gpu.enabled ?? (gpu.count > 0)),
-    count: gpu.count ?? 1,
-    type: gpu.type ?? "",
-  });
+/**
+ * Did a legacy `gpu:` descriptor ask for a GPU? Accepts the structured object
+ * as well as the bare number/boolean forms found in older manifests.
+ */
+const legacyGpuEnabled = (gpu) => {
+  if (!gpu) return false;
+  if (typeof gpu === "number") return gpu > 0;
+  if (typeof gpu === "boolean") return gpu;
+  return Boolean(gpu.enabled ?? Number(gpu.count) > 0);
+};
+
+/**
+ * Normalize a `computeTypes` list off a runtime/runtimeConfig object: map the
+ * legacy "ecs" alias to "standard" and fold a legacy `gpu:` block in as the
+ * "gpu" compute type, since that is all it ever meant.
+ * @returns {string[]}
+ */
+const parseComputeTypes = (rc) => {
+  const declared = Array.isArray(rc?.computeTypes) ? rc.computeTypes : [];
+  const types = declared.map((t) =>
+    t === "ecs" ? COMPUTE_TYPES.STANDARD : t,
+  );
+  if (legacyGpuEnabled(rc?.gpu)) types.push(COMPUTE_TYPES.GPU);
+  const unique = [...new Set(types.filter(Boolean))];
+  return unique.length ? unique : [...DEFAULT_COMPUTE_TYPES];
 };
 
 /**
@@ -277,14 +320,10 @@ const parseGpu = (rc) => {
  */
 export const parseApplication = (app) => {
   const rc = app?.runtimeConfig || {};
-  const computeTypes =
-    Array.isArray(rc.computeTypes) && rc.computeTypes.length
-      ? rc.computeTypes.map((t) => (t === "ecs" ? COMPUTE_TYPES.STANDARD : t))
-      : [...DEFAULT_COMPUTE_TYPES];
 
   return createApplicationSchema({
     resources: { cpu: rc.cpu ?? null, memory: rc.memory ?? null },
-    runtime: { computeTypes, gpu: parseGpu(rc) },
+    runtime: { computeTypes: parseComputeTypes(rc) },
     parameters: parseParameters(app),
     inputs: asArray(app?.inputs).map(parsePort),
     outputs: asArray(app?.outputs).map(parsePort),
@@ -300,6 +339,10 @@ const parsePort = (raw) =>
     description: raw?.description ?? "",
     dataType: raw?.dataType ?? "any",
     required: Boolean(raw?.required),
+    // Carried through so port compatibility can compare media types when a
+    // manifest describes ports that way.
+    mediaTypes: asArray(raw?.mediaTypes).map(String),
+    cardinality: typeof raw?.cardinality === "string" ? raw.cardinality : "",
   });
 
 /* ──────────────────────────────────────────────────────────────────────────
@@ -308,7 +351,7 @@ const parsePort = (raw) =>
 
 /**
  * Strip a parameter down to the fields meaningful for its type so we never
- * send (for example) `allowedValues` on a plain text param.
+ * send (for example) `min` on a plain text param.
  * @returns {ParameterSchema}
  */
 const serializeParameter = (p) => {
@@ -320,7 +363,10 @@ const serializeParameter = (p) => {
   };
   if (p.label && p.label.trim()) out.label = p.label.trim();
   if (p.description && p.description.trim()) out.description = p.description.trim();
-  if (p.type === PARAM_TYPES.ENUM) out.allowedValues = asArray(p.allowedValues);
+  // Choices are independent of type — `validValues` is what the run form and
+  // the Workflow Builder read back off `paramSchema`.
+  const choices = asArray(p.validValues);
+  if (choices.length) out.validValues = choices;
   if (p.type === PARAM_TYPES.NUMBER) {
     if (p.min != null && p.min !== "") out.min = Number(p.min);
     if (p.max != null && p.max !== "") out.max = Number(p.max);
@@ -370,6 +416,7 @@ export const buildSchemaPayload = (schema) => {
   const s = schema || createApplicationSchema();
   const named = asArray(s.parameters).filter((p) => (p.name || "").trim());
 
+  // GPU rides in `computeTypes`; there is no separate gpu block to emit.
   const runtimeConfig = {
     cpu: s.resources?.cpu != null ? Number(s.resources.cpu) : null,
     memory: s.resources?.memory != null ? Number(s.resources.memory) : null,
@@ -378,13 +425,6 @@ export const buildSchemaPayload = (schema) => {
         ? [...s.runtime.computeTypes]
         : [...DEFAULT_COMPUTE_TYPES],
   };
-  if (s.runtime?.gpu?.enabled) {
-    runtimeConfig.gpu = {
-      enabled: true,
-      count: Number(s.runtime.gpu.count) || 1,
-      ...(s.runtime.gpu.type ? { type: s.runtime.gpu.type } : {}),
-    };
-  }
 
   const payload = { runtimeConfig };
 
@@ -425,19 +465,36 @@ export const APPLICATION_TYPES = Object.freeze([
 ]);
 
 /**
- * Serialize one parameter into the manifest shape. Differs from the API
- * payload (`serializeParameter`) in that the default is keyed `default` (not
- * `defaultValue`) and empty/irrelevant fields are omitted to keep the emitted
- * app.yml clean.
+ * Serialize one parameter into the manifest shape:
+ *
+ *   - name: threshold
+ *     type: number
+ *     description: Detection threshold.
+ *     defaultValue: "0.5"
+ *     validValues: ["0.1", "0.5", "0.9"]
+ *
+ * Three things differ from the editable model. There is no `enum` type — a
+ * choice parameter is a `string` carrying `validValues`. Values are written as
+ * strings, which is how both the run form and the API carry them. And
+ * `required` is implied by the absence of a `defaultValue`, so it is emitted
+ * only when the parameter contradicts that.
  */
 const manifestParameter = (p) => {
-  const out = { name: (p.name || "").trim(), type: p.type };
+  const out = {
+    name: (p.name || "").trim(),
+    type: p.type === PARAM_TYPES.ENUM ? PARAM_TYPES.STRING : p.type,
+  };
   if (p.label && p.label.trim()) out.label = p.label.trim();
   if (p.description && p.description.trim()) out.description = p.description.trim();
-  if (p.required) out.required = true;
+
   const def = coerceParameterValue(p, p.defaultValue);
-  if (def != null && def !== "") out.default = def;
-  if (p.type === PARAM_TYPES.ENUM) out.allowedValues = asArray(p.allowedValues);
+  const hasDefault = def != null && def !== "";
+  if (hasDefault) out.defaultValue = String(def);
+  if (Boolean(p.required) !== !hasDefault) out.required = Boolean(p.required);
+
+  const choices = asArray(p.validValues).map(String);
+  if (choices.length) out.validValues = choices;
+
   if (p.type === PARAM_TYPES.NUMBER) {
     if (p.min != null && p.min !== "") out.min = Number(p.min);
     if (p.max != null && p.max !== "") out.max = Number(p.max);
@@ -458,51 +515,58 @@ const manifestPort = (port) => {
 
 /**
  * Build the `app.yml` manifest object from the editable schema plus the
- * top-level metadata the form collects. The result matches the JSON Schema at
- * MANIFEST_SCHEMA_URL and is what the author commits (serialized to YAML) to
- * their repository.
+ * metadata the form collects. This is what the author commits (serialized to
+ * YAML) to their repository, and it is written in the same shape the platform
+ * serves: application metadata under `application:`, cpu/memory under
+ * `runtime:` alongside `computeTypes`, and no standalone `gpu:` block.
  *
  * @param {ApplicationSchema} schema
- * @param {{name?: string, description?: string, applicationType?: string}} [meta]
+ * @param {{name?: string, description?: string, applicationType?: string,
+ *          id?: string, version?: string, maintainers?: Array,
+ *          schemaVersion?: string, timeoutSeconds?: number}} [meta]
  * @returns {Object} app.yml manifest
  */
 export const buildManifest = (schema, meta = {}) => {
   const s = schema || createApplicationSchema();
   const manifest = {
     $schema: MANIFEST_SCHEMA_URL,
-    schemaVersion: MANIFEST_SCHEMA_VERSION,
+    schemaVersion: meta.schemaVersion || MANIFEST_SCHEMA_VERSION,
   };
 
-  if (meta.name && meta.name.trim()) manifest.name = meta.name.trim();
-  if (meta.description && meta.description.trim())
-    manifest.description = meta.description.trim();
-  if (meta.applicationType) manifest.applicationType = meta.applicationType;
+  const str = (v) => (v == null ? "" : String(v).trim());
 
-  const mCategories = asArray(s.categories)
-    .map((c) => String(c).trim())
-    .filter(Boolean);
-  const mTags = asArray(s.tags).map((t) => String(t).trim()).filter(Boolean);
-  if (mCategories.length) manifest.categories = mCategories;
-  if (mTags.length) manifest.tags = mTags;
+  const application = {};
+  if (str(meta.id)) application.id = str(meta.id);
+  if (str(meta.name)) application.name = str(meta.name);
+  if (str(meta.description)) application.description = str(meta.description);
+  if (meta.applicationType) application.type = meta.applicationType;
+  if (str(meta.version)) application.version = str(meta.version);
 
-  const runtime = {
-    computeTypes: s.runtime?.computeTypes?.length
-      ? [...s.runtime.computeTypes]
-      : [...DEFAULT_COMPUTE_TYPES],
-  };
-  if (s.runtime?.gpu?.enabled) {
-    runtime.gpu = {
-      enabled: true,
-      count: Number(s.runtime.gpu.count) || 1,
-      ...(s.runtime.gpu.type ? { type: s.runtime.gpu.type } : {}),
-    };
+  const mMaintainers = asArray(meta.maintainers)
+    .map((m) => (typeof m === "string" ? { name: m } : m))
+    .filter((m) => m && str(m.name))
+    .map((m) => (str(m.email) ? { name: str(m.name), email: str(m.email) } : { name: str(m.name) }));
+  if (mMaintainers.length) application.maintainers = mMaintainers;
+
+  const mCategories = asArray(s.categories).map(str).filter(Boolean);
+  const mTags = asArray(s.tags).map(str).filter(Boolean);
+  if (mCategories.length) application.categories = mCategories;
+  if (mTags.length) application.tags = mTags;
+
+  if (Object.keys(application).length) manifest.application = application;
+
+  // cpu / memory belong to `runtime`, and a GPU requirement is simply the
+  // "gpu" compute type — never a `gpu:` mapping of its own.
+  const runtime = {};
+  if (s.resources?.cpu != null) runtime.cpu = Number(s.resources.cpu);
+  if (s.resources?.memory != null) runtime.memory = Number(s.resources.memory);
+  runtime.computeTypes = s.runtime?.computeTypes?.length
+    ? [...s.runtime.computeTypes]
+    : [...DEFAULT_COMPUTE_TYPES];
+  if (meta.timeoutSeconds != null && meta.timeoutSeconds !== "") {
+    runtime.timeoutSeconds = Number(meta.timeoutSeconds);
   }
   manifest.runtime = runtime;
-
-  const resources = {};
-  if (s.resources?.cpu != null) resources.cpu = Number(s.resources.cpu);
-  if (s.resources?.memory != null) resources.memory = Number(s.resources.memory);
-  if (Object.keys(resources).length) manifest.resources = resources;
 
   const mParams = asArray(s.parameters).filter((p) => (p.name || "").trim());
   if (mParams.length) manifest.parameters = mParams.map(manifestParameter);
@@ -545,6 +609,56 @@ export const manifestToYaml = (manifest) => {
 export const serializeManifestYaml = (schema, meta) =>
   manifestToYaml(buildManifest(schema, meta));
 
+/* ──────────────────────────────────────────────────────────────────────────
+ * Manifest shapes
+ *
+ * Two `app.yml` shapes exist in the wild and reading must tolerate both:
+ *
+ *   nested — canonical. What the backend serves in `assets["app.yml"]` and
+ *            what buildManifest() emits: application metadata under
+ *            `application:`, cpu/memory under `runtime:` next to
+ *            `computeTypes` (GPU is one of those types), parameter defaults
+ *            keyed `defaultValue`.
+ *
+ *   flat   — legacy. Metadata top-level, cpu/memory under `resources:`,
+ *            defaults keyed `default`, GPU as a `runtime.gpu` mapping. Still
+ *            read, never written.
+ *
+ * Settled with the backend team (ClickUp 868kf8e27) — the nested shape won.
+ * ────────────────────────────────────────────────────────────────────────── */
+
+export const MANIFEST_SHAPES = Object.freeze({
+  NESTED: "nested",
+  FLAT: "flat",
+});
+
+/**
+ * A manifest is nested when it carries an `application` mapping; everything
+ * else is treated as flat.
+ * @returns {"nested"|"flat"}
+ */
+export const detectManifestShape = (manifest) =>
+  manifest &&
+  typeof manifest.application === "object" &&
+  manifest.application !== null &&
+  !Array.isArray(manifest.application)
+    ? MANIFEST_SHAPES.NESTED
+    : MANIFEST_SHAPES.FLAT;
+
+/**
+ * Maintainers are `[{name, email?}]` in the manifest, but tolerate bare
+ * strings so a hand-written `maintainers: [alice]` still reads.
+ * @returns {{name: string, email: string}[]}
+ */
+const parseMaintainers = (raw) =>
+  asArray(raw)
+    .map((m) =>
+      typeof m === "string"
+        ? { name: m.trim(), email: "" }
+        : { name: (m?.name ?? "").trim(), email: (m?.email ?? "").trim() },
+    )
+    .filter((m) => m.name || m.email);
+
 /**
  * Parse a committed `app.yml` manifest — either raw YAML text or an
  * already-parsed object — back into the top-level metadata and the editable
@@ -563,41 +677,47 @@ export const parseManifest = (source) => {
   const manifest =
     typeof source === "string" ? loadYaml(source) || {} : source || {};
 
-  const meta = {
-    name: typeof manifest.name === "string" ? manifest.name : "",
-    description:
-      typeof manifest.description === "string" ? manifest.description : "",
-    applicationType: APPLICATION_TYPES.some(
-      (t) => t.value === manifest.applicationType,
-    )
-      ? manifest.applicationType
-      : "processor",
-  };
-
+  const nested = detectManifestShape(manifest) === MANIFEST_SHAPES.NESTED;
+  // In the nested shape the application metadata lives under `application`
+  // and cpu/memory sit on `runtime`; in the flat shape both are top-level.
+  const app = nested ? manifest.application || {} : manifest;
   const runtime = manifest.runtime || {};
-  const computeTypes =
-    Array.isArray(runtime.computeTypes) && runtime.computeTypes.length
-      ? runtime.computeTypes.map((t) =>
-          t === "ecs" ? COMPUTE_TYPES.STANDARD : t,
-        )
-      : [...DEFAULT_COMPUTE_TYPES];
-  const resources = manifest.resources || {};
+  const resources = nested ? runtime : manifest.resources || {};
+
+  const rawType = nested ? app.type : app.applicationType;
+
+  const meta = {
+    name: typeof app.name === "string" ? app.name : "",
+    description: typeof app.description === "string" ? app.description : "",
+    applicationType: APPLICATION_TYPES.some((t) => t.value === rawType)
+      ? rawType
+      : "processor",
+    // Present in the nested shape only; empty strings/arrays otherwise so
+    // callers never have to branch on shape.
+    id: typeof app.id === "string" ? app.id : "",
+    version: app.version == null ? "" : String(app.version),
+    maintainers: parseMaintainers(app.maintainers),
+    schemaVersion:
+      manifest.schemaVersion == null ? "" : String(manifest.schemaVersion),
+    timeoutSeconds:
+      typeof runtime.timeoutSeconds === "number" ? runtime.timeoutSeconds : null,
+    shape: nested ? MANIFEST_SHAPES.NESTED : MANIFEST_SHAPES.FLAT,
+  };
 
   const schema = createApplicationSchema({
     resources: {
       cpu: resources.cpu ?? null,
       memory: resources.memory ?? null,
     },
-    runtime: { computeTypes, gpu: parseGpu(runtime) },
-    // Manifest parameters key the default as `default`; the editable schema
-    // (and parseParameter) expect `defaultValue`.
-    parameters: asArray(manifest.parameters).map((p) =>
-      parseParameter({ ...p, defaultValue: p?.default }),
-    ),
+    runtime: { computeTypes: parseComputeTypes(runtime) },
+    // Both manifest shapes go through parseParameter, which reads the
+    // canonical `defaultValue`/`validValues` and the legacy `default`/
+    // `allowedValues` alike.
+    parameters: asArray(manifest.parameters).map(parseParameter),
     inputs: asArray(manifest.inputs).map(parsePort),
     outputs: asArray(manifest.outputs).map(parsePort),
-    tags: asArray(manifest.tags),
-    categories: asArray(manifest.categories),
+    tags: asArray(nested ? app.tags : manifest.tags),
+    categories: asArray(nested ? app.categories : manifest.categories),
   });
 
   return { meta, schema };
@@ -626,8 +746,9 @@ export const toParamSchema = (parameters) =>
         description: p.description || "",
         // `undefined` (not null) signals "no default" to the builder UI.
         defaultValue: coerced == null || coerced === "" ? undefined : coerced,
-        validValues:
-          p.type === PARAM_TYPES.ENUM ? asArray(p.allowedValues) : [],
+        // Any type may carry choices: the manifest declares a dropdown as
+        // `type: string` (or number) plus `validValues`.
+        validValues: asArray(p.validValues),
       };
     });
 
@@ -678,6 +799,13 @@ export function validateParameterValue(param, value) {
   }
   if (!has) return { valid: true, error: null };
 
+  // Choices are checked for every type, not just `enum`: a manifest can
+  // declare `type: number` with `validValues`.
+  const choices = asArray(param.validValues).map(String);
+  if (choices.length && !choices.includes(String(value))) {
+    return { valid: false, error: "Not a valid value" };
+  }
+
   switch (param.type) {
     case PARAM_TYPES.NUMBER: {
       const n = Number(value);
@@ -687,12 +815,6 @@ export function validateParameterValue(param, value) {
         return { valid: false, error: `Must be ≥ ${param.min}` };
       if (param.max != null && n > Number(param.max))
         return { valid: false, error: `Must be ≤ ${param.max}` };
-      return { valid: true, error: null };
-    }
-    case PARAM_TYPES.ENUM: {
-      const allowed = asArray(param.allowedValues).map(String);
-      if (allowed.length && !allowed.includes(String(value)))
-        return { valid: false, error: "Not an allowed value" };
       return { valid: true, error: null };
     }
     default:
@@ -719,8 +841,8 @@ export function validateParameters(parameters) {
     } else {
       seen.add(name);
     }
-    if (p.type === PARAM_TYPES.ENUM && !asArray(p.allowedValues).length) {
-      errors.push(`${where} is a choice but has no allowed values`);
+    if (p.type === PARAM_TYPES.ENUM && !asArray(p.validValues).length) {
+      errors.push(`${where} is a choice but has no valid values`);
     }
     if (
       p.type === PARAM_TYPES.NUMBER &&
@@ -750,6 +872,18 @@ export function validateParameters(parameters) {
  */
 export function arePortsCompatible(output, input) {
   if (!output || !input) return false;
+
+  // The backend's manifest describes ports by media type rather than by
+  // `dataType`. When both sides declare media types, compare those — otherwise
+  // every nested-manifest port would read as `any` and match everything.
+  const outMedia = asArray(output.mediaTypes);
+  const inMedia = asArray(input.mediaTypes);
+  if (outMedia.length && inMedia.length) {
+    const wildcard = (t) => t === "*/*" || t === "application/octet-stream";
+    if (outMedia.some(wildcard) || inMedia.some(wildcard)) return true;
+    return outMedia.some((o) => inMedia.includes(o));
+  }
+
   const a = output.dataType || "any";
   const b = input.dataType || "any";
   return a === "any" || b === "any" || a === b;

@@ -10,59 +10,59 @@ import { ref } from "vue";
 const exampleManifest = `# yaml-language-server: $schema=https://app.pennsieve.io/static/schemas/app-manifest.v1.json
 schemaVersion: "1.0"
 
-name: Spike Sorter
-description: Detects and sorts neural spikes from extracellular recordings.
-applicationType: processor
-categories:
-  - Preprocessing
-  - Machine Learning
-tags:
-  - electrophysiology
-  - spike-sorting
+application:
+  name: Spike Sorter
+  description: Detects and sorts neural spikes from extracellular recordings.
+  type: processor
+  categories:
+    - Preprocessing
+    - Machine Learning
+  tags:
+    - electrophysiology
+    - spike-sorting
 
 runtime:
-  computeTypes:
-    - standard
-  gpu:
-    enabled: true
-    count: 1
-    type: nvidia-t4
-
-resources:
   cpu: 4096
   memory: 16384
+  computeTypes:
+    - standard
+    - gpu
 
 parameters:
   - name: threshold
     label: Detection threshold (σ)
     description: Spike detection threshold in standard deviations.
     type: number
-    required: true
-    default: 5
+    defaultValue: "5"
     min: 1
     max: 20
   - name: sorter
     label: Sorting algorithm
-    type: enum
-    default: kilosort
-    allowedValues:
+    description: Sorting algorithm to run.
+    type: string
+    defaultValue: kilosort
+    validValues:
       - kilosort
       - mountainsort
       - spykingcircus
   - name: drift_correction
     label: Enable drift correction
     type: boolean
-    default: true
+    defaultValue: "true"
+  - name: channel
+    label: Channel
+    description: Channel to analyze. No defaultValue, so it is required at run time.
+    type: string
 
 inputs:
   - name: recording
-    dataType: timeseries
+    dataType: TimeSeries
     required: true
     description: Raw extracellular recording.
 
 outputs:
   - name: sorted_units
-    dataType: package
+    dataType: Tabular
     description: Sorted spike trains and unit metadata.`;
 
 const SCHEMA_URL = "https://app.pennsieve.io/static/schemas/app-manifest.v1.json";
@@ -85,32 +85,41 @@ const copyExample = async () => {
 */
 const topLevelFields = [
   { name: "schemaVersion", type: "string", required: true, desc: 'Manifest version. Must be "1.0".' },
-  { name: "name", type: "string", required: true, desc: "Human-readable application name." },
-  { name: "description", type: "string", required: false, desc: "Short description of what the application does." },
-  { name: "applicationType", type: "enum", required: false, desc: "processor, preprocessor, or postprocessor." },
-  { name: "categories", type: "string[]", required: false, desc: "Curated categories used to group applications." },
-  { name: "tags", type: "string[]", required: false, desc: "Free-form labels for search and filtering." },
-  { name: "runtime", type: "object", required: false, desc: "computeTypes and optional gpu configuration." },
-  { name: "resources", type: "object", required: false, desc: "Default cpu (units) and memory (MB)." },
+  { name: "application", type: "object", required: true, desc: "Application metadata — see the table below." },
+  { name: "runtime", type: "object", required: false, desc: "cpu (units), memory (MB), and computeTypes." },
   { name: "parameters", type: "object[]", required: false, desc: "Run-time parameters with defaults." },
   { name: "inputs", type: "object[]", required: false, desc: "Typed input ports for workflow validation." },
   { name: "outputs", type: "object[]", required: false, desc: "Typed output ports for workflow validation." },
 ];
 
+const applicationFields = [
+  { name: "name", type: "string", required: true, desc: "Human-readable application name." },
+  { name: "description", type: "string", required: false, desc: "Short description of what the application does." },
+  { name: "type", type: "enum", required: false, desc: "processor, preprocessor, or postprocessor." },
+  { name: "categories", type: "string[]", required: false, desc: "Curated categories used to group applications." },
+  { name: "tags", type: "string[]", required: false, desc: "Free-form labels for search and filtering." },
+];
+
+const runtimeFields = [
+  { name: "cpu", type: "number", required: false, desc: "Default CPU units (1024 = 1 vCPU)." },
+  { name: "memory", type: "number", required: false, desc: "Default memory reservation in MB." },
+  { name: "computeTypes", type: "string[]", required: false, desc: "Compute environments the application supports: standard, lambda, gpu. A GPU application lists gpu here — there is no separate gpu block." },
+];
+
 const parameterFields = [
   { name: "name", type: "string", required: true, desc: "Machine name passed to the application. Must be unique." },
-  { name: "type", type: "enum", required: true, desc: "string, number, boolean, or enum." },
+  { name: "type", type: "enum", required: true, desc: "string, number, or boolean." },
   { name: "label", type: "string", required: false, desc: "Label shown in the run form." },
   { name: "description", type: "string", required: false, desc: "Help text shown beneath the field." },
-  { name: "required", type: "boolean", required: false, desc: "Whether a value must be supplied before a run starts." },
-  { name: "default", type: "any", required: false, desc: "Default value that pre-populates the run form." },
-  { name: "allowedValues", type: "array", required: false, desc: 'Permitted values. Required when type is "enum".' },
+  { name: "defaultValue", type: "string", required: false, desc: "Value that pre-populates the run form. Omit to make the parameter required." },
+  { name: "validValues", type: "string[]", required: false, desc: "Permitted values. Renders the field as a dropdown." },
+  { name: "required", type: "boolean", required: false, desc: "Only to contradict the default rule — a parameter with no defaultValue is already required." },
   { name: "min / max", type: "number", required: false, desc: "Bounds for numeric parameters." },
 ];
 
 const portFields = [
   { name: "name", type: "string", required: true, desc: "Port name. Unique among inputs (or outputs)." },
-  { name: "dataType", type: "enum", required: true, desc: "any, file, directory, package, dataset, tabular, image, timeseries." },
+  { name: "dataType", type: "string", required: true, desc: "A Pennsieve package type (the manifest builder lists the ones the platform reports), or \"any\" to match everything." },
   { name: "description", type: "string", required: false, desc: "What flows through this port." },
   { name: "required", type: "boolean", required: false, desc: "Whether the port must be connected (inputs only)." },
 ];
@@ -123,7 +132,7 @@ const portFields = [
       <p class="lede">
         Applications are published from a GitHub repository. Add an
         <code>app.yml</code> file to the root of your repository to declare its
-        runtime, resources, parameters, and inputs/outputs. When you publish the
+        runtime, parameters, and inputs/outputs. When you publish the
         repository to the App Store, Pennsieve reads this file and uses it to
         populate the application's defaults — including the default values shown
         when the application is added to a workflow.
@@ -165,10 +174,10 @@ const portFields = [
         From <strong>My Code</strong>, enable
         <strong>Publishing &rarr; App Store</strong> on the repository. Pennsieve
         validates <code>app.yml</code> during registration and maps it onto the
-        application: <code>resources</code> and <code>runtime</code> become the
-        runtime configuration, <code>parameters</code> become the typed parameter
-        schema, and <code>inputs</code>/<code>outputs</code> become the ports used
-        to validate workflow connections.
+        application: <code>runtime</code> becomes the runtime configuration,
+        <code>parameters</code> become the typed parameter schema, and
+        <code>inputs</code>/<code>outputs</code> become the ports used to
+        validate workflow connections.
       </p>
       <p class="guide-note guide-note--warn">
         If <code>app.yml</code> is missing or fails validation, the application
@@ -195,11 +204,56 @@ const portFields = [
     </section>
 
     <section class="guide-section">
+      <h2>Application fields</h2>
+      <p>
+        Everything under <code>application</code> describes the app itself.
+      </p>
+      <table class="field-table">
+        <thead>
+          <tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr>
+        </thead>
+        <tbody>
+          <tr v-for="f in applicationFields" :key="f.name">
+            <td><code>{{ f.name }}</code></td>
+            <td>{{ f.type }}</td>
+            <td>{{ f.required ? "Yes" : "—" }}</td>
+            <td>{{ f.desc }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="guide-section">
+      <h2>Runtime fields</h2>
+      <p>
+        <code>runtime</code> carries the defaults a run starts from. A GPU
+        application declares <code>gpu</code> among its
+        <code>computeTypes</code>; there is no standalone <code>gpu</code>
+        block.
+      </p>
+      <table class="field-table">
+        <thead>
+          <tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr>
+        </thead>
+        <tbody>
+          <tr v-for="f in runtimeFields" :key="f.name">
+            <td><code>{{ f.name }}</code></td>
+            <td>{{ f.type }}</td>
+            <td>{{ f.required ? "Yes" : "—" }}</td>
+            <td>{{ f.desc }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="guide-section">
       <h2>Parameter fields</h2>
       <p>
-        Each entry in <code>parameters</code> describes one run-time input. The
-        <code>default</code> value pre-populates the field when a user adds the
-        application to a workflow.
+        Each entry in <code>parameters</code> describes one run-time input.
+        <code>defaultValue</code> pre-populates the field when a user adds the
+        application to a workflow, and <code>validValues</code> turns it into a
+        dropdown. A parameter with no <code>defaultValue</code> is treated as
+        required &mdash; a value has to be supplied before the run starts.
       </p>
       <table class="field-table">
         <thead>
@@ -223,6 +277,13 @@ const portFields = [
         ports. Pennsieve uses the <code>dataType</code> of an upstream output and
         a downstream input to validate that two applications can be connected in a
         workflow.
+      </p>
+      <p>
+        A <code>dataType</code> is a Pennsieve package type &mdash; the same
+        vocabulary the platform uses for the files in a dataset &mdash; or
+        <code>any</code>, which matches everything. The manifest builder's port
+        dropdown lists the types the platform currently reports, so use it rather
+        than guessing a spelling.
       </p>
       <table class="field-table">
         <thead>
