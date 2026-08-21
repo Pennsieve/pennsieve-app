@@ -57,7 +57,7 @@ describe('useAppManifest helpers', () => {
       expect(parsed.schema.parameters[0]).toMatchObject({
         name: 'mode',
         defaultValue: 'fast',
-        allowedValues: ['fast', 'accurate'],
+        validValues: ['fast', 'accurate'],
       })
     })
 

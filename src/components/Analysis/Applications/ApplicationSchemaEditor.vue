@@ -38,47 +38,25 @@
         </el-select>
       </div>
 
+      <!-- GPU is one of these, not a block of its own. -->
       <div class="field-row">
         <label class="field-label">Compute Types</label>
         <div class="field-control inline-checks">
           <el-checkbox :model-value="true" disabled>Standard</el-checkbox>
           <el-checkbox
             :model-value="schema.runtime.computeTypes.includes('lambda')"
-            @change="toggleLambda"
+            @change="(checked) => toggleComputeType('lambda', checked)"
           >
             Lambda
           </el-checkbox>
+          <el-checkbox
+            :model-value="schema.runtime.computeTypes.includes('gpu')"
+            @change="(checked) => toggleComputeType('gpu', checked)"
+          >
+            GPU
+          </el-checkbox>
         </div>
       </div>
-
-      <!-- GPU -->
-      <div class="field-row">
-        <label class="field-label">GPU</label>
-        <div class="field-control">
-          <el-switch v-model="schema.runtime.gpu.enabled" />
-        </div>
-      </div>
-      <template v-if="schema.runtime.gpu.enabled">
-        <div class="field-row sub-field">
-          <label class="field-label">GPU Count</label>
-          <el-input-number
-            v-model="schema.runtime.gpu.count"
-            :min="1"
-            :max="16"
-            size="small"
-            class="field-control"
-          />
-        </div>
-        <div class="field-row sub-field">
-          <label class="field-label">GPU Type</label>
-          <el-input
-            v-model="schema.runtime.gpu.type"
-            size="small"
-            placeholder="e.g. nvidia-t4 (optional)"
-            class="field-control"
-          />
-        </div>
-      </template>
     </section>
 
     <!-- ───────────── Parameters ───────────── -->
@@ -132,11 +110,11 @@
             </div>
           </div>
 
-          <!-- Allowed values (enum) -->
+          <!-- Valid values (enum) -->
           <div v-if="param.type === PARAM_TYPES.ENUM" class="field-row">
-            <label class="field-label">Allowed Values</label>
+            <label class="field-label">Valid Values</label>
             <el-select
-              v-model="param.allowedValues"
+              v-model="param.validValues"
               size="small"
               multiple
               filterable
@@ -196,7 +174,7 @@
               class="field-control"
             >
               <el-option
-                v-for="v in param.allowedValues"
+                v-for="v in param.validValues"
                 :key="v"
                 :label="v"
                 :value="v"
@@ -262,7 +240,7 @@
             <label class="field-label">Data Type</label>
             <el-select v-model="port.dataType" size="small" class="field-control">
               <el-option
-                v-for="dt in PORT_DATA_TYPES"
+                v-for="dt in portDataTypes"
                 :key="dt.value"
                 :label="dt.label"
                 :value="dt.value"
@@ -348,15 +326,16 @@
 </template>
 
 <script setup>
-import { computed } from "vue";
+import { computed, onMounted } from "vue";
+import { useStore } from "vuex";
 import { CircleClose, Plus } from "@element-plus/icons-vue";
 import {
   PARAM_TYPES,
   PARAM_TYPE_OPTIONS,
-  PORT_DATA_TYPES,
   APPLICATION_CATEGORIES,
   createParameter,
   createPort,
+  portDataTypeOptions,
   STANDARD_CPU_OPTIONS,
   getStandardMemoryOptions,
 } from "./applicationSchema";
@@ -372,6 +351,23 @@ defineProps({
   // configuration itself (e.g. an edit flow that can't change resources).
   showRuntime: { type: Boolean, default: true },
 });
+
+const store = useStore();
+
+/*
+  A port's data type is a platform package type, not a vocabulary this form
+  invents: the list comes from GET /packages/types. Types already written into
+  the manifest are kept in the list too, so editing an older app.yml cannot
+  quietly blank its ports.
+*/
+onMounted(() => store.dispatch("analysisModule/fetchPackageTypes"));
+
+const portDataTypes = computed(() =>
+  portDataTypeOptions(store.state.analysisModule.packageTypes, [
+    ...(schema.value.inputs || []).map((p) => p.dataType),
+    ...(schema.value.outputs || []).map((p) => p.dataType),
+  ]),
+);
 
 const portKinds = [
   {
@@ -397,10 +393,11 @@ const onCpuChange = () => {
   schema.value.resources.memory = null;
 };
 
-const toggleLambda = (checked) => {
+const toggleComputeType = (type, checked) => {
   const types = new Set(schema.value.runtime.computeTypes);
-  if (checked) types.add("lambda");
-  else types.delete("lambda");
+  if (checked) types.add(type);
+  else types.delete(type);
+  // Standard is always supported and is not user-removable.
   types.add("standard");
   schema.value.runtime.computeTypes = Array.from(types);
 };
@@ -409,7 +406,7 @@ const onParamTypeChange = (param, type) => {
   param.type = type;
   // A default carried over from another type is usually invalid; reset it.
   param.defaultValue = type === PARAM_TYPES.BOOLEAN ? false : null;
-  if (type !== PARAM_TYPES.ENUM) param.allowedValues = [];
+  if (type !== PARAM_TYPES.ENUM) param.validValues = [];
   if (type !== PARAM_TYPES.NUMBER) {
     param.min = null;
     param.max = null;
