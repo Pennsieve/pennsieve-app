@@ -730,12 +730,17 @@ watch(
 
               <!-- Raw file -->
               <section class="manifest-block">
-                <div class="manifest-raw-header">
-                  <h4 class="manifest-block-title">Raw app.yml</h4>
-                  <button type="button" class="manifest-raw-toggle" @click="showRawManifest = !showRawManifest">
-                    {{ showRawManifest ? "Hide" : "Show" }}
+                <h4 class="manifest-block-title manifest-raw-title">
+                  <button
+                    type="button"
+                    class="manifest-raw-toggle"
+                    :aria-expanded="showRawManifest"
+                    @click="showRawManifest = !showRawManifest"
+                  >
+                    Raw app.yml
+                    <span class="manifest-raw-toggle-action">{{ showRawManifest ? "Hide" : "Show" }}</span>
                   </button>
-                </div>
+                </h4>
                 <pre v-if="showRawManifest" class="manifest-raw"><code>{{ manifestRaw }}</code></pre>
               </section>
             </div>
@@ -1502,24 +1507,34 @@ watch(
   color: theme.$gray_4;
 }
 
-.manifest-raw-header {
+/* The whole title is the control: "Show" sits next to "Raw app.yml"
+   rather than flush right, where it was easy to miss and easy to click
+   the heading instead. */
+.manifest-raw-title {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
 }
 
 .manifest-raw-toggle {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
   background: none;
   border: none;
   padding: 0;
-  font-size: 12px;
-  color: theme.$purple_3;
+  font: inherit;
+  color: theme.$black;
   cursor: pointer;
 
-  &:hover {
+  &:hover .manifest-raw-toggle-action,
+  &:focus-visible .manifest-raw-toggle-action {
     text-decoration: underline;
   }
+}
+
+.manifest-raw-toggle-action {
+  font-size: 12px;
+  font-weight: 400;
+  color: theme.$purple_3;
 }
 
 .manifest-raw {
