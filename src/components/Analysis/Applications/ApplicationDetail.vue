@@ -600,13 +600,6 @@ watch(
                       {{ manifestMeta.timeoutSeconds }}s
                     </span>
                   </div>
-                  <div v-if="manifestSchema.runtime.gpu.enabled" class="manifest-field">
-                    <span class="manifest-field-label">GPU</span>
-                    <span class="manifest-field-value">
-                      {{ manifestSchema.runtime.gpu.count }}&times;
-                      {{ manifestSchema.runtime.gpu.type || "GPU" }}
-                    </span>
-                  </div>
                 </div>
               </section>
 
@@ -643,7 +636,7 @@ watch(
                         <th>Name</th>
                         <th>Type</th>
                         <th>Default</th>
-                        <th>Allowed values</th>
+                        <th>Valid values</th>
                         <th>Description</th>
                       </tr>
                     </thead>
@@ -655,7 +648,7 @@ watch(
                           {{ formatDefaultValue(param.defaultValue) }}
                         </td>
                         <td class="manifest-mono">
-                          {{ param.allowedValues.length ? param.allowedValues.join(", ") : "—" }}
+                          {{ param.validValues.length ? param.validValues.join(", ") : "—" }}
                         </td>
                         <td>{{ param.description || "—" }}</td>
                       </tr>

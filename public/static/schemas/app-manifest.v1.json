@@ -4,7 +4,7 @@
   "title": "Pennsieve Application Manifest",
   "description": "Declarative manifest (app.yml) committed to an application's source repository. Pennsieve reads this file when the repository is published to the App Store to seed the application's runtime configuration, parameters, inputs/outputs, and classification.",
   "type": "object",
-  "required": ["schemaVersion", "name"],
+  "required": ["schemaVersion"],
   "additionalProperties": false,
   "properties": {
     "$schema": {
@@ -15,78 +15,110 @@
       "const": "1.0",
       "description": "Manifest schema version. Must be \"1.0\"."
     },
+    "application": {
+      "type": "object",
+      "description": "Application metadata. This is where name, description and type belong.",
+      "additionalProperties": false,
+      "required": ["name"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Stable identifier, normally the repository name."
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Human-readable application name."
+        },
+        "description": {
+          "type": "string",
+          "description": "Short description of what the application does."
+        },
+        "type": {
+          "enum": ["processor", "preprocessor", "postprocessor"],
+          "description": "Role the application plays within a workflow."
+        },
+        "version": {
+          "type": ["string", "number"],
+          "description": "Application version."
+        },
+        "maintainers": {
+          "type": "array",
+          "description": "Who maintains the application.",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["name"],
+            "properties": {
+              "name": { "type": "string", "minLength": 1 },
+              "email": { "type": "string" }
+            }
+          }
+        },
+        "categories": { "$ref": "#/$defs/categories" },
+        "tags": { "$ref": "#/$defs/tags" }
+      }
+    },
     "name": {
       "type": "string",
       "minLength": 1,
-      "description": "Human-readable application name."
+      "deprecated": true,
+      "description": "Deprecated: use application.name."
     },
     "description": {
       "type": "string",
-      "description": "Short description of what the application does."
+      "deprecated": true,
+      "description": "Deprecated: use application.description."
     },
     "applicationType": {
       "enum": ["processor", "preprocessor", "postprocessor"],
-      "description": "Role the application plays within a workflow."
+      "deprecated": true,
+      "description": "Deprecated: use application.type."
     },
-    "categories": {
-      "type": "array",
-      "description": "Curated categories used to group and discover applications.",
-      "items": {
-        "enum": [
-          "Preprocessing",
-          "Segmentation",
-          "Registration",
-          "Quantification",
-          "Visualization",
-          "Machine Learning",
-          "Statistics",
-          "Format Conversion",
-          "Quality Control",
-          "Utility"
-        ]
-      },
-      "uniqueItems": true
-    },
-    "tags": {
-      "type": "array",
-      "description": "Free-form labels for search and filtering.",
-      "items": { "type": "string", "minLength": 1 },
-      "uniqueItems": true
-    },
+    "categories": { "$ref": "#/$defs/categories", "deprecated": true },
+    "tags": { "$ref": "#/$defs/tags", "deprecated": true },
     "runtime": {
       "type": "object",
-      "description": "Where and how the application executes.",
+      "description": "Where and how the application executes, and the cpu/memory it starts from. These are defaults; workspace runs may override within allowed limits.",
       "additionalProperties": false,
       "properties": {
+        "cpu": {
+          "enum": [256, 512, 1024, 2048, 4096, 8192, 16384],
+          "description": "CPU units (1024 = 1 vCPU)."
+        },
+        "memory": {
+          "enum": [512, 1024, 2048, 4096, 8192, 16384, 30720, 61440, 122880],
+          "description": "Memory reservation in MB."
+        },
         "computeTypes": {
           "type": "array",
-          "description": "Compute environments the application supports.",
-          "items": { "enum": ["standard", "lambda"] },
+          "description": "Compute environments the application supports. A GPU application lists \"gpu\" here; there is no separate gpu block.",
+          "items": { "enum": ["standard", "lambda", "gpu"] },
           "uniqueItems": true,
           "default": ["standard"]
         },
+        "timeoutSeconds": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Maximum run time before the application is stopped."
+        },
         "gpu": {
-          "type": "object",
-          "description": "GPU requirements. Omit or set enabled=false for CPU-only applications.",
+          "deprecated": true,
+          "description": "Deprecated: add \"gpu\" to computeTypes instead. Read as computeTypes: [gpu].",
+          "type": ["object", "boolean", "integer"],
           "additionalProperties": false,
           "properties": {
-            "enabled": { "type": "boolean", "default": false },
-            "count": {
-              "type": "integer",
-              "minimum": 1,
-              "description": "Number of GPUs to allocate."
-            },
-            "type": {
-              "type": "string",
-              "description": "GPU model identifier (e.g. nvidia-t4)."
-            }
+            "enabled": { "type": "boolean" },
+            "count": { "type": "integer", "minimum": 1 },
+            "type": { "type": "string" }
           }
         }
       }
     },
     "resources": {
       "type": "object",
-      "description": "Default CPU and memory reservation. These are defaults; workspace runs may override within allowed limits.",
+      "deprecated": true,
+      "description": "Deprecated: put cpu and memory on runtime instead.",
       "additionalProperties": false,
       "properties": {
         "cpu": {
@@ -115,7 +147,36 @@
       "items": { "$ref": "#/$defs/port" }
     }
   },
+  "anyOf": [
+    { "required": ["application"] },
+    { "required": ["name"] }
+  ],
   "$defs": {
+    "categories": {
+      "type": "array",
+      "description": "Curated categories used to group and discover applications.",
+      "items": {
+        "enum": [
+          "Preprocessing",
+          "Segmentation",
+          "Registration",
+          "Quantification",
+          "Visualization",
+          "Machine Learning",
+          "Statistics",
+          "Format Conversion",
+          "Quality Control",
+          "Utility"
+        ]
+      },
+      "uniqueItems": true
+    },
+    "tags": {
+      "type": "array",
+      "description": "Free-form labels for search and filtering.",
+      "items": { "type": "string", "minLength": 1 },
+      "uniqueItems": true
+    },
     "parameter": {
       "type": "object",
       "required": ["name", "type"],
@@ -136,20 +197,21 @@
         },
         "type": {
           "enum": ["string", "number", "boolean", "enum"],
-          "description": "Parameter data type. Determines the control rendered in the UI."
+          "description": "Parameter data type. Determines the control rendered in the UI. Prefer \"string\" with validValues over \"enum\", which is kept for older manifests."
+        },
+        "defaultValue": {
+          "type": "string",
+          "description": "Value used to pre-populate the run form, written as a string. A parameter with no defaultValue is treated as required."
+        },
+        "validValues": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Permitted values. Renders the parameter as a dropdown, whatever its declared type.",
+          "minItems": 1
         },
         "required": {
           "type": "boolean",
-          "default": false,
-          "description": "Whether a value must be supplied before the run can start."
-        },
-        "default": {
-          "description": "Default value used to pre-populate the run form. Must match the parameter type."
-        },
-        "allowedValues": {
-          "type": "array",
-          "description": "Permitted values. Required when type is \"enum\".",
-          "minItems": 1
+          "description": "Only needed to contradict what defaultValue implies: without a defaultValue a parameter is required, with one it is not."
         },
         "min": {
           "type": "number",
@@ -158,12 +220,30 @@
         "max": {
           "type": "number",
           "description": "Maximum value (numeric parameters only)."
+        },
+        "default": {
+          "deprecated": true,
+          "description": "Deprecated alias for defaultValue."
+        },
+        "allowedValues": {
+          "type": "array",
+          "deprecated": true,
+          "description": "Deprecated alias for validValues.",
+          "minItems": 1
         }
       },
       "allOf": [
         {
-          "if": { "properties": { "type": { "const": "enum" } } },
-          "then": { "required": ["allowedValues"] }
+          "if": {
+            "properties": { "type": { "const": "enum" } },
+            "required": ["type"]
+          },
+          "then": {
+            "anyOf": [
+              { "required": ["validValues"] },
+              { "required": ["allowedValues"] }
+            ]
+          }
         }
       ]
     },
@@ -182,17 +262,9 @@
           "description": "What flows through this port."
         },
         "dataType": {
-          "enum": [
-            "any",
-            "file",
-            "directory",
-            "package",
-            "dataset",
-            "tabular",
-            "image",
-            "timeseries"
-          ],
-          "description": "Data type carried by the port. Used to validate workflow connections."
+          "type": "string",
+          "minLength": 1,
+          "description": "Data type carried by the port: a Pennsieve package type, or \"any\" to match everything. The available package types are served by GET /packages/types, so this is not a fixed list. Used to validate workflow connections."
         },
         "required": {
           "type": "boolean",
