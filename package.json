@@ -35,7 +35,7 @@
     "@jupyterlab/services": "^7.2.0",
     "@pennsieve-viz/core": "^0.3.3",
     "@pennsieve-viz/micro-ct": "^1.0.72",
-    "@pennsieve-viz/tsviewer": "1.4.2",
+    "@pennsieve-viz/tsviewer": "2.0.0",
     "@sigma/node-border": "^3.0.0",
     "@types/d3": "^7.4.3",
     "@types/ramda": "^0.29.10",
