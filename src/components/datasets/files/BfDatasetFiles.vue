@@ -1231,6 +1231,7 @@ export default {
      */
     onFolderCreated: function (folder) {
       this.files.push(folder);
+      this.syncTargetPackageChildren();
       this.sortColumn(this.sortBy, this.sortDirection);
     },
 
@@ -1269,9 +1270,39 @@ export default {
         );
         this.files.splice(fileIndex, 1);
       }
+      // The names these rows held are free again — see
+      // syncTargetPackageChildren.
+      this.syncTargetPackageChildren();
       // Resort files
       this.sortColumn(this.sortBy, this.sortDirection);
       this.resetSelectedFiles();
+    },
+
+    /**
+     * Mirror this folder's rows into the upload store's snapshot of the
+     * destination package (`currentTargetPackage`).
+     *
+     * syncManifest pre-resolves upload name conflicts client-side
+     * (resolveKeepBothName) against that snapshot, and the snapshot is only
+     * ever written by fetchFiles / silentlyFetchFiles. Rows dropped locally
+     * after a *confirmed* delete or move stay in it, so the next upload of a
+     * just-freed name gets renamed to "x (1).ext" by us, before the manifest
+     * is even sent — the API frees the name synchronously inside the
+     * /data/delete transaction, so it is not the one adding the suffix.
+     * Reloading the page fixed it only because it refetched the children.
+     *
+     * Syncing on additions too (new folder, landed upload) keeps the other
+     * direction honest: colliding with a row that is really there should
+     * still produce "(1)".
+     */
+    syncTargetPackageChildren: function () {
+      const targetPackage =
+        this.$store.state.uploadModule?.currentTargetPackage;
+      if (!targetPackage || !Array.isArray(targetPackage.children)) return;
+      this.$store.dispatch("uploadModule/setCurrentTargetPackage", {
+        ...targetPackage,
+        children: [...this.files],
+      });
     },
 
     /**
@@ -1417,6 +1448,7 @@ export default {
         isParent
       ) {
         this.files.push(packageDTO);
+        this.syncTargetPackageChildren();
         // Resort files
         this.sortColumn(this.sortBy, this.sortDirection);
         this.resetSelectedFiles();
