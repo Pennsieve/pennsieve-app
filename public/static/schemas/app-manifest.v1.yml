@@ -1,3 +1,4 @@
+# yaml-language-server
 schemaVersion: 1.0.0
 application:
   id: test-app

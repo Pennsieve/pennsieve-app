@@ -457,11 +457,13 @@ export const MANIFEST_EXAMPLE_URL =
 
 export const MANIFEST_SCHEMA_VERSION = "1.0";
 
-/** Roles an application can play within a workflow. */
+/**
+ * Roles an application can play within a workflow. Only `processor` is
+ * supported today, so it is the sole option the manifest builder offers and
+ * the value any unrecognized `application.type` normalizes to.
+ */
 export const APPLICATION_TYPES = Object.freeze([
   { value: "processor", label: "Processor" },
-  { value: "preprocessor", label: "Preprocessor" },
-  { value: "postprocessor", label: "Postprocessor" },
 ]);
 
 /**
