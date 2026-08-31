@@ -19,7 +19,6 @@ import {
   serializeManifestYaml,
   parseManifest,
   createPort,
-  MANIFEST_SCHEMA_URL,
   MANIFEST_SHAPES,
   detectManifestShape,
 } from './applicationSchema'
@@ -355,13 +354,13 @@ describe('applicationSchema', () => {
   })
 
   describe('buildManifest', () => {
-    it('emits the $schema pointer and version, with metadata under `application`', () => {
+    it('emits the version and metadata under `application`, with no $schema', () => {
       const m = buildManifest(createApplicationSchema(), {
         name: 'My App',
         description: 'Does things.',
         applicationType: 'processor',
       })
-      expect(m.$schema).toBe(MANIFEST_SCHEMA_URL)
+      expect(m).not.toHaveProperty('$schema')
       expect(m.schemaVersion).toBe('1.0')
       expect(m.application).toEqual({
         name: 'My App',
@@ -482,11 +481,16 @@ describe('applicationSchema', () => {
   })
 
   describe('manifestToYaml', () => {
-    it('emits $schema as a yaml-language-server directive, not a data key', () => {
+    it('never writes $schema as a data key', () => {
       const yaml = manifestToYaml(buildManifest(createApplicationSchema(), { name: 'X' }))
-      expect(yaml.startsWith(`# yaml-language-server: $schema=${MANIFEST_SCHEMA_URL}\n`)).toBe(true)
       expect(yaml).not.toMatch(/^\$schema:/m)
       expect(yaml).toMatch(/^ {2}name: X$/m)
+    })
+
+    it('emits a $schema carried by the manifest as a yaml-language-server directive', () => {
+      const yaml = manifestToYaml({ $schema: 'https://example.test/s.json', schemaVersion: '1.0' })
+      expect(yaml.startsWith('# yaml-language-server: $schema=https://example.test/s.json\n')).toBe(true)
+      expect(yaml).not.toMatch(/^\$schema:/m)
     })
   })
 

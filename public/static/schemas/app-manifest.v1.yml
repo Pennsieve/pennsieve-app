@@ -1,0 +1,33 @@
+schemaVersion: 1.0.0
+application:
+  id: test-app
+  name: test-app
+  description: test-app
+  version: 1.0.1
+  type: processor
+  maintainers:
+    - name: edmore
+  tags:
+    - pytorch
+    - gpu
+    - demo
+runtime:
+  cpu: 1024
+  memory: 2048
+  computeTypes:
+    - gpu
+  timeoutSeconds: 300
+parameters: []
+commandArguments: []
+inputs:
+  - name: package_file
+    description: Pipeline package file.
+    mediaTypes:
+      - application/octet-stream
+    cardinality: one
+    required: true
+outputs:
+  - name: package_file
+    description: Pipeline package file.
+    mediaTypes:
+      - application/octet-stream

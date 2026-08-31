@@ -3,12 +3,10 @@ import { ref } from "vue";
 
 /*
   The canonical app.yml example shown in the guide. Kept as a string so it can
-  be rendered verbatim and copied to the clipboard in one click. The
-  `# yaml-language-server` directive enables schema autocomplete/validation in
-  editors such as VS Code.
+  be rendered verbatim and copied to the clipboard in one click. The same
+  example is served as a static asset at EXAMPLE_URL.
 */
-const exampleManifest = `# yaml-language-server: $schema=https://app.pennsieve.io/static/schemas/app-manifest.v1.json
-schemaVersion: "1.0"
+const exampleManifest = `schemaVersion: "1.0"
 
 application:
   name: Spike Sorter
@@ -65,7 +63,7 @@ outputs:
     dataType: Tabular
     description: Sorted spike trains and unit metadata.`;
 
-const SCHEMA_URL = "https://app.pennsieve.io/static/schemas/app-manifest.v1.json";
+const EXAMPLE_URL = "https://app.pennsieve.io/static/schemas/app-manifest.v1.yml";
 
 const copied = ref(false);
 
@@ -81,7 +79,7 @@ const copyExample = async () => {
 
 /*
   Field reference tables. Driven by data so the guide stays in lock-step with the
-  JSON Schema served at SCHEMA_URL.
+  example manifest served at EXAMPLE_URL.
 */
 const topLevelFields = [
   { name: "schemaVersion", type: "string", required: true, desc: 'Manifest version. Must be "1.0".' },
@@ -161,10 +159,8 @@ const portFields = [
         <pre><code>{{ exampleManifest }}</code></pre>
       </div>
       <p class="guide-note">
-        Add the <code># yaml-language-server</code> directive shown above to get
-        autocomplete and inline validation in editors such as VS Code. The schema
-        lives at
-        <a :href="SCHEMA_URL" target="_blank" rel="noopener">{{ SCHEMA_URL }}</a>.
+        This example is also served as a file you can download and adapt:
+        <a :href="EXAMPLE_URL" target="_blank" rel="noopener">{{ EXAMPLE_URL }}</a>.
       </p>
     </section>
 

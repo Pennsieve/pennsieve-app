@@ -451,9 +451,9 @@ export const buildSchemaPayload = (schema) => {
  * Serialization — editable ApplicationSchema  ->  app.yml manifest
  * ────────────────────────────────────────────────────────────────────────── */
 
-/** Canonical location of the manifest JSON Schema (served as a static asset). */
-export const MANIFEST_SCHEMA_URL =
-  "https://app.pennsieve.io/static/schemas/app-manifest.v1.json";
+/** Canonical location of the example app.yml manifest (served as a static asset). */
+export const MANIFEST_EXAMPLE_URL =
+  "https://app.pennsieve.io/static/schemas/app-manifest.v1.yml";
 
 export const MANIFEST_SCHEMA_VERSION = "1.0";
 
@@ -529,7 +529,6 @@ const manifestPort = (port) => {
 export const buildManifest = (schema, meta = {}) => {
   const s = schema || createApplicationSchema();
   const manifest = {
-    $schema: MANIFEST_SCHEMA_URL,
     schemaVersion: meta.schemaVersion || MANIFEST_SCHEMA_VERSION,
   };
 
@@ -584,10 +583,11 @@ export const buildManifest = (schema, meta = {}) => {
  * ────────────────────────────────────────────────────────────────────────── */
 
 /**
- * Serialize a manifest object to the YAML an author commits as `app.yml`. The
- * `$schema` reference is emitted as a `yaml-language-server` directive comment
- * (the YAML convention for editor autocomplete/validation) rather than a data
- * key, so the body stays clean.
+ * Serialize a manifest object to the YAML an author commits as `app.yml`. A
+ * `$schema` carried by the manifest is emitted as a `yaml-language-server`
+ * directive comment (the YAML convention for editor autocomplete/validation)
+ * rather than a data key, so the body stays clean. buildManifest() does not set
+ * one, so manifests written here carry no directive.
  *
  * @param {Object} manifest  manifest object (e.g. from buildManifest)
  * @returns {string} app.yml text

@@ -11,7 +11,7 @@ import {
   parseManifest,
   validateParameters,
   APPLICATION_TYPES,
-  MANIFEST_SCHEMA_URL,
+  MANIFEST_EXAMPLE_URL,
 } from "./applicationSchema";
 
 const router = useRouter();
@@ -37,9 +37,8 @@ const schema = ref(createApplicationSchema());
 const manifest = computed(() => buildManifest(schema.value, meta));
 
 /*
-  YAML preview — the exact app.yml the author commits. Serialization (including
-  the yaml-language-server directive) lives in the schema module so the builder
-  and any consumer stay in lock-step.
+  YAML preview — the exact app.yml the author commits. Serialization lives in
+  the schema module so the builder and any consumer stay in lock-step.
 */
 const manifestYaml = computed(() =>
   serializeManifestYaml(schema.value, meta),
@@ -218,9 +217,9 @@ const goToGuide = () => router.push({ name: "application-manifest-guide" });
           <pre class="preview-code"><code>{{ manifestYaml }}</code></pre>
 
           <p class="preview-footnote">
-            Validated against
-            <a :href="MANIFEST_SCHEMA_URL" target="_blank" rel="noopener">
-              app-manifest.v1.json
+            Modeled on
+            <a :href="MANIFEST_EXAMPLE_URL" target="_blank" rel="noopener">
+              app-manifest.v1.yml
             </a>
           </p>
         </div>
