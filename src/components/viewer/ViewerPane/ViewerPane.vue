@@ -380,6 +380,10 @@ export default {
 
       let viewers = this.checkViewerType(activeViewer) || ['UnknownViewer'];
 
+      // A ready Zarr bundle makes the package viewable regardless of the legacy
+      // package state; set below once the asset listing comes back.
+      let hasReadyZarrTimeseries = false;
+
       // Check for neuroglancer-compatible viewer assets (ome-zarr, etc.)
       const pkgId = pathOr("", ["content", "id"], activeViewer);
       const datasetId = pathOr("", ["content", "datasetNodeId"], activeViewer);
@@ -411,11 +415,14 @@ export default {
               ? { ...tsAsset, cloudfront: result.cloudfront }
               : null;
 
-            if (zarrAsset && !viewers.includes("TimeseriesViewer")) {
-              viewers = [
-                "TimeseriesViewer",
-                ...viewers.filter((v) => v !== "UnknownViewer"),
-              ];
+            if (zarrAsset) {
+              hasReadyZarrTimeseries = true;
+              if (!viewers.includes("TimeseriesViewer")) {
+                viewers = [
+                  "TimeseriesViewer",
+                  ...viewers.filter((v) => v !== "UnknownViewer"),
+                ];
+              }
             }
 
             const neuroglancerTypes = ["ome-zarr", "neuroglancer-precomputed"];
@@ -465,8 +472,11 @@ export default {
 
       this.availableViewers = viewers;
 
+      // `state` is only a signal about the legacy processing pipeline: a package
+      // with a ready Zarr bundle is viewable whether or not it ever ran.
       if (
         this.isTimeseriesPackageUnprocessed(activeViewer) &&
+        !hasReadyZarrTimeseries &&
         !this.isLayFile(activeViewer)
       ) {
         this.loadVueViewer("UnknownViewer");

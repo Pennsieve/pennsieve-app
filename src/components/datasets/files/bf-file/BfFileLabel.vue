@@ -168,6 +168,7 @@ import FileIcon from '../../../../mixins/file-icon/index'
 import GetFileProperty from '../../../../mixins/get-file-property'
 import FileTypeMapper from '../../../../mixins/FileTypeMapper'
 import { packageDisplayName } from '../../../../utils/packages'
+import { useTimeseriesZarrAssets } from '@/composables/useTimeseriesZarrAssets'
 
 import validUrl from 'valid-url'
 import IconEyeball from "../../../icons/IconEyeball.vue";
@@ -219,7 +220,26 @@ export default {
     }
   },
 
+  setup() {
+    const { hasTimeseriesZarrAsset, probeTimeseriesZarrAsset } =
+      useTimeseriesZarrAssets()
+    return { hasTimeseriesZarrAsset, probeTimeseriesZarrAsset }
+  },
+
   watch: {
+    // A timeseries package that never ran the legacy pipeline can still be
+    // viewable via its Zarr bundle. Only rows the state check would hide ask,
+    // and the composable caches the answer per package.
+    needsZarrProbe: {
+      immediate: true,
+      handler: function(needed) {
+        if (!needed) {
+          return
+        }
+        this.probeTimeseriesZarrAsset(this.fileDatasetId, this.filePackageId)
+      }
+    },
+
     isRenaming(val) {
       if (val) {
         this.$nextTick(() => {
@@ -269,17 +289,51 @@ export default {
         hasViewer = true
       }
       
-      const isTimeseriesFile = packageType.toLowerCase() === 'timeseries';
-      let isFileUnprocessed = false;
-      if (isTimeseriesFile) {
-        isFileUnprocessed = this.isFileUnprocessed(this.file);
-      }
-
-      if (isFileUnprocessed) {
-        hasViewer = false
+      const isTimeseriesFile = packageType.toLowerCase() === 'timeseries'
+      if (isTimeseriesFile && this.isFileUnprocessed(this.file)) {
+        // A ready Zarr bundle makes the package viewable even though the legacy
+        // pipeline never ran — but only out of the resting UPLOADED state; one
+        // that is still uploading or mid-pipeline has nothing to read yet.
+        hasViewer =
+          this.isUnprocessedTimeseriesPackage &&
+          this.hasTimeseriesZarrAsset(this.filePackageId)
       }
 
       return hasViewer
+    },
+
+    filePackageId: function() {
+      return pathOr(
+        pathOr('', ['content', 'nodeId'], this.file),
+        ['content', 'id'],
+        this.file
+      )
+    },
+
+    fileDatasetId: function() {
+      return (
+        pathOr('', ['content', 'datasetNodeId'], this.file) ||
+        this.$route.params.datasetId ||
+        pathOr('', ['dataset', 'content', 'id'], this.$store.state)
+      )
+    },
+
+    // The legacy resting state — an upload that no processing pipeline ever
+    // touched. The transient states (uploading, processing, failed) stay hidden.
+    isUnprocessedTimeseriesPackage: function() {
+      const packageType = pathOr('', ['content', 'packageType'], this.file)
+      return (
+        packageType.toLowerCase() === 'timeseries' &&
+        this.fileState === 'unprocessed'
+      )
+    },
+
+    needsZarrProbe: function() {
+      return (
+        this.isUnprocessedTimeseriesPackage &&
+        Boolean(this.fileDatasetId) &&
+        Boolean(this.filePackageId)
+      )
     },
 
     fileState: function() {
