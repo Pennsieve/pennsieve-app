@@ -8,7 +8,6 @@ import {
   buildManifest,
   serializeManifestYaml,
   validateParameters,
-  APPLICATION_TYPES,
   MANIFEST_EXAMPLE_URL,
 } from "./applicationSchema";
 
@@ -112,22 +111,10 @@ const goToGuide = () => router.push({ name: "application-manifest-guide" });
             <label class="field-label">Name <span class="req">*</span></label>
             <el-input
               v-model="meta.name"
-              placeholder="e.g. Spike Sorter"
+              placeholder="my-application"
               maxlength="100"
               class="field-control"
             />
-          </div>
-
-          <div class="field-row">
-            <label class="field-label">Type</label>
-            <el-select v-model="meta.applicationType" class="field-control">
-              <el-option
-                v-for="t in APPLICATION_TYPES"
-                :key="t.value"
-                :label="t.label"
-                :value="t.value"
-              />
-            </el-select>
           </div>
 
           <div class="field-row full-width">

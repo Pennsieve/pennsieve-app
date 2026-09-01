@@ -461,6 +461,28 @@ const latestVersion = (app) => {
   )[0];
 };
 
+/*
+  Sidebar application search
+  --------------------------
+  The palette is a flat list of every application in the org, which gets long
+  enough to scroll past what you are looking for. Matching is done over the
+  text the row actually shows plus the source URL, so typing either the repo
+  name or the org narrows it.
+*/
+const applicationSearch = ref("");
+
+const filteredApplications = computed(() => {
+  const query = applicationSearch.value.trim().toLowerCase();
+  if (!query) return availableApplications.value;
+  return availableApplications.value.filter((app) =>
+    [repoName(app), app?.name, app?.description, app?.sourceUrl]
+      .filter(Boolean)
+      .join(" ")
+      .toLowerCase()
+      .includes(query),
+  );
+});
+
 const sortedVersions = (app) => {
   const versions = app?.versions || [];
   return [...versions].sort(
@@ -887,7 +909,7 @@ onConnect((params) => {
 
   // Immediate feedback: a toast for this connection, plus the persistent
   // marks (red edge / canvas summary) that outlive it.
-  warnOnIncompatibleConnection(srcNode, tgtNode);
+  reportConnectionCheck(srcNode, tgtNode);
   revalidateEdges();
 });
 
@@ -906,9 +928,13 @@ onConnect((params) => {
   without app.yml produced exactly the same canvas as a clean bill of health.
 */
 const INVALID_EDGE_COLOR = "#e94b4b";
+const VALID_EDGE_COLOR = "#17bb62";
 
-// Edges the manifests say are wrong, and edges we had no manifest to judge.
+// Edges the manifests say are wrong, edges the manifests say are right, and
+// edges we had no manifest to judge. A confirmed-good edge is worth showing:
+// otherwise a clean workflow and an unvalidated one look identical.
 const edgeIssues = ref([]);
+const validEdgeCount = ref(0);
 const uncheckedEdgeCount = ref(0);
 
 const isAppNode = (node) => node?.type === "default";
@@ -926,14 +952,33 @@ const classifyEdge = (edge) => {
   const target = tgt.data?.manifestPorts;
   if (!source || !target) return { state: "unchecked", src, tgt };
 
-  const { compatible, unmetInputs } = validateAppConnection(source, target);
+  const { compatible, reason, unmetInputs, metInputs } = validateAppConnection(
+    source,
+    target,
+  );
   return compatible
-    ? { state: "ok", src, tgt }
-    : { state: "invalid", src, tgt, unmetInputs };
+    ? { state: "ok", src, tgt, metInputs }
+    : { state: "invalid", src, tgt, reason, unmetInputs };
 };
 
-const unmetInputNames = (unmetInputs) =>
-  (unmetInputs || []).map((i) => i.name).filter(Boolean);
+const portNames = (ports) => (ports || []).map((p) => p.name).filter(Boolean);
+const unmetInputNames = portNames;
+
+/*
+  What matched, in the port's own words: the input's name, the media type that
+  carried the match, and the description app.yml gives it. Naming the two
+  applications again is noise — the user just drew that edge and can see both
+  ends of it.
+*/
+const matchedPortSummary = (port) => {
+  const mediaType =
+    (port?.mediaTypes || []).join(", ") || port?.dataType || "any";
+  const head = port?.name ? `${port.name} (${mediaType})` : mediaType;
+  // The sentence supplies its own full stop; manifest descriptions usually
+  // carry one of their own.
+  const description = (port?.description || "").trim().replace(/\.$/, "");
+  return description ? `${head} \u2014 ${description}` : head;
+};
 
 /*
   Re-derive every edge's appearance from the current nodes. Cheap (a handful of
@@ -943,6 +988,7 @@ const unmetInputNames = (unmetInputs) =>
 const revalidateEdges = () => {
   const issues = [];
   let unchecked = 0;
+  let validated = 0;
 
   edges.value = edges.value.map((edge) => {
     const result = classifyEdge(edge);
@@ -965,6 +1011,7 @@ const revalidateEdges = () => {
         id: edge.id,
         source: result.src.data.label,
         target: result.tgt.data.label,
+        reason: result.reason,
         names,
       });
       return {
@@ -974,7 +1021,12 @@ const revalidateEdges = () => {
           strokeWidth: 2,
           strokeDasharray: "6 4",
         },
-        label: names.length ? `\u26A0 ${names.join(", ")}` : "\u26A0 incompatible",
+        label:
+          result.reason === "no-overlap"
+            ? "\u26A0 media type mismatch"
+            : names.length
+              ? `\u26A0 ${names.join(", ")}`
+              : "\u26A0 incompatible",
         labelShowBg: true,
         labelBgPadding: [6, 3],
         labelBgBorderRadius: 2,
@@ -988,30 +1040,69 @@ const revalidateEdges = () => {
       return { ...next, style: { stroke, strokeDasharray: "2 4" } };
     }
 
+    if (result.state === "ok") {
+      validated += 1;
+      const names = portNames(result.metInputs);
+      return {
+        ...next,
+        style: { stroke: VALID_EDGE_COLOR, strokeWidth: 2 },
+        label: names.length ? `\u2713 ${names.join(", ")}` : "\u2713",
+        labelShowBg: true,
+        labelBgPadding: [6, 3],
+        labelBgBorderRadius: 2,
+        labelBgStyle: { fill: "#eaf9ef", stroke: VALID_EDGE_COLOR },
+        labelStyle: { fill: "#0f7a3f", fontSize: 11, fontWeight: 600 },
+      };
+    }
+
     return next;
   });
 
   edgeIssues.value = issues;
+  validEdgeCount.value = validated;
   uncheckedEdgeCount.value = unchecked;
 };
 
-const warnOnIncompatibleConnection = (srcNode, tgtNode) => {
+const reportConnectionCheck = (srcNode, tgtNode) => {
   const source = srcNode?.data?.manifestPorts;
   const target = tgtNode?.data?.manifestPorts;
   if (!source || !target) return;
 
-  const { compatible, unmetInputs } = validateAppConnection(source, target);
-  if (compatible) return;
+  const { compatible, reason, unmetInputs, metInputs } = validateAppConnection(
+    source,
+    target,
+  );
+
+  if (compatible) {
+    // Only claim a match when media types actually lined up. A pair where one
+    // side declares no ports is not a clean bill of health, just an unjudged
+    // edge, and saying "media types match" there would be a lie.
+    if (!metInputs?.length) return;
+    ElMessage({
+      type: "success",
+      duration: 4000,
+      showClose: true,
+      message: `Media types match on ${metInputs
+        .map(matchedPortSummary)
+        .join("; ")}.`,
+    });
+    return;
+  }
 
   const names = unmetInputNames(unmetInputs).join(", ");
+  const detail =
+    reason === "no-overlap"
+      ? `${srcNode.data.label} produces no output whose media type matches an ` +
+        `input on ${tgtNode.data.label}${names ? ` (${names})` : ""}.`
+      : `${tgtNode.data.label} declares required input` +
+        `${unmetInputs.length > 1 ? "s" : ""}${names ? ` (${names})` : ""} ` +
+        `that ${srcNode.data.label} does not produce.`;
+
   ElMessage({
     type: "warning",
     duration: 6000,
     showClose: true,
-    message:
-      `${tgtNode.data.label} declares required input${unmetInputs.length > 1 ? "s" : ""}` +
-      `${names ? ` (${names})` : ""} that ${srcNode.data.label} does not produce. ` +
-      "The connection was made — check it before running.",
+    message: `${detail} The connection was made — check it before running.`,
   });
 };
 
@@ -1033,6 +1124,7 @@ const clearWorkflow = () => {
   nodes.value = [];
   edges.value = [];
   edgeIssues.value = [];
+  validEdgeCount.value = 0;
   uncheckedEdgeCount.value = 0;
   workflowName.value = "";
   workflowDescription.value = "";
@@ -1334,22 +1426,39 @@ const openNodeSettings = (id) => {
             workflow, so "did it validate?" has a visible answer.
           -->
           <div
-            v-if="edgeIssues.length || uncheckedEdgeCount"
+            v-if="edgeIssues.length || validEdgeCount || uncheckedEdgeCount"
             class="compat-panel"
-            :class="{ 'compat-panel--invalid': edgeIssues.length > 0 }"
+            :class="{
+              'compat-panel--invalid': edgeIssues.length > 0,
+              'compat-panel--valid':
+                edgeIssues.length === 0 && validEdgeCount > 0,
+            }"
           >
             <div class="compat-panel-title">
               <template v-if="edgeIssues.length">
                 {{ edgeIssues.length }} incompatible
                 {{ edgeIssues.length === 1 ? "connection" : "connections" }}
               </template>
+              <template v-else-if="validEdgeCount">
+                &#10003; {{ validEdgeCount }}
+                {{ validEdgeCount === 1 ? "connection" : "connections" }}
+                checked &mdash; media types match
+              </template>
               <template v-else>Connections not checked</template>
+            </div>
+            <div
+              v-if="edgeIssues.length && validEdgeCount"
+              class="compat-panel-ok"
+            >
+              &#10003; {{ validEdgeCount }} other
+              {{ validEdgeCount === 1 ? "connection" : "connections" }} match
             </div>
             <ul v-if="edgeIssues.length" class="compat-panel-list">
               <li v-for="issue in edgeIssues" :key="issue.id">
                 {{ issue.source }} &rarr; {{ issue.target }}
                 <span v-if="issue.names.length" class="compat-panel-detail">
-                  needs {{ issue.names.join(", ") }}
+                  {{ issue.reason === "no-overlap" ? "no media type match for" : "needs" }}
+                  {{ issue.names.join(", ") }}
                 </span>
               </li>
             </ul>
@@ -2289,34 +2398,52 @@ const openNodeSettings = (id) => {
             <!-- Applications Section -->
             <h4 class="sidebar-section-title">Applications</h4>
             <div v-if="isLoading" class="loading">Loading applications...</div>
-            <div v-else class="applications-list">
+            <template v-else>
+              <el-input
+                v-model="applicationSearch"
+                size="small"
+                clearable
+                placeholder="Search applications"
+                class="application-search"
+              />
               <div
-                v-for="app in availableApplications"
-                :key="app.uuid"
-                class="application-item"
-                :class="{ disabled: isReadOnly }"
-                :draggable="!isReadOnly"
-                @dragstart="onDragStart(app, $event, 'application')"
+                v-if="!filteredApplications.length"
+                class="applications-empty"
               >
-                <IconAnalysis class="app-icon" :width="20" :height="20" />
-                <div class="app-info">
-                  <div class="app-name">{{ repoName(app) }}</div>
-                  <span
-                    v-if="visibilityLabel(app)"
-                    class="app-type-badge"
-                  >{{ visibilityLabel(app) }}</span>
-                  <div class="app-description">
-                    {{ (app.versions || []).length }}
-                    {{
-                      (app.versions || []).length === 1 ? "version" : "versions"
-                    }}
-                    <template v-if="latestVersion(app)">
-                      &middot; latest {{ latestVersion(app).version }}
-                    </template>
+                <template v-if="availableApplications.length">
+                  No application matches &ldquo;{{ applicationSearch }}&rdquo;.
+                </template>
+                <template v-else>No applications available.</template>
+              </div>
+              <div class="applications-list">
+                <div
+                  v-for="app in filteredApplications"
+                  :key="app.uuid"
+                  class="application-item"
+                  :class="{ disabled: isReadOnly }"
+                  :draggable="!isReadOnly"
+                  @dragstart="onDragStart(app, $event, 'application')"
+                >
+                  <IconAnalysis class="app-icon" :width="20" :height="20" />
+                  <div class="app-info">
+                    <div class="app-name">{{ repoName(app) }}</div>
+                    <span
+                      v-if="visibilityLabel(app)"
+                      class="app-type-badge"
+                    >{{ visibilityLabel(app) }}</span>
+                    <div class="app-description">
+                      {{ (app.versions || []).length }}
+                      {{
+                        (app.versions || []).length === 1 ? "version" : "versions"
+                      }}
+                      <template v-if="latestVersion(app)">
+                        &middot; latest {{ latestVersion(app).version }}
+                      </template>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
+            </template>
           </el-collapse-item>
 
           <!-- Danger Zone (always last) -->
@@ -2755,6 +2882,16 @@ const openNodeSettings = (id) => {
   }
 }
 
+.application-search {
+  margin-bottom: 8px;
+}
+
+.applications-empty {
+  padding: 8px 0;
+  font-size: 12px;
+  color: theme.$gray_4;
+}
+
 .applications-list {
   display: flex;
   flex-direction: column;
@@ -2889,6 +3026,15 @@ const openNodeSettings = (id) => {
 
 .compat-panel--invalid {
   border-left-color: #e94b4b;
+}
+
+.compat-panel--valid {
+  border-left-color: #17bb62;
+}
+
+.compat-panel-ok {
+  margin-top: 6px;
+  color: #0f7a3f;
 }
 
 .compat-panel-title {

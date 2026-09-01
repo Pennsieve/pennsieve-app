@@ -349,7 +349,76 @@ describe('applicationSchema', () => {
       }
       const res = validateAppConnection(source, target)
       expect(res.compatible).toBe(false)
+      expect(res.reason).toBe('unmet-required')
       expect(res.unmetInputs.map((i) => i.name)).toEqual(['scan'])
+    })
+
+    it('flags an edge whose media types do not overlap, with no required input', () => {
+      // app.yml declares no `required` flag, so every manifest-shaped input
+      // parses as optional. Judging required inputs alone passed every edge.
+      const source = { outputs: [{ name: 'out', mediaTypes: ['application/zarr'] }] }
+      const target = {
+        inputs: [{ name: 'scan', mediaTypes: ['application/x-nifti'] }],
+      }
+      const res = validateAppConnection(source, target)
+      expect(res.compatible).toBe(false)
+      expect(res.reason).toBe('no-overlap')
+      expect(res.unmetInputs.map((i) => i.name)).toEqual(['scan'])
+    })
+
+    it('passes when one optional input of several matches', () => {
+      const source = { outputs: [{ name: 'out', mediaTypes: ['application/zarr'] }] }
+      const target = {
+        inputs: [
+          { name: 'scan', mediaTypes: ['application/x-nifti'] },
+          { name: 'archive', mediaTypes: ['application/zarr'] },
+        ],
+      }
+      expect(validateAppConnection(source, target).compatible).toBe(true)
+    })
+
+    it('does not judge an edge when either side declares no ports', () => {
+      const zarr = { mediaTypes: ['application/zarr'] }
+      expect(
+        validateAppConnection({ outputs: [] }, { inputs: [{ name: 'i', ...zarr }] })
+          .compatible,
+      ).toBe(true)
+      expect(
+        validateAppConnection({ outputs: [{ name: 'o', ...zarr }] }, { inputs: [] })
+          .compatible,
+      ).toBe(true)
+    })
+
+    it('passes the generic octet-stream pipeline ports the reference manifest uses', () => {
+      const port = { mediaTypes: ['application/octet-stream'] }
+      const res = validateAppConnection(
+        { outputs: [{ name: 'package', ...port }] },
+        { inputs: [{ name: 'package', ...port }] },
+      )
+      expect(res.compatible).toBe(true)
+    })
+
+    it('names the inputs a match landed on, for positive feedback', () => {
+      const source = { outputs: [{ name: 'out', mediaTypes: ['application/zarr'] }] }
+      const target = {
+        inputs: [
+          { name: 'archive', mediaTypes: ['application/zarr'] },
+          { name: 'scan', mediaTypes: ['application/x-nifti'] },
+        ],
+      }
+      const res = validateAppConnection(source, target)
+      expect(res.compatible).toBe(true)
+      expect(res.metInputs.map((i) => i.name)).toEqual(['archive'])
+    })
+
+    it('reports no matched inputs when a side declares no ports', () => {
+      // "Nothing to judge" must not be dressed up as a confirmed match.
+      const res = validateAppConnection(
+        { outputs: [] },
+        { inputs: [{ name: 'i', mediaTypes: ['application/zarr'] }] },
+      )
+      expect(res.compatible).toBe(true)
+      expect(res.metInputs).toEqual([])
     })
   })
 

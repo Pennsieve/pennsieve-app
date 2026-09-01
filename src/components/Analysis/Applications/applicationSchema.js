@@ -76,31 +76,39 @@ export const DEFAULT_COMPUTE_TYPES = Object.freeze([COMPUTE_TYPES.STANDARD]);
  * upstream application's outputs are compatible with a downstream
  * application's inputs when wiring a workflow. `any` matches everything.
  *
- * The authoritative vocabulary is the platform's package types, served by
- * `GET {api2Url}/packages/types` (analysisModule/fetchPackageTypes). This list
- * is only the fallback used before that call lands or when it fails — pass the
- * fetched list to portDataTypeOptions() instead of reading this directly.
+ * The authoritative vocabulary is the platform's package formats, served by
+ * `GET {api2Url}/packages/formats` (analysisModule/fetchPackageFormats). This
+ * list is only the fallback used before that call lands or when it fails —
+ * pass the fetched list to portDataTypeOptions() instead of reading this
+ * directly.
  */
 export const FALLBACK_PORT_DATA_TYPES = Object.freeze([
   { value: "any", label: "Any" },
 ]);
 
 /**
- * Options for a port's `dataType` control: "Any" first, then the package types
- * the platform reports. Anything the manifest already declares but the server
- * does not list is kept as well, so opening an older app.yml never silently
- * drops its port types.
+ * Options for a port's `dataType` control: "Any" first, then the package
+ * formats the platform reports. Anything the manifest already declares but the
+ * server does not list is kept as well, so opening an older app.yml never
+ * silently drops its port types.
  *
- * @param {Array<{value: string, label: string}>} [packageTypes]  from the store
+ * @param {Array<{value: string, label: string}>} [packageFormats] from the store
  * @param {string[]} [declared]  dataTypes already present in the manifest
  */
-export const portDataTypeOptions = (packageTypes, declared = []) => {
+export const portDataTypeOptions = (packageFormats, declared = []) => {
   const options = [...FALLBACK_PORT_DATA_TYPES];
   const seen = new Set(options.map((o) => o.value));
-  for (const t of asArray(packageTypes)) {
+  for (const t of asArray(packageFormats)) {
     if (!t?.value || seen.has(t.value)) continue;
     seen.add(t.value);
-    options.push({ value: t.value, label: t.label || t.value });
+    // `name`/`description` come from the package format the media type belongs
+    // to. The port form does not collect them; selecting a media type copies
+    // them onto the port. Omitted when the server does not supply them so the
+    // option stays a bare {value, label}.
+    const option = { value: t.value, label: t.label || t.value };
+    if (t.name) option.name = String(t.name);
+    if (t.description) option.description = String(t.description);
+    options.push(option);
   }
   for (const value of asArray(declared)) {
     if (!value || seen.has(value)) continue;
@@ -150,8 +158,8 @@ export const APPLICATION_CATEGORIES = Object.freeze([
  * @typedef {Object} PortSchema
  * @property {string} name
  * @property {string} [description]
- * @property {string} dataType            A package type from GET /packages/types,
- *                                       or "any".
+ * @property {string} dataType            A package format from
+ *                                       GET /packages/formats, or "any".
  * @property {boolean} [required]         Inputs only: must be connected.
  */
 
@@ -337,7 +345,7 @@ const parsePort = (raw) =>
   createPort({
     name: raw?.name ?? "",
     description: raw?.description ?? "",
-    dataType: raw?.dataType ?? "any",
+    dataType: raw?.dataType ?? asArray(raw?.mediaTypes).map(String)[0] ?? "any",
     required: Boolean(raw?.required),
     // Carried through so port compatibility can compare media types when a
     // manifest describes ports that way.
@@ -838,6 +846,8 @@ export function validateParameters(parameters) {
     const where = name || `Parameter ${i + 1}`;
     if (!name) {
       errors.push(`${where} is missing a name`);
+    } else if (/\s/.test(name)) {
+      errors.push(`Parameter name "${name}" cannot contain spaces`);
     } else if (seen.has(name)) {
       errors.push(`Duplicate parameter name "${name}"`);
     } else {
@@ -892,20 +902,57 @@ export function arePortsCompatible(output, input) {
 }
 
 /**
- * Can `sourceApp`'s outputs satisfy `targetApp`'s required inputs? Returns the
- * required inputs that have no compatible upstream output. Empty array == ok.
+ * Can `sourceApp`'s outputs feed `targetApp`'s inputs? Two ways an edge fails:
+ *
+ *  - `unmet-required`: a required input has no compatible upstream output.
+ *  - `no-overlap`: nothing the source produces matches any input at all.
+ *
+ * The second case carries the check. `app.yml` has no `required` flag on a
+ * port, so a manifest-shaped input always parses as optional — judging only
+ * required inputs would pass every edge regardless of the media types the two
+ * sides declare, which is the same as not validating.
+ *
  * @param {ApplicationSchema|Object} sourceApp  parsed schema or raw app
  * @param {ApplicationSchema|Object} targetApp
- * @returns {{compatible: boolean, unmetInputs: PortSchema[]}}
+ * `metInputs` lists the inputs an upstream output can actually feed, so a
+ * caller can tell the user *what* lined up rather than only that nothing
+ * broke.
+ *
+ * @returns {{compatible: boolean, reason: string|null,
+ *            unmetInputs: PortSchema[], metInputs: PortSchema[]}}
  */
 export function validateAppConnection(sourceApp, targetApp) {
   const outputs = asArray(sourceApp?.outputs).map(parsePort);
   const inputs = asArray(targetApp?.inputs).map(parsePort);
-  const required = inputs.filter((i) => i.required);
-  const unmetInputs = required.filter(
-    (input) => !outputs.some((output) => arePortsCompatible(output, input)),
-  );
-  return { compatible: unmetInputs.length === 0, unmetInputs };
+
+  const isMet = (input) =>
+    outputs.some((output) => arePortsCompatible(output, input));
+  const metInputs = inputs.filter(isMet);
+  const unmet = inputs.filter((input) => !isMet(input));
+  const unmetRequired = unmet.filter((input) => input.required);
+
+  if (unmetRequired.length) {
+    return {
+      compatible: false,
+      reason: "unmet-required",
+      unmetInputs: unmetRequired,
+      metInputs,
+    };
+  }
+
+  // Only judged when there is something on both sides to compare; a source
+  // that declares no outputs, or a target that declares no inputs, tells us
+  // nothing about the edge.
+  if (inputs.length && outputs.length && unmet.length === inputs.length) {
+    return {
+      compatible: false,
+      reason: "no-overlap",
+      unmetInputs: unmet,
+      metInputs,
+    };
+  }
+
+  return { compatible: true, reason: null, unmetInputs: [], metInputs };
 }
 
 /* ──────────────────────────────────────────────────────────────────────────

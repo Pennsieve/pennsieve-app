@@ -78,11 +78,12 @@
           <div class="field-row">
             <label class="field-label">Name</label>
             <el-input
-              v-model="param.name"
+              :model-value="param.name"
               size="small"
-              placeholder="parameter_name"
+              placeholder="parameter"
               maxlength="50"
               class="field-control"
+              @input="(v) => onParamNameInput(param, v)"
             />
           </div>
 
@@ -228,17 +229,13 @@
       >
         <div class="param-card-grid">
           <div class="field-row">
-            <label class="field-label">Name</label>
-            <el-input
-              v-model="port.name"
+            <label class="field-label">Media Type</label>
+            <el-select
+              :model-value="port.dataType"
               size="small"
-              placeholder="port_name"
               class="field-control"
-            />
-          </div>
-          <div class="field-row">
-            <label class="field-label">Data Type</label>
-            <el-select v-model="port.dataType" size="small" class="field-control">
+              @change="(v) => onPortDataTypeChange(port, v)"
+            >
               <el-option
                 v-for="dt in portDataTypes"
                 :key="dt.value"
@@ -253,14 +250,25 @@
               <el-switch v-model="port.required" />
             </div>
           </div>
+          <!--
+            Name and description are not authored here: they come from the
+            package format the selected media type belongs to, and are shown
+            read-only so the author can see what will be written to app.yml.
+          -->
+          <div class="field-row full-width">
+            <label class="field-label">Name</label>
+            <span class="field-static" :class="{ 'is-empty': !port.name }">
+              {{ port.name || "Select a media type" }}
+            </span>
+          </div>
           <div class="field-row full-width">
             <label class="field-label">Description</label>
-            <el-input
-              v-model="port.description"
-              size="small"
-              placeholder="optional"
-              class="field-control"
-            />
+            <span
+              class="field-static"
+              :class="{ 'is-empty': !port.description }"
+            >
+              {{ port.description || "—" }}
+            </span>
           </div>
         </div>
         <button
@@ -283,30 +291,9 @@
       </el-button>
     </section>
 
-    <!-- ───────────── Tags & Categories ───────────── -->
+    <!-- ───────────── Tags ───────────── -->
     <section class="schema-section">
       <h4 class="schema-section-title">Classification</h4>
-
-      <div class="field-row">
-        <label class="field-label">Categories</label>
-        <el-select
-          v-model="schema.categories"
-          class="field-control"
-          multiple
-          filterable
-          allow-create
-          default-first-option
-          :reserve-keyword="false"
-          placeholder="Select or create categories"
-        >
-          <el-option
-            v-for="cat in APPLICATION_CATEGORIES"
-            :key="cat"
-            :label="cat"
-            :value="cat"
-          />
-        </el-select>
-      </div>
 
       <div class="field-row">
         <label class="field-label">Tags</label>
@@ -332,7 +319,6 @@ import { CircleClose, Plus } from "@element-plus/icons-vue";
 import {
   PARAM_TYPES,
   PARAM_TYPE_OPTIONS,
-  APPLICATION_CATEGORIES,
   createParameter,
   createPort,
   portDataTypeOptions,
@@ -355,15 +341,15 @@ defineProps({
 const store = useStore();
 
 /*
-  A port's data type is a platform package type, not a vocabulary this form
-  invents: the list comes from GET /packages/types. Types already written into
-  the manifest are kept in the list too, so editing an older app.yml cannot
-  quietly blank its ports.
+  A port's media type is a platform package format, not a vocabulary this form
+  invents: the list comes from GET /packages/formats. Types already written
+  into the manifest are kept in the list too, so editing an older app.yml
+  cannot quietly blank its ports.
 */
-onMounted(() => store.dispatch("analysisModule/fetchPackageTypes"));
+onMounted(() => store.dispatch("analysisModule/fetchPackageFormats"));
 
 const portDataTypes = computed(() =>
-  portDataTypeOptions(store.state.analysisModule.packageTypes, [
+  portDataTypeOptions(store.state.analysisModule.packageFormats, [
     ...(schema.value.inputs || []).map((p) => p.dataType),
     ...(schema.value.outputs || []).map((p) => p.dataType),
   ]),
@@ -400,6 +386,28 @@ const toggleComputeType = (type, checked) => {
   // Standard is always supported and is not user-removable.
   types.add("standard");
   schema.value.runtime.computeTypes = Array.from(types);
+};
+
+/*
+  Parameter names are referenced by the running application, so they must be
+  single tokens. Whitespace is stripped as it is typed (or pasted) rather than
+  flagged after the fact.
+*/
+const onParamNameInput = (param, value) => {
+  param.name = String(value ?? "").replace(/\s+/g, "");
+};
+
+/*
+  A port's media type is the only thing the author picks. Its name and
+  description are the package format's, copied from the option the platform
+  served, and its `mediaTypes` is kept in step so a manifest round-trips.
+*/
+const onPortDataTypeChange = (port, value) => {
+  port.dataType = value || "any";
+  const option = portDataTypes.value.find((o) => o.value === port.dataType);
+  port.name = option?.name || "";
+  port.description = option?.description || "";
+  port.mediaTypes = port.dataType && port.dataType !== "any" ? [port.dataType] : [];
 };
 
 const onParamTypeChange = (param, type) => {
@@ -480,6 +488,20 @@ const removePort = (key, i) => schema.value[key].splice(i, 1);
 .field-control {
   flex: 1 1 auto;
   width: 100%;
+}
+
+/* Values the form fills in from the selected package format, not fields. */
+.field-static {
+  flex: 1 1 auto;
+  font-size: 13px;
+  line-height: 24px;
+  color: theme.$gray_6;
+  word-break: break-word;
+
+  &.is-empty {
+    color: theme.$gray_4;
+    font-style: italic;
+  }
 }
 
 .inline-checks {
