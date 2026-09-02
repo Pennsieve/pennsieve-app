@@ -599,7 +599,8 @@ describe('applicationSchema', () => {
       expect(meta).toMatchObject({
         name: 'Spike Sorter',
         description: 'Sorts spikes.',
-        applicationType: 'preprocessor',
+        // `processor` is the only supported type, so any other value normalizes.
+        applicationType: 'processor',
         shape: MANIFEST_SHAPES.FLAT,
       })
       expect(schema.resources).toEqual({ cpu: 4096, memory: 16384 })
