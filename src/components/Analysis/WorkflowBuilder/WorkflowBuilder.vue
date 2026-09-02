@@ -9,7 +9,7 @@ import { useVueFlow, VueFlow, Handle, Position } from "@vue-flow/core";
 import { Background } from "@vue-flow/background";
 import { Controls } from "@vue-flow/controls";
 import dagre from "@dagrejs/dagre";
-import { ElMessageBox } from "element-plus";
+import { ElMessage, ElMessageBox } from "element-plus";
 import EventBus from "../../../utils/event-bus";
 import IconFile from "../../icons/IconFile.vue";
 import IconCollection from "../../icons/IconCollection.vue";
@@ -26,6 +26,11 @@ import {
 } from "../RunMonitor/runHelpers";
 import BfButton from "../../shared/bf-button/BfButton.vue";
 import MetricsDashboard from "../Metrics/MetricsDashboard.vue";
+import {
+  toParamSchema,
+  validateAppConnection,
+} from "../Applications/applicationSchema";
+import { useAppManifest } from "@/composables/useAppManifest";
 
 const { onNodeClick, onPaneClick, onConnect, screenToFlowCoordinate, fitView } =
   useVueFlow();
@@ -171,6 +176,7 @@ const saveWorkflowChanges = async () => {
     nodes.value = result.nodes;
     edges.value = result.edges;
     snapshotDefaultParams();
+    hydrateManifestPorts();
   } catch (err) {
     EventBus.$emit("toast", {
       detail: { type: "error", msg: "Failed to save workflow changes." },
@@ -267,6 +273,91 @@ const getComputeTypesForTarget = (targetType) => {
 const getComputeTypesForApplication = (application) => {
   const types = application?.runtimeConfig?.computeTypes;
   return types && types.length ? withGpu(types) : DEFAULT_COMPUTE_TYPES;
+};
+
+/*
+  app.yml defaults
+  ----------------
+  An application dropped on the canvas comes from the applications *list*, which
+  carries no `assets` — so the manifest has to be fetched per application. The
+  node is created immediately on its existing defaults and patched in place when
+  the manifest arrives; the user is never blocked on the request.
+
+  Only fields the user has not already set are touched, and only compute types
+  the builder actually offers are applied.
+*/
+const { loadManifest } = useAppManifest();
+
+const applyManifestDefaults = async (nodeId, application) => {
+  const uuid = application?.uuid;
+  if (!uuid) return;
+
+  const parsed = await loadManifest(uuid);
+  if (!parsed) return;
+
+  // The node may have been deleted while the request was in flight.
+  const node = nodes.value.find((n) => n.id === nodeId);
+  if (!node) return;
+
+  const { schema } = parsed;
+
+  // computeType — first declared type that the builder actually supports.
+  const declared = schema.runtime?.computeTypes || [];
+  const supported = declared.find((t) => DEFAULT_COMPUTE_TYPES.includes(t));
+  if (supported) node.data.computeType = supported;
+
+  // cpu / memory — only when the manifest declares them and the node has none.
+  if (!node.data.cpu && schema.resources?.cpu != null) {
+    node.data.cpu = String(schema.resources.cpu);
+  }
+  if (!node.data.memory && schema.resources?.memory != null) {
+    node.data.memory = String(schema.resources.memory);
+  }
+
+  // Parameters — feeds both the parameter list and its editable defaults.
+  const paramSchema = toParamSchema(schema.parameters);
+  if (paramSchema.length) node.data.paramSchema = paramSchema;
+
+  setManifestPorts(node, parsed);
+};
+
+// Ports live on the node so connection checks stay synchronous.
+const setManifestPorts = (node, parsed) => {
+  node.data.manifestPorts = {
+    inputs: parsed.schema.inputs || [],
+    outputs: parsed.schema.outputs || [],
+  };
+  node.data.hasManifest = true;
+  // A manifest can land after the user has already drawn the edge — the
+  // connection was made against no port information at all, so re-check
+  // everything now that we have some.
+  revalidateEdges();
+};
+
+/*
+  Ports for nodes that were not dropped in this session
+  -----------------------------------------------------
+  definitionToNodesAndEdges builds its nodes from a saved definition, which
+  carries no manifest — so an opened workflow had nothing to validate against
+  until every node was re-dropped by hand. Manifests are memoized per uuid, so
+  this costs at most one request per distinct application, once.
+*/
+const hydrateManifestPorts = async () => {
+  const pending = nodes.value.filter(
+    (n) => isAppNode(n) && n.data?.application?.uuid && !n.data.manifestPorts,
+  );
+  if (!pending.length) return;
+
+  await Promise.all(
+    pending.map(async (n) => {
+      const parsed = await loadManifest(n.data.application.uuid);
+      // The node may have been removed while the request was in flight.
+      const node = nodes.value.find((x) => x.id === n.id);
+      if (node && parsed) setManifestPorts(node, parsed);
+    }),
+  );
+
+  revalidateEdges();
 };
 
 const getTargetTypeParams = (targetType) => {
@@ -369,6 +460,28 @@ const latestVersion = (app) => {
       (new Date(a.createdAt).getTime() || 0),
   )[0];
 };
+
+/*
+  Sidebar application search
+  --------------------------
+  The palette is a flat list of every application in the org, which gets long
+  enough to scroll past what you are looking for. Matching is done over the
+  text the row actually shows plus the source URL, so typing either the repo
+  name or the org narrows it.
+*/
+const applicationSearch = ref("");
+
+const filteredApplications = computed(() => {
+  const query = applicationSearch.value.trim().toLowerCase();
+  if (!query) return availableApplications.value;
+  return availableApplications.value.filter((app) =>
+    [repoName(app), app?.name, app?.description, app?.sourceUrl]
+      .filter(Boolean)
+      .join(" ")
+      .toLowerCase()
+      .includes(query),
+  );
+});
 
 const sortedVersions = (app) => {
   const versions = app?.versions || [];
@@ -648,6 +761,8 @@ const selectWorkflow = (workflow) => {
   nodes.value = result.nodes;
   edges.value = result.edges;
   snapshotDefaultParams();
+  // Fire-and-forget: the manifests patch the nodes and re-run the check.
+  hydrateManifestPorts();
 
   if (result.needsAutoLayout) {
     autoLayout();
@@ -743,14 +858,20 @@ const onDrop = (event) => {
         cpu: "",
         memory: "",
         defaultParams: {},
+        paramSchema: [],
+        hasManifest: false,
         tag: latestVersion(draggedApp.value)?.version || "",
       },
       position,
     };
   }
 
+  const droppedApp = draggedApp.value;
+
   if (newNode) {
     nodes.value.push(newNode);
+    // Fire-and-forget: patches the node in place once app.yml is read.
+    if (droppedApp) applyManifestDefaults(newNode.id, droppedApp);
   }
 
   draggedApp.value = null;
@@ -776,6 +897,8 @@ onConnect((params) => {
   if (duplicate) return;
 
   const srcNode = nodes.value.find((n) => n.id === params.source);
+  const tgtNode = nodes.value.find((n) => n.id === params.target);
+
   edges.value.push({
     id: `e${params.source}-${params.target}`,
     source: params.source,
@@ -783,7 +906,205 @@ onConnect((params) => {
     animated: false,
     style: { stroke: nodeTypeColor(srcNode?.type) },
   });
+
+  // Immediate feedback: a toast for this connection, plus the persistent
+  // marks (red edge / canvas summary) that outlive it.
+  reportConnectionCheck(srcNode, tgtNode);
+  revalidateEdges();
 });
+
+/*
+  Connection validation
+  ---------------------
+  Every edge between two application nodes is classified from the ports the
+  two app.yml manifests declare. The connection is always made — per the
+  ticket a mismatch is a warning the user can proceed past, not a block — but
+  the verdict is *persistent*: the edge is restyled and the canvas keeps a
+  running list, so the check is still visible after the toast has gone and
+  after the workflow is reopened.
+
+  A missing manifest is reported as "not checked" rather than silently passing.
+  Staying quiet there was the main reason the validation looked absent: an app
+  without app.yml produced exactly the same canvas as a clean bill of health.
+*/
+const INVALID_EDGE_COLOR = "#e94b4b";
+const VALID_EDGE_COLOR = "#17bb62";
+
+// Edges the manifests say are wrong, edges the manifests say are right, and
+// edges we had no manifest to judge. A confirmed-good edge is worth showing:
+// otherwise a clean workflow and an unvalidated one look identical.
+const edgeIssues = ref([]);
+const validEdgeCount = ref(0);
+const uncheckedEdgeCount = ref(0);
+
+const isAppNode = (node) => node?.type === "default";
+
+const classifyEdge = (edge) => {
+  const src = nodes.value.find((n) => n.id === edge.source);
+  const tgt = nodes.value.find((n) => n.id === edge.target);
+  if (!src || !tgt) return { state: "skip", src, tgt };
+
+  // Only application-to-application links carry port information; a data
+  // source or target has no manifest to compare against.
+  if (!isAppNode(src) || !isAppNode(tgt)) return { state: "skip", src, tgt };
+
+  const source = src.data?.manifestPorts;
+  const target = tgt.data?.manifestPorts;
+  if (!source || !target) return { state: "unchecked", src, tgt };
+
+  const { compatible, reason, unmetInputs, metInputs } = validateAppConnection(
+    source,
+    target,
+  );
+  return compatible
+    ? { state: "ok", src, tgt, metInputs }
+    : { state: "invalid", src, tgt, reason, unmetInputs };
+};
+
+const portNames = (ports) => (ports || []).map((p) => p.name).filter(Boolean);
+const unmetInputNames = portNames;
+
+/*
+  What matched, in the port's own words: the input's name, the media type that
+  carried the match, and the description app.yml gives it. Naming the two
+  applications again is noise — the user just drew that edge and can see both
+  ends of it.
+*/
+const matchedPortSummary = (port) => {
+  const mediaType =
+    (port?.mediaTypes || []).join(", ") || port?.dataType || "any";
+  const head = port?.name ? `${port.name} (${mediaType})` : mediaType;
+  // The sentence supplies its own full stop; manifest descriptions usually
+  // carry one of their own.
+  const description = (port?.description || "").trim().replace(/\.$/, "");
+  return description ? `${head} \u2014 ${description}` : head;
+};
+
+/*
+  Re-derive every edge's appearance from the current nodes. Cheap (a handful of
+  edges, ports already in memory) and idempotent, so it can be called from
+  anywhere the graph changes rather than trying to patch single edges.
+*/
+const revalidateEdges = () => {
+  const issues = [];
+  let unchecked = 0;
+  let validated = 0;
+
+  edges.value = edges.value.map((edge) => {
+    const result = classifyEdge(edge);
+    const stroke = nodeTypeColor(result.src?.type);
+    // Spread the existing edge so anything VueFlow put on it (handles,
+    // selection) survives; the label fields are always restated so a
+    // connection that stops being invalid loses its marker.
+    const next = {
+      ...edge,
+      style: { stroke },
+      label: undefined,
+      labelShowBg: undefined,
+      labelBgStyle: undefined,
+      labelStyle: undefined,
+    };
+
+    if (result.state === "invalid") {
+      const names = unmetInputNames(result.unmetInputs);
+      issues.push({
+        id: edge.id,
+        source: result.src.data.label,
+        target: result.tgt.data.label,
+        reason: result.reason,
+        names,
+      });
+      return {
+        ...next,
+        style: {
+          stroke: INVALID_EDGE_COLOR,
+          strokeWidth: 2,
+          strokeDasharray: "6 4",
+        },
+        label:
+          result.reason === "no-overlap"
+            ? "\u26A0 media type mismatch"
+            : names.length
+              ? `\u26A0 ${names.join(", ")}`
+              : "\u26A0 incompatible",
+        labelShowBg: true,
+        labelBgPadding: [6, 3],
+        labelBgBorderRadius: 2,
+        labelBgStyle: { fill: "#fdecec", stroke: INVALID_EDGE_COLOR },
+        labelStyle: { fill: INVALID_EDGE_COLOR, fontSize: 11, fontWeight: 600 },
+      };
+    }
+
+    if (result.state === "unchecked") {
+      unchecked += 1;
+      return { ...next, style: { stroke, strokeDasharray: "2 4" } };
+    }
+
+    if (result.state === "ok") {
+      validated += 1;
+      const names = portNames(result.metInputs);
+      return {
+        ...next,
+        style: { stroke: VALID_EDGE_COLOR, strokeWidth: 2 },
+        label: names.length ? `\u2713 ${names.join(", ")}` : "\u2713",
+        labelShowBg: true,
+        labelBgPadding: [6, 3],
+        labelBgBorderRadius: 2,
+        labelBgStyle: { fill: "#eaf9ef", stroke: VALID_EDGE_COLOR },
+        labelStyle: { fill: "#0f7a3f", fontSize: 11, fontWeight: 600 },
+      };
+    }
+
+    return next;
+  });
+
+  edgeIssues.value = issues;
+  validEdgeCount.value = validated;
+  uncheckedEdgeCount.value = unchecked;
+};
+
+const reportConnectionCheck = (srcNode, tgtNode) => {
+  const source = srcNode?.data?.manifestPorts;
+  const target = tgtNode?.data?.manifestPorts;
+  if (!source || !target) return;
+
+  const { compatible, reason, unmetInputs, metInputs } = validateAppConnection(
+    source,
+    target,
+  );
+
+  if (compatible) {
+    // Only claim a match when media types actually lined up. A pair where one
+    // side declares no ports is not a clean bill of health, just an unjudged
+    // edge, and saying "media types match" there would be a lie.
+    if (!metInputs?.length) return;
+    ElMessage({
+      type: "success",
+      duration: 4000,
+      showClose: true,
+      message: `Media types match on ${metInputs
+        .map(matchedPortSummary)
+        .join("; ")}.`,
+    });
+    return;
+  }
+
+  const names = unmetInputNames(unmetInputs).join(", ");
+  const detail =
+    reason === "no-overlap"
+      ? `${srcNode.data.label} produces no output whose media type matches an ` +
+        `input on ${tgtNode.data.label}${names ? ` (${names})` : ""}.`
+      : `${tgtNode.data.label} declares required input` +
+        `${unmetInputs.length > 1 ? "s" : ""}${names ? ` (${names})` : ""} ` +
+        `that ${srcNode.data.label} does not produce.`;
+
+  ElMessage({
+    type: "warning",
+    duration: 6000,
+    showClose: true,
+    message: `${detail} The connection was made — check it before running.`,
+  });
+};
 
 const removeNode = (nodeId) => {
   const nodeIndex = nodes.value.findIndex((n) => n.id === nodeId);
@@ -796,11 +1117,15 @@ const removeNode = (nodeId) => {
 
   // Remove node
   nodes.value.splice(nodeIndex, 1);
+  revalidateEdges();
 };
 
 const clearWorkflow = () => {
   nodes.value = [];
   edges.value = [];
+  edgeIssues.value = [];
+  validEdgeCount.value = 0;
+  uncheckedEdgeCount.value = 0;
   workflowName.value = "";
   workflowDescription.value = "";
 };
@@ -1093,6 +1418,55 @@ const openNodeSettings = (id) => {
               <h3>No workflow loaded</h3>
               <p>Return to the workflows gallery to select a workflow</p>
             </template>
+          </div>
+
+          <!--
+            Persistent verdict for the whole canvas. The per-connection toast
+            is gone in six seconds; this stays, and survives reopening the
+            workflow, so "did it validate?" has a visible answer.
+          -->
+          <div
+            v-if="edgeIssues.length || validEdgeCount || uncheckedEdgeCount"
+            class="compat-panel"
+            :class="{
+              'compat-panel--invalid': edgeIssues.length > 0,
+              'compat-panel--valid':
+                edgeIssues.length === 0 && validEdgeCount > 0,
+            }"
+          >
+            <div class="compat-panel-title">
+              <template v-if="edgeIssues.length">
+                {{ edgeIssues.length }} incompatible
+                {{ edgeIssues.length === 1 ? "connection" : "connections" }}
+              </template>
+              <template v-else-if="validEdgeCount">
+                &#10003; {{ validEdgeCount }}
+                {{ validEdgeCount === 1 ? "connection" : "connections" }}
+                checked &mdash; media types match
+              </template>
+              <template v-else>Connections not checked</template>
+            </div>
+            <div
+              v-if="edgeIssues.length && validEdgeCount"
+              class="compat-panel-ok"
+            >
+              &#10003; {{ validEdgeCount }} other
+              {{ validEdgeCount === 1 ? "connection" : "connections" }} match
+            </div>
+            <ul v-if="edgeIssues.length" class="compat-panel-list">
+              <li v-for="issue in edgeIssues" :key="issue.id">
+                {{ issue.source }} &rarr; {{ issue.target }}
+                <span v-if="issue.names.length" class="compat-panel-detail">
+                  {{ issue.reason === "no-overlap" ? "no media type match for" : "needs" }}
+                  {{ issue.names.join(", ") }}
+                </span>
+              </li>
+            </ul>
+            <div v-if="uncheckedEdgeCount" class="compat-panel-note">
+              {{ uncheckedEdgeCount }}
+              {{ uncheckedEdgeCount === 1 ? "connection" : "connections" }} not
+              checked &mdash; no app.yml on one of the applications.
+            </div>
           </div>
 
           <div class="workflow-builder-flow">
@@ -2024,34 +2398,52 @@ const openNodeSettings = (id) => {
             <!-- Applications Section -->
             <h4 class="sidebar-section-title">Applications</h4>
             <div v-if="isLoading" class="loading">Loading applications...</div>
-            <div v-else class="applications-list">
+            <template v-else>
+              <el-input
+                v-model="applicationSearch"
+                size="small"
+                clearable
+                placeholder="Search applications"
+                class="application-search"
+              />
               <div
-                v-for="app in availableApplications"
-                :key="app.uuid"
-                class="application-item"
-                :class="{ disabled: isReadOnly }"
-                :draggable="!isReadOnly"
-                @dragstart="onDragStart(app, $event, 'application')"
+                v-if="!filteredApplications.length"
+                class="applications-empty"
               >
-                <IconAnalysis class="app-icon" :width="20" :height="20" />
-                <div class="app-info">
-                  <div class="app-name">{{ repoName(app) }}</div>
-                  <span
-                    v-if="visibilityLabel(app)"
-                    class="app-type-badge"
-                  >{{ visibilityLabel(app) }}</span>
-                  <div class="app-description">
-                    {{ (app.versions || []).length }}
-                    {{
-                      (app.versions || []).length === 1 ? "version" : "versions"
-                    }}
-                    <template v-if="latestVersion(app)">
-                      &middot; latest {{ latestVersion(app).version }}
-                    </template>
+                <template v-if="availableApplications.length">
+                  No application matches &ldquo;{{ applicationSearch }}&rdquo;.
+                </template>
+                <template v-else>No applications available.</template>
+              </div>
+              <div class="applications-list">
+                <div
+                  v-for="app in filteredApplications"
+                  :key="app.uuid"
+                  class="application-item"
+                  :class="{ disabled: isReadOnly }"
+                  :draggable="!isReadOnly"
+                  @dragstart="onDragStart(app, $event, 'application')"
+                >
+                  <IconAnalysis class="app-icon" :width="20" :height="20" />
+                  <div class="app-info">
+                    <div class="app-name">{{ repoName(app) }}</div>
+                    <span
+                      v-if="visibilityLabel(app)"
+                      class="app-type-badge"
+                    >{{ visibilityLabel(app) }}</span>
+                    <div class="app-description">
+                      {{ (app.versions || []).length }}
+                      {{
+                        (app.versions || []).length === 1 ? "version" : "versions"
+                      }}
+                      <template v-if="latestVersion(app)">
+                        &middot; latest {{ latestVersion(app).version }}
+                      </template>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
+            </template>
           </el-collapse-item>
 
           <!-- Danger Zone (always last) -->
@@ -2490,6 +2882,16 @@ const openNodeSettings = (id) => {
   }
 }
 
+.application-search {
+  margin-bottom: 8px;
+}
+
+.applications-empty {
+  padding: 8px 0;
+  font-size: 12px;
+  color: theme.$gray_4;
+}
+
 .applications-list {
   display: flex;
   flex-direction: column;
@@ -2603,6 +3005,60 @@ const openNodeSettings = (id) => {
   top: 10px;
   right: 10px;
   z-index: 10;
+}
+
+/* Sits under the Auto Layout button, which owns the top-right corner. */
+.compat-panel {
+  position: absolute;
+  top: 52px;
+  right: 10px;
+  z-index: 10;
+  max-width: 300px;
+  padding: 8px 10px;
+  border: 1px solid theme.$gray_3;
+  border-left: 3px solid theme.$gray_4;
+  border-radius: 4px;
+  background: theme.$white;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+  font-size: 11px;
+  color: theme.$gray_5;
+}
+
+.compat-panel--invalid {
+  border-left-color: #e94b4b;
+}
+
+.compat-panel--valid {
+  border-left-color: #17bb62;
+}
+
+.compat-panel-ok {
+  margin-top: 6px;
+  color: #0f7a3f;
+}
+
+.compat-panel-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: theme.$black;
+}
+
+.compat-panel-list {
+  margin: 6px 0 0;
+  padding-left: 14px;
+
+  li {
+    margin-bottom: 2px;
+  }
+}
+
+.compat-panel-detail {
+  color: #b45309;
+}
+
+.compat-panel-note {
+  margin-top: 6px;
+  color: theme.$gray_4;
 }
 
 .auto-layout-btn {

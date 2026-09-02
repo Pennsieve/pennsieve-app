@@ -42,6 +42,11 @@ const initialState = () => ({
   workflowsNextCursor: "",
   targetTypes: [],
   targetTypesLoaded: false,
+  // Package formats an application's input/output ports can declare. Served
+  // by GET {api2Url}/packages/formats so the vocabulary follows the platform
+  // rather than a list maintained in the front end.
+  packageFormats: [],
+  packageFormatsLoaded: false,
   analyticsChannel: null,
   pendingRunConfig: null,
 });
@@ -180,6 +185,10 @@ export const mutations = {
   UPDATE_TARGET_TYPES(state, targetTypes) {
     state.targetTypes = targetTypes;
     state.targetTypesLoaded = true;
+  },
+  UPDATE_PACKAGE_FORMATS(state, packageFormats) {
+    state.packageFormats = packageFormats;
+    state.packageFormatsLoaded = true;
   },
   UPDATE_WORKFLOW_ACTIVE_STATUS(state, { uuid, isActive }) {
     const workflow = state.workflows.find((w) => w.uuid === uuid);
@@ -1036,6 +1045,62 @@ export const actions = {
       return Promise.reject(err);
     }
   },
+  /*
+    Package formats for application input/output ports, from
+    GET {api2Url}/packages/formats.
+
+    Fetched once per session. A failure resolves rather than rejects: callers
+    fall back to the built-in vocabulary in applicationSchema, so a port
+    dropdown still works offline — it just isn't authoritative.
+  */
+  fetchPackageFormats: async ({ state, commit, rootState }, { force } = {}) => {
+    if (!force && state.packageFormatsLoaded) return state.packageFormats;
+    try {
+      const userToken = await useGetToken();
+      const url = `${rootState.config.api2Url}/packages/formats`;
+      const resp = await fetch(url, {
+        method: "GET",
+        headers: { Authorization: `Bearer ${userToken}` },
+      });
+      if (!resp.ok) throw new Error(`packages/formats responded ${resp.status}`);
+
+      // Tolerate a bare list of names, a list of objects, or a wrapped list —
+      // the endpoint's exact envelope is not pinned down here.
+      const raw = await resp.json();
+      const list = Array.isArray(raw)
+        ? raw
+        : raw?.formats || raw?.packageFormats || [];
+      // A format row can carry several media types. A port names one media
+      // type, so each element becomes its own option rather than being folded
+      // into a single entry labelled by the format's name or description. The
+      // row's name and description ride along: the manifest builder does not
+      // ask the author for them, it fills them in from the format the selected
+      // media type belongs to.
+      const result = list
+        .flatMap((t) => {
+          if (typeof t === "string") return [{ value: t, label: t }];
+          const name = String(t?.name ?? t?.displayName ?? t?.label ?? "");
+          const description = String(t?.description ?? "");
+          const mediaTypes = Array.isArray(t?.mediaTypes)
+            ? t.mediaTypes
+            : [t?.mediaType ?? t?.format ?? t?.value ?? t?.name];
+          return mediaTypes.filter(Boolean).map((m) => ({
+            value: String(m),
+            label: String(m),
+            name,
+            description,
+          }));
+        })
+        .filter((t) => t.value);
+
+      commit("UPDATE_PACKAGE_FORMATS", result);
+      return result;
+    } catch (err) {
+      console.warn("Unable to load package formats; using built-in list.", err);
+      commit("UPDATE_PACKAGE_FORMATS", []);
+      return [];
+    }
+  },
   fetchWorkflowDefinition: async ({ rootState }, uuid) => {
     const userToken = await useGetToken();
     const url = `${rootState.config.api2Url}/compute/workflows/definitions/${uuid}`;
@@ -1107,6 +1172,7 @@ export const getters = {
   applications: (state) => state.applications,
   computeNodes: (state) => state.computeNodes,
   targetTypes: (state) => state.targetTypes,
+  packageFormats: (state) => state.packageFormats,
   analyticsChannel: (state) => state.analyticsChannel,
 };
 
