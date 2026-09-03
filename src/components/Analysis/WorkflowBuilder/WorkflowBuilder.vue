@@ -952,28 +952,43 @@ const classifyEdge = (edge) => {
   const target = tgt.data?.manifestPorts;
   if (!source || !target) return { state: "unchecked", src, tgt };
 
-  const { compatible, reason, unmetInputs, metInputs } = validateAppConnection(
-    source,
-    target,
-  );
+  const { compatible, checked, reason, unmetInputs, metInputs } =
+    validateAppConnection(source, target);
+  // Manifests present but nothing comparable on the ports — no media types
+  // declared on one side. Reported as unchecked, not as a match.
+  if (!checked) return { state: "unchecked", src, tgt };
   return compatible
     ? { state: "ok", src, tgt, metInputs }
     : { state: "invalid", src, tgt, reason, unmetInputs };
 };
 
-const portNames = (ports) => (ports || []).map((p) => p.name).filter(Boolean);
-const unmetInputNames = portNames;
+/*
+  Media types are what the check compares, so they are also what it reports.
+  A port's `name` is the manifest author's local label — two applications that
+  interoperate perfectly rarely agree on one — so naming names made a
+  media-type verdict read like a name match. Deduped and order-preserving: a
+  target with three inputs that all accept NIfTI should say NIfTI once.
+*/
+const portMediaTypes = (ports) => {
+  const seen = [];
+  (ports || []).forEach((port) => {
+    const types = (port?.mediaTypes || []).length
+      ? port.mediaTypes
+      : [port?.dataType || "any"];
+    types.forEach((t) => {
+      if (t && !seen.includes(t)) seen.push(t);
+    });
+  });
+  return seen;
+};
 
 /*
-  What matched, in the port's own words: the input's name, the media type that
-  carried the match, and the description app.yml gives it. Naming the two
-  applications again is noise — the user just drew that edge and can see both
-  ends of it.
+  What matched, in media-type terms: the type that carried the match and the
+  description app.yml gives the port it fed. Naming the two applications again
+  is noise — the user just drew that edge and can see both ends of it.
 */
 const matchedPortSummary = (port) => {
-  const mediaType =
-    (port?.mediaTypes || []).join(", ") || port?.dataType || "any";
-  const head = port?.name ? `${port.name} (${mediaType})` : mediaType;
+  const head = portMediaTypes([port]).join(", ") || "any";
   // The sentence supplies its own full stop; manifest descriptions usually
   // carry one of their own.
   const description = (port?.description || "").trim().replace(/\.$/, "");
@@ -1006,13 +1021,13 @@ const revalidateEdges = () => {
     };
 
     if (result.state === "invalid") {
-      const names = unmetInputNames(result.unmetInputs);
+      const mediaTypes = portMediaTypes(result.unmetInputs);
       issues.push({
         id: edge.id,
         source: result.src.data.label,
         target: result.tgt.data.label,
         reason: result.reason,
-        names,
+        mediaTypes,
       });
       return {
         ...next,
@@ -1024,8 +1039,8 @@ const revalidateEdges = () => {
         label:
           result.reason === "no-overlap"
             ? "\u26A0 media type mismatch"
-            : names.length
-              ? `\u26A0 ${names.join(", ")}`
+            : mediaTypes.length
+              ? `\u26A0 needs ${mediaTypes.join(", ")}`
               : "\u26A0 incompatible",
         labelShowBg: true,
         labelBgPadding: [6, 3],
@@ -1042,11 +1057,11 @@ const revalidateEdges = () => {
 
     if (result.state === "ok") {
       validated += 1;
-      const names = portNames(result.metInputs);
+      const mediaTypes = portMediaTypes(result.metInputs);
       return {
         ...next,
         style: { stroke: VALID_EDGE_COLOR, strokeWidth: 2 },
-        label: names.length ? `\u2713 ${names.join(", ")}` : "\u2713",
+        label: mediaTypes.length ? `\u2713 ${mediaTypes.join(", ")}` : "\u2713",
         labelShowBg: true,
         labelBgPadding: [6, 3],
         labelBgBorderRadius: 2,
@@ -1068,35 +1083,43 @@ const reportConnectionCheck = (srcNode, tgtNode) => {
   const target = tgtNode?.data?.manifestPorts;
   if (!source || !target) return;
 
-  const { compatible, reason, unmetInputs, metInputs } = validateAppConnection(
-    source,
-    target,
-  );
+  const { compatible, checked, reason, unmetInputs, metInputs } =
+    validateAppConnection(source, target);
+  // Nothing to compare — no ports, or no media types on them. Silence beats
+  // "media types match", which would be a lie, and the edge is already drawn
+  // dashed and counted as unchecked on the canvas.
+  if (!checked) return;
 
   if (compatible) {
-    // Only claim a match when media types actually lined up. A pair where one
-    // side declares no ports is not a clean bill of health, just an unjudged
-    // edge, and saying "media types match" there would be a lie.
     if (!metInputs?.length) return;
+    // One line per media type, not per port: several inputs accepting the same
+    // type is one fact about the edge, not three.
+    const matched = [];
+    const seenTypes = [];
+    metInputs.forEach((port) => {
+      const type = portMediaTypes([port]).join(", ") || "any";
+      if (seenTypes.includes(type)) return;
+      seenTypes.push(type);
+      matched.push(matchedPortSummary(port));
+    });
     ElMessage({
       type: "success",
       duration: 4000,
       showClose: true,
-      message: `Media types match on ${metInputs
-        .map(matchedPortSummary)
-        .join("; ")}.`,
+      message: `Media types match: ${matched.join("; ")}.`,
     });
     return;
   }
 
-  const names = unmetInputNames(unmetInputs).join(", ");
+  const mediaTypes = portMediaTypes(unmetInputs).join(", ");
   const detail =
     reason === "no-overlap"
       ? `${srcNode.data.label} produces no output whose media type matches an ` +
-        `input on ${tgtNode.data.label}${names ? ` (${names})` : ""}.`
-      : `${tgtNode.data.label} declares required input` +
-        `${unmetInputs.length > 1 ? "s" : ""}${names ? ` (${names})` : ""} ` +
-        `that ${srcNode.data.label} does not produce.`;
+        `input on ${tgtNode.data.label}` +
+        `${mediaTypes ? ` (accepts ${mediaTypes})` : ""}.`
+      : `${tgtNode.data.label} requires ` +
+        `${mediaTypes || "media types"} on input, which ` +
+        `${srcNode.data.label} does not produce.`;
 
   ElMessage({
     type: "warning",
@@ -1456,16 +1479,17 @@ const openNodeSettings = (id) => {
             <ul v-if="edgeIssues.length" class="compat-panel-list">
               <li v-for="issue in edgeIssues" :key="issue.id">
                 {{ issue.source }} &rarr; {{ issue.target }}
-                <span v-if="issue.names.length" class="compat-panel-detail">
+                <span v-if="issue.mediaTypes.length" class="compat-panel-detail">
                   {{ issue.reason === "no-overlap" ? "no media type match for" : "needs" }}
-                  {{ issue.names.join(", ") }}
+                  {{ issue.mediaTypes.join(", ") }}
                 </span>
               </li>
             </ul>
             <div v-if="uncheckedEdgeCount" class="compat-panel-note">
               {{ uncheckedEdgeCount }}
               {{ uncheckedEdgeCount === 1 ? "connection" : "connections" }} not
-              checked &mdash; no app.yml on one of the applications.
+              checked &mdash; one side declares no app.yml, or no media types on
+              its ports.
             </div>
           </div>
 

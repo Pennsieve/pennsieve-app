@@ -876,54 +876,84 @@ export function validateParameters(parameters) {
 }
 
 /**
- * Are an upstream output and a downstream input compatible? `any` on either
- * side matches; otherwise data types must be equal. Used to validate
- * connections between applications in a workflow.
+ * Are an upstream output and a downstream input compatible? Media types are
+ * the comparison whenever both ports declare them; `dataType` is the fallback
+ * for schemas authored in the app form, which describe ports that way.
+ *
+ * `*` + `/` + `*` is the only wildcard. `application/octet-stream` is a
+ * concrete type here: it is what the reference manifest puts on its generic
+ * pipeline ports, so treating it as "matches anything" short-circuited the
+ * comparison before it ran and passed every edge between real applications.
+ *
  * @param {PortSchema} output
  * @param {PortSchema} input
  */
 export function arePortsCompatible(output, input) {
   if (!output || !input) return false;
 
-  // The backend's manifest describes ports by media type rather than by
-  // `dataType`. When both sides declare media types, compare those — otherwise
-  // every nested-manifest port would read as `any` and match everything.
   const outMedia = asArray(output.mediaTypes);
   const inMedia = asArray(input.mediaTypes);
   if (outMedia.length && inMedia.length) {
-    const wildcard = (t) => t === "*/*" || t === "application/octet-stream";
+    const wildcard = (t) => t === "*/*";
     if (outMedia.some(wildcard) || inMedia.some(wildcard)) return true;
     return outMedia.some((o) => inMedia.includes(o));
   }
 
+  // Only reachable for dataType-shaped ports: validateAppConnection excludes
+  // media-type-less ports from an edge that has media types anywhere on it.
   const a = output.dataType || "any";
   const b = input.dataType || "any";
   return a === "any" || b === "any" || a === b;
 }
 
 /**
- * Can `sourceApp`'s outputs feed `targetApp`'s inputs? Two ways an edge fails:
+ * Can `sourceApp`'s outputs feed `targetApp`'s inputs? Three outcomes, not
+ * two — `checked: false` means the ports carry nothing to compare, which is
+ * distinct from a clean bill of health and must not be shown as one:
  *
+ *  - `checked: false`: a side has no ports, or none declaring a media type
+ *    while the other side does.
  *  - `unmet-required`: a required input has no compatible upstream output.
  *  - `no-overlap`: nothing the source produces matches any input at all.
  *
- * The second case carries the check. `app.yml` has no `required` flag on a
- * port, so a manifest-shaped input always parses as optional — judging only
+ * The `no-overlap` case carries the check. `app.yml` has no `required` flag on
+ * a port, so a manifest-shaped input always parses as optional — judging only
  * required inputs would pass every edge regardless of the media types the two
  * sides declare, which is the same as not validating.
  *
- * @param {ApplicationSchema|Object} sourceApp  parsed schema or raw app
- * @param {ApplicationSchema|Object} targetApp
  * `metInputs` lists the inputs an upstream output can actually feed, so a
  * caller can tell the user *what* lined up rather than only that nothing
  * broke.
  *
- * @returns {{compatible: boolean, reason: string|null,
+ * @param {ApplicationSchema|Object} sourceApp  parsed schema or raw app
+ * @param {ApplicationSchema|Object} targetApp
+ * @returns {{compatible: boolean, checked: boolean, reason: string|null,
  *            unmetInputs: PortSchema[], metInputs: PortSchema[]}}
  */
 export function validateAppConnection(sourceApp, targetApp) {
-  const outputs = asArray(sourceApp?.outputs).map(parsePort);
-  const inputs = asArray(targetApp?.inputs).map(parsePort);
+  const allOutputs = asArray(sourceApp?.outputs).map(parsePort);
+  const allInputs = asArray(targetApp?.inputs).map(parsePort);
+
+  const declaresMedia = (port) => asArray(port.mediaTypes).length > 0;
+  // Media-type mode as soon as either side describes itself that way — which
+  // is every manifest the backend serves. A port with no declared media type
+  // is then not judgeable: excluded here and reported as unchecked below,
+  // rather than waved through on the `dataType: "any"` fallback, which dressed
+  // "we don't know" up as a confirmed match.
+  const mediaMode =
+    allOutputs.some(declaresMedia) || allInputs.some(declaresMedia);
+  const outputs = mediaMode ? allOutputs.filter(declaresMedia) : allOutputs;
+  const inputs = mediaMode ? allInputs.filter(declaresMedia) : allInputs;
+
+  if (!outputs.length || !inputs.length) {
+    return {
+      compatible: true,
+      checked: false,
+      reason: null,
+      unmetInputs: [],
+      metInputs: [],
+    };
+  }
 
   const isMet = (input) =>
     outputs.some((output) => arePortsCompatible(output, input));
@@ -934,25 +964,30 @@ export function validateAppConnection(sourceApp, targetApp) {
   if (unmetRequired.length) {
     return {
       compatible: false,
+      checked: true,
       reason: "unmet-required",
       unmetInputs: unmetRequired,
       metInputs,
     };
   }
 
-  // Only judged when there is something on both sides to compare; a source
-  // that declares no outputs, or a target that declares no inputs, tells us
-  // nothing about the edge.
-  if (inputs.length && outputs.length && unmet.length === inputs.length) {
+  if (unmet.length === inputs.length) {
     return {
       compatible: false,
+      checked: true,
       reason: "no-overlap",
       unmetInputs: unmet,
       metInputs,
     };
   }
 
-  return { compatible: true, reason: null, unmetInputs: [], metInputs };
+  return {
+    compatible: true,
+    checked: true,
+    reason: null,
+    unmetInputs: [],
+    metInputs,
+  };
 }
 
 /* ──────────────────────────────────────────────────────────────────────────
