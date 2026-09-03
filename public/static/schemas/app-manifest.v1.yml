@@ -1,0 +1,47 @@
+# yaml-language-server: $schema=./pennsieve-app-schema.json
+schemaVersion: 1.0.0
+application:
+  name: test-private-repo-3
+  description: this is a test repo for development purposes
+  version: 1.0.1
+  maintainers:
+    - name: edmore
+  tags:
+    - demo
+runtime:
+  cpu: 1024
+  memory: 2048
+  computeTypes:
+    - standard
+  timeoutSeconds: 300
+parameters:
+  - name: threshold
+    type: number
+    description: Detection threshold.
+    defaultValue: "0.5"
+    validValues:
+      - "0.1"
+      - "0.5"
+      - "0.9"
+  - name: mode
+    type: string
+    description: Processing mode.
+    defaultValue: fast
+    validValues:
+      - fast
+      - accurate
+  - name: verbose
+    type: boolean
+    description: Enable verbose logging.
+    defaultValue: "false"
+  - name: channel
+    type: string
+    description: Channel to analyze (no default, treated as required).
+inputs:
+  - description: Pipeline package file.
+    mediaTypes:
+      - application/octet-stream
+outputs:
+  - description: Pipeline package file.
+    mediaTypes:
+      - application/octet-stream
