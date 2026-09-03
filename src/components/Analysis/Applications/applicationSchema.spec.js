@@ -317,17 +317,27 @@ describe('applicationSchema', () => {
       ).toBe(true)
     })
 
-    it('treats octet-stream and */* as wildcards', () => {
-      // The generic pipeline port real manifests use — must not warn.
-      expect(
-        arePortsCompatible(
-          { mediaTypes: ['application/octet-stream'] },
-          { mediaTypes: ['application/x-nifti'] },
-        ),
-      ).toBe(true)
+    it('treats */* as the only wildcard', () => {
       expect(
         arePortsCompatible({ mediaTypes: ['image/png'] }, { mediaTypes: ['*/*'] }),
       ).toBe(true)
+      expect(
+        arePortsCompatible({ mediaTypes: ['*/*'] }, { mediaTypes: ['image/png'] }),
+      ).toBe(true)
+    })
+
+    it('treats octet-stream as a concrete type, not a wildcard', () => {
+      // Every port in the reference manifest is octet-stream. Waving it
+      // through matched everything and made the check vacuous, so it now has
+      // to be equal like any other type.
+      const octet = { mediaTypes: ['application/octet-stream'] }
+      expect(arePortsCompatible(octet, octet)).toBe(true)
+      expect(
+        arePortsCompatible(octet, { mediaTypes: ['application/x-nifti'] }),
+      ).toBe(false)
+      expect(
+        arePortsCompatible({ mediaTypes: ['application/x-nifti'] }, octet),
+      ).toBe(false)
     })
 
     it('falls back to dataType when only one side declares media types', () => {
@@ -379,14 +389,51 @@ describe('applicationSchema', () => {
 
     it('does not judge an edge when either side declares no ports', () => {
       const zarr = { mediaTypes: ['application/zarr'] }
-      expect(
-        validateAppConnection({ outputs: [] }, { inputs: [{ name: 'i', ...zarr }] })
-          .compatible,
-      ).toBe(true)
-      expect(
-        validateAppConnection({ outputs: [{ name: 'o', ...zarr }] }, { inputs: [] })
-          .compatible,
-      ).toBe(true)
+      const noOutputs = validateAppConnection(
+        { outputs: [] },
+        { inputs: [{ name: 'i', ...zarr }] },
+      )
+      expect(noOutputs).toMatchObject({ compatible: true, checked: false })
+      const noInputs = validateAppConnection(
+        { outputs: [{ name: 'o', ...zarr }] },
+        { inputs: [] },
+      )
+      expect(noInputs).toMatchObject({ compatible: true, checked: false })
+    })
+
+    it('reports unchecked when one side declares no media types', () => {
+      // The old `dataType: "any"` fallback returned a confirmed match here,
+      // which is how an unjudgeable edge came to show a green tick.
+      const res = validateAppConnection(
+        { outputs: [{ name: 'out' }] },
+        { inputs: [{ name: 'in', mediaTypes: ['application/zarr'] }] },
+      )
+      expect(res).toMatchObject({ checked: false, metInputs: [] })
+    })
+
+    it('ignores individual ports that declare no media types', () => {
+      // A manifest may describe some ports fully and some not; the ones it
+      // does not describe are neither met nor unmet.
+      const res = validateAppConnection(
+        { outputs: [{ name: 'out', mediaTypes: ['application/zarr'] }] },
+        {
+          inputs: [
+            { name: 'archive', mediaTypes: ['application/zarr'] },
+            { name: 'untyped' },
+          ],
+        },
+      )
+      expect(res).toMatchObject({ compatible: true, checked: true })
+      expect(res.metInputs.map((i) => i.name)).toEqual(['archive'])
+      expect(res.unmetInputs).toEqual([])
+    })
+
+    it('still judges dataType-shaped ports when no side declares media types', () => {
+      const res = validateAppConnection(
+        { outputs: [{ name: 'o', dataType: 'file' }] },
+        { inputs: [{ name: 'i', dataType: 'image' }] },
+      )
+      expect(res).toMatchObject({ compatible: false, checked: true, reason: 'no-overlap' })
     })
 
     it('passes the generic octet-stream pipeline ports the reference manifest uses', () => {
@@ -395,7 +442,7 @@ describe('applicationSchema', () => {
         { outputs: [{ name: 'package', ...port }] },
         { inputs: [{ name: 'package', ...port }] },
       )
-      expect(res.compatible).toBe(true)
+      expect(res).toMatchObject({ compatible: true, checked: true })
     })
 
     it('names the inputs a match landed on, for positive feedback', () => {
