@@ -12,8 +12,8 @@ import IconRemove from '@/components/icons/IconRemove.vue'
 import IconCopyDocument from '@/components/icons/IconCopyDocument.vue'
 import ComputeNodeSecrets from './ComputeNodeSecrets.vue'
 import ComputeNodeLayers from './ComputeNodeLayers.vue'
-import ComputeNodeQuotas from './ComputeNodeQuotas.vue'
 import ComputeNodeLLMBudget from './ComputeNodeLLMBudget.vue'
+import ComputeNodePipelineBudget from './ComputeNodePipelineBudget.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -837,30 +837,28 @@ async function saveConfig() {
         </div>
       </div>
 
-      <!-- Node-wide LLM budget. The SSM-backed cap the governor enforces
-           on every invocation — chat *and* workflow applications. This is
-           the only enforcement layer that catches non-chat callers, so
-           it's shown first. Per-user quotas (below) are an additional
-           cap on chat only. -->
-      <div id="llm-budget" class="management-section" v-if="canManagePermissions && computeNode?.enableLLMAccess">
+      <!-- Pipeline spend limits. Enforced at run creation in workflow-service,
+           so a submission that would breach a cap never starts any compute.
+           Shown for every node, not just LLM-enabled ones — these govern
+           ordinary analysis pipelines. Owner-gated because the underlying
+           list endpoint is owner-only. -->
+      <div id="pipeline-budget" class="management-section" v-if="canManagePermissions">
         <div class="section-header">
-          <h2>Node LLM Budget</h2>
+          <h2>Pipeline Budget</h2>
         </div>
-        <ComputeNodeLLMBudget :node-id="nodeUuid" :is-owner="isNodeOwner" />
+        <ComputeNodePipelineBudget :node-id="nodeUuid" :is-owner="isNodeOwner" />
       </div>
 
-      <!-- Per-user chat LLM quotas. Anchor `#quotas` is what the chat
-           panel's "Manage quotas" link targets. -->
-      <div id="quotas" class="management-section" v-if="canManagePermissions && computeNode?.enableLLMAccess">
+      <!-- LLM spend limits: node-wide pot, per-user default, per-user
+           overrides. One section laid out like Pipeline Budget above, since
+           the two families answer the same question about different spend.
+           The `#quotas` anchor the chat panel links to lives on the overrides
+           block inside the panel. -->
+      <div id="llm-budget" class="management-section" v-if="canManagePermissions && computeNode?.enableLLMAccess">
         <div class="section-header">
-          <h2>Per-user LLM Quotas</h2>
+          <h2>LLM Budget</h2>
         </div>
-        <p class="section-blurb">
-          Optional per-user caps applied <em>in addition to</em> the node
-          budget above. These only gate chat — workflow applications are
-          governed solely by the node budget.
-        </p>
-        <ComputeNodeQuotas :node-id="nodeUuid" :is-owner="isNodeOwner" />
+        <ComputeNodeLLMBudget :node-id="nodeUuid" :is-owner="isNodeOwner" />
       </div>
 
       <!-- Access & Permissions Section -->
