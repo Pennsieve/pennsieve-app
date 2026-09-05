@@ -14,6 +14,7 @@ import ComputeNodeSecrets from './ComputeNodeSecrets.vue'
 import ComputeNodeLayers from './ComputeNodeLayers.vue'
 import ComputeNodeQuotas from './ComputeNodeQuotas.vue'
 import ComputeNodeLLMBudget from './ComputeNodeLLMBudget.vue'
+import ComputeNodePipelineBudget from './ComputeNodePipelineBudget.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -835,6 +836,18 @@ async function saveConfig() {
             </div>
           </template>
         </div>
+      </div>
+
+      <!-- Pipeline spend limits. Enforced at run creation in workflow-service,
+           so a submission that would breach a cap never starts any compute.
+           Shown for every node, not just LLM-enabled ones — these govern
+           ordinary analysis pipelines. Owner-gated because the underlying
+           list endpoint is owner-only. -->
+      <div id="pipeline-budget" class="management-section" v-if="canManagePermissions">
+        <div class="section-header">
+          <h2>Pipeline Budget</h2>
+        </div>
+        <ComputeNodePipelineBudget :node-id="nodeUuid" :is-owner="isNodeOwner" />
       </div>
 
       <!-- Node-wide LLM budget. The SSM-backed cap the governor enforces
