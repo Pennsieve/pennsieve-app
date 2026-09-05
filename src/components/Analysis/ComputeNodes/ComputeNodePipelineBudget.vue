@@ -1,64 +1,69 @@
 <template>
-  <div class="llm-budget-admin" v-loading="isLoading">
+  <div class="pipeline-budget-admin" v-loading="isLoading">
     <p class="section-blurb">
-      Caps what this node may spend on LLM calls. Enforced at the governor: once
-      a cap is reached, every further invocation is rejected until the period
-      rolls over.
+      Caps what analysis pipelines may spend on this node. Enforced at run
+      creation: a submission that would breach a cap is rejected before any
+      compute starts.
       <span class="propagation-note">
-        Node budget changes take effect within ~60 seconds (the governor caches
-        the value). Unset per-user fields fall back to the platform safety cap.
+        Unlike LLM quotas, pipeline axes are <strong>unlimited</strong> unless
+        set here — pipeline compute runs in this node's own AWS account.
       </span>
     </p>
 
-    <!-- Node-wide pot: all callers combined, chat and workflow applications
-         alike. Listed first because it outranks the per-user axes — if this is
-         exhausted, raising one user's cap achieves nothing. It is also the only
-         layer that catches non-chat callers. -->
+    <!-- Live consumption against the caller's own resolved limits. Rendered
+         above the policy cards so an owner checking "is anything actually
+         hitting these?" sees the answer first. Hides itself entirely on an
+         unconfigured node. -->
+    <PipelineBudgetMeter
+      :budget="meterBudget"
+      :spend-axes="meterSpendAxes"
+      :concurrency-axes="meterConcurrencyAxes"
+      :level="meterLevel"
+      :per-run-usd="meterPerRunUsd"
+      :loading="meterLoading"
+      :error="meterError"
+    />
+
+    <!-- Node-wide pot: all users combined. Listed first because it outranks
+         the per-user axes — if this is exhausted, raising one user's cap
+         achieves nothing. -->
     <div class="policy-card">
       <div class="policy-card-head">
         <div>
           <h3 class="policy-title">Node-wide budget</h3>
           <p class="policy-subtitle">
-            Total across all callers on this node — chat <em>and</em> workflow
-            applications.
+            Total across all users of this node. No per-run ceiling here — a
+            per-run cap is a property of a single run, so set it below.
           </p>
         </div>
         <button v-if="isOwner" class="processor-edit-button" @click="openEditNode">
-          {{ nodeConfig ? 'Edit' : 'Set' }}
+          {{ nodeRow ? 'Edit' : 'Set' }}
         </button>
       </div>
       <div class="caps-grid">
-        <div class="cap-cell">
-          <span class="cap-label">Budget cap</span>
-          <span class="cap-value" :class="{ unset: !nodeConfig }">
-            {{ nodeConfig ? formatUsd(nodeConfig.budgetUsd) : '—' }}
-          </span>
-        </div>
-        <div class="cap-cell">
-          <span class="cap-label">Period</span>
-          <span class="cap-value" :class="{ unset: !nodeConfig }">
-            {{ nodeConfig ? periodLabel(nodeConfig.budgetPeriod) : '—' }}
+        <div v-for="axis in nodeAxes" :key="axis.key" class="cap-cell">
+          <span class="cap-label">{{ axis.label }}</span>
+          <span class="cap-value" :class="{ unset: !isSet(nodeRow, axis.key) }">
+            {{ formatAxis(nodeRow, axis) }}
           </span>
         </div>
       </div>
-      <!-- Unlike the pipeline axes, no budget here is not "unlimited" — the
-           governor rejects everything until a cap exists. Worth saying plainly. -->
-      <p v-if="!nodeConfig && !isLoading" class="empty-warning">
-        No budget configured. The governor will reject all LLM calls on this
-        node until a cap is set.
-      </p>
+      <p v-if="nodeRow?.notes" class="notes-line">{{ nodeRow.notes }}</p>
+      <div v-if="isOwner && nodeRow" class="card-actions">
+        <button class="row-action danger" @click="confirmClear('node', 'the node-wide budget')">
+          Remove
+        </button>
+      </div>
     </div>
 
-    <!-- Per-user default. Chat only: workflow applications are governed solely
-         by the node budget above. -->
+    <!-- Per-user default. -->
     <div class="policy-card">
       <div class="policy-card-head">
         <div>
           <h3 class="policy-title">Default per user</h3>
           <p class="policy-subtitle">
             Applies to each user individually, unless they have an override
-            below. Gates chat only — workflow applications are governed solely
-            by the node budget.
+            below.
           </p>
         </div>
         <button v-if="isOwner" class="processor-edit-button" @click="openEditDefault">
@@ -66,19 +71,23 @@
         </button>
       </div>
       <div class="caps-grid">
-        <div v-for="axis in USER_AXES" :key="axis.key" class="cap-cell">
+        <div v-for="axis in userAxes" :key="axis.key" class="cap-cell">
           <span class="cap-label">{{ axis.label }}</span>
           <span class="cap-value" :class="{ unset: !isSet(defaultRow, axis.key) }">
-            {{ formatAxis(defaultRow, axis.key) }}
+            {{ formatAxis(defaultRow, axis) }}
           </span>
         </div>
       </div>
       <p v-if="defaultRow?.notes" class="notes-line">{{ defaultRow.notes }}</p>
+      <div v-if="isOwner && defaultRow" class="card-actions">
+        <button class="row-action danger" @click="confirmClear('default', 'the per-user default')">
+          Remove
+        </button>
+      </div>
     </div>
 
-    <!-- Per-user overrides. The `#quotas` anchor is what the chat panel's
-         "Manage quotas" link targets, so it has to stay on this block. -->
-    <div id="quotas" class="overrides-block">
+    <!-- Per-user overrides. -->
+    <div class="overrides-block">
       <div class="overrides-head">
         <h3 class="overrides-title">User overrides</h3>
         <bf-button v-if="isOwner" class="small primary" @click="openAddUser">Add User</bf-button>
@@ -92,7 +101,7 @@
         <thead>
           <tr>
             <th>User</th>
-            <th v-for="axis in USER_AXES" :key="axis.key">{{ axis.label }}</th>
+            <th v-for="axis in userAxes" :key="axis.key">{{ axis.label }}</th>
             <th>Notes</th>
             <th v-if="isOwner" class="actions-col">Actions</th>
           </tr>
@@ -100,22 +109,27 @@
         <tbody>
           <tr v-for="row in userRows" :key="row.userId">
             <td>{{ getUserName(row.userId) }}</td>
-            <td v-for="axis in USER_AXES" :key="axis.key" :class="{ unset: !isSet(row, axis.key) }">
-              {{ formatAxis(row, axis.key) }}
+            <td v-for="axis in userAxes" :key="axis.key" :class="{ unset: !isSet(row, axis.key) }">
+              {{ formatAxis(row, axis) }}
             </td>
             <td class="notes-cell">{{ row.notes || '' }}</td>
             <td v-if="isOwner" class="actions-col">
               <button class="row-action" @click="openEditUser(row)">Edit</button>
-              <button class="row-action danger" @click="confirmDelete(row)">Remove</button>
+              <button
+                class="row-action danger"
+                @click="confirmClear(row.userId, `the override for ${getUserName(row.userId)}`)"
+              >
+                Remove
+              </button>
             </td>
           </tr>
         </tbody>
       </table>
     </div>
 
-    <p v-if="loadError" class="error-line">Couldn't load LLM budget: {{ loadError.message }}</p>
+    <p v-if="loadError" class="error-line">Couldn't load pipeline budget: {{ loadError.message }}</p>
 
-    <QuotaEditModal
+    <PipelineQuotaEditModal
       v-model:visible="modalOpen"
       :node-id="nodeId"
       :mode="modalMode"
@@ -128,57 +142,51 @@
 </template>
 
 <script setup>
-// One section for everything that caps LLM spend on a node, laid out the same
-// way as ComputeNodePipelineBudget: node-wide pot, per-user default, per-user
-// overrides. The two families are deliberately separate sections — they have
-// different defaults (an LLM node with no budget rejects everything; a pipeline
-// node with no budget is unlimited) — but they read the same.
-//
-// Two backing stores sit behind this one panel, because the platform stores the
-// two tiers differently:
-//
-//   nodeLlmBudgetStore    the node-wide cap, SSM-backed via account-service's
-//                         llm-config endpoint. Enforced by the governor on
-//                         every Bedrock invocation, so it catches non-chat
-//                         callers too.
-//   chatQuotaAdminStore   per-user rows in the chat quota table. Gates chat
-//                         turns only.
 import { computed, onMounted, ref, watch } from 'vue'
 import { useStore } from 'vuex'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import BfButton from '@/components/shared/bf-button/BfButton.vue'
-import QuotaEditModal from './QuotaEditModal.vue'
-import { useChatQuotaAdminStore, DEFAULT_USER_SENTINEL } from '@/stores/chatQuotaAdminStore'
-import { useNodeLlmBudgetStore } from '@/stores/nodeLlmBudgetStore'
+import PipelineBudgetMeter from './PipelineBudgetMeter.vue'
+import PipelineQuotaEditModal from './PipelineQuotaEditModal.vue'
+import {
+  useNodePipelineQuotaStore,
+  axesForScope,
+  SCOPE_NODE,
+} from '@/stores/nodePipelineQuotaStore'
+import { usePipelineBudgetStore } from '@/stores/pipelineBudgetStore'
 
 const props = defineProps({
   nodeId: { type: String, required: true },
   isOwner: { type: Boolean, default: false },
 })
 
-const USER_AXES = [
-  { key: 'dailyCostUsd', label: 'Daily' },
-  { key: 'monthlyCostUsd', label: 'Monthly' },
-  { key: 'perWorkflowUsd', label: 'Per workflow' },
-]
-
 const vuexStore = useStore()
-const adminStore = useChatQuotaAdminStore()
-const nodeBudgetStore = useNodeLlmBudgetStore()
+const store = useNodePipelineQuotaStore()
+const budgetStore = usePipelineBudgetStore()
 
 const orgMembers = computed(() => vuexStore.state?.orgMembers || [])
 const profile = computed(() => vuexStore.state?.profile)
 
-const nodeConfig = computed(() => nodeBudgetStore.getConfig(props.nodeId))
-const defaultRow = computed(() => adminStore.getDefaultRow(props.nodeId))
-const userRows = computed(() => adminStore.getUserRows(props.nodeId))
+const nodeRow = computed(() => store.getNodeRow(props.nodeId))
+const defaultRow = computed(() => store.getDefaultRow(props.nodeId))
+const userRows = computed(() => store.getUserRows(props.nodeId))
+const isLoading = computed(() => store.isLoading(props.nodeId))
+const loadError = computed(() => store.getError(props.nodeId))
 
-const isLoading = computed(
-  () => adminStore.isLoading(props.nodeId) || nodeBudgetStore.isLoading(props.nodeId),
-)
-const loadError = computed(
-  () => adminStore.getError(props.nodeId) || nodeBudgetStore.getError(props.nodeId),
-)
+const nodeAxes = axesForScope(SCOPE_NODE)
+const userAxes = axesForScope('')
+
+// Meter wiring — the same props ChatQuotaHeader-style presentational components
+// expect. Reads workflow-service rather than account-service: account-service
+// resolves the limits above but has no access to the usage table, so only
+// workflow-service can report what has actually been spent against them.
+const meterBudget = computed(() => budgetStore.getBudget(props.nodeId))
+const meterSpendAxes = computed(() => budgetStore.spendAxes(props.nodeId))
+const meterConcurrencyAxes = computed(() => budgetStore.concurrencyAxes(props.nodeId))
+const meterLevel = computed(() => budgetStore.warningLevel(props.nodeId))
+const meterPerRunUsd = computed(() => budgetStore.perRunUsd(props.nodeId))
+const meterLoading = computed(() => budgetStore.isLoading(props.nodeId))
+const meterError = computed(() => budgetStore.getError(props.nodeId))
 
 const availableUsersForPicker = computed(() => {
   const taken = new Set(userRows.value.map((r) => r.userId))
@@ -192,15 +200,15 @@ const modalSubjectLabel = ref('')
 
 function openEditNode() {
   modalMode.value = 'edit-node'
-  modalRow.value = nodeConfig.value
-  modalSubjectLabel.value = 'This compute node (all callers combined)'
+  modalRow.value = nodeRow.value
+  modalSubjectLabel.value = 'This compute node (all users combined)'
   modalOpen.value = true
 }
 
 function openEditDefault() {
   modalMode.value = 'edit-default'
   modalRow.value = defaultRow.value
-  modalSubjectLabel.value = 'All users (default)'
+  modalSubjectLabel.value = 'Every user without an override'
   modalOpen.value = true
 }
 
@@ -218,31 +226,34 @@ function openEditUser(row) {
   modalOpen.value = true
 }
 
-async function confirmDelete(row) {
+async function confirmClear(scope, label) {
   try {
     await ElMessageBox.confirm(
-      `Remove the quota override for ${getUserName(row.userId)}? They will fall back to the default.`,
-      'Remove override',
+      `Remove ${label}? Every axis it sets falls back to the next tier, and to unlimited if no tier sets it.`,
+      'Remove budget',
       { type: 'warning', confirmButtonText: 'Remove', cancelButtonText: 'Cancel' },
     )
   } catch {
     return
   }
   try {
-    await adminStore.deleteRow(props.nodeId, row.userId)
-    ElMessage.success('Override removed')
+    await store.deleteRow(props.nodeId, scope)
+    ElMessage.success('Budget removed')
+    budgetStore.fetch(props.nodeId)
   } catch (e) {
     ElMessage.error(`Failed to remove: ${e?.message || e}`)
   }
 }
 
 function onSaved() {
-  ElMessage.success('LLM budget saved')
+  ElMessage.success('Pipeline budget saved')
+  // The meter reads resolved limits from workflow-service, so a policy change
+  // here only shows up after a refetch.
+  budgetStore.fetch(props.nodeId)
 }
 
 function getUserName(userId) {
   if (!userId) return 'Unknown'
-  if (userId === DEFAULT_USER_SENTINEL) return 'All users (default)'
   if (profile.value && (profile.value.id === userId || profile.value.intId === userId)) {
     return `${profile.value.firstName} ${profile.value.lastName}`.trim() || 'You'
   }
@@ -253,23 +264,19 @@ function getUserName(userId) {
 
 const isSet = (row, key) => row?.[key] !== null && row?.[key] !== undefined
 
-function formatUsd(v) {
+// An em-dash means "not set here" — the axis falls through. A literal 0 is a
+// real cap, so it must never render as unset.
+function formatAxis(row, axis) {
+  const v = row?.[axis.key]
   if (v === null || v === undefined) return '—'
-  return `$${Number(v).toFixed(2)}`
-}
-
-const formatAxis = (row, key) => formatUsd(row?.[key])
-
-function periodLabel(p) {
-  if (p === 'daily') return 'Daily'
-  if (p === 'monthly') return 'Monthly'
-  return p || '—'
+  if (axis.unit === 'usd') return `$${Number(v).toFixed(2)}`
+  return String(v)
 }
 
 function load() {
   if (!props.nodeId) return
-  adminStore.fetchAll(props.nodeId)
-  nodeBudgetStore.fetch(props.nodeId)
+  store.fetchAll(props.nodeId)
+  budgetStore.fetch(props.nodeId)
 }
 
 onMounted(load)
@@ -279,7 +286,7 @@ watch(() => props.nodeId, load)
 <style scoped lang="scss">
 @use '../../../styles/_theme.scss';
 
-.llm-budget-admin {
+.pipeline-budget-admin {
   display: flex;
   flex-direction: column;
   gap: 20px;
@@ -291,7 +298,7 @@ watch(() => props.nodeId, load)
   color: theme.$gray_5;
   line-height: 1.5;
 
-  em { font-style: italic; }
+  strong { color: theme.$gray_6; }
 }
 
 .propagation-note {
@@ -327,8 +334,6 @@ watch(() => props.nodeId, load)
   margin: 0;
   font-size: 13px;
   color: theme.$gray_5;
-
-  em { font-style: italic; }
 }
 
 .caps-grid {
@@ -361,18 +366,15 @@ watch(() => props.nodeId, load)
   }
 }
 
-.empty-warning {
-  margin: 12px 0 0 0;
-  font-size: 12px;
-  color: theme.$orange_1;
-  line-height: 1.5;
-}
-
 .notes-line {
   margin: 12px 0 0 0;
   font-size: 12px;
   color: theme.$gray_5;
   font-style: italic;
+}
+
+.card-actions {
+  margin-top: 12px;
 }
 
 .overrides-block {
