@@ -16,6 +16,7 @@ import BreadcrumbNavigation from "../../datasets/files/BreadcrumbNavigation/Brea
 import { useGetToken } from "@/composables/useGetToken";
 import { useSendXhr } from "@/mixins/request/request_composable";
 import { useMetricsCounters } from "@/composables/useMetricsCounters";
+import { useWorkflowSearch } from "@/composables/useWorkflowSearch";
 import toQueryParams from "@/utils/toQueryParams";
 import LayerNameSelector from "./LayerNameSelector.vue";
 import { validateRunName, runDisplayName, RUN_NAME_MAX_LENGTH } from "./runHelpers";
@@ -845,16 +846,21 @@ const onDatasetSearch = (query) => {
 */
 const wizardStepTitles = ["Select Workflow", "Select Compute Node", "Select Dataset", "Ready to Configure"];
 
-const workflowSearch = ref("");
 const computeNodeSearch = ref("");
 
-const filteredWizardWorkflows = computed(() => {
-  const q = workflowSearch.value.toLowerCase().trim();
-  if (!q) return workflows.value;
-  return workflows.value.filter(w =>
-    w.name?.toLowerCase().includes(q) || w.description?.toLowerCase().includes(q)
-  );
-});
+// Server-side workflow search + cursor pagination, with a list local to the
+// wizard so the shared store list (which feeds the run filter dropdown) is
+// left alone.
+const {
+  workflowOptions: wizardWorkflowOptions,
+  nextCursor: wizardWorkflowsCursor,
+  isLoading: wizardWorkflowsLoading,
+  isLoadingMore: wizardWorkflowsLoadingMore,
+  searchQuery: workflowSearch,
+  onSearchInput: onWorkflowSearch,
+  loadMore: loadMoreWizardWorkflows,
+  reset: resetWorkflowSearch,
+} = useWorkflowSearch();
 
 const filteredWizardComputeNodes = computed(() => {
   const q = computeNodeSearch.value.toLowerCase().trim();
@@ -865,7 +871,9 @@ const filteredWizardComputeNodes = computed(() => {
 });
 
 const wizardSelectedWorkflow = computed(() =>
-  workflows.value.find(w => w.uuid === wizardForm.value.workflowId) || null
+  wizardWorkflowOptions.value.find(w => w.uuid === wizardForm.value.workflowId) ||
+  workflows.value.find(w => w.uuid === wizardForm.value.workflowId) ||
+  null
 );
 const wizardSelectedComputeNode = computed(() =>
   computeNodes.value.find(cn => cn.uuid === wizardForm.value.computeNodeId) || null
@@ -883,13 +891,13 @@ const wizardCanNext = computed(() => {
 
 const openWizardDialog = () => {
   wizardForm.value = { workflowId: "", computeNodeId: "", datasetId: "" };
-  workflowSearch.value = "";
   computeNodeSearch.value = "";
   datasetSearchQuery.value = "";
   wizardStep.value = 0;
   rerunSource.value = null;
   accordionActiveNames.value = ["information"];
   wizardVisible.value = true;
+  resetWorkflowSearch();
   fetchDatasetOptions();
 };
 
@@ -922,10 +930,10 @@ const rerunFromRun = async (run) => {
     computeNodeId: run.computeNodeUuid || "",
     datasetId: run.datasetId || "",
   };
-  workflowSearch.value = "";
   computeNodeSearch.value = "";
   wizardStep.value = 3; // jump to confirmation
   wizardVisible.value = true;
+  resetWorkflowSearch();
   fetchDatasetOptions();
 };
 
@@ -2581,17 +2589,19 @@ onUnmounted(() => {
           <template v-else>
             <el-input
               v-model="workflowSearch"
-              placeholder="Filter workflows..."
+              placeholder="Search workflows..."
               clearable
               class="wizard-search"
+              @input="onWorkflowSearch"
             />
             <div class="wizard-cards">
+              <div v-if="wizardWorkflowsLoading" class="wizard-cards-loading">Searching...</div>
               <div
-                v-for="wf in filteredWizardWorkflows"
+                v-for="wf in wizardWorkflowOptions"
                 :key="wf.uuid"
                 class="wizard-card"
                 :class="{ disabled: !wf.isActive }"
-                @click="wf.isActive && (wizardForm.workflowId = wf.uuid, workflowSearch = '')"
+                @click="wf.isActive && (wizardForm.workflowId = wf.uuid)"
               >
                 <div class="wizard-card-name">{{ wf.name }}</div>
                 <div v-if="wf.description" class="wizard-card-desc">{{ wf.description }}</div>
@@ -2600,7 +2610,15 @@ onUnmounted(() => {
                   <span v-if="!wf.isActive" class="wizard-card-badge">Archived</span>
                 </div>
               </div>
-              <div v-if="filteredWizardWorkflows.length === 0" class="wizard-cards-loading">No workflows found</div>
+              <div v-if="!wizardWorkflowsLoading && wizardWorkflowOptions.length === 0" class="wizard-cards-loading">No workflows found</div>
+              <button
+                v-if="wizardWorkflowsCursor"
+                class="load-more-btn"
+                :disabled="wizardWorkflowsLoadingMore"
+                @click="loadMoreWizardWorkflows"
+              >
+                {{ wizardWorkflowsLoadingMore ? 'Loading...' : 'Load more workflows' }}
+              </button>
             </div>
           </template>
         </div>
