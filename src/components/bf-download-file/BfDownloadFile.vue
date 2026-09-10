@@ -73,6 +73,7 @@
 </template>
 
 <script>
+import { trackEvent, bucket } from "@/utils/analytics";
 import { mapGetters, mapState } from "vuex";
 import { pathOr } from "ramda";
 import Request from "../../mixins/request/index";
@@ -204,6 +205,11 @@ export default {
      *     represents the parent package of those files
      */
     triggerDownload: async function (packageDTOs, fileDTOs) {
+      // every download UI funnels through here; counts only, bucketed
+      trackEvent('file_downloaded', {
+        kind: fileDTOs ? 'files' : 'packages',
+        count: bucket((fileDTOs || packageDTOs || []).length),
+      });
       // A package is downloadable only when its source data actually exists
       // in storage and is retrievable. Deny by default: gating on READY
       // alone was wrong (an uploaded package rests in UPLOADED indefinitely

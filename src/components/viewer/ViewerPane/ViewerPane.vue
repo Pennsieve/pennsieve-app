@@ -75,6 +75,7 @@ import FileTypeMapper from "../../../mixins/FileTypeMapper";
 import GetFileProperty from "../../../mixins/get-file-property";
 import NeuroglancerViewer from "../../viewers/NeuroglancerViewer.vue";
 import BfButton from "@/components/shared/bf-button/BfButton.vue";
+import { trackEvent } from "@/utils/analytics";
 import {
   TSViewer,
   TIMESERIES_ZARR,
@@ -511,6 +512,8 @@ export default {
      */
     loadVueViewer: function (component) {
       this.cmpViewer = component;
+      // component name is an enumerable viewer type, not user content
+      trackEvent("viewer_opened", { viewer: String(component || "").replace(/Viewer$/, "").toLowerCase() });
     },
 
     isTimeseriesPackageUnprocessed: function (pkg) {
