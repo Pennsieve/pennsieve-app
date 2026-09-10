@@ -40,6 +40,55 @@ export function sanitizePath(path) {
   return out === '' ? '/' : out
 }
 
+
+// ---- events ---------------------------------------------------------------
+
+let enabled = false
+
+/**
+ * Bucket a count. Exact counts are needlessly identifying in aggregate
+ * ("the workspace that uploaded exactly 1,247 files") and nobody makes a
+ * decision on the difference between 11 and 12.
+ */
+export function bucket(n) {
+  const v = Number(n)
+  if (!Number.isFinite(v) || v < 0) return 'unknown'
+  if (v === 0) return '0'
+  if (v === 1) return '1'
+  if (v <= 10) return '2-10'
+  if (v <= 100) return '11-100'
+  if (v <= 1000) return '101-1000'
+  return '1000+'
+}
+
+// Parameter values must be enumerable, not free text: a label that can carry
+// a dataset name or a search query is one refactor away from sending PHI to
+// Google. Strings are accepted only if they look like an identifier-free
+// token; anything else is dropped.
+const SAFE_TOKEN = /^[a-z0-9_-]{1,40}$/i
+
+function safeParams(params) {
+  const out = {}
+  for (const [k, v] of Object.entries(params || {})) {
+    if (typeof v === 'number' && Number.isFinite(v)) out[k] = v
+    else if (typeof v === 'boolean') out[k] = v
+    else if (typeof v === 'string' && SAFE_TOKEN.test(v)) out[k] = v
+    // everything else (free text, ids, objects) is intentionally dropped
+  }
+  return out
+}
+
+/**
+ * Send a product event. No-ops when analytics is disabled (clin, local
+ * without an id) so call sites never need to check.
+ */
+export function trackEvent(name, params = {}) {
+  if (!enabled || typeof window === 'undefined' || !window.gtag) return false
+  if (!SAFE_TOKEN.test(name)) return false
+  window.gtag('event', name, safeParams(params))
+  return true
+}
+
 export function initAnalytics(router, measurementId) {
   if (!measurementId) return false          // unconfigured env: stay silent
   if (typeof window === 'undefined' || typeof document === 'undefined') return false
@@ -69,5 +118,6 @@ export function initAnalytics(router, measurementId) {
 
   router.afterEach((to) => send(to))
   router.isReady().then(() => send(router.currentRoute.value)).catch(() => {})
+  enabled = true
   return true
 }

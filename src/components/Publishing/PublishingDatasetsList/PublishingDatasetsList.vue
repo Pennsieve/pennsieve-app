@@ -97,6 +97,7 @@
 </template>
 
 <script>
+import { trackEvent } from "@/utils/analytics";
 import { mapActions, mapGetters, mapState } from "vuex";
 import { pathOr } from "ramda";
 
@@ -296,6 +297,7 @@ export default {
             }
           );
         })
+        .then(() => trackEvent("dataset_published"))
         .catch(useHandleXhrError);
     },
 
