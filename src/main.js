@@ -11,6 +11,7 @@ import { VueReCaptcha } from 'vue-recaptcha-v3'
 import AWSConfig from './utils/aws-exports.js'
 // import { ElMessage } from 'element-plus'
 import VueClipboard from 'vue3-clipboard'
+import { initAnalytics } from './utils/analytics'
 import ClickOutside from './utils/ClickOutsideDirective'; // Adjust the import path according to your project structure
 
 // Import Element Plus CSS manually to ensure proper theming
@@ -82,6 +83,11 @@ app.use(VueReCaptcha, {
   })
 
 app.use(router);
+
+// GA4: per-environment measurement id, page views sent from the router
+// (SPA navigations are invisible to gtag's automatic pageview) with
+// identifiers stripped from the path. Empty id = disabled.
+initAnalytics(router, siteConfig.googleAnalytics)
 
 app.mount("#app");
 
