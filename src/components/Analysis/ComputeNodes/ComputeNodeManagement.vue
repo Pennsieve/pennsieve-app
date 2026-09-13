@@ -653,7 +653,7 @@ async function saveConfig() {
           <h2>Deployment Configuration</h2>
           <div class="section-actions" v-if="canManagePermissions && provisionerUpdateAvailable">
             <button class="processor-edit-button" :disabled="isUpdatingDeployment" @click="updateProvisioner">
-              {{ isUpdatingDeployment ? 'Updating...' : `Update to ${latestProvisionerVersion}` }}
+              {{ isUpdatingDeployment ? 'Updating...' : 'Update node' }}
             </button>
           </div>
         </div>
@@ -679,7 +679,7 @@ async function saveConfig() {
               <span v-else class="empty-value">Not set</span>
               <el-tooltip
                 v-if="provisionerUpdateAvailable"
-                :content="`A newer provisioner release (${latestProvisionerVersion}) is available. Updating re-provisions the node's infrastructure with the new version.`"
+                :content="`This node is running version ${computeNode.provisionerImageTag || 'latest'}. Version ${latestProvisionerVersion} is available. Updating re-provisions the node with the latest infrastructure changes in your cloud account.`"
                 placement="top"
                 :show-after="300"
                 :popper-style="{ maxWidth: '320px' }"

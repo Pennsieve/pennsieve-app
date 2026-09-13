@@ -48,8 +48,8 @@
             <span class="tag interactive">Interactive</span>
           </el-tooltip>
           <el-tooltip
-            v-if="node.updateAvailable && node.latestVersion"
-            :content="`A newer provisioner release (${node.latestVersion}) is available. Open the node to update.`"
+            v-if="hasProvisionerUpdate && !canManagePermissions"
+            :content="`This node is running version ${node.provisionerImageTag || 'latest'}. Version ${node.latestVersion} is available. The node owner can update it.`"
             placement="top"
             :show-after="300"
             :popper-style="{ maxWidth: '320px' }"
@@ -83,6 +83,21 @@
     </div>
 
     <div class="node-card-actions">
+      <el-tooltip
+        v-if="hasProvisionerUpdate && canManagePermissions"
+        :content="`This node is running version ${node.provisionerImageTag || 'latest'}. Version ${node.latestVersion} is available. Updating re-provisions the node with the latest infrastructure changes in your cloud account.`"
+        placement="top"
+        :show-after="300"
+        :popper-style="{ maxWidth: '320px' }"
+      >
+        <button
+          class="card-action-button update"
+          :disabled="isUpdatingPermissions"
+          @click.stop="updateNode"
+        >
+          {{ isUpdatingPermissions ? 'Updating...' : 'Update node' }}
+        </button>
+      </el-tooltip>
       <router-link
         :to="{ name: 'compute-node-management', params: { nodeId: node.uuid } }"
         class="card-action-link"
@@ -126,6 +141,7 @@ const isNodeOwner = computed(() => {
 })
 
 const canManagePermissions = computed(() => isNodeOwner.value)
+const hasProvisionerUpdate = computed(() => props.node.updateAvailable === true && !!props.node.latestVersion)
 
 const ownerName = computed(() => {
   const member = store.getters.getOrgMember(props.node.ownerId)
@@ -186,6 +202,22 @@ async function updateStatus(newStatus) {
   } catch (error) {
     console.error('Failed to update compute node status:', error)
     ElMessage.error('Failed to update compute node status')
+  }
+}
+
+// Re-provision the node with the newest released provisioner tag (never "latest")
+async function updateNode() {
+  const targetTag = props.node.latestVersion
+  if (!targetTag) return
+  try {
+    await computeResourcesStore.updateComputeNodeDeployment(props.node.uuid, {
+      provisionerImage: props.node.provisionerImage || computeResourcesStore.DEFAULT_PROVISIONER_IMAGE,
+      provisionerImageTag: targetTag
+    })
+    ElMessage.success(`Compute node update to ${targetTag} initiated`)
+  } catch (error) {
+    console.error('Failed to update compute node:', error)
+    ElMessage.error('Failed to update compute node')
   }
 }
 </script>
@@ -443,6 +475,32 @@ async function updateStatus(newStatus) {
   padding-top: 14px;
   border-top: 1px solid theme.$gray_2;
   flex-wrap: wrap;
+}
+
+.card-action-button {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 12px;
+  border-radius: 4px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+
+  &.update {
+    background: rgba(#F59E0B, 0.12);
+    border: 1px solid rgba(#F59E0B, 0.4);
+    color: #B45309;
+
+    &:hover:not(:disabled) {
+      background: rgba(#F59E0B, 0.2);
+    }
+  }
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: default;
+  }
 }
 
 .card-action-link {
