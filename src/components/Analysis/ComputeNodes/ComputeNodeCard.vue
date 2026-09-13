@@ -85,7 +85,7 @@
     <div class="node-card-actions">
       <el-tooltip
         v-if="hasProvisionerUpdate && canManagePermissions"
-        :content="`This node is running version ${node.provisionerImageTag || 'latest'}. Version ${node.latestVersion} is available. Updating re-provisions the node with the latest infrastructure changes in your cloud account.`"
+        :content="`This node is running version ${node.provisionerImageTag || 'latest'}. Version ${node.latestVersion} is available. Updating re-provisions the node with the latest infrastructure changes in your cloud account and typically takes 6-8 minutes.`"
         placement="top"
         :show-after="300"
         :popper-style="{ maxWidth: '320px' }"
@@ -214,7 +214,7 @@ async function updateNode() {
       provisionerImage: props.node.provisionerImage || computeResourcesStore.DEFAULT_PROVISIONER_IMAGE,
       provisionerImageTag: targetTag
     })
-    ElMessage.success(`Compute node update to ${targetTag} initiated`)
+    ElMessage.success(`Updating compute node to ${targetTag}. This typically takes 6-8 minutes.`)
   } catch (error) {
     console.error('Failed to update compute node:', error)
     ElMessage.error('Failed to update compute node')

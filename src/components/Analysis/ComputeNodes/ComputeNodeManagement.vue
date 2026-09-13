@@ -428,7 +428,7 @@ async function updateProvisioner() {
       provisionerImageTag: targetTag
     })
     await fetchComputeNode()
-    ElMessage.success(`Compute node update to ${targetTag} initiated`)
+    ElMessage.success(`Updating compute node to ${targetTag}. This typically takes 6-8 minutes.`)
   } catch (error) {
     console.error('Failed to update provisioner:', error)
     ElMessage.error('Failed to update compute node')
@@ -679,7 +679,7 @@ async function saveConfig() {
               <span v-else class="empty-value">Not set</span>
               <el-tooltip
                 v-if="provisionerUpdateAvailable"
-                :content="`This node is running version ${computeNode.provisionerImageTag || 'latest'}. Version ${latestProvisionerVersion} is available. Updating re-provisions the node with the latest infrastructure changes in your cloud account.`"
+                :content="`This node is running version ${computeNode.provisionerImageTag || 'latest'}. Version ${latestProvisionerVersion} is available. Updating re-provisions the node with the latest infrastructure changes in your cloud account and typically takes 6-8 minutes.`"
                 placement="top"
                 :show-after="300"
                 :popper-style="{ maxWidth: '320px' }"
