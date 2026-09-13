@@ -47,6 +47,15 @@
           >
             <span class="tag interactive">Interactive</span>
           </el-tooltip>
+          <el-tooltip
+            v-if="node.updateAvailable && node.latestVersion"
+            :content="`A newer provisioner release (${node.latestVersion}) is available. Open the node to update.`"
+            placement="top"
+            :show-after="300"
+            :popper-style="{ maxWidth: '320px' }"
+          >
+            <span class="tag update">Update available</span>
+          </el-tooltip>
         </div>
       </div>
       <div class="node-header-actions">
@@ -279,6 +288,11 @@ async function updateStatus(newStatus) {
     &.interactive {
       background: rgba(#011F5B, 0.1);
       color: #011F5B; /* brand navy */
+    }
+
+    &.update {
+      background: rgba(#F59E0B, 0.12);
+      color: #B45309;
     }
   }
 }

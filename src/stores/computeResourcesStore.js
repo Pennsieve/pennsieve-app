@@ -45,10 +45,32 @@ export const useComputeResourcesStore = defineStore('computeResources', () => {
   // Cache timeout (5 minutes)
   const CACHE_TIMEOUT = 5 * 60 * 1000
 
+  const DEFAULT_PROVISIONER_IMAGE = 'pennsieve/compute-node-aws-provisioner-v2'
+
   // Getters
   const getComputeNodeById = computed(() => (nodeId, scope = 'account-owner') => {
     const nodes = scopedComputeNodes.value.get(scope) || []
     return nodes.find(node => node.uuid === nodeId)
+  })
+
+  const findComputeNodeByUuid = computed(() => (nodeId) => {
+    for (const nodes of scopedComputeNodes.value.values()) {
+      const match = nodes.find(node => node.uuid === nodeId)
+      if (match) return match
+    }
+    return null
+  })
+
+  // Newest released provisioner tag for an image, as annotated on any fetched node
+  // (GET compute-nodes returns latestVersion per node). Null when unknown.
+  const getLatestProvisionerVersion = computed(() => (image = DEFAULT_PROVISIONER_IMAGE) => {
+    for (const nodes of scopedComputeNodes.value.values()) {
+      const match = nodes.find(node =>
+        node.latestVersion && (node.provisionerImage || DEFAULT_PROVISIONER_IMAGE) === image
+      )
+      if (match) return match.latestVersion
+    }
+    return null
   })
 
   const getNodePermissions = computed(() => (nodeId) => {
@@ -1004,6 +1026,19 @@ export const useComputeResourcesStore = defineStore('computeResources', () => {
 
       if (response.ok) {
         const result = await response.json()
+        for (const [scope, scopedNodes] of scopedComputeNodes.value.entries()) {
+          const index = scopedNodes.findIndex(node => node.uuid === nodeUuid)
+          if (index !== -1) {
+            const updatedNodes = [...scopedNodes]
+            updatedNodes[index] = {
+              ...updatedNodes[index],
+              provisionerImage,
+              provisionerImageTag,
+              updateAvailable: false
+            }
+            scopedComputeNodes.value.set(scope, updatedNodes)
+          }
+        }
         return result
       } else {
         const errorDetails = await response.text()
@@ -1476,6 +1511,9 @@ export const useComputeResourcesStore = defineStore('computeResources', () => {
     
     // Getters
     getComputeNodeById,
+    findComputeNodeByUuid,
+    getLatestProvisionerVersion,
+    DEFAULT_PROVISIONER_IMAGE,
     getNodePermissions,
     isNodeUpdating,
     isNodePermissionsLoading,
