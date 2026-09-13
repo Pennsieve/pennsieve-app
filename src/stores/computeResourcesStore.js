@@ -46,6 +46,9 @@ export const useComputeResourcesStore = defineStore('computeResources', () => {
   const CACHE_TIMEOUT = 5 * 60 * 1000
 
   const DEFAULT_PROVISIONER_IMAGE = 'pennsieve/compute-node-aws-provisioner-v2'
+  // Newest released tag for the default provisioner image, reported at the root
+  // of GET compute-nodes so it is known even when the user has no nodes yet.
+  const latestProvisionerVersion = ref(null)
 
   // Getters
   const getComputeNodeById = computed(() => (nodeId, scope = 'account-owner') => {
@@ -61,9 +64,13 @@ export const useComputeResourcesStore = defineStore('computeResources', () => {
     return null
   })
 
-  // Newest released provisioner tag for an image, as annotated on any fetched node
-  // (GET compute-nodes returns latestVersion per node). Null when unknown.
+  // Newest released provisioner tag for an image. For the default image this is
+  // the root-level latestVersion from GET compute-nodes; otherwise it falls back
+  // to the per-node annotation on any fetched node. Null when unknown.
   const getLatestProvisionerVersion = computed(() => (image = DEFAULT_PROVISIONER_IMAGE) => {
+    if (image === DEFAULT_PROVISIONER_IMAGE && latestProvisionerVersion.value) {
+      return latestProvisionerVersion.value
+    }
     for (const nodes of scopedComputeNodes.value.values()) {
       const match = nodes.find(node =>
         node.latestVersion && (node.provisionerImage || DEFAULT_PROVISIONER_IMAGE) === image
@@ -890,7 +897,12 @@ export const useComputeResourcesStore = defineStore('computeResources', () => {
       })
       
       if (response.ok) {
-        const data = await response.json()
+        const payload = await response.json()
+        // Response is { nodes, latestVersion }; tolerate the legacy bare array
+        const data = Array.isArray(payload) ? payload : (payload?.nodes || [])
+        if (payload?.latestVersion) {
+          latestProvisionerVersion.value = payload.latestVersion
+        }
         
         // Sort nodes by name for consistent ordering
         const sortedData = Array.isArray(data) ? data.sort((a, b) => {
@@ -1513,6 +1525,7 @@ export const useComputeResourcesStore = defineStore('computeResources', () => {
     getComputeNodeById,
     findComputeNodeByUuid,
     getLatestProvisionerVersion,
+    latestProvisionerVersion,
     DEFAULT_PROVISIONER_IMAGE,
     getNodePermissions,
     isNodeUpdating,
