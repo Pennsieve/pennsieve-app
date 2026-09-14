@@ -253,7 +253,12 @@ export const actions = {
           if (resp.ok) {
             return resp
               .json()
-              .then((json) => commit("UPDATE_COMPUTE_NODES", json));
+              .then((json) =>
+                commit(
+                  "UPDATE_COMPUTE_NODES",
+                  Array.isArray(json) ? json : json?.nodes || [],
+                ),
+              );
           } else {
             return Promise.reject(resp);
           }

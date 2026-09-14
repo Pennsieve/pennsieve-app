@@ -3,6 +3,7 @@ import { ref, computed, watch, onMounted } from 'vue'
 import { useStore } from 'vuex'
 import { ElMessage } from 'element-plus'
 import { useGetToken } from '@/composables/useGetToken'
+import { useComputeResourcesStore } from '@/stores/computeResourcesStore'
 import * as siteConfig from '@/site-config/site.json'
 import BfButton from '@/components/shared/bf-button/BfButton.vue'
 import BfDialogHeader from '@/components/shared/bf-dialog-header/BfDialogHeader.vue'
@@ -17,6 +18,7 @@ const props = defineProps({
 const emit = defineEmits(['close'])
 
 const store = useStore()
+const computeResourcesStore = useComputeResourcesStore()
 const computeNodeForm = ref(null)
 const isLoading = ref(false)
 const computeResourceAccounts = ref([])
@@ -37,8 +39,7 @@ const computeNode = ref({
   name: '',
   description: '',
   account: null,
-  provisionerImage: 'pennsieve/compute-node-aws-provisioner-v2',
-  provisionerImageTag: 'latest',
+  provisionerImage: computeResourcesStore.DEFAULT_PROVISIONER_IMAGE,
   deploymentMode: 'basic',
   enableLLMAccess: false,
   llmBaaAcknowledged: false,
@@ -48,6 +49,15 @@ const computeNode = ref({
   enableInteractive: false,
   maxInteractiveSessions: 2
 })
+
+// New nodes are always pinned to the newest released provisioner tag (never a
+// floating "latest"). The version comes from the compute-nodes list; when it is
+// unknown here the tag is omitted and the backend resolves the current release.
+const latestProvisionerVersion = computed(() =>
+  computeResourcesStore.getLatestProvisionerVersion(
+    computeNode.value.provisionerImage.trim() || computeResourcesStore.DEFAULT_PROVISIONER_IMAGE
+  )
+)
 
 // GPU tiers from API
 const gpuTiers = ref([])
@@ -113,8 +123,7 @@ const validateStep1 = () => {
 }
 
 const validateStep2 = () => {
-  return computeNode.value.provisionerImage.trim() !== '' &&
-    computeNode.value.provisionerImageTag.trim() !== ''
+  return computeNode.value.provisionerImage.trim() !== ''
 }
 
 // Step navigation
@@ -126,7 +135,7 @@ const advanceStep = async (direction) => {
     }
     if (currentStep.value === 2) {
       if (!validateStep2()) {
-        ElMessage.warning('Provisioner image and tag are required.')
+        ElMessage.warning('Provisioner image is required.')
         return
       }
     }
@@ -297,8 +306,7 @@ const closeDialog = () => {
     name: '',
     description: '',
     account: null,
-    provisionerImage: 'pennsieve/compute-node-aws-provisioner-v2',
-    provisionerImageTag: 'latest',
+    provisionerImage: computeResourcesStore.DEFAULT_PROVISIONER_IMAGE,
     deploymentMode: 'basic',
     enableLLMAccess: false,
     llmBaaAcknowledged: false,
@@ -323,8 +331,8 @@ const handleCreateComputeNode = async () => {
       name: computeNode.value.name.trim(),
       description: computeNode.value.description.trim(),
       accountId: computeNode.value.account,
-      provisionerImage: computeNode.value.provisionerImage,
-      provisionerImageTag: computeNode.value.provisionerImageTag,
+      provisionerImage: computeNode.value.provisionerImage.trim(),
+      ...(latestProvisionerVersion.value ? { provisionerImageTag: latestProvisionerVersion.value } : {}),
       deploymentMode: computeNode.value.deploymentMode,
       enableLLMAccess: computeNode.value.enableLLMAccess,
       llmBaaAcknowledged: computeNode.value.llmBaaAcknowledged,
@@ -352,11 +360,19 @@ const handleCreateComputeNode = async () => {
   }
 }
 
+// Cached; populates latestVersion on the listed nodes if the list wasn't loaded yet
+const fetchLatestProvisionerVersion = () => {
+  const orgId = currentOrganization.value?.id
+  if (!orgId) return
+  computeResourcesStore.fetchComputeNodes(orgId).catch(() => {})
+}
+
 // Watch for dialog visibility to fetch accounts
 watch(() => props.dialogVisible, (newValue) => {
   if (newValue) {
     fetchComputeResourceAccounts()
     fetchGpuTiers()
+    fetchLatestProvisionerVersion()
   }
 })
 
@@ -364,6 +380,7 @@ onMounted(() => {
   if (props.dialogVisible) {
     fetchComputeResourceAccounts()
     fetchGpuTiers()
+    fetchLatestProvisionerVersion()
   }
 })
 </script>
@@ -567,15 +584,13 @@ onMounted(() => {
                 :disabled="isLoading"
               />
               <span class="provisioner-separator">:</span>
-              <el-input
-                v-model="computeNode.provisionerImageTag"
-                placeholder="latest"
-                :disabled="isLoading"
-                class="tag-input"
-              />
+              <span class="provisioner-tag" :class="{ unresolved: !latestProvisionerVersion }">
+                {{ latestProvisionerVersion || 'newest release' }}
+              </span>
             </div>
             <div class="field-help">
-              The container image and tag used to provision infrastructure in your cloud account.
+              The container image used to provision infrastructure in your cloud account.
+              New nodes are always created with the newest released provisioner version{{ latestProvisionerVersion ? ` (${latestProvisionerVersion})` : '' }}.
             </div>
           </div>
         </div>
@@ -1116,8 +1131,19 @@ onMounted(() => {
           flex-shrink: 0;
         }
 
-        .tag-input {
-          max-width: 120px;
+        .provisioner-tag {
+          font-family: 'Courier New', monospace;
+          font-size: 13px;
+          color: theme.$gray_6;
+          background: theme.$gray_1;
+          padding: 8px 8px;
+          border-radius: 4px;
+          white-space: nowrap;
+
+          &.unresolved {
+            color: theme.$gray_4;
+            font-style: italic;
+          }
         }
       }
     }
