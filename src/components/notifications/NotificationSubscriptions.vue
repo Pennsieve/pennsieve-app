@@ -1,45 +1,51 @@
 <template>
-  <div class="notification-subscriptions" v-loading="loading">
-    <h2 class="section-title">Notification Preferences</h2>
-    <p class="section-description">
-      Choose which notifications you'd like to receive and how.
-    </p>
-
-    <div class="subscriptions-table" v-if="topics.length">
-      <div class="table-header">
-        <span class="col-topic">Topic</span>
-        <span class="col-toggle">Email</span>
-        <span class="col-toggle">In-app</span>
+  <bf-stage
+    slot="stage"
+    v-loading="loading"
+    element-loading-background="transparent"
+  >
+    <div v-if="topics.length" class="bf-table">
+      <div class="bf-table-header">
+        <el-row align="middle" :gutter="32">
+          <el-col :span="16" class="col-label">Topic</el-col>
+          <el-col :span="4" class="col-label">Email</el-col>
+          <el-col :span="4" class="col-label">In-app</el-col>
+        </el-row>
       </div>
 
       <div
         v-for="topic in topics"
-        :key="topic.id"
-        class="table-row"
+        :key="topic.topic_id"
+        class="bf-table-row"
       >
-        <div class="col-topic">
-          <span class="topic-name">{{ topic.name }}</span>
-          <span class="topic-description">{{ topic.description }}</span>
-        </div>
-        <div class="col-toggle">
-          <el-switch
-            :model-value="isSubscribed(topic.id, 'email')"
-            @change="(val) => handleToggle(topic.id, 'email', val)"
-          />
-        </div>
-        <div class="col-toggle">
-          <el-switch
-            :model-value="isSubscribed(topic.id, 'in-app')"
-            @change="(val) => handleToggle(topic.id, 'in-app', val)"
-          />
-        </div>
+        <el-row align="middle" :gutter="32">
+          <el-col :span="16">
+            <span class="topic-name">{{ topic.name }}</span>
+            <span class="topic-description">{{ topic.description }}</span>
+          </el-col>
+          <el-col :span="4" class="col-toggle">
+            <el-switch
+              :model-value="isSubscribed(topic.topic_id, 'email')"
+              @change="(val) => handleToggle(topic.topic_id, 'email', val)"
+            />
+          </el-col>
+          <el-col :span="4" class="col-toggle">
+            <el-switch
+              :model-value="isSubscribed(topic.topic_id, 'in-app')"
+              @change="(val) => handleToggle(topic.topic_id, 'in-app', val)"
+            />
+          </el-col>
+        </el-row>
       </div>
     </div>
 
-    <div v-else-if="!loading" class="empty-state">
-      No notification topics available.
-    </div>
-  </div>
+    <bf-empty-page-state v-else-if="!loading" class="empty">
+      <div class="copy">
+        <h2>No notification topics available.</h2>
+        <p>Check back later for notification preferences.</p>
+      </div>
+    </bf-empty-page-state>
+  </bf-stage>
 </template>
 
 <script setup>
@@ -61,13 +67,13 @@ const subscriptions = ref([])
 
 function isSubscribed(topicId, channel) {
   return subscriptions.value.some(
-    (s) => s.topicId === topicId && s.context?.channel === channel
+    (s) => s.topic_id === topicId && s.context?.channel === channel
   )
 }
 
 function findSubscription(topicId, channel) {
   return subscriptions.value.find(
-    (s) => s.topicId === topicId && s.context?.channel === channel
+    (s) => s.topic_id === topicId && s.context?.channel === channel
   )
 }
 
@@ -76,7 +82,7 @@ async function handleToggle(topicId, channel, enabled) {
 
   if (enabled) {
     // Optimistic update
-    const tempSub = { id: `temp-${Date.now()}`, topicId, context: { channel, organizationId: orgId } }
+    const tempSub = { id: `temp-${Date.now()}`, topic_id: topicId, context: { channel, organizationId: orgId } }
     subscriptions.value.push(tempSub)
 
     try {
@@ -129,77 +135,57 @@ onMounted(async () => {
 
 <style scoped lang="scss">
 @use "../../styles/theme";
+@use "../../styles/element/table";
 
-.notification-subscriptions {
-  max-width: 720px;
-  padding: 32px;
+:deep(.bf-table) {
+  min-height: auto;
 }
 
-.section-title {
-  font-size: 20px;
-  font-weight: 600;
-  margin: 0 0 8px;
-}
-
-.section-description {
+.col-label {
   color: theme.$gray_4;
-  font-size: 14px;
-  margin: 0 0 24px;
+  font-size: 12px;
+  font-weight: 500;
+  text-transform: capitalize;
 }
 
-.subscriptions-table {
-  border: 1px solid theme.$gray_2;
-  border-radius: 4px;
-  overflow: hidden;
-}
-
-.table-header {
-  background: theme.$gray_1;
+.col-toggle {
   display: flex;
   align-items: center;
-  padding: 12px 16px;
-  font-size: 13px;
-  font-weight: 600;
-  color: theme.$gray_4;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.table-row {
-  display: flex;
-  align-items: center;
-  padding: 16px;
-  border-top: 1px solid theme.$gray_2;
-}
-
-.col-topic {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
 }
 
 .topic-name {
   font-size: 14px;
   font-weight: 500;
+  display: block;
 }
 
 .topic-description {
   font-size: 13px;
   color: theme.$gray_4;
+  display: block;
+  margin-top: 2px;
 }
 
-.col-toggle {
-  width: 80px;
+.empty {
   display: flex;
+  flex-direction: column;
   justify-content: center;
-  flex-shrink: 0;
+  align-items: center;
+  text-align: center;
+  padding: 85px 190px;
 }
 
-.empty-state {
-  color: theme.$gray_4;
-  font-size: 14px;
-  padding: 32px 0;
-  text-align: center;
+.copy {
+  h2 {
+    font-size: 16px;
+    font-weight: 600;
+    line-height: 16px;
+  }
+
+  p {
+    color: theme.$gray_4;
+    font-size: 14px;
+    line-height: 16px;
+  }
 }
 </style>

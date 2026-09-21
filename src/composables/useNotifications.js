@@ -24,7 +24,7 @@ import { useSendXhr } from '@/mixins/request/request_composable'
 // Toggle this to `false` when BE is ready.
 // Must be `false` before deploying to any env.
 // ──────────────────────────────────────────────
-const USE_MOCK = true
+const USE_MOCK = false
 
 // ── Mock data (only used when USE_MOCK is true) ──
 const MOCK_TOPICS = [
@@ -74,7 +74,7 @@ export async function subscribe(topicId, context) {
   return useSendXhr(`${BASE_URL}/subscriptions/${topicId}`, {
     method: 'POST',
     header,
-    body: context,
+    body: { context },
   })
 }
 
