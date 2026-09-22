@@ -107,7 +107,7 @@ async function handleToggle(topicId, channel, enabled) {
     subscriptions.value.splice(idx, 1)
 
     try {
-      await unsubscribe(topicId, existing.id)
+      await unsubscribe(existing.subscription_id)
     } catch {
       // Rollback
       subscriptions.value.splice(idx, 0, existing)
