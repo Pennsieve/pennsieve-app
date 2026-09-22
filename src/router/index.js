@@ -92,6 +92,7 @@ const OrgSettings = () => import('../components/OrgSettings/OrgSettings.vue')
 
 const People = () => import('./people/People.vue')
 const WorkspaceResources = () => import('./resources/WorkspaceResources.vue')
+const WorkspaceNotifications = () => import('./notifications/WorkspaceNotifications.vue')
 const PeopleList = () => import('../components/people/list/PeopleList.vue')
 
 const Teams = () => import('./teams/Teams.vue')
@@ -1657,6 +1658,24 @@ const router = createRouter({
           path: 'ontology-browser',
           components: {
             stage: OntologyBrowser
+          },
+          props: true
+        }
+      ]
+    },
+    {
+      path: '/:orgId/notifications',
+      components: {
+        page: WorkspaceNotifications,
+        navigation: BfNavigation
+      },
+      props: true,
+      children: [
+        {
+          name: 'workspace-notifications',
+          path: '',
+          components: {
+            stage: () => import('../components/notifications/NotificationSubscriptions.vue')
           },
           props: true
         }
