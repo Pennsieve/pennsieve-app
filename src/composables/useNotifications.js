@@ -39,9 +39,9 @@ export async function subscribe(topicId, context) {
   })
 }
 
-export async function unsubscribe(topicId, subscriptionId) {
+export async function unsubscribe(subscriptionId) {
   const header = await authHeader()
-  return useSendXhr(`${BASE_URL}/subscriptions/${topicId}`, {
+  return useSendXhr(`${BASE_URL}/subscriptions/${subscriptionId}`, {
     method: 'DELETE',
     header,
   })
