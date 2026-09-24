@@ -38,47 +38,25 @@
         </el-select>
       </div>
 
+      <!-- GPU is one of these, not a block of its own. -->
       <div class="field-row">
         <label class="field-label">Compute Types</label>
         <div class="field-control inline-checks">
           <el-checkbox :model-value="true" disabled>Standard</el-checkbox>
           <el-checkbox
             :model-value="schema.runtime.computeTypes.includes('lambda')"
-            @change="toggleLambda"
+            @change="(checked) => toggleComputeType('lambda', checked)"
           >
             Lambda
           </el-checkbox>
+          <el-checkbox
+            :model-value="schema.runtime.computeTypes.includes('gpu')"
+            @change="(checked) => toggleComputeType('gpu', checked)"
+          >
+            GPU
+          </el-checkbox>
         </div>
       </div>
-
-      <!-- GPU -->
-      <div class="field-row">
-        <label class="field-label">GPU</label>
-        <div class="field-control">
-          <el-switch v-model="schema.runtime.gpu.enabled" />
-        </div>
-      </div>
-      <template v-if="schema.runtime.gpu.enabled">
-        <div class="field-row sub-field">
-          <label class="field-label">GPU Count</label>
-          <el-input-number
-            v-model="schema.runtime.gpu.count"
-            :min="1"
-            :max="16"
-            size="small"
-            class="field-control"
-          />
-        </div>
-        <div class="field-row sub-field">
-          <label class="field-label">GPU Type</label>
-          <el-input
-            v-model="schema.runtime.gpu.type"
-            size="small"
-            placeholder="e.g. nvidia-t4 (optional)"
-            class="field-control"
-          />
-        </div>
-      </template>
     </section>
 
     <!-- ───────────── Parameters ───────────── -->
@@ -100,11 +78,12 @@
           <div class="field-row">
             <label class="field-label">Name</label>
             <el-input
-              v-model="param.name"
+              :model-value="param.name"
               size="small"
-              placeholder="parameter_name"
+              placeholder="parameter"
               maxlength="50"
               class="field-control"
+              @input="(v) => onParamNameInput(param, v)"
             />
           </div>
 
@@ -132,11 +111,11 @@
             </div>
           </div>
 
-          <!-- Allowed values (enum) -->
+          <!-- Valid values (enum) -->
           <div v-if="param.type === PARAM_TYPES.ENUM" class="field-row">
-            <label class="field-label">Allowed Values</label>
+            <label class="field-label">Valid Values</label>
             <el-select
-              v-model="param.allowedValues"
+              v-model="param.validValues"
               size="small"
               multiple
               filterable
@@ -196,7 +175,7 @@
               class="field-control"
             >
               <el-option
-                v-for="v in param.allowedValues"
+                v-for="v in param.validValues"
                 :key="v"
                 :label="v"
                 :value="v"
@@ -250,19 +229,15 @@
       >
         <div class="param-card-grid">
           <div class="field-row">
-            <label class="field-label">Name</label>
-            <el-input
-              v-model="port.name"
+            <label class="field-label">Media Type</label>
+            <el-select
+              :model-value="port.dataType"
               size="small"
-              placeholder="port_name"
               class="field-control"
-            />
-          </div>
-          <div class="field-row">
-            <label class="field-label">Data Type</label>
-            <el-select v-model="port.dataType" size="small" class="field-control">
+              @change="(v) => onPortDataTypeChange(port, v)"
+            >
               <el-option
-                v-for="dt in PORT_DATA_TYPES"
+                v-for="dt in portDataTypes"
                 :key="dt.value"
                 :label="dt.label"
                 :value="dt.value"
@@ -275,14 +250,25 @@
               <el-switch v-model="port.required" />
             </div>
           </div>
+          <!--
+            Name and description are not authored here: they come from the
+            package format the selected media type belongs to, and are shown
+            read-only so the author can see what will be written to app.yml.
+          -->
+          <div class="field-row full-width">
+            <label class="field-label">Name</label>
+            <span class="field-static" :class="{ 'is-empty': !port.name }">
+              {{ port.name || "Select a media type" }}
+            </span>
+          </div>
           <div class="field-row full-width">
             <label class="field-label">Description</label>
-            <el-input
-              v-model="port.description"
-              size="small"
-              placeholder="optional"
-              class="field-control"
-            />
+            <span
+              class="field-static"
+              :class="{ 'is-empty': !port.description }"
+            >
+              {{ port.description || "—" }}
+            </span>
           </div>
         </div>
         <button
@@ -305,30 +291,9 @@
       </el-button>
     </section>
 
-    <!-- ───────────── Tags & Categories ───────────── -->
+    <!-- ───────────── Tags ───────────── -->
     <section class="schema-section">
       <h4 class="schema-section-title">Classification</h4>
-
-      <div class="field-row">
-        <label class="field-label">Categories</label>
-        <el-select
-          v-model="schema.categories"
-          class="field-control"
-          multiple
-          filterable
-          allow-create
-          default-first-option
-          :reserve-keyword="false"
-          placeholder="Select or create categories"
-        >
-          <el-option
-            v-for="cat in APPLICATION_CATEGORIES"
-            :key="cat"
-            :label="cat"
-            :value="cat"
-          />
-        </el-select>
-      </div>
 
       <div class="field-row">
         <label class="field-label">Tags</label>
@@ -348,15 +313,15 @@
 </template>
 
 <script setup>
-import { computed } from "vue";
+import { computed, onMounted } from "vue";
+import { useStore } from "vuex";
 import { CircleClose, Plus } from "@element-plus/icons-vue";
 import {
   PARAM_TYPES,
   PARAM_TYPE_OPTIONS,
-  PORT_DATA_TYPES,
-  APPLICATION_CATEGORIES,
   createParameter,
   createPort,
+  portDataTypeOptions,
   STANDARD_CPU_OPTIONS,
   getStandardMemoryOptions,
 } from "./applicationSchema";
@@ -372,6 +337,23 @@ defineProps({
   // configuration itself (e.g. an edit flow that can't change resources).
   showRuntime: { type: Boolean, default: true },
 });
+
+const store = useStore();
+
+/*
+  A port's media type is a platform package format, not a vocabulary this form
+  invents: the list comes from GET /packages/formats. Types already written
+  into the manifest are kept in the list too, so editing an older app.yml
+  cannot quietly blank its ports.
+*/
+onMounted(() => store.dispatch("analysisModule/fetchPackageFormats"));
+
+const portDataTypes = computed(() =>
+  portDataTypeOptions(store.state.analysisModule.packageFormats, [
+    ...(schema.value.inputs || []).map((p) => p.dataType),
+    ...(schema.value.outputs || []).map((p) => p.dataType),
+  ]),
+);
 
 const portKinds = [
   {
@@ -397,19 +379,42 @@ const onCpuChange = () => {
   schema.value.resources.memory = null;
 };
 
-const toggleLambda = (checked) => {
+const toggleComputeType = (type, checked) => {
   const types = new Set(schema.value.runtime.computeTypes);
-  if (checked) types.add("lambda");
-  else types.delete("lambda");
+  if (checked) types.add(type);
+  else types.delete(type);
+  // Standard is always supported and is not user-removable.
   types.add("standard");
   schema.value.runtime.computeTypes = Array.from(types);
+};
+
+/*
+  Parameter names are referenced by the running application, so they must be
+  single tokens. Whitespace is stripped as it is typed (or pasted) rather than
+  flagged after the fact.
+*/
+const onParamNameInput = (param, value) => {
+  param.name = String(value ?? "").replace(/\s+/g, "");
+};
+
+/*
+  A port's media type is the only thing the author picks. Its name and
+  description are the package format's, copied from the option the platform
+  served, and its `mediaTypes` is kept in step so a manifest round-trips.
+*/
+const onPortDataTypeChange = (port, value) => {
+  port.dataType = value || "any";
+  const option = portDataTypes.value.find((o) => o.value === port.dataType);
+  port.name = option?.name || "";
+  port.description = option?.description || "";
+  port.mediaTypes = port.dataType && port.dataType !== "any" ? [port.dataType] : [];
 };
 
 const onParamTypeChange = (param, type) => {
   param.type = type;
   // A default carried over from another type is usually invalid; reset it.
   param.defaultValue = type === PARAM_TYPES.BOOLEAN ? false : null;
-  if (type !== PARAM_TYPES.ENUM) param.allowedValues = [];
+  if (type !== PARAM_TYPES.ENUM) param.validValues = [];
   if (type !== PARAM_TYPES.NUMBER) {
     param.min = null;
     param.max = null;
@@ -483,6 +488,20 @@ const removePort = (key, i) => schema.value[key].splice(i, 1);
 .field-control {
   flex: 1 1 auto;
   width: 100%;
+}
+
+/* Values the form fills in from the selected package format, not fields. */
+.field-static {
+  flex: 1 1 auto;
+  font-size: 13px;
+  line-height: 24px;
+  color: theme.$gray_6;
+  word-break: break-word;
+
+  &.is-empty {
+    color: theme.$gray_4;
+    font-style: italic;
+  }
 }
 
 .inline-checks {

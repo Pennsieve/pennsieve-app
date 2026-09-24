@@ -2,70 +2,61 @@
 import { ref } from "vue";
 
 /*
-  The canonical app.yml example shown in the guide. Kept as a string so it can
-  be rendered verbatim and copied to the clipboard in one click. The
-  `# yaml-language-server` directive enables schema autocomplete/validation in
-  editors such as VS Code.
+  The canonical app.yml example shown in the guide. This is the reference
+  manifest served at EXAMPLE_URL, reproduced verbatim so the guide never
+  documents a field the reference does not declare. Kept as a string so it can
+  be rendered as-is and copied to the clipboard in one click.
 */
-const exampleManifest = `# yaml-language-server: $schema=https://app.pennsieve.io/static/schemas/app-manifest.v1.json
-schemaVersion: "1.0"
-
-name: Spike Sorter
-description: Detects and sorts neural spikes from extracellular recordings.
-applicationType: processor
-categories:
-  - Preprocessing
-  - Machine Learning
-tags:
-  - electrophysiology
-  - spike-sorting
-
+const exampleManifest = `schemaVersion: 1.0.0
+application:
+  name: test-private-repo-3
+  description: this is a test repo for development purposes
+  version: 1.0.1
+  maintainers:
+    - name: edmore
+  tags:
+    - demo
 runtime:
+  cpu: 1024
+  memory: 2048
   computeTypes:
     - standard
-  gpu:
-    enabled: true
-    count: 1
-    type: nvidia-t4
-
-resources:
-  cpu: 4096
-  memory: 16384
-
+  timeoutSeconds: 300
 parameters:
   - name: threshold
-    label: Detection threshold (σ)
-    description: Spike detection threshold in standard deviations.
     type: number
-    required: true
-    default: 5
-    min: 1
-    max: 20
-  - name: sorter
-    label: Sorting algorithm
-    type: enum
-    default: kilosort
-    allowedValues:
-      - kilosort
-      - mountainsort
-      - spykingcircus
-  - name: drift_correction
-    label: Enable drift correction
+    description: Detection threshold.
+    defaultValue: "0.5"
+    validValues:
+      - "0.1"
+      - "0.5"
+      - "0.9"
+  - name: mode
+    type: string
+    description: Processing mode.
+    defaultValue: fast
+    validValues:
+      - fast
+      - accurate
+  - name: verbose
     type: boolean
-    default: true
-
+    description: Enable verbose logging.
+    defaultValue: "false"
+  - name: channel
+    type: string
+    description: Channel to analyze (no default, treated as required).
 inputs:
-  - name: recording
-    dataType: timeseries
-    required: true
-    description: Raw extracellular recording.
-
+  - name: package
+    description: Pipeline package file.
+    mediaTypes:
+      - application/octet-stream
 outputs:
-  - name: sorted_units
-    dataType: package
-    description: Sorted spike trains and unit metadata.`;
+  - name: package
+    description: Pipeline package file.
+    mediaTypes:
+      - application/octet-stream`;
 
-const SCHEMA_URL = "https://app.pennsieve.io/static/schemas/app-manifest.v1.json";
+const EXAMPLE_URL = "https://app.pennsieve.io/static/schemas/app-manifest.v1.yml";
 
 const copied = ref(false);
 
@@ -80,39 +71,46 @@ const copyExample = async () => {
 };
 
 /*
-  Field reference tables. Driven by data so the guide stays in lock-step with the
-  JSON Schema served at SCHEMA_URL.
+  Field reference tables. Driven by data, and deliberately limited to the
+  fields the reference manifest at EXAMPLE_URL declares, so the guide stays in
+  lock-step with it.
 */
 const topLevelFields = [
-  { name: "schemaVersion", type: "string", required: true, desc: 'Manifest version. Must be "1.0".' },
+  { name: "schemaVersion", type: "string", required: true, desc: "Manifest schema version. The reference declares 1.0.0." },
+  { name: "application", type: "object", required: true, desc: "Application metadata — see the table below." },
+  { name: "runtime", type: "object", required: false, desc: "cpu (units), memory (MB), computeTypes, and timeoutSeconds." },
+  { name: "parameters", type: "object[]", required: false, desc: "Run-time parameters and their defaults — see the table below." },
+  { name: "inputs", type: "object[]", required: false, desc: "Typed inputs the application consumes, used for workflow validation." },
+  { name: "outputs", type: "object[]", required: false, desc: "Typed outputs the application produces, used for workflow validation." },
+];
+
+const applicationFields = [
   { name: "name", type: "string", required: true, desc: "Human-readable application name." },
   { name: "description", type: "string", required: false, desc: "Short description of what the application does." },
-  { name: "applicationType", type: "enum", required: false, desc: "processor, preprocessor, or postprocessor." },
-  { name: "categories", type: "string[]", required: false, desc: "Curated categories used to group applications." },
+  { name: "version", type: "string", required: false, desc: "Version of the application this manifest describes." },
+  { name: "maintainers", type: "object[]", required: false, desc: "Who maintains the application. Each entry has a name." },
   { name: "tags", type: "string[]", required: false, desc: "Free-form labels for search and filtering." },
-  { name: "runtime", type: "object", required: false, desc: "computeTypes and optional gpu configuration." },
-  { name: "resources", type: "object", required: false, desc: "Default cpu (units) and memory (MB)." },
-  { name: "parameters", type: "object[]", required: false, desc: "Run-time parameters with defaults." },
-  { name: "inputs", type: "object[]", required: false, desc: "Typed input ports for workflow validation." },
-  { name: "outputs", type: "object[]", required: false, desc: "Typed output ports for workflow validation." },
+];
+
+const runtimeFields = [
+  { name: "cpu", type: "number", required: false, desc: "Default CPU units (1024 = 1 vCPU)." },
+  { name: "memory", type: "number", required: false, desc: "Default memory reservation in MB." },
+  { name: "computeTypes", type: "string[]", required: false, desc: "Compute environments the application supports. A GPU application lists gpu here — there is no separate gpu block." },
+  { name: "timeoutSeconds", type: "number", required: false, desc: "How long a run may take before it is timed out." },
 ];
 
 const parameterFields = [
-  { name: "name", type: "string", required: true, desc: "Machine name passed to the application. Must be unique." },
-  { name: "type", type: "enum", required: true, desc: "string, number, boolean, or enum." },
-  { name: "label", type: "string", required: false, desc: "Label shown in the run form." },
-  { name: "description", type: "string", required: false, desc: "Help text shown beneath the field." },
-  { name: "required", type: "boolean", required: false, desc: "Whether a value must be supplied before a run starts." },
-  { name: "default", type: "any", required: false, desc: "Default value that pre-populates the run form." },
-  { name: "allowedValues", type: "array", required: false, desc: 'Permitted values. Required when type is "enum".' },
-  { name: "min / max", type: "number", required: false, desc: "Bounds for numeric parameters." },
+  { name: "name", type: "string", required: true, desc: "Parameter name. Unique among parameters." },
+  { name: "type", type: "string", required: true, desc: "Value type: string, number, or boolean." },
+  { name: "description", type: "string", required: false, desc: "What the parameter controls." },
+  { name: "defaultValue", type: "string", required: false, desc: "Value used when the user does not supply one. Written as a string, including for number and boolean parameters. A parameter with no default is treated as required." },
+  { name: "validValues", type: "string[]", required: false, desc: "Restricts the parameter to this set of values, rendered as a picker in the workflow builder." },
 ];
 
-const portFields = [
-  { name: "name", type: "string", required: true, desc: "Port name. Unique among inputs (or outputs)." },
-  { name: "dataType", type: "enum", required: true, desc: "any, file, directory, package, dataset, tabular, image, timeseries." },
-  { name: "description", type: "string", required: false, desc: "What flows through this port." },
-  { name: "required", type: "boolean", required: false, desc: "Whether the port must be connected (inputs only)." },
+const inputOutputFields = [
+  { name: "name", type: "string", required: true, desc: "Name. Unique among inputs (or outputs)." },
+  { name: "description", type: "string", required: false, desc: "What flows through this input or output." },
+  { name: "mediaTypes", type: "string[]", required: false, desc: "Media types accepted or produced, e.g. application/octet-stream." },
 ];
 </script>
 
@@ -123,7 +121,7 @@ const portFields = [
       <p class="lede">
         Applications are published from a GitHub repository. Add an
         <code>app.yml</code> file to the root of your repository to declare its
-        runtime, resources, parameters, and inputs/outputs. When you publish the
+        runtime, parameters, and inputs/outputs. When you publish the
         repository to the App Store, Pennsieve reads this file and uses it to
         populate the application's defaults — including the default values shown
         when the application is added to a workflow.
@@ -140,7 +138,9 @@ const portFields = [
       <h2>1. Add app.yml to your repository</h2>
       <p>
         Create a file named <code>app.yml</code> in the root of your repository
-        and commit it. The example below is a complete, valid manifest.
+        and commit it. The manifest below is the reference &mdash; a complete,
+        valid <code>app.yml</code> using every field this guide documents.
+        Copy it and replace the values with your own.
       </p>
       <div class="code-block">
         <div class="code-toolbar">
@@ -152,10 +152,8 @@ const portFields = [
         <pre><code>{{ exampleManifest }}</code></pre>
       </div>
       <p class="guide-note">
-        Add the <code># yaml-language-server</code> directive shown above to get
-        autocomplete and inline validation in editors such as VS Code. The schema
-        lives at
-        <a :href="SCHEMA_URL" target="_blank" rel="noopener">{{ SCHEMA_URL }}</a>.
+        This example is also served as a file you can download and adapt:
+        <a :href="EXAMPLE_URL" target="_blank" rel="noopener">{{ EXAMPLE_URL }}</a>.
       </p>
     </section>
 
@@ -165,10 +163,10 @@ const portFields = [
         From <strong>My Code</strong>, enable
         <strong>Publishing &rarr; App Store</strong> on the repository. Pennsieve
         validates <code>app.yml</code> during registration and maps it onto the
-        application: <code>resources</code> and <code>runtime</code> become the
-        runtime configuration, <code>parameters</code> become the typed parameter
-        schema, and <code>inputs</code>/<code>outputs</code> become the ports used
-        to validate workflow connections.
+        application: <code>runtime</code> becomes the runtime configuration,
+        <code>parameters</code> become the typed parameter schema, and
+        <code>inputs</code>/<code>outputs</code> are used to validate
+        workflow connections.
       </p>
       <p class="guide-note guide-note--warn">
         If <code>app.yml</code> is missing or fails validation, the application
@@ -195,11 +193,58 @@ const portFields = [
     </section>
 
     <section class="guide-section">
+      <h2>Application fields</h2>
+      <p>
+        Everything under <code>application</code> describes the app itself.
+      </p>
+      <table class="field-table">
+        <thead>
+          <tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr>
+        </thead>
+        <tbody>
+          <tr v-for="f in applicationFields" :key="f.name">
+            <td><code>{{ f.name }}</code></td>
+            <td>{{ f.type }}</td>
+            <td>{{ f.required ? "Yes" : "—" }}</td>
+            <td>{{ f.desc }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="guide-section">
+      <h2>Runtime fields</h2>
+      <p>
+        <code>runtime</code> carries the defaults a run starts from. A GPU
+        application declares <code>gpu</code> among its
+        <code>computeTypes</code>; there is no standalone <code>gpu</code>
+        block.
+      </p>
+      <table class="field-table">
+        <thead>
+          <tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr>
+        </thead>
+        <tbody>
+          <tr v-for="f in runtimeFields" :key="f.name">
+            <td><code>{{ f.name }}</code></td>
+            <td>{{ f.type }}</td>
+            <td>{{ f.required ? "Yes" : "—" }}</td>
+            <td>{{ f.desc }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="guide-section">
       <h2>Parameter fields</h2>
       <p>
-        Each entry in <code>parameters</code> describes one run-time input. The
-        <code>default</code> value pre-populates the field when a user adds the
-        application to a workflow.
+        <code>parameters</code> declares the values a user supplies when the
+        application runs. Each entry becomes a field in the workflow builder,
+        pre-filled with its <code>defaultValue</code>. A parameter with no
+        default is treated as required. Note that
+        <code>defaultValue</code> and <code>validValues</code> are written as
+        strings even for <code>number</code> and <code>boolean</code>
+        parameters.
       </p>
       <table class="field-table">
         <thead>
@@ -217,19 +262,19 @@ const portFields = [
     </section>
 
     <section class="guide-section">
-      <h2>Input &amp; output ports</h2>
+      <h2>Inputs &amp; outputs</h2>
       <p>
-        Entries in <code>inputs</code> and <code>outputs</code> declare typed
-        ports. Pennsieve uses the <code>dataType</code> of an upstream output and
-        a downstream input to validate that two applications can be connected in a
-        workflow.
+        Entries in <code>inputs</code> and <code>outputs</code> declare what
+        the application consumes and produces. Each names the
+        <code>mediaTypes</code> it carries. Pennsieve uses these to validate
+        that two applications can be connected in a workflow.
       </p>
       <table class="field-table">
         <thead>
           <tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr>
         </thead>
         <tbody>
-          <tr v-for="f in portFields" :key="f.name">
+          <tr v-for="f in inputOutputFields" :key="f.name">
             <td><code>{{ f.name }}</code></td>
             <td>{{ f.type }}</td>
             <td>{{ f.required ? "Yes" : "—" }}</td>
@@ -238,6 +283,8 @@ const portFields = [
         </tbody>
       </table>
     </section>
+
+    <div class="guide-bottom-spacer" aria-hidden="true" />
   </div>
 </template>
 
@@ -247,7 +294,18 @@ const portFields = [
 .manifest-guide {
   max-width: 900px;
   margin: 0;
-  padding: 16px 24px 48px;
+  padding: 16px 24px 0;
+}
+
+/*
+  BfPage stretches the stage's last child to the viewport (flex: 1, min-height:
+  0), so content taller than the viewport overflows the root box and any
+  padding-bottom on it is painted mid-scroll. A spacer in the content flow is
+  what actually puts room after the last section.
+*/
+.guide-bottom-spacer {
+  flex: 0 0 96px;
+  height: 96px;
 }
 
 .guide-header {
