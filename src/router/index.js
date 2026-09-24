@@ -92,7 +92,6 @@ const OrgSettings = () => import('../components/OrgSettings/OrgSettings.vue')
 
 const People = () => import('./people/People.vue')
 const WorkspaceResources = () => import('./resources/WorkspaceResources.vue')
-const WorkspaceNotifications = () => import('./notifications/WorkspaceNotifications.vue')
 const PeopleList = () => import('../components/people/list/PeopleList.vue')
 
 const Teams = () => import('./teams/Teams.vue')
@@ -1664,24 +1663,6 @@ const router = createRouter({
       ]
     },
     {
-      path: '/:orgId/notifications',
-      components: {
-        page: WorkspaceNotifications,
-        navigation: BfNavigation
-      },
-      props: true,
-      children: [
-        {
-          name: 'workspace-notifications',
-          path: '',
-          components: {
-            stage: () => import('../components/notifications/NotificationSubscriptions.vue')
-          },
-          props: true
-        }
-      ]
-    },
-    {
       name: "people",
       path: '/:orgId/people',
       components: {
@@ -1979,6 +1960,13 @@ const router = createRouter({
           path: 'storage-nodes',
           components: {
             stage: () => import('../components/OrgSettings/StorageNodesPage.vue')
+          }
+        },
+        {
+          name: 'workspace-notifications',
+          path: 'notifications',
+          components: {
+            stage: () => import('../components/notifications/NotificationSubscriptions.vue')
           }
         },
       ],

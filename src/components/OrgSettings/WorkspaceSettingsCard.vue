@@ -33,6 +33,7 @@ import IconTeam from '../icons/IconTeam.vue'
 import IconArrowRight from '../icons/IconArrowRight.vue'
 import IconIntegrations from '../icons/IconIntegrations.vue'
 import IconAnalysis from '../icons/IconAnalysis.vue'
+import IconNotifications from '../icons/IconNotifications.vue'
 
 export default {
   name: 'WorkspaceSettingsCard',
@@ -46,7 +47,8 @@ export default {
     IconTeam,
     IconArrowRight,
     IconIntegrations,
-    IconAnalysis
+    IconAnalysis,
+    IconNotifications
   },
 
   props: {
@@ -86,7 +88,8 @@ export default {
         'analytics': 'IconGraph',
         'people': 'IconTeam',
         'integrations': 'IconIntegrations',
-        'compute': 'IconAnalysis'
+        'compute': 'IconAnalysis',
+        'notifications': 'IconNotifications'
       }
       return iconMap[this.icon] || 'IconSettings'
     }

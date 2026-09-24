@@ -37,6 +37,8 @@ let route = useRoute();
     </div>
   </div>
 
+  <notification-bell v-if="activeOrganization && activeOrganization.organization" />
+
   <!--  <bf-upload ref="bfUpload" />-->
 
   <pennsieve-upload
@@ -82,6 +84,7 @@ import request from "./mixins/request";
 import PennsieveUpload from "./components/PennsieveUpload/PennsieveUpload.vue";
 import Office365Dialog from "@/components/datasets/files/Office365Dialog/Office365Dialog.vue";
 import ChatSpotlight from "@/components/Chat/Spotlight.vue";
+import NotificationBell from "@/components/notifications/NotificationBell.vue";
 import { useGetToken } from "@/composables/useGetToken";
 
 export default {
@@ -93,6 +96,7 @@ export default {
     BfDownloadFile,
     Office365Dialog,
     ChatSpotlight,
+    NotificationBell,
   },
   mixins: [globalMessageHandler, request],
 
