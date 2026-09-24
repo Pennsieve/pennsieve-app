@@ -30,6 +30,13 @@
         icon="database"
       />
 
+      <workspace-settings-card
+        title="Notifications"
+        description="Manage your notification subscriptions and delivery preferences"
+        :route="{ name: 'workspace-notifications' }"
+        icon="notifications"
+      />
+
 <!--      <workspace-settings-card-->
 <!--        title="Usage Analytics"-->
 <!--        description="View storage usage and workspace activity metrics"-->
