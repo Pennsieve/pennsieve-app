@@ -1,7 +1,7 @@
 <template>
   <div 
     class="workspace-settings-card"
-    :class="{ 'coming-soon': comingSoon }"
+    :class="{ 'coming-soon': comingSoon, 'disabled': disabled }"
     @click="handleClick"
   >
     <div class="card-icon">
@@ -75,6 +75,10 @@ export default {
     comingSoon: {
       type: Boolean,
       default: false
+    },
+    disabled: {
+      type: Boolean,
+      default: false
     }
   },
 
@@ -97,7 +101,7 @@ export default {
 
   methods: {
     handleClick() {
-      if (this.comingSoon) return
+      if (this.comingSoon || this.disabled) return
       
       if (this.route) {
         this.$router.push(this.route)
@@ -133,7 +137,8 @@ export default {
     }
   }
 
-  &.coming-soon {
+  &.coming-soon,
+  &.disabled {
     cursor: not-allowed;
     opacity: 0.6;
 
@@ -141,6 +146,7 @@ export default {
       border-color: theme.$gray_2;
       box-shadow: none;
       transform: none;
+      background-color: theme.$white;
 
       .card-arrow {
         transform: none;
