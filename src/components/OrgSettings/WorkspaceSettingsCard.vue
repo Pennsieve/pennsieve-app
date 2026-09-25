@@ -1,7 +1,7 @@
 <template>
   <div 
     class="workspace-settings-card"
-    :class="{ 'coming-soon': comingSoon }"
+    :class="{ 'coming-soon': comingSoon, 'disabled': disabled }"
     @click="handleClick"
   >
     <div class="card-icon">
@@ -33,6 +33,7 @@ import IconTeam from '../icons/IconTeam.vue'
 import IconArrowRight from '../icons/IconArrowRight.vue'
 import IconIntegrations from '../icons/IconIntegrations.vue'
 import IconAnalysis from '../icons/IconAnalysis.vue'
+import IconNotifications from '../icons/IconNotifications.vue'
 
 export default {
   name: 'WorkspaceSettingsCard',
@@ -46,7 +47,8 @@ export default {
     IconTeam,
     IconArrowRight,
     IconIntegrations,
-    IconAnalysis
+    IconAnalysis,
+    IconNotifications
   },
 
   props: {
@@ -73,6 +75,10 @@ export default {
     comingSoon: {
       type: Boolean,
       default: false
+    },
+    disabled: {
+      type: Boolean,
+      default: false
     }
   },
 
@@ -86,7 +92,8 @@ export default {
         'analytics': 'IconGraph',
         'people': 'IconTeam',
         'integrations': 'IconIntegrations',
-        'compute': 'IconAnalysis'
+        'compute': 'IconAnalysis',
+        'notifications': 'IconNotifications'
       }
       return iconMap[this.icon] || 'IconSettings'
     }
@@ -94,7 +101,7 @@ export default {
 
   methods: {
     handleClick() {
-      if (this.comingSoon) return
+      if (this.comingSoon || this.disabled) return
       
       if (this.route) {
         this.$router.push(this.route)
@@ -130,7 +137,8 @@ export default {
     }
   }
 
-  &.coming-soon {
+  &.coming-soon,
+  &.disabled {
     cursor: not-allowed;
     opacity: 0.6;
 
@@ -138,6 +146,7 @@ export default {
       border-color: theme.$gray_2;
       box-shadow: none;
       transform: none;
+      background-color: theme.$white;
 
       .card-arrow {
         transform: none;

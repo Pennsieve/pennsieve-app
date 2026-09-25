@@ -46,3 +46,35 @@ export async function unsubscribe(subscriptionId) {
     header,
   })
 }
+
+export async function fetchUserNotificationPrefs(userId) {
+  const header = await authHeader()
+  return useSendXhr(`${BASE_URL}/user/${userId}`, { header })
+}
+
+export async function initUserNotificationPrefs(userId) {
+  const header = await authHeader()
+  return useSendXhr(`${BASE_URL}/user/${userId}`, {
+    method: 'POST',
+    header,
+  })
+}
+
+export async function patchNotificationsLastSeen(userId, currentPrefs) {
+  const header = await authHeader()
+  return useSendXhr(`${BASE_URL}/user/${userId}`, {
+    method: 'PATCH',
+    header,
+    body: {
+      ...currentPrefs,
+      notificationsLastSeen: new Date().toISOString(),
+    },
+  })
+}
+
+export async function fetchNotificationsByTopic(topicId, limit = 10) {
+  const header = await authHeader()
+  return useSendXhr(`${BASE_URL}/${topicId}/notifications?limit=${limit}`, {
+    header,
+  })
+}
