@@ -24,7 +24,7 @@ export async function useGetProfileAndOrg(store) {
                 // Bootstrap notification preferences
                 if (profile.intId) {
                     const prefs = await store.dispatch('notificationModule/fetchUserNotificationPrefs', { intId: profile.intId })
-                    if (!prefs) {
+                    if (!prefs || !prefs.userId) {
                         await store.dispatch('notificationModule/initUserNotificationPrefs', { intId: profile.intId })
                     }
                 }

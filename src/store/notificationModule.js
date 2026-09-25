@@ -8,7 +8,7 @@ import {
 const initialState = () => ({
   userNotificationPrefs: {},
   notifications: [],
-  notificationsLastSeenAt: null,
+  notificationsLastSeen: null,
 })
 
 export const state = initialState()
@@ -21,8 +21,8 @@ export const mutations = {
 
   SET_USER_NOTIFICATION_PREFS(state, prefs) {
     state.userNotificationPrefs = prefs
-    if (prefs.notificationsLastSeenAt) {
-      state.notificationsLastSeenAt = prefs.notificationsLastSeenAt
+    if (prefs.notificationsLastSeen) {
+      state.notificationsLastSeen = prefs.notificationsLastSeen
     }
   },
 
@@ -31,7 +31,11 @@ export const mutations = {
   },
 
   SET_NOTIFICATIONS_LAST_SEEN_AT(state, timestamp) {
-    state.notificationsLastSeenAt = timestamp
+    state.notificationsLastSeen = timestamp
+  },
+
+  ADD_NOTIFICATION(state, notification) {
+    state.notifications.unshift(notification)
   },
 }
 
@@ -60,13 +64,17 @@ export const actions = {
     }
   },
 
-  async updateNotificationsLastSeen({ commit }, { intId }) {
+  async updateNotificationsLastSeen({ commit, state }, { intId }) {
+    // Skip PATCH if user prefs record hasn't been created yet
+    if (!state.userNotificationPrefs || !state.userNotificationPrefs.userId) {
+      return
+    }
     const now = new Date().toISOString()
     commit('SET_NOTIFICATIONS_LAST_SEEN_AT', now)
     try {
-      await patchNotificationsLastSeen(intId)
+      await patchNotificationsLastSeen(intId, state.userNotificationPrefs)
     } catch (e) {
-      console.error('Failed to update notificationsLastSeenAt', e)
+      console.error('Failed to update notificationsLastSeen', e)
     }
   },
 
@@ -84,18 +92,18 @@ export const actions = {
 
 export const getters = {
   hasUnreadNotifications(state) {
-    if (!state.notificationsLastSeenAt || state.notifications.length === 0) {
+    if (!state.notificationsLastSeen || state.notifications.length === 0) {
       return false
     }
-    const lastSeen = new Date(state.notificationsLastSeenAt).getTime()
+    const lastSeen = new Date(state.notificationsLastSeen).getTime()
     return state.notifications.some(
       n => new Date(n.created_at).getTime() > lastSeen
     )
   },
 
   unreadCount(state) {
-    if (!state.notificationsLastSeenAt) return state.notifications.length
-    const lastSeen = new Date(state.notificationsLastSeenAt).getTime()
+    if (!state.notificationsLastSeen) return state.notifications.length
+    const lastSeen = new Date(state.notificationsLastSeen).getTime()
     return state.notifications.filter(
       n => new Date(n.created_at).getTime() > lastSeen
     ).length
