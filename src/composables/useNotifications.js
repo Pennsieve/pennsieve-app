@@ -60,12 +60,15 @@ export async function initUserNotificationPrefs(userId) {
   })
 }
 
-export async function patchNotificationsLastSeen(userId) {
+export async function patchNotificationsLastSeen(userId, currentPrefs) {
   const header = await authHeader()
   return useSendXhr(`${BASE_URL}/user/${userId}`, {
     method: 'PATCH',
     header,
-    body: { notificationsLastSeenAt: new Date().toISOString() },
+    body: {
+      ...currentPrefs,
+      notificationsLastSeen: new Date().toISOString(),
+    },
   })
 }
 

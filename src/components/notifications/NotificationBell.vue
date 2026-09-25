@@ -2,7 +2,7 @@
   <div v-if="profile.intId" class="notification-bell" ref="bellRef">
     <button class="bell-button" @click="toggleDropdown" aria-label="Notifications">
       <IconNotifications :width="20" :height="20" color="currentColor" />
-      <span v-if="hasUnreadNotifications" class="unread-badge" />
+      <span v-if="unreadCount > 0" class="unread-badge">{{ displayCount }}</span>
     </button>
 
     <div v-if="open" class="bell-dropdown">
@@ -33,6 +33,7 @@
 <script>
 import { mapState, mapGetters } from 'vuex'
 import IconNotifications from '../icons/IconNotifications.vue'
+import { fetchSubscriptions } from '@/composables/useNotifications'
 
 export default {
   name: 'NotificationBell',
@@ -42,13 +43,18 @@ export default {
   data() {
     return {
       open: false,
+      pusherChannel: null,
     }
   },
 
   computed: {
     ...mapState(['profile']),
     ...mapState('notificationModule', ['notifications']),
-    ...mapGetters('notificationModule', ['hasUnreadNotifications']),
+    ...mapGetters('notificationModule', ['hasUnreadNotifications', 'unreadCount']),
+
+    displayCount() {
+      return this.unreadCount > 99 ? '99+' : this.unreadCount
+    },
   },
 
   methods: {
@@ -62,7 +68,7 @@ export default {
     },
 
     isUnread(notification) {
-      const lastSeen = this.$store.state.notificationModule.notificationsLastSeenAt
+      const lastSeen = this.$store.state.notificationModule.notificationsLastSeen
       if (!lastSeen) return true
       return new Date(notification.created_at).getTime() > new Date(lastSeen).getTime()
     },
@@ -87,14 +93,44 @@ export default {
         this.open = false
       }
     },
+
+    async loadInitialNotifications() {
+      try {
+        const subscriptions = await fetchSubscriptions()
+        if (Array.isArray(subscriptions) && subscriptions.length > 0) {
+          const firstTopicId = subscriptions[0].topic_id
+          await this.$store.dispatch('notificationModule/fetchNotifications', {
+            topicId: firstTopicId,
+          })
+        }
+      } catch (e) {
+        // Subscriptions may not exist yet — that's fine
+      }
+    },
+
+    subscribeToPusher() {
+      const channelName = `user-${this.profile.intId}-notifications`
+      this.pusherChannel = this.$pusher.subscribe(channelName)
+      this.pusherChannel.bind('notification-event', this.onPushNotification.bind(this))
+    },
+
+    onPushNotification(data) {
+      this.$store.commit('notificationModule/ADD_NOTIFICATION', data)
+    },
   },
 
-  mounted() {
+  async mounted() {
     document.addEventListener('click', this.onClickOutside)
+    await this.loadInitialNotifications()
+    this.subscribeToPusher()
   },
 
   beforeUnmount() {
     document.removeEventListener('click', this.onClickOutside)
+    if (this.pusherChannel) {
+      this.pusherChannel.unbind('notification-event')
+      this.$pusher.unsubscribe(this.pusherChannel.name)
+    }
   },
 }
 </script>
@@ -127,12 +163,18 @@ export default {
 
 .unread-badge {
   position: absolute;
-  top: 4px;
-  right: 4px;
-  width: 8px;
-  height: 8px;
+  top: 0;
+  right: 0;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
   background: theme.$red_1;
-  border-radius: 50%;
+  border-radius: 8px;
+  color: theme.$white;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 16px;
+  text-align: center;
 }
 
 .bell-dropdown {
