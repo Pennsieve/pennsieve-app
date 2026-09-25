@@ -7,6 +7,7 @@
         description="Configure workspace name, appearance, and basic settings"
         :route="{ name: 'workspace-general' }"
         icon="settings"
+        :disabled="!hasAdminRights"
       />
 
       <workspace-settings-card
@@ -14,6 +15,7 @@
         description="Manage custom workflow statuses for datasets"
         :route="{ name: 'workspace-dataset-statuses' }"
         icon="dataset-status"
+        :disabled="!hasAdminRights"
       />
 
       <workspace-settings-card
@@ -21,6 +23,7 @@
         description="Manage data use agreements and compliance settings"
         :route="{ name: 'workspace-data-use-agreements' }"
         icon="security"
+        :disabled="!hasAdminRights"
       />
 
       <workspace-settings-card
@@ -28,6 +31,7 @@
         description="Manage external storage locations attached to this workspace"
         :route="{ name: 'workspace-storage-nodes' }"
         icon="database"
+        :disabled="!hasAdminRights"
       />
 
       <workspace-settings-card
@@ -55,6 +59,8 @@
 </template>
 
 <script>
+import { mapGetters } from 'vuex'
+import { propOr } from 'ramda'
 import WorkspaceSettingsCard from './WorkspaceSettingsCard.vue'
 
 export default {
@@ -62,6 +68,16 @@ export default {
 
   components: {
     WorkspaceSettingsCard
+  },
+
+  computed: {
+    ...mapGetters(['activeOrganization']),
+
+    hasAdminRights() {
+      const isAdmin = propOr(false, 'isAdmin', this.activeOrganization)
+      const isOwner = propOr(false, 'isOwner', this.activeOrganization)
+      return isAdmin || isOwner
+    }
   }
 }
 </script>
