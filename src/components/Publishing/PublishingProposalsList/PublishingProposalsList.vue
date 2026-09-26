@@ -3,26 +3,40 @@
     <template #actions>
       <div class="actions-wrapper">
         <form
-      class="mb-8 dataset-search-form"
-      @submit.prevent="searchProposalsByQuery"
-    >
-      <el-input
-        ref="input"
-        v-model="searchQuery"
-        class="dataset-search-input icon-prefix"
-        placeholder="Find Datasets"
-        @keyup.enter.native="searchProposalsByQuery"
-      >
-        <template #prefix>
-          <IconMagnifyingGlass
-            :height="24"
-            :width="24"
-            color="#71747c"
-          />
-        </template>
+          class="mb-8 dataset-search-form"
+          @submit.prevent
+        >
+          <el-input
+            ref="input"
+            v-model="searchQuery"
+            class="dataset-search-input icon-prefix"
+            placeholder="Find proposals"
+            clearable
+          >
+            <template #prefix>
+              <IconMagnifyingGlass
+                :height="24"
+                :width="24"
+                color="#71747c"
+              />
+            </template>
+          </el-input>
+        </form>
 
-      </el-input>
-    </form>
+        <div class="status-filter">
+          <label class="status-filter-label">Showing</label>
+          <el-select
+            v-model="statusFilter"
+            @change="onStatusFilterChange"
+          >
+            <el-option
+              v-for="option in reviewStatuses"
+              :key="option.value"
+              :label="option.label"
+              :value="option.value"
+            />
+          </el-select>
+        </div>
       </div>
     </template>
 
@@ -68,7 +82,7 @@
         :pager-count="5"
         :current-page="curPage"
         layout="prev, pager, next"
-        :total="publishingSearchParams.totalCount"
+        :total="matchingProposals.length"
         @current-change="onPaginationPageChange"
       />
     </div>
@@ -81,7 +95,7 @@
         class="dataset-list-item-wrap"
       >
         <publishing-proposals-list-item
-          v-for="proposal in proposals"
+          v-for="proposal in visibleProposals"
           :key="proposal.nodeId"
           :proposal="proposal"
           @view="viewProposal"
@@ -92,7 +106,7 @@
 
 
       <bf-empty-page-state v-if="!hasProposals">
-        No dataset proposals found
+        {{ emptyStateMessage }}
       </bf-empty-page-state>
 
       <request-survey
@@ -100,7 +114,7 @@
         :proposal="selectedRequest"
         :repository="selectedRepository"
         :read-only="true"
-        :show-review-actions="isUserPublisher"
+        :show-review-actions="canReviewSelected"
         @accept="acceptDatasetProposalRequest"
         @reject="rejectDatasetProposalRequest"
         @close="closeProposalDialog"
@@ -138,6 +152,7 @@ import ConfirmationDialog from "../../shared/ConfirmationDialog/ConfirmationDial
 import IconMagnifyingGlass from "../../icons/IconMagnifyingGlass.vue";
 import IconSort from "../../icons/IconSort.vue";
 import EventBus from "../../../utils/event-bus";
+import { ProposalStatus, ProposalReviewStatuses } from "../../../utils/constants";
 
 export default {
   name: 'PublishingProposalsList',
@@ -181,10 +196,21 @@ export default {
     })
   },
 
+  watch: {
+    // Otherwise a query that shortens the list leaves the user on a page that
+    // no longer has any results on it
+    searchQuery: function() {
+      if (this.publishingSearchParams.offset !== 0) {
+        this.updatePublishingOffset(0)
+      }
+    },
+  },
+
   data() {
     return {
       isLoadingDatasetsError: false,
       searchQuery: '',
+      statusFilter: ProposalStatus.SUBMITTED,
       selectedRequest: null,
       selectedRepository: {},
       confirmationDialogVisible: false,
@@ -217,11 +243,75 @@ export default {
 
 
     proposals: function() {
-      return this.getDatasets(this.$route.name)
+      return this.getDatasets(this.$route.name) || []
+    },
+
+    /**
+     * The endpoint returns every proposal for the status in one response and
+     * reports totalCount as the length of that list, so searching, sorting and
+     * paging all happen here rather than in query parameters.
+     */
+    matchingProposals: function() {
+      const query = this.searchQuery.trim().toLowerCase()
+
+      const matches = query
+        ? this.proposals.filter(proposal => {
+            return [proposal.name, proposal.ownerName, proposal.emailAddress]
+              .some(field => (field || '').toLowerCase().includes(query))
+          })
+        : [...this.proposals]
+
+      const direction = this.publishingSearchParams.orderDirection === 'Asc' ? 1 : -1
+
+      if (this.publishingSearchParams.orderBy === 'Name') {
+        return matches.sort((a, b) => {
+          return direction * (a.name || '').localeCompare(b.name || '', 'en', { numeric: true })
+        })
+      }
+
+      // The sort menu is shared with the dataset tabs, so it also offers
+      // accession number, which proposals do not have. Sort by date for
+      // anything that isn't a name.
+      const field = this.publishingSearchParams.orderBy === 'UpdatedAt'
+        ? 'updatedAt'
+        : 'submittedAt'
+
+      return matches.sort((a, b) => {
+        return direction * ((a[field] || a.updatedAt || 0) - (b[field] || b.updatedAt || 0))
+      })
+    },
+
+    visibleProposals: function() {
+      const offset = this.publishingSearchParams.offset
+      return this.matchingProposals.slice(offset, offset + this.publishingSearchParams.limit)
     },
 
     hasProposals: function() {
-      return this.proposals != null && this.proposals.length > 0
+      return this.visibleProposals.length > 0
+    },
+
+    reviewStatuses: function() {
+      return ProposalReviewStatuses
+    },
+
+    // A proposal that has already been accepted or rejected is read-only
+    canReviewSelected: function() {
+      return Boolean(
+        this.isUserPublisher &&
+        this.selectedRequest &&
+        this.selectedRequest.proposalStatus === ProposalStatus.SUBMITTED
+      )
+    },
+
+    emptyStateMessage: function() {
+      if (this.searchQuery.trim()) {
+        return `No proposals match “${this.searchQuery.trim()}”`
+      }
+      const status = ProposalReviewStatuses
+        .find(option => option.value === this.statusFilter)
+      return status && status.value !== ProposalStatus.SUBMITTED
+        ? `No ${status.label.toLowerCase()} dataset proposals`
+        : 'No dataset proposals awaiting review'
     },
 
     /**
@@ -229,14 +319,13 @@ export default {
      * @returns {String}
      */
     searchHeading: function () {
+      const total = this.matchingProposals.length
       const start = this.publishingSearchParams.offset + 1
       const pageRange = this.publishingSearchParams.limit * this.curPage
-      const end = pageRange < this.publishingSearchParams.totalCount
-        ? pageRange
-        : this.publishingSearchParams.totalCount
-      const query = this.publishingSearchParams.query
+      const end = pageRange < total ? pageRange : total
+      const query = this.searchQuery.trim()
 
-      let searchHeading = `Displaying ${start}-${end} of ${this.publishingSearchParams.totalCount} results`
+      const searchHeading = `Displaying ${start}-${end} of ${total} results`
 
       return query === ''
         ? searchHeading
@@ -274,12 +363,16 @@ export default {
       this.clearSearchParams()
         .then(() => {
           this.proposalStore.fetchRepositories()
-          this.fetchDatasetProposals()
+          this.fetchDatasetProposals(this.statusFilter)
         })
     },
 
-    searchProposalsByQuery: function() {
-
+    /**
+     * Switching status is a refetch; searching, sorting and paging are not.
+     */
+    onStatusFilterChange: function() {
+      this.updatePublishingOffset(0)
+      this.fetchDatasetProposals(this.statusFilter)
     },
 
     /**
@@ -439,7 +532,7 @@ export default {
 
     // Reloads the list; the same response also refreshes the "Proposed" tab count
     refreshProposals: async function() {
-      await this.fetchDatasetProposals()
+      await this.fetchDatasetProposals(this.statusFilter)
     },
 
   },
@@ -471,5 +564,23 @@ export default {
   flex-direction: row;
   justify-content: space-between;
 
+}
+.status-filter {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+
+  .status-filter-label {
+    color: theme.$gray_4;
+    flex-shrink: 0;
+    font-size: 12px;
+    font-weight: 500;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+  }
+
+  :deep(.el-select) {
+    width: 180px;
+  }
 }
 </style>

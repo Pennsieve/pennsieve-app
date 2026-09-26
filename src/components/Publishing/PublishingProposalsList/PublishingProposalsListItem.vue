@@ -37,12 +37,21 @@
             </strong>
             Request Type
           </p>
+          <p
+            v-if="status"
+            class="bf-dataset-list-item-stat"
+          >
+            <strong class="col-label">
+              {{ status }}
+            </strong>
+            Status
+          </p>
         </div>
       </el-col>
 
       <el-col :span="4">
         <div class="bf-dataset-list-item-stat-align">
-          <div v-if="isUserPublisher" class="dataset-actions">
+          <div v-if="canReview" class="dataset-actions">
             <div class="button-wrapper">
               <p>
                 <a
@@ -70,7 +79,7 @@
 <script>
 import { mapGetters } from "vuex";
 import FormatDate from "../../../mixins/format-date";
-import { DatasetProposalAction } from "../../../utils/constants";
+import { DatasetProposalAction, ProposalStatus } from "../../../utils/constants";
 
 export default {
   name: "PublishingProposalsListItem",
@@ -86,6 +95,31 @@ export default {
 
   computed: {
     ...mapGetters(["isUserPublisher"]),
+
+    /**
+     * Only a proposal still awaiting review can be accepted or rejected; the
+     * list also shows already-decided proposals.
+     */
+    canReview: function () {
+      return (
+        this.isUserPublisher &&
+        this.proposal.proposalStatus === ProposalStatus.SUBMITTED
+      );
+    },
+
+    status: function () {
+      const labels = {
+        [ProposalStatus.SUBMITTED]: "Awaiting review",
+        [ProposalStatus.ACCEPTED]: "Accepted",
+        [ProposalStatus.REJECTED]: "Rejected",
+        [ProposalStatus.WITHDRAWN]: "Withdrawn",
+        [ProposalStatus.DRAFT]: "Draft",
+      };
+      const proposalStatus = this.proposal.proposalStatus;
+      return proposalStatus
+        ? labels[proposalStatus] || proposalStatus
+        : "";
+    },
 
     /**
      * Compute title of dataset proposl

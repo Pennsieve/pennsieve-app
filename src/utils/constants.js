@@ -38,6 +38,24 @@ export const PublicationTabs = Object.freeze({
   PROPOSED: 'proposed'
 })
 
+// Dataset proposal statuses as publishing-service reports them. DRAFT and
+// WITHDRAWN only ever belong to the author, so they never reach a workspace's
+// review queue.
+export const ProposalStatus = Object.freeze({
+  DRAFT: 'DRAFT',
+  SUBMITTED: 'SUBMITTED',
+  ACCEPTED: 'ACCEPTED',
+  REJECTED: 'REJECTED',
+  WITHDRAWN: 'WITHDRAWN'
+})
+
+// The statuses a publisher can review, in the order they are offered
+export const ProposalReviewStatuses = Object.freeze([
+  { label: 'Awaiting review', value: ProposalStatus.SUBMITTED },
+  { label: 'Accepted', value: ProposalStatus.ACCEPTED },
+  { label: 'Rejected', value: ProposalStatus.REJECTED }
+])
+
 export const UserFriendlyPublicationStatus = Object.freeze({
   REQUESTED: 'In Review',
   REJECTED: 'Request Rejected',
