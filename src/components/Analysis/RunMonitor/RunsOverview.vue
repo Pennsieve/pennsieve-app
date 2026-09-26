@@ -11,6 +11,7 @@ import { endInteractiveSession } from "@/composables/useJupyterSession";
 import { useGetToken } from "@/composables/useGetToken";
 import { useSendXhr } from "@/mixins/request/request_composable";
 import { useMetricsCounters } from "@/composables/useMetricsCounters";
+import { useWorkflowSearch } from "@/composables/useWorkflowSearch";
 import toQueryParams from "@/utils/toQueryParams";
 import {
   statusDotClass,
@@ -226,7 +227,6 @@ const wizardVisible = ref(false);
 const wizardStep = ref(0);
 const wizardForm = ref({ workflowId: "", computeNodeId: "", datasetId: "" });
 const rerunSource = ref(null);
-const workflowSearch = ref("");
 const computeNodeSearch = ref("");
 const datasetOptions = ref([]);
 const datasetSearchLoading = ref(false);
@@ -234,13 +234,19 @@ const datasetSearchQuery = ref("");
 let datasetSearchTimer = null;
 const wizardStepTitles = ["Select Workflow", "Select Compute Node", "Select Dataset", "Ready to Configure"];
 
-const filteredWizardWorkflows = computed(() => {
-  const q = workflowSearch.value.toLowerCase().trim();
-  if (!q) return workflows.value;
-  return workflows.value.filter(w =>
-    w.name?.toLowerCase().includes(q) || w.description?.toLowerCase().includes(q)
-  );
-});
+// Server-side workflow search + cursor pagination, with a list local to the
+// wizard so the shared store list (which feeds the run filter dropdown) is
+// left alone.
+const {
+  workflowOptions: wizardWorkflowOptions,
+  nextCursor: wizardWorkflowsCursor,
+  isLoading: wizardWorkflowsLoading,
+  isLoadingMore: wizardWorkflowsLoadingMore,
+  searchQuery: workflowSearch,
+  onSearchInput: onWorkflowSearch,
+  loadMore: loadMoreWizardWorkflows,
+  reset: resetWorkflowSearch,
+} = useWorkflowSearch();
 
 const filteredWizardComputeNodes = computed(() => {
   const q = computeNodeSearch.value.toLowerCase().trim();
@@ -251,7 +257,9 @@ const filteredWizardComputeNodes = computed(() => {
 });
 
 const wizardSelectedWorkflow = computed(() =>
-  workflows.value.find(w => w.uuid === wizardForm.value.workflowId) || null
+  wizardWorkflowOptions.value.find(w => w.uuid === wizardForm.value.workflowId) ||
+  workflows.value.find(w => w.uuid === wizardForm.value.workflowId) ||
+  null
 );
 const wizardSelectedComputeNode = computed(() =>
   computeNodes.value.find(cn => cn.uuid === wizardForm.value.computeNodeId) || null
@@ -298,12 +306,12 @@ const onDatasetSearch = (query) => {
 
 const openWizardDialog = () => {
   wizardForm.value = { workflowId: "", computeNodeId: "", datasetId: "" };
-  workflowSearch.value = "";
   computeNodeSearch.value = "";
   datasetSearchQuery.value = "";
   wizardStep.value = 0;
   rerunSource.value = null;
   wizardVisible.value = true;
+  resetWorkflowSearch();
   fetchDatasetOptions();
 };
 
@@ -321,10 +329,10 @@ const rerunFromRun = async (run) => {
     computeNodeId: run.computeNodeUuid || "",
     datasetId: run.datasetId || "",
   };
-  workflowSearch.value = "";
   computeNodeSearch.value = "";
   wizardStep.value = 3;
   wizardVisible.value = true;
+  resetWorkflowSearch();
   fetchDatasetOptions();
 };
 
@@ -687,17 +695,19 @@ onBeforeUnmount(() => {
           <template v-else>
             <el-input
               v-model="workflowSearch"
-              placeholder="Filter workflows..."
+              placeholder="Search workflows..."
               clearable
               class="wizard-search"
+              @input="onWorkflowSearch"
             />
             <div class="wizard-cards">
+              <div v-if="wizardWorkflowsLoading" class="wizard-cards-loading">Searching...</div>
               <div
-                v-for="wf in filteredWizardWorkflows"
+                v-for="wf in wizardWorkflowOptions"
                 :key="wf.uuid"
                 class="wizard-card"
                 :class="{ disabled: !wf.isActive }"
-                @click="wf.isActive && (wizardForm.workflowId = wf.uuid, workflowSearch = '')"
+                @click="wf.isActive && (wizardForm.workflowId = wf.uuid)"
               >
                 <div class="wizard-card-name">{{ wf.name }}</div>
                 <div v-if="wf.description" class="wizard-card-desc">{{ wf.description }}</div>
@@ -706,7 +716,15 @@ onBeforeUnmount(() => {
                   <span v-if="!wf.isActive" class="wizard-card-badge">Archived</span>
                 </div>
               </div>
-              <div v-if="filteredWizardWorkflows.length === 0" class="wizard-cards-loading">No workflows found</div>
+              <div v-if="!wizardWorkflowsLoading && wizardWorkflowOptions.length === 0" class="wizard-cards-loading">No workflows found</div>
+              <button
+                v-if="wizardWorkflowsCursor"
+                class="load-more-btn"
+                :disabled="wizardWorkflowsLoadingMore"
+                @click="loadMoreWizardWorkflows"
+              >
+                {{ wizardWorkflowsLoadingMore ? 'Loading...' : 'Load more workflows' }}
+              </button>
             </div>
           </template>
         </div>
