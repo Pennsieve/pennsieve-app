@@ -1,166 +1,168 @@
 <template>
-  <div
-    class="reset-password"
-    :class="{ 'welcome-to-pennsieve': $route.name === 'welcome-to-pennsieve' }"
-  >
-    <div class="reset-password-wrapper">
-      <div class="reset-password-inner">
-        <div class="login-header">
-          <PennsieveLogoContainer
-            class="logo-container"
-            :dark-background="false"
-            :show-pennsieve-logo="true"
-          />
+  <AuthLayout>
+    <!-- submit email -->
+    <div
+      v-if="!verificationCode && !linkSent"
+      key="emailForm"
+      class="auth-content"
+    >
+      <h2 class="auth-title">Reset your password</h2>
+      <p
+        v-if="!hideEmail"
+        class="auth-info"
+      >
+        Enter the email address associated with your account, and we’ll email you a link to reset your password.
+      </p>
 
-        </div>
-        <!-- submit email -->
-        <div
-          v-if="!verificationCode && !linkSent"
-          key="emailForm"
-        >
-          <h2>Reset your password.</h2>
-          <p
-            v-if="!hideEmail"
-            class="email-description"
-          >
-            Enter the email address associated with your account, and we’ll email you a link to reset your password.
-          </p>
-          <el-form
-            ref="emailForm"
-            :model="emailForm"
-            :rules="emailRules"
-            @submit.native.prevent="onEmailFormSubmit"
-          >
-            <el-form-item
-              class="email"
-              prop="email"
-            >
-              <el-input
-                v-model="emailForm.email"
-                type="email"
-                placeholder="Your email address"
-                autofocus
-                @enter="onEmailFormSubmit"
-              />
-            </el-form-item>
-              <bf-button
-                class="send-email-btn"
-                :processing="isSendingEmail"
-                processing-text="Sending Email"
-                @click="onEmailFormSubmit"
-              >
-                Reset Password
-              </bf-button>
-              <router-link
-                :to="{ name: 'home' }"
-                class="back-to-login"
-              >
-                Back to sign in page.
-              </router-link>
-          </el-form>
-
-          <p
-            v-if="errorMsg !== ''"
-            class="mt-8 error"
-          >
-            {{ errorMsg }}
-          </p>
-        </div>
-
-        <!-- submit new password -->
-        <div
-          v-if="verificationCode || linkSent"
-          key="resetForm"
-        >
-          <h2 v-if="linkSent">
-            Reset code sent.
-          </h2>
-          <h2 v-else>
-            Reset your password.
-          </h2>
-          <p class="link-sent-text">
-            We’ve sent an email that contains a code to reset your password. Contact support if you have any issues or don’t receive an email.
-          </p>
-          <p class="password-requirements">
-            We recommend that you create a password that is more than 8 characters long and contains a combination of uppercase &amp; lowercase characters,
-            numbers and symbols.
-          </p>
-          <el-form
-            ref="passwordForm"
-            :model="passwordForm"
-            :rules="passwordRules"
-            @submit.native.prevent="onPasswordFormSubmit"
-          >
-            <el-form-item
-              v-show="!$route.query.username"
-              class="email"
-              prop="email"
-            >
-              <el-input
-                ref="passwordFormEmail"
-                v-model="passwordForm.email"
-                placeholder="Email"
-              />
-            </el-form-item>
-            <el-form-item
-              class="code"
-              prop="code"
-            >
-              <el-input
-                ref="passwordFormCode"
-                v-model="passwordForm.code"
-                placeholder="Verification Code"
-              />
-            </el-form-item>
-            <el-form-item
-              class="password"
-              prop="password"
-            >
-              <el-input
-                v-model="passwordForm.password"
-                type="password"
-                placeholder="New Password"
-                autofocus
-                @click="onPasswordFormSubmit"
-                show-password
-              />
-              <transition name="el-zoom-in-top">
-                <div
-                  v-if="isPasswordFormValid"
-                  class="pw-is-valid-text"
-                >
-                  Strong Password!
-                </div>
-              </transition>
-            </el-form-item>
-              <bf-button
-                class="reset-pw-btn"
-                :processing="isResettingPassword"
-                :processing-text="resettingPasswordText"
-                @click="onPasswordFormSubmit"
-              >
-                Reset Password
-              </bf-button>
-              <router-link
-                :to="{ name: 'home' }"
-                class="back-to-login"
-              >
-                Back to sign in page.
-              </router-link>
-
-            <p
-              v-if="errorMsg !== ''"
-              class="mt-8 error"
-            >
-              {{ errorMsg }}
-            </p>
-          </el-form>
-        </div>
+      <div
+        v-if="errorMsg !== ''"
+        class="auth-error"
+        role="alert"
+      >
+        {{ errorMsg }}
       </div>
 
-      <pennsieve-simple-footer/>
+      <el-form
+        ref="emailForm"
+        :model="emailForm"
+        :rules="emailRules"
+        class="auth-form"
+        label-position="top"
+        hide-required-asterisk
+        @submit.prevent="onEmailFormSubmit"
+      >
+        <el-form-item
+          label="Email"
+          prop="email"
+        >
+          <el-input
+            v-model="emailForm.email"
+            type="email"
+            autocomplete="username"
+            autofocus
+          />
+        </el-form-item>
+        <bf-button
+          class="auth-full-width"
+          type="submit"
+          :processing="isSendingEmail"
+          processing-text="Sending Email"
+        >
+          Reset Password
+        </bf-button>
+      </el-form>
+
+      <router-link
+        :to="signInRoute"
+        class="auth-secondary-link"
+      >
+        Back to Sign In
+      </router-link>
     </div>
-  </div>
+
+    <!-- submit new password -->
+    <div
+      v-if="verificationCode || linkSent"
+      key="resetForm"
+      class="auth-content"
+    >
+      <h2
+        v-if="linkSent"
+        class="auth-title"
+      >
+        Reset code sent
+      </h2>
+      <h2
+        v-else
+        class="auth-title"
+      >
+        Reset your password
+      </h2>
+      <p
+        v-if="linkSent"
+        class="auth-info"
+      >
+        We’ve sent an email that contains a code to reset your password. Contact support if you have any issues or don’t receive an email.
+      </p>
+      <p class="auth-info password-requirements">
+        Use more than 8 characters, with a mix of uppercase &amp; lowercase letters, numbers and symbols.
+      </p>
+
+      <div
+        v-if="errorMsg !== ''"
+        class="auth-error"
+        role="alert"
+      >
+        {{ errorMsg }}
+      </div>
+
+      <el-form
+        ref="passwordForm"
+        :model="passwordForm"
+        :rules="passwordRules"
+        class="auth-form"
+        label-position="top"
+        hide-required-asterisk
+        @submit.prevent="onPasswordFormSubmit"
+      >
+        <el-form-item
+          v-show="!$route.query.username"
+          label="Email"
+          prop="email"
+        >
+          <el-input
+            ref="passwordFormEmail"
+            v-model="passwordForm.email"
+            type="email"
+            autocomplete="username"
+          />
+        </el-form-item>
+        <el-form-item
+          label="Verification code"
+          prop="code"
+        >
+          <el-input
+            ref="passwordFormCode"
+            v-model="passwordForm.code"
+            autocomplete="one-time-code"
+            inputmode="numeric"
+          />
+        </el-form-item>
+        <el-form-item
+          label="New password"
+          prop="password"
+        >
+          <el-input
+            v-model="passwordForm.password"
+            type="password"
+            autocomplete="new-password"
+            show-password
+          />
+        </el-form-item>
+        <p
+          v-if="isPasswordFormValid"
+          class="pw-is-valid-text"
+        >
+          Strong password!
+        </p>
+        <bf-button
+          class="auth-full-width"
+          type="submit"
+          :processing="isResettingPassword"
+          :processing-text="resettingPasswordText"
+        >
+          Reset Password
+        </bf-button>
+      </el-form>
+
+      <router-link
+        :to="signInRoute"
+        class="auth-secondary-link"
+      >
+        Back to Sign In
+      </router-link>
+    </div>
+  </AuthLayout>
 </template>
 
 <script>
@@ -169,23 +171,20 @@ import { pathOr, propOr } from 'ramda'
 import { confirmResetPassword, resetPassword, signIn } from 'aws-amplify/auth';
 
 import BfButton from '../../components/shared/bf-button/BfButton.vue'
-import PennsieveSimpleFooter from "../../components/shared/PennsieveFooter/PennsieveSimpleFooter.vue";
+import AuthLayout from '../../components/shared/AuthLayout/AuthLayout.vue'
+import { isFeatureEnabled } from '@/utils/features'
 
 import AutoFocus from '../../mixins/auto-focus'
 import Request from '../../mixins/request'
 import PasswordValidator from '../../mixins/password-validator/index'
 import EventBus from '../../utils/event-bus'
-import PennsieveMark from "../../components/icons/IconPennsieveMark.vue";
-import PennsieveLogoContainer from "../../components/shared/PennsieveLogoContainer/PennsieveLogoContainer.vue";
 
 export default {
   name: 'ResetPassword',
 
   components: {
-    PennsieveMark,
     BfButton,
-    PennsieveSimpleFooter,
-    PennsieveLogoContainer
+    AuthLayout
   },
 
   mixins: [
@@ -255,6 +254,10 @@ export default {
       'config'
     ]),
 
+    signInRoute: function() {
+      return isFeatureEnabled('inAppLogin') ? { name: 'login' } : { name: 'home' }
+    },
+
     /**
      * Grab verificationCode from query param in route
      */
@@ -323,24 +326,19 @@ export default {
      */
     submitResetRequest: async function() {
       this.isSendingEmail = true
+      this.errorMsg = ''
 
-      const output = await resetPassword({
-        username: this.emailForm.email
-      });
-
-      const { nextStep } = output;
-      switch (nextStep.resetPasswordStep) {
-        case 'CONFIRM_RESET_PASSWORD_WITH_CODE':
-          const codeDeliveryDetails = nextStep.codeDeliveryDetails;
-          console.log(
-            `Confirmation code was sent to ${codeDeliveryDetails.deliveryMedium}`
-          );
-          this.isSendingEmail = false
-          // Collect the confirmation code from the user and pass to confirmResetPassword.
-          break;
-        case 'DONE':
-          console.log('Successfully reset password.');
-          break;
+      try {
+        const { nextStep } = await resetPassword({
+          username: this.emailForm.email
+        })
+        if (nextStep.resetPasswordStep === 'CONFIRM_RESET_PASSWORD_WITH_CODE') {
+          this.onEmailFormSuccess()
+        }
+      } catch (error) {
+        this.errorMsg = error.message
+      } finally {
+        this.isSendingEmail = false
       }
     },
 
@@ -353,7 +351,7 @@ export default {
       this.passwordForm.email = this.emailForm.email
 
       this.$nextTick(() => {
-        this.$refs.passwordFormEmail.focus()
+        this.$refs.passwordFormCode.focus()
       })
     },
 
@@ -362,7 +360,11 @@ export default {
      * @param {Object} e
      */
     onPasswordFormSubmit: function (e) {
+      if (this.isResettingPassword) {
+        return
+      }
       this.resettingPasswordText = 'Saving'
+      this.errorMsg = ''
 
       this.$refs.passwordForm.validate(valid => {
         if (!valid) {
@@ -381,9 +383,12 @@ export default {
           .then(() => {
             this.resettingPasswordText = 'Reset successful!'
             EventBus.$emit('toast', {
-              type: 'success',
-              msg: 'Password successfully reset'
+              detail: {
+                type: 'success',
+                msg: 'Password successfully reset. Sign in with your new password.'
+              }
             })
+            this.$router.push(this.signInRoute)
           })
           .catch(error => {
             this.errorMsg = error.message
@@ -414,127 +419,18 @@ export default {
 }
 </script>
 
-<style lang="scss">
+<style scoped lang="scss">
 @use '../../styles/theme';
 
-.logo-container {
-  width: 300px;
+.password-requirements {
+  font-size: 14px;
+  color: theme.$gray_5;
 }
 
-.reset-password {
-  background: theme.$purple_1;
-  display: block;
-
-  h2 {
-    color: theme.$purple_3;
-    font: 700 24px/31px SharpSans,sans-serif;
-    margin: 0 0 10px 0;
-  }
-
-
-  .reset-password-wrapper {
-    background: theme.$white;
-    box-sizing: border-box;
-    color: theme.$gray_4;
-    max-width: 720px;
-    min-height: 100vh;
-    padding-bottom: 20px;
-    padding-top: 130px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-  }
-
-  .reset-password-inner {
-    background: theme.$white;
-    box-sizing: border-box;
-    color: theme.$gray_4;
-    max-width: 720px;
-    flex: 1;
-    width: 360px;
-  }
-
-  .login-header {
-    margin-bottom: 60px;
-    display: flex;
-    flex-direction: row;
-    justify-content: center;
-  }
-
-  .logo {
-    display: block;
-    height: 35px;
-    width: 198px;
-  }
-
-  .email-description {
-    margin-bottom: 28px;
-  }
-
-  .el-form-item.email {
-    margin-bottom: 20px;
-  }
-
-  .send-email-btn,
-  .reset-pw-btn {
-    width: 50%;
-  }
-
-  .back-to-login {
-    margin-left: 16px;
-    width: 50%;
-    text-align: center;
-  }
-
-  .link-sent-text {
-    margin-bottom: 16px;
-  }
-
-  .password-requirements {
-    margin-bottom: 24px;
-  }
-
-  .pw-is-valid-text {
-    color: #17bb62;
-    font-size: 13px;
-    line-height: 1;
-    padding: 13px 10px;
-    background: #FAFAFA;
-    border-radius: 0 0 5px 5px;
-    border: solid 1px #dadada;
-    height: 15px;
-    width: 93.5%;
-    position: relative;
-    z-index: 0;
-    margin: 0;
-  }
-
-  .button-spinner {
-    height: 20px;
-    margin: -3px 8px -3px 0;
-    width: 20px;
-  }
-
-  .send-email-form-item {
-    .el-form-item__content {
-      display: flex;
-    }
-  }
-
-  .reset-pw-form-item {
-    .el-form-item__content {
-      display: flex;
-    }
-  }
-  .error {
-    color: theme.$error-color;
-  }
-}
-
-.welcome-to-pennsieve {
-  .login-header {
-    align-items: center;
-    flex-direction: column;
-  }
+.pw-is-valid-text {
+  margin: -8px 0 16px 0;
+  color: theme.$green_2;
+  font-size: 14px;
+  line-height: 24px;
 }
 </style>
