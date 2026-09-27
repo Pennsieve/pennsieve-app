@@ -32,6 +32,8 @@ import {useSendXhr} from "@/mixins/request/request_composable";
 import EventBus from "@/utils/event-bus";
 import {checkIsSubscribed} from "@/composables/useCheckTerms";
 import {useSwitchWorkspace} from "@/composables/useSwitchWorkspace";
+import { isFeatureEnabled } from '@/utils/features'
+import { loginQuery } from '@/utils/auth-redirect'
 import { createPinia } from 'pinia'
 import { useDuckDBStore } from '@/stores/duckdbStore'
 
@@ -155,8 +157,11 @@ router.beforeEach(async (to, from, next) => {
         console.warn('Session check failed:', err.message)
     }
 
-    // If there is no token and route is not on the un-authenticated list --> redirect to discover app
+    // If there is no token and route is not on the un-authenticated list --> redirect to login
     if (!token && !(allowList.indexOf(to.name) >= 0)) {
+        if (isFeatureEnabled('inAppLogin')) {
+            return next({ name: 'login', query: loginQuery(to.fullPath) })
+        }
         window.location.replace(siteConfig.discoverAppUrl)
     }
 
