@@ -23,6 +23,10 @@
   "notificationUrl": "wss://api.pennsieve.net/notifications/notification/connect",
   "googleMapApi": "xxxxxxxxxxxxxx",
   "mapTiler": "xxxxx",
+  "realtime": {
+    "httpHost": "events.pennsieve.net",
+    "realtimeHost": "events.pennsieve.net"
+  },
   "pusherConfig": {
     "appId": "47a81ebaf87f4c168177",
     "region": "us2"

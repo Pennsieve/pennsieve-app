@@ -367,8 +367,6 @@ export default {
       renamingFileId: null,
       moveDialogVisible: false,
       selectedFileForAction: {},
-      pusherChannelName: "",
-      pusherChannel: {},
     };
   },
 
@@ -393,7 +391,7 @@ export default {
     ]),
 
     ...mapGetters("datasetModule", [
-      "getPusherChannel",
+      "getRealtimeChannel",
       "getManifestNotification",
     ]),
 
@@ -556,7 +554,7 @@ export default {
         }
       },
     },
-    getPusherChannel: {
+    getRealtimeChannel: {
       handler(channel) {
         function isEmpty(obj) {
           for (const prop in obj) {
@@ -571,12 +569,12 @@ export default {
           channel.bind(
             "upload-event",
             function () {
-              // Pusher's job here is purely "a file landed in Postgres,
+              // The live update's job here is purely "a file landed in Postgres,
               // refresh the dataset table." It fires for uploads from any
               // source (this browser session, a different session, the
               // agent). The browser upload flow's own state machine is
               // driven by the finalize API response (see uploadModule.js)
-              // — nothing on this Pusher event touches it.
+              // — nothing on this event touches it.
               //
               // Silent refetch + leading/maxWait debounce keep the table
               // current during a burst without the per-second flash.
@@ -592,7 +590,7 @@ export default {
   },
 
   created() {
-    // Throttled silent refetch used by the upload-event Pusher handler to
+    // Throttled silent refetch used by the upload-event handler to
     // coalesce the hundreds of events a large direct-to-storage upload
     // produces. Leading + maxWait mean the first event in a burst refreshes
     // immediately and sustained bursts still produce at most one refresh
@@ -633,8 +631,8 @@ export default {
   },
 
   beforeUnmount() {
-    const pusherCh = this.getPusherChannel;
-    pusherCh.unbind("upload-event");
+    const channel = this.getRealtimeChannel;
+    channel.unbind?.("upload-event");
   },
 
   unmounted: function () {

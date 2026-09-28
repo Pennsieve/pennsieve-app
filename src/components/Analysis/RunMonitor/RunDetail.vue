@@ -1,5 +1,6 @@
 <script setup>
 import { computed, ref, reactive, watch, onMounted, onBeforeUnmount, onUnmounted, getCurrentInstance } from "vue";
+import { runScopeChannel } from "@/realtime/channels";
 import { useStore } from "vuex";
 import { useRouter, useRoute } from "vue-router";
 import { useVueFlow, VueFlow, Handle, Position } from "@vue-flow/core";
@@ -65,7 +66,7 @@ const { onNodeClick, onPaneClick, fitView, updateNodeData } = useVueFlow();
 const store = useStore();
 const router = useRouter();
 const route = useRoute();
-const pusher = getCurrentInstance()?.appContext.config.globalProperties.$pusher;
+const realtime = getCurrentInstance()?.appContext.config.globalProperties.$realtime;
 
 /*
   Local State
@@ -77,7 +78,6 @@ const nodes = ref([]);
 const edges = ref([]);
 const isLoading = ref(false);
 let analyticsChannel = null;
-let analyticsChannelName = null;
 
 // Configure mode state
 const initiateForm = ref({ workflowId: "", computeNodeId: "", datasetId: "", name: "" });
@@ -458,9 +458,9 @@ const runToNodesAndEdges = (run) => {
 };
 
 /*
-  Pusher event handlers
+  Live-update event handlers
 */
-const parsePusherData = (data) => {
+const parseEventData = (data) => {
   if (typeof data === "string") {
     try { return JSON.parse(data); } catch { return data; }
   }
@@ -468,7 +468,7 @@ const parsePusherData = (data) => {
 };
 
 const onRunStatusUpdate = async (raw) => {
-  const data = parsePusherData(raw);
+  const data = parseEventData(raw);
   store.commit("analysisModule/UPDATE_RUN_STATUS", { runId: data.runId, status: data.status });
 
   const currentRunId = selectedWorkflowActivity.value?.uuid;
@@ -500,7 +500,7 @@ const onRunStatusUpdate = async (raw) => {
 };
 
 const onProcessorStatusUpdate = (raw) => {
-  const data = parsePusherData(raw);
+  const data = parseEventData(raw);
   const currentRunId = selectedWorkflowActivity.value?.uuid;
   if (data.runId !== currentRunId) return;
   store.commit("analysisModule/UPDATE_NODE_STATUS", { nodeId: data.nodeId, status: data.status });
@@ -1249,16 +1249,11 @@ onMounted(async () => {
     return;
   }
 
-  // Subscribe to Pusher
-  if (pusher) {
-    const rawOrgId = store.state.activeOrganization?.organization?.id;
-    const rawUserId = store.state.profile?.id;
-    const orgUuid = rawOrgId?.replace(/^N:organization:/, "");
-    const userUuid = rawUserId?.replace(/^N:user:/, "");
-    analyticsChannelName = orgUuid
-      ? `organization-${orgUuid}-analytics`
-      : `user-${userUuid}-analytics`;
-    analyticsChannel = pusher.subscribe(analyticsChannelName);
+  // Live updates for every run in the workspace (or the user's own runs)
+  if (realtime) {
+    analyticsChannel = realtime.subscribe(
+      runScopeChannel(store.state.activeOrganization?.organization?.id, store.state.profile?.id)
+    );
     store.commit("analysisModule/SET_ANALYTICS_CHANNEL", analyticsChannel);
     analyticsChannel.bind("workflow-run-status", onRunStatusUpdate);
     analyticsChannel.bind("workflow-processor-status", onProcessorStatusUpdate);
@@ -1287,11 +1282,8 @@ onBeforeUnmount(() => {
       "workflow-processor-status",
       onProcessorStatusUpdate
     );
-    if (pusher && analyticsChannelName) {
-      pusher.unsubscribe(analyticsChannelName);
-    }
+    analyticsChannel.unsubscribe();
     analyticsChannel = null;
-    analyticsChannelName = null;
     store.commit("analysisModule/CLEAR_ANALYTICS_CHANNEL");
   }
 });

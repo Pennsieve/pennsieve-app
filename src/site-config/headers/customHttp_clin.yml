@@ -23,7 +23,6 @@ customHeaders:
             'wasm-unsafe-eval'
             'self'
             data:
-            https://js.pusher.com
             https://www.gstatic.com
             https://www.google.com/recaptcha/api.js
             https://www.googletagmanager.com
@@ -88,9 +87,7 @@ customHeaders:
             https://orthogonal-viewer.pennsieve.net;
             connect-src
             'self'
-            wss://*.pusher.com
-            https://*.pusher.com
-            *.pusherapp.com
+            wss://events.pennsieve.ai
             https://pub.sandbox.orcid.org
             https://pub.orcid.org
             https://citation.crosscite.org

@@ -9,6 +9,7 @@ import {
   onBeforeUnmount,
   getCurrentInstance,
 } from "vue";
+import { runScopeChannel } from "@/realtime/channels";
 import { useStore } from "vuex";
 import { useRouter, useRoute } from "vue-router";
 import BfButton from "../../shared/bf-button/BfButton.vue";
@@ -34,7 +35,7 @@ const store = useStore();
 const computeResources = useComputeResourcesStore();
 const router = useRouter();
 const route = useRoute();
-const pusher = getCurrentInstance()?.appContext.config.globalProperties.$pusher;
+const realtime = getCurrentInstance()?.appContext.config.globalProperties.$realtime;
 
 /* ----------------------------------------------------------------- store ---- */
 const workflowInstances = computed(
@@ -218,8 +219,8 @@ const confirmEndSession = async () => {
   }
 };
 
-/* ------------------------------------------------------- pusher / lifecycle - */
-const parsePusherData = (data) => {
+/* -------------------------------------------------- live updates / lifecycle */
+const parseEventData = (data) => {
   if (typeof data === "string") {
     try {
       return JSON.parse(data);
@@ -230,7 +231,7 @@ const parsePusherData = (data) => {
   return data;
 };
 const onRunStatusUpdate = (raw) => {
-  const data = parsePusherData(raw);
+  const data = parseEventData(raw);
   store.commit("analysisModule/UPDATE_RUN_STATUS", {
     runId: data.runId,
     status: data.status,
@@ -238,7 +239,6 @@ const onRunStatusUpdate = (raw) => {
 };
 
 let analyticsChannel = null;
-let analyticsChannelName = null;
 onMounted(async () => {
   isLoading.value = true;
   try {
@@ -251,26 +251,19 @@ onMounted(async () => {
   } finally {
     isLoading.value = false;
   }
-  if (pusher) {
-    const rawOrgId = store.state.activeOrganization?.organization?.id;
-    const rawUserId = store.state.profile?.id;
-    const orgUuid = rawOrgId?.replace(/^N:organization:/, "");
-    const userUuid = rawUserId?.replace(/^N:user:/, "");
-    analyticsChannelName = orgUuid
-      ? `organization-${orgUuid}-analytics`
-      : `user-${userUuid}-analytics`;
-    analyticsChannel = pusher.subscribe(analyticsChannelName);
+  // Live updates for every run in the workspace (or the user's own runs)
+  if (realtime) {
+    analyticsChannel = realtime.subscribe(
+      runScopeChannel(store.state.activeOrganization?.organization?.id, store.state.profile?.id)
+    );
     analyticsChannel.bind("workflow-run-status", onRunStatusUpdate);
   }
 });
 onBeforeUnmount(() => {
   if (analyticsChannel) {
     analyticsChannel.unbind("workflow-run-status", onRunStatusUpdate);
-    if (pusher && analyticsChannelName) {
-      pusher.unsubscribe(analyticsChannelName);
-    }
+    analyticsChannel.unsubscribe();
     analyticsChannel = null;
-    analyticsChannelName = null;
   }
 });
 </script>

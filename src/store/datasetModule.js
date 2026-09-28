@@ -74,7 +74,7 @@ const initialState = () => ({
   isLoadingManifestsActivity: false,
   datasetActivity: [],
   datasetManifests: [],
-  pusherChannel: {},
+  realtimeChannel: {},
   manifestNotification: {}
 })
 
@@ -177,8 +177,8 @@ export const mutations = {
   UPDATE_IS_LOADING_MANIFESTS(state, isLoading) {
     state.isLoadingManifestsActivity = isLoading
   },
-  SET_PUSHER_CHANNEL(state, channel) {
-    state.pusherChannel = channel
+  SET_REALTIME_CHANNEL(state, channel) {
+    state.realtimeChannel = channel
   },
   ADD_MANIFEST_NOTIFICATION(state, notification) {
     state.manifestNotification = notification
@@ -336,8 +336,8 @@ export const actions = {
     commit('CLEAR_DATASET_ACTIVITY_STATE')
   },
 
-  setPusherChannel: async({commit}, channel) => {
-    commit('SET_PUSHER_CHANNEL', channel)
+  setRealtimeChannel: async({commit}, channel) => {
+    commit('SET_REALTIME_CHANNEL', channel)
   },
 
   createDatasetManifest: async({ commit, rootState }) => {
@@ -377,8 +377,8 @@ export const getters = {
   curDatasetSearchPage: state => {
     return state.datasetSearchParams.offset / state.datasetSearchParams.limit + 1
   },
-  getPusherChannel: state => {
-    return state.pusherChannel
+  getRealtimeChannel: state => {
+    return state.realtimeChannel
   },
   getManifestNotification: state => state.manifestNotification,
   datasetActivity: state => state.datasetActivity,

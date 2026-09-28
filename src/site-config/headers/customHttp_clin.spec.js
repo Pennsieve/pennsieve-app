@@ -45,6 +45,11 @@ describe('clin custom headers', () => {
     endpoints.forEach((url) => expect(allows(connect, url), url).toBe(true))
   })
 
+  it('lets the app open the live-update WebSocket, and nothing of Pusher', () => {
+    expect(allows(directive('connect-src'), `wss://${clin.realtime.realtimeHost}/event/realtime`)).toBe(true)
+    expect(csp).not.toMatch(/pusher/i)
+  })
+
   it('lets public-dataset ZIP downloads post to zipit', () => {
     const formAction = directive('form-action')
     const zipit = clin.discoverZipitUrl || `${clin.zipitUrl}/discover`

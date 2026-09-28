@@ -1,5 +1,6 @@
 <script setup>
 import { computed, ref, reactive, watch, onMounted, onBeforeUnmount, onUnmounted, getCurrentInstance } from "vue";
+import { runScopeChannel } from "@/realtime/channels";
 import { useStore } from "vuex";
 import { useVueFlow, VueFlow, Handle, Position } from "@vue-flow/core";
 import { Background } from "@vue-flow/background";
@@ -23,7 +24,7 @@ import { validateRunName, runDisplayName, RUN_NAME_MAX_LENGTH } from "./runHelpe
 const { onNodeClick, onPaneClick, fitView, updateNodeData } = useVueFlow();
 
 const store = useStore();
-const pusher = getCurrentInstance()?.appContext.config.globalProperties.$pusher;
+const realtime = getCurrentInstance()?.appContext.config.globalProperties.$realtime;
 
 /*
   Local State
@@ -51,7 +52,6 @@ const edges = ref([]);
 const isLoading = ref(false);
 const isLoadingMore = ref(false);
 let analyticsChannel = null;
-let analyticsChannelName = null;
 
 // Initiate Workflow dialog state
 const initiateForm = ref({
@@ -593,9 +593,9 @@ const runToNodesAndEdges = (run) => {
 };
 
 /*
-  Pusher event handlers
+  Live-update event handlers
 */
-const parsePusherData = (data) => {
+const parseEventData = (data) => {
   if (typeof data === "string") {
     try { return JSON.parse(data); } catch { return data; }
   }
@@ -603,7 +603,7 @@ const parsePusherData = (data) => {
 };
 
 const onRunStatusUpdate = async (raw) => {
-  const data = parsePusherData(raw);
+  const data = parseEventData(raw);
 
   // Update the run in the instances list
   store.commit("analysisModule/UPDATE_RUN_STATUS", {
@@ -650,7 +650,7 @@ const onRunStatusUpdate = async (raw) => {
 };
 
 const onProcessorStatusUpdate = (raw) => {
-  const data = parsePusherData(raw);
+  const data = parseEventData(raw);
   const currentRunId = selectedWorkflowActivity.value?.uuid;
   if (data.runId !== currentRunId) return;
 
@@ -1640,17 +1640,11 @@ onMounted(async () => {
     isLoading.value = false;
   }
 
-  // Subscribe to Pusher analytics channel for real-time status updates
-  if (pusher) {
-    const rawOrgId = store.state.activeOrganization?.organization?.id;
-    const rawUserId = store.state.profile?.id;
-    const orgUuid = rawOrgId?.replace(/^N:organization:/, '');
-    const userUuid = rawUserId?.replace(/^N:user:/, '');
-    analyticsChannelName = orgUuid
-      ? `organization-${orgUuid}-analytics`
-      : `user-${userUuid}-analytics`;
-
-    analyticsChannel = pusher.subscribe(analyticsChannelName);
+  // Live updates for every run in the workspace (or the user's own runs)
+  if (realtime) {
+    analyticsChannel = realtime.subscribe(
+      runScopeChannel(store.state.activeOrganization?.organization?.id, store.state.profile?.id)
+    );
     store.commit("analysisModule/SET_ANALYTICS_CHANNEL", analyticsChannel);
 
     analyticsChannel.bind("workflow-run-status", onRunStatusUpdate);
@@ -1659,15 +1653,12 @@ onMounted(async () => {
 });
 
 onBeforeUnmount(() => {
-  // Unsubscribe from Pusher analytics channel
+  // Stop live updates
   if (analyticsChannel) {
     analyticsChannel.unbind("workflow-run-status", onRunStatusUpdate);
     analyticsChannel.unbind("workflow-processor-status", onProcessorStatusUpdate);
-    if (pusher && analyticsChannelName) {
-      pusher.unsubscribe(analyticsChannelName);
-    }
+    analyticsChannel.unsubscribe();
     analyticsChannel = null;
-    analyticsChannelName = null;
     store.commit("analysisModule/CLEAR_ANALYTICS_CHANNEL");
   }
 });
