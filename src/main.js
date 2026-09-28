@@ -37,7 +37,7 @@ import { loginQuery } from '@/utils/auth-redirect'
 import { createPinia } from 'pinia'
 import { useDuckDBStore } from '@/stores/duckdbStore'
 
-import Pusher from 'pusher-js'
+import { createRealtime } from '@/realtime'
 
 Amplify.configure(AWSConfig)
 
@@ -95,9 +95,9 @@ app.mount("#app");
 
 app.config.globalProperties.$sanitize = (html, allowedTags=['br']) => striptags(html, allowedTags)
 app.config.globalProperties.$message = ElMessage;
-app.config.globalProperties.$pusher = new Pusher(siteConfig.pusherConfig.appId, {
-    cluster: siteConfig.pusherConfig.region
-});
+// Live updates: the AppSync Event API where the site config has `realtime`,
+// otherwise Pusher (see src/realtime).
+app.config.globalProperties.$realtime = createRealtime(siteConfig);
 
 
 // Top level routes allowList

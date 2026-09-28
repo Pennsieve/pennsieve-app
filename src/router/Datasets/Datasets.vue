@@ -34,6 +34,7 @@ import BfPage from "../../components/layout/BfPage/BfPage.vue";
 import PackageAttachmentWidget from "../../components/datasets/metadata/shared/PackageAttachmentWidget.vue";
 import RecordAttachmentWidget from "../../components/datasets/metadata/shared/RecordAttachmentWidget.vue";
 import { useGetToken } from "@/composables/useGetToken";
+import { datasetChannel } from "@/realtime/channels";
 
 export default {
   name: "BfDatasets",
@@ -129,13 +130,10 @@ export default {
     },
     /**
      * Not sure if this ever is the case but if the datasetID changes,
-     * we should start listening to new pusher channel
+     * we should start listening to the new dataset's channel
      */
     datasetId: function () {
-      this.$pusher.unsubscribe(this.pusherChannelName);
-      this.pusherChannelName = this.datasetId.replace("N:dataset:", "dataset-");
-      const pusherChannel = this.$pusher.subscribe(this.pusherChannelName);
-      this.setPusherChannel(pusherChannel);
+      this.subscribeToDataset();
     },
   },
 
@@ -145,9 +143,7 @@ export default {
       this.getDatasetContributors.bind(this)
     );
 
-    this.pusherChannelName = this.datasetId.replace("N:dataset:", "dataset-");
-    const pusherChannel = this.$pusher.subscribe(this.pusherChannelName);
-    this.setPusherChannel(pusherChannel);
+    this.subscribeToDataset();
 
     try {
       await this.fetchIntegrations();
@@ -161,8 +157,7 @@ export default {
       "get-dataset-contributors",
       this.getDatasetContributors.bind(this)
     );
-    this.$pusher.unsubscribe(this.pusherChannelName);
-    this.pusherChannelName = "";
+    this.unsubscribeFromDataset();
   },
 
   methods: {
@@ -190,7 +185,24 @@ export default {
       "updateScientificUnits",
       "setChangelogText",
     ]),
-    ...mapActions("datasetModule", ["setPusherChannel"]),
+    ...mapActions("datasetModule", ["setRealtimeChannel"]),
+
+    /**
+     * Live updates (upload-event) for this dataset; BfDatasetFiles binds to
+     * the channel through the store.
+     */
+    subscribeToDataset: function () {
+      this.unsubscribeFromDataset();
+      this.realtimeChannel = this.$realtime.subscribe(datasetChannel(this.datasetId));
+      this.setRealtimeChannel(this.realtimeChannel);
+    },
+    unsubscribeFromDataset: function () {
+      if (this.realtimeChannel) {
+        this.realtimeChannel.unsubscribe();
+        this.realtimeChannel = null;
+        this.setRealtimeChannel({});
+      }
+    },
     ...mapActions("integrationsModule", ["fetchIntegrations"]),
 
     // /**

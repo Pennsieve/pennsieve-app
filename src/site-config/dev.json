@@ -36,6 +36,10 @@
       "scope": ["openid"]
     }
   },
+  "realtime": {
+    "httpHost": "h5lgat4ekjddfatguw66vgjhhe.appsync-api.us-east-1.amazonaws.com",
+    "realtimeHost": "h5lgat4ekjddfatguw66vgjhhe.appsync-realtime-api.us-east-1.amazonaws.com"
+  },
   "pusherConfig": {
     "appId": "47a81ebaf87f4c168177",
     "region": "us2"
