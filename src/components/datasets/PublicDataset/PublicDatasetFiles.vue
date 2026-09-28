@@ -67,7 +67,7 @@ import { useGetToken } from "@/composables/useGetToken";
 import { triggerBrowserDownload } from "@/utils/triggerBrowserDownload.js";
 import FilesTable from "@/components/FilesTable/FilesTable.vue";
 import IconUpload from "@/components/icons/IconUpload.vue";
-import * as siteConfig from "@/site-config/site.json";
+import { discoverSharesApi, discoverZipitUrl } from "@/utils/discover";
 
 const props = defineProps({
   dataset: {
@@ -79,7 +79,8 @@ const props = defineProps({
 const store = useReadOnlyDatasetStore();
 const router = useRouter();
 
-const zipitUrl = siteConfig.zipitUrl;
+// zipit's Discover endpoint, on the platform that hosts this Discover.
+const zipitUrl = discoverZipitUrl();
 const zipForm = ref(null);
 const zipData = ref("");
 const filesTable = ref(null);
@@ -205,15 +206,17 @@ const onDownloadSelected = async () => {
 };
 
 const downloadViaZipit = async (selection) => {
-  let token = await useGetToken();
-  if (!token) token = {};
-
   const payload = {
     paths: selection.map((f) => f._path),
     datasetId: props.dataset.id,
     version: props.dataset.version,
-    userToken: token,
   };
+  // Only this platform's zipit may see the user's token (public datasets
+  // need none; it only matters for embargoed ones on the same platform).
+  if (discoverSharesApi()) {
+    const token = await useGetToken();
+    if (token) payload.userToken = token;
+  }
   if (currentPath.value) payload.rootPath = currentPath.value;
 
   zipData.value = JSON.stringify(payload);
