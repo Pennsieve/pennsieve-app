@@ -8,12 +8,12 @@
 # so the lines join with spaces. A literal newline in a value makes Amplify
 # drop the header (the previous version of this file never served its CSP).
 #
-# Report-Only first: violations show in the browser console without breaking
-# anything. Switch the key to Content-Security-Policy once clean.
+# Enforced. A new third party or platform host has to be added here (and to
+# prod's list if prod uses it too), or the browser blocks it.
 customHeaders:
   - pattern: "**"
     headers:
-      - key: "Content-Security-Policy-Report-Only"
+      - key: "Content-Security-Policy"
         value: >-
             default-src
             'self';
