@@ -36,8 +36,8 @@
     }
   },
   "realtime": {
-    "httpHost": "wtgqt5vd7rhdjnapn3d2ixawci.appsync-api.us-east-1.amazonaws.com",
-    "realtimeHost": "wtgqt5vd7rhdjnapn3d2ixawci.appsync-realtime-api.us-east-1.amazonaws.com"
+    "httpHost": "events.pennsieve.ai",
+    "realtimeHost": "events.pennsieve.ai"
   },
   "GitHubAppUrl": "https://github.com/apps/pennsieve/installations/new",
   "reCAPTCHASiteKey": "6Le2Wr0aAAAAAHouFUEmy7UwN6b9wa_PPRGrWxAG",

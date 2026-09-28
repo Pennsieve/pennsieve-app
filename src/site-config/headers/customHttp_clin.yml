@@ -87,7 +87,7 @@ customHeaders:
             https://orthogonal-viewer.pennsieve.net;
             connect-src
             'self'
-            wss://wtgqt5vd7rhdjnapn3d2ixawci.appsync-realtime-api.us-east-1.amazonaws.com
+            wss://events.pennsieve.ai
             https://pub.sandbox.orcid.org
             https://pub.orcid.org
             https://citation.crosscite.org
