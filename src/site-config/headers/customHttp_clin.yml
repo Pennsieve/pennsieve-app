@@ -1,75 +1,93 @@
+# Amplify custom headers for the clin web app (copied to ./customHttp.yml by
+# `npm run site-config-clin`). Prod sets its headers with app-lambda-edge
+# instead; its CSP lists (infrastructure: pennsieve-prod/.../app-lambda-edge)
+# are the reference this policy follows, with the platform hosts on
+# pennsieve.ai and Discover on prod (clin browses the prod catalogue).
+#
+# Every header value must be ONE line: the CSP below is a folded (>-) scalar,
+# so the lines join with spaces. A literal newline in a value makes Amplify
+# drop the header (the previous version of this file never served its CSP).
+#
+# Enforced. A new third party or platform host has to be added here (and to
+# prod's list if prod uses it too), or the browser blocks it.
 customHeaders:
-  # ====================================================================
-  # GLOBAL HEADERS - Applied to all routes
-  # ====================================================================
   - pattern: "**"
     headers:
       - key: "Content-Security-Policy"
-        value: >
-          default-src 'self';
-          script-src 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' 'self' data:
+        value: >-
+            default-src
+            'self';
+            script-src
+            'unsafe-inline'
+            'unsafe-eval'
+            'wasm-unsafe-eval'
+            'self'
+            data:
             https://js.pusher.com
             https://www.gstatic.com
             https://www.google.com/recaptcha/api.js
             https://www.googletagmanager.com
-            https://www.google-analytics.com
             https://maps.googleapis.com
             https://cdn.polyfill.io
             https://polyfill.io
+            https://www.google-analytics.com
             https://bam.nr-data.net
+            https://api.tiles.mapbox.com
             https://code.jquery.com
             https://cdnjs.cloudflare.com
             https://stackpath.bootstrapcdn.com
+            https://cdn.jsdelivr.net/npm/@duckdb/
             https://use.fontawesome.com;
-          style-src 'unsafe-inline' 'self'
+            style-src
+            'unsafe-inline'
+            'self'
             https://fonts.googleapis.com
             https://api.tiles.mapbox.com
             https://stackpath.bootstrapcdn.com;
-          img-src 'self' data: blob:
-            https://pennsieve-clin-prod-dataset-assets-use1.s3.amazonaws.com
-            https://pennsieve-clin-prod-dataset-assets-use1.s3.us-east-1.amazonaws.com
-            https://pennsieve-clin-prod-storage-use1.s3.amazonaws.com
-            https://pennsieve-clin-prod-uploads-use1.s3.us-east-1.amazonaws.com
-            https://prod-rejoin-storage-use1.s3.amazonaws.com
-            https://prod-precision-storage-use1.s3.amazonaws.com
-            https://prd-sparc-storage-use1.s3.amazonaws.com
-            https://api.pennsieve.org
-            https://api2.pennsieve.org
-            https://assets.discover.pennsieve.org
-            https://raw.githubusercontent.com
-            https://*.githubusercontent.com
+            worker-src
+            'self'
+            blob:
+            https://www.youtube.com
+            https://player.vimeo.com
+            https://fast.wistia.net
+            https://cdn.jsdelivr.net/npm/@duckdb/;
+            img-src
+            'self'
+            data:
+            blob:
             https://stats.g.doubleclick.net
             https://maps.gstatic.com
             https://www.google-analytics.com
-            https://heapanalytics.com
             http://gravatar.com
-            https://static.intercomassets.com
-            https://downloads.intercomcdn.com
-            https://uploads.intercomusercontent.com;
-          font-src 'self' data: blob:
+            https://api.pennsieve.ai
+            https://api2.pennsieve.ai
+            https://workspace-assets.pennsieve.ai
+            https://assets.pennsieve.ai
+            https://assets.discover.pennsieve.io
+            https://*.s3.amazonaws.com
+            https://*.s3.us-east-1.amazonaws.com
+            https://*.s3.af-south-1.amazonaws.com
+            https://raw.githubusercontent.com
+            https://*.githubusercontent.com;
+            font-src
+            'self'
+            data:
+            blob:
             https://fonts.gstatic.com;
-          media-src blob:
-            https://pennsieve-clin-prod-storage-use1.s3.amazonaws.com
-            https://pennsieve-clin-prod-uploads-use1.s3.us-east-1.amazonaws.com
-            https://prod-rejoin-storage-use1.s3.amazonaws.com
-            https://prod-precision-storage-use1.s3.amazonaws.com
-            https://prd-sparc-storage-use1.s3.amazonaws.com
-            https://api.pennsieve.org
-            https://api2.pennsieve.org;
-          frame-src 'self'
+            media-src
+            blob:
+            https://api.pennsieve.ai
+            https://api2.pennsieve.ai
+            https://*.s3.amazonaws.com
+            https://*.s3.us-east-1.amazonaws.com
+            https://*.s3.af-south-1.amazonaws.com;
+            frame-src
             https://www.google.com
-            https://api.pennsieve.org
-            https://api2.pennsieve.org
-            https://pennsieve-clin-prod-storage-use1.s3.amazonaws.com
-            https://pennsieve-clin-prod-uploads-use1.s3.us-east-1.amazonaws.com
-            https://prod-rejoin-storage-use1.s3.amazonaws.com
-            https://prod-precision-storage-use1.s3.amazonaws.com
-            https://prd-sparc-storage-use1.s3.amazonaws.com;
-          worker-src 'self' blob:
-            https://www.youtube.com
-            https://player.vimeo.com
-            https://fast.wistia.net;
-          connect-src 'self'
+            https://api.pennsieve.ai
+            https://api2.pennsieve.ai
+            https://orthogonal-viewer.pennsieve.net;
+            connect-src
+            'self'
             wss://*.pusher.com
             https://*.pusher.com
             *.pusherapp.com
@@ -78,64 +96,53 @@ customHeaders:
             https://citation.crosscite.org
             https://data.datacite.org
             https://doi.org
+            https://api.maptiler.com
+            https://maps.tilehosting.com
             https://www.google-analytics.com
-            https://pennsieve-clin-prod-uploads-use1.s3.amazonaws.com
-            https://pennsieve-clin-prod-uploads-use1.s3.us-east-1.amazonaws.com
-            https://pennsieve-clin-prod-storage-use1.s3.amazonaws.com
-            https://pennsieve-clin-prod-dataset-assets-use1.s3.amazonaws.com
-            https://pennsieve-clin-prod-dataset-assets-use1.s3.us-east-1.amazonaws.com
-            https://prod-rejoin-storage-use1.s3.amazonaws.com
-            https://prod-precision-storage-use1.s3.amazonaws.com
-            https://prd-sparc-storage-use1.s3.amazonaws.com
             https://bam.nr-data.net
             https://app.getsentry.com
-            https://maps.tilehosting.com
-            https://api.maptiler.com
-            wss://notifications.pennsieve.org
-            https://streaming.pennsieve.org
-            wss://streaming.pennsieve.org
-            wss://api.pennsieve.org
-            https://api.pennsieve.org
-            https://api2.pennsieve.org
-            https://admin.api.pennsieve.org
-            https://concepts.pennsieve.org
+            https://api.prodpad.com
+            https://api.pennsieve.ai
+            wss://api.pennsieve.ai
+            https://api2.pennsieve.ai
+            wss://chat.pennsieve.ai
+            https://workspace-assets.pennsieve.ai
+            https://assets.pennsieve.ai
+            https://cognito-idp.us-east-1.amazonaws.com
+            https://cognito-identity.us-east-1.amazonaws.com
+            https://pennsieve-clin-users.auth.us-east-1.amazoncognito.com
+            https://api.pennsieve.io
+            https://discover.pennsieve.io
+            https://assets.discover.pennsieve.io
+            https://extensions.duckdb.org
+            https://cdn.jsdelivr.net/npm/@duckdb/
             https://s3.amazonaws.com
-            https://*.compute.pennsieve.net
-            wss://*.compute.pennsieve.net
-            https://*.compute.pennsieve.io
-            wss://*.compute.pennsieve.io
-            https://discover.pennsieve.org;
-          object-src 'self';
-          frame-ancestors 'none';
-          base-uri 'self';
-          form-action 'self';
-
-      # Additional Security Headers
+            https://*.s3.amazonaws.com
+            https://*.s3.us-east-1.amazonaws.com
+            https://*.s3.af-south-1.amazonaws.com
+            https://compute.pennsieve.ai
+            https://*.compute.pennsieve.ai
+            wss://compute.pennsieve.ai
+            wss://*.compute.pennsieve.ai;
+            object-src
+            'self';
+            base-uri
+            'self';
+            form-action
+            'self'
+            https://api.pennsieve.io
+            https://api.pennsieve.ai;
       - key: "X-Frame-Options"
         value: "DENY"
-
       - key: "X-Content-Type-Options"
         value: "nosniff"
-
       - key: "Referrer-Policy"
         value: "strict-origin-when-cross-origin"
-
       - key: "Permissions-Policy"
         value: "camera=(), microphone=(), geolocation=(), payment=()"
-
       - key: "Strict-Transport-Security"
         value: "max-age=31536000; includeSubDomains"
-
-  # ====================================================================
-  # STATIC ASSETS - Performance optimized headers
-  # ====================================================================
   - pattern: "/assets/**"
     headers:
       - key: "Cache-Control"
         value: "public, max-age=11536000, immutable"
-
-      - key: "Content-Security-Policy"
-        value: >
-          default-src 'self';
-          img-src 'self' data: https:;
-          style-src 'self' 'unsafe-inline';
