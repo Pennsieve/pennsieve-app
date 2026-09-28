@@ -3,6 +3,7 @@ import { defineStore } from "pinia";
 import { useGetToken } from "@/composables/useGetToken.js";
 import { useSendXhr } from "@/mixins/request/request_composable.js";
 import * as siteConfig from "@/site-config/site.json";
+import { withDiscoverAuth } from "@/utils/discover";
 
 // Helper function to derive license from datasets
 const deriveLicenseFromDatasets = (datasets) => {
@@ -306,7 +307,10 @@ export const useCollectionsStore = defineStore("collectionsStore", () => {
   const fetchDatasetCollections = async (datasetId) => {
     try {
       const token = await useGetToken();
-      const url = `${siteConfig.discoverUrl}/datasets/${datasetId}/collections?api_key=${token}`;
+      const url = withDiscoverAuth(
+        `${siteConfig.discoverUrl}/datasets/${datasetId}/collections`,
+        token
+      );
       const response = await fetch(url, {
         method: "GET",
         headers: {
@@ -330,7 +334,10 @@ export const useCollectionsStore = defineStore("collectionsStore", () => {
   const addCollection = async ({ datasetId, collectionId }) => {
     try {
       const token = await useGetToken();
-      const url = `${siteConfig.discoverUrl}/datasets/${datasetId}/collections?api_key=${token}`;
+      const url = withDiscoverAuth(
+        `${siteConfig.discoverUrl}/datasets/${datasetId}/collections`,
+        token
+      );
       const response = await fetch(url, {
         method: "PUT",
         headers: {
@@ -355,7 +362,10 @@ export const useCollectionsStore = defineStore("collectionsStore", () => {
   const removeCollection = async ({ datasetId, collectionId }) => {
     try {
       const token = await useGetToken();
-      const url = `${siteConfig.discoverUrl}/datasets/${datasetId}/collections/${collectionId}?api_key=${token}`;
+      const url = withDiscoverAuth(
+        `${siteConfig.discoverUrl}/datasets/${datasetId}/collections/${collectionId}`,
+        token
+      );
       const response = await fetch(url, {
         method: "DELETE",
         headers: {
@@ -451,11 +461,10 @@ export const useCollectionsStore = defineStore("collectionsStore", () => {
   const searchDatasets = async (query, limit = 25, offset = 0) => {
     try {
       const token = await useGetToken();
-      const url = `${
-        siteConfig.discoverUrl
-      }/search/datasets?limit=${limit}&offset=${offset}&query=${encodeURIComponent(
-        query
-      )}&api_key=${token}`;
+      const url = withDiscoverAuth(
+        `${siteConfig.discoverUrl}/search/datasets?limit=${limit}&offset=${offset}&query=${encodeURIComponent(query)}`,
+        token
+      );
       const response = await useSendXhr(url, {
         method: "GET",
         header: {
