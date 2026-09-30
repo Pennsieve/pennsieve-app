@@ -6,13 +6,15 @@ vi.mock('@/utils/downloadService', () => ({
 }))
 vi.mock('@/utils/triggerBrowserDownload', () => ({ triggerBrowserDownload: vi.fn() }))
 vi.mock('@/composables/useGetToken', () => ({ useGetToken: vi.fn(() => Promise.resolve('tok')) }))
+const start = vi.fn()
+vi.mock('@/stores/downloadsStore', () => ({ useDownloadsStore: () => ({ start }) }))
 
 import BfDownloadFile from './BfDownloadFile.vue'
 import { downloadServiceUrl, getFileUrl } from '@/utils/downloadService'
 import { triggerBrowserDownload } from '@/utils/triggerBrowserDownload'
 import EventBus from '@/utils/event-bus'
 
-const { tryDirectDownload, downloadViaService } = BfDownloadFile.methods
+const { tryDirectDownload, downloadViaService, downloadPackages, archiveViaService } = BfDownloadFile.methods
 
 const pkg = {
   content: {
@@ -95,5 +97,50 @@ describe('BfDownloadFile single-file downloads', () => {
     expect(await tryDirectDownload.call(cmp)).toBe(false)
     expect(getFileUrl).not.toHaveBeenCalled()
     expect(cmp.sendXhr).toHaveBeenCalled()
+  })
+})
+
+describe('BfDownloadFile archives', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    downloadServiceUrl.mockReturnValue('https://api2.pennsieve.net/downloads')
+  })
+
+  function archiving(overrides = {}) {
+    return component({ archiveName: 'my-study', archiveViaService, ...overrides })
+  }
+
+  it('asks download-service for an archive instead of posting to zipit', async () => {
+    start.mockResolvedValue({ id: 'd1' })
+    const cmp = archiving({ packageDTOs: [pkg, pkg] })
+    downloadPackages.call(cmp, ['N:package:1', 'N:package:2'])
+    await vi.waitFor(() => expect(start).toHaveBeenCalled())
+    expect(start).toHaveBeenCalledWith({
+      datasetId: 'N:dataset:1', nodeIds: ['N:package:1', 'N:package:2'], fileIds: undefined, archiveName: 'my-study',
+    })
+  })
+
+  it('names a single folder or package after itself, and passes picked files', async () => {
+    start.mockResolvedValue({ id: 'd1' })
+    const folder = { content: { ...pkg.content, name: 'study', packageType: 'Collection' } }
+    await archiveViaService.call(archiving({ packageDTOs: [folder] }), ['N:collection:1'], [4, 5])
+    expect(start.mock.calls[0][0]).toMatchObject({ nodeIds: ['N:collection:1'], fileIds: [4, 5], archiveName: 'study' })
+  })
+
+  it("shows the service's reason when it refuses, such as a selection that's too large", async () => {
+    const emit = vi.spyOn(EventBus, '$emit')
+    start.mockRejectedValue(new ServiceError(413, 'this selection is too large to download as one archive; select fewer files or use the Pennsieve agent'))
+    await archiveViaService.call(archiving(), ['N:collection:1'])
+    expect(emit.mock.calls[0][1].detail).toEqual({
+      type: 'error',
+      msg: 'This selection is too large to download as one archive; select fewer files or use the Pennsieve agent',
+    })
+  })
+
+  it('keeps a server error generic', async () => {
+    const emit = vi.spyOn(EventBus, '$emit')
+    start.mockRejectedValue(new ServiceError(500, 'could not prepare the download'))
+    await archiveViaService.call(archiving(), ['N:collection:1'])
+    expect(emit.mock.calls[0][1].detail.msg).toBe("The download couldn't be started. Try again.")
   })
 })
