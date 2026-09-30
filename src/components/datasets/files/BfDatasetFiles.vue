@@ -286,6 +286,7 @@ import IconUpload from "../../icons/IconUpload.vue";
 import PsButtonDropdown from "@/components/shared/ps-button-dropdown/PsButtonDropdown.vue";
 import IconAnnotation from "@/components/icons/IconAnnotation.vue";
 import { useGetToken } from "@/composables/useGetToken";
+import { downloadServiceUrl, getFileUrl } from "@/utils/downloadService";
 import { useSendXhr } from "@/mixins/request/request_composable";
 import debounce from "lodash.debounce";
 
@@ -1592,6 +1593,10 @@ export default {
      * @param {Object} file
      */
     getPresignedUrl: function (file) {
+      if (downloadServiceUrl()) {
+        this.copyLinkViaService(file);
+        return;
+      }
       const packageId = pathOr("", ["content", "id"], file);
 
       // Get the files for the package
@@ -1651,6 +1656,40 @@ export default {
           });
       });
     },
+    /**
+     * Copies a download-service link to the file. The service signs it,
+     * records it as a download, and refuses packages with several files.
+     * @param {Object} file
+     */
+    copyLinkViaService: async function (file) {
+      const content = file.content || {};
+      const toast = (type, msg) => EventBus.$emit("toast", { detail: { type, msg } });
+      let link;
+      try {
+        link = await getFileUrl({
+          datasetId: content.datasetNodeId || this.$route.params.datasetId,
+          packageId: content.nodeId || content.id,
+        });
+      } catch (e) {
+        if (e.status === 400) {
+          toast("info", "This package has several files. Download it to get all of them.");
+        } else {
+          toast("error", "Unable to create a link to this file");
+        }
+        return;
+      }
+      copyText(link.url, undefined, (error) => {
+        if (error) {
+          toast("error", "Unable to copy to clipboard");
+        } else {
+          const minutes = Math.round((Date.parse(link.expiresAt) - Date.now()) / 60000);
+          toast("success", minutes > 0
+            ? `Link to file copied to clipboard. It works for ${minutes} minutes.`
+            : "Link to file copied to clipboard");
+        }
+      });
+    },
+
     handleRouteChange: function (to, from) {
       const DATASET_FILES_ROUTES = [
         "dataset-files",
