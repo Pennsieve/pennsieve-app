@@ -52,6 +52,7 @@ const DatasetPermissionsHeader = () => import('./Dataset/DatasetPermissionsHeade
 const DatasetPermissions = () => import('../components/datasets/DatasetPermissions/DatasetPermissions.vue')
 const EmbargoedPermissions = () => import('../components/datasets/DatasetPermissions/EmbargoedPermissions/EmbargoedPermissions.vue')
 const DatasetIntegrationsSettings = () => import('../components/datasets/settings/DatasetIntegrationsSettings.vue')
+const DatasetNotificationSubscriptions = () => import('../components/notifications/NotificationSubscriptions.vue')
 
 /**
  * ORCIDRedirect
@@ -1173,6 +1174,16 @@ const router = createRouter({
               },
               props: {
                 stage: true
+              }
+            },
+            {
+              name: 'dataset-notifications-settings',
+              path: 'notifications',
+              components: {
+                stage: DatasetNotificationSubscriptions
+              },
+              props: {
+                stage: () => ({ scope: 'dataset' })
               }
             },
           ]

@@ -56,8 +56,16 @@ import {
   fetchTopics,
   fetchSubscriptions,
   subscribe,
-  unsubscribe,
+  toggleSubscription,
 } from '@/composables/useNotifications'
+
+const props = defineProps({
+  scope: {
+    type: String,
+    default: 'org',
+    validator: (v) => ['org', 'dataset'].includes(v),
+  },
+})
 
 const route = useRoute()
 
@@ -67,7 +75,7 @@ const subscriptions = ref([])
 
 function isSubscribed(topicId, channel) {
   return subscriptions.value.some(
-    (s) => s.topic_id === topicId && s.context?.channel === channel
+    (s) => s.topic_id === topicId && s.context?.channel === channel && s.enabled !== false
   )
 }
 
@@ -77,23 +85,29 @@ function findSubscription(topicId, channel) {
   )
 }
 
+function buildContext(channel) {
+  const ctx = { channel, organizationId: route.params.orgId }
+  if (props.scope === 'dataset') {
+    ctx.datasetId = route.params.datasetId
+  }
+  return ctx
+}
+
 async function handleToggle(topicId, channel, enabled) {
-  const orgId = route.params.orgId
+  const context = buildContext(channel)
 
   if (enabled) {
-    // Optimistic update
-    const tempSub = { id: `temp-${Date.now()}`, topic_id: topicId, context: { channel, organizationId: orgId } }
+    // POST upserts — creates or re-enables
+    const tempSub = { id: `temp-${Date.now()}`, topic_id: topicId, enabled: true, context }
     subscriptions.value.push(tempSub)
 
     try {
-      const created = await subscribe(topicId, { channel, organizationId: orgId })
-      // Replace temp with real subscription
+      const created = await subscribe(topicId, context)
       const idx = subscriptions.value.indexOf(tempSub)
       if (idx !== -1) {
         subscriptions.value.splice(idx, 1, created)
       }
     } catch {
-      // Rollback
       const idx = subscriptions.value.indexOf(tempSub)
       if (idx !== -1) subscriptions.value.splice(idx, 1)
       ElMessage.error('Failed to subscribe. Please try again.')
@@ -102,16 +116,13 @@ async function handleToggle(topicId, channel, enabled) {
     const existing = findSubscription(topicId, channel)
     if (!existing) return
 
-    // Optimistic remove
-    const idx = subscriptions.value.indexOf(existing)
-    subscriptions.value.splice(idx, 1)
+    existing.enabled = false
 
     try {
-      await unsubscribe(existing.subscription_id)
+      await toggleSubscription(existing.subscription_id, false)
     } catch {
-      // Rollback
-      subscriptions.value.splice(idx, 0, existing)
-      ElMessage.error('Failed to unsubscribe. Please try again.')
+      existing.enabled = true
+      ElMessage.error('Failed to disable subscription. Please try again.')
     }
   }
 }
@@ -123,7 +134,10 @@ onMounted(async () => {
       fetchTopics(),
       fetchSubscriptions(),
     ])
-    topics.value = topicsData
+    const requiresDataset = (t) => (t.context?.required ?? []).includes('datasetId')
+    topics.value = props.scope === 'dataset'
+      ? topicsData.filter(requiresDataset)
+      : topicsData.filter((t) => !requiresDataset(t))
     subscriptions.value = subsData
   } catch {
     ElMessage.error('Failed to load notification preferences.')
