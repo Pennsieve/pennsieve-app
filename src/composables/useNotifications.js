@@ -1,12 +1,13 @@
 // Notification subscriptions API layer.
 //
 // BE endpoints (api2):
-//   GET    /integration/notification/topics
-//   GET    /integration/notification/subscriptions
-//   POST   /integration/notification/subscriptions/{topicId}  — body: { context: { channel, organizationId } }
-//   DELETE /integration/notification/subscriptions/{topicId}
-//   GET    /integration/notification/messages              — all notifications for the user
+//   GET    /notification/topics
+//   GET    /notification/subscriptions
+//   POST   /notification/topic/{topicId}/subscription  — body: { context: { channel, organizationId } }
+//   PATCH  /notification/subscription/{subscriptionId} — body: { enabled: boolean }
+//   GET    /notification/messages                      — all notifications for the user
 //
+// Subscriptions are disabled rather than deleted (history is kept).
 // Subscriptions returned from the BE nest channel info under `context`:
 //   { subscription_id, topic_id, context: { channel: "email" | "in-app", organizationId } }
 
@@ -14,7 +15,7 @@ import * as siteConfig from '@/site-config/site.json'
 import { useGetToken } from '@/composables/useGetToken'
 import { useSendXhr } from '@/mixins/request/request_composable'
 
-const BASE_URL = `${siteConfig.api2Url}/integration/notification`
+const BASE_URL = `${siteConfig.api2Url}/notification`
 
 async function authHeader() {
   const token = await useGetToken()
@@ -33,18 +34,19 @@ export async function fetchSubscriptions() {
 
 export async function subscribe(topicId, context) {
   const header = await authHeader()
-  return useSendXhr(`${BASE_URL}/subscriptions/${topicId}`, {
+  return useSendXhr(`${BASE_URL}/topic/${topicId}/subscription`, {
     method: 'POST',
     header,
     body: { context },
   })
 }
 
-export async function unsubscribe(subscriptionId) {
+export async function toggleSubscription(subscriptionId, enabled) {
   const header = await authHeader()
-  return useSendXhr(`${BASE_URL}/subscriptions/${subscriptionId}`, {
-    method: 'DELETE',
+  return useSendXhr(`${BASE_URL}/subscription/${subscriptionId}`, {
+    method: 'PATCH',
     header,
+    body: { enabled },
   })
 }
 
