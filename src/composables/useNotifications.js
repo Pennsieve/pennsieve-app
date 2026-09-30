@@ -5,6 +5,7 @@
 //   GET    /integration/notification/subscriptions
 //   POST   /integration/notification/subscriptions/{topicId}  — body: { context: { channel, organizationId } }
 //   DELETE /integration/notification/subscriptions/{topicId}
+//   GET    /integration/notification/messages              — all notifications for the user
 //
 // Subscriptions returned from the BE nest channel info under `context`:
 //   { subscription_id, topic_id, context: { channel: "email" | "in-app", organizationId } }
@@ -72,9 +73,9 @@ export async function patchNotificationsLastSeen(userId, currentPrefs) {
   })
 }
 
-export async function fetchNotificationsByTopic(topicId, limit = 10) {
+export async function fetchNotificationMessages({ offset = 0, limit = 50 } = {}) {
   const header = await authHeader()
-  return useSendXhr(`${BASE_URL}/${topicId}/notifications?limit=${limit}`, {
+  return useSendXhr(`${BASE_URL}/messages?offset=${offset}&limit=${limit}`, {
     header,
   })
 }
