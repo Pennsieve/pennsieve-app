@@ -2,7 +2,7 @@
   <div class="bf-navigation-tertiary">
     <downloads-nav-button
       v-if="showDownloads"
-      :condensed="primaryNavCondensed"
+      :condensed="railCondensed"
       :style-color="navStyleColor"
     />
 
@@ -120,7 +120,14 @@
         'pageNotFound',
         'activeOrganization',
         'primaryNavCondensed',
+        'secondaryNavOpen',
       ]),
+      // The same rule as BfNavigation's condensed class: the rail is narrow
+      // whenever a secondary nav is open (the dataset view), not only when
+      // the primary nav is collapsed.
+      railCondensed: function() {
+        return this.primaryNavCondensed || this.pageNotFound || this.secondaryNavOpen
+      },
       /**
        * Compute active organization id
        * @returns {String}

@@ -16,9 +16,13 @@
     >
       <div class="svg-icon svg-fill icon-main">
         <IconDirectDownload :width="20" :height="20" color="currentColor" />
+        <!-- Collapsed: on the icon's corner, inside the narrow rail. -->
+        <span v-if="condensed && store.attentionCount" class="nav-badge on-icon">
+          {{ store.attentionCount }}
+        </span>
       </div>
       <span v-if="!condensed" class="label">{{ label }}</span>
-      <span v-if="store.attentionCount" class="nav-badge" :class="{ condensed }">
+      <span v-if="!condensed && store.attentionCount" class="nav-badge">
         {{ store.attentionCount }}
       </span>
     </button>
@@ -55,6 +59,11 @@ const label = "Downloads";
   .label {
     flex: 1;
   }
+
+  .icon-main {
+    position: relative;
+    overflow: visible;
+  }
 }
 
 .nav-badge {
@@ -62,17 +71,28 @@ const label = "Downloads";
   min-width: 18px;
   padding: 0 5px;
   border-radius: 9px;
-  background: theme.$red_1;
+  // A count, not a warning: the brand navy, outlined so it shows on every
+  // workspace's rail colour.
+  background: theme.$purple_3;
   color: theme.$white;
+  box-shadow: 0 0 0 1px theme.$white;
   font-size: 11px;
   font-weight: 600;
   line-height: 18px;
   text-align: center;
 
-  &.condensed {
+  // Just off the icon's top-right corner (the icon is 20px), still inside
+  // the collapsed rail.
+  &.on-icon {
     position: absolute;
-    top: 8px;
-    left: 34px;
+    top: -11px;
+    left: 13px;
+    min-width: 15px;
+    padding: 0 4px;
+    font-size: 9px;
+    line-height: 15px;
+    border-radius: 8px;
+    pointer-events: none;
   }
 }
 </style>

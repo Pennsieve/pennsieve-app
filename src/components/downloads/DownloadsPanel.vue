@@ -22,7 +22,7 @@
     </div>
     <div v-if="!collapsed" class="items">
       <download-item v-for="d in recent" :key="d.id" :download="d" />
-      <p class="hint">You can keep working or leave. If you leave, we'll email you when it's ready.</p>
+      <p v-if="store.active.length" class="hint">We'll email you if you leave before it's ready.</p>
     </div>
   </div>
 </template>
@@ -71,8 +71,7 @@ const title = computed(() => {
   max-width: calc(100vw - 32px);
   background: theme.$white;
   border: 1px solid theme.$gray_2;
-  border-radius: 6px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 
   .header {
     display: flex;
@@ -116,7 +115,10 @@ const title = computed(() => {
   .hint {
     color: theme.$gray_4;
     font-size: 12px;
-    margin: 4px 0 4px;
+    margin: 0 0 8px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 }
 </style>
