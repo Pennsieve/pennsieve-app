@@ -64,3 +64,40 @@ export function getFileUrl({ datasetId, packageId, fileId, purpose = 'download' 
   if (fileId) body.fileId = fileId
   return downloadServiceRequest('/files/url', { ...options, method: 'POST', datasetId, body })
 }
+
+// Archives: a selection zipped by the service, fetched when ready. Records
+// carry id, status (QUEUED, RUNNING, READY, FAILED, CANCELLED), archiveName,
+// fileCount, totalBytes, filesDone, bytesDone, datasetNodeId, error and
+// expiresAt.
+
+// notify: 'auto' emails the requester only if they aren't watching when it
+// finishes; 'email' always; 'none' never.
+export function createArchive({ datasetId, nodeIds, fileIds, archiveName, notify = 'auto' }, options = {}) {
+  const body = { nodeIds, notify }
+  if (fileIds?.length) body.fileIds = fileIds
+  if (archiveName) body.archiveName = archiveName
+  return downloadServiceRequest('/archives', { ...options, method: 'POST', datasetId, body })
+}
+
+// Polling an active archive also tells the service the requester is
+// watching, so it skips the email.
+export function getArchive(id, options = {}) {
+  return downloadServiceRequest(`/archives/${encodeURIComponent(id)}`, options)
+}
+
+export async function listArchives(options = {}) {
+  const data = await downloadServiceRequest('/archives', options)
+  return data.downloads || []
+}
+
+// A fresh signed link to a finished archive. The dataset lets the service
+// check the requester can still see it.
+export function getArchiveUrl({ id, datasetId }, options = {}) {
+  return downloadServiceRequest(`/archives/${encodeURIComponent(id)}/url`, { ...options, datasetId })
+}
+
+// Cancels an active archive (resolving to its CANCELLED record), or deletes
+// a finished one (resolving to {}).
+export function deleteArchive(id, options = {}) {
+  return downloadServiceRequest(`/archives/${encodeURIComponent(id)}`, { ...options, method: 'DELETE' })
+}
