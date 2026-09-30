@@ -14,17 +14,18 @@
         No notifications yet
       </div>
 
-      <ul v-else class="notification-list">
+      <ul v-else class="notification-list" @scroll="onListScroll">
         <li
           v-for="n in notifications"
-          :key="n.id"
+          :key="n.notification_id"
           class="notification-item"
           :class="{ unread: isUnread(n) }"
         >
-          <div class="notification-title">{{ n.title || n.topic_name || 'Notification' }}</div>
-          <div class="notification-message">{{ n.message || n.body || '' }}</div>
+          <div class="notification-title">{{ n.title }}</div>
+          <div class="notification-message">{{ n.message }}</div>
           <div class="notification-time">{{ relativeTime(n.created_at) }}</div>
         </li>
+        <li v-if="loadingMore" class="notification-loading">Loading...</li>
       </ul>
     </div>
   </div>
@@ -33,7 +34,6 @@
 <script>
 import { mapState, mapGetters } from 'vuex'
 import IconNotifications from '../icons/IconNotifications.vue'
-import { fetchSubscriptions } from '@/composables/useNotifications'
 
 export default {
   name: 'NotificationBell',
@@ -44,13 +44,14 @@ export default {
     return {
       open: false,
       pusherChannel: null,
+      loadingMore: false,
     }
   },
 
   computed: {
     ...mapState(['profile']),
     ...mapState('notificationModule', ['notifications']),
-    ...mapGetters('notificationModule', ['hasUnreadNotifications', 'unreadCount']),
+    ...mapGetters('notificationModule', ['hasUnreadNotifications', 'unreadCount', 'hasMoreNotifications']),
 
     displayCount() {
       return this.unreadCount > 99 ? '99+' : this.unreadCount
@@ -96,15 +97,9 @@ export default {
 
     async loadInitialNotifications() {
       try {
-        const subscriptions = await fetchSubscriptions()
-        if (Array.isArray(subscriptions) && subscriptions.length > 0) {
-          const firstTopicId = subscriptions[0].topic_id
-          await this.$store.dispatch('notificationModule/fetchNotifications', {
-            topicId: firstTopicId,
-          })
-        }
+        await this.$store.dispatch('notificationModule/fetchNotifications')
       } catch (e) {
-        // Subscriptions may not exist yet — that's fine
+        // Notifications may not exist yet — that's fine
       }
     },
 
@@ -116,6 +111,20 @@ export default {
 
     onPushNotification(data) {
       this.$store.commit('notificationModule/ADD_NOTIFICATION', data)
+    },
+
+    async onListScroll(e) {
+      const el = e.target
+      const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 50
+      if (!nearBottom || !this.hasMoreNotifications || this.loadingMore) return
+
+      this.loadingMore = true
+      const nextOffset = this.notifications.length
+      try {
+        await this.$store.dispatch('notificationModule/fetchNotifications', { offset: nextOffset })
+      } finally {
+        this.loadingMore = false
+      }
     },
   },
 
@@ -184,7 +193,8 @@ export default {
   margin-top: 8px;
   width: 320px;
   max-height: 420px;
-  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
   background: theme.$white;
   border: 1px solid theme.$gray_2;
   border-radius: 4px;
@@ -213,6 +223,8 @@ export default {
   list-style: none;
   margin: 0;
   padding: 0;
+  overflow-y: auto;
+  flex: 1;
 }
 
 .notification-item {
@@ -246,5 +258,12 @@ export default {
   font-size: 11px;
   color: theme.$gray_3;
   margin-top: 4px;
+}
+
+.notification-loading {
+  padding: 8px 16px;
+  text-align: center;
+  font-size: 12px;
+  color: theme.$gray_3;
 }
 </style>

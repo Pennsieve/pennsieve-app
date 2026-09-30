@@ -2,13 +2,14 @@ import {
   fetchUserNotificationPrefs,
   initUserNotificationPrefs,
   patchNotificationsLastSeen,
-  fetchNotificationsByTopic,
+  fetchNotificationMessages,
 } from '@/composables/useNotifications'
 
 const initialState = () => ({
   userNotificationPrefs: {},
   notifications: [],
   notificationsLastSeen: null,
+  totalCount: 0,
 })
 
 export const state = initialState()
@@ -26,8 +27,14 @@ export const mutations = {
     }
   },
 
-  SET_NOTIFICATIONS(state, notifications) {
+  SET_NOTIFICATIONS(state, { notifications, totalCount }) {
     state.notifications = notifications
+    state.totalCount = totalCount
+  },
+
+  APPEND_NOTIFICATIONS(state, { notifications, totalCount }) {
+    state.notifications = state.notifications.concat(notifications)
+    state.totalCount = totalCount
   },
 
   SET_NOTIFICATIONS_LAST_SEEN_AT(state, timestamp) {
@@ -36,6 +43,7 @@ export const mutations = {
 
   ADD_NOTIFICATION(state, notification) {
     state.notifications.unshift(notification)
+    state.totalCount += 1
   },
 }
 
@@ -78,11 +86,18 @@ export const actions = {
     }
   },
 
-  async fetchNotifications({ commit }, { topicId }) {
+  async fetchNotifications({ commit }, { offset = 0, limit = 50 } = {}) {
     try {
-      const data = await fetchNotificationsByTopic(topicId)
-      const list = Array.isArray(data) ? data : (data?.notifications ?? [])
-      commit('SET_NOTIFICATIONS', list)
+      const data = await fetchNotificationMessages({ offset, limit })
+      const list = Array.isArray(data) ? data : (data?.messages ?? [])
+      const totalCount = data?.totalCount ?? list.length
+
+      if (offset === 0) {
+        commit('SET_NOTIFICATIONS', { notifications: list, totalCount })
+      } else {
+        commit('APPEND_NOTIFICATIONS', { notifications: list, totalCount })
+      }
+
       return list
     } catch (e) {
       return []
@@ -92,9 +107,8 @@ export const actions = {
 
 export const getters = {
   hasUnreadNotifications(state) {
-    if (!state.notificationsLastSeen || state.notifications.length === 0) {
-      return false
-    }
+    if (state.notifications.length === 0) return false
+    if (!state.notificationsLastSeen) return true
     const lastSeen = new Date(state.notificationsLastSeen).getTime()
     return state.notifications.some(
       n => new Date(n.created_at).getTime() > lastSeen
@@ -107,6 +121,10 @@ export const getters = {
     return state.notifications.filter(
       n => new Date(n.created_at).getTime() > lastSeen
     ).length
+  },
+
+  hasMoreNotifications(state) {
+    return state.notifications.length < state.totalCount
   },
 }
 
