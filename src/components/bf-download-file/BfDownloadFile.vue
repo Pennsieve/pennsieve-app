@@ -85,6 +85,8 @@ import Sorter from "../../mixins/sorter";
 import IconXCircle from "../icons/IconXCircle.vue";
 import { useGetToken } from "@/composables/useGetToken";
 import EventBus from "../../utils/event-bus";
+import { downloadServiceUrl, getFileUrl } from "@/utils/downloadService";
+import { triggerBrowserDownload } from "@/utils/triggerBrowserDownload";
 
 const DEFAULT_ARCHIVE_NAME = "pennsieve-data";
 
@@ -292,6 +294,7 @@ export default {
       if (pathOr("", ["content", "packageType"], pkg) === "Collection") {
         return false;
       }
+      if (downloadServiceUrl()) return this.downloadViaService(pkg);
       const packageId = pathOr("", ["content", "id"], pkg);
       if (!packageId) return false;
 
@@ -336,6 +339,42 @@ export default {
         document.body.removeChild(a);
         return true;
       } catch (e) {
+        return false;
+      }
+    },
+
+    /**
+     * Downloads a one-file selection through download-service, which signs
+     * the link and records the download. Returns false when the selection
+     * isn't one file (a package with several files and none picked, which
+     * the service answers with a 400), so the multi-file path runs instead.
+     * A refusal (malware scan, no access) is shown, not retried as a zip.
+     */
+    downloadViaService: async function (pkg) {
+      let fileId;
+      if (this.fileDTOs) {
+        if (this.fileDTOs.length !== 1) return false;
+        fileId = this.fileDTOs[0].id;
+      }
+      const content = pkg.content || {};
+      try {
+        const link = await getFileUrl({
+          datasetId: content.datasetNodeId || this.$route?.params?.datasetId,
+          packageId: content.nodeId || content.id,
+          fileId,
+        });
+        triggerBrowserDownload(link.url);
+        return true;
+      } catch (e) {
+        if (e.status === 403) {
+          EventBus.$emit("toast", {
+            detail: {
+              type: "error",
+              msg: e.message.charAt(0).toUpperCase() + e.message.slice(1),
+            },
+          });
+          return true;
+        }
         return false;
       }
     },
