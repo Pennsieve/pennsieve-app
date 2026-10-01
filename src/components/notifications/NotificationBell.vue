@@ -45,6 +45,7 @@ export default {
       open: false,
       pusherChannel: null,
       loadingMore: false,
+      lastSeenSnapshot: null,
     }
   },
 
@@ -61,15 +62,18 @@ export default {
   methods: {
     toggleDropdown() {
       this.open = !this.open
-      if (this.open && this.profile.intId) {
-        this.$store.dispatch('notificationModule/updateNotificationsLastSeen', {
-          intId: this.profile.intId,
-        })
+      if (this.open) {
+        this.lastSeenSnapshot = this.$store.state.notificationModule.notificationsLastSeen
+        if (this.profile.intId) {
+          this.$store.dispatch('notificationModule/updateNotificationsLastSeen', {
+            intId: this.profile.intId,
+          })
+        }
       }
     },
 
     isUnread(notification) {
-      const lastSeen = this.$store.state.notificationModule.notificationsLastSeen
+      const lastSeen = this.lastSeenSnapshot
       if (!lastSeen) return true
       return new Date(notification.created_at).getTime() > new Date(lastSeen).getTime()
     },
@@ -90,9 +94,9 @@ export default {
     },
 
     onClickOutside(e) {
-      if (this.$refs.bellRef && !this.$refs.bellRef.contains(e.target)) {
-        this.open = false
-      }
+      if (!this.$refs.bellRef) return
+      if (this.$refs.bellRef.contains(e.target)) return
+      this.open = false
     },
 
     async loadInitialNotifications() {
@@ -121,7 +125,10 @@ export default {
       this.loadingMore = true
       const nextOffset = this.notifications.length
       try {
-        await this.$store.dispatch('notificationModule/fetchNotifications', { offset: nextOffset })
+        const [list] = await Promise.all([
+          this.$store.dispatch('notificationModule/fetchNotifications', { offset: nextOffset }),
+          new Promise((r) => setTimeout(r, 1500)),
+        ])
       } finally {
         this.loadingMore = false
       }
@@ -129,13 +136,13 @@ export default {
   },
 
   async mounted() {
-    document.addEventListener('click', this.onClickOutside)
+    document.addEventListener('mousedown', this.onClickOutside)
     await this.loadInitialNotifications()
     this.subscribeToPusher()
   },
 
   beforeUnmount() {
-    document.removeEventListener('click', this.onClickOutside)
+    document.removeEventListener('mousedown', this.onClickOutside)
     if (this.pusherChannel) {
       this.pusherChannel.unbind('notification-event')
       this.$pusher.unsubscribe(this.pusherChannel.name)

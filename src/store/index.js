@@ -682,7 +682,6 @@ export const actions = {
     commit("viewerModule/CLEAR_STATE");
     commit("datasetModule/CLEAR_STATE");
     commit("analysisModule/CLEAR_STATE");
-    commit("notificationModule/CLEAR_STATE");
   },
   updateCurDataset: ({ commit }, evt) =>
       commit("UPDATE_CUR_DATASET", getDataset(evt)),
