@@ -132,8 +132,9 @@ export const useDownloadsStore = defineStore("downloads", () => {
 
   // Loads a workspace's archives. The service lists the token's workspace;
   // right after a switch its cached authorization can still answer for the
-  // previous one, so the list is filtered too. Brings the panel back if
-  // anything needs attention, e.g. after a reload.
+  // previous one, so the list is filtered too. The panel stays as it is:
+  // after a reload the navigation's Downloads item and its badge show what
+  // needs attention, and opening the panel is the user's call.
   async function load(organizationNodeId) {
     const list = await listArchives();
     // Records without organizationNodeId (older service versions) are kept:
@@ -142,7 +143,6 @@ export const useDownloadsStore = defineStore("downloads", () => {
       ? list.filter((d) => !d.organizationNodeId || d.organizationNodeId === organizationNodeId)
       : list;
     loaded.value = true;
-    if (attentionCount.value) panelOpen.value = true;
     schedule();
   }
 
