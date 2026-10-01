@@ -12,6 +12,7 @@ vi.mock("@/utils/downloadService", () => ({
 }));
 
 import DownloadsPanel from "./DownloadsPanel.vue";
+import { useDownloadsStore } from "@/stores/downloadsStore";
 import { listArchives } from "@/utils/downloadService";
 
 const org = (id) => ({ organization: { id } });
@@ -34,14 +35,18 @@ describe("DownloadsPanel", () => {
     localStorage.clear();
   });
 
-  it("loads the workspace's downloads on start, so a reload brings a build in progress back", async () => {
+  it("loads the workspace's downloads on start, but stays closed until opened", async () => {
     listArchives.mockResolvedValue([
       { id: "d1", status: "RUNNING", fileCount: 3, filesDone: 1 },
     ]);
     const { wrapper } = mountPanel(org("N:organization:1"));
     await flushPromises();
     expect(listArchives).toHaveBeenCalledTimes(1);
-    expect(wrapper.find(".downloads-panel").exists()).toBe(true);
+    expect(wrapper.find(".downloads-panel").exists(), "a reload shows only the navigation item").toBe(false);
+
+    useDownloadsStore().panelOpen = true;
+    await flushPromises();
+    expect(wrapper.find(".downloads-panel").exists(), "a build in progress is there once opened").toBe(true);
   });
 
   it("waits for a workspace, and reloads when it changes", async () => {

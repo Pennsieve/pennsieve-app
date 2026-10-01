@@ -38,7 +38,7 @@ describe('clin custom headers', () => {
   it('lets the app reach every endpoint in its site config', () => {
     const connect = directive('connect-src')
     const endpoints = [
-      clin.apiUrl, clin.api2Url, clin.zipitUrl, clin.discoverUrl, clin.discoverZipitUrl,
+      clin.apiUrl, clin.api2Url, clin.downloadServiceUrl, clin.zipitUrl, clin.discoverUrl, clin.discoverZipitUrl,
       clin.timeSeriesUrl, clin.timeSeriesApi, clin.conceptsUrl, clin.bucket,
       `https://${clin.awsConfig.oauth.domain}`,
     ].filter(Boolean)

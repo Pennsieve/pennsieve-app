@@ -117,7 +117,7 @@ describe("downloads store", () => {
     getArchiveUrl.mockResolvedValue({ url: "https://s3/zip" });
     await store.load();
     expect(store.attentionCount).toBe(2);
-    expect(store.panelOpen).toBe(true);
+    expect(store.panelOpen, "loading never opens the panel").toBe(false);
 
     await store.download(store.downloads.find((d) => d.id === "b"));
     expect(store.attentionCount).toBe(1);
@@ -139,7 +139,7 @@ describe("downloads store", () => {
     expect(store.panelDownloads.map((d) => d.id)).toEqual(["new", "old", "building"]);
   });
 
-  it("after a reload, brings back ready archives that weren't downloaded", async () => {
+  it("after a reload, keeps ready archives that weren't downloaded, without opening the panel", async () => {
     localStorage.setItem("pennsieve.downloads.fetched", JSON.stringify(["done"]));
     const store = useDownloadsStore();
     listArchives.mockResolvedValue([
@@ -147,8 +147,9 @@ describe("downloads store", () => {
       { ...queued, id: "done", status: "READY" },
     ]);
     await store.load();
-    expect(store.panelOpen).toBe(true);
+    expect(store.panelOpen).toBe(false);
     expect(store.panelDownloads.map((d) => d.id)).toEqual(["ready"]);
+    expect(store.attentionCount).toBe(1);
   });
 
   it("drops an archive the service no longer has", async () => {
