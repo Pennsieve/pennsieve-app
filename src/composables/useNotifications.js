@@ -37,7 +37,7 @@ export async function subscribe(topicId, context) {
   return useSendXhr(`${BASE_URL}/topic/${topicId}/subscription`, {
     method: 'POST',
     header,
-    body: { context },
+    body: context,
   })
 }
 

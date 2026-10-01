@@ -37,7 +37,7 @@ let route = useRoute();
     </div>
   </div>
 
-  <notification-bell v-if="activeOrganization && activeOrganization.organization" />
+  <notification-bell />
 
   <!--  <bf-upload ref="bfUpload" />-->
 

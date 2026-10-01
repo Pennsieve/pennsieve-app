@@ -17,14 +17,14 @@ const datasetId = computed(() => route.params.datasetId);
 const tabs = [
   { to: 'dataset-settings-general', name: 'Details' },
   { to: 'integrations-settings', name: 'Configuration' },
-  { to: 'dataset-notifications-settings', name: 'Notifications' },
+  // { to: 'dataset-notifications-settings', name: 'Notifications' },
 ];
 
 const currentTabName = computed(() => {
   const routeToTab = {
     'dataset-settings-general': 'Details',
     'integrations-settings': 'Configuration',
-    'dataset-notifications-settings': 'Notifications',
+    // 'dataset-notifications-settings': 'Notifications',
   };
   return routeToTab[route.name] || 'Settings';
 });
