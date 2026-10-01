@@ -28,10 +28,11 @@ function respond(status, body) {
 describe('downloadServiceUrl', () => {
   it('is set where the platform has download-service', () => {
     expect(downloadServiceUrl(dev)).toBe('https://api2.pennsieve.net/downloads')
+    expect(downloadServiceUrl(prod)).toBe('https://api2.pennsieve.io/downloads')
   })
 
-  it('is empty where it has none yet, so callers keep their old path', () => {
-    expect(downloadServiceUrl(prod)).toBe('')
+  it('is empty where a site has none, so callers keep their old path', () => {
+    expect(downloadServiceUrl({ api2Url: 'https://api2.example.org' })).toBe('')
   })
 
   it('drops a trailing slash', () => {
