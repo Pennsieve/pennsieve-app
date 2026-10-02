@@ -103,22 +103,22 @@ describe('archives', () => {
     expect(JSON.parse(init.body)).toEqual({ nodeIds: ['N:collection:1'], notify: 'auto', archiveName: 'study' })
   })
 
-  it('polls, lists, links and deletes by id', async () => {
+  it('reaches an archive through its dataset, and lists by workspace, never the preferred workspace', async () => {
     const fetchFn = respond(200, { downloads: [{ id: 'd1' }], url: 'https://s3/zip' })
-    await getArchive('d1', { config, getToken, fetchFn })
-    expect(await listArchives({ config, getToken, fetchFn })).toEqual([{ id: 'd1' }])
+    await getArchive({ id: 'd1', datasetId: 'N:dataset:1' }, { config, getToken, fetchFn })
+    expect(await listArchives({ organizationId: 'N:organization:1' }, { config, getToken, fetchFn })).toEqual([{ id: 'd1' }])
     await getArchiveUrl({ id: 'd1', datasetId: 'N:dataset:1' }, { config, getToken, fetchFn })
-    await deleteArchive('d1', { config, getToken, fetchFn })
+    await deleteArchive({ id: 'd1', datasetId: 'N:dataset:1' }, { config, getToken, fetchFn })
     expect(fetchFn.mock.calls.map(([url, init]) => `${init.method} ${url}`)).toEqual([
-      'GET https://api2.pennsieve.net/downloads/archives/d1',
-      'GET https://api2.pennsieve.net/downloads/archives',
+      'GET https://api2.pennsieve.net/downloads/archives/d1?dataset_id=N%3Adataset%3A1',
+      'GET https://api2.pennsieve.net/downloads/archives?organization_id=N%3Aorganization%3A1',
       'GET https://api2.pennsieve.net/downloads/archives/d1/url?dataset_id=N%3Adataset%3A1',
-      'DELETE https://api2.pennsieve.net/downloads/archives/d1',
+      'DELETE https://api2.pennsieve.net/downloads/archives/d1?dataset_id=N%3Adataset%3A1',
     ])
   })
 
   it('treats an empty response (204) as done', async () => {
     const fetchFn = vi.fn().mockResolvedValue({ ok: true, status: 204, json: () => Promise.reject(new Error('no body')) })
-    expect(await deleteArchive('d1', { config, getToken, fetchFn })).toEqual({})
+    expect(await deleteArchive({ id: 'd1', datasetId: 'N:dataset:1' }, { config, getToken, fetchFn })).toEqual({})
   })
 })
