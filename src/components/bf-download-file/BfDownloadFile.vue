@@ -22,10 +22,19 @@
       </template>
 
       <dialog-body class="bf-download-body">
-        <div v-if="showReduceSize" class="mb-24">
-          <p>
+        <div v-if="showReduceSize" class="mb-24 too-large">
+          <template v-if="agentCommand">
+            <p>
+              {{ tooLargeText }} Download it with the Pennsieve agent instead:
+            </p>
+            <agent-download-command v-bind="agentCommand" />
+            <p class="or-remove">
+              Or remove items to bring the selection under the limit:
+            </p>
+          </template>
+          <p v-else>
             The file(s) you are trying to download exceed the limit of
-            {{ formatMetric(this.config.maxDownloadSize) }}. Please reduce the
+            {{ formatMetric(config.maxDownloadSize) }}. Please reduce the
             number of files selected and try again.
           </p>
           <el-table
@@ -36,7 +45,7 @@
             <el-table-column prop="content.name">
             </el-table-column>
             <el-table-column prop="storage" align="right">
-              <template #default>
+              <template #default="scope">
                 {{ formatMetric(scope.row.storage) }}
                 <button @click="removeRow(scope.row)">
                   <IconXCircle color="#404554" :height="28" :width="28" />
@@ -86,6 +95,7 @@ import IconXCircle from "../icons/IconXCircle.vue";
 import { useGetToken } from "@/composables/useGetToken";
 import EventBus from "../../utils/event-bus";
 import { downloadServiceUrl, getFileUrl } from "@/utils/downloadService";
+import AgentDownloadCommand from "../downloads/AgentDownloadCommand.vue";
 import { useDownloadsStore } from "@/stores/downloadsStore";
 import { triggerBrowserDownload } from "@/utils/triggerBrowserDownload";
 
@@ -95,6 +105,7 @@ export default {
   name: "BfDownloadFile",
 
   components: {
+    AgentDownloadCommand,
     IconXCircle,
     BfDialogHeader,
     DialogBody,
@@ -112,6 +123,9 @@ export default {
       recordCsvQuery: "",
       archiveName: DEFAULT_ARCHIVE_NAME,
       showReduceSize: false,
+      // download-service refused to zip the selection (413): too many
+      // files or bytes, whatever the sizes here add up to.
+      tooLargeForZip: false,
       downloadConfirmed: false,
       zipItUrl: "",
       recordCsvUrl: "",
@@ -156,9 +170,34 @@ export default {
      */
     disableDownload: function () {
       return (
+        this.tooLargeForZip ||
         this.downloadSize > this.config.maxDownloadSize ||
         this.sizeTarget.length === 0
       );
+    },
+
+    tooLargeText: function () {
+      if (this.downloadSize > this.config.maxDownloadSize) {
+        return `This selection is ${this.formatMetric(this.downloadSize)}, more than the ${this.formatMetric(this.config.maxDownloadSize)} you can download as a zip.`;
+      }
+      return "This selection is too large to download as a zip.";
+    },
+
+    /**
+     * The agent command for a selection too large to zip, where downloads go
+     * through download-service. Picked files download with their package.
+     */
+    agentCommand: function () {
+      if (!downloadServiceUrl() || this.packageDTOs.length === 0) return null;
+      const content = pathOr({}, [0, "content"], this.packageDTOs);
+      const datasetId = content.datasetNodeId || this.$route?.params?.datasetId;
+      if (!datasetId) return null;
+      return {
+        datasetId,
+        nodeIds: this.packageDTOs.map((p) => p.content.nodeId),
+        folderName:
+          this.packageDTOs.length === 1 ? content.name : this.archiveName,
+      };
     },
 
     /**
@@ -180,6 +219,7 @@ export default {
       this.archiveName = DEFAULT_ARCHIVE_NAME;
       this.downloadConfirmed = false;
       this.showReduceSize = false;
+      this.tooLargeForZip = false;
       this.dialogVisible = false;
     },
 
@@ -389,6 +429,7 @@ export default {
      */
     archiveViaService: async function (nodeIds, fileIds) {
       const content = pathOr({}, [0, "content"], this.packageDTOs);
+      const archiveName = this.archiveName;
       try {
         await useDownloadsStore().start({
           datasetId: content.datasetNodeId || this.$route?.params?.datasetId,
@@ -396,9 +437,17 @@ export default {
           fileIds,
           // Several items: the name from the dialog. One folder or package:
           // its own name.
-          archiveName: nodeIds.length > 1 ? this.archiveName : content.name,
+          archiveName: nodeIds.length > 1 ? archiveName : content.name,
         });
       } catch (e) {
+        // Too large to zip: offer the agent instead.
+        if (e.status === 413 && this.agentCommand) {
+          this.archiveName = archiveName;
+          this.tooLargeForZip = true;
+          this.showReduceSize = true;
+          this.dialogVisible = true;
+          return;
+        }
         const reason = e.status >= 400 && e.status < 500 && e.message
           ? e.message.charAt(0).toUpperCase() + e.message.slice(1)
           : "The download couldn't be started. Try again.";
@@ -455,6 +504,15 @@ export default {
 @use "../../styles/element/dialog";
 
 .bf-download-body {
+  .too-large {
+    p {
+      margin: 0 0 8px;
+    }
+    .or-remove {
+      margin-top: 16px;
+    }
+  }
+
   .download-name {
     display: flex;
     align-items: center;

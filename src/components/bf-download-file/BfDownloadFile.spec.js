@@ -15,6 +15,7 @@ import { triggerBrowserDownload } from '@/utils/triggerBrowserDownload'
 import EventBus from '@/utils/event-bus'
 
 const { tryDirectDownload, downloadViaService, downloadPackages, archiveViaService } = BfDownloadFile.methods
+const { agentCommand, tooLargeText, disableDownload } = BfDownloadFile.computed
 
 const pkg = {
   content: {
@@ -127,7 +128,16 @@ describe('BfDownloadFile archives', () => {
     expect(start.mock.calls[0][0]).toMatchObject({ nodeIds: ['N:collection:1'], fileIds: [4, 5], archiveName: 'study' })
   })
 
-  it("shows the service's reason when it refuses, such as a selection that's too large", async () => {
+  it('offers the agent when the service finds the selection too large to zip', async () => {
+    const emit = vi.spyOn(EventBus, '$emit')
+    start.mockRejectedValue(new ServiceError(413, 'this selection is too large to download as one archive'))
+    const cmp = archiving({ agentCommand: { datasetId: 'N:dataset:1', nodeIds: ['N:collection:1'] }, archiveName: 'my-study' })
+    await archiveViaService.call(cmp, ['N:collection:1', 'N:collection:2'])
+    expect(cmp).toMatchObject({ tooLargeForZip: true, showReduceSize: true, dialogVisible: true, archiveName: 'my-study' })
+    expect(emit).not.toHaveBeenCalled()
+  })
+
+  it("shows the service's reason when it refuses", async () => {
     const emit = vi.spyOn(EventBus, '$emit')
     start.mockRejectedValue(new ServiceError(413, 'this selection is too large to download as one archive; select fewer files or use the Pennsieve agent'))
     await archiveViaService.call(archiving(), ['N:collection:1'])
@@ -142,5 +152,43 @@ describe('BfDownloadFile archives', () => {
     start.mockRejectedValue(new ServiceError(500, 'could not prepare the download'))
     await archiveViaService.call(archiving(), ['N:collection:1'])
     expect(emit.mock.calls[0][1].detail.msg).toBe("The download couldn't be started. Try again.")
+  })
+})
+
+describe('BfDownloadFile over the limit', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    downloadServiceUrl.mockReturnValue('https://api2.pennsieve.net/downloads')
+  })
+
+  const folder = (n) => ({ content: { ...pkg.content, nodeId: `N:collection:${n}`, name: `folder ${n}`, packageType: 'Collection' } })
+  const ctx = (overrides = {}) => ({
+    packageDTOs: [folder(1)], archiveName: 'pennsieve-data', $route: { params: {} },
+    config: { maxDownloadSize: 15e9 }, downloadSize: 0, formatMetric: (n) => `${n / 1e9} GB`,
+    ...overrides,
+  })
+
+  it('builds the agent command for the selection, named after a single item', () => {
+    expect(agentCommand.call(ctx())).toEqual({
+      datasetId: 'N:dataset:1', nodeIds: ['N:collection:1'], folderName: 'folder 1',
+    })
+    expect(agentCommand.call(ctx({ packageDTOs: [folder(1), folder(2)], archiveName: 'my-study' }))).toMatchObject({
+      nodeIds: ['N:collection:1', 'N:collection:2'], folderName: 'my-study',
+    })
+  })
+
+  it("has no agent command where downloads don't go through download-service", () => {
+    downloadServiceUrl.mockReturnValue('')
+    expect(agentCommand.call(ctx())).toBeNull()
+  })
+
+  it('says how far over the limit the selection is', () => {
+    expect(tooLargeText.call(ctx({ downloadSize: 32e9 })))
+      .toBe('This selection is 32 GB, more than the 15 GB you can download as a zip.')
+    expect(tooLargeText.call(ctx({ downloadSize: 1e9 }))).toBe('This selection is too large to download as a zip.')
+  })
+
+  it("can't be zipped once the service refused it", () => {
+    expect(disableDownload.call({ tooLargeForZip: true, downloadSize: 1, config: { maxDownloadSize: 15e9 }, sizeTarget: [pkg] })).toBe(true)
   })
 })
