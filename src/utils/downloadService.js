@@ -79,14 +79,19 @@ export function createArchive({ datasetId, nodeIds, fileIds, archiveName, notify
   return downloadServiceRequest('/archives', { ...options, method: 'POST', datasetId, body })
 }
 
+// Every archive route names its scope: an archive is reached through its
+// own dataset (which re-checks access), the list through its workspace.
+// None relies on the user's preferred workspace.
+
 // Polling an active archive also tells the service the requester is
 // watching, so it skips the email.
-export function getArchive(id, options = {}) {
-  return downloadServiceRequest(`/archives/${encodeURIComponent(id)}`, options)
+export function getArchive({ id, datasetId }, options = {}) {
+  return downloadServiceRequest(`/archives/${encodeURIComponent(id)}`, { ...options, datasetId })
 }
 
-export async function listArchives(options = {}) {
-  const data = await downloadServiceRequest('/archives', options)
+// The workspace's archives, newest first.
+export async function listArchives({ organizationId }, options = {}) {
+  const data = await downloadServiceRequest(`/archives?organization_id=${encodeURIComponent(organizationId)}`, options)
   return data.downloads || []
 }
 
@@ -98,6 +103,6 @@ export function getArchiveUrl({ id, datasetId }, options = {}) {
 
 // Cancels an active archive (resolving to its CANCELLED record), or deletes
 // a finished one (resolving to {}).
-export function deleteArchive(id, options = {}) {
-  return downloadServiceRequest(`/archives/${encodeURIComponent(id)}`, { ...options, method: 'DELETE' })
+export function deleteArchive({ id, datasetId }, options = {}) {
+  return downloadServiceRequest(`/archives/${encodeURIComponent(id)}`, { ...options, method: 'DELETE', datasetId })
 }
