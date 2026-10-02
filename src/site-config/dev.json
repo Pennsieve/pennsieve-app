@@ -8,7 +8,7 @@
   "discoverAppUrl": "https://discover.pennsieve.net",
   "zipitUrl": "https://api.pennsieve.net/zipit",
   "docsUrl": "https://docs.pennsieve.io",
-  "maxDownloadSize": 15000000000,
+  "maxDownloadSize": 20000000000,
   "environment": "dev",
   "ORCIDAPIHost": "https://sandbox.orcid.org",
   "ORCIDpubUrl": "https://pub.sandbox.orcid.org/v2.1",
