@@ -2,6 +2,7 @@
   "app_domain": "pennsieve.ai",
   "apiUrl": "https://api.pennsieve.ai",
   "api2Url": "https://api2.pennsieve.ai",
+  "downloadServiceUrl": "https://api2.pennsieve.ai/downloads",
   "zipitUrl": "https://api.pennsieve.ai/zipit",
   "discoverUrl": "https://api.pennsieve.io/discover",
   "discoverZipitUrl": "https://api.pennsieve.io/zipit/discover",

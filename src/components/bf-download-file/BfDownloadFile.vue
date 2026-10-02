@@ -85,6 +85,9 @@ import Sorter from "../../mixins/sorter";
 import IconXCircle from "../icons/IconXCircle.vue";
 import { useGetToken } from "@/composables/useGetToken";
 import EventBus from "../../utils/event-bus";
+import { downloadServiceUrl, getFileUrl } from "@/utils/downloadService";
+import { useDownloadsStore } from "@/stores/downloadsStore";
+import { triggerBrowserDownload } from "@/utils/triggerBrowserDownload";
 
 const DEFAULT_ARCHIVE_NAME = "pennsieve-data";
 
@@ -292,6 +295,7 @@ export default {
       if (pathOr("", ["content", "packageType"], pkg) === "Collection") {
         return false;
       }
+      if (downloadServiceUrl()) return this.downloadViaService(pkg);
       const packageId = pathOr("", ["content", "id"], pkg);
       if (!packageId) return false;
 
@@ -340,6 +344,68 @@ export default {
       }
     },
 
+    /**
+     * Downloads a one-file selection through download-service, which signs
+     * the link and records the download. Returns false when the selection
+     * isn't one file (a package with several files and none picked, which
+     * the service answers with a 400), so the multi-file path runs instead.
+     * A refusal (malware scan, no access) is shown, not retried as a zip.
+     */
+    downloadViaService: async function (pkg) {
+      let fileId;
+      if (this.fileDTOs) {
+        if (this.fileDTOs.length !== 1) return false;
+        fileId = this.fileDTOs[0].id;
+      }
+      const content = pkg.content || {};
+      try {
+        const link = await getFileUrl({
+          datasetId: content.datasetNodeId || this.$route?.params?.datasetId,
+          packageId: content.nodeId || content.id,
+          fileId,
+        });
+        triggerBrowserDownload(link.url);
+        return true;
+      } catch (e) {
+        if (e.status === 403) {
+          EventBus.$emit("toast", {
+            detail: {
+              type: "error",
+              msg: e.message.charAt(0).toUpperCase() + e.message.slice(1),
+            },
+          });
+          return true;
+        }
+        return false;
+      }
+    },
+
+    /**
+     * Asks download-service to zip the selection. The downloads panel shows
+     * its progress, and the archive downloads once it's ready; if the user
+     * leaves, they're emailed instead.
+     * @param {Array} nodeIds
+     * @param {Array} fileIds - when downloading a single package, only these files
+     */
+    archiveViaService: async function (nodeIds, fileIds) {
+      const content = pathOr({}, [0, "content"], this.packageDTOs);
+      try {
+        await useDownloadsStore().start({
+          datasetId: content.datasetNodeId || this.$route?.params?.datasetId,
+          nodeIds,
+          fileIds,
+          // Several items: the name from the dialog. One folder or package:
+          // its own name.
+          archiveName: nodeIds.length > 1 ? this.archiveName : content.name,
+        });
+      } catch (e) {
+        const reason = e.status >= 400 && e.status < 500 && e.message
+          ? e.message.charAt(0).toUpperCase() + e.message.slice(1)
+          : "The download couldn't be started. Try again.";
+        EventBus.$emit("toast", { detail: { type: "error", msg: reason } });
+      }
+    },
+
     triggerRecordCsvDownload: function (query) {
       this.recordCsvQuery = JSON.stringify(query);
       this.$nextTick(() => {
@@ -354,6 +420,10 @@ export default {
      * @param {Array} fileIds - when downloading a single package, includes only specified files
      */
     downloadPackages: function (nodeIds, fileIds) {
+      if (downloadServiceUrl()) {
+        this.archiveViaService(nodeIds, fileIds);
+        return;
+      }
       const fileIdPayload = fileIds ? { fileIds } : {};
       const archiveNamePayload =
         this.archiveName && nodeIds.length > 1
