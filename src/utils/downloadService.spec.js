@@ -10,6 +10,8 @@ import {
   getArchiveUrl,
   deleteArchive,
   DownloadServiceError,
+  agentDownloadCommand,
+  agentFolderName,
 } from './downloadService'
 import dev from '../site-config/dev.json'
 import prod from '../site-config/prod.json'
@@ -120,5 +122,24 @@ describe('archives', () => {
   it('treats an empty response (204) as done', async () => {
     const fetchFn = vi.fn().mockResolvedValue({ ok: true, status: 204, json: () => Promise.reject(new Error('no body')) })
     expect(await deleteArchive({ id: 'd1', datasetId: 'N:dataset:1' }, { config, getToken, fetchFn })).toEqual({})
+  })
+})
+
+describe('agentDownloadCommand', () => {
+  it('downloads the selected folders and packages into a new folder', () => {
+    expect(agentDownloadCommand({
+      datasetId: 'N:dataset:1', nodeIds: ['N:collection:1', 'N:package:2'], folderName: 'my-study',
+    })).toBe('pennsieve download dataset N:dataset:1 ./my-study --node N:collection:1,N:package:2')
+  })
+
+  it('downloads the whole dataset without nodeIds', () => {
+    expect(agentDownloadCommand({ datasetId: 'N:dataset:1', folderName: 'Study' }))
+      .toBe('pennsieve download dataset N:dataset:1 ./Study')
+  })
+
+  it('names the folder so that no shell needs quotes', () => {
+    expect(agentFolderName("Mouse EEG (day 1)'s")).toBe('Mouse-EEG-day-1-s')
+    expect(agentFolderName('../..')).toBe('pennsieve-data')
+    expect(agentFolderName('')).toBe('pennsieve-data')
   })
 })
