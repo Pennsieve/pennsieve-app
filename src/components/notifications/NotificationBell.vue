@@ -108,6 +108,7 @@ export default {
     },
 
     subscribeToPusher() {
+      if (!this.profile.intId) return
       const channelName = `user-${this.profile.intId}-notifications`
       this.pusherChannel = this.$pusher.subscribe(channelName)
       this.pusherChannel.bind('notification-event', this.onPushNotification.bind(this))
@@ -135,10 +136,19 @@ export default {
     },
   },
 
-  async mounted() {
+  watch: {
+    'profile.intId': {
+      immediate: true,
+      handler(intId) {
+        if (!intId) return
+        this.loadInitialNotifications()
+        this.subscribeToPusher()
+      },
+    },
+  },
+
+  mounted() {
     document.addEventListener('mousedown', this.onClickOutside)
-    await this.loadInitialNotifications()
-    this.subscribeToPusher()
   },
 
   beforeUnmount() {
