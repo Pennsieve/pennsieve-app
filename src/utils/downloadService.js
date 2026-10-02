@@ -106,3 +106,22 @@ export function getArchiveUrl({ id, datasetId }, options = {}) {
 export function deleteArchive({ id, datasetId }, options = {}) {
   return downloadServiceRequest(`/archives/${encodeURIComponent(id)}`, { ...options, method: 'DELETE', datasetId })
 }
+
+// Selections too large to zip download with the Pennsieve agent instead.
+export const AGENT_MIN_VERSION = '2.2.1'
+export const AGENT_DOCS_URL = 'https://docs.pennsieve.io/docs/the-pennsieve-agent'
+export const AGENT_RELEASES_URL = 'https://github.com/Pennsieve/pennsieve-agent/releases/latest'
+
+// A folder name that needs no quoting in any shell.
+export function agentFolderName(name) {
+  const safe = (name || '').replace(/[^A-Za-z0-9._-]+/g, '-').replace(/^[-.]+|-+$/g, '')
+  return safe || 'pennsieve-data'
+}
+
+// The agent command that downloads a selection of a dataset into a new
+// folder. Without nodeIds it downloads the whole dataset.
+export function agentDownloadCommand({ datasetId, nodeIds = [], folderName }) {
+  const parts = ['pennsieve', 'download', 'dataset', datasetId, `./${agentFolderName(folderName)}`]
+  if (nodeIds.length) parts.push('--node', nodeIds.join(','))
+  return parts.join(' ')
+}
