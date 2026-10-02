@@ -53,6 +53,7 @@ describe("downloads store", () => {
 
     await vi.advanceTimersByTimeAsync(POLL_MS);
     expect(store.downloads[0]).toMatchObject({ status: "RUNNING", filesDone: 1 });
+    expect(getArchive).toHaveBeenCalledWith({ id: "d1", datasetId: "N:dataset:1" });
 
     await vi.advanceTimersByTimeAsync(POLL_MS);
     expect(store.downloads[0].status).toBe("READY");
@@ -97,6 +98,7 @@ describe("downloads store", () => {
     ]);
     await store.load("N:organization:1");
     expect(store.downloads.map((d) => d.id)).toEqual(["mine"]);
+    expect(listArchives).toHaveBeenCalledWith({ organizationId: "N:organization:1" });
   });
 
   it("keeps records that don't name a workspace", async () => {

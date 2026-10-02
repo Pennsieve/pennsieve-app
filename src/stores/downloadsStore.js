@@ -112,7 +112,7 @@ export const useDownloadsStore = defineStore("downloads", () => {
     await Promise.all(
       active.value.map(async (d) => {
         try {
-          const updated = await getArchive(d.id);
+          const updated = await getArchive({ id: d.id, datasetId: d.datasetNodeId });
           upsert(updated);
           if (updated.status === "READY" && autoStart.has(d.id)) {
             autoStart.delete(d.id);
@@ -136,7 +136,7 @@ export const useDownloadsStore = defineStore("downloads", () => {
   // after a reload the navigation's Downloads item and its badge show what
   // needs attention, and opening the panel is the user's call.
   async function load(organizationNodeId) {
-    const list = await listArchives();
+    const list = await listArchives({ organizationId: organizationNodeId });
     // Records without organizationNodeId (older service versions) are kept:
     // only one that names another workspace is dropped.
     downloads.value = organizationNodeId
@@ -166,7 +166,7 @@ export const useDownloadsStore = defineStore("downloads", () => {
 
   // Cancels an active archive, or deletes a finished one.
   async function remove(d) {
-    const result = await deleteArchive(d.id);
+    const result = await deleteArchive({ id: d.id, datasetId: d.datasetNodeId });
     autoStart.delete(d.id);
     if (result && result.id) {
       upsert(result);
