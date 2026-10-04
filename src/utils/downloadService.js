@@ -107,8 +107,19 @@ export function deleteArchive({ id, datasetId }, options = {}) {
   return downloadServiceRequest(`/archives/${encodeURIComponent(id)}`, { ...options, method: 'DELETE', datasetId })
 }
 
-// Selections too large to zip download with the Pennsieve agent instead.
+// Saves a selection of a dataset for the agent to download by a short id,
+// for two days. The id grants nothing: whoever downloads it is checked
+// against the dataset. Resolves to { id, expiresAt, count, size,
+// blockedCount }.
+export function createSelection({ datasetId, nodeIds }, options = {}) {
+  return downloadServiceRequest('/selections', { ...options, method: 'POST', datasetId, body: { nodeIds } })
+}
+
+// Selections too large to zip download with the Pennsieve agent instead:
+// by a saved selection's id (AGENT_SELECTION_MIN_VERSION), or, if it can't
+// be saved, by node ids (AGENT_MIN_VERSION).
 export const AGENT_MIN_VERSION = '2.2.1'
+export const AGENT_SELECTION_MIN_VERSION = '2.3.0'
 export const AGENT_DOCS_URL = 'https://docs.pennsieve.io/docs/the-pennsieve-agent'
 export const AGENT_RELEASES_URL = 'https://github.com/Pennsieve/pennsieve-agent/releases/latest'
 
@@ -124,4 +135,10 @@ export function agentDownloadCommand({ datasetId, nodeIds = [], folderName }) {
   const parts = ['pennsieve', 'download', 'dataset', datasetId, `./${agentFolderName(folderName)}`]
   if (nodeIds.length) parts.push('--node', nodeIds.join(','))
   return parts.join(' ')
+}
+
+// The agent command that downloads a saved selection into a new folder:
+// short however many items were selected.
+export function agentSelectionCommand({ selectionId, folderName }) {
+  return ['pennsieve', 'download', 'selection', selectionId, `./${agentFolderName(folderName)}`].join(' ')
 }
