@@ -42,11 +42,6 @@
       @selection-change="onSelectionChange"
     />
 
-    <!-- Multi-file downloads are zipped server-side via zipit. -->
-    <form ref="zipForm" method="POST" :action="zipitUrl" class="hidden-form">
-      <input v-model="zipData" type="hidden" name="data" />
-    </form>
-
     <div v-if="totalCount > pageSize" class="pagination-container">
       <el-pagination
         :page-size="pageSize"
@@ -60,14 +55,14 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted, nextTick } from "vue";
+import { ref, computed, watch, onMounted } from "vue";
 import { useRouter } from "vue-router";
 import { useReadOnlyDatasetStore } from "@/stores/readOnlyDatasetStore.js";
-import { useGetToken } from "@/composables/useGetToken";
+import { useDownloadsStore } from "@/stores/downloadsStore.js";
 import { triggerBrowserDownload } from "@/utils/triggerBrowserDownload.js";
+import EventBus from "@/utils/event-bus";
 import FilesTable from "@/components/FilesTable/FilesTable.vue";
 import IconUpload from "@/components/icons/IconUpload.vue";
-import { discoverSharesApi, discoverZipitUrl } from "@/utils/discover";
 
 const props = defineProps({
   dataset: {
@@ -79,10 +74,6 @@ const props = defineProps({
 const store = useReadOnlyDatasetStore();
 const router = useRouter();
 
-// zipit's Discover endpoint, on the platform that hosts this Discover.
-const zipitUrl = discoverZipitUrl();
-const zipForm = ref(null);
-const zipData = ref("");
 const filesTable = ref(null);
 const selectedFiles = ref([]);
 const isDownloading = ref(false);
@@ -181,8 +172,9 @@ const onDownloadSelected = async () => {
   const selection = selectedFiles.value;
   if (!selection.length) return;
 
-  // A single file downloads directly via its presigned URL; anything else
-  // (multiple files, or a folder) is zipped server-side via zipit.
+  // A single file downloads directly through its link; anything else
+  // (several files, or a folder) is zipped by download-service, and the
+  // downloads panel follows it.
   const isSingleFile = selection.length === 1 && !selection[0]._isDir;
 
   isDownloading.value = true;
@@ -196,32 +188,23 @@ const onDownloadSelected = async () => {
       });
       if (url) triggerBrowserDownload(url, selection[0].content?.name);
     } else {
-      await downloadViaZipit(selection);
+      await useDownloadsStore().startPublic({
+        datasetId: props.dataset.id,
+        version: props.dataset.version,
+        paths: selection.map((f) => f._path),
+        rootPath: currentPath.value || undefined,
+        archiveName: selection.length === 1 ? selection[0].content?.name : props.dataset.name,
+      });
     }
   } catch (e) {
-    console.error("Error preparing download:", e);
+    // Too large, no access, over a daily allowance: the service says why.
+    const reason = e.status >= 400 && e.status < 500 && e.message
+      ? e.message.charAt(0).toUpperCase() + e.message.slice(1)
+      : "The download couldn't be started. Try again.";
+    EventBus.$emit("toast", { detail: { type: "error", msg: reason } });
   } finally {
     isDownloading.value = false;
   }
-};
-
-const downloadViaZipit = async (selection) => {
-  const payload = {
-    paths: selection.map((f) => f._path),
-    datasetId: props.dataset.id,
-    version: props.dataset.version,
-  };
-  // Only this platform's zipit may see the user's token (public datasets
-  // need none; it only matters for embargoed ones on the same platform).
-  if (discoverSharesApi()) {
-    const token = await useGetToken();
-    if (token) payload.userToken = token;
-  }
-  if (currentPath.value) payload.rootPath = currentPath.value;
-
-  zipData.value = JSON.stringify(payload);
-  await nextTick();
-  zipForm.value.submit();
 };
 
 const onPageChange = (page) => {
@@ -331,10 +314,6 @@ watch(
       color: theme.$gray_6;
     }
   }
-}
-
-.hidden-form {
-  display: none;
 }
 
 .pagination-container {

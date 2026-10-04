@@ -109,6 +109,7 @@ customHeaders:
             https://cognito-identity.us-east-1.amazonaws.com
             https://pennsieve-clin-users.auth.us-east-1.amazoncognito.com
             https://api.pennsieve.io
+            https://downloads.pennsieve.io
             https://discover.pennsieve.io
             https://assets.discover.pennsieve.io
             https://extensions.duckdb.org
@@ -127,7 +128,6 @@ customHeaders:
             'self';
             form-action
             'self'
-            https://api.pennsieve.io
             https://api.pennsieve.ai;
       - key: "X-Frame-Options"
         value: "DENY"

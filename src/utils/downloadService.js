@@ -1,6 +1,7 @@
 import * as siteConfig from '@/site-config/site.json'
 import { version } from '../../package.json'
 import { useGetToken } from '@/composables/useGetToken'
+import { discoverSharesApi } from '@/utils/discover'
 
 // download-service (api2.<domain>/downloads) signs every link to save a
 // dataset file. The token travels in the Authorization header, never in a
@@ -36,17 +37,20 @@ export async function downloadServiceRequest(path, {
   const url = new URL(`${base}${path}`)
   if (datasetId) url.searchParams.set('dataset_id', datasetId)
 
-  const headers = {
-    Authorization: `Bearer ${await getToken()}`,
-    'X-Pennsieve-Client': clientHeader,
-  }
+  return send(url.toString(), { method, body, token: await getToken(), fetchFn })
+}
+
+async function send(url, { method, body, token, fetchFn }) {
+  const headers = { 'X-Pennsieve-Client': clientHeader }
+  if (token) headers.Authorization = `Bearer ${token}`
   if (body !== undefined) headers['Content-Type'] = 'application/json'
 
-  const resp = await fetchFn(url.toString(), {
+  const resp = await fetchFn(url, {
     method,
     headers,
     body: body === undefined ? undefined : JSON.stringify(body),
   })
+  if (resp.status === 204) return {}
   const data = await resp.json().catch(() => ({}))
   if (!resp.ok) {
     throw new DownloadServiceError(resp.status, data.message || `download-service responded ${resp.status}`)
@@ -54,15 +58,13 @@ export async function downloadServiceRequest(path, {
   return data
 }
 
-// A signed link to one file: to save it (`download`), or to open it in a
-// viewer (`view`, recorded apart from downloads). A package with several
-// files needs fileId; without it the service answers 400.
+// A signed link to one file (a package is one file): to save it
+// (`download`), or to open it in a viewer (`view`, recorded apart from
+// downloads).
 //
 // Resolves to { url, expiresAt, fileName, size }.
-export function getFileUrl({ datasetId, packageId, fileId, purpose = 'download' }, options = {}) {
-  const body = { packageId, purpose }
-  if (fileId) body.fileId = fileId
-  return downloadServiceRequest('/files/url', { ...options, method: 'POST', datasetId, body })
+export function getFileUrl({ datasetId, packageId, purpose = 'download' }, options = {}) {
+  return downloadServiceRequest('/files/url', { ...options, method: 'POST', datasetId, body: { packageId, purpose } })
 }
 
 // Archives: a selection zipped by the service, fetched when ready. Records
@@ -72,9 +74,8 @@ export function getFileUrl({ datasetId, packageId, fileId, purpose = 'download' 
 
 // notify: 'auto' emails the requester only if they aren't watching when it
 // finishes; 'email' always; 'none' never.
-export function createArchive({ datasetId, nodeIds, fileIds, archiveName, notify = 'auto' }, options = {}) {
+export function createArchive({ datasetId, nodeIds, archiveName, notify = 'auto' }, options = {}) {
   const body = { nodeIds, notify }
-  if (fileIds?.length) body.fileIds = fileIds
   if (archiveName) body.archiveName = archiveName
   return downloadServiceRequest('/archives', { ...options, method: 'POST', datasetId, body })
 }
@@ -105,6 +106,62 @@ export function getArchiveUrl({ id, datasetId }, options = {}) {
 // a finished one (resolving to {}).
 export function deleteArchive({ id, datasetId }, options = {}) {
   return downloadServiceRequest(`/archives/${encodeURIComponent(id)}`, { ...options, method: 'DELETE', datasetId })
+}
+
+// Published datasets go through download-service's /public routes, by the
+// dataset's public id and version, and paths within it. Signed in, on this
+// platform's api2, when Discover is this platform's. Otherwise (clin browses
+// prod's Discover) anonymously, on that platform's public downloads API
+// (discoverDownloadsUrl), so a credential never leaves the environment that
+// issued it; only open versions are available there.
+export function publicDownloadsTarget(config = siteConfig) {
+  if (discoverSharesApi(config)) {
+    const base = downloadServiceUrl(config)
+    return base ? { base: `${base}/public`, signedIn: true } : null
+  }
+  const host = (config.discoverDownloadsUrl || '').replace(/\/+$/, '')
+  return host ? { base: `${host}/public`, signedIn: false } : null
+}
+
+export async function publicDownloadsRequest(path, {
+  method = 'GET',
+  body,
+  config = siteConfig,
+  getToken = useGetToken,
+  fetchFn = globalThis.fetch,
+} = {}) {
+  const target = publicDownloadsTarget(config)
+  if (!target) throw new Error('downloads of published datasets are not configured for this site')
+  const token = target.signedIn ? await getToken() : ''
+  return send(`${target.base}${path}`, { method, body, token, fetchFn })
+}
+
+// A signed link to one file of a published version: to save it, or (`view`)
+// to open it in the browser. Resolves to { url, expiresAt, fileName, size }.
+export function getPublicFileUrl({ datasetId, version, path, purpose = 'download' }, options = {}) {
+  const body = { datasetId: Number(datasetId), version: Number(version) || undefined, paths: [path], purpose }
+  return publicDownloadsRequest('/files/url', { ...options, method: 'POST', body })
+}
+
+// A zip of paths of a published version, built like a workspace archive.
+// Its record has scope "public", publicDatasetId and publicVersion.
+export function createPublicArchive({ datasetId, version, paths, rootPath, archiveName, notify = 'auto' }, options = {}) {
+  const body = { datasetId: Number(datasetId), version: Number(version) || undefined, paths, notify }
+  if (rootPath) body.rootPath = rootPath
+  if (archiveName) body.archiveName = archiveName
+  return publicDownloadsRequest('/archives', { ...options, method: 'POST', body })
+}
+
+export function getPublicArchive({ id }, options = {}) {
+  return publicDownloadsRequest(`/archives/${encodeURIComponent(id)}`, options)
+}
+
+export function getPublicArchiveUrl({ id }, options = {}) {
+  return publicDownloadsRequest(`/archives/${encodeURIComponent(id)}/url`, options)
+}
+
+export function deletePublicArchive({ id }, options = {}) {
+  return publicDownloadsRequest(`/archives/${encodeURIComponent(id)}`, { ...options, method: 'DELETE' })
 }
 
 // Selections too large to zip download with the Pennsieve agent instead.
