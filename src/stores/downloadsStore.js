@@ -6,6 +6,10 @@ import {
   listArchives,
   getArchiveUrl,
   deleteArchive,
+  createPublicArchive,
+  getPublicArchive,
+  getPublicArchiveUrl,
+  deletePublicArchive,
 } from "@/utils/downloadService";
 import { triggerBrowserDownload } from "@/utils/triggerBrowserDownload";
 
@@ -17,6 +21,17 @@ export const ACTIVE_STATUSES = ["QUEUED", "RUNNING"];
 export const POLL_MS = 2000;
 
 export const isActive = (d) => ACTIVE_STATUSES.includes(d.status);
+
+// A zip of a published dataset: reached through the /public routes, and in
+// no workspace's list.
+const isPublic = (d) => d.scope === "public";
+
+const fetchArchive = (d) =>
+  isPublic(d) ? getPublicArchive({ id: d.id }) : getArchive({ id: d.id, datasetId: d.datasetNodeId });
+const fetchArchiveUrl = (d) =>
+  isPublic(d) ? getPublicArchiveUrl({ id: d.id }) : getArchiveUrl({ id: d.id, datasetId: d.datasetNodeId });
+const removeArchive = (d) =>
+  isPublic(d) ? deletePublicArchive({ id: d.id }) : deleteArchive({ id: d.id, datasetId: d.datasetNodeId });
 
 // Ready archives this browser has downloaded, so the navigation badge only
 // counts new ones. A convenience: without storage the badge counts every
@@ -112,7 +127,7 @@ export const useDownloadsStore = defineStore("downloads", () => {
     await Promise.all(
       active.value.map(async (d) => {
         try {
-          const updated = await getArchive({ id: d.id, datasetId: d.datasetNodeId });
+          const updated = await fetchArchive(d);
           upsert(updated);
           if (updated.status === "READY" && autoStart.has(d.id)) {
             autoStart.delete(d.id);
@@ -139,9 +154,11 @@ export const useDownloadsStore = defineStore("downloads", () => {
     const list = await listArchives({ organizationId: organizationNodeId });
     // Records without organizationNodeId (older service versions) are kept:
     // only one that names another workspace is dropped.
-    downloads.value = organizationNodeId
+    const workspace = organizationNodeId
       ? list.filter((d) => !d.organizationNodeId || d.organizationNodeId === organizationNodeId)
       : list;
+    // Public archives aren't listed: keep the ones this tab asked for.
+    downloads.value = [...downloads.value.filter(isPublic), ...workspace];
     loaded.value = true;
     schedule();
   }
@@ -149,7 +166,15 @@ export const useDownloadsStore = defineStore("downloads", () => {
   // Queues an archive of a selection. Rejects with a DownloadServiceError
   // (413 too large, 403 no access, 400 nothing to download).
   async function start(selection) {
-    const d = await createArchive(selection);
+    return track(await createArchive(selection));
+  }
+
+  // Queues a zip of a published dataset's paths (createPublicArchive).
+  async function startPublic(selection) {
+    return track(await createPublicArchive(selection));
+  }
+
+  function track(d) {
     upsert(d);
     autoStart.add(d.id);
     requested.value = new Set([...requested.value, d.id]);
@@ -159,14 +184,14 @@ export const useDownloadsStore = defineStore("downloads", () => {
   }
 
   async function download(d) {
-    const { url } = await getArchiveUrl({ id: d.id, datasetId: d.datasetNodeId });
+    const { url } = await fetchArchiveUrl(d);
     triggerBrowserDownload(url);
     markFetched(d.id);
   }
 
   // Cancels an active archive, or deletes a finished one.
   async function remove(d) {
-    const result = await deleteArchive({ id: d.id, datasetId: d.datasetNodeId });
+    const result = await removeArchive(d);
     autoStart.delete(d.id);
     if (result && result.id) {
       upsert(result);
@@ -188,6 +213,7 @@ export const useDownloadsStore = defineStore("downloads", () => {
     attentionCount,
     load,
     start,
+    startPublic,
     download,
     remove,
     poll,

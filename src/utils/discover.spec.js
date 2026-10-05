@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { discoverSharesApi, withDiscoverAuth, discoverZipitUrl } from './discover'
+import { discoverSharesApi, withDiscoverAuth } from './discover'
 import dev from '../site-config/dev.json'
 import prod from '../site-config/prod.json'
 import clin from '../site-config/clin.json'
@@ -34,17 +34,6 @@ describe('withDiscoverAuth', () => {
 
   it('leaves the url alone without a token', () => {
     expect(withDiscoverAuth(`${prod.discoverUrl}/datasets`, undefined, prod)).toBe(`${prod.discoverUrl}/datasets`)
-  })
-})
-
-describe('discoverZipitUrl', () => {
-  it('is the platform\'s own zipit /discover by default', () => {
-    expect(discoverZipitUrl(prod)).toBe('https://api.pennsieve.io/zipit/discover')
-    expect(discoverZipitUrl(dev)).toBe('https://api.pennsieve.net/zipit/discover')
-  })
-
-  it('follows Discover to prod in clin', () => {
-    expect(discoverZipitUrl(clin)).toBe('https://api.pennsieve.io/zipit/discover')
   })
 })
 

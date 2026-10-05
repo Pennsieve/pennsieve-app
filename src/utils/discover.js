@@ -18,10 +18,3 @@ export function withDiscoverAuth(url, token, config = siteConfig) {
   if (!token || !discoverSharesApi(config)) return url
   return `${url}${url.includes('?') ? '&' : '?'}api_key=${token}`
 }
-
-// zipit's Discover download endpoint (POST /discover), on the platform that
-// hosts that Discover: `discoverZipitUrl` when a config points Discover
-// elsewhere, otherwise this platform's zipit.
-export function discoverZipitUrl(config = siteConfig) {
-  return config.discoverZipitUrl || `${config.zipitUrl}/discover`
-}

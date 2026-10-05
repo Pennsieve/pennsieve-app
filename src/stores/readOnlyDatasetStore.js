@@ -3,6 +3,7 @@ import { defineStore } from "pinia";
 import { useSendXhr } from "@/mixins/request/request_composable.js";
 import { useDuckDBStore } from "@/stores/duckdbStore.js";
 import * as siteConfig from "@/site-config/site.json";
+import { getPublicFileUrl } from "@/utils/downloadService";
 
 // "cde_classification" -> "Cde Classification"
 const humanize = (name) =>
@@ -100,10 +101,18 @@ const discoverAdapter = {
     };
   },
 
-  // Single-file download: the download-manifest endpoint returns a
-  // presigned S3 URL per requested path (used for individual files and as
-  // the `src` for image/OME previews; multi-file downloads go through zipit).
-  async getFileDownloadUrl({ id, version, path }) {
+  // A link to one file from download-service: to save it (`download`), or
+  // to show it in a preview (`view`, recorded as a view, not a download).
+  // Several files download as a zip (downloadsStore.startPublic).
+  async getFileDownloadUrl({ id, version, path, purpose = "download" }) {
+    const { url } = await getPublicFileUrl({ datasetId: id, version, path, purpose });
+    return url || null;
+  },
+
+  // The app's own reads of metadata files (schemas, records for DuckDB):
+  // a presigned URL from Discover's download-manifest. Not a user's download
+  // or view, so not one of download-service's.
+  async _metadataFileUrl({ id, version, path }) {
     const url = `${siteConfig.discoverUrl}/datasets/${id}/versions/${version}/files/download-manifest`;
     const response = await useSendXhr(url, {
       method: "POST",
@@ -112,10 +121,9 @@ const discoverAdapter = {
     return response?.data?.[0]?.url || null;
   },
 
-  // Text/markdown preview content: fetch the file's presigned S3 URL and
-  // read it as text (same presigned-URL path as image/OME previews).
+  // Text/markdown preview content: a view link, read as text.
   async getFileContent({ id, version, path }) {
-    const url = await this.getFileDownloadUrl({ id, version, path });
+    const url = await this.getFileDownloadUrl({ id, version, path, purpose: "view" });
     if (!url) return "";
     const response = await fetch(url);
     if (!response.ok) {
@@ -145,7 +153,7 @@ const discoverAdapter = {
   // One model: its latest schema.json + derived display fields.
   async getModel({ id, version, model }) {
     const modelVersion = await this._latestModelVersion({ id, version, model });
-    const url = await this.getFileDownloadUrl({
+    const url = await this._metadataFileUrl({
       id,
       version,
       path: `metadata/models/${model}/versions/${modelVersion}/schema.json`,
@@ -189,7 +197,7 @@ const discoverAdapter = {
 
   // Presigned URL for a model's records.jsonl (fed to DuckDB).
   async getRecordsUrl({ id, version, model, modelVersion }) {
-    return this.getFileDownloadUrl({
+    return this._metadataFileUrl({
       id,
       version,
       path: `metadata/models/${model}/versions/${modelVersion}/records.jsonl`,
@@ -286,11 +294,12 @@ export const useReadOnlyDatasetStore = defineStore("readOnlyDatasetStore", () =>
     return adapter.browseFiles({ id, version, path, limit: pageLimit, offset: pageOffset });
   };
 
-  // Returns a presigned URL for a single file, or null.
-  const getFileDownloadUrl = async ({ id, version, path, sourceType = "discover" }) => {
+  // Returns a link to a single file, or null: to save it, or (purpose
+  // "view") to show it.
+  const getFileDownloadUrl = async ({ id, version, path, purpose, sourceType = "discover" }) => {
     const adapter = adapters[sourceType];
     if (!adapter?.getFileDownloadUrl) return null;
-    return adapter.getFileDownloadUrl({ id, version, path });
+    return adapter.getFileDownloadUrl({ id, version, path, purpose });
   };
 
   // Returns text content for a previewable file (text/markdown).

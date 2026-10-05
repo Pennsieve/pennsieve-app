@@ -38,7 +38,7 @@ describe('clin custom headers', () => {
   it('lets the app reach every endpoint in its site config', () => {
     const connect = directive('connect-src')
     const endpoints = [
-      clin.apiUrl, clin.api2Url, clin.downloadServiceUrl, clin.zipitUrl, clin.discoverUrl, clin.discoverZipitUrl,
+      clin.apiUrl, clin.api2Url, clin.downloadServiceUrl, clin.discoverUrl, clin.discoverDownloadsUrl,
       clin.timeSeriesUrl, clin.timeSeriesApi, clin.conceptsUrl, clin.bucket,
       `https://${clin.awsConfig.oauth.domain}`,
     ].filter(Boolean)
@@ -50,10 +50,8 @@ describe('clin custom headers', () => {
     expect(csp).not.toMatch(/pusher/i)
   })
 
-  it('lets public-dataset ZIP downloads post to zipit', () => {
-    const formAction = directive('form-action')
-    const zipit = clin.discoverZipitUrl || `${clin.zipitUrl}/discover`
-    expect(allows(formAction, zipit), zipit).toBe(true)
+  it('posts forms to nothing of prod: public-dataset downloads no longer go through zipit', () => {
+    expect(allows(directive('form-action'), 'https://api.pennsieve.io/zipit/discover')).toBe(false)
   })
 
   it('allows presigned S3 links for downloads, images and media', () => {

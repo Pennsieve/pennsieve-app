@@ -1,8 +1,5 @@
 <template>
   <div>
-    <form id="zipForm" method="POST" :action="zipItUrl">
-      <input v-model="zipData" type="hidden" name="data" />
-    </form>
     <form id="recordCsvForm" method="POST" :action="recordCsvUrl">
       <input v-model="recordCsvQuery" type="hidden" name="data" />
     </form>
@@ -116,7 +113,6 @@ export default {
 
   data() {
     return {
-      zipData: "",
       dialogVisible: false,
       packageDTOs: [],
       fileDTOs: undefined,
@@ -127,14 +123,12 @@ export default {
       // files or bytes, whatever the sizes here add up to.
       tooLargeForZip: false,
       downloadConfirmed: false,
-      zipItUrl: "",
       recordCsvUrl: "",
     };
   },
   mounted() {
     useGetToken()
       .then((token) => {
-        this.zipItUrl = `${this.config.zipitUrl}/?api_key=${token}`;
         const activeOrgIntId = pathOr(
           "",
           ["organization", "intId"],
@@ -306,28 +300,19 @@ export default {
         this.dialogVisible = true;
         return;
       }
-      // Fast path: a selection that resolves to exactly one file gets a
-      // direct presigned download, no zipit round-trip and no
-      // pennsieve-data.zip wrapper around a single file.
+      // One file downloads directly through its link; anything else is
+      // zipped by download-service, and the downloads panel follows it.
       if (await this.tryDirectDownload()) {
         this.closeDialog();
         return;
       }
-      const nodeIds = this.packageDTOs.map((s) => s.content.nodeId);
-      if (this.fileDTOs) {
-        const fileIds = this.fileDTOs.map((f) => f.id);
-        this.downloadPackages(nodeIds, fileIds);
-      } else {
-        this.downloadPackages(nodeIds);
-      }
+      this.downloadPackages(this.packageDTOs.map((s) => s.content.nodeId));
       this.closeDialog();
     },
 
     /**
-     * Attempts to download the selection as a single file via its presigned
-     * URL. Returns true if handled; false to defer to zipit. Any unexpected
-     * error is swallowed and returns false, so the zipit fallback always
-     * runs — a broken fast path never blocks the existing flow.
+     * Downloads a one-package selection (a package is one file) directly.
+     * Returns false for anything else, so it's zipped instead.
      */
     tryDirectDownload: async function () {
       if (this.packageDTOs.length !== 1) return false;
@@ -335,74 +320,21 @@ export default {
       if (pathOr("", ["content", "packageType"], pkg) === "Collection") {
         return false;
       }
-      if (downloadServiceUrl()) return this.downloadViaService(pkg);
-      const packageId = pathOr("", ["content", "id"], pkg);
-      if (!packageId) return false;
-
-      // A file-level selection short-circuits the sources lookup. Multiple
-      // file selections (e.g. picking 2 sources out of a legacy multi-file
-      // package) defer to zipit.
-      let fileId;
-      if (this.fileDTOs) {
-        if (this.fileDTOs.length !== 1) return false;
-        fileId = this.fileDTOs[0].id;
-      } else {
-        try {
-          const token = await useGetToken();
-          const pkgResp = await this.sendXhr(
-            `${this.config.apiUrl}/packages/${packageId}?include=sources&includeAncestors=false&api_key=${token}`,
-            { method: "GET", header: { Authorization: `bearer ${token}` } },
-          );
-          const sources = pathOr([], ["objects", "source"], pkgResp);
-          // Legacy multi-file packages need to be zipped so none of the
-          // extra sources get silently dropped.
-          if (sources.length !== 1) return false;
-          fileId = pathOr("", [0, "content", "id"], sources);
-          if (!fileId) return false;
-        } catch (e) {
-          return false;
-        }
-      }
-
-      try {
-        const token = await useGetToken();
-        const presigned = await this.sendXhr(
-          `${this.config.apiUrl}/packages/${packageId}/files/${fileId}?api_key=${token}`,
-          { method: "GET", header: { Authorization: `bearer ${token}` } },
-        );
-        const url = pathOr("", ["url"], presigned);
-        if (!url) return false;
-        const a = document.createElement("a");
-        a.href = url;
-        a.rel = "noopener";
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        return true;
-      } catch (e) {
-        return false;
-      }
+      return this.downloadViaService(pkg);
     },
 
     /**
      * Downloads a one-file selection through download-service, which signs
-     * the link and records the download. Returns false when the selection
-     * isn't one file (a package with several files and none picked, which
-     * the service answers with a 400), so the multi-file path runs instead.
-     * A refusal (malware scan, no access) is shown, not retried as a zip.
+     * the link and records the download. Returns false when the service
+     * can't link it as one file, so it's zipped instead. A refusal (malware
+     * scan, no access) is shown, not retried as a zip.
      */
     downloadViaService: async function (pkg) {
-      let fileId;
-      if (this.fileDTOs) {
-        if (this.fileDTOs.length !== 1) return false;
-        fileId = this.fileDTOs[0].id;
-      }
       const content = pkg.content || {};
       try {
         const link = await getFileUrl({
           datasetId: content.datasetNodeId || this.$route?.params?.datasetId,
           packageId: content.nodeId || content.id,
-          fileId,
         });
         triggerBrowserDownload(link.url);
         return true;
@@ -425,16 +357,14 @@ export default {
      * its progress, and the archive downloads once it's ready; if the user
      * leaves, they're emailed instead.
      * @param {Array} nodeIds
-     * @param {Array} fileIds - when downloading a single package, only these files
      */
-    archiveViaService: async function (nodeIds, fileIds) {
+    archiveViaService: async function (nodeIds) {
       const content = pathOr({}, [0, "content"], this.packageDTOs);
       const archiveName = this.archiveName;
       try {
         await useDownloadsStore().start({
           datasetId: content.datasetNodeId || this.$route?.params?.datasetId,
           nodeIds,
-          fileIds,
           // Several items: the name from the dialog. One folder or package:
           // its own name.
           archiveName: nodeIds.length > 1 ? archiveName : content.name,
@@ -464,36 +394,11 @@ export default {
     },
 
     /**
-     * downloads multiple packages
+     * Zips packages and folders (download-service).
      * @param {Array} nodeIds
-     * @param {Array} fileIds - when downloading a single package, includes only specified files
      */
-    downloadPackages: function (nodeIds, fileIds) {
-      if (downloadServiceUrl()) {
-        this.archiveViaService(nodeIds, fileIds);
-        return;
-      }
-      const fileIdPayload = fileIds ? { fileIds } : {};
-      const archiveNamePayload =
-        this.archiveName && nodeIds.length > 1
-          ? { archiveName: this.archiveName }
-          : {};
-      const payload = { nodeIds, ...fileIdPayload, ...archiveNamePayload };
-
-      const form = document.createElement("form");
-      form.method = "POST";
-      form.action = this.zipItUrl;
-      form.target = "_blank";
-
-      const input = document.createElement("input");
-      input.type = "hidden";
-      input.name = "data";
-      input.value = JSON.stringify(payload);
-
-      form.appendChild(input);
-      document.body.appendChild(form);
-      form.submit();
-      document.body.removeChild(form);
+    downloadPackages: function (nodeIds) {
+      this.archiveViaService(nodeIds);
     },
   },
 };

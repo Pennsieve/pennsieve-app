@@ -202,6 +202,7 @@ const preparePreview = async () => {
         id: props.dataset.id,
         version: props.dataset.version,
         path: filePath.value,
+        purpose: "view",
       });
     } else if (viewer.needs === "content") {
       fileContent.value = await store.getFileContent({

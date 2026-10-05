@@ -6,7 +6,6 @@
   "cdeCatalogUrl": "https://cde-catalog.pennsieve.net",
   "discoverUrl": "https://api.pennsieve.net/discover",
   "discoverAppUrl": "https://discover.pennsieve.net",
-  "zipitUrl": "https://api.pennsieve.net/zipit",
   "docsUrl": "https://docs.pennsieve.io",
   "maxDownloadSize": 20000000000,
   "environment": "dev",

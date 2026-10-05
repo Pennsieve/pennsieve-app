@@ -7,6 +7,10 @@ vi.mock("@/utils/downloadService", () => ({
   listArchives: vi.fn(),
   getArchiveUrl: vi.fn(),
   deleteArchive: vi.fn(),
+  createPublicArchive: vi.fn(),
+  getPublicArchive: vi.fn(),
+  getPublicArchiveUrl: vi.fn(),
+  deletePublicArchive: vi.fn(),
 }));
 vi.mock("@/utils/triggerBrowserDownload", () => ({ triggerBrowserDownload: vi.fn() }));
 
@@ -17,6 +21,10 @@ import {
   listArchives,
   getArchiveUrl,
   deleteArchive,
+  createPublicArchive,
+  getPublicArchive,
+  getPublicArchiveUrl,
+  deletePublicArchive,
 } from "@/utils/downloadService";
 import { triggerBrowserDownload } from "@/utils/triggerBrowserDownload";
 
@@ -176,6 +184,34 @@ describe("downloads store", () => {
     await store.remove(store.downloads.find((d) => d.id === "d2"));
     expect(store.downloads.map((d) => d.id)).toEqual(["d1"]);
   });
+  it("follows a zip of a published dataset through the public routes, and keeps it when the workspace list loads", async () => {
+    const store = useDownloadsStore();
+    const pub = { id: "pa_1", scope: "public", status: "QUEUED", publicDatasetId: 5347, fileCount: 2, filesDone: 0 };
+    createPublicArchive.mockResolvedValue(pub);
+    getPublicArchive.mockResolvedValueOnce({ ...pub, status: "READY", filesDone: 2 });
+    getPublicArchiveUrl.mockResolvedValue({ url: "https://s3/zip" });
+    listArchives.mockResolvedValue([{ ...queued, organizationNodeId: "N:organization:1" }]);
+
+    await store.startPublic({ datasetId: 5347, version: 2, paths: ["files"] });
+    expect(createPublicArchive).toHaveBeenCalledWith({ datasetId: 5347, version: 2, paths: ["files"] });
+    expect(store.panelOpen).toBe(true);
+
+    await store.load("N:organization:1");
+    expect(store.downloads.map((d) => d.id)).toEqual(["pa_1", "d1"]);
+
+    getArchive.mockResolvedValue(queued);
+    await vi.advanceTimersByTimeAsync(POLL_MS);
+    expect(getPublicArchive).toHaveBeenCalledWith({ id: "pa_1" });
+    expect(getPublicArchiveUrl).toHaveBeenCalledWith({ id: "pa_1" });
+    expect(triggerBrowserDownload).toHaveBeenCalledWith("https://s3/zip");
+    expect(getArchive).not.toHaveBeenCalledWith(expect.objectContaining({ id: "pa_1" }));
+
+    deletePublicArchive.mockResolvedValue({});
+    await store.remove(store.downloads.find((d) => d.id === "pa_1"));
+    expect(deletePublicArchive).toHaveBeenCalledWith({ id: "pa_1" });
+    expect(deleteArchive).not.toHaveBeenCalled();
+  });
+
 });
 
 describe("humanSize", () => {

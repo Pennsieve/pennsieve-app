@@ -53,19 +53,21 @@ describe('BfDownloadFile single-file downloads', () => {
     getFileUrl.mockResolvedValue({ url: 'https://s3/signed' })
     const cmp = component()
     expect(await tryDirectDownload.call(cmp)).toBe(true)
-    expect(getFileUrl).toHaveBeenCalledWith({ datasetId: 'N:dataset:1', packageId: 'N:package:1', fileId: undefined })
+    expect(getFileUrl).toHaveBeenCalledWith({ datasetId: 'N:dataset:1', packageId: 'N:package:1' })
     expect(triggerBrowserDownload).toHaveBeenCalledWith('https://s3/signed')
     expect(cmp.sendXhr).not.toHaveBeenCalled()
   })
 
-  it('passes the one file picked from a package', async () => {
+  it('links the package whatever files were picked: a package is one file', async () => {
     getFileUrl.mockResolvedValue({ url: 'https://s3/signed' })
     expect(await tryDirectDownload.call(component({ fileDTOs: [{ id: 42 }] }))).toBe(true)
-    expect(getFileUrl.mock.calls[0][0].fileId).toBe(42)
+    expect(getFileUrl.mock.calls[0][0]).toEqual({ datasetId: 'N:dataset:1', packageId: 'N:package:1' })
   })
 
-  it('leaves several picked files to the multi-file path', async () => {
-    expect(await tryDirectDownload.call(component({ fileDTOs: [{ id: 1 }, { id: 2 }] }))).toBe(false)
+  it('zips several packages or a folder instead', async () => {
+    expect(await tryDirectDownload.call(component({ packageDTOs: [pkg, pkg] }))).toBe(false)
+    const folder = { content: { ...pkg.content, packageType: 'Collection' } }
+    expect(await tryDirectDownload.call(component({ packageDTOs: [folder] }))).toBe(false)
     expect(getFileUrl).not.toHaveBeenCalled()
   })
 
@@ -91,14 +93,6 @@ describe('BfDownloadFile single-file downloads', () => {
     await tryDirectDownload.call(component({ packageDTOs: [bare] }))
     expect(getFileUrl.mock.calls[0][0].datasetId).toBe('N:dataset:route')
   })
-
-  it('keeps the pennsieve-api path where download-service is not configured', async () => {
-    downloadServiceUrl.mockReturnValue('')
-    const cmp = component()
-    expect(await tryDirectDownload.call(cmp)).toBe(false)
-    expect(getFileUrl).not.toHaveBeenCalled()
-    expect(cmp.sendXhr).toHaveBeenCalled()
-  })
 })
 
 describe('BfDownloadFile archives', () => {
@@ -117,15 +111,15 @@ describe('BfDownloadFile archives', () => {
     downloadPackages.call(cmp, ['N:package:1', 'N:package:2'])
     await vi.waitFor(() => expect(start).toHaveBeenCalled())
     expect(start).toHaveBeenCalledWith({
-      datasetId: 'N:dataset:1', nodeIds: ['N:package:1', 'N:package:2'], fileIds: undefined, archiveName: 'my-study',
+      datasetId: 'N:dataset:1', nodeIds: ['N:package:1', 'N:package:2'], archiveName: 'my-study',
     })
   })
 
-  it('names a single folder or package after itself, and passes picked files', async () => {
+  it('names a single folder or package after itself', async () => {
     start.mockResolvedValue({ id: 'd1' })
     const folder = { content: { ...pkg.content, name: 'study', packageType: 'Collection' } }
-    await archiveViaService.call(archiving({ packageDTOs: [folder] }), ['N:collection:1'], [4, 5])
-    expect(start.mock.calls[0][0]).toMatchObject({ nodeIds: ['N:collection:1'], fileIds: [4, 5], archiveName: 'study' })
+    await archiveViaService.call(archiving({ packageDTOs: [folder] }), ['N:collection:1'])
+    expect(start.mock.calls[0][0]).toEqual({ datasetId: 'N:dataset:1', nodeIds: ['N:collection:1'], archiveName: 'study' })
   })
 
   it('offers the agent when the service finds the selection too large to zip', async () => {
