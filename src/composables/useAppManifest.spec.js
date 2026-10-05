@@ -1,6 +1,7 @@
 import {
   getManifestAsset,
   parseManifestText,
+  resolveManifest,
 } from './useAppManifest'
 
 /*
@@ -70,6 +71,44 @@ describe('useAppManifest helpers', () => {
       // Valid YAML, but not a mapping.
       expect(parseManifestText('just a string')).toBeNull()
       expect(parseManifestText('- one\n- two')).toBeNull()
+    })
+  })
+
+  describe('resolveManifest', () => {
+    const V1_YAML = NESTED_YAML.replace('name: mode', 'name: legacyMode')
+    const versions = [
+      { version: 'v1', createdAt: '2026-01-01T00:00:00Z' },
+      { version: 'v2', createdAt: '2026-06-01T00:00:00Z' },
+    ]
+    const paramNames = (r) => r.schema.parameters.map((p) => p.name)
+
+    it('uses the top-level manifest as the latest version', () => {
+      const detail = { assets: { 'app.yml': NESTED_YAML }, versions }
+      expect(resolveManifest(detail).exact).toBe(true)
+      expect(resolveManifest(detail, 'v2').exact).toBe(true)
+    })
+
+    it('falls back to the top-level manifest for an older version, flagged inexact', () => {
+      // Today's backend: no per-version assets.
+      const detail = { assets: { 'app.yml': NESTED_YAML }, versions }
+      const r = resolveManifest(detail, 'v1')
+      expect(r.exact).toBe(false)
+      expect(paramNames(r)).toEqual(['mode'])
+    })
+
+    it("prefers a version's own assets", () => {
+      const detail = {
+        assets: { 'app.yml': NESTED_YAML },
+        versions: [{ ...versions[0], assets: { 'app.yml': V1_YAML } }, versions[1]],
+      }
+      const r = resolveManifest(detail, 'v1')
+      expect(r.exact).toBe(true)
+      expect(paramNames(r)).toEqual(['legacyMode'])
+    })
+
+    it('returns null when nothing usable is there', () => {
+      expect(resolveManifest(null, 'v1')).toBeNull()
+      expect(resolveManifest({ assets: {}, versions }, 'v1')).toBeNull()
     })
   })
 })

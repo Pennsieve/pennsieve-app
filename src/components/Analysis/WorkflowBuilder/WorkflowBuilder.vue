@@ -80,6 +80,8 @@ const selectedNodeProcessor = computed(() => {
 const selectedNodeParamSchema = computed(() => {
   const node = selectedNode.value;
   if (!node || node.type !== "default") return [];
+  // Read from the node's own version of app.yml — authoritative even if empty
+  if (node.data?.paramSchemaExact) return node.data.paramSchema || [];
   // In browse mode: use paramSchema from the workflow definition DAG node
   if (node.data?.paramSchema?.length > 0) return node.data.paramSchema;
   // In create mode: use params from the application (flat key-value object)
@@ -288,16 +290,17 @@ const getComputeTypesForApplication = (application) => {
 */
 const { loadManifest } = useAppManifest();
 
-const applyManifestDefaults = async (nodeId, application) => {
+const applyManifestDefaults = async (nodeId, application, tag) => {
   const uuid = application?.uuid;
   if (!uuid) return;
 
-  const parsed = await loadManifest(uuid);
+  const parsed = await loadManifest(uuid, tag);
   if (!parsed) return;
 
-  // The node may have been deleted while the request was in flight.
+  // The node may have been deleted, or moved to another version, while the
+  // request was in flight.
   const node = nodes.value.find((n) => n.id === nodeId);
-  if (!node) return;
+  if (!node || node.data.tag !== tag) return;
 
   const { schema } = parsed;
 
@@ -350,14 +353,55 @@ const hydrateManifestPorts = async () => {
 
   await Promise.all(
     pending.map(async (n) => {
-      const parsed = await loadManifest(n.data.application.uuid);
-      // The node may have been removed while the request was in flight.
+      const tag = n.data.tag;
+      const parsed = await loadManifest(n.data.application.uuid, tag);
+      // The node may have been removed, or moved to another version, while
+      // the request was in flight.
       const node = nodes.value.find((x) => x.id === n.id);
-      if (node && parsed) setManifestPorts(node, parsed);
+      if (!node || !parsed || node.data.tag !== tag) return;
+      setManifestPorts(node, parsed);
+      // The saved definition's paramSchema may describe a different version
+      // than the node's tag; the tag's own manifest is authoritative.
+      if (parsed.exact) {
+        node.data.paramSchema = toParamSchema(parsed.schema.parameters);
+        node.data.paramSchemaExact = true;
+      }
     }),
   );
 
   revalidateEdges();
+};
+
+/*
+  Version changes
+  ---------------
+  Each version can declare different parameters and ports. When the user
+  picks another version, swap in that version's manifest. Overrides for
+  parameters the new version still declares are kept; the rest are dropped so
+  they are not sent to a version that does not know them.
+
+  If the backend cannot tell us that version's app.yml (`exact` is false), the
+  node is left alone rather than shown another version's parameters.
+*/
+const onNodeVersionChange = async (node) => {
+  const tag = node.data.tag;
+  const uuid = node.data.application?.uuid;
+  if (!uuid || !tag) return;
+
+  const parsed = await loadManifest(uuid, tag);
+  const current = nodes.value.find((n) => n.id === node.id);
+  if (!current || current.data.tag !== tag || !parsed?.exact) return;
+
+  const paramSchema = toParamSchema(parsed.schema.parameters);
+  const declared = new Set(paramSchema.map((p) => p.name));
+  current.data.paramSchema = paramSchema;
+  current.data.paramSchemaExact = true;
+  current.data.defaultParams = Object.fromEntries(
+    Object.entries(current.data.defaultParams || {}).filter(([k]) =>
+      declared.has(k),
+    ),
+  );
+  setManifestPorts(current, parsed);
 };
 
 const getTargetTypeParams = (targetType) => {
@@ -871,7 +915,9 @@ const onDrop = (event) => {
   if (newNode) {
     nodes.value.push(newNode);
     // Fire-and-forget: patches the node in place once app.yml is read.
-    if (droppedApp) applyManifestDefaults(newNode.id, droppedApp);
+    if (droppedApp) {
+      applyManifestDefaults(newNode.id, droppedApp, newNode.data.tag);
+    }
   }
 
   draggedApp.value = null;
@@ -1884,6 +1930,7 @@ const openNodeSettings = (id) => {
                       v-model="selectedNode.data.tag"
                       size="small"
                       class="info-inline-select"
+                      @change="onNodeVersionChange(selectedNode)"
                     >
                       <el-option
                         v-for="v in sortedVersions(

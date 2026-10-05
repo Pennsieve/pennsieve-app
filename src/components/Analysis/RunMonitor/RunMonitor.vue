@@ -20,6 +20,8 @@ import { useMetricsCounters } from "@/composables/useMetricsCounters";
 import toQueryParams from "@/utils/toQueryParams";
 import LayerNameSelector from "./LayerNameSelector.vue";
 import { validateRunName, runDisplayName, RUN_NAME_MAX_LENGTH } from "./runHelpers";
+import { useAppManifest } from "@/composables/useAppManifest";
+import { toParamSchema } from "../Applications/applicationSchema";
 
 const { onNodeClick, onPaneClick, fitView, updateNodeData } = useVueFlow();
 
@@ -191,6 +193,53 @@ const findMatchedApp = (sourceUrl) => {
         normalizeUrl(app.source?.url) === normalized
     ) || null
   );
+};
+
+/*
+  Per-version parameters
+  ----------------------
+  The definition's paramSchema describes one version of each application, but
+  the run can pick any version. Rebuild a processor's parameter list from the
+  selected version's app.yml. Values the user typed are kept for parameters
+  the version still declares; values that were only the previous version's
+  default give way to this version's default.
+
+  If the backend cannot tell us that version's app.yml (`exact` is false), the
+  list is left as it is.
+*/
+const { loadManifest } = useAppManifest();
+
+const applyVersionParams = async (nodeId) => {
+  const dagNode = (configDefinition.value?.dag || []).find((n) => n.id === nodeId);
+  const uuid = findMatchedApp(dagNode?.sourceUrl)?.uuid;
+  const version = nodeConfigs[nodeId]?.version;
+  if (!uuid || !version) return;
+
+  const parsed = await loadManifest(uuid, version);
+  const cfg = nodeConfigs[nodeId];
+  // The dialog may have closed, or the version changed again, meanwhile.
+  if (!cfg || cfg.version !== version || !parsed?.exact) return;
+
+  const overrides = dagNode.defaultParams || {};
+  const typed = Object.fromEntries(
+    (cfg.schemaParams || [])
+      .filter((p) => p.value !== "" && p.value !== p.resolvedDefault)
+      .map((p) => [p.name, p.value]),
+  );
+
+  cfg.schemaParams = toParamSchema(parsed.schema.parameters).map((pd) => {
+    const def = overrides[pd.name] ?? pd.defaultValue;
+    const resolvedDefault = def != null ? String(def) : "";
+    return {
+      name: pd.name,
+      type: pd.type || "string",
+      description: pd.description || "",
+      required: pd.defaultValue == null,
+      validValues: pd.validValues || [],
+      resolvedDefault,
+      value: typed[pd.name] ?? resolvedDefault,
+    };
+  });
 };
 
 const getTargetTypeDefinition = (targetType) => {
@@ -1034,6 +1083,11 @@ const initiateWorkflow = async () => {
 
     // Clear rerun source after applying
     rerunSource.value = null;
+
+    // Fire-and-forget: swap in each processor's own version of its parameters.
+    dag
+      .filter((d) => d.type !== "data-source" && d.type !== "data-target")
+      .forEach((d) => applyVersionParams(d.id));
 
     // Render the definition DAG on canvas
     const result = definitionToNodesAndEdges(definition);
@@ -1992,6 +2046,7 @@ onUnmounted(() => {
                     size="small"
                     style="width: 100%"
                     placeholder="latest"
+                    @change="applyVersionParams(selectedNode.id)"
                     :disabled="sortedVersions(findMatchedApp(selectedNode.data?.sourceUrl)).length <= 1"
                   >
                     <el-option
