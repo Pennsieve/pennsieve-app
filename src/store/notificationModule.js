@@ -6,7 +6,7 @@ import {
 } from '@/composables/useNotifications'
 
 // ── Mock data for testing pagination ──
-const USE_MOCK = true
+const USE_MOCK = false
 
 const MOCK_NOTIFICATIONS = (() => {
   const items = []
