@@ -3,6 +3,7 @@
   "apiUrl": "https://api.pennsieve.ai",
   "api2Url": "https://api2.pennsieve.ai",
   "downloadServiceUrl": "https://api2.pennsieve.ai/downloads",
+  "cdeCatalogUrl": "https://cde-catalog.pennsieve.ai",
   "discoverUrl": "https://api.pennsieve.io/discover",
   "discoverDownloadsUrl": "https://downloads.pennsieve.io",
   "discoverAppUrl": "https://discover.pennsieve.io",

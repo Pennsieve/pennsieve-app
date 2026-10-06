@@ -102,6 +102,7 @@ customHeaders:
             https://api.pennsieve.ai
             wss://api.pennsieve.ai
             https://api2.pennsieve.ai
+            https://cde-catalog.pennsieve.ai
             wss://chat.pennsieve.ai
             https://workspace-assets.pennsieve.ai
             https://assets.pennsieve.ai
