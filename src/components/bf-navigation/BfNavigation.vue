@@ -190,19 +190,6 @@
 
       <bf-navigation-item
         v-if="!(pageNotFound || isWelcomeOrg) && !isWorkspaceGuest"
-        id="nav-notifications"
-        :link="{ name: 'workspace-notifications', params: { orgId: activeOrganizationId } }"
-        label="Notifications"
-        :condensed="primaryNavCondensed"
-        :styleColor="navStyleColor"
-      >
-        <template v-slot:icon>
-          <IconNotifications :width="20" :height="20" color="currentColor" />
-        </template>
-      </bf-navigation-item>
-
-      <bf-navigation-item
-        v-if="hasAdminRights && !pageNotFound && !isWorkspaceGuest"
         :link="{ name: 'workspace-settings-overview', params: { orgId: activeOrganizationId } }"
         label="Settings"
         :condensed="primaryNavCondensed"
@@ -266,7 +253,6 @@ import IconPublic from "../icons/IconPublic.vue";
 import IconArrowLeft from "../icons/IconArrowLeft.vue";
 import WorkspaceLogo from "../shared/WorkspaceLogo/WorkspaceLogo.vue";
 import IconCollection from "../icons/IconCollection.vue";
-import IconNotifications from "../icons/IconNotifications.vue";
 import CustomTheme from "../../mixins/custom-theme";
 
 export default {
@@ -300,7 +286,6 @@ export default {
     IconTeam,
     IconIntegrations,
     IconCollection,
-    IconNotifications,
   },
   mixins: [CustomTheme],
 

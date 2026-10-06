@@ -14,6 +14,7 @@ import analysisModule from "./analysisModule";
 import codeReposModule from "./codeReposModule";
 import collectionsModule from "./collectionsModule";
 import workspaceLogoModule from "./workspaceLogoModule";
+import notificationModule from "./notificationModule";
 
 const hashFunction = (key, list) => {
   const obj = {};
@@ -1065,7 +1066,8 @@ export default createStore({
     analysisModule,
     codeReposModule,
     collectionsModule,
-    workspaceLogoModule
+    workspaceLogoModule,
+    notificationModule
   }
 
 });

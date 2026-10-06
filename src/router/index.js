@@ -1,5 +1,7 @@
 import { createRouter, createWebHistory } from "vue-router";
+import { propOr } from 'ramda'
 import { PublicationStatus, PublicationTabs } from '../utils/constants.js'
+import store from '../store'
 
 import NotFound from './not-found/NotFound.vue'
 import MyCollectionsStage from "@/router/MyWorkSpace/MyCollectionsStage.vue";
@@ -50,6 +52,7 @@ const DatasetPermissionsHeader = () => import('./Dataset/DatasetPermissionsHeade
 const DatasetPermissions = () => import('../components/datasets/DatasetPermissions/DatasetPermissions.vue')
 const EmbargoedPermissions = () => import('../components/datasets/DatasetPermissions/EmbargoedPermissions/EmbargoedPermissions.vue')
 const DatasetIntegrationsSettings = () => import('../components/datasets/settings/DatasetIntegrationsSettings.vue')
+const DatasetNotificationSubscriptions = () => import('../components/notifications/NotificationSubscriptions.vue')
 
 /**
  * ORCIDRedirect
@@ -92,7 +95,6 @@ const OrgSettings = () => import('../components/OrgSettings/OrgSettings.vue')
 
 const People = () => import('./people/People.vue')
 const WorkspaceResources = () => import('./resources/WorkspaceResources.vue')
-const WorkspaceNotifications = () => import('./notifications/WorkspaceNotifications.vue')
 const PeopleList = () => import('../components/people/list/PeopleList.vue')
 
 const Teams = () => import('./teams/Teams.vue')
@@ -184,6 +186,17 @@ const PS404 = () => import('../components/PS-404/PS-404.vue')
  * if more navigation history is needed, this functionality should be moved to its own store. 
  */
 let previousCollection = null;
+
+function requireAdminRights(to, from, next) {
+  const activeOrg = store.getters.activeOrganization
+  const isAdmin = propOr(false, 'isAdmin', activeOrg)
+  const isOwner = propOr(false, 'isOwner', activeOrg)
+  if (isAdmin || isOwner) {
+    next()
+  } else {
+    next({ name: 'workspace-settings-overview', params: { orgId: to.params.orgId } })
+  }
+}
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -1184,6 +1197,16 @@ const router = createRouter({
                 stage: true
               }
             },
+            {
+              name: 'dataset-notifications-settings',
+              path: 'notifications',
+              components: {
+                stage: DatasetNotificationSubscriptions
+              },
+              props: {
+                stage: () => ({ scope: 'dataset' })
+              }
+            },
           ]
         },
         {
@@ -1685,24 +1708,6 @@ const router = createRouter({
       ]
     },
     {
-      path: '/:orgId/notifications',
-      components: {
-        page: WorkspaceNotifications,
-        navigation: BfNavigation
-      },
-      props: true,
-      children: [
-        {
-          name: 'workspace-notifications',
-          path: '',
-          components: {
-            stage: () => import('../components/notifications/NotificationSubscriptions.vue')
-          },
-          props: true
-        }
-      ]
-    },
-    {
       name: "people",
       path: '/:orgId/people',
       components: {
@@ -1972,34 +1977,46 @@ const router = createRouter({
           path: 'general',
           components: {
             stage: () => import('../components/OrgSettings/GeneralSettingsPage.vue')
-          }
+          },
+          beforeEnter: requireAdminRights
         },
         {
           name: 'workspace-dataset-statuses',
           path: 'dataset-statuses',
           components: {
             stage: () => import('../components/OrgSettings/DatasetStatusesPage.vue')
-          }
+          },
+          beforeEnter: requireAdminRights
         },
         {
           name: 'workspace-data-use-agreements',
           path: 'data-use-agreements',
           components: {
             stage: () => import('../components/OrgSettings/DataUseAgreementsPage.vue')
-          }
+          },
+          beforeEnter: requireAdminRights
         },
         {
           name: 'workspace-usage-analytics',
           path: 'usage',
           components: {
             stage: () => import('../components/OrgSettings/UsageAnalyticsPage.vue')
-          }
+          },
+          beforeEnter: requireAdminRights
         },
         {
           name: 'workspace-storage-nodes',
           path: 'storage-nodes',
           components: {
             stage: () => import('../components/OrgSettings/StorageNodesPage.vue')
+          },
+          beforeEnter: requireAdminRights
+        },
+        {
+          name: 'workspace-notifications',
+          path: 'notifications',
+          components: {
+            stage: () => import('../components/notifications/NotificationSubscriptions.vue')
           }
         },
       ],
