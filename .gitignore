@@ -22,7 +22,7 @@ yarn-error.log*
 coverage
 **/*/__snapshots__
 .claude
-
+CLAUDE.md
 # Editor directories and files
 .idea
 .vscode
