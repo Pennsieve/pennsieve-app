@@ -576,6 +576,7 @@ export default {
   border: 1px solid theme.$gray_2;
   border-radius: 4px;
   background: theme.$white;
+  text-align: center;
 
   strong {
     font-size: 14px;
