@@ -27,7 +27,7 @@
           Ready to submit for publication
         </span>
       </div>
-      <a v-if="isPublished" target="_blank" :href="discoverLink" class="discover-link">
+      <a v-if="isPublished && discoverLink" target="_blank" :href="discoverLink" class="discover-link">
         View on Discover
       </a>
     </div>
@@ -335,8 +335,10 @@ export default {
      * @returns {String}
      */
     publishedDate: function () {
-      const date = propOr("", "lastPublishedDate", this.publishedData);
-      return this.formatDate(date);
+      const date =
+        pathOr("", ["publication", "publishedDataset", "lastPublishedDate"], this.dataset) ||
+        propOr("", "lastPublishedDate", this.publishedData);
+      return date ? this.formatDate(date) : "";
     },
 
     /**
@@ -344,11 +346,13 @@ export default {
      * @returns {String}
      */
     discoverLink: function () {
-      const publishedDatasetId = propOr(
-        1,
-        "publishedDatasetId",
-        this.publishedData
-      );
+      const publishedDatasetId =
+        pathOr(null, ["publication", "publishedDataset", "id"], this.dataset) ||
+        propOr(null, "publishedDatasetId", this.publishedData);
+
+      if (!publishedDatasetId) {
+        return "";
+      }
 
       return this.config.environment === "prod"
         ? `https://discover.pennsieve.io/datasets/${publishedDatasetId}`
