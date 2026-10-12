@@ -51,18 +51,41 @@
       </p>
     </div>
 
-    <!-- Submit Action -->
-    <div v-if="!isPublished || isPublished" class="action-row">
-      <div class="action-info">
-        <strong>{{ (isPublished || hasBeenPublished) ? 'Publish a new version' : 'Submit for review' }}</strong>
-        <p>{{ (isPublished || hasBeenPublished) ? 'Request to publish an updated version to Discover.' : 'While under review, this dataset will be locked until approved or rejected.' }}</p>
+    <!-- Submit Actions: the user picks exactly one pathway -->
+    <div
+      class="pathway-choice"
+      :class="{ 'is-single': !canRequestEmbargo }"
+      role="group"
+      aria-label="Choose a publishing pathway"
+    >
+      <div class="pathway-card">
+        <strong>{{ hasBeenPublished ? 'Publish a new version' : 'Ready to Publish' }}</strong>
+        <p>{{ hasBeenPublished ? 'Request to publish an updated version to Discover.' : 'Submit dataset for standard publication review. While under review, the dataset will be locked until approved or rejected.' }}</p>
+        <submit-for-publication
+          class="pathway-action"
+          :can-publish="canPublish"
+          :dataset-id="datasetId"
+          :is-requested="isRequested"
+          :publication-type="PublicationType.PUBLICATION"
+        />
       </div>
-      <submit-for-publication
-        :has-dataset="true"
-        :can-publish="canPublish"
-        :dataset-id="datasetId"
-        :is-requested="publicationStatus === PublicationStatus.REQUESTED"
-      />
+
+      <!-- A dataset already on Discover can't be pulled back under embargo -->
+      <template v-if="canRequestEmbargo">
+        <span class="pathway-divider" aria-hidden="true">OR</span>
+
+        <div class="pathway-card">
+          <strong>Ready to Publish under Embargo</strong>
+          <p>Submit dataset for review with a scheduled embargo date before public release.</p>
+          <submit-for-publication
+            class="pathway-action"
+            :can-publish="canPublish"
+            :dataset-id="datasetId"
+            :is-requested="isRequested"
+            :publication-type="PublicationType.EMBARGO"
+          />
+        </div>
+      </template>
     </div>
 
     <!-- Post-publication actions -->
@@ -259,6 +282,14 @@ export default {
     hasBeenPublished: function () {
       const publication = propOr({}, "publication", this.dataset);
       return publication.hasOwnProperty("publishedDataset");
+    },
+
+    /**
+     * Embargo is only offered before a dataset is publicly released
+     * @returns {Boolean}
+     */
+    canRequestEmbargo: function () {
+      return !this.hasBeenPublished || this.publicationType === PublicationType.REMOVAL;
     },
 
     isPublished: function () {
@@ -519,6 +550,67 @@ export default {
       line-height: 1.5;
     }
   }
+}
+
+.pathway-choice {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: stretch;
+  gap: 16px;
+  padding: 8px 0 24px;
+  border-bottom: 1px solid theme.$gray_2;
+
+  &.is-single {
+    grid-template-columns: 1fr;
+  }
+
+  @media (max-width: 800px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.pathway-card {
+  display: flex;
+  flex-direction: column;
+  padding: 16px;
+  border: 1px solid theme.$gray_2;
+  border-radius: 4px;
+  background: theme.$white;
+
+  strong {
+    font-size: 14px;
+    color: theme.$gray_6;
+  }
+
+  p {
+    font-size: 13px;
+    color: theme.$gray_5;
+    margin: 4px 0 16px;
+    line-height: 1.5;
+  }
+
+  // Pin the button to the bottom so both cards' Submits line up
+  // regardless of description length
+  .pathway-action {
+    margin-top: auto;
+    align-self: center;
+  }
+}
+
+.pathway-divider {
+  align-self: center;
+  justify-self: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 1px solid theme.$gray_2;
+  background: theme.$gray_1;
+  color: theme.$gray_5;
+  font-size: 12px;
+  font-weight: 600;
 }
 
 .readiness-message {
