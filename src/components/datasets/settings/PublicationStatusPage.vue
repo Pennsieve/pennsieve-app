@@ -112,7 +112,7 @@
         </div>
 
         <div class="pub-section">
-          <div class="pub-section-header">Submit for Publication</div>
+          <div class="pub-section-header">Manage Publication</div>
           <div class="pub-section-content">
             <dataset-settings-publishing
               :orcid-api-url="getORCIDApiUrl"
