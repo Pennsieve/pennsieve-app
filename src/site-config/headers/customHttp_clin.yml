@@ -30,7 +30,6 @@ customHeaders:
             https://cdn.polyfill.io
             https://polyfill.io
             https://www.google-analytics.com
-            https://bam.nr-data.net
             https://api.tiles.mapbox.com
             https://code.jquery.com
             https://cdnjs.cloudflare.com
@@ -96,7 +95,6 @@ customHeaders:
             https://api.maptiler.com
             https://maps.tilehosting.com
             https://www.google-analytics.com
-            https://bam.nr-data.net
             https://app.getsentry.com
             https://api.prodpad.com
             https://api.pennsieve.ai
