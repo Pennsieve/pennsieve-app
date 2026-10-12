@@ -224,13 +224,13 @@ export default {
     },
 
     getORCIDUrl() {
-      return pathOr("", ["config", "ORCIDUrl"])(this) || "";
+      return this.config?.ORCIDUrl || "";
     },
 
     getORCIDApiUrl() {
       return useGetToken()
         .then((token) => {
-          const url = pathOr("", ["config", "apiUrl"])(this);
+          const url = this.config?.apiUrl || "";
           return `${url}/user/orcid?api_key=${token}`;
         })
         .catch(() => "");
