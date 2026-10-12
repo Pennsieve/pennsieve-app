@@ -1128,7 +1128,7 @@ const router = createRouter({
           children: [
             {
               name: 'publication-settings',
-              path: '',
+              path: 'settings',
               components: {
                 stage: PublicationSettingsPage
               },

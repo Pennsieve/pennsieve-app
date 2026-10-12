@@ -16,15 +16,15 @@ const datasetId = computed(() => route.params.datasetId);
 
 const tabs = [
   { to: 'publication-settings', name: 'Settings' },
-  { to: 'publication-status', name: 'Publishing' },
+  { to: 'publication-status', name: 'Publishing Status' },
 ];
 
 const currentTabName = computed(() => {
   const routeToTab = {
     'publication-settings': 'Settings',
-    'publication-status': 'Publishing',
+    'publication-status': 'Publishing Status',
   };
-  return routeToTab[route.name] || 'Publishing';
+  return routeToTab[route.name] || 'Publishing Status';
 });
 </script>
 
