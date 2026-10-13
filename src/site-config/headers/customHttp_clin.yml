@@ -27,8 +27,6 @@ customHeaders:
             https://www.google.com/recaptcha/api.js
             https://www.googletagmanager.com
             https://maps.googleapis.com
-            https://cdn.polyfill.io
-            https://polyfill.io
             https://www.google-analytics.com
             https://api.tiles.mapbox.com
             https://code.jquery.com
