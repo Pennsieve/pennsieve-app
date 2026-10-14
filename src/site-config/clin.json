@@ -42,7 +42,7 @@
   },
   "GitHubAppUrl": "https://github.com/apps/pennsieve/installations/new",
   "reCAPTCHASiteKey": "6Le2Wr0aAAAAAHouFUEmy7UwN6b9wa_PPRGrWxAG",
-  "neuroglancerUrl": "https://orthogonal-viewer.pennsieve.net",
+  "neuroglancerUrl": "https://orthogonal-viewer.pennsieve.ai",
   "chatWsUrl": "wss://chat.pennsieve.ai",
   "chatRestUrl": "https://api2.pennsieve.ai/chat",
   "features": {

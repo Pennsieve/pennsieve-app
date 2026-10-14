@@ -54,6 +54,13 @@ describe('clin custom headers', () => {
     expect(allows(directive('form-action'), 'https://api.pennsieve.io/zipit/discover')).toBe(false)
   })
 
+  // The viewer receives the open dataset's CloudFront signing params.
+  it('frames the clin orthogonal viewer and nothing of dev', () => {
+    expect(allows(directive('frame-src'), clin.neuroglancerUrl)).toBe(true)
+    expect(clin.neuroglancerUrl).not.toMatch(/pennsieve\.net/)
+    expect(directive('frame-src').join(' ')).not.toMatch(/pennsieve\.net/)
+  })
+
   it('allows presigned S3 links for downloads, images and media', () => {
     const link = 'https://sparc-prod-aod-discover-publish50-use1.s3.amazonaws.com/x'
     ;['connect-src', 'img-src', 'media-src'].forEach((d) => expect(allows(directive(d), link), d).toBe(true))
