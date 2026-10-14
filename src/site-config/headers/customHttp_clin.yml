@@ -81,7 +81,7 @@ customHeaders:
             https://www.google.com
             https://api.pennsieve.ai
             https://api2.pennsieve.ai
-            https://orthogonal-viewer.pennsieve.net;
+            https://orthogonal-viewer.pennsieve.ai;
             connect-src
             'self'
             wss://events.pennsieve.ai
