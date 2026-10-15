@@ -484,8 +484,9 @@ export default {
         return vueViewerMap['parquet_umap_viewer']
       }
 
-      // LAY file check based on filename - display as structured viewer
-      if (this.isLayFile(pkg)) {
+      // A Persyst .lay header gets its own structured viewer only while the
+      // recording is unprocessed. 
+      if (this.isLayFile(pkg) && !this.isProcessedTimeseries(pkg)) {
         return vueViewerMap['lay']
       }
 
@@ -534,6 +535,11 @@ export default {
     isLayFile: function(pkg) {
       const fileName = pathOr('', ['content', 'name'], pkg).toLowerCase()
       return fileName.endsWith('.lay')
+    },
+    isProcessedTimeseries: function(pkg) {
+      const packageType = pathOr('', ['content', 'packageType'], pkg).toLowerCase()
+      const state = pathOr('', ['content', 'state'], pkg).toUpperCase()
+      return packageType === 'timeseries' && state === 'READY'
     },
     isNifti: function(pkg) {
       const fileName = pathOr('', ['content', 'name'], pkg).toLowerCase()
