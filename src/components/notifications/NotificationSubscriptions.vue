@@ -7,9 +7,8 @@
     <div v-if="topics.length" class="bf-table">
       <div class="bf-table-header">
         <el-row align="middle" :gutter="32">
-          <el-col :span="16" class="col-label">Topic</el-col>
+          <el-col :span="20" class="col-label">Topic</el-col>
           <el-col :span="4" class="col-label">Email</el-col>
-          <el-col :span="4" class="col-label">In-app</el-col>
         </el-row>
       </div>
 
@@ -19,7 +18,7 @@
         class="bf-table-row"
       >
         <el-row align="middle" :gutter="32">
-          <el-col :span="16">
+          <el-col :span="20">
             <span class="topic-name">{{ topic.name }}</span>
             <span class="topic-description">{{ topic.description }}</span>
           </el-col>
@@ -27,12 +26,6 @@
             <el-switch
               :model-value="isSubscribed(topic.topic_id, 'email')"
               @change="(val) => handleToggle(topic.topic_id, 'email', val)"
-            />
-          </el-col>
-          <el-col :span="4" class="col-toggle">
-            <el-switch
-              :model-value="isSubscribed(topic.topic_id, 'in-app')"
-              @change="(val) => handleToggle(topic.topic_id, 'in-app', val)"
             />
           </el-col>
         </el-row>
