@@ -36,6 +36,7 @@ export default {
         'workspace-data-use-agreements': 'Data Use Agreements',
         'workspace-usage-analytics': 'Usage Analytics',
         'workspace-storage-nodes': 'Storage Nodes',
+        'workspace-notifications': 'Notifications',
       }
       const subPageTitle = routeTitles[this.$route.name]
       if (subPageTitle) {

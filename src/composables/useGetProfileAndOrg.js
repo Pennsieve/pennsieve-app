@@ -19,8 +19,15 @@ export async function useGetProfileAndOrg(store) {
             .then(async ( [orgs, profile]) => {
                 const updatePromise = store.dispatch('updateProfile', profile)
                 const updatePromise2 = store.dispatch('updateOrganizations',orgs.organizations)
-                return Promise.all([updatePromise, updatePromise2])
+                await Promise.all([updatePromise, updatePromise2])
 
+                // Bootstrap notification preferences
+                if (profile.intId) {
+                    const prefs = await store.dispatch('notificationModule/fetchUserNotificationPrefs', { intId: profile.intId })
+                    if (!prefs || !prefs.userId) {
+                        await store.dispatch('notificationModule/initUserNotificationPrefs', { intId: profile.intId })
+                    }
+                }
             })
     }).catch(err => console.log(err))
 
