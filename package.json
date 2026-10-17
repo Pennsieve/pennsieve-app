@@ -75,7 +75,7 @@
     "lodash.debounce": "^4.0.8",
     "lodash.snakecase": "^4.1.1",
     "marked": "^9.0.0",
-    "moment": "^2.29.4",
+    "moment": "^2.31.0",
     "moment-range": "^4.0.2",
     "papaparse": "^5.4.1",
     "pdfjs-dist": "^4.0.379",
