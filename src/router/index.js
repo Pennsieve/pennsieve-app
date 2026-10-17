@@ -37,7 +37,6 @@ const DatasetSettingsView = () => import('./Dataset/DatasetSettingsView.vue')
 const BfDatasetFiles = () => import('../components/datasets/files/BfDatasetFiles.vue')
 const FileDetails = () => import('../components/datasets/files/FileDetails/FileDetails.vue')
 const DatasetFilesView = () => import('./Dataset/DatasetFilesView.vue')
-const BfPublishingSettings = () => import('../components/datasets/settings/BfPublishingSettings.vue')
 const DatasetActivityLog = () => import('../components/datasets/DatasetActivity/DatasetActivityLog.vue')
 const DatasetManifests = () => import('../components/datasets/DatasetActivity/DatasetManifests.vue')
 const DatasetActivityView = () => import('./Dataset/DatasetActivityView.vue');
@@ -1129,7 +1128,7 @@ const router = createRouter({
           children: [
             {
               name: 'publication-settings',
-              path: '',
+              path: 'settings',
               components: {
                 stage: PublicationSettingsPage
               },

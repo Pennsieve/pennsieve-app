@@ -51,7 +51,7 @@
   "chatWsUrl": "wss://chat.pennsieve.net",
   "chatRestUrl": "https://api2.pennsieve.net/chat",
   "features": {
-    "inAppLogin": false,
+    "inAppLogin": true,
     "publishing": true
   }
 }
