@@ -48,8 +48,8 @@
             <span class="tag interactive">Interactive</span>
           </el-tooltip>
           <el-tooltip
-            v-if="hasProvisionerUpdate && !canManagePermissions"
-            :content="`This node is running version ${node.provisionerImageTag || 'latest'}. Version ${node.latestVersion} is available. The node owner can update it.`"
+            v-if="hasProvisionerUpdate && !canUpdateNode"
+            :content="`This node is running version ${node.provisionerImageTag || 'latest'}. Version ${node.latestVersion} is available. The node owner or a workspace admin (if the node is Admin Managed) can update it.`"
             placement="top"
             :show-after="300"
             :popper-style="{ maxWidth: '320px' }"
@@ -84,7 +84,7 @@
 
     <div class="node-card-actions">
       <el-tooltip
-        v-if="hasProvisionerUpdate && canManagePermissions"
+        v-if="hasProvisionerUpdate && canUpdateNode"
         :content="`This node is running version ${node.provisionerImageTag || 'latest'}. Version ${node.latestVersion} is available. Updating re-provisions the node with the latest infrastructure changes in your cloud account and typically takes 6-8 minutes.`"
         placement="top"
         :show-after="300"
@@ -141,6 +141,13 @@ const isNodeOwner = computed(() => {
 })
 
 const canManagePermissions = computed(() => isNodeOwner.value)
+
+// Mirrors the API: node owner, account owner, or a workspace admin when the account is Admin Managed
+const canUpdateNode = computed(() =>
+  isNodeOwner.value ||
+  (!!profile.value?.id && props.node.account?.ownerId === profile.value.id) ||
+  (props.hasAdminRights && computeResourcesStore.isNodeAdminManaged(props.node))
+)
 const hasProvisionerUpdate = computed(() => props.node.updateAvailable === true && !!props.node.latestVersion)
 
 const ownerName = computed(() => {

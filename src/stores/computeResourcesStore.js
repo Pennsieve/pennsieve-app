@@ -15,6 +15,11 @@ export const useComputeResourcesStore = defineStore('computeResources', () => {
   const computeAccountsLoaded = ref(false)
   const isLoadingComputeAccounts = ref(false)
   const computeAccountsLastFetched = ref(null)
+
+  // Accounts usable in a workspace (the user's own, plus Admin Managed ones when the
+  // user is a workspace admin), keyed by organizationId. Includes workspace enablements.
+  const workspaceComputeAccounts = ref({})
+  const workspaceComputeAccountsRequests = {}
   
   // Permissions cache - keyed by nodeId
   const nodePermissions = ref({})
@@ -167,6 +172,7 @@ export const useComputeResourcesStore = defineStore('computeResources', () => {
     computeAccounts.value = []
     computeAccountsLoaded.value = false
     computeAccountsLastFetched.value = null
+    workspaceComputeAccounts.value = {}
 
     nodePermissions.value = {}
     permissionsLoaded.value = {}
@@ -238,6 +244,54 @@ export const useComputeResourcesStore = defineStore('computeResources', () => {
     } finally {
       isLoadingComputeAccounts.value = false
     }
+  }
+
+  const fetchWorkspaceComputeAccounts = async (organizationId, forceRefresh = false) => {
+    if (!organizationId) return []
+    if (!forceRefresh && workspaceComputeAccounts.value[organizationId]) {
+      return workspaceComputeAccounts.value[organizationId]
+    }
+    if (!forceRefresh && workspaceComputeAccountsRequests[organizationId]) {
+      return workspaceComputeAccountsRequests[organizationId]
+    }
+
+    const request = (async () => {
+      try {
+        const token = await useGetToken()
+        const url = `${siteConfig.api2Url}/compute/resources/accounts?organization_id=${encodeURIComponent(organizationId)}&includeWorkspaces=true`
+        const response = await fetch(url, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        })
+        if (!response.ok) {
+          console.error('Failed to fetch workspace compute accounts:', response.status, response.statusText)
+          return []
+        }
+        const data = (await response.json()) || []
+        workspaceComputeAccounts.value = { ...workspaceComputeAccounts.value, [organizationId]: data }
+        return data
+      } catch (error) {
+        console.error('Failed to fetch workspace compute accounts:', error)
+        return []
+      } finally {
+        delete workspaceComputeAccountsRequests[organizationId]
+      }
+    })()
+    workspaceComputeAccountsRequests[organizationId] = request
+    return request
+  }
+
+  // True when the node's account is enabled as Admin Managed for the node's workspace.
+  // Requires fetchWorkspaceComputeAccounts(node.organizationId) to have run.
+  const isNodeAdminManaged = (node) => {
+    const orgId = node?.organizationId
+    const accountUuid = node?.account?.uuid
+    if (!orgId || !accountUuid) return false
+    const account = (workspaceComputeAccounts.value[orgId] || []).find(a => a.uuid === accountUuid)
+    return !!account?.enabledWorkspaces?.some(ws => ws.organizationId === orgId && ws.isPublic)
   }
 
   const fetchNodePermissions = async (nodeId, forceRefresh = false) => {
@@ -1531,6 +1585,7 @@ export const useComputeResourcesStore = defineStore('computeResources', () => {
     isNodeUpdating,
     isNodePermissionsLoading,
     isComputeAccountsCacheValid,
+    isNodeAdminManaged,
     getComputeNodesForAccount,
     getScopedComputeNodes,
     isScopedCacheValid,
@@ -1540,6 +1595,7 @@ export const useComputeResourcesStore = defineStore('computeResources', () => {
     clearCache,
     fetchComputeNodes,
     fetchScopedComputeNodes,
+    fetchWorkspaceComputeAccounts,
     fetchNodePermissions,
     updateNodeStatus,
     updateAccessScope,
