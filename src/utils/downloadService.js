@@ -16,11 +16,16 @@ export function downloadServiceUrl(config = siteConfig) {
   return (config.downloadServiceUrl || '').replace(/\/+$/, '')
 }
 
+// code is the service's machine-readable reason, where it gives one: a 409
+// with code 'scan_pending' means the file's malware scan hasn't finished
+// (scanStatus 'pending' or 'scanning') and it will be available shortly.
 export class DownloadServiceError extends Error {
-  constructor(status, message) {
+  constructor(status, message, { code, scanStatus } = {}) {
     super(message)
     this.name = 'DownloadServiceError'
     this.status = status
+    this.code = code
+    this.scanStatus = scanStatus
   }
 }
 
@@ -53,7 +58,10 @@ async function send(url, { method, body, token, fetchFn }) {
   if (resp.status === 204) return {}
   const data = await resp.json().catch(() => ({}))
   if (!resp.ok) {
-    throw new DownloadServiceError(resp.status, data.message || `download-service responded ${resp.status}`)
+    throw new DownloadServiceError(resp.status, data.message || `download-service responded ${resp.status}`, {
+      code: data.code,
+      scanStatus: data.scanStatus,
+    })
   }
   return data
 }
@@ -62,7 +70,8 @@ async function send(url, { method, body, token, fetchFn }) {
 // (`download`), or to open it in a viewer (`view`, recorded apart from
 // downloads).
 //
-// Resolves to { url, expiresAt, fileName, size }.
+// Resolves to { url, expiresAt, fileName, size }. Rejects with a 409
+// 'scan_pending' while the file is still being scanned for malware.
 export function getFileUrl({ datasetId, packageId, purpose = 'download' }, options = {}) {
   return downloadServiceRequest('/files/url', { ...options, method: 'POST', datasetId, body: { packageId, purpose } })
 }
@@ -72,6 +81,10 @@ export function getFileUrl({ datasetId, packageId, purpose = 'download' }, optio
 // fileCount, totalBytes, filesDone, bytesDone, datasetNodeId, error and
 // expiresAt.
 
+// Files still being scanned for malware are left out and counted in the
+// record's pendingCount (next to blockedCount); when that is every file,
+// the request is refused with a 409 'scan_pending'.
+//
 // notify: 'auto' emails the requester only if they aren't watching when it
 // finishes; 'email' always; 'none' never.
 export function createArchive({ datasetId, nodeIds, archiveName, notify = 'auto' }, options = {}) {

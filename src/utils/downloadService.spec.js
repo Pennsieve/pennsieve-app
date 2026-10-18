@@ -77,6 +77,17 @@ describe('downloadServiceRequest', () => {
     expect(err.message).toContain('malware scan')
   })
 
+  it('keeps the code and scan status of a file still being scanned', async () => {
+    const fetchFn = respond(409, {
+      code: 'scan_pending',
+      scanStatus: 'scanning',
+      message: 'This file is still being scanned for malware. It will be available to download shortly.',
+    })
+    const err = await downloadServiceRequest('/files/url', { method: 'POST', body: {}, config, getToken, fetchFn }).catch((e) => e)
+    expect(err).toMatchObject({ status: 409, code: 'scan_pending', scanStatus: 'scanning' })
+    expect(err.message).toBe('This file is still being scanned for malware. It will be available to download shortly.')
+  })
+
   it('refuses to run where the service is not configured', async () => {
     const fetchFn = respond(200, {})
     await expect(downloadServiceRequest('/archives', { config: {}, getToken, fetchFn })).rejects.toThrow('not configured')

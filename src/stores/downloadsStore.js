@@ -164,7 +164,9 @@ export const useDownloadsStore = defineStore("downloads", () => {
   }
 
   // Queues an archive of a selection. Rejects with a DownloadServiceError
-  // (413 too large, 403 no access, 400 nothing to download).
+  // (413 too large, 403 no access, 400 nothing to download, 409 scan_pending
+  // when every file is still being scanned). Files still being scanned are
+  // otherwise left out and counted in the record's pendingCount.
   async function start(selection) {
     return track(await createArchive(selection));
   }
