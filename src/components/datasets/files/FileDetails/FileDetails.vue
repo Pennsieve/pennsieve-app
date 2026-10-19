@@ -359,6 +359,7 @@
 </template>
 
 <script>
+import { isFeatureEnabled } from "@/utils/features";
 import { mapGetters, mapActions, mapState } from "vuex";
 import {
   head,
@@ -1171,9 +1172,10 @@ export default {
      */
     isMSOfficeFile: function () {
       return (
-        this.fileType === "MS Word" ||
-        this.fileType === "MS Powerpoint" ||
-        this.fileType === "MS Excel"
+        isFeatureEnabled("office365Viewer") &&
+        (this.fileType === "MS Word" ||
+          this.fileType === "MS Powerpoint" ||
+          this.fileType === "MS Excel")
       );
     },
 
