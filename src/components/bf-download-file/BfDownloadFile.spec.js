@@ -37,11 +37,15 @@ function component(overrides = {}) {
 }
 
 class ServiceError extends Error {
-  constructor(status, message) {
+  constructor(status, message, extra = {}) {
     super(message)
     this.status = status
+    Object.assign(this, extra)
   }
 }
+
+const FILE_PENDING = 'This file is still being scanned for malware. It will be available to download shortly.'
+const SELECTION_PENDING = 'The selected files are still being scanned for malware. They will be available to download shortly.'
 
 describe('BfDownloadFile single-file downloads', () => {
   beforeEach(() => {
@@ -85,6 +89,22 @@ describe('BfDownloadFile single-file downloads', () => {
       detail: { type: 'error', msg: "This file can't be opened: it did not pass the malware scan" },
     })
     expect(triggerBrowserDownload).not.toHaveBeenCalled()
+  })
+
+  it('says a file still being scanned will be available shortly, instead of zipping it', async () => {
+    const emit = vi.spyOn(EventBus, '$emit')
+    getFileUrl.mockRejectedValue(new ServiceError(409, FILE_PENDING, { code: 'scan_pending', scanStatus: 'pending' }))
+    expect(await tryDirectDownload.call(component())).toBe(true)
+    expect(emit).toHaveBeenCalledWith('toast', { detail: { type: 'info', msg: FILE_PENDING } })
+    expect(emit).toHaveBeenCalledWith('download-scan-pending', { packageId: 'N:package:1' })
+    expect(triggerBrowserDownload).not.toHaveBeenCalled()
+  })
+
+  it('treats any other 409 as before: left to the zip path', async () => {
+    const emit = vi.spyOn(EventBus, '$emit')
+    getFileUrl.mockRejectedValue(new ServiceError(409, 'conflict'))
+    expect(await tryDirectDownload.call(component())).toBe(false)
+    expect(emit).not.toHaveBeenCalled()
   })
 
   it('falls back to the route for the dataset id', async () => {
@@ -139,6 +159,32 @@ describe('BfDownloadFile archives', () => {
       type: 'error',
       msg: 'This selection is too large to download as one archive; select fewer files or use the Pennsieve agent',
     })
+  })
+
+  it('says how many files were left out because they are still being scanned', async () => {
+    const emit = vi.spyOn(EventBus, '$emit')
+    start.mockResolvedValue({ id: 'd1', pendingCount: 2, blockedCount: 0 })
+    await archiveViaService.call(archiving({ packageDTOs: [pkg, pkg] }), ['N:package:1', 'N:package:2'])
+    expect(emit).toHaveBeenCalledWith('toast', {
+      detail: { type: 'info', msg: '2 files were left out because they are still being scanned. Download them again shortly.' },
+    })
+  })
+
+  it('stays quiet when no file was left out', async () => {
+    const emit = vi.spyOn(EventBus, '$emit')
+    start.mockResolvedValue({ id: 'd1', blockedCount: 0 })
+    await archiveViaService.call(archiving(), ['N:collection:1'])
+    expect(emit).not.toHaveBeenCalled()
+  })
+
+  it('says the selection will be available shortly when every file is still being scanned', async () => {
+    const emit = vi.spyOn(EventBus, '$emit')
+    start.mockRejectedValue(new ServiceError(409, SELECTION_PENDING, { code: 'scan_pending', scanStatus: 'pending' }))
+    const cmp = archiving()
+    await archiveViaService.call(cmp, ['N:collection:1'])
+    expect(emit).toHaveBeenCalledTimes(1)
+    expect(emit.mock.calls[0][1].detail).toEqual({ type: 'info', msg: SELECTION_PENDING })
+    expect(cmp.dialogVisible).toBeUndefined()
   })
 
   it('keeps a server error generic', async () => {

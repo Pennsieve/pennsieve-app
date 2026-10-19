@@ -95,6 +95,11 @@ import { downloadServiceUrl, getFileUrl } from "@/utils/downloadService";
 import AgentDownloadCommand from "../downloads/AgentDownloadCommand.vue";
 import { useDownloadsStore } from "@/stores/downloadsStore";
 import { triggerBrowserDownload } from "@/utils/triggerBrowserDownload";
+import {
+  isScanPendingError,
+  scanPendingMessage,
+  scanPendingCountText,
+} from "@/utils/scan-status";
 
 const DEFAULT_ARCHIVE_NAME = "pennsieve-data";
 
@@ -327,7 +332,9 @@ export default {
      * Downloads a one-file selection through download-service, which signs
      * the link and records the download. Returns false when the service
      * can't link it as one file, so it's zipped instead. A refusal (malware
-     * scan, no access) is shown, not retried as a zip.
+     * scan, no access) is shown, not retried as a zip; so is a file held
+     * because its scan hasn't finished (409 scan_pending), which is not an
+     * error — the file view listens for it to hold its Download button.
      */
     downloadViaService: async function (pkg) {
       const content = pkg.content || {};
@@ -339,6 +346,15 @@ export default {
         triggerBrowserDownload(link.url);
         return true;
       } catch (e) {
+        if (isScanPendingError(e)) {
+          EventBus.$emit("toast", {
+            detail: { type: "info", msg: scanPendingMessage(e) },
+          });
+          EventBus.$emit("download-scan-pending", {
+            packageId: content.nodeId || content.id,
+          });
+          return true;
+        }
         if (e.status === 403) {
           EventBus.$emit("toast", {
             detail: {
@@ -362,14 +378,29 @@ export default {
       const content = pathOr({}, [0, "content"], this.packageDTOs);
       const archiveName = this.archiveName;
       try {
-        await useDownloadsStore().start({
+        const record = await useDownloadsStore().start({
           datasetId: content.datasetNodeId || this.$route?.params?.datasetId,
           nodeIds,
           // Several items: the name from the dialog. One folder or package:
           // its own name.
           archiveName: nodeIds.length > 1 ? archiveName : content.name,
         });
+        // Files still being scanned are left out of the zip (and listed in
+        // it); say so now rather than only once it's ready.
+        const pending = scanPendingCountText(record && record.pendingCount);
+        if (pending) {
+          EventBus.$emit("toast", {
+            detail: { type: "info", msg: `${pending}. Download them again shortly.` },
+          });
+        }
       } catch (e) {
+        // Every file is still being scanned: not an error, just not yet.
+        if (isScanPendingError(e)) {
+          EventBus.$emit("toast", {
+            detail: { type: "info", msg: scanPendingMessage(e) },
+          });
+          return;
+        }
         // Too large to zip: offer the agent instead.
         if (e.status === 413 && this.agentCommand) {
           this.archiveName = archiveName;

@@ -48,6 +48,11 @@ export default {
   },
 
   watch: {
+    // Set by the static-viewer mixin, including when a file held for its
+    // malware scan is released.
+    fileUrl: function (url) {
+      if (url) this.url = url;
+    },
     getViewerDataUrl: {
       handler: function (val) {
         this.getFullUrl();
@@ -64,10 +69,9 @@ export default {
           return this.sendXhr(fullUrl);
         })
         .then(async (response) => {
+          this.viewFile = response[0];
           this.viewerDataId = response[0].content.id;
-          return this.getFileUrl().then((url) => {
-            this.url = url;
-          });
+          return this.getFileUrl();
         })
         .catch((err) => {
           console.log(err);

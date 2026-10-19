@@ -27,10 +27,7 @@ customHeaders:
             https://www.google.com/recaptcha/api.js
             https://www.googletagmanager.com
             https://maps.googleapis.com
-            https://cdn.polyfill.io
-            https://polyfill.io
             https://www.google-analytics.com
-            https://bam.nr-data.net
             https://api.tiles.mapbox.com
             https://code.jquery.com
             https://cdnjs.cloudflare.com
@@ -84,7 +81,7 @@ customHeaders:
             https://www.google.com
             https://api.pennsieve.ai
             https://api2.pennsieve.ai
-            https://orthogonal-viewer.pennsieve.net;
+            https://orthogonal-viewer.pennsieve.ai;
             connect-src
             'self'
             wss://events.pennsieve.ai
@@ -96,7 +93,6 @@ customHeaders:
             https://api.maptiler.com
             https://maps.tilehosting.com
             https://www.google-analytics.com
-            https://bam.nr-data.net
             https://app.getsentry.com
             https://api.prodpad.com
             https://api.pennsieve.ai

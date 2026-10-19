@@ -34,6 +34,7 @@
 import { computed, ref } from "vue";
 import { useDownloadsStore, isActive, humanSize } from "@/stores/downloadsStore";
 import EventBus from "@/utils/event-bus";
+import { scanPendingCountText } from "@/utils/scan-status";
 
 const props = defineProps({
   download: { type: Object, required: true },
@@ -52,19 +53,23 @@ const percent = computed(() => {
 const statusText = computed(() => {
   const d = props.download;
   const files = `${d.fileCount} ${d.fileCount === 1 ? "file" : "files"}`;
+  // Files still being scanned for malware when the archive was requested
+  // are left out of it (and listed in the zip).
+  const pending = scanPendingCountText(d.pendingCount);
+  const withPending = (text) => (pending ? `${text} · ${pending}` : text);
   switch (d.status) {
     case "QUEUED":
-      return `Waiting to start · ${files}, ${humanSize(d.totalBytes)}`;
+      return withPending(`Waiting to start · ${files}, ${humanSize(d.totalBytes)}`);
     case "RUNNING":
-      return `Zipping ${d.filesDone} of ${files}`;
+      return withPending(`Zipping ${d.filesDone} of ${files}`);
     case "READY": {
       const until = d.expiresAt ? new Date(d.expiresAt).toLocaleDateString() : "";
       const size = humanSize(d.archiveBytes || d.totalBytes);
       const ready = until ? `Ready · ${size} · until ${until}` : `Ready · ${size}`;
       const skipped = d.skippedCount || 0;
-      return skipped
+      return withPending(skipped
         ? `${ready} · ${skipped} ${skipped === 1 ? "file" : "files"} couldn't be included (listed in the zip)`
-        : ready;
+        : ready);
     }
     case "FAILED":
       return d.error || "The download failed. Try again.";

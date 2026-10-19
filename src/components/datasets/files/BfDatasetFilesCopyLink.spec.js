@@ -20,9 +20,10 @@ function component() {
 }
 
 class ServiceError extends Error {
-  constructor(status, message) {
+  constructor(status, message, extra = {}) {
     super(message)
     this.status = status
+    Object.assign(this, extra)
   }
 }
 
@@ -52,6 +53,14 @@ describe('BfDatasetFiles copy link', () => {
     await copyLinkViaService.call(component(), file)
     expect(copyText).not.toHaveBeenCalled()
     expect(emit.mock.calls[0][1].detail.type).toBe('info')
+  })
+
+  it('says a file still being scanned will be available shortly', async () => {
+    const msg = 'This file is still being scanned for malware. It will be available to download shortly.'
+    getFileUrl.mockRejectedValue(new ServiceError(409, msg, { code: 'scan_pending', scanStatus: 'scanning' }))
+    await copyLinkViaService.call(component(), file)
+    expect(copyText).not.toHaveBeenCalled()
+    expect(emit.mock.calls[0][1].detail).toEqual({ type: 'info', msg })
   })
 
   it('reports other failures', async () => {

@@ -491,10 +491,10 @@ export default {
             const sourceFiles = await this.fetchSourceFiles(pkgId);
 
             if (sourceFiles && sourceFiles.length > 0) {
-              const fileId = pathOr("", ["content", "id"], sourceFiles[0]);
               this.omeTiffSource = await this.fetchFileUrl({
+                datasetId,
                 packageId: pkgId,
-                fileId,
+                file: sourceFiles[0],
               });
             }
           } catch (err) {
