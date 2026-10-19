@@ -287,6 +287,7 @@ import PsButtonDropdown from "@/components/shared/ps-button-dropdown/PsButtonDro
 import IconAnnotation from "@/components/icons/IconAnnotation.vue";
 import { useGetToken } from "@/composables/useGetToken";
 import { downloadServiceUrl, getFileUrl } from "@/utils/downloadService";
+import { isScanPendingError, scanPendingMessage } from "@/utils/scan-status";
 import { useSendXhr } from "@/mixins/request/request_composable";
 import debounce from "lodash.debounce";
 
@@ -1656,7 +1657,8 @@ export default {
     },
     /**
      * Copies a download-service link to the file. The service signs it,
-     * records it as a download, and refuses packages with several files.
+     * records it as a download, and refuses packages with several files
+     * and (409 scan_pending) files still being scanned for malware.
      * @param {Object} file
      */
     copyLinkViaService: async function (file) {
@@ -1669,7 +1671,9 @@ export default {
           packageId: content.nodeId || content.id,
         });
       } catch (e) {
-        if (e.status === 400) {
+        if (isScanPendingError(e)) {
+          toast("info", scanPendingMessage(e));
+        } else if (e.status === 400) {
           toast("info", "This package has several files. Download it to get all of them.");
         } else {
           toast("error", "Unable to create a link to this file");
