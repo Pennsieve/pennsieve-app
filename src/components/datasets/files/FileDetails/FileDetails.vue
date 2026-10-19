@@ -409,6 +409,8 @@ import {
   getScanStatusDisplay,
   scanStatusInProgress,
   SCAN_PENDING_MESSAGE,
+  SCAN_POLL_MS,
+  SCAN_POLL_LIMIT,
 } from "../../../../utils/scan-status";
 import { useGetToken } from "@/composables/useGetToken";
 import {
@@ -421,12 +423,6 @@ import IconInfo from '@/components/icons/IconInfo.vue';
 import { useRecordKeyProperties } from '@/composables/useRecordKeyProperties';
 import { useViewerInstance } from '@/composables/useViewerInstance';
 import { useViewerAssets } from '@/composables/useViewerAssets';
-
-// While a source file is still being scanned, its verdict is re-checked this
-// often, for at most this many times (10 minutes): files skipped by the
-// legacy upload path stay `pending` and never settle.
-const SCAN_POLL_MS = 15000;
-const SCAN_POLL_LIMIT = 40;
 
 export default {
   name: "FileDetails",

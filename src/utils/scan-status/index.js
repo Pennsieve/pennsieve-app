@@ -143,6 +143,14 @@ export const scanStatusBlocksDownload = (status) => BLOCKING.includes(status);
 export const scanStatusInProgress = (status) => IN_PROGRESS.includes(status);
 
 /**
+ * While a file is still being scanned, its verdict (or a held link) is
+ * re-checked this often, for at most this many times (10 minutes): files
+ * skipped by the legacy upload path stay `pending` and never settle.
+ */
+export const SCAN_POLL_MS = 15000;
+export const SCAN_POLL_LIMIT = 40;
+
+/**
  * True when download-service held a download because the malware scan
  * hasn't finished (409 `scan_pending`). Not a failure: the file will be
  * available shortly, so callers say so instead of reporting an error.

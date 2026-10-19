@@ -1,3 +1,4 @@
+import { viewFileUrl } from '@/utils/viewFileUrl'
 import {
   mergeRight,
   propOr,
@@ -347,32 +348,16 @@ export const actions = {
   },
 
   /**
-   * Get presigned URL for a file
+   * Get a signed link to view a file (see utils/viewFileUrl): through
+   * download-service for a source file, so a file still being scanned for
+   * malware rejects with a 409 'scan_pending'.
+   * @param {String} datasetId
    * @param {String} packageId
-   * @param {String} fileId
+   * @param {Object} file an entry of /view or /sources
    * @returns {Promise<String>} Presigned URL
    */
-  fetchFileUrl: async ({rootState}, { packageId, fileId }) => {
-    try {
-      const token = await useGetToken()
-      const url = `${rootState.config.apiUrl}/packages/${packageId}/files/${fileId}?api_key=${token}`
-
-      const resp = await fetch(url, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json'
-        }
-      })
-
-      if (resp.ok) {
-        const result = await resp.json()
-        return result.url
-      } else {
-        return Promise.reject(resp)
-      }
-    } catch (err) {
-      return Promise.reject(err)
-    }
+  fetchFileUrl: async ({rootState}, { datasetId, packageId, file }) => {
+    return viewFileUrl({ datasetId, packageId, file }, { config: rootState.config })
   },
 
 }
