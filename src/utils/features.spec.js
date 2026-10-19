@@ -24,8 +24,12 @@ describe('site configs', () => {
     Object.values(config.features).forEach((v) => expect(typeof v).toBe('boolean'))
   })
 
-  it('clin logs in on the app and has publishing off', () => {
-    expect(clin.features).toEqual({ inAppLogin: true, publishing: false })
+  it('clin logs in on the app, has publishing off and no Office 365 viewer', () => {
+    expect(clin.features).toEqual({ inAppLogin: true, publishing: false, office365Viewer: false })
+  })
+
+  it('only clin turns off the Office 365 viewer', () => {
+    expect([dev, prod, local].map((c) => c.features.office365Viewer)).toEqual([true, true, true])
   })
 
   it('local-clin mirrors clin features and environment name', () => {

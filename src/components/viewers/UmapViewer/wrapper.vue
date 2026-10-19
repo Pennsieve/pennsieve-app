@@ -31,6 +31,9 @@ import { pathOr } from 'ramda';
 import { UMAP } from '@pennsieve-viz/core';
 import { useGetToken } from '@/composables/useGetToken';
 import * as siteConfig from '@/site-config/site.json';
+import EventBus from '@/utils/event-bus';
+import { viewFileUrl } from '@/utils/viewFileUrl';
+import { isScanPendingError, scanPendingMessage } from '@/utils/scan-status';
 
 const props = defineProps({
   pkg: {
@@ -76,29 +79,6 @@ async function getViewerAssets() {
 }
 
 /**
- * Get presigned URL for a file
- */
-async function getFileUrl(fileId) {
-  const pkgId = pathOr('', ['content', 'id'], props.pkg);
-  const token = await useGetToken();
-  const url = `${siteConfig.apiUrl}/packages/${pkgId}/files/${fileId}?api_key=${token}`;
-
-  const response = await fetch(url, {
-    method: 'GET',
-    headers: {
-      'Content-Type': 'application/json'
-    }
-  });
-
-  if (!response.ok) {
-    throw new Error('Failed to fetch file URL');
-  }
-
-  const result = await response.json();
-  return result.url;
-}
-
-/**
  * Find the parquet file from viewer assets
  */
 function findParquetFile(assets) {
@@ -140,8 +120,18 @@ onMounted(async () => {
       return;
     }
 
-    srcUrl.value = await getFileUrl(fileId);
+    srcUrl.value = await viewFileUrl({
+      datasetId: pathOr('', ['content', 'datasetNodeId'], props.pkg),
+      packageId: pathOr('', ['content', 'id'], props.pkg),
+      file: parquetFile,
+    });
   } catch (err) {
+    if (isScanPendingError(err)) {
+      // Held until its malware scan finishes: not an error.
+      EventBus.$emit('download-scan-pending', { packageId: pathOr('', ['content', 'id'], props.pkg) });
+      error.value = scanPendingMessage(err);
+      return;
+    }
     console.error('UMAP viewer error:', err);
     error.value = err.message || 'Failed to load UMAP visualization';
   } finally {

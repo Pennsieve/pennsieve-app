@@ -90,6 +90,7 @@
 </template>
 
 <script>
+import { isFeatureEnabled } from "@/utils/features";
 import { mapGetters, mapState, mapActions } from "vuex";
 import { path, pathOr, propOr } from "ramda";
 
@@ -151,9 +152,10 @@ export default {
      */
     isMSOfficeFile: function () {
       return (
-        this.kind === "MS Powerpoint" ||
-        this.kind === "MS Excel" ||
-        this.kind === "MS Word"
+        isFeatureEnabled("office365Viewer") &&
+        (this.kind === "MS Powerpoint" ||
+          this.kind === "MS Excel" ||
+          this.kind === "MS Word")
       );
     },
 

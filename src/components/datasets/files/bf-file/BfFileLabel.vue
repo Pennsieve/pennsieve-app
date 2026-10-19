@@ -154,6 +154,7 @@
 </template>
 
 <script>
+import { isFeatureEnabled } from '@/utils/features'
 import {
   isNil,
   path,
@@ -435,7 +436,8 @@ export default {
      * @returns {String}
      */
     isMSOfficeFile: function() {
-      return this.file.subtype === 'MS Word' || this.file.subtype === 'MS Powerpoint' || this.file.subtype === "MS Excel"
+      return isFeatureEnabled('office365Viewer') &&
+        (this.file.subtype === 'MS Word' || this.file.subtype === 'MS Powerpoint' || this.file.subtype === "MS Excel")
     }
   },
 

@@ -3,6 +3,7 @@ import toQueryParams from '../utils/toQueryParams.js'
 import router from '@/router'
 import {useGetToken} from "@/composables/useGetToken";
 import EventBus from "../utils/event-bus.js"
+import { isFeatureEnabled } from '@/utils/features'
 
 
 const initialState = () => ({
@@ -36,6 +37,8 @@ export const mutations = {
 
 export const actions = {
   openOffice365File: ({commit}, file) => {
+    // Never hand a file link to Microsoft's viewer where it is off.
+    if (!isFeatureEnabled('office365Viewer')) return
     if (!Cookie.get('acceptedOffice365Terms')) {
       commit('OPEN_OFFICE_365_DIALOG', file)
     } else {
