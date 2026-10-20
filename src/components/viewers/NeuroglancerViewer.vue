@@ -4,7 +4,7 @@
       v-if="asset?.asset_url"
       :source="asset.asset_url"
       :embed-url="embedUrl"
-      :cloudfront="asset.cloudfront || null"
+      :cloudfront="cloudfront"
       @error="onError"
     />
     <div v-else-if="error" class="neuroglancer-status neuroglancer-error">
@@ -15,10 +15,15 @@
 
 <script setup>
 import { ref } from 'vue'
-import { OrthogonalFrame } from '@pennsieve-viz/core'
+import {
+  OrthogonalFrame,
+  useCloudfrontCredentials,
+  fetchViewerAssetById,
+} from '@pennsieve-viz/core'
+import { useGetToken } from '@/composables/useGetToken'
 import * as siteConfig from '@/site-config/site.json'
 
-defineProps({
+const props = defineProps({
   pkg: {
     type: Object,
     default: () => ({}),
@@ -30,6 +35,23 @@ defineProps({
 })
 
 const error = ref('')
+
+// CloudFront policies last an hour; renew them ahead of expiry so tiles keep
+// loading in a long session. OrthogonalFrame forwards each renewal to the
+// embedded viewer's service worker.
+const { cloudfront } = useCloudfrontCredentials({
+  initial: () => props.asset?.cloudfront,
+  renew: async () => {
+    const { cloudfront } = await fetchViewerAssetById({
+      api2Url: siteConfig.api2Url,
+      assetId: props.asset.id,
+      datasetId: props.pkg?.content?.datasetNodeId,
+      getToken: useGetToken,
+    })
+    return cloudfront
+  },
+})
+
 const embedUrl = siteConfig.neuroglancerUrl || 'https://orthogonal-viewer.pennsieve.net'
 
 function onError(msg) {
