@@ -1,6 +1,7 @@
 # Surfacing Virus-Scan Status in pennsieve-app — Planning Doc
 
 > Status: **DRAFT v0.1** — backend is built and partly shipped; this doc covers the app-side surfacing that has never been specified.
+> **Update 2026-10-17 (POAM-040):** download-service now holds files whose scan hasn't finished (clin only, behind an env flag). See **§9** for what changed in the app; §2, §4a, §5 and §7.5 are superseded where they say otherwise.
 > Upstream reference: `pennsieve/scan-service/docs/developer.md` (§7 value vocabulary, §12 quarantine policy, §14.2 roadmap) and `docs/user-guide.md`.
 > This doc replaces the single roadmap line in scan-service `developer.md` §14.2: *"Enforcement (pennsieve-app / agent) — surface `scan_status` in file detail / dataset table; disable download controls for non-clean states."*
 
@@ -106,10 +107,10 @@ Eight values are legal; **only six are ever written**. Don't build UI affordance
 | `infected` | yes | danger | red, always shown | **yes — 403** |
 | `failed` | yes | danger | red, always shown | **yes — 403** |
 | `unscanned` | yes | info | yellow, shown | no |
-| `pending` | yes | in-progress | blue/muted, shown | no |
+| `pending` | yes | in-progress | muted "Scanning", shown | **held (409) where the scan wait is on — clin; see §9** |
 | `clean` | yes | ok | **none** | no |
 | `format_validated` | yes | ok | **none** | no |
-| `scanning` | **never** | in-progress | treat as `pending` | no |
+| `scanning` | **never** | in-progress | treat as `pending` | as `pending` |
 | `not_required` | **never** | ok | none | no |
 | `null` / absent | pre-migration rows | ok | **none** | no |
 
@@ -174,7 +175,7 @@ Copy spec — icon + label + secondary line:
 | `clean` | ✓ green | **No threats detected** | `Scanned {scanned_at} · ClamAV {scan_engine}` | **yes** |
 | `format_validated` | ✓ green | **Format validated** | `File header verified — not virus-scanned.` (+ `{scanned_at}`) | partial |
 | `unscanned` | — grey | **Not scanned** | mapped from `scan_skip_reason`: `size` → "File is above the automatic scan size limit." | **yes** |
-| `pending` | — grey | **Not yet scanned** | *(none — do not imply an ETA, see §1a)* | no |
+| `pending` / `scanning` | — grey | **Scanning** *(was "Not yet scanned"; §9)* | `Downloads may wait until the scan finishes.` | no |
 | `infected` | ⚠ red | **Threat detected** | `Download blocked. Do not open or share this file — contact your workspace administrator.` | no |
 | `failed` | ⚠ amber | **Scan could not complete** | `Download blocked. Contact Pennsieve support.` | no |
 | absent | *(omit row)* | — | — | — |
@@ -282,3 +283,23 @@ Per the repo convention (`feedback_pennsieve_app_two_pr_workflow`): one epic bra
 Note `FileMetadataInfo_updated.vue` in the same folder is dead code and imported nowhere — do not edit it.
 
 The value→presentation map should live in exactly one module. There are already three duplicated copies of the package-state map in this repo (`BfFileLabel.vue:427`, `TableMenu.vue:164`, `SourceFilesTable.vue:506`); don't make it four for scan status.
+
+## 9. Scan wait (POAM-040, 2026-10-17)
+
+download-service (branch `feat/scan-wait-gate`) now holds files whose scan hasn't finished, behind an env flag that is **on in clin only**. Allowed: `clean`, `format_validated`, `unscanned`, `not_required`. Held: `pending`, `scanning`. Blocked: `infected`, `failed`, and empty/unknown.
+
+- `POST /files/url` answers a held file with **409** `{"code":"scan_pending","scanStatus":"pending"|"scanning","message":"This file is still being scanned for malware. It will be available to download shortly."}`. Blocked stays 403.
+- `POST /archives` leaves held files out (listed in the zip's `FILES_NOT_INCLUDED.txt`) and counts them in the record's `pendingCount`, next to `blockedCount`; if every file is held it answers 409 `scan_pending`.
+
+**Decision: the 409, not the status, decides.** Outside clin a `pending` file still downloads, and legacy-path uploads sit at `pending` indefinitely (§1a), so the app never disables Download from the status alone.
+
+| Where | What the app does |
+|---|---|
+| Scan copy (`src/utils/scan-status`) | `pending`/`scanning` read **Scanning** · "Downloads may wait until the scan finishes." `unscanned` stays "Not scanned" (size reason) and downloadable; `infected`/`failed` unchanged. New helpers: `scanStatusInProgress`, `isScanPendingError`, `scanPendingMessage`, `scanPendingCountText`. |
+| `DownloadServiceError` | carries the response's `code` and `scanStatus`. |
+| `BfDownloadFile.vue` | single file: 409 `scan_pending` → info toast with the service's message (no zip fallback), and emits `download-scan-pending` with the package id. Archive: 409 → info toast; a record with `pendingCount` → "N files were left out because they are still being scanned. Download them again shortly." |
+| `BfDatasetFiles.vue` copy link | 409 `scan_pending` → info toast with the message. |
+| `DownloadItem.vue` (downloads panel / page) | appends the `pendingCount` line to queued, running and ready archives. |
+| `FileDetails.vue` | while any source is `pending`/`scanning`, re-fetches `sources-paged` every 15 s (skipped while the tab is hidden), at most 40 times (10 min), stopping when it settles, on navigation to another file, or on unmount. Once a download of this file got the 409, Download is disabled and a muted "Scanning" banner shows the message until the scan settles (or the re-checks give up, so it can be retried). |
+
+**Viewers (2026-10-19).** The viewers that open a file's contents (static viewers: image, video, PDF, text, XLS, Lay; DuckDB / DataExplorer; UMAP; OME-TIFF) ask download-service for a `purpose: "view"` link through `utils/viewFileUrl.js` when `/view` (or `/sources`) gives them the package's **source** file, so the scan wait holds them too: on a 409 `scan_pending` they emit `download-scan-pending` (FileDetails shows Scanning) and the static viewers ask again every 15 s, at most 40 times. Still on pennsieve-api's `GET /packages/:id/files/:id`: derived View/File objects (download-service links only a package's source file), the Slide viewer's tiles (`/presign/<subpath>`), the CSV viewer inside `@pennsieve-viz/core`, and the Office 365 viewer, which is off in clin (`office365Viewer` feature; POAM-074). Derived viewer assets come from packages-service through CloudFront and timeseries from pennsieve-streaming; neither applies the scan wait yet. `blockedCount` on archive records is still not surfaced anywhere in the app (only `skippedCount` and now `pendingCount`).

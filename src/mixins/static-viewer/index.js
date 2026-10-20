@@ -3,9 +3,12 @@ import { mapState } from 'vuex'
 
 import Request from '../../mixins/request'
 import {useGetToken} from "@/composables/useGetToken";
+import EventBus from '../../utils/event-bus'
+import { viewFileUrl } from '@/utils/viewFileUrl'
+import { isScanPendingError, SCAN_POLL_MS, SCAN_POLL_LIMIT } from '@/utils/scan-status'
 
-const getPkgId = compose(
-  pathOr('', ['content', 'id']),
+// The file /view returns first: a derived view, else a file, else the source.
+const getViewFile = compose(
   defaultTo({}),
   head,
   defaultTo([])
@@ -22,7 +25,13 @@ export default {
   data() {
     return {
       viewerDataId: '',
-      fileUrl: ''
+      viewFile: {},
+      fileUrl: '',
+      // download-service is holding the file until its malware scan
+      // finishes; the link is asked for again until it is released.
+      scanPending: false,
+      scanRetryTimer: null,
+      scanRetryCount: 0
     }
   },
 
@@ -68,33 +77,33 @@ export default {
     },
 
     getFileUrl: async function() {
-      const apiUrl = propOr('', 'apiUrl', this.config)
-      const pkgId = pathOr('', ['content', 'id'], this.pkg)
-      const token = await useGetToken()
-      const url = `${apiUrl}/packages/${pkgId}/files/${this.viewerDataId}?api_key=${token}`
+      const packageId = pathOr('', ['content', 'id'], this.pkg)
+      const datasetId = pathOr('', ['content', 'datasetNodeId'], this.pkg)
       try {
-        const response = await fetch(url, {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json'
-          }
-        });
-
-        if (response.ok) {
-         const result = await response.json()
-         const fileUrl = result.url
-          this.fileUrl = fileUrl
-          return fileUrl;
-        }
-    
-        if (!response.ok) {
-          return;
-        }
-    
+        const fileUrl = await viewFileUrl({ datasetId, packageId, file: this.viewFile }, { config: this.config })
+        this.scanPending = false
+        this.fileUrl = fileUrl
+        return fileUrl
       } catch (err) {
+        if (isScanPendingError(err)) {
+          this.onScanPending(packageId)
+          return
+        }
         console.error(err)
-        throw err;
       }
+    },
+
+    /**
+     * The file is still being scanned: let the page say so (FileDetails
+     * shows Scanning) and ask for the link again shortly.
+     */
+    onScanPending: function(packageId) {
+      this.scanPending = true
+      EventBus.$emit('download-scan-pending', { packageId })
+      clearTimeout(this.scanRetryTimer)
+      if (this.scanRetryCount >= SCAN_POLL_LIMIT) return
+      this.scanRetryCount += 1
+      this.scanRetryTimer = setTimeout(() => this.getFileUrl(), SCAN_POLL_MS)
     },
 
     /**
@@ -102,8 +111,14 @@ export default {
      * @param {Object} response
      */
     handleGetViewerData: function(response) {
-      this.viewerDataId = getPkgId(response)
+      this.viewFile = getViewFile(response)
+      this.viewerDataId = pathOr('', ['content', 'id'], this.viewFile)
+      this.scanRetryCount = 0
       this.getFileUrl()
     }
+  },
+
+  beforeUnmount() {
+    clearTimeout(this.scanRetryTimer)
   }
 }

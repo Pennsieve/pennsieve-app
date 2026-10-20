@@ -51,6 +51,7 @@
   "chatRestUrl": "https://api2.pennsieve.net/chat",
   "features": {
     "inAppLogin": false,
-    "publishing": true
+    "publishing": true,
+    "office365Viewer": true
   }
 }

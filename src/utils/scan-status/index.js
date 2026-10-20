@@ -7,6 +7,11 @@
  *
  * Eight values are legal in the DB CHECK constraint but only six are ever
  * written — `scanning` and `not_required` are reserved and unused.
+ *
+ * `pending` / `scanning` read as "Scanning". Where download-service holds
+ * unscanned files (clin), it answers a download of one with a 409
+ * `scan_pending` rather than a link; elsewhere the file still downloads.
+ * That response, not the status, is what decides — see isScanPendingError.
  */
 
 export const SCAN_STATUS = {
@@ -43,6 +48,19 @@ const SEVERITY = [
  * Mirrors `scanStatusBlocks` in pennsieve-api and packages-service.
  */
 const BLOCKING = [SCAN_STATUS.INFECTED, SCAN_STATUS.FAILED];
+
+/**
+ * Statuses whose scan hasn't finished. download-service holds these where
+ * its scan wait is on, and they are worth re-checking while a page is open.
+ */
+const IN_PROGRESS = [SCAN_STATUS.PENDING, SCAN_STATUS.SCANNING];
+
+/**
+ * What download-service says when it holds a file; shown when its own
+ * message is missing.
+ */
+export const SCAN_PENDING_MESSAGE =
+  "This file is still being scanned for malware. It will be available to download shortly.";
 
 /**
  * Statuses that warrant a badge in an unbounded list context. The OK states
@@ -84,12 +102,12 @@ const PRESENTATION = {
   },
   [SCAN_STATUS.PENDING]: {
     severity: "muted",
-    label: "Not yet scanned",
+    label: "Scanning",
     icon: "dash",
   },
   [SCAN_STATUS.SCANNING]: {
     severity: "muted",
-    label: "Scan in progress",
+    label: "Scanning",
     icon: "dash",
   },
   [SCAN_STATUS.UNSCANNED]: {
@@ -121,6 +139,43 @@ export const isUnknownScanStatus = (status) =>
   !status || !Object.prototype.hasOwnProperty.call(PRESENTATION, status);
 
 export const scanStatusBlocksDownload = (status) => BLOCKING.includes(status);
+
+export const scanStatusInProgress = (status) => IN_PROGRESS.includes(status);
+
+/**
+ * While a file is still being scanned, its verdict (or a held link) is
+ * re-checked this often, for at most this many times (10 minutes): files
+ * skipped by the legacy upload path stay `pending` and never settle.
+ */
+export const SCAN_POLL_MS = 15000;
+export const SCAN_POLL_LIMIT = 40;
+
+/**
+ * True when download-service held a download because the malware scan
+ * hasn't finished (409 `scan_pending`). Not a failure: the file will be
+ * available shortly, so callers say so instead of reporting an error.
+ */
+export const isScanPendingError = (e) =>
+  !!e && e.status === 409 && e.code === "scan_pending";
+
+/**
+ * The user-facing copy for a held download: the service's message, or ours.
+ */
+export const scanPendingMessage = (e) => (e && e.message) || SCAN_PENDING_MESSAGE;
+
+/**
+ * Copy for the files an archive left out because they were still being
+ * scanned (the record's `pendingCount`), or "" when there were none.
+ */
+export const scanPendingCountText = (count) => {
+  const n = Number(count) || 0;
+  if (n <= 0) {
+    return "";
+  }
+  return n === 1
+    ? "1 file was left out because it is still being scanned"
+    : `${n} files were left out because they are still being scanned`;
+};
 
 export const scanStatusNeedsAttention = (status) =>
   NEEDS_ATTENTION.includes(status);
@@ -209,6 +264,11 @@ export const getScanStatusDisplay = (status, detail = {}) => {
       break;
     case SCAN_STATUS.FAILED:
       secondary = "Download blocked. Contact Pennsieve support.";
+      break;
+    case SCAN_STATUS.PENDING:
+    case SCAN_STATUS.SCANNING:
+      // "may": only environments with the scan wait on hold the download.
+      secondary = "Downloads may wait until the scan finishes.";
       break;
     case SCAN_STATUS.UNSCANNED:
       // Only mapped copy — scan_skip_reason also carries raw scanner errors.

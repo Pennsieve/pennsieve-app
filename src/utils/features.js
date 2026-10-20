@@ -7,6 +7,9 @@ export const FEATURE_DEFAULTS = Object.freeze({
   inAppLogin: false,
   // Dataset publishing to Discover.
   publishing: true,
+  // "Open with Office 365": Microsoft's public Office viewer fetches the file
+  // from a signed link. Off where files may hold ePHI (POAM-074).
+  office365Viewer: true,
 })
 
 export function resolveFeatures(features = {}) {
