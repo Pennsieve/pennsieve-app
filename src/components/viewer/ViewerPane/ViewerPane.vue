@@ -48,8 +48,6 @@
       v-else-if="cmpViewer === 'CSVViewer'"
       ref="viewer"
       :pkg="pkg"
-      :api-url="apiUrl"
-      :file-type="pkg.content?.packageType"
     />
     <component
       v-else
@@ -128,7 +126,7 @@ export default {
       import("../../viewers/DuckDBExplorer/DuckDBViewerWrapper.vue"),
     ),
     CSVViewer: defineAsyncComponent(() =>
-      import("@pennsieve-viz/core").then((m) => m.CSVViewer),
+      import("../../viewers/CSVViewerWrapper.vue"),
     ),
     LayViewer: defineAsyncComponent(() =>
       import("../../viewers/LayViewer.vue"),
@@ -173,7 +171,6 @@ export default {
       isLoading: false,
       omeTiffSource: "",
       omeTiffSlowWarning: false,
-      apiUrl: siteConfig.apiUrl,
       viewerInstanceId: VIEWER_INSTANCE_ID,
     };
   },
