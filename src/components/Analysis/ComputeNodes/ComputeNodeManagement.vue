@@ -61,6 +61,14 @@ const isNodeOwner = computed(() => {
 
 const canManagePermissions = computed(() => isNodeOwner.value)
 
+// Mirrors the API: node owner, account owner, or a workspace admin when the account is Admin Managed
+const canUpdateNode = computed(() => {
+  if (!computeNode.value) return false
+  return isNodeOwner.value ||
+    (!!profile.value?.id && computeNode.value.account?.ownerId === profile.value.id) ||
+    (hasAdminRights.value && computeResourcesStore.isNodeAdminManaged(computeNode.value))
+})
+
 const deploymentModeDescription = computed(() => {
   const mode = (computeNode.value?.deploymentMode || 'basic').toLowerCase()
   switch (mode) {
@@ -189,6 +197,10 @@ onMounted(async () => {
     computeResourcesStore.fetchGpuTiers(activeOrganization.value?.organization?.id).then(tiers => {
       availableGpuTiers.value = tiers || []
     }).catch(() => {}),
+    // Admins need the workspace's account enablements to know if this node is Admin Managed
+    hasAdminRights.value && computeNode.value?.organizationId
+      ? computeResourcesStore.fetchWorkspaceComputeAccounts(computeNode.value.organizationId)
+      : Promise.resolve(),
   ])
 })
 
@@ -651,7 +663,7 @@ async function saveConfig() {
       <div class="management-section">
         <div class="section-header">
           <h2>Deployment Configuration</h2>
-          <div class="section-actions" v-if="canManagePermissions && provisionerUpdateAvailable">
+          <div class="section-actions" v-if="canUpdateNode && provisionerUpdateAvailable">
             <button class="processor-edit-button" :disabled="isUpdatingDeployment" @click="updateProvisioner">
               {{ isUpdatingDeployment ? 'Updating...' : 'Update node' }}
             </button>
