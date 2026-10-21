@@ -453,17 +453,17 @@ function submitProposal() {
         <div class="read-only-actions" v-if="readOnly">
           <bf-button
             v-if="showReviewActions"
-            class="secondary"
-            @click="rejectProposal"
-          >
-            Reject Proposal
-          </bf-button>
-          <bf-button
-            v-if="showReviewActions"
             class="primary"
             @click="acceptProposal"
           >
             Accept Proposal
+          </bf-button>
+          <bf-button
+            v-if="showReviewActions"
+            class="secondary"
+            @click="rejectProposal"
+          >
+            Reject Proposal
           </bf-button>
           <bf-button
             @click="closeDialog"

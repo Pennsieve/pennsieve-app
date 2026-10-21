@@ -14,7 +14,7 @@
         <IconArrowUp
           class="ml-8 arrow-style"
           :class="[ menuArrowDir === 'down' ? 'svg-flip' : '' ]"
-          color="black"
+          color="currentColor"
         />
 
       </button>
@@ -36,7 +36,7 @@
               class="item-icon-check"
               :width="20"
               :height="20"
-              color="black"
+              color="currentColor"
             />
           </el-dropdown-item>
         </el-dropdown-menu>
@@ -108,5 +108,11 @@ export default {
 }
 </script>
 <style scoped lang="scss">
+@use '../../../styles/theme';
 @use '../../../styles/element/dropdown';
+
+.dataset-filter-dropdown {
+  color: theme.$text-color;
+  padding: 0;
+}
 </style>

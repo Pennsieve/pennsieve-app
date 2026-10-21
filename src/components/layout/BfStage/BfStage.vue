@@ -81,7 +81,6 @@
         }
 
         return classString
-        // return this.$slots['actions']? "bf-stage-content" : "bf-stage-content no-actions"
       }
     },
 
@@ -178,7 +177,7 @@
     flex-direction: row;
     align-items: center;
     justify-content: end;
-    padding: 16px 32px 16px 16px;
+    padding: 16px 32px;
 
     &.no-padding {
       padding: 16px 0 16px 0;
