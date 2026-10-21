@@ -33,7 +33,7 @@
         <div class="bf-dataset-list-item-storage">
           <p
             v-if="status"
-            class="bf-dataset-list-item-stat"
+            class="bf-dataset-list-item-stat proposal-status"
           >
             <strong class="status-label">Status</strong>
             {{ status }}
@@ -225,6 +225,10 @@ export default {
       margin-top: -1px;
     }
   }
+}
+
+.proposal-status {
+  text-align: left;
 }
 
 .status-label {
