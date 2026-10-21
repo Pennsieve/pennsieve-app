@@ -69,21 +69,33 @@ describe('clin custom headers', () => {
   })
 
   // POAM-006: only the third parties clin actually loads.
-  it('carries no analytics, telemetry or retired third parties', () => {
+  it('carries no telemetry or retired third parties', () => {
     ;[
-      /polyfill\.io/, /googletagmanager/, /google-analytics/, /doubleclick/, /getsentry/, /prodpad/,
+      /polyfill\.io/, /doubleclick/, /getsentry/, /prodpad/,
       /newrelic|nr-data/, /mapbox|maptiler|tilehosting|maps\.g/, /jquery|cdnjs|bootstrapcdn|fontawesome/,
       /youtube|vimeo|wistia/, /gravatar/,
     ].forEach((re) => {
       expect(csp, String(re)).not.toMatch(re)
       expect(reportOnly, String(re)).not.toMatch(re)
     })
-    expect(clin.googleAnalytics).toBeFalsy()
   })
 
-  it('limits Google to reCAPTCHA paths', () => {
+  it('lets gtag.js load and report to GA4', () => {
+    expect(allows(directive('script-src'), 'https://www.googletagmanager.com/gtag/js?id=G-X')).toBe(true)
+    ;['https://region1.google-analytics.com/g/collect', 'https://region1.analytics.google.com/g/collect',
+      'https://www.google-analytics.com/g/collect']
+      .forEach((url) => expect(allows(directive('connect-src'), url), url).toBe(true))
+  })
+
+  it('lets dataset pages fetch ORCID records and DOI citations', () => {
+    ;[clin.ORCIDpubUrl, 'https://doi.org/10.26275/x', 'https://citation.doi.org/format',
+      'https://data.crosscite.org/x', 'https://api.crossref.org/v1/works/x']
+      .forEach((url) => expect(allows(directive('connect-src'), url), url).toBe(true))
+  })
+
+  it('limits Google to reCAPTCHA paths, fonts and analytics', () => {
     const google = Object.values(directives(csp)).flat().filter((s) => /google\.com|gstatic\.com/.test(s))
-    google.filter((s) => !/fonts\./.test(s)).forEach((s) => expect(s).toMatch(/\/recaptcha\/$/))
+    google.filter((s) => !/fonts\.|analytics\.google\.com/.test(s)).forEach((s) => expect(s).toMatch(/\/recaptcha\/$/))
   })
 
   // The Report-Only policy is the next step: the same, without inline or data: scripts.
