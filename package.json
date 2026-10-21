@@ -70,7 +70,7 @@
     "hyparquet": "^1.12.1",
     "js-cookie": "^3.0.1",
     "js-yaml": "^4.1.0",
-    "katex": "^0.16.47",
+    "katex": "^0.18.2",
     "lodash.clonedeep": "^4.5.0",
     "lodash.debounce": "^4.0.8",
     "lodash.snakecase": "^4.1.1",
