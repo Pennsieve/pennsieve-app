@@ -40,10 +40,7 @@ const error = ref('')
 // loading in a long session. OrthogonalFrame forwards each renewal to the
 // embedded viewer's service worker.
 const { cloudfront } = useCloudfrontCredentials({
-  // A copy per asset: every asset in a package shares the listing's credentials
-  // object, so returning it directly wouldn't register an asset switch, and the
-  // previous asset's renewed (possibly asset-scoped) credentials would carry over.
-  initial: () => (props.asset?.cloudfront ? { ...props.asset.cloudfront } : null),
+  initial: () => props.asset?.cloudfront,
   renew: async () => {
     const { cloudfront } = await fetchViewerAssetById({
       api2Url: siteConfig.api2Url,
