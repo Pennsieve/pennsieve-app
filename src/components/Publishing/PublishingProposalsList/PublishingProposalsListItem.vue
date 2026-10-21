@@ -31,20 +31,12 @@
 
       <el-col :sm="4">
         <div class="bf-dataset-list-item-storage">
-          <p class="bf-dataset-list-item-stat">
-            <strong class="col-label publication-type">
-              {{ publicationType }}
-            </strong>
-            Request Type
-          </p>
           <p
             v-if="status"
             class="bf-dataset-list-item-stat"
           >
-            <strong class="col-label">
-              {{ status }}
-            </strong>
-            Status
+            <strong class="status-label">Status</strong>
+            {{ status }}
           </p>
         </div>
       </el-col>
@@ -53,22 +45,17 @@
         <div class="bf-dataset-list-item-stat-align">
           <div v-if="canReview" class="dataset-actions">
             <div class="button-wrapper">
-              <p>
-                <a
-                  href="#"
-                  @click.prevent="triggerRequest(DatasetProposalAction.ACCEPT)"
-                >
-                  Accept Request
-                </a>
-              </p>
-              <p>
-                <a
-                  href="#"
-                  @click.prevent="triggerRequest(DatasetProposalAction.REJECT)"
-                >
-                  Reject Request
-                </a>
-              </p>
+              <bf-button
+                @click="triggerRequest(DatasetProposalAction.ACCEPT)"
+              >
+                Accept Request
+              </bf-button>
+              <bf-button
+                class="secondary"
+                @click="triggerRequest(DatasetProposalAction.REJECT)"
+              >
+                Reject Request
+              </bf-button>
             </div>
           </div>
         </div>
@@ -80,9 +67,14 @@
 import { mapGetters } from "vuex";
 import FormatDate from "../../../mixins/format-date";
 import { DatasetProposalAction, ProposalStatus } from "../../../utils/constants";
+import BfButton from "@/components/shared/bf-button/BfButton.vue";
 
 export default {
   name: "PublishingProposalsListItem",
+
+  components: {
+    BfButton,
+  },
 
   mixins: [FormatDate],
 
@@ -157,10 +149,6 @@ export default {
       return 0;
     },
 
-    publicationType: function () {
-      return "proposal";
-    },
-
     DatasetProposalAction: function () {
       return DatasetProposalAction;
     },
@@ -217,11 +205,7 @@ export default {
 
 .dataset-actions {
   display: flex;
-  flex-wrap: wrap;
-  justify-content: space-around;
-  .secondary {
-    margin-left: 16px;
-  }
+  justify-content: flex-end;
 }
 
 .publishing-info {
@@ -243,18 +227,18 @@ export default {
   }
 }
 
-.publication-type {
-  text-transform: capitalize;
+.status-label {
+  color: theme.$text-color;
+  display: block;
+  font-weight: 500;
+  padding-bottom: 8px;
 }
 
 .button-wrapper {
   display: flex;
   flex-direction: column;
-  justify-content: flex-end;
-
-  a {
-    margin-bottom: 12px;
-  }
+  gap: 16px;
+  width: 160px;
 }
 
 @media only screen and (max-width: 1200px) {
