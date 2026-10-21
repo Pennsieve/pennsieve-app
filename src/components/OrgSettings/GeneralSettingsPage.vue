@@ -5,18 +5,21 @@
   >
     <div class="settings-page">
       <general-settings-form />
+      <workspace-logo-form />
     </div>
   </bf-stage>
 </template>
 
 <script>
 import GeneralSettingsForm from './forms/GeneralSettingsForm.vue'
+import WorkspaceLogoForm from './forms/WorkspaceLogoForm.vue'
 
 export default {
   name: 'GeneralSettingsPage',
 
   components: {
-    GeneralSettingsForm
+    GeneralSettingsForm,
+    WorkspaceLogoForm
   }
 }
 </script>

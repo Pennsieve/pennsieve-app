@@ -12,7 +12,7 @@
           />
 
           <bf-button
-            :disabled="isUploading || isFileProcessing"
+            :disabled="isUploading || isFileProcessing || holdDownloadForScan"
             class="primary mr-8 flex"
             data-cy="btnDownloadFiles"
             @click="downloadFile"
@@ -106,6 +106,27 @@
       @close="onCloseMoveDialog"
     />
 
+    <div
+      v-if="showScanBanner"
+      class="scan-banner"
+      :class="`scan-banner--${scanStatusDisplay.severity}`"
+      role="alert"
+    >
+      <strong>{{ scanStatusDisplay.label }}</strong>
+      <span v-if="scanStatusDisplay.secondary">
+        {{ scanStatusDisplay.secondary }}
+      </span>
+    </div>
+
+    <div
+      v-else-if="holdDownloadForScan"
+      class="scan-banner scan-banner--muted"
+      role="status"
+    >
+      <strong>Scanning</strong>
+      <span>{{ scanPendingMessage }}</span>
+    </div>
+
     <div class="concept-instance-section">
       <div files-section class="file-list">
         <concept-instance-static-property
@@ -122,6 +143,18 @@
 
         <concept-instance-static-property :label="fileStatusLabel">
           {{ getDisplayFileStatus }}
+        </concept-instance-static-property>
+
+        <concept-instance-static-property
+          v-if="scanStatusDisplay"
+          label="Virus scan"
+        >
+          <span class="scan-status" :class="`scan-${scanStatusDisplay.severity}`">
+            <span class="scan-headline">{{ scanStatusDisplay.label }}</span>
+            <span v-if="scanStatusDisplay.secondary" class="scan-secondary">
+              · {{ scanStatusDisplay.secondary }}
+            </span>
+          </span>
         </concept-instance-static-property>
 
         <concept-instance-static-property label="Location">
@@ -326,6 +359,7 @@
 </template>
 
 <script>
+import { isFeatureEnabled } from "@/utils/features";
 import { mapGetters, mapActions, mapState } from "vuex";
 import {
   head,
@@ -369,7 +403,16 @@ import StageActions from "../../../shared/StageActions/StageActions.vue";
 import SourceFilesTable from "./SourceFilesTable.vue";
 import ViewerPane from "../../../viewer/ViewerPane/ViewerPane.vue";
 import FileTypeMapper from "../../../../mixins/FileTypeMapper";
+import FormatDate from "../../../../mixins/format-date";
 import { viewerToolTypes } from "../../../../utils/constants";
+import {
+  aggregateScanStatus,
+  getScanStatusDisplay,
+  scanStatusInProgress,
+  SCAN_PENDING_MESSAGE,
+  SCAN_POLL_MS,
+  SCAN_POLL_LIMIT,
+} from "../../../../utils/scan-status";
 import { useGetToken } from "@/composables/useGetToken";
 import {
   useHandleXhrError,
@@ -399,7 +442,16 @@ export default {
     AddRelationshipDrawer,
   },
 
-  mixins: [Request, StorageMetrics, FileIcon, GetFileProperty, FileTypeMapper],
+  // FormatDate supplies formatDate, which this component already called in
+  // fileCreatedAt without the mixin registered.
+  mixins: [
+    Request,
+    StorageMetrics,
+    FileIcon,
+    GetFileProperty,
+    FileTypeMapper,
+    FormatDate,
+  ],
 
   props: {
     datasetId: {
@@ -480,6 +532,12 @@ export default {
       isUnlinkFileDialogVisible: false,
       relationshipNameTruncated: false,
       packageSourceFiles: {},
+      // download-service held this file's download (409 scan_pending): the
+      // scan wait is on here, so Download stays off until the scan settles.
+      scanWaitConfirmed: false,
+      scanPendingMessage: SCAN_PENDING_MESSAGE,
+      scanPollTimer: null,
+      scanPollCount: 0,
       isDisabled: false,
       stringSubtypes: [],
       deleteDialogVisible: false,
@@ -665,6 +723,76 @@ export default {
      */
     hasMultipleSourceFiles: function () {
       return this.packageSourceFiles.length > 1 ? true : false;
+    },
+
+    /**
+     * Malware-scan verdict for this package, derived from the source files
+     * already loaded for the sources table — no extra request.
+     *
+     * Packages are 1:1 with source files for anything uploaded through the
+     * current path; the aggregation only matters for legacy multi-source
+     * packages, where the worst verdict wins.
+     *
+     * @returns {Object|null} null when no source file carries a recognized
+     *   status, so the row is omitted rather than showing a placeholder
+     */
+    scanStatusDisplay: function () {
+      const sources = Array.isArray(this.packageSourceFiles)
+        ? this.packageSourceFiles
+        : [];
+      const info = aggregateScanStatus(sources);
+
+      if (!info) {
+        return null;
+      }
+
+      return getScanStatusDisplay(info.status, {
+        skipReason: info.skipReason,
+        engine: info.engine,
+        scannedAtLabel: info.scannedAt ? this.formatDate(info.scannedAt) : "",
+      });
+    },
+
+    /**
+     * True while any source file's malware scan hasn't finished.
+     * @returns {Boolean}
+     */
+    scanInProgress: function () {
+      const sources = Array.isArray(this.packageSourceFiles)
+        ? this.packageSourceFiles
+        : [];
+      return sources.some((file) =>
+        scanStatusInProgress(file?.content?.scanStatus)
+      );
+    },
+
+    /**
+     * Download is held only once download-service has said so (409
+     * scan_pending): outside clin a pending file still downloads, so the
+     * status alone doesn't disable the button. Released too once the
+     * re-checks give up, so a scan that never settles can be retried.
+     * @returns {Boolean}
+     */
+    holdDownloadForScan: function () {
+      return (
+        this.scanWaitConfirmed &&
+        this.scanInProgress &&
+        this.scanPollCount < SCAN_POLL_LIMIT
+      );
+    },
+
+    /**
+     * Only infected / failed warrant interrupting the user with a banner —
+     * they are also the only statuses the API refuses to issue a download
+     * URL for.
+     * @returns {Boolean}
+     */
+    showScanBanner: function () {
+      return (
+        !!this.scanStatusDisplay &&
+        (this.scanStatusDisplay.severity === "danger" ||
+          this.scanStatusDisplay.severity === "warning")
+      );
     },
 
     /**
@@ -1044,9 +1172,10 @@ export default {
      */
     isMSOfficeFile: function () {
       return (
-        this.fileType === "MS Word" ||
-        this.fileType === "MS Powerpoint" ||
-        this.fileType === "MS Excel"
+        isFeatureEnabled("office365Viewer") &&
+        (this.fileType === "MS Word" ||
+          this.fileType === "MS Powerpoint" ||
+          this.fileType === "MS Excel")
       );
     },
 
@@ -1188,12 +1317,20 @@ export default {
   watch: {
     fileId: {
       handler: function (val) {
+        this.resetScanWait();
         if (val) {
           this.getInstanceDetails();
           this.fetchConnectedRecords();
         }
       },
       immediate: true,
+    },
+
+    /**
+     * Keep re-checking the scan verdict while it hasn't settled
+     */
+    packageSourceFiles: function () {
+      this.scheduleScanPoll();
     },
 
     /**
@@ -1321,6 +1458,9 @@ export default {
     // Update the relationships state
     EventBus.$on("update-relationships-list", this.updateRelationshipsList);
 
+    // download-service held a download until the malware scan finishes
+    EventBus.$on("download-scan-pending", this.onDownloadScanPending);
+
     // Check if user has seen relationships empty state info
     const hasSeenRelationshipsInfo = localStorage.getItem(
       "seen-relationships-info"
@@ -1342,6 +1482,10 @@ export default {
     EventBus.$off("refresh-table-data", this.refreshTableData);
     EventBus.$off("add-relationship", this.handleAddRelationship);
     EventBus.$off("update-relationships-list", this.updateRelationshipsList);
+    EventBus.$off("download-scan-pending", this.onDownloadScanPending);
+    this.scanPollCount = SCAN_POLL_LIMIT;
+    clearTimeout(this.scanPollTimer);
+    this.scanPollTimer = null;
   },
 
   methods: {
@@ -1448,6 +1592,60 @@ export default {
           })
           .catch(this.handleXhrError.bind(this));
       });
+    },
+
+    /**
+     * Re-fetch the source files in a while if a scan hasn't finished yet
+     */
+    scheduleScanPoll: function () {
+      if (
+        this.scanPollTimer ||
+        !this.scanInProgress ||
+        this.scanPollCount >= SCAN_POLL_LIMIT
+      ) {
+        return;
+      }
+      this.scanPollTimer = setTimeout(() => this.pollScanStatus(), SCAN_POLL_MS);
+    },
+
+    /**
+     * Quietly re-fetch the source files for their scan verdicts. A failure
+     * is not worth a toast; the next attempt may succeed.
+     */
+    pollScanStatus: function () {
+      this.scanPollTimer = null;
+      const fileId = this.fileId;
+      if (typeof document !== "undefined" && document.hidden) {
+        this.scheduleScanPoll();
+        return;
+      }
+      this.scanPollCount += 1;
+      this.packageFilesUrl
+        .then((url) => this.sendXhr(url))
+        .then((response) => {
+          // Ignore an answer for a file the user has since left.
+          if (fileId === this.fileId) {
+            this.packageSourceFiles = response.results;
+          }
+        })
+        .catch(() => this.scheduleScanPoll());
+    },
+
+    resetScanWait: function () {
+      this.scanWaitConfirmed = false;
+      this.scanPollCount = 0;
+      clearTimeout(this.scanPollTimer);
+      this.scanPollTimer = null;
+    },
+
+    /**
+     * download-service held this file's download: its scan wait is on here
+     */
+    onDownloadScanPending: function ({ packageId } = {}) {
+      const id = pathOr("", ["content", "id"], this.proxyRecord);
+      if (packageId && (packageId === this.fileId || packageId === id)) {
+        this.scanWaitConfirmed = true;
+      }
     },
 
     /**
@@ -2938,6 +3136,69 @@ export default {
 @use "../../../../styles/element/dialog";
 @use "../../../../styles/spacing";
 
+
+// Status and its detail read as one sentence on this page, which has the
+// width for it. The narrow browser sidebar stacks them instead.
+.scan-status {
+  display: inline;
+}
+
+.scan-headline {
+  font-weight: 400;
+}
+
+.scan-secondary {
+  color: theme.$gray_4;
+}
+
+.scan-ok .scan-headline {
+  color: theme.$green_1;
+}
+
+.scan-muted .scan-headline {
+  color: theme.$gray_5;
+}
+
+.scan-warning .scan-headline {
+  color: theme.$status_yellow;
+}
+
+// The only status worth extra emphasis — it also blocks download.
+.scan-danger .scan-headline {
+  color: theme.$red_1;
+  font-weight: 600;
+}
+
+.scan-banner {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 16px;
+  margin-bottom: 16px;
+  border-radius: 4px;
+  border-left: 4px solid transparent;
+  font-size: 13px;
+  line-height: 1.4;
+
+  &--danger {
+    background: rgba(theme.$red_1, 0.08);
+    border-left-color: theme.$red_1;
+    color: theme.$red_1;
+  }
+
+  &--warning {
+    background: rgba(theme.$status_yellow, 0.1);
+    border-left-color: theme.$status_yellow;
+    color: theme.$gray_5;
+  }
+
+  // Not a problem, just not yet: the file downloads once its scan is done.
+  &--muted {
+    background: theme.$gray_1;
+    border-left-color: theme.$gray_4;
+    color: theme.$gray_5;
+  }
+}
 
 #file-name-header {
   font-size: 20px;

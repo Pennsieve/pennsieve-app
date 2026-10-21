@@ -8,8 +8,15 @@ if (env.BRANCH_NAME == "main") {
     executorEnv = "dev"
 }
 
+// Branch names may contain "/" (e.g. "fix/some-thing"), and JOB_NAME on a
+// multibranch job already carries the branch URL-encoded. Interpolating either
+// straight into a workspace path nests it into unintended directories, so
+// collapse anything that isn't path-safe into a single flat segment.
+safeJobName = env.JOB_NAME.replaceAll(/[^A-Za-z0-9._-]/, '-')
+safeBranchName = env.BRANCH_NAME.replaceAll(/[^A-Za-z0-9._-]/, '-')
+
 node('executor') {
-    ws("/tmp/${env.JOB_NAME}/${env.BRANCH_NAME}") {
+    ws("/tmp/${safeJobName}/${safeBranchName}") {
         checkout scm
         def authorName = sh(returnStdout: true, script: 'git --no-pager show --format="%an" --no-patch').trim()
 
@@ -48,7 +55,7 @@ node('executor') {
                         unstash 'dist'
                         sh "aws s3 --region us-east-1 rm --recursive s3://$bucketName/"
                         sh "aws s3 --region us-east-1 cp --recursive dist s3://$bucketName"
-                        sh "aws s3 --region us-east-1 cp --cache-control 0 dist/index.html s3://$bucketName/"
+                        sh "aws s3 --region us-east-1 cp --cache-control 'no-cache' dist/index.html s3://$bucketName/"
                         def distributionId = sh(
                             script: "aws cloudfront list-distributions --query \"DistributionList.Items[?contains(Origins.Items[0].DomainName, '${bucketName}.s3.amazonaws.com')].Id\" --output text",
                             returnStdout: true

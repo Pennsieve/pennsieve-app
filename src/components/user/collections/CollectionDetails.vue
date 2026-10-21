@@ -164,7 +164,6 @@ import DatasetCardCollections from "./DatasetCardCollections.vue";
 import DatasetFinderDialog from "./DatasetFinderDialog.vue";
 import PublishCollectionDialog from "./PublishCollectionDialog.vue";
 import EditCollectionDialog from "./EditCollectionDialog.vue";
-import ContributorItem from "./ContributorItem.vue";
 import IconLink from "../../icons/IconLink.vue";
 import BfButton from "@/components/shared/bf-button/BfButton.vue";
 

@@ -47,6 +47,7 @@ let route = useRoute();
   <PsAnalytics />
 
   <bf-download-file ref="downloadFile" />
+  <downloads-panel v-if="hasDownloadService" />
 
   <office-365-dialog />
 
@@ -78,6 +79,8 @@ import toQueryParams from "./utils/toQueryParams.js";
 
 import PsAnalytics from "./components/analytics/Analytics.vue";
 import BfDownloadFile from "./components/bf-download-file/BfDownloadFile.vue";
+import DownloadsPanel from "./components/downloads/DownloadsPanel.vue";
+import { downloadServiceUrl } from "./utils/downloadService";
 import request from "./mixins/request";
 import PennsieveUpload from "./components/PennsieveUpload/PennsieveUpload.vue";
 import Office365Dialog from "@/components/datasets/files/Office365Dialog/Office365Dialog.vue";
@@ -91,6 +94,7 @@ export default {
     PennsieveUpload,
     PsAnalytics,
     BfDownloadFile,
+    DownloadsPanel,
     Office365Dialog,
     ChatSpotlight,
   },
@@ -192,6 +196,7 @@ export default {
   },
 
   computed: {
+    hasDownloadService: () => Boolean(downloadServiceUrl()),
     ...mapState([
       "datasets",
       "primaryNavOpen",

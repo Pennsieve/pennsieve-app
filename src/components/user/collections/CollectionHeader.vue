@@ -119,7 +119,7 @@
 <script>
 import { mapState } from "vuex";
 import CollectionsBannerImage from "./CollectionsBannerImage.vue";
-import ContributorItem from "./ContributorItem.vue";
+import ContributorItem from "../../datasets/ContributorItem/ContributorItem.vue";
 import IconArrowLeft from "../../icons/IconArrowLeft.vue";
 import IconLicense from "../../icons/IconLicense.vue";
 import IconFiles from "../../icons/IconFiles.vue";

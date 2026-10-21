@@ -78,7 +78,6 @@ import {
   compose,
   uniq,
   pluck,
-  pathEq,
   propOr
 } from 'ramda'
 
@@ -217,7 +216,7 @@ const onChannelVisibilityToggled = (visibilityData) => {
 
 
 const getChannelsByType = (type) => {
-  return sortedChannels.value.filter(channel => pathEq(['content', 'channelType'], type))
+  return sortedChannels.value.filter(channel => channel.type === type)
 }
 
 const openFilterMenu = () => {

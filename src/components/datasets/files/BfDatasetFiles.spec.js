@@ -2,6 +2,7 @@ import Vuex, { mapActions } from 'vuex'
 import { shallowMount } from '@vue/test-utils'
 import BfDatasetFiles from './BfDatasetFiles.vue'
 import { state, actions, mutations, getters } from '../../../store'
+import uploadModule from '../../../store/uploadModule'
 
 describe('bf-dataset-files.vue', () => {
   let cmp
@@ -41,7 +42,8 @@ describe('bf-dataset-files.vue', () => {
       state,
       actions,
       mutations,
-      getters
+      getters,
+      modules: { uploadModule }
     })
     cmp = shallowMount(BfDatasetFiles, {
       data() {
@@ -95,5 +97,43 @@ describe('bf-dataset-files.vue', () => {
   it('onAddUploadedFile() - Update files list', () => {
     cmp.vm.onAddUploadedFile(evt)
     expect(cmp.vm.files.length).toEqual(1)
+  })
+
+  // Regression: deleting a file and immediately re-uploading it produced
+  // "settings (1)". syncManifest pre-resolves name conflicts against
+  // uploadModule.currentTargetPackage.children, which only fetchFiles /
+  // silentlyFetchFiles used to write — so a deleted row lingered there and
+  // the client suffixed the new upload itself.
+  it('onDelete() - frees the deleted name in the upload conflict snapshot', () => {
+    const deletedId = 'N:package:77c88edb-b881-4b18-a5df-b1d49f155095'
+    store.commit('uploadModule/SET_CURRENT_TARGET_PACKAGE', {
+      content: { id: 'N:dataset:8c02e00f-1b77-4f84-9e89-664443da13bb' },
+      children: [...cmp.vm.files]
+    })
+
+    cmp.vm.onDelete({ success: [deletedId] })
+
+    const names = store.state.uploadModule.currentTargetPackage.children.map(
+      (c) => c.content.name
+    )
+    expect(cmp.vm.files.length).toEqual(0)
+    expect(names).not.toContain('settings')
+  })
+
+  it('onFolderCreated() - claims the new name in the upload conflict snapshot', () => {
+    store.commit('uploadModule/SET_CURRENT_TARGET_PACKAGE', {
+      content: { id: 'N:dataset:8c02e00f-1b77-4f84-9e89-664443da13bb' },
+      children: [...cmp.vm.files]
+    })
+
+    cmp.vm.onFolderCreated({
+      children: [],
+      content: { id: 'N:collection:1', name: 'new folder', packageType: 'Collection' }
+    })
+
+    const names = store.state.uploadModule.currentTargetPackage.children.map(
+      (c) => c.content.name
+    )
+    expect(names).toContain('new folder')
   })
 })

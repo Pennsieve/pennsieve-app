@@ -491,13 +491,20 @@ const conceptValueSet = (property) => {
   const vs =
     property?.property?.['x-pennsieve-concept-valueset'] ||
     property?.property?.items?.['x-pennsieve-concept-valueset']
-  return vs && vs.ontology && vs.root ? vs : null
+  if (!vs || !vs.ontology) return null
+  // termset tier: whole flat list (no root); subtree tier: is_a subtree of `root`.
+  if (vs.tier === 'termset' && vs.slug) return vs
+  if (vs.root) return vs
+  return null
 }
 
 const conceptValueSetHint = (property) => {
   const vs = conceptValueSet(property)
   if (!vs) return ''
   const anchor = property?.property?.['x-pennsieve-concept']
+  if (vs.tier === 'termset') {
+    return `Search the ${anchor?.label || vs.ontology} termset for a term.`
+  }
   const rootLabel = anchor?.label || vs.root
   return `Search ${vs.ontology} for a term under “${rootLabel}”.`
 }
@@ -540,7 +547,10 @@ const runSubtreeSearch = async (key, vs, query) => {
   }
   subtreeSearching.value = { ...subtreeSearching.value, [key]: true }
   try {
-    const hits = await ontologyStore.searchSubtree(vs.root, term, { ontology: vs.ontology, limit: 25 })
+    // termset tier: flat search over the whole slice; subtree tier: restricted to root's descendants.
+    const hits = vs.tier === 'termset'
+      ? await ontologyStore.search(term, { ontologies: [vs.ontology], limit: 25 })
+      : await ontologyStore.searchSubtree(vs.root, term, { ontology: vs.ontology, limit: 25 })
     subtreeOptions.value = {
       ...subtreeOptions.value,
       [key]: hits.map((h) => ({ code: h.curie, label: h.label || h.curie }))

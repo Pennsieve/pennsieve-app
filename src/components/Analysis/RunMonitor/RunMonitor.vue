@@ -1,5 +1,6 @@
 <script setup>
 import { computed, ref, reactive, watch, onMounted, onBeforeUnmount, onUnmounted, getCurrentInstance } from "vue";
+import { runScopeChannel } from "@/realtime/channels";
 import { useStore } from "vuex";
 import { useVueFlow, VueFlow, Handle, Position } from "@vue-flow/core";
 import { Background } from "@vue-flow/background";
@@ -23,7 +24,7 @@ import { validateRunName, runDisplayName, RUN_NAME_MAX_LENGTH } from "./runHelpe
 const { onNodeClick, onPaneClick, fitView, updateNodeData } = useVueFlow();
 
 const store = useStore();
-const pusher = getCurrentInstance()?.appContext.config.globalProperties.$pusher;
+const realtime = getCurrentInstance()?.appContext.config.globalProperties.$realtime;
 
 /*
   Local State
@@ -51,7 +52,6 @@ const edges = ref([]);
 const isLoading = ref(false);
 const isLoadingMore = ref(false);
 let analyticsChannel = null;
-let analyticsChannelName = null;
 
 // Initiate Workflow dialog state
 const initiateForm = ref({
@@ -205,13 +205,15 @@ const config = computed(() => store.state.config);
 /*
   Fargate CPU / Memory combinations
 */
-const FARGATE_CPU_OPTIONS = ["256", "512", "1024", "2048", "4096"];
+const FARGATE_CPU_OPTIONS = ["256", "512", "1024", "2048", "4096", "8192"];
 const FARGATE_MEMORY_MAP = {
   "256":  ["512", "1024", "2048"],
   "512":  ["1024", "2048", "3072", "4096"],
   "1024": ["2048", "3072", "4096", "5120", "6144", "7168", "8192"],
   "2048": ["4096", "5120", "6144", "7168", "8192", "9216", "10240", "11264", "12288", "13312", "14336", "15360", "16384"],
   "4096": ["8192", "9216", "10240", "11264", "12288", "13312", "14336", "15360", "16384", "17408", "18432", "19456", "20480", "21504", "22528", "23552", "24576", "25600", "26624", "27648", "28672", "29696", "30720"],
+  // 8 vCPU: 16 GB – 60 GB in 4 GB increments
+  "8192": ["16384", "20480", "24576", "28672", "32768", "36864", "40960", "45056", "49152", "53248", "57344", "61440"],
 };
 
 const getMemoryOptionsForCpu = (cpu) => FARGATE_MEMORY_MAP[cpu] || [];
@@ -591,9 +593,9 @@ const runToNodesAndEdges = (run) => {
 };
 
 /*
-  Pusher event handlers
+  Live-update event handlers
 */
-const parsePusherData = (data) => {
+const parseEventData = (data) => {
   if (typeof data === "string") {
     try { return JSON.parse(data); } catch { return data; }
   }
@@ -601,7 +603,7 @@ const parsePusherData = (data) => {
 };
 
 const onRunStatusUpdate = async (raw) => {
-  const data = parsePusherData(raw);
+  const data = parseEventData(raw);
 
   // Update the run in the instances list
   store.commit("analysisModule/UPDATE_RUN_STATUS", {
@@ -648,7 +650,7 @@ const onRunStatusUpdate = async (raw) => {
 };
 
 const onProcessorStatusUpdate = (raw) => {
-  const data = parsePusherData(raw);
+  const data = parseEventData(raw);
   const currentRunId = selectedWorkflowActivity.value?.uuid;
   if (data.runId !== currentRunId) return;
 
@@ -1638,17 +1640,11 @@ onMounted(async () => {
     isLoading.value = false;
   }
 
-  // Subscribe to Pusher analytics channel for real-time status updates
-  if (pusher) {
-    const rawOrgId = store.state.activeOrganization?.organization?.id;
-    const rawUserId = store.state.profile?.id;
-    const orgUuid = rawOrgId?.replace(/^N:organization:/, '');
-    const userUuid = rawUserId?.replace(/^N:user:/, '');
-    analyticsChannelName = orgUuid
-      ? `organization-${orgUuid}-analytics`
-      : `user-${userUuid}-analytics`;
-
-    analyticsChannel = pusher.subscribe(analyticsChannelName);
+  // Live updates for every run in the workspace (or the user's own runs)
+  if (realtime) {
+    analyticsChannel = realtime.subscribe(
+      runScopeChannel(store.state.activeOrganization?.organization?.id, store.state.profile?.id)
+    );
     store.commit("analysisModule/SET_ANALYTICS_CHANNEL", analyticsChannel);
 
     analyticsChannel.bind("workflow-run-status", onRunStatusUpdate);
@@ -1657,15 +1653,12 @@ onMounted(async () => {
 });
 
 onBeforeUnmount(() => {
-  // Unsubscribe from Pusher analytics channel
+  // Stop live updates
   if (analyticsChannel) {
     analyticsChannel.unbind("workflow-run-status", onRunStatusUpdate);
     analyticsChannel.unbind("workflow-processor-status", onProcessorStatusUpdate);
-    if (pusher && analyticsChannelName) {
-      pusher.unsubscribe(analyticsChannelName);
-    }
+    analyticsChannel.unsubscribe();
     analyticsChannel = null;
-    analyticsChannelName = null;
     store.commit("analysisModule/CLEAR_ANALYTICS_CHANNEL");
   }
 });

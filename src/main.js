@@ -11,6 +11,7 @@ import { VueReCaptcha } from 'vue-recaptcha-v3'
 import AWSConfig from './utils/aws-exports.js'
 // import { ElMessage } from 'element-plus'
 import VueClipboard from 'vue3-clipboard'
+import { initAnalytics } from './utils/analytics'
 import ClickOutside from './utils/ClickOutsideDirective'; // Adjust the import path according to your project structure
 
 // Import Element Plus CSS manually to ensure proper theming
@@ -31,10 +32,12 @@ import {useSendXhr} from "@/mixins/request/request_composable";
 import EventBus from "@/utils/event-bus";
 import {checkIsSubscribed} from "@/composables/useCheckTerms";
 import {useSwitchWorkspace} from "@/composables/useSwitchWorkspace";
+import { isFeatureEnabled } from '@/utils/features'
+import { loginQuery } from '@/utils/auth-redirect'
 import { createPinia } from 'pinia'
 import { useDuckDBStore } from '@/stores/duckdbStore'
 
-import Pusher from 'pusher-js'
+import { createRealtime } from '@/realtime'
 
 Amplify.configure(AWSConfig)
 
@@ -83,13 +86,18 @@ app.use(VueReCaptcha, {
 
 app.use(router);
 
+// GA4: per-environment measurement id, page views sent from the router
+// (SPA navigations are invisible to gtag's automatic pageview) with
+// identifiers stripped from the path. Empty id = disabled.
+initAnalytics(router, siteConfig.googleAnalytics)
+
 app.mount("#app");
 
 app.config.globalProperties.$sanitize = (html, allowedTags=['br']) => striptags(html, allowedTags)
 app.config.globalProperties.$message = ElMessage;
-app.config.globalProperties.$pusher = new Pusher(siteConfig.pusherConfig.appId, {
-    cluster: siteConfig.pusherConfig.region
-});
+// Live updates: the AppSync Event API where the site config has `realtime`,
+// otherwise Pusher (see src/realtime).
+app.config.globalProperties.$realtime = createRealtime(siteConfig);
 
 
 // Top level routes allowList
@@ -149,8 +157,11 @@ router.beforeEach(async (to, from, next) => {
         console.warn('Session check failed:', err.message)
     }
 
-    // If there is no token and route is not on the un-authenticated list --> redirect to discover app
+    // If there is no token and route is not on the un-authenticated list --> redirect to login
     if (!token && !(allowList.indexOf(to.name) >= 0)) {
+        if (isFeatureEnabled('inAppLogin')) {
+            return next({ name: 'login', query: loginQuery(to.fullPath) })
+        }
         window.location.replace(siteConfig.discoverAppUrl)
     }
 

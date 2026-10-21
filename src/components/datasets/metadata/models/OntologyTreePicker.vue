@@ -33,7 +33,7 @@
             <li
               v-for="r in results"
               :key="r.curie"
-              :class="{ active: selected && selected.curie === r.curie }"
+              :class="{ active: isPicked(r.curie) }"
               @click="pick(r)"
             >
               <span class="otp-label">{{ r.label }}</span>
@@ -57,7 +57,7 @@
           @node-click="pick"
         >
           <template #default="{ data }">
-            <span class="otp-node" :class="{ active: selected && selected.curie === data.curie }">
+            <span class="otp-node" :class="{ active: isPicked(data.curie) }">
               <span class="otp-label">{{ data.label }}</span>
               <span class="otp-code">{{ data.curie }}</span>
             </span>
@@ -68,13 +68,30 @@
 
     <template #footer>
       <div class="otp-footer">
-        <span v-if="selected" class="otp-selected">
-          Selected: <strong>{{ selected.label }}</strong> <span class="otp-code">{{ selected.curie }}</span>
-        </span>
-        <span v-else class="otp-selected otp-muted">Pick a term to use as the value-set root.</span>
-        <span class="otp-spacer" />
-        <el-button @click="$emit('update:modelValue', false)">Cancel</el-button>
-        <el-button type="primary" :disabled="!selected" @click="confirm">Use this term</el-button>
+        <div v-if="picked.length" class="otp-picked">
+          <el-tag
+            v-for="p in visiblePicked"
+            :key="p.curie"
+            closable
+            size="small"
+            disable-transitions
+            @close="unpick(p.curie)"
+          >{{ p.label }}</el-tag>
+          <el-tag v-if="hiddenPicked" size="small" type="info" disable-transitions :title="hiddenLabels">
+            +{{ hiddenPicked }} more
+          </el-tag>
+        </div>
+        <p v-else class="otp-picked-hint">
+          {{ isTermset ? 'Pick one or more terms, or use the entire termset.' : 'Pick one or more terms for the value set.' }}
+        </p>
+        <div class="otp-actions">
+          <el-button @click="$emit('update:modelValue', false)">Cancel</el-button>
+          <el-button v-if="isTermset" @click="useTermset">Use entire termset</el-button>
+          <el-button v-if="picked.length === 1" @click="useSubtreeRoot">Use subtree of this term</el-button>
+          <el-button type="primary" :disabled="!picked.length" @click="useSelected">
+            Use {{ picked.length ? picked.length + ' ' : '' }}selected term{{ picked.length === 1 ? '' : 's' }}
+          </el-button>
+        </div>
       </div>
     </template>
   </el-dialog>
@@ -94,11 +111,23 @@ const store = useOntologyStore()
 // UCUM is a flat unit list — not a browsable tree.
 const options = computed(() => (store.available || []).filter((o) => o.ontology !== 'UCUM'))
 const scope = ref('')
+// The chosen vocabulary's registry entry. A termset (kind:'termset') is a curated
+// flat list, so the whole set can be used as a value set (no single root term).
+const scopeEntry = computed(() => (store.available || []).find((o) => o.ontology === scope.value) || null)
+const isTermset = computed(() => scopeEntry.value?.kind === 'termset')
 const loading = ref(false)
 const term = ref('')
 const results = ref([])
 const searching = ref(false)
-const selected = ref(null)
+// Multi-pick: clicking a term toggles it into `picked`. Picks persist across scope
+// changes so a value set can be composed from several ontologies/termsets.
+const picked = ref([])
+const isPicked = (curie) => picked.value.some((p) => p.curie === curie)
+// Cap the chips shown in the footer; the rest collapse into a "+N more" tag.
+const MAX_CHIPS = 10
+const visiblePicked = computed(() => picked.value.slice(0, MAX_CHIPS))
+const hiddenPicked = computed(() => Math.max(0, picked.value.length - MAX_CHIPS))
+const hiddenLabels = computed(() => picked.value.slice(MAX_CHIPS).map((p) => p.label).join(', '))
 
 const treeProps = { label: 'label', children: 'children', isLeaf: (d) => !d.has_children }
 // Terms in a slice share the ontology's version (the tree rows don't carry it).
@@ -116,7 +145,7 @@ const loadOntology = async () => {
 }
 
 const onOpen = async () => {
-  selected.value = null
+  picked.value = []
   term.value = ''
   results.value = []
   loading.value = true
@@ -132,7 +161,7 @@ const onOpen = async () => {
 }
 
 const onScopeChange = async () => {
-  selected.value = null
+  // Keep picks when switching ontology so a set can span vocabularies.
   term.value = ''
   results.value = []
   await loadOntology()
@@ -162,14 +191,43 @@ const onSearch = debounce(async () => {
   }
 }, 250)
 
+// Toggle a term in/out of the picked set.
 const pick = (node) => {
   if (!node || !node.curie) return
-  selected.value = { curie: node.curie, label: node.label, ontology: scope.value, ontology_version: scopeVersion() }
+  const i = picked.value.findIndex((p) => p.curie === node.curie)
+  if (i >= 0) picked.value.splice(i, 1)
+  else picked.value.push({ curie: node.curie, label: node.label, ontology: scope.value, ontology_version: scopeVersion() })
+}
+const unpick = (curie) => {
+  picked.value = picked.value.filter((p) => p.curie !== curie)
 }
 
-const confirm = () => {
-  if (!selected.value) return
-  emit('select', { ...selected.value })
+// Use the picked terms as the value set (exactly those terms, materialized).
+const useSelected = () => {
+  if (!picked.value.length) return
+  emit('select', { terms: picked.value.map((p) => ({ ...p })) })
+  emit('update:modelValue', false)
+}
+
+// One term picked: offer its is_a subtree instead of just the single term.
+const useSubtreeRoot = () => {
+  if (picked.value.length !== 1) return
+  emit('select', { ...picked.value[0] })
+  emit('update:modelValue', false)
+}
+
+// Use the entire termset as the value set (all members), not a single term's subtree.
+const useTermset = () => {
+  const e = scopeEntry.value
+  if (!e) return
+  emit('select', {
+    termset: true,
+    ontology: e.ontology,
+    slug: e.slug,
+    label: e.display_name || e.ontology,
+    count: e.count,
+    ontology_version: e.ontology_version || '',
+  })
   emit('update:modelValue', false)
 }
 </script>
@@ -238,17 +296,23 @@ const confirm = () => {
 }
 .otp-footer {
   display: flex;
-  align-items: center;
-  gap: 12px;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
 }
-.otp-selected {
+.otp-picked {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.otp-picked-hint {
+  margin: 0;
   font-size: 13px;
-  color: theme.$gray_6;
-}
-.otp-muted {
   color: theme.$gray_4;
 }
-.otp-spacer {
-  flex: 1;
+.otp-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
 }
 </style>

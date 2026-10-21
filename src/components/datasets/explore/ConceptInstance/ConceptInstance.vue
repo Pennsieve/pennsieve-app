@@ -314,6 +314,7 @@
 </template>
 
 <script>
+import { isFeatureEnabled } from '@/utils/features'
 import {mapActions, mapGetters, mapState} from 'vuex'
 import {
   clone,
@@ -912,7 +913,8 @@ export default {
      * @returns {Boolean}
      */
     isMSOfficeFile: function() {
-      return this.fileType === 'MS Word' || this.fileType === 'MS Powerpoint' || this.fileType === "MS Excel"
+      return isFeatureEnabled('office365Viewer') &&
+        (this.fileType === 'MS Word' || this.fileType === 'MS Powerpoint' || this.fileType === "MS Excel")
     },
 
     /**

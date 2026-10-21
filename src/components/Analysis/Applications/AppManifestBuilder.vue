@@ -1,17 +1,14 @@
 <script setup>
 import { computed, reactive, ref } from "vue";
 import { useRouter } from "vue-router";
-import { ElMessage } from "element-plus";
 
 import ApplicationSchemaEditor from "./ApplicationSchemaEditor.vue";
 import {
   createApplicationSchema,
   buildManifest,
   serializeManifestYaml,
-  parseManifest,
   validateParameters,
-  APPLICATION_TYPES,
-  MANIFEST_SCHEMA_URL,
+  MANIFEST_EXAMPLE_URL,
 } from "./applicationSchema";
 
 const router = useRouter();
@@ -37,9 +34,8 @@ const schema = ref(createApplicationSchema());
 const manifest = computed(() => buildManifest(schema.value, meta));
 
 /*
-  YAML preview — the exact app.yml the author commits. Serialization (including
-  the yaml-language-server directive) lives in the schema module so the builder
-  and any consumer stay in lock-step.
+  YAML preview — the exact app.yml the author commits. Serialization lives in
+  the schema module so the builder and any consumer stay in lock-step.
 */
 const manifestYaml = computed(() =>
   serializeManifestYaml(schema.value, meta),
@@ -56,34 +52,6 @@ const validation = computed(() => {
   errors.push(...paramResult.errors);
   return { valid: errors.length === 0, errors };
 });
-
-/*
-  Import — load an existing app.yml back into the form. Parses the YAML through
-  the schema module (the same path a consumer uses) and repopulates both the
-  top-level metadata and the editable schema.
-*/
-const fileInput = ref(null);
-
-const openImport = () => fileInput.value?.click();
-
-const importManifest = async (event) => {
-  const file = event.target.files?.[0];
-  if (!file) return;
-  try {
-    const text = await file.text();
-    const { meta: parsedMeta, schema: parsedSchema } = parseManifest(text);
-    meta.name = parsedMeta.name;
-    meta.description = parsedMeta.description;
-    meta.applicationType = parsedMeta.applicationType;
-    schema.value = parsedSchema;
-    ElMessage.success(`Loaded ${file.name}`);
-  } catch (e) {
-    ElMessage.error("Could not parse that file as a valid app.yml manifest.");
-  } finally {
-    // Reset so selecting the same file again re-triggers the change event.
-    event.target.value = "";
-  }
-};
 
 /*
   Actions
@@ -131,16 +99,6 @@ const goToGuide = () => router.push({ name: "application-manifest-guide" });
           </a>
         </p>
       </div>
-      <div class="builder-header-actions">
-        <el-button @click="openImport">Import app.yml</el-button>
-        <input
-          ref="fileInput"
-          type="file"
-          accept=".yml,.yaml,application/x-yaml,text/yaml"
-          class="hidden-file-input"
-          @change="importManifest"
-        />
-      </div>
     </header>
 
     <div class="builder-body">
@@ -153,22 +111,10 @@ const goToGuide = () => router.push({ name: "application-manifest-guide" });
             <label class="field-label">Name <span class="req">*</span></label>
             <el-input
               v-model="meta.name"
-              placeholder="e.g. Spike Sorter"
+              placeholder="my-application"
               maxlength="100"
               class="field-control"
             />
-          </div>
-
-          <div class="field-row">
-            <label class="field-label">Type</label>
-            <el-select v-model="meta.applicationType" class="field-control">
-              <el-option
-                v-for="t in APPLICATION_TYPES"
-                :key="t.value"
-                :label="t.label"
-                :value="t.value"
-              />
-            </el-select>
           </div>
 
           <div class="field-row full-width">
@@ -218,9 +164,9 @@ const goToGuide = () => router.push({ name: "application-manifest-guide" });
           <pre class="preview-code"><code>{{ manifestYaml }}</code></pre>
 
           <p class="preview-footnote">
-            Validated against
-            <a :href="MANIFEST_SCHEMA_URL" target="_blank" rel="noopener">
-              app-manifest.v1.json
+            Modeled on
+            <a :href="MANIFEST_EXAMPLE_URL" target="_blank" rel="noopener">
+              app-manifest.v1.yml
             </a>
           </p>
         </div>
@@ -240,10 +186,6 @@ const goToGuide = () => router.push({ name: "application-manifest-guide" });
 
 .builder-header {
   margin-bottom: 24px;
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 24px;
 
   h1 {
     font-size: 24px;
@@ -264,14 +206,6 @@ const goToGuide = () => router.push({ name: "application-manifest-guide" });
     color: theme.$purple_1;
     white-space: nowrap;
   }
-}
-
-.builder-header-actions {
-  flex: 0 0 auto;
-}
-
-.hidden-file-input {
-  display: none;
 }
 
 .builder-body {

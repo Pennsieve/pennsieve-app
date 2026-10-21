@@ -2,12 +2,12 @@
   "app_domain": "pennsieve.io",
   "apiUrl": "https://api.pennsieve.io",
   "api2Url": "https://api2.pennsieve.io",
+  "downloadServiceUrl": "https://api2.pennsieve.io/downloads",
   "cdeCatalogUrl": "https://cde-catalog.pennsieve.io",
-  "zipitUrl": "https://api.pennsieve.io/zipit",
   "discoverUrl": "https://api.pennsieve.io/discover",
   "discoverAppUrl": "https://discover.pennsieve.io",
   "docsUrl": "https://docs.pennsieve.io",
-  "maxDownloadSize": 15000000000,
+  "maxDownloadSize": 20000000000,
   "environment": "prod",
   "ORCIDAPIHost": "https://orcid.org",
   "ORCIDpubUrl": "https://pub.orcid.org/v2.1",
@@ -43,6 +43,10 @@
   "reCAPTCHASiteKey": "6Le2Wr0aAAAAAHouFUEmy7UwN6b9wa_PPRGrWxAG",
   "neuroglancerUrl": "https://orthogonal-viewer.pennsieve.io",
   "chatWsUrl": "wss://chat.pennsieve.io",
-  "chatRestUrl": "https://api2.pennsieve.io/chat"
-
+  "chatRestUrl": "https://api2.pennsieve.io/chat",
+  "features": {
+    "inAppLogin": false,
+    "publishing": true,
+    "office365Viewer": true
+  }
 }

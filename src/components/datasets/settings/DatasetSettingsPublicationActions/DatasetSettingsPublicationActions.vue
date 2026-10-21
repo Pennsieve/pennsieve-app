@@ -32,16 +32,30 @@
         Request Revision
       </bf-button>
     </div>
+    <div class="action-row">
+      <div class="action-info">
+        <strong>Request removal</strong>
+        <p>Request to remove this dataset from Pennsieve Discover.</p>
+      </div>
+      <bf-button
+        class="secondary red"
+        :disabled="!isPublished || !getPermission('owner')"
+        @click="onRequestRemoval"
+      >
+        Request Removal
+      </bf-button>
+    </div>
+
     <withdraw-dataset-dialog
       :dialog-visible="withdrawDatasetDialogVisible"
       @on-withdraw="triggerRequest(PublicationStatus.CANCELLED, publicationType)"
       @on-close="onCloseWithdraw"
     />
-    <!-- <request-removal-dialog
+    <request-removal-dialog
       :dialog-visible="requestRemovalDialogVisible"
       @on-removal="triggerRequest(PublicationStatus.REQUESTED, PublicationType.REMOVAL)"
       @close="onCloseRemoval"
-    /> -->
+    />
     <request-revision-dialog
       :dialog-visible="requestRevisionDialogVisible"
       @on-revision="triggerRequest(PublicationStatus.REQUESTED, PublicationType.REVISION)"

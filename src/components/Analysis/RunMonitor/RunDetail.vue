@@ -1,5 +1,6 @@
 <script setup>
 import { computed, ref, reactive, watch, onMounted, onBeforeUnmount, onUnmounted, getCurrentInstance } from "vue";
+import { runScopeChannel } from "@/realtime/channels";
 import { useStore } from "vuex";
 import { useRouter, useRoute } from "vue-router";
 import { useVueFlow, VueFlow, Handle, Position } from "@vue-flow/core";
@@ -22,6 +23,11 @@ import { useGetToken } from "@/composables/useGetToken";
 import { useSendXhr } from "@/mixins/request/request_composable";
 import toQueryParams from "@/utils/toQueryParams";
 import LayerNameSelector from "./LayerNameSelector.vue";
+
+const ASSET_TYPE_OPTIONS = ["timeseries-zarr","ome-zarr", "thumb"];
+const ASSET_TYPE_CUSTOM = "__custom__";
+const customAssetTypeNodes = reactive(new Set());
+
 import {
   statusClass,
   statusBorderColor,
@@ -60,7 +66,7 @@ const { onNodeClick, onPaneClick, fitView, updateNodeData } = useVueFlow();
 const store = useStore();
 const router = useRouter();
 const route = useRoute();
-const pusher = getCurrentInstance()?.appContext.config.globalProperties.$pusher;
+const realtime = getCurrentInstance()?.appContext.config.globalProperties.$realtime;
 
 /*
   Local State
@@ -72,7 +78,6 @@ const nodes = ref([]);
 const edges = ref([]);
 const isLoading = ref(false);
 let analyticsChannel = null;
-let analyticsChannelName = null;
 
 // Configure mode state
 const initiateForm = ref({ workflowId: "", computeNodeId: "", datasetId: "", name: "" });
@@ -453,9 +458,9 @@ const runToNodesAndEdges = (run) => {
 };
 
 /*
-  Pusher event handlers
+  Live-update event handlers
 */
-const parsePusherData = (data) => {
+const parseEventData = (data) => {
   if (typeof data === "string") {
     try { return JSON.parse(data); } catch { return data; }
   }
@@ -463,7 +468,7 @@ const parsePusherData = (data) => {
 };
 
 const onRunStatusUpdate = async (raw) => {
-  const data = parsePusherData(raw);
+  const data = parseEventData(raw);
   store.commit("analysisModule/UPDATE_RUN_STATUS", { runId: data.runId, status: data.status });
 
   const currentRunId = selectedWorkflowActivity.value?.uuid;
@@ -495,7 +500,7 @@ const onRunStatusUpdate = async (raw) => {
 };
 
 const onProcessorStatusUpdate = (raw) => {
-  const data = parsePusherData(raw);
+  const data = parseEventData(raw);
   const currentRunId = selectedWorkflowActivity.value?.uuid;
   if (data.runId !== currentRunId) return;
   store.commit("analysisModule/UPDATE_NODE_STATUS", { nodeId: data.nodeId, status: data.status });
@@ -1244,16 +1249,11 @@ onMounted(async () => {
     return;
   }
 
-  // Subscribe to Pusher
-  if (pusher) {
-    const rawOrgId = store.state.activeOrganization?.organization?.id;
-    const rawUserId = store.state.profile?.id;
-    const orgUuid = rawOrgId?.replace(/^N:organization:/, "");
-    const userUuid = rawUserId?.replace(/^N:user:/, "");
-    analyticsChannelName = orgUuid
-      ? `organization-${orgUuid}-analytics`
-      : `user-${userUuid}-analytics`;
-    analyticsChannel = pusher.subscribe(analyticsChannelName);
+  // Live updates for every run in the workspace (or the user's own runs)
+  if (realtime) {
+    analyticsChannel = realtime.subscribe(
+      runScopeChannel(store.state.activeOrganization?.organization?.id, store.state.profile?.id)
+    );
     store.commit("analysisModule/SET_ANALYTICS_CHANNEL", analyticsChannel);
     analyticsChannel.bind("workflow-run-status", onRunStatusUpdate);
     analyticsChannel.bind("workflow-processor-status", onProcessorStatusUpdate);
@@ -1282,11 +1282,8 @@ onBeforeUnmount(() => {
       "workflow-processor-status",
       onProcessorStatusUpdate
     );
-    if (pusher && analyticsChannelName) {
-      pusher.unsubscribe(analyticsChannelName);
-    }
+    analyticsChannel.unsubscribe();
     analyticsChannel = null;
-    analyticsChannelName = null;
     store.commit("analysisModule/CLEAR_ANALYTICS_CHANNEL");
   }
 });
@@ -1700,6 +1697,49 @@ onUnmounted(() => {
                         :value="v"
                       />
                     </el-select>
+                    <template v-else-if="param.name === 'ASSET_TYPE'">
+                      <el-select
+                        :model-value="
+                          ASSET_TYPE_OPTIONS.includes(param.value) || (!param.value && !customAssetTypeNodes.has(selectedNode.id))
+                            ? (param.value ?? '')
+                            : ASSET_TYPE_CUSTOM
+                        "
+                        size="small"
+                        placeholder="Select asset type..."
+                        clearable
+                        style="width: 100%"
+                        @update:model-value="
+                          (val) => {
+                            if (val === ASSET_TYPE_CUSTOM) {
+                              customAssetTypeNodes.add(selectedNode.id);
+                              param.value = '';
+                            } else {
+                              customAssetTypeNodes.delete(selectedNode.id);
+                              param.value = val;
+                            }
+                          }
+                        "
+                      >
+                        <el-option
+                          v-for="v in ASSET_TYPE_OPTIONS"
+                          :key="v"
+                          :label="v"
+                          :value="v"
+                        />
+                        <el-option
+                          :key="ASSET_TYPE_CUSTOM"
+                          label="Other (custom)"
+                          :value="ASSET_TYPE_CUSTOM"
+                        />
+                      </el-select>
+                      <el-input
+                        v-if="customAssetTypeNodes.has(selectedNode.id) || (param.value && !ASSET_TYPE_OPTIONS.includes(param.value))"
+                        v-model="param.value"
+                        size="small"
+                        placeholder="Enter custom asset type..."
+                        style="margin-top: 4px"
+                      />
+                    </template>
                     <el-input
                       v-else
                       v-model="param.value"
@@ -1791,6 +1831,49 @@ onUnmounted(() => {
                       v-model="param.value"
                       :compute-node-id="initiateForm.computeNodeId"
                     />
+                    <template v-else-if="param.name === 'ASSET_TYPE'">
+                      <el-select
+                        :model-value="
+                          ASSET_TYPE_OPTIONS.includes(param.value) || (!param.value && !customAssetTypeNodes.has(selectedNode.id))
+                            ? (param.value ?? '')
+                            : ASSET_TYPE_CUSTOM
+                        "
+                        size="small"
+                        placeholder="Select asset type..."
+                        clearable
+                        style="width: 100%"
+                        @update:model-value="
+                          (val) => {
+                            if (val === ASSET_TYPE_CUSTOM) {
+                              customAssetTypeNodes.add(selectedNode.id);
+                              param.value = '';
+                            } else {
+                              customAssetTypeNodes.delete(selectedNode.id);
+                              param.value = val;
+                            }
+                          }
+                        "
+                      >
+                        <el-option
+                          v-for="v in ASSET_TYPE_OPTIONS"
+                          :key="v"
+                          :label="v"
+                          :value="v"
+                        />
+                        <el-option
+                          :key="ASSET_TYPE_CUSTOM"
+                          label="Other (custom)"
+                          :value="ASSET_TYPE_CUSTOM"
+                        />
+                      </el-select>
+                      <el-input
+                        v-if="customAssetTypeNodes.has(selectedNode.id) || (param.value && !ASSET_TYPE_OPTIONS.includes(param.value))"
+                        v-model="param.value"
+                        size="small"
+                        placeholder="Enter custom asset type..."
+                        style="margin-top: 4px"
+                      />
+                    </template>
                     <el-input
                       v-else
                       v-model="param.value"

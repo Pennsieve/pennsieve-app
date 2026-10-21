@@ -1,0 +1,220 @@
+import { describe, it, expect, vi } from 'vitest'
+import {
+  clientHeader,
+  downloadServiceUrl,
+  downloadServiceRequest,
+  getFileUrl,
+  createArchive,
+  getArchive,
+  listArchives,
+  getArchiveUrl,
+  deleteArchive,
+  DownloadServiceError,
+  publicDownloadsTarget,
+  getPublicFileUrl,
+  createPublicArchive,
+  getPublicArchive,
+  getPublicArchiveUrl,
+  deletePublicArchive,
+  agentDownloadCommand,
+  agentFolderName,
+} from './downloadService'
+import dev from '../site-config/dev.json'
+import prod from '../site-config/prod.json'
+import clin from '../site-config/clin.json'
+
+const config = { downloadServiceUrl: 'https://api2.pennsieve.net/downloads/' }
+const getToken = () => Promise.resolve('tok')
+
+function respond(status, body) {
+  return vi.fn().mockResolvedValue({
+    ok: status >= 200 && status < 300,
+    status,
+    json: () => Promise.resolve(body),
+  })
+}
+
+describe('downloadServiceUrl', () => {
+  it('is set where the platform has download-service', () => {
+    expect(downloadServiceUrl(dev)).toBe('https://api2.pennsieve.net/downloads')
+    expect(downloadServiceUrl(prod)).toBe('https://api2.pennsieve.io/downloads')
+  })
+
+  it('is empty where a site has none, so callers keep their old path', () => {
+    expect(downloadServiceUrl({ api2Url: 'https://api2.example.org' })).toBe('')
+  })
+
+  it('drops a trailing slash', () => {
+    expect(downloadServiceUrl(config)).toBe('https://api2.pennsieve.net/downloads')
+  })
+})
+
+describe('downloadServiceRequest', () => {
+  it('sends the token in a header, never in the URL', async () => {
+    const fetchFn = respond(200, {})
+    await downloadServiceRequest('/archives', { config, getToken, fetchFn })
+    const [url, init] = fetchFn.mock.calls[0]
+    expect(url).toBe('https://api2.pennsieve.net/downloads/archives')
+    expect(url).not.toContain('tok')
+    expect(init.headers.Authorization).toBe('Bearer tok')
+    expect(init.headers['X-Pennsieve-Client']).toBe(clientHeader)
+    expect(clientHeader).toMatch(/^pennsieve-app\/\S+$/)
+  })
+
+  it('names the dataset in the query, as the dataset authorizer requires', async () => {
+    const fetchFn = respond(200, {})
+    await downloadServiceRequest('/files/url', { method: 'POST', datasetId: 'N:dataset:1', body: {}, config, getToken, fetchFn })
+    const [url, init] = fetchFn.mock.calls[0]
+    expect(url).toBe('https://api2.pennsieve.net/downloads/files/url?dataset_id=N%3Adataset%3A1')
+    expect(init.headers['Content-Type']).toBe('application/json')
+  })
+
+  it('turns an error response into a DownloadServiceError with its status and message', async () => {
+    const fetchFn = respond(403, { message: 'this file can\'t be opened: it did not pass the malware scan' })
+    const err = await downloadServiceRequest('/files/url', { method: 'POST', body: {}, config, getToken, fetchFn }).catch((e) => e)
+    expect(err).toBeInstanceOf(DownloadServiceError)
+    expect(err.status).toBe(403)
+    expect(err.message).toContain('malware scan')
+  })
+
+  it('keeps the code and scan status of a file still being scanned', async () => {
+    const fetchFn = respond(409, {
+      code: 'scan_pending',
+      scanStatus: 'scanning',
+      message: 'This file is still being scanned for malware. It will be available to download shortly.',
+    })
+    const err = await downloadServiceRequest('/files/url', { method: 'POST', body: {}, config, getToken, fetchFn }).catch((e) => e)
+    expect(err).toMatchObject({ status: 409, code: 'scan_pending', scanStatus: 'scanning' })
+    expect(err.message).toBe('This file is still being scanned for malware. It will be available to download shortly.')
+  })
+
+  it('refuses to run where the service is not configured', async () => {
+    const fetchFn = respond(200, {})
+    await expect(downloadServiceRequest('/archives', { config: {}, getToken, fetchFn })).rejects.toThrow('not configured')
+    expect(fetchFn).not.toHaveBeenCalled()
+  })
+})
+
+describe('getFileUrl', () => {
+  it('asks for a download link by default', async () => {
+    const fetchFn = respond(200, { url: 'https://s3/x', expiresAt: 'later', fileName: 'a.csv', size: 3 })
+    const link = await getFileUrl({ datasetId: 'N:dataset:1', packageId: 'N:package:1' }, { config, getToken, fetchFn })
+    expect(link.url).toBe('https://s3/x')
+    expect(JSON.parse(fetchFn.mock.calls[0][1].body)).toEqual({ packageId: 'N:package:1', purpose: 'download' })
+  })
+
+  it('passes a view purpose through, and never a file id: a package is one file', async () => {
+    const fetchFn = respond(200, {})
+    await getFileUrl({ datasetId: 'N:dataset:1', packageId: 'N:package:1', fileId: 7, purpose: 'view' }, { config, getToken, fetchFn })
+    expect(JSON.parse(fetchFn.mock.calls[0][1].body)).toEqual({ packageId: 'N:package:1', purpose: 'view' })
+  })
+})
+
+describe('archives', () => {
+  it('creates an archive of a selection', async () => {
+    const fetchFn = respond(202, { id: 'd1', status: 'QUEUED' })
+    const d = await createArchive(
+      { datasetId: 'N:dataset:1', nodeIds: ['N:collection:1'], fileIds: [4], archiveName: 'study' },
+      { config, getToken, fetchFn },
+    )
+    expect(d.id).toBe('d1')
+    const [url, init] = fetchFn.mock.calls[0]
+    expect(url).toBe('https://api2.pennsieve.net/downloads/archives?dataset_id=N%3Adataset%3A1')
+    expect(JSON.parse(init.body)).toEqual({ nodeIds: ['N:collection:1'], notify: 'auto', archiveName: 'study' })
+  })
+
+  it('reaches an archive through its dataset, and lists by workspace, never the preferred workspace', async () => {
+    const fetchFn = respond(200, { downloads: [{ id: 'd1' }], url: 'https://s3/zip' })
+    await getArchive({ id: 'd1', datasetId: 'N:dataset:1' }, { config, getToken, fetchFn })
+    expect(await listArchives({ organizationId: 'N:organization:1' }, { config, getToken, fetchFn })).toEqual([{ id: 'd1' }])
+    await getArchiveUrl({ id: 'd1', datasetId: 'N:dataset:1' }, { config, getToken, fetchFn })
+    await deleteArchive({ id: 'd1', datasetId: 'N:dataset:1' }, { config, getToken, fetchFn })
+    expect(fetchFn.mock.calls.map(([url, init]) => `${init.method} ${url}`)).toEqual([
+      'GET https://api2.pennsieve.net/downloads/archives/d1?dataset_id=N%3Adataset%3A1',
+      'GET https://api2.pennsieve.net/downloads/archives?organization_id=N%3Aorganization%3A1',
+      'GET https://api2.pennsieve.net/downloads/archives/d1/url?dataset_id=N%3Adataset%3A1',
+      'DELETE https://api2.pennsieve.net/downloads/archives/d1?dataset_id=N%3Adataset%3A1',
+    ])
+  })
+
+  it('treats an empty response (204) as done', async () => {
+    const fetchFn = vi.fn().mockResolvedValue({ ok: true, status: 204, json: () => Promise.reject(new Error('no body')) })
+    expect(await deleteArchive({ id: 'd1', datasetId: 'N:dataset:1' }, { config, getToken, fetchFn })).toEqual({})
+  })
+})
+
+describe('agentDownloadCommand', () => {
+  it('downloads the selected folders and packages into a new folder', () => {
+    expect(agentDownloadCommand({
+      datasetId: 'N:dataset:1', nodeIds: ['N:collection:1', 'N:package:2'], folderName: 'my-study',
+    })).toBe('pennsieve download dataset N:dataset:1 ./my-study --node N:collection:1,N:package:2')
+  })
+
+  it('downloads the whole dataset without nodeIds', () => {
+    expect(agentDownloadCommand({ datasetId: 'N:dataset:1', folderName: 'Study' }))
+      .toBe('pennsieve download dataset N:dataset:1 ./Study')
+  })
+
+  it('names the folder so that no shell needs quotes', () => {
+    expect(agentFolderName("Mouse EEG (day 1)'s")).toBe('Mouse-EEG-day-1-s')
+    expect(agentFolderName('../..')).toBe('pennsieve-data')
+    expect(agentFolderName('')).toBe('pennsieve-data')
+  })
+})
+
+describe('published datasets', () => {
+  it('go to api2 with the token where Discover is this platform\'s', () => {
+    expect(publicDownloadsTarget(prod)).toEqual({ base: 'https://api2.pennsieve.io/downloads/public', signedIn: true })
+    expect(publicDownloadsTarget(dev)).toEqual({ base: 'https://api2.pennsieve.net/downloads/public', signedIn: true })
+  })
+
+  it('go anonymously to prod\'s public API from clin: a clin token never leaves clin', () => {
+    expect(publicDownloadsTarget(clin)).toEqual({ base: 'https://downloads.pennsieve.io/public', signedIn: false })
+  })
+
+  it('sign a file link, signed in, by public id, version and path', async () => {
+    const fetchFn = respond(200, { url: 'https://s3/x' })
+    await getPublicFileUrl({ datasetId: '5347', version: 2, path: 'files/a.png', purpose: 'view' }, { config: prod, getToken, fetchFn })
+    const [url, init] = fetchFn.mock.calls[0]
+    expect(url).toBe('https://api2.pennsieve.io/downloads/public/files/url')
+    expect(init.headers.Authorization).toBe('Bearer tok')
+    expect(JSON.parse(init.body)).toEqual({ datasetId: 5347, version: 2, paths: ['files/a.png'], purpose: 'view' })
+  })
+
+  it('send no credential anonymously', async () => {
+    const fetchFn = respond(200, { url: 'https://s3/x' })
+    const token = vi.fn(() => Promise.resolve('clin-token'))
+    await getPublicFileUrl({ datasetId: 698, version: 1, path: 'a.csv' }, { config: clin, getToken: token, fetchFn })
+    expect(fetchFn.mock.calls[0][0]).toBe('https://downloads.pennsieve.io/public/files/url')
+    expect(fetchFn.mock.calls[0][1].headers.Authorization).toBeUndefined()
+    expect(token).not.toHaveBeenCalled()
+  })
+
+  it('zip paths of a version, and reach the archive by its id', async () => {
+    const fetchFn = respond(202, { id: 'pa_x', scope: 'public', status: 'QUEUED' })
+    await createPublicArchive(
+      { datasetId: 5347, version: 2, paths: ['files/a', 'b.csv'], rootPath: 'files', archiveName: 'study' },
+      { config: prod, getToken, fetchFn },
+    )
+    expect(fetchFn.mock.calls[0][0]).toBe('https://api2.pennsieve.io/downloads/public/archives')
+    expect(JSON.parse(fetchFn.mock.calls[0][1].body)).toEqual({
+      datasetId: 5347, version: 2, paths: ['files/a', 'b.csv'], rootPath: 'files', archiveName: 'study', notify: 'auto',
+    })
+
+    const more = respond(200, {})
+    await getPublicArchive({ id: 'pa_x' }, { config: prod, getToken, fetchFn: more })
+    await getPublicArchiveUrl({ id: 'pa_x' }, { config: prod, getToken, fetchFn: more })
+    await deletePublicArchive({ id: 'pa_x' }, { config: prod, getToken, fetchFn: more })
+    expect(more.mock.calls.map(([url, init]) => `${init.method} ${url}`)).toEqual([
+      'GET https://api2.pennsieve.io/downloads/public/archives/pa_x',
+      'GET https://api2.pennsieve.io/downloads/public/archives/pa_x/url',
+      'DELETE https://api2.pennsieve.io/downloads/public/archives/pa_x',
+    ])
+  })
+
+  it('reject with the service\'s reason', async () => {
+    const fetchFn = respond(413, { message: 'this selection is too large to download as one archive' })
+    await expect(createPublicArchive({ datasetId: 1, paths: [''] }, { config: prod, getToken, fetchFn }))
+      .rejects.toMatchObject({ status: 413, message: 'this selection is too large to download as one archive' })
+  })
+})

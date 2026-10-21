@@ -113,6 +113,7 @@ import { mapActions, mapState } from "vuex";
 import { find, propEq } from "ramda";
 import FormatDate from "../../../mixins/format-date";
 import EventBus from "../../../utils/event-bus";
+import { applicationChannel } from "@/realtime/channels";
 import BfWaitingIcon from "../../shared/bf-waiting-icon/bf-waiting-icon.vue";
 import { Setting } from "@element-plus/icons-vue";
 import { CircleClose } from "@element-plus/icons-vue";
@@ -188,7 +189,6 @@ export default {
     return {
       isWaitingForResponse: false,
       status: this.application.status,
-      pusherChannel: null,
       isDeleteApplicationDialogOpen: false,
     };
   },
@@ -267,24 +267,20 @@ export default {
       this.$emit("open-edit-application-dialog", this.application);
     },
     /**
-     * Open pusher channel for each List item
-     *
+     * Live build/deploy status for each list item
      */
-    setupPusherChannel() {
-      const pusher = this.$pusher;
+    setupRealtimeChannel() {
+      const realtime = this.$realtime;
 
-      if (!pusher || !this.application.uuid) return;
+      if (!realtime || !this.application.uuid) return;
 
-      // Subscribe to a unique channel
-      this.channel = pusher.subscribe(`application-${this.application.uuid}`);
-      //bind event name to channel
+      this.channel = realtime.subscribe(applicationChannel(this.application.uuid));
       this.channel.bind("application_status_event", (data) => {
         this.status = data.status;
       });
     },
-    cleanupPusherChannel() {
+    cleanupRealtimeChannel() {
       if (this.channel) {
-        this.channel.unbind("application_status_event");
         this.channel.unsubscribe();
         this.channel = null;
       }
@@ -292,11 +288,11 @@ export default {
   },
 
   mounted() {
-    this.setupPusherChannel();
+    this.setupRealtimeChannel();
   },
 
   beforeUnmount() {
-    this.cleanupPusherChannel();
+    this.cleanupRealtimeChannel();
   },
 };
 </script>

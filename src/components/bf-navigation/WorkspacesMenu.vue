@@ -74,6 +74,11 @@
                   class="bf-menu-item"
                   @click.prevent="switchOrganization(org)"
                 >
+                  <workspace-logo
+                    class="workspace-menu-logo"
+                    :organization="org"
+                    :size="20"
+                  />
                   {{ org.organization.name }}
                   <IconCheck
                     v-if="org.organization.name === organizationName"
@@ -105,6 +110,7 @@ import EventBus from "../../../utils/event-bus";
 import IconArrowRight from "../../icons/IconArrowRight.vue";
 import IconCheck from "../../icons/IconCheck.vue";
 import IconPerson from "../../icons/IconPerson.vue";
+import WorkspaceLogo from "../../shared/WorkspaceLogo/WorkspaceLogo.vue";
 
 export default {
   name: "UserMenu",
@@ -117,6 +123,7 @@ export default {
     Avatar,
     FilterInput,
     FilterEmptyState,
+    WorkspaceLogo,
   },
 
   data() {
@@ -368,6 +375,11 @@ export default {
 .user-menu-wrap {
   --el-popover-padding: 0;
   --el-popover-bg-color: theme.$purple_2;
+}
+
+.workspace-menu-logo {
+  margin-right: 8px;
+  vertical-align: middle;
 }
 
 .person-circle {
