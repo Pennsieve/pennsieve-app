@@ -1,18 +1,22 @@
 <template>
   <div class="proposed-dataset-list-item">
-    
-    <el-row type="flex" :gutter="4">
+    <el-row type="flex" align="middle" :gutter="32">
       <el-col :sm="16">
         <div class="dataset-info">
           <div>
-            <h2>
-              <a
-                href="#"
-                @click.prevent="triggerRequest(DatasetProposalAction.VIEW)"
-              >
-                {{ proposalName }}
-              </a>
-            </h2>
+            <div class="proposal-title">
+              <h2>
+                <a
+                  href="#"
+                  @click.prevent="triggerRequest(DatasetProposalAction.VIEW)"
+                >
+                  {{ proposalName }}
+                </a>
+              </h2>
+              <bf-pill v-if="status" :class="statusPillColor">
+                {{ status }}
+              </bf-pill>
+            </div>
             <p class="dataset-meta">
               Submitted by
               <strong>{{ owner }}</strong>
@@ -29,35 +33,20 @@
         </div>
       </el-col>
 
-      <el-col :sm="4">
-        <div class="bf-dataset-list-item-storage">
-          <p
-            v-if="status"
-            class="bf-dataset-list-item-stat proposal-status"
+      <el-col :sm="8">
+        <div v-if="canReview" class="dataset-actions">
+          <bf-button
+            class="compact"
+            @click="triggerRequest(DatasetProposalAction.ACCEPT)"
           >
-            <span class="status-label">Status</span>
-            <strong class="status-value">{{ status }}</strong>
-          </p>
-        </div>
-      </el-col>
-
-      <el-col :span="4">
-        <div class="bf-dataset-list-item-stat-align">
-          <div v-if="canReview" class="dataset-actions">
-            <div class="button-wrapper">
-              <bf-button
-                @click="triggerRequest(DatasetProposalAction.ACCEPT)"
-              >
-                Accept Request
-              </bf-button>
-              <bf-button
-                class="secondary"
-                @click="triggerRequest(DatasetProposalAction.REJECT)"
-              >
-                Reject Request
-              </bf-button>
-            </div>
-          </div>
+            Accept Request
+          </bf-button>
+          <bf-button
+            class="secondary compact"
+            @click="triggerRequest(DatasetProposalAction.REJECT)"
+          >
+            Reject Request
+          </bf-button>
         </div>
       </el-col>
     </el-row>
@@ -68,12 +57,14 @@ import { mapGetters } from "vuex";
 import FormatDate from "../../../mixins/format-date";
 import { DatasetProposalAction, ProposalStatus } from "../../../utils/constants";
 import BfButton from "@/components/shared/bf-button/BfButton.vue";
+import BfPill from "@/components/shared/BfPill/BfPill.vue";
 
 export default {
   name: "PublishingProposalsListItem",
 
   components: {
     BfButton,
+    BfPill,
   },
 
   mixins: [FormatDate],
@@ -111,6 +102,15 @@ export default {
       return proposalStatus
         ? labels[proposalStatus] || proposalStatus
         : "";
+    },
+
+    statusPillColor: function () {
+      const pillColors = {
+        [ProposalStatus.SUBMITTED]: "yellow",
+        [ProposalStatus.ACCEPTED]: "green",
+        [ProposalStatus.REJECTED]: "red",
+      };
+      return pillColors[this.proposal.proposalStatus] || "";
     },
 
     /**
@@ -169,29 +169,16 @@ export default {
 @use "../../../styles/theme";
 @use "../../../styles/list-item";
 
+.proposal-title {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+}
+
 .dataset-actions {
   display: flex;
-  justify-content: flex-end;
-}
-
-.proposal-status {
-  text-align: left;
-}
-
-.status-label {
-  color: theme.$gray_4;
-  display: block;
-  padding-bottom: 8px;
-}
-
-.status-value {
-  color: theme.$text-color;
-}
-
-.button-wrapper {
-  display: flex;
-  flex-direction: column;
+  flex-wrap: wrap;
   gap: 16px;
-  width: 160px;
+  justify-content: flex-end;
 }
 </style>
