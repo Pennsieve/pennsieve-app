@@ -21,7 +21,7 @@
               You'll be notified by email when approved or rejected.
             </p>
             <div class="info-links">
-              <a href="https://docs.pennsieve.io/docs/publishing-datasets" target="_blank" class="doc-link">
+              <a href="https://docs.pennsieve.io/docs/getting-started" target="_blank" class="doc-link">
                 View Documentation
               </a>
             </div>

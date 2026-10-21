@@ -16,7 +16,6 @@ const datasetId = computed(() => route.params.datasetId);
 const pageName = computed(() => {
   const routeNames = {
     'dataset-settings': 'Settings',
-    'publishing-settings': 'Publishing Settings',
     'integrations-settings': 'Integrations',
   };
   return routeNames[route.name] || 'Settings';

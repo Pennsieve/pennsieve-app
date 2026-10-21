@@ -3,26 +3,24 @@
     <bf-button
       class="primary"
       :disabled="!canPublish || datasetLocked || isRequested"
-      @click="submitForPublication"
+      @click="openSubmitDialog"
     >
-      Request to Publish
-      </bf-button>
+      Submit
+    </bf-button>
     <submit-dataset-dialog
-      :dialog-visible="isSubmitDatasetDialogVisible"
+      v-model:visible="isSubmitDatasetDialogVisible"
       :dataset-id="datasetId"
-      @close="closeDialog"
+      :publication-type="publicationType"
     />
   </div>
-
-  <!-- </router-link> -->
 </template>
 
 <script>
-import { PublicationTabs } from '../../../../utils/constants'
+import { PublicationType } from '../../../../utils/constants'
 import BfButton from '../../../shared/bf-button/BfButton.vue';
 import SubmitDatasetDialog from '../../../Publishing/SubmitDatasetDialog/SubmitDatasetDialog.vue'
 import { mapGetters } from 'vuex';
-//import ChangelogPopup from '@/components/datasets/settings/DataSettingsPublishing/ChangeloPopup.vue';
+
 export default {
   components: {
     BfButton,
@@ -40,6 +38,10 @@ export default {
     isRequested: {
       type: Boolean,
       default: false
+    },
+    publicationType: {
+      type: String,
+      default: PublicationType.PUBLICATION
     }
   },
 
@@ -50,22 +52,12 @@ export default {
   },
   computed: {
     ...mapGetters(['datasetLocked']),
-
-    PublicationTabs: function() {
-      return PublicationTabs
-    }
   },
 
   methods: {
-    closeDialog: function() {
-      this.isSubmitDatasetDialogVisible = false
-    },
-     /**
-      * Open submit for publication dialog
-     */
-      submitForPublication: function() {
-       this.isSubmitDatasetDialogVisible = true
-     }
+    openSubmitDialog: function() {
+      this.isSubmitDatasetDialogVisible = true
+    }
   },
 }
 </script>
