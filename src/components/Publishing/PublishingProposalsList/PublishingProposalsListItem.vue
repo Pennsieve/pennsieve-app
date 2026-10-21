@@ -35,8 +35,8 @@
             v-if="status"
             class="bf-dataset-list-item-stat proposal-status"
           >
-            <strong class="status-label">Status</strong>
-            {{ status }}
+            <span class="status-label">Status</span>
+            <strong class="status-value">{{ status }}</strong>
           </p>
         </div>
       </el-col>
@@ -231,11 +231,15 @@ export default {
   text-align: left;
 }
 
+// Same label/value treatment as the .dataset-meta lines on the left
 .status-label {
-  color: theme.$text-color;
+  color: theme.$gray_4;
   display: block;
-  font-weight: 500;
   padding-bottom: 8px;
+}
+
+.status-value {
+  color: theme.$text-color;
 }
 
 .button-wrapper {
