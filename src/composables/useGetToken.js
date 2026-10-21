@@ -1,5 +1,5 @@
 import { fetchAuthSession } from "aws-amplify/auth";
-import * as siteConfig from "@/site-config/site.json";
+import { redirectToLogin } from "@/utils/auth-redirect";
 import Cookies from "js-cookie";
 
 export async function useGetToken() {
@@ -8,8 +8,7 @@ export async function useGetToken() {
     return session?.tokens?.accessToken.toString();
   } catch (error) {
     console.log(error);
-    // If we don't have a token, redirect to discover app
-    window.location.replace(siteConfig.discoverAppUrl);
+    redirectToLogin();
   }
 }
 

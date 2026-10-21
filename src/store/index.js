@@ -13,6 +13,7 @@ import uploadModule from "./uploadModule";
 import analysisModule from "./analysisModule";
 import codeReposModule from "./codeReposModule";
 import collectionsModule from "./collectionsModule";
+import workspaceLogoModule from "./workspaceLogoModule";
 
 const hashFunction = (key, list) => {
   const obj = {};
@@ -1007,6 +1008,11 @@ export const getters = {
   datasetOwner: (state, getters) => {
     const ownerId = R.propOr("", "owner", state.dataset);
 
+    // Guests never load org members, so resolve the current user from their own profile
+    if (ownerId && ownerId === state.profile.id) {
+      return state.profile;
+    }
+
     return getters.getOrgMember(ownerId);
   },
   isUserDatasetOwner: (state) => (dataset) => {
@@ -1063,7 +1069,8 @@ export default createStore({
     uploadModule,
     analysisModule,
     codeReposModule,
-    collectionsModule
+    collectionsModule,
+    workspaceLogoModule
   }
 
 });

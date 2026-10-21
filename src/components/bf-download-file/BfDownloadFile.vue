@@ -1,8 +1,5 @@
 <template>
   <div>
-    <form id="zipForm" method="POST" :action="zipItUrl">
-      <input v-model="zipData" type="hidden" name="data" />
-    </form>
     <form id="recordCsvForm" method="POST" :action="recordCsvUrl">
       <input v-model="recordCsvQuery" type="hidden" name="data" />
     </form>
@@ -22,10 +19,19 @@
       </template>
 
       <dialog-body class="bf-download-body">
-        <div v-if="showReduceSize" class="mb-24">
-          <p>
+        <div v-if="showReduceSize" class="mb-24 too-large">
+          <template v-if="agentCommand">
+            <p>
+              {{ tooLargeText }} Download it with the Pennsieve agent instead:
+            </p>
+            <agent-download-command v-bind="agentCommand" />
+            <p class="or-remove">
+              Or remove items to bring the selection under the limit:
+            </p>
+          </template>
+          <p v-else>
             The file(s) you are trying to download exceed the limit of
-            {{ formatMetric(this.config.maxDownloadSize) }}. Please reduce the
+            {{ formatMetric(config.maxDownloadSize) }}. Please reduce the
             number of files selected and try again.
           </p>
           <el-table
@@ -36,7 +42,7 @@
             <el-table-column prop="content.name">
             </el-table-column>
             <el-table-column prop="storage" align="right">
-              <template #default>
+              <template #default="scope">
                 {{ formatMetric(scope.row.storage) }}
                 <button @click="removeRow(scope.row)">
                   <IconXCircle color="#404554" :height="28" :width="28" />
@@ -73,6 +79,7 @@
 </template>
 
 <script>
+import { trackEvent, bucket } from "@/utils/analytics";
 import { mapGetters, mapState } from "vuex";
 import { pathOr } from "ramda";
 import Request from "../../mixins/request/index";
@@ -84,6 +91,15 @@ import Sorter from "../../mixins/sorter";
 import IconXCircle from "../icons/IconXCircle.vue";
 import { useGetToken } from "@/composables/useGetToken";
 import EventBus from "../../utils/event-bus";
+import { downloadServiceUrl, getFileUrl } from "@/utils/downloadService";
+import AgentDownloadCommand from "../downloads/AgentDownloadCommand.vue";
+import { useDownloadsStore } from "@/stores/downloadsStore";
+import { triggerBrowserDownload } from "@/utils/triggerBrowserDownload";
+import {
+  isScanPendingError,
+  scanPendingMessage,
+  scanPendingCountText,
+} from "@/utils/scan-status";
 
 const DEFAULT_ARCHIVE_NAME = "pennsieve-data";
 
@@ -91,6 +107,7 @@ export default {
   name: "BfDownloadFile",
 
   components: {
+    AgentDownloadCommand,
     IconXCircle,
     BfDialogHeader,
     DialogBody,
@@ -101,22 +118,22 @@ export default {
 
   data() {
     return {
-      zipData: "",
       dialogVisible: false,
       packageDTOs: [],
       fileDTOs: undefined,
       recordCsvQuery: "",
       archiveName: DEFAULT_ARCHIVE_NAME,
       showReduceSize: false,
+      // download-service refused to zip the selection (413): too many
+      // files or bytes, whatever the sizes here add up to.
+      tooLargeForZip: false,
       downloadConfirmed: false,
-      zipItUrl: "",
       recordCsvUrl: "",
     };
   },
   mounted() {
     useGetToken()
       .then((token) => {
-        this.zipItUrl = `${this.config.zipitUrl}/?api_key=${token}`;
         const activeOrgIntId = pathOr(
           "",
           ["organization", "intId"],
@@ -152,9 +169,34 @@ export default {
      */
     disableDownload: function () {
       return (
+        this.tooLargeForZip ||
         this.downloadSize > this.config.maxDownloadSize ||
         this.sizeTarget.length === 0
       );
+    },
+
+    tooLargeText: function () {
+      if (this.downloadSize > this.config.maxDownloadSize) {
+        return `This selection is ${this.formatMetric(this.downloadSize)}, more than the ${this.formatMetric(this.config.maxDownloadSize)} you can download as a zip.`;
+      }
+      return "This selection is too large to download as a zip.";
+    },
+
+    /**
+     * The agent command for a selection too large to zip, where downloads go
+     * through download-service. Picked files download with their package.
+     */
+    agentCommand: function () {
+      if (!downloadServiceUrl() || this.packageDTOs.length === 0) return null;
+      const content = pathOr({}, [0, "content"], this.packageDTOs);
+      const datasetId = content.datasetNodeId || this.$route?.params?.datasetId;
+      if (!datasetId) return null;
+      return {
+        datasetId,
+        nodeIds: this.packageDTOs.map((p) => p.content.nodeId),
+        folderName:
+          this.packageDTOs.length === 1 ? content.name : this.archiveName,
+      };
     },
 
     /**
@@ -176,6 +218,7 @@ export default {
       this.archiveName = DEFAULT_ARCHIVE_NAME;
       this.downloadConfirmed = false;
       this.showReduceSize = false;
+      this.tooLargeForZip = false;
       this.dialogVisible = false;
     },
 
@@ -204,28 +247,53 @@ export default {
      *     represents the parent package of those files
      */
     triggerDownload: async function (packageDTOs, fileDTOs) {
-      // Block optimistic upload rows and packages still being processed
-      // server-side. Selection is already gated (FilesTable.isRowSelectable),
-      // but the toolbar + keyboard paths can still route a placeholder
-      // here, and a package freshly finalized may briefly sit in
-      // UPLOADED/PROCESSING before hitting READY.
-      const notReady = (packageDTOs || []).filter(
+      // every download UI funnels through here; counts only, bucketed
+      trackEvent('file_downloaded', {
+        kind: fileDTOs ? 'files' : 'packages',
+        count: bucket((fileDTOs || packageDTOs || []).length),
+      });
+      // A package is downloadable only when its source data actually exists
+      // in storage and is retrievable. Deny by default: gating on READY
+      // alone was wrong (an uploaded package rests in UPLOADED indefinitely
+      // and only reaches READY when explicitly processed), but so is
+      // allowing anything that isn't a known-bad state — an unrecognized or
+      // future state (an ARCHIVED / SCANNING / quarantine-like state) must
+      // not silently become downloadable. Failing safe with a visible "not
+      // available yet" beats handing out a broken presigned URL or data
+      // that isn't meant to leave storage.
+      //
+      // Downloadable states (see PackageState.scala):
+      //   UPLOADED            - resting state of an uploaded, unprocessed package
+      //   READY               - processed
+      //   PROCESSING, RUNNING - source is uploaded and present during processing
+      // Everything else is blocked, including placeholders (optimistic
+      // upload rows) and UNAVAILABLE / PENDING / RESTORING / DELETING /
+      // DELETED / INFECTED / ERROR (UPLOAD_FAILED and PROCESSING_FAILED are
+      // serialized to ERROR in DTOs, so the frontend only ever sees ERROR).
+      const DOWNLOADABLE_STATES = new Set([
+        "UPLOADED",
+        "READY",
+        "PROCESSING",
+        "RUNNING",
+      ]);
+      const notDownloadable = (packageDTOs || []).filter(
         (p) =>
           (p && p._placeholder) ||
-          (pathOr("", ["content", "state"], p) &&
-            pathOr("", ["content", "state"], p) !== "READY")
+          !DOWNLOADABLE_STATES.has(pathOr("", ["content", "state"], p))
       );
-      if (notReady.length > 0) {
+      if (notDownloadable.length > 0) {
         EventBus.$emit("toast", {
           detail: {
             type: "info",
             msg:
-              notReady.length === (packageDTOs || []).length
-                ? "Files are still being processed. Download will be available once they're ready."
-                : "Some selected files are still being processed and were skipped.",
+              notDownloadable.length === (packageDTOs || []).length
+                ? "The selected file(s) aren't available for download yet."
+                : "Some selected files aren't available for download and were skipped.",
           },
         });
-        packageDTOs = (packageDTOs || []).filter((p) => !notReady.includes(p));
+        packageDTOs = (packageDTOs || []).filter(
+          (p) => !notDownloadable.includes(p)
+        );
         if (packageDTOs.length === 0) return;
       }
 
@@ -237,28 +305,19 @@ export default {
         this.dialogVisible = true;
         return;
       }
-      // Fast path: a selection that resolves to exactly one file gets a
-      // direct presigned download, no zipit round-trip and no
-      // pennsieve-data.zip wrapper around a single file.
+      // One file downloads directly through its link; anything else is
+      // zipped by download-service, and the downloads panel follows it.
       if (await this.tryDirectDownload()) {
         this.closeDialog();
         return;
       }
-      const nodeIds = this.packageDTOs.map((s) => s.content.nodeId);
-      if (this.fileDTOs) {
-        const fileIds = this.fileDTOs.map((f) => f.id);
-        this.downloadPackages(nodeIds, fileIds);
-      } else {
-        this.downloadPackages(nodeIds);
-      }
+      this.downloadPackages(this.packageDTOs.map((s) => s.content.nodeId));
       this.closeDialog();
     },
 
     /**
-     * Attempts to download the selection as a single file via its presigned
-     * URL. Returns true if handled; false to defer to zipit. Any unexpected
-     * error is swallowed and returns false, so the zipit fallback always
-     * runs — a broken fast path never blocks the existing flow.
+     * Downloads a one-package selection (a package is one file) directly.
+     * Returns false for anything else, so it's zipped instead.
      */
     tryDirectDownload: async function () {
       if (this.packageDTOs.length !== 1) return false;
@@ -266,51 +325,94 @@ export default {
       if (pathOr("", ["content", "packageType"], pkg) === "Collection") {
         return false;
       }
-      const packageId = pathOr("", ["content", "id"], pkg);
-      if (!packageId) return false;
+      return this.downloadViaService(pkg);
+    },
 
-      // A file-level selection short-circuits the sources lookup. Multiple
-      // file selections (e.g. picking 2 sources out of a legacy multi-file
-      // package) defer to zipit.
-      let fileId;
-      if (this.fileDTOs) {
-        if (this.fileDTOs.length !== 1) return false;
-        fileId = this.fileDTOs[0].id;
-      } else {
-        try {
-          const token = await useGetToken();
-          const pkgResp = await this.sendXhr(
-            `${this.config.apiUrl}/packages/${packageId}?include=sources&includeAncestors=false&api_key=${token}`,
-            { method: "GET", header: { Authorization: `bearer ${token}` } },
-          );
-          const sources = pathOr([], ["objects", "source"], pkgResp);
-          // Legacy multi-file packages need to be zipped so none of the
-          // extra sources get silently dropped.
-          if (sources.length !== 1) return false;
-          fileId = pathOr("", [0, "content", "id"], sources);
-          if (!fileId) return false;
-        } catch (e) {
-          return false;
-        }
-      }
-
+    /**
+     * Downloads a one-file selection through download-service, which signs
+     * the link and records the download. Returns false when the service
+     * can't link it as one file, so it's zipped instead. A refusal (malware
+     * scan, no access) is shown, not retried as a zip; so is a file held
+     * because its scan hasn't finished (409 scan_pending), which is not an
+     * error — the file view listens for it to hold its Download button.
+     */
+    downloadViaService: async function (pkg) {
+      const content = pkg.content || {};
       try {
-        const token = await useGetToken();
-        const presigned = await this.sendXhr(
-          `${this.config.apiUrl}/packages/${packageId}/files/${fileId}?api_key=${token}`,
-          { method: "GET", header: { Authorization: `bearer ${token}` } },
-        );
-        const url = pathOr("", ["url"], presigned);
-        if (!url) return false;
-        const a = document.createElement("a");
-        a.href = url;
-        a.rel = "noopener";
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
+        const link = await getFileUrl({
+          datasetId: content.datasetNodeId || this.$route?.params?.datasetId,
+          packageId: content.nodeId || content.id,
+        });
+        triggerBrowserDownload(link.url);
         return true;
       } catch (e) {
+        if (isScanPendingError(e)) {
+          EventBus.$emit("toast", {
+            detail: { type: "info", msg: scanPendingMessage(e) },
+          });
+          EventBus.$emit("download-scan-pending", {
+            packageId: content.nodeId || content.id,
+          });
+          return true;
+        }
+        if (e.status === 403) {
+          EventBus.$emit("toast", {
+            detail: {
+              type: "error",
+              msg: e.message.charAt(0).toUpperCase() + e.message.slice(1),
+            },
+          });
+          return true;
+        }
         return false;
+      }
+    },
+
+    /**
+     * Asks download-service to zip the selection. The downloads panel shows
+     * its progress, and the archive downloads once it's ready; if the user
+     * leaves, they're emailed instead.
+     * @param {Array} nodeIds
+     */
+    archiveViaService: async function (nodeIds) {
+      const content = pathOr({}, [0, "content"], this.packageDTOs);
+      const archiveName = this.archiveName;
+      try {
+        const record = await useDownloadsStore().start({
+          datasetId: content.datasetNodeId || this.$route?.params?.datasetId,
+          nodeIds,
+          // Several items: the name from the dialog. One folder or package:
+          // its own name.
+          archiveName: nodeIds.length > 1 ? archiveName : content.name,
+        });
+        // Files still being scanned are left out of the zip (and listed in
+        // it); say so now rather than only once it's ready.
+        const pending = scanPendingCountText(record && record.pendingCount);
+        if (pending) {
+          EventBus.$emit("toast", {
+            detail: { type: "info", msg: `${pending}. Download them again shortly.` },
+          });
+        }
+      } catch (e) {
+        // Every file is still being scanned: not an error, just not yet.
+        if (isScanPendingError(e)) {
+          EventBus.$emit("toast", {
+            detail: { type: "info", msg: scanPendingMessage(e) },
+          });
+          return;
+        }
+        // Too large to zip: offer the agent instead.
+        if (e.status === 413 && this.agentCommand) {
+          this.archiveName = archiveName;
+          this.tooLargeForZip = true;
+          this.showReduceSize = true;
+          this.dialogVisible = true;
+          return;
+        }
+        const reason = e.status >= 400 && e.status < 500 && e.message
+          ? e.message.charAt(0).toUpperCase() + e.message.slice(1)
+          : "The download couldn't be started. Try again.";
+        EventBus.$emit("toast", { detail: { type: "error", msg: reason } });
       }
     },
 
@@ -323,32 +425,11 @@ export default {
     },
 
     /**
-     * downloads multiple packages
+     * Zips packages and folders (download-service).
      * @param {Array} nodeIds
-     * @param {Array} fileIds - when downloading a single package, includes only specified files
      */
-    downloadPackages: function (nodeIds, fileIds) {
-      const fileIdPayload = fileIds ? { fileIds } : {};
-      const archiveNamePayload =
-        this.archiveName && nodeIds.length > 1
-          ? { archiveName: this.archiveName }
-          : {};
-      const payload = { nodeIds, ...fileIdPayload, ...archiveNamePayload };
-
-      const form = document.createElement("form");
-      form.method = "POST";
-      form.action = this.zipItUrl;
-      form.target = "_blank";
-
-      const input = document.createElement("input");
-      input.type = "hidden";
-      input.name = "data";
-      input.value = JSON.stringify(payload);
-
-      form.appendChild(input);
-      document.body.appendChild(form);
-      form.submit();
-      document.body.removeChild(form);
+    downloadPackages: function (nodeIds) {
+      this.archiveViaService(nodeIds);
     },
   },
 };
@@ -359,6 +440,15 @@ export default {
 @use "../../styles/element/dialog";
 
 .bf-download-body {
+  .too-large {
+    p {
+      margin: 0 0 8px;
+    }
+    .or-remove {
+      margin-top: 16px;
+    }
+  }
+
   .download-name {
     display: flex;
     align-items: center;

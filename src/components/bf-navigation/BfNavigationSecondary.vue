@@ -9,7 +9,14 @@
         class="heading-wrap"
         :style="{ backgroundColor: `${secNavHeaderCollapsedStyle}` }"
       >
-        <template v-if="!secondaryNavCondensed">
+        <template v-if="secondaryNavCondensed">
+          <div
+            :style="{ 'background-color': condensedMarkerColor }"
+            class="dot condensed-status"
+            :title="datasetName"
+          />
+        </template>
+        <template v-else>
           <div>
             <el-dropdown
               class="dataset-status-dropdown"
@@ -64,24 +71,6 @@
               </template>
             </el-dropdown>
           </div>
-          <div>
-            <button
-              class="btn-expand-collapse"
-              name="Collapse Secondary Menu"
-              @click="toggleMenu"
-            >
-              <IconNavCollapse color="#71747C" />
-            </button>
-          </div>
-        </template>
-        <template v-else>
-          <button
-            class="btn-expand-collapse"
-            name="Expand Secondary Menu"
-            @click="toggleMenu"
-          >
-            <IconNavExpand color="#ffF" :height="32" :width="32" />
-          </button>
         </template>
       </div>
 
@@ -199,7 +188,21 @@
       </bf-navigation-item>
     </div>
 
-    <span class="collapse-handle" @click="toggleMenu" />
+    <button
+      type="button"
+      class="collapse-handle"
+      :aria-label="secondaryNavCondensed ? 'Expand secondary navigation' : 'Collapse secondary navigation'"
+      :aria-expanded="!secondaryNavCondensed"
+      @click="toggleMenu"
+    >
+      <IconArrowLeft
+        class="collapse-chevron"
+        :class="{ 'is-flipped': secondaryNavCondensed }"
+        :width="6"
+        :height="10"
+        color="currentColor"
+      />
+    </button>
     <bf-navigation-tertiary
       v-if="secondaryNavCondensed"
       :bk-color="tertiaryNavColor"
@@ -219,8 +222,7 @@ import EventBus from "../../utils/event-bus";
 
 import Request from "../../mixins/request/index";
 import IconArrowUp from "../icons/IconArrowUp.vue";
-import IconNavCollapse from "../icons/IconNavCollapse.vue";
-import IconNavExpand from "../icons/IconNavExpand.vue";
+import IconArrowLeft from '../icons/IconArrowLeft.vue'
 import IconOverview from "../icons/IconOverview.vue";
 import IconDatasetSettings from "../icons/IconDatasetSettings.vue";
 import IconFiles from "../icons/IconFiles.vue";
@@ -244,8 +246,7 @@ export default {
     IconFiles,
     IconDatasetSettings,
     IconOverview,
-    IconNavExpand,
-    IconNavCollapse,
+    IconArrowLeft,
     IconArrowUp,
     BfNavigationItem,
     BfNavigationTertiary,
@@ -309,6 +310,15 @@ export default {
       }
       return '';
     },
+    // The condensed header is the darkened primary theme colour, so the
+    // marker uses the secondary - the one the header is not already using -
+    // to stay visible against it. Deliberately not the dataset status colour:
+    // most statuses are greys, which disappeared into the header.
+    condensedMarkerColor: function () {
+      const themeColors = this.getThemeColors;
+      return themeColors && themeColors.length >= 2 ? themeColors[1] : "";
+    },
+
     tertiaryNavColor: function () {
       if (this.secondaryNavCondensed) {
         const themeColors = this.getThemeColors;
@@ -416,7 +426,12 @@ export default {
   },
 
   beforeUnmount() {
+    // Restore the primary rail on the way out. Collapsing this one sets
+    // primaryNavOpen false, and App.vue renders the primary behind
+    // v-if="primaryNavOpen" - so leaving it false meant navigating away from a
+    // collapsed rail landed on a page with no navigation at all.
     this.toggleSecondaryNav(false);
+    this.togglePrimaryNav(true);
   },
 
   methods: {
@@ -525,17 +540,28 @@ hr {
 .heading-wrap {
   box-sizing: border-box;
   color: theme.$gray_6;
-  padding: 21px 24px 0px;
+  // Symmetrical: bottom padding was 0 because the collapse button was the
+  // only thing giving this row height. With the dropdown alone it needs to
+  // match the top, or it sits flush against the items below.
+  padding: 21px 24px;
 
   display: flex;
-  justify-content: space-between;
+  // The dropdown is the only child now, so there is nothing to space apart.
+  justify-content: flex-start;
   white-space: nowrap;
   font-size: 14px;
-  align-items: baseline;
+  align-items: center;
 
   .condensed & {
     background: theme.$purple_0_7;
     height: 56px;
+    // Centred: flex-start suits the expanded dropdown, but leaves the lone
+    // marker against the left edge of a 56px rail.
+    justify-content: center;
+    // Cancels the -6px that navigation.scss puts on .menu-wrap when
+    // condensed. That shift aligns the nav item icons below, but this row
+    // inherits it too, so centring here landed 6px left of the rail's middle.
+    margin-left: 6px;
     padding: 10px;
   }
 
@@ -583,6 +609,14 @@ hr {
   margin-right: 4px;
   border-radius: 50%;
   display: inline-block;
+
+  // Alone in the condensed heading, so no trailing gap and slightly larger to
+  // stay legible as the only thing in a 56px rail.
+  &.condensed-status {
+    height: 14px;
+    margin-right: 0;
+    width: 14px;
+  }
 
   &.main-status {
     margin-right: 2px;

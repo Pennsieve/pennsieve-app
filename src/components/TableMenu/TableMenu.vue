@@ -28,7 +28,7 @@
             !isMSOfficeFile &&
             packageType !== 'Collection' &&
             packageType !== 'Unknown' &&
-            getFileState !== 'Unprocessed' &&
+            (getFileState !== 'Unprocessed' || hasZarrTimeseries) &&
             getFileState !== 'Processing' &&
             getFileState !== 'Failed' &&
             !isExternalFile
@@ -90,12 +90,14 @@
 </template>
 
 <script>
+import { isFeatureEnabled } from "@/utils/features";
 import { mapGetters, mapState, mapActions } from "vuex";
 import { path, pathOr, propOr } from "ramda";
 
 import EventBus from "../../utils/event-bus";
 import GetFileProperty from "../../mixins/get-file-property";
 import IconMenu from "../icons/IconMenu.vue";
+import { useTimeseriesZarrAssets } from "@/composables/useTimeseriesZarrAssets";
 
 const conceptId = "00000000-0000-0000-0000-000000000000";
 
@@ -118,6 +120,27 @@ export default {
     },
   },
 
+  setup() {
+    const { hasTimeseriesZarrAsset, probeTimeseriesZarrAsset } =
+      useTimeseriesZarrAssets();
+    return { hasTimeseriesZarrAsset, probeTimeseriesZarrAsset };
+  },
+
+  watch: {
+    // Same rule as the file row's eye button: an unprocessed timeseries package
+    // with a ready Zarr bundle is viewable, so "Open Viewer" has to stay in the
+    // menu. Cached per package by the composable, so this rarely costs a call.
+    needsZarrProbe: {
+      immediate: true,
+      handler: function (needed) {
+        if (!needed) {
+          return;
+        }
+        this.probeTimeseriesZarrAsset(this.fileDatasetId, this.filePackageId);
+      },
+    },
+  },
+
   computed: {
     ...mapGetters(["getPermission", "datasetLocked"]),
 
@@ -129,9 +152,10 @@ export default {
      */
     isMSOfficeFile: function () {
       return (
-        this.kind === "MS Powerpoint" ||
-        this.kind === "MS Excel" ||
-        this.kind === "MS Word"
+        isFeatureEnabled("office365Viewer") &&
+        (this.kind === "MS Powerpoint" ||
+          this.kind === "MS Excel" ||
+          this.kind === "MS Word")
       );
     },
 
@@ -198,6 +222,37 @@ export default {
      */
     packageType: function () {
       return pathOr("", ["content", "packageType"], this.selection[0] || []);
+    },
+
+    filePackageId: function () {
+      const file = this.selection[0] || {};
+      return pathOr(pathOr("", ["content", "nodeId"], file), ["content", "id"], file);
+    },
+
+    fileDatasetId: function () {
+      return (
+        pathOr("", ["content", "datasetNodeId"], this.selection[0] || {}) ||
+        this.$route.params.datasetId ||
+        pathOr("", ["content", "id"], this.dataset)
+      );
+    },
+
+    needsZarrProbe: function () {
+      return (
+        this.packageType.toLowerCase() === "timeseries" &&
+        this.getFileState === "Unprocessed" &&
+        Boolean(this.fileDatasetId) &&
+        Boolean(this.filePackageId)
+      );
+    },
+
+    /**
+     * Whether the selected package carries a ready timeseries-zarr asset, which
+     * makes it viewable no matter what the legacy package state says.
+     * @returns {Boolean}
+     */
+    hasZarrTimeseries: function () {
+      return this.hasTimeseriesZarrAsset(this.filePackageId);
     },
   },
 

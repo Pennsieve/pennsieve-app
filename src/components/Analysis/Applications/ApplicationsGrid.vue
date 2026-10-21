@@ -274,9 +274,9 @@ const goToManifestBuilder = () => {
             clearable
             class="applications-search-input"
           />
-          <el-button type="primary" @click="goToManifestBuilder">
+          <!-- <el-button type="primary" @click="goToManifestBuilder">
             Create app.yml
-          </el-button>
+          </el-button> -->
         </div>
       </div>
 

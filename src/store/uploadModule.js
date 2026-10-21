@@ -1,3 +1,4 @@
+import { trackEvent, bucket } from '@/utils/analytics'
 import toQueryParams from '../utils/toQueryParams.js'
 import { compose, find, join, map, prepend, propEq } from "ramda";
 import { Upload } from "@aws-sdk/lib-storage"
@@ -679,6 +680,7 @@ export const actions = {
         }
 
         commit('SET_UPLOAD_COMPLETE', true)
+        trackEvent('upload_completed', { files: bucket(state.totalFilesInBatch) })
     },
 
     // POST /upload/manifest/files/finalize with the currently-queued files.

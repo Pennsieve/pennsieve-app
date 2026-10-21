@@ -60,6 +60,7 @@
         <dataset-sort-menu
           class="mr-24"
           :order-by="publishingSearchParams.orderBy"
+          :excluded-options="['IntId']"
           @select="onDatasetSortSelect"
         />
 
@@ -269,9 +270,8 @@ export default {
         })
       }
 
-      // The sort menu is shared with the dataset tabs, so it also offers
-      // accession number, which proposals do not have. Sort by date for
-      // anything that isn't a name.
+      // Proposals have no accession number, so the sort menu hides that
+      // option here; anything that isn't a name sorts by date.
       const field = this.publishingSearchParams.orderBy === 'UpdatedAt'
         ? 'updatedAt'
         : 'submittedAt'

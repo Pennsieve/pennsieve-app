@@ -112,7 +112,7 @@
         </div>
 
         <div class="pub-section">
-          <div class="pub-section-header">Submit for Publication</div>
+          <div class="pub-section-header">Manage Publication</div>
           <div class="pub-section-content">
             <dataset-settings-publishing
               :orcid-api-url="getORCIDApiUrl"
@@ -224,13 +224,13 @@ export default {
     },
 
     getORCIDUrl() {
-      return pathOr("", ["config", "ORCIDUrl"])(this) || "";
+      return this.config?.ORCIDUrl || "";
     },
 
     getORCIDApiUrl() {
       return useGetToken()
         .then((token) => {
-          const url = pathOr("", ["config", "apiUrl"])(this);
+          const url = this.config?.apiUrl || "";
           return `${url}/user/orcid?api_key=${token}`;
         })
         .catch(() => "");

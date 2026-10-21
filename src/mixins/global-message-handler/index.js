@@ -13,6 +13,7 @@ import { path, pathOr, propOr, find, pathEq, defaultTo, compose, prop, propEq } 
 import {useGetToken} from "@/composables/useGetToken";
 import {useSwitchWorkspace} from "@/composables/useSwitchWorkspace";
 import router from "@/router";
+import { isFeatureEnabled } from '@/utils/features'
 
 export default {
   data() {
@@ -389,6 +390,16 @@ export default {
      * @param {Object} payload
      */
     onLogout: async function(payload) {
+      if (isFeatureEnabled('inAppLogin')) {
+        try {
+          await signOut()
+        } catch (error) {
+          console.warn('Sign out failed:', error)
+        }
+        // Full page load so no in-memory state from the previous session survives.
+        window.location.replace('/login')
+        return
+      }
       window.location.href = siteConfig.discoverAppUrl
       // try {
       //

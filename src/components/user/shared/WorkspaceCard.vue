@@ -11,6 +11,17 @@
       class="bottom" 
       :style="`background-image: linear-gradient(0deg, ${colorScheme[0]}, ${colorScheme[1]});`"
     >
+      <!-- Each card shows its own workspace, not the active one, so the
+           organization is passed explicitly. No monogram fallback: the card
+           already shows the name directly above, so initials would only
+           repeat it. -->
+      <workspace-logo
+        :organization="workspace"
+        fit="natural"
+        :size="40"
+        :max-width="150"
+        hide-when-missing
+      />
     </div>
   </div>
 </template>
@@ -18,9 +29,14 @@
 <script>
 import * as siteConfig from '@/site-config/site.json'
 import EventBus from '@/utils/event-bus'
+import WorkspaceLogo from '@/components/shared/WorkspaceLogo/WorkspaceLogo.vue'
 
 export default {
   name: 'WorkspaceCard',
+
+  components: {
+    WorkspaceLogo
+  },
   
   props: {
     workspace: {
@@ -91,7 +107,12 @@ export default {
   }
 
   .bottom {
+    align-items: center;
+    display: flex;
     flex: 1;
+    justify-content: center;
+    // Keeps a wide wordmark off the card's edges.
+    padding: 0 16px;
   }
 }
 

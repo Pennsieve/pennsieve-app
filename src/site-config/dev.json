@@ -2,12 +2,12 @@
   "app_domain": "pennsieve.net",
   "apiUrl": "https://api.pennsieve.net",
   "api2Url": "https://api2.pennsieve.net",
+  "downloadServiceUrl": "https://api2.pennsieve.net/downloads",
   "cdeCatalogUrl": "https://cde-catalog.pennsieve.net",
   "discoverUrl": "https://api.pennsieve.net/discover",
   "discoverAppUrl": "https://discover.pennsieve.net",
-  "zipitUrl": "https://api.pennsieve.net/zipit",
   "docsUrl": "https://docs.pennsieve.io",
-  "maxDownloadSize": 15000000000,
+  "maxDownloadSize": 20000000000,
   "environment": "dev",
   "ORCIDAPIHost": "https://sandbox.orcid.org",
   "ORCIDpubUrl": "https://pub.sandbox.orcid.org/v2.1",
@@ -36,6 +36,10 @@
       "scope": ["openid"]
     }
   },
+  "realtime": {
+    "httpHost": "events.pennsieve.net",
+    "realtimeHost": "events.pennsieve.net"
+  },
   "pusherConfig": {
     "appId": "47a81ebaf87f4c168177",
     "region": "us2"
@@ -44,5 +48,10 @@
   "reCAPTCHASiteKey": "6Le2Wr0aAAAAAHouFUEmy7UwN6b9wa_PPRGrWxAG",
   "neuroglancerUrl": "https://orthogonal-viewer.pennsieve.net",
   "chatWsUrl": "wss://chat.pennsieve.net",
-  "chatRestUrl": "https://api2.pennsieve.net/chat"
+  "chatRestUrl": "https://api2.pennsieve.net/chat",
+  "features": {
+    "inAppLogin": false,
+    "publishing": true,
+    "office365Viewer": true
+  }
 }

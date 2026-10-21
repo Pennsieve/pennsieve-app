@@ -37,7 +37,6 @@ const DatasetSettingsView = () => import('./Dataset/DatasetSettingsView.vue')
 const BfDatasetFiles = () => import('../components/datasets/files/BfDatasetFiles.vue')
 const FileDetails = () => import('../components/datasets/files/FileDetails/FileDetails.vue')
 const DatasetFilesView = () => import('./Dataset/DatasetFilesView.vue')
-const BfPublishingSettings = () => import('../components/datasets/settings/BfPublishingSettings.vue')
 const DatasetActivityLog = () => import('../components/datasets/DatasetActivity/DatasetActivityLog.vue')
 const DatasetManifests = () => import('../components/datasets/DatasetActivity/DatasetManifests.vue')
 const DatasetActivityView = () => import('./Dataset/DatasetActivityView.vue');
@@ -120,6 +119,8 @@ const UserGithubIntegrations = () => import('../components/user/integrations/Use
 const DataPublishingDashboard = () => import('../components/user/publishing/DataPublishingDashboard.vue')
 const SharedWorkspaces = () => import('../components/user/shared/SharedWorkspaces.vue')
 const SharedDatasets = () => import('../components/user/shared/SharedDatasets.vue')
+const Downloads = () => import('./downloads/Downloads.vue')
+const WorkspaceDownloads = () => import('../components/downloads/WorkspaceDownloads.vue')
 const PublicDatasetList = () => import('../components/user/shared/PublicDatasetList.vue')
 const PublicDatasetDetail = () => import('../components/datasets/PublicDataset/PublicDatasetDetail.vue')
 const PublicDatasetOverview = () => import('../components/datasets/PublicDataset/PublicDatasetOverview.vue')
@@ -948,6 +949,25 @@ const router = createRouter({
         name: 'datasets-list',
       }
     },
+    // Archives from download-service, per workspace. Download emails link
+    // here.
+    {
+      path: '/:orgId/downloads',
+      components: {
+        page: Downloads,
+        navigation: BfNavigation
+      },
+      children: [
+        {
+          name: 'workspace-downloads',
+          path: '',
+          components: {
+            stage: WorkspaceDownloads
+          }
+        },
+      ],
+      props: true
+    },
     /**
      * Workspace Insights — chat-centric dashboard
      */
@@ -1108,7 +1128,7 @@ const router = createRouter({
           children: [
             {
               name: 'publication-settings',
-              path: '',
+              path: 'settings',
               components: {
                 stage: PublicationSettingsPage
               },

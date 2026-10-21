@@ -197,6 +197,7 @@
       @close="onClosePackageDialog"
     />
 
+    <!-- TODO: leftover Vue 2 `.sync` modifier below, dead in Vue 3 (no onUpdate:open listener is generated) - verify any bugs caused by this outdated code and update to v-model:open -->
     <deleted-files
       :open.sync="deletedDialogOpen"
       @close-deleted-dialog="closeDeletedDialog"
@@ -285,6 +286,8 @@ import IconUpload from "../../icons/IconUpload.vue";
 import PsButtonDropdown from "@/components/shared/ps-button-dropdown/PsButtonDropdown.vue";
 import IconAnnotation from "@/components/icons/IconAnnotation.vue";
 import { useGetToken } from "@/composables/useGetToken";
+import { downloadServiceUrl, getFileUrl } from "@/utils/downloadService";
+import { isScanPendingError, scanPendingMessage } from "@/utils/scan-status";
 import { useSendXhr } from "@/mixins/request/request_composable";
 import debounce from "lodash.debounce";
 
@@ -366,8 +369,6 @@ export default {
       renamingFileId: null,
       moveDialogVisible: false,
       selectedFileForAction: {},
-      pusherChannelName: "",
-      pusherChannel: {},
     };
   },
 
@@ -392,7 +393,7 @@ export default {
     ]),
 
     ...mapGetters("datasetModule", [
-      "getPusherChannel",
+      "getRealtimeChannel",
       "getManifestNotification",
     ]),
 
@@ -555,7 +556,7 @@ export default {
         }
       },
     },
-    getPusherChannel: {
+    getRealtimeChannel: {
       handler(channel) {
         function isEmpty(obj) {
           for (const prop in obj) {
@@ -570,12 +571,12 @@ export default {
           channel.bind(
             "upload-event",
             function () {
-              // Pusher's job here is purely "a file landed in Postgres,
+              // The live update's job here is purely "a file landed in Postgres,
               // refresh the dataset table." It fires for uploads from any
               // source (this browser session, a different session, the
               // agent). The browser upload flow's own state machine is
               // driven by the finalize API response (see uploadModule.js)
-              // — nothing on this Pusher event touches it.
+              // — nothing on this event touches it.
               //
               // Silent refetch + leading/maxWait debounce keep the table
               // current during a burst without the per-second flash.
@@ -591,7 +592,7 @@ export default {
   },
 
   created() {
-    // Throttled silent refetch used by the upload-event Pusher handler to
+    // Throttled silent refetch used by the upload-event handler to
     // coalesce the hundreds of events a large direct-to-storage upload
     // produces. Leading + maxWait mean the first event in a burst refreshes
     // immediately and sustained bursts still produce at most one refresh
@@ -632,8 +633,8 @@ export default {
   },
 
   beforeUnmount() {
-    const pusherCh = this.getPusherChannel;
-    pusherCh.unbind("upload-event");
+    const channel = this.getRealtimeChannel;
+    channel.unbind?.("upload-event");
   },
 
   unmounted: function () {
@@ -1230,6 +1231,7 @@ export default {
      */
     onFolderCreated: function (folder) {
       this.files.push(folder);
+      this.syncTargetPackageChildren();
       this.sortColumn(this.sortBy, this.sortDirection);
     },
 
@@ -1268,9 +1270,39 @@ export default {
         );
         this.files.splice(fileIndex, 1);
       }
+      // The names these rows held are free again — see
+      // syncTargetPackageChildren.
+      this.syncTargetPackageChildren();
       // Resort files
       this.sortColumn(this.sortBy, this.sortDirection);
       this.resetSelectedFiles();
+    },
+
+    /**
+     * Mirror this folder's rows into the upload store's snapshot of the
+     * destination package (`currentTargetPackage`).
+     *
+     * syncManifest pre-resolves upload name conflicts client-side
+     * (resolveKeepBothName) against that snapshot, and the snapshot is only
+     * ever written by fetchFiles / silentlyFetchFiles. Rows dropped locally
+     * after a *confirmed* delete or move stay in it, so the next upload of a
+     * just-freed name gets renamed to "x (1).ext" by us, before the manifest
+     * is even sent — the API frees the name synchronously inside the
+     * /data/delete transaction, so it is not the one adding the suffix.
+     * Reloading the page fixed it only because it refetched the children.
+     *
+     * Syncing on additions too (new folder, landed upload) keeps the other
+     * direction honest: colliding with a row that is really there should
+     * still produce "(1)".
+     */
+    syncTargetPackageChildren: function () {
+      const targetPackage =
+        this.$store.state.uploadModule?.currentTargetPackage;
+      if (!targetPackage || !Array.isArray(targetPackage.children)) return;
+      this.$store.dispatch("uploadModule/setCurrentTargetPackage", {
+        ...targetPackage,
+        children: [...this.files],
+      });
     },
 
     /**
@@ -1416,6 +1448,7 @@ export default {
         isParent
       ) {
         this.files.push(packageDTO);
+        this.syncTargetPackageChildren();
         // Resort files
         this.sortColumn(this.sortBy, this.sortDirection);
         this.resetSelectedFiles();
@@ -1559,6 +1592,10 @@ export default {
      * @param {Object} file
      */
     getPresignedUrl: function (file) {
+      if (downloadServiceUrl()) {
+        this.copyLinkViaService(file);
+        return;
+      }
       const packageId = pathOr("", ["content", "id"], file);
 
       // Get the files for the package
@@ -1618,6 +1655,43 @@ export default {
           });
       });
     },
+    /**
+     * Copies a download-service link to the file. The service signs it,
+     * records it as a download, and refuses packages with several files
+     * and (409 scan_pending) files still being scanned for malware.
+     * @param {Object} file
+     */
+    copyLinkViaService: async function (file) {
+      const content = file.content || {};
+      const toast = (type, msg) => EventBus.$emit("toast", { detail: { type, msg } });
+      let link;
+      try {
+        link = await getFileUrl({
+          datasetId: content.datasetNodeId || this.$route.params.datasetId,
+          packageId: content.nodeId || content.id,
+        });
+      } catch (e) {
+        if (isScanPendingError(e)) {
+          toast("info", scanPendingMessage(e));
+        } else if (e.status === 400) {
+          toast("info", "This package has several files. Download it to get all of them.");
+        } else {
+          toast("error", "Unable to create a link to this file");
+        }
+        return;
+      }
+      copyText(link.url, undefined, (error) => {
+        if (error) {
+          toast("error", "Unable to copy to clipboard");
+        } else {
+          const minutes = Math.round((Date.parse(link.expiresAt) - Date.now()) / 60000);
+          toast("success", minutes > 0
+            ? `Link to file copied to clipboard. It works for ${minutes} minutes.`
+            : "Link to file copied to clipboard");
+        }
+      });
+    },
+
     handleRouteChange: function (to, from) {
       const DATASET_FILES_ROUTES = [
         "dataset-files",

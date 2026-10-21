@@ -35,7 +35,9 @@ export default {
      */
     handleGetViewerData: function(response) {
       const pkg = reject(pathEq(['content', 'fileType'], 'PNG'), response)
+      this.viewFile = pathOr({}, [0])(pkg)
       this.viewerDataId = pathOr('', [0, 'content', 'id'])(pkg)
+      this.scanRetryCount = 0
       this.getFileUrl()
     }
   }

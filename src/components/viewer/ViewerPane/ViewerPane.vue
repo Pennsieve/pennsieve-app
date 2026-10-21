@@ -48,8 +48,6 @@
       v-else-if="cmpViewer === 'CSVViewer'"
       ref="viewer"
       :pkg="pkg"
-      :api-url="apiUrl"
-      :file-type="pkg.content?.packageType"
     />
     <component
       v-else
@@ -75,14 +73,18 @@ import FileTypeMapper from "../../../mixins/FileTypeMapper";
 import GetFileProperty from "../../../mixins/get-file-property";
 import NeuroglancerViewer from "../../viewers/NeuroglancerViewer.vue";
 import BfButton from "@/components/shared/bf-button/BfButton.vue";
-import { TSViewer } from "@pennsieve-viz/tsviewer";
+import { trackEvent } from "@/utils/analytics";
+import {
+  TSViewer,
+  TIMESERIES_ZARR,
+  TIMESERIES_WEBSOCKET,
+} from "@pennsieve-viz/tsviewer";
 import "@pennsieve-viz/tsviewer/style.css";
 import * as siteConfig from "@/site-config/site.json";
 import {
   VIEWER_INSTANCE_ID,
   initViewerStore,
   cleanupViewerStore,
-  useViewerInstance,
 } from "@/composables/useViewerInstance";
 import { useViewerAssets } from "@/composables/useViewerAssets";
 
@@ -124,7 +126,7 @@ export default {
       import("../../viewers/DuckDBExplorer/DuckDBViewerWrapper.vue"),
     ),
     CSVViewer: defineAsyncComponent(() =>
-      import("@pennsieve-viz/core").then((m) => m.CSVViewer),
+      import("../../viewers/CSVViewerWrapper.vue"),
     ),
     LayViewer: defineAsyncComponent(() =>
       import("../../viewers/LayViewer.vue"),
@@ -165,10 +167,10 @@ export default {
       availableViewers: [],
       viewerAssets: [],
       thumbnailAsset: null,
+      timeseriesAsset: null,
       isLoading: false,
       omeTiffSource: "",
       omeTiffSlowWarning: false,
-      apiUrl: siteConfig.apiUrl,
       viewerInstanceId: VIEWER_INSTANCE_ID,
     };
   },
@@ -187,11 +189,14 @@ export default {
         }
         const pkg = this.pkg;
         await this.loadViewer(pkg);
-        if (
+        // Activate on packageType as before, and additionally whenever loadViewer resolved a
+        // timeseries viewer asset: a Zarr bundle's package need not carry packageType
+        // Timeseries, and without this such a package mounts the viewer but never feeds it.
+        const isTimeseriesPackage =
           pathOr("", ["content", "packageType"], pkg).toLowerCase() ===
-          "timeseries"
-        ) {
-          this.fetchTimeseriesData();
+          "timeseries";
+        if (isTimeseriesPackage || this.timeseriesAsset) {
+          await this.fetchTimeseriesData();
         }
       },
       immediate: true,
@@ -201,9 +206,56 @@ export default {
   methods: {
     ...mapActions("viewerModule", [
       "fetchViewerAssets",
+      "fetchViewerAssetById",
       "fetchFileUrl",
       "fetchSourceFiles",
     ]),
+
+    /**
+     * Builds the URL a viewer asset's bytes are read from.
+     *
+     * `asset_url` is a directory prefix that already ends in `/`, and one CloudFront policy
+     * covers every object beneath it, so the signature goes on the prefix and the reader
+     * appends its own keys. Returns the bare prefix when no policy came back (a public
+     * bucket, or signing unavailable), and null when there is nothing to read at all.
+     */
+    signedAssetUrl: function (asset) {
+      const url = asset?.asset_url;
+      if (!url) return null;
+
+      const cf = asset?.cloudfront;
+      if (!cf?.policy || !cf?.signature || !cf?.key_pair_id) return url;
+
+      const qs = new URLSearchParams({
+        Policy: cf.policy,
+        Signature: cf.signature,
+        "Key-Pair-Id": cf.key_pair_id,
+      });
+      return `${url}?${qs.toString()}`;
+    },
+
+    /**
+     * Returns a callback the viewer calls to re-sign a bundle whose policy has expired.
+     *
+     * CloudFront policies last an hour and a viewing session outlives that. The ids are taken
+     * as arguments rather than read off `this`, so the callback stays pinned to the asset it
+     * was created for even after the user navigates to another package.
+     */
+    buildUrlRefresher: function (datasetId, assetId) {
+      return async () => {
+        const result = await this.fetchViewerAssetById({ datasetId, assetId });
+        // fetchViewerAssetById swallows failures and resolves null, so this has to throw
+        // rather than hand back an unusable value.
+        const url = this.signedAssetUrl({
+          ...result?.asset,
+          cloudfront: result?.cloudfront,
+        });
+        if (!url) {
+          throw new Error(`Could not re-sign viewer asset ${assetId}`);
+        }
+        return url;
+      };
+    },
 
     /**
      * Called when component is mounted
@@ -212,7 +264,6 @@ export default {
       this.isLoading = true;
       // Initialize the viewer store with the shared instance ID
       const viewerStore = initViewerStore(this.viewerInstanceId);
-      const viewerControls = useViewerInstance(this.viewerInstanceId);
 
       const viewerConfig = {
         timeseriesDiscoverApi: siteConfig.timeSeriesUrl,
@@ -222,14 +273,48 @@ export default {
       viewerStore.setViewerConfig(viewerConfig);
 
       try {
-        const viewerAssetId = this.timeseriesAsset?.id || null;
+        const asset = this.timeseriesAsset;
+        const viewerAssetId = asset?.id || null;
         const packageId = this.pkg?.content?.id || null;
+        const datasetId = this.pkg?.content?.datasetNodeId || null;
         if (!viewerAssetId && !packageId) return;
-        const result = await viewerStore.fetchAndSetActiveViewer({
+
+        // The viewer asset's type picks the data path: a Zarr bundle is read straight from
+        // CloudFront in the browser, anything else streams over the discovery WebSocket.
+        const bundleUrl =
+          asset?.asset_type === TIMESERIES_ZARR
+            ? this.signedAssetUrl(asset)
+            : null;
+
+        if (asset?.asset_type === TIMESERIES_ZARR && !bundleUrl) {
+          // Claiming the Zarr path without a URL would make the viewer throw. Degrade
+          // instead, which is what an unrecognized asset type does anyway.
+          console.warn(
+            `Viewer asset ${viewerAssetId} is ${TIMESERIES_ZARR} but exposes no URL to read; using the streaming service instead.`,
+          );
+        }
+
+        const payload = {
           viewerAssetId,
           packageId,
-        });
-        return result;
+          assetType: bundleUrl ? TIMESERIES_ZARR : TIMESERIES_WEBSOCKET,
+        };
+        if (bundleUrl) {
+          payload.url = bundleUrl;
+          if (datasetId && viewerAssetId) {
+            payload.onUrlExpired = this.buildUrlRefresher(
+              datasetId,
+              viewerAssetId,
+            );
+          }
+        }
+
+        return await viewerStore.fetchAndSetActiveViewer(payload);
+      } catch (err) {
+        // Both paths can reject (a failed bundle open, a failed discovery socket). Swallow
+        // it here so the watcher that calls this cannot raise an unhandled rejection.
+        console.error("Failed to activate the timeseries viewer:", err);
+        return null;
       } finally {
         this.isLoading = false;
       }
@@ -293,6 +378,10 @@ export default {
 
       let viewers = this.checkViewerType(activeViewer) || ['UnknownViewer'];
 
+      // A ready Zarr bundle makes the package viewable regardless of the legacy
+      // package state; set below once the asset listing comes back.
+      let hasReadyZarrTimeseries = false;
+
       // Check for neuroglancer-compatible viewer assets (ome-zarr, etc.)
       const pkgId = pathOr("", ["content", "id"], activeViewer);
       const datasetId = pathOr("", ["content", "datasetNodeId"], activeViewer);
@@ -306,7 +395,34 @@ export default {
             pkgId
           );
           if (result?.assets?.length > 0) {
-            this.timeseriesAsset = result.assets.find(a => a.asset_type === 'timeseries') || null
+            // A package can carry both a legacy streaming asset and a newer Zarr bundle.
+            // The listing comes back ordered by created_at DESC, so choose by explicit
+            // precedence rather than by position: the bundle wins when it is ready to read.
+            // `cloudfront` rides along so the URL can be signed at activation time.
+            // Only the bundle is status-gated — an unready bundle has no bytes to read,
+            // whereas the legacy asset is just an identifier for the streaming service and
+            // has never been filtered on status here.
+            const zarrAsset = result.assets.find(
+              (a) => a.asset_type === TIMESERIES_ZARR && a.status === "ready",
+            );
+            const legacyAsset = result.assets.find(
+              (a) => a.asset_type === TIMESERIES_WEBSOCKET,
+            );
+            const tsAsset = zarrAsset || legacyAsset || null;
+            this.timeseriesAsset = tsAsset
+              ? { ...tsAsset, cloudfront: result.cloudfront }
+              : null;
+
+            if (zarrAsset) {
+              hasReadyZarrTimeseries = true;
+              if (!viewers.includes("TimeseriesViewer")) {
+                viewers = [
+                  "TimeseriesViewer",
+                  ...viewers.filter((v) => v !== "UnknownViewer"),
+                ];
+              }
+            }
+
             const neuroglancerTypes = ["ome-zarr", "neuroglancer-precomputed"];
             const seen = new Set();
             const ngAssets = result.assets.filter((a) => {
@@ -354,8 +470,11 @@ export default {
 
       this.availableViewers = viewers;
 
+      // `state` is only a signal about the legacy processing pipeline: a package
+      // with a ready Zarr bundle is viewable whether or not it ever ran.
       if (
         this.isTimeseriesPackageUnprocessed(activeViewer) &&
+        !hasReadyZarrTimeseries &&
         !this.isLayFile(activeViewer)
       ) {
         this.loadVueViewer("UnknownViewer");
@@ -369,10 +488,10 @@ export default {
             const sourceFiles = await this.fetchSourceFiles(pkgId);
 
             if (sourceFiles && sourceFiles.length > 0) {
-              const fileId = pathOr("", ["content", "id"], sourceFiles[0]);
               this.omeTiffSource = await this.fetchFileUrl({
+                datasetId,
                 packageId: pkgId,
-                fileId,
+                file: sourceFiles[0],
               });
             }
           } catch (err) {
@@ -390,6 +509,8 @@ export default {
      */
     loadVueViewer: function (component) {
       this.cmpViewer = component;
+      // component name is an enumerable viewer type, not user content
+      trackEvent("viewer_opened", { viewer: String(component || "").replace(/Viewer$/, "").toLowerCase() });
     },
 
     isTimeseriesPackageUnprocessed: function (pkg) {

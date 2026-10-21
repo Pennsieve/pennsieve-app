@@ -4,8 +4,19 @@ import {defaultTo, prop} from "ramda";
 import Cookies from "js-cookie";
 import EventBus from "@/utils/event-bus";
 import {useRoute, useRouter} from "vue-router";
+import { signOut } from "aws-amplify/auth";
+import { isFeatureEnabled } from "@/utils/features";
+import { redirectToLogin } from "@/utils/auth-redirect";
 
 export function useHandleLogout(payload) {
+
+    // Checked before useRoute(): this runs from request error handlers, outside component setup.
+    if (isFeatureEnabled('inAppLogin')) {
+        signOut()
+            .catch(error => console.warn('Sign out failed:', error))
+            .finally(() => redirectToLogin())
+        return
+    }
 
     const route = useRoute()
     const router = useRouter()

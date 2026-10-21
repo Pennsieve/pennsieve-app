@@ -16,6 +16,9 @@
       </template>
 
       <dialog-body>
+        <p class="required-field-note">
+          <span class="required-asterisk">*</span> indicates a required field
+        </p>
         <el-form
           ref="form"
           label-position="top"
@@ -24,20 +27,13 @@
           @keyup.enter.native="validateForm"
         >
           <el-row
-            class="mb-24"
             :gutter="8"
           >
             <el-col :span="18">
               <el-form-item
-                class="mb-16"
                 prop="firstName"
+                label="First Name"
               >
-                <template #label>
-                  First Name
-                  <span class="label-helper">
-                  required
-                </span>
-                </template>
                 <el-input
                   id="firstName"
                   v-model="form.firstName"
@@ -49,7 +45,6 @@
             </el-col>
             <el-col :span="6">
               <el-form-item
-                class="mb-16"
                 prop="middleInitial"
                 label="Middle Initial"
               >
@@ -71,15 +66,9 @@
             </el-col>
           </el-row>
           <el-form-item
-            class="mb-16"
             prop="lastName"
+            label="Last Name"
           >
-            <template #label>
-              Last Name
-              <span class="label-helper">
-              required
-            </span>
-            </template>
             <el-input
               id="lastName"
               v-model="form.lastName"
@@ -88,15 +77,9 @@
             />
           </el-form-item>
           <el-form-item
-            class="mb-16"
             prop="email"
+            label="Email"
           >
-            <template #label>
-              Email
-              <span class="label-helper">
-              required
-            </span>
-            </template>
             <el-input
               id="email"
               v-model="form.email"
@@ -108,7 +91,6 @@
             </p>
           </el-form-item>
           <el-form-item
-            class="mb-16"
             prop="degree"
           >
             <template #label>
@@ -117,15 +99,9 @@
             <degree-select v-model="form.degree" />
           </el-form-item>
           <el-form-item
-            class="mb-16"
             prop="orcid"
+            label="ORCID iD"
           >
-            <template #label>
-              ORCID iD
-              <span class="label-helper">
-              optional
-            </span>
-            </template>
             <el-input
               id="orcid"
               v-model="form.orcid"
@@ -321,7 +297,7 @@ export default {
       } else {
        const result = this.orgContributors.filter(contributor => value === contributor.email );
        if (result.length !== 0 && !this.isEditing) {
-          callback(new Error('Contributor with this email already exists'));
+          callback(new Error('This user is already an org member with this email and can be added from the dropdown outside of the dialog'));
        } else {
          callback()
        }
@@ -364,6 +340,9 @@ export default {
       if (Object.keys(this.contributor).length) {
         this.form = { ...this.contributor }
         this.isEditing = true
+      } else {
+        this.form = defaultForm()
+        this.isEditing = false
       }
     },
 
@@ -431,11 +410,25 @@ export default {
 <style lang="scss" scoped>
 
 @use '../../../../../styles/element/dialog';
+@use '../../../../../styles/theme';
+
+:deep(.el-dialog .el-dialog__body) {
+  padding-top: 0px;
+}
 
 p {
   font-size: 12px;
   margin: 4px 0 0;
   line-height: 14px;
+}
+
+.required-field-note {
+  color: theme.$gray_4;
+  margin: 0 0 16px;
+}
+
+.required-asterisk {
+  color: theme.$red_1;
 }
 
 </style>

@@ -1,4 +1,5 @@
 @use './theme';
+@use './collapse-handle';
 
 .bf-navigation {
   background: #{theme.$purple_2};
@@ -19,21 +20,17 @@
     flex: 1;
   }
 }
+// The rail's collapse control: a generous invisible hit area straddling the
+// right edge, which reveals a solid bar on the boundary when hovered.
+//
+// Previously sat at right: -18px, so the whole strip - and the 2px line it
+// drew - was outside the rail, floating in the content area rather than on
+// the edge it controls. It now centres on the boundary: half the hit area
+// each side, with the visible indicator exactly on the seam.
 .collapse-handle {
-  border-left: 2px solid transparent;
-  cursor: ew-resize;
-  height: 100%;
-  position: absolute;
-  right: -18px;
-  top: 0;
-  width: 18px;
-  &:hover {
-    border-color: #{theme.$purple_2};
-  }
-  .primary &:hover {
-    border-color: #{theme.$purple_2}
-  }
+  @include collapse-handle.collapse-handle(".bf-navigation");
 }
+
 .logo {
   display: block;
   min-height: 20px;

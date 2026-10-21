@@ -183,6 +183,7 @@ function getStatusForNode(node) {
 onMounted(async () => {
   await fetchComputeNode()
   await Promise.all([
+    computeResourcesStore.fetchComputeNodes(orgId.value).catch(() => {}),
     computeResourcesStore.fetchNodePermissions(nodeUuid.value),
     computeResourcesStore.fetchAllowedProcessors(nodeUuid.value),
     computeResourcesStore.fetchGpuTiers(activeOrganization.value?.organization?.id).then(tiers => {
@@ -403,40 +404,34 @@ async function saveAllowedProcessors() {
   }
 }
 
-// Update deployment (provisioner image)
-const isEditingDeployment = ref(false)
+// Provisioner update (always to the newest released tag, never a floating tag)
+// latestVersion/updateAvailable are annotated on the GET compute-nodes list, so
+// prefer the listed copy of this node over the single-node fetch.
 const isUpdatingDeployment = ref(false)
-const deploymentForm = ref({ provisionerImage: '', provisionerImageTag: '' })
+const listedNode = computed(() => computeResourcesStore.findComputeNodeByUuid(nodeUuid.value))
+const latestProvisionerVersion = computed(() =>
+  listedNode.value?.latestVersion || computeNode.value?.latestVersion || null
+)
+const provisionerUpdateAvailable = computed(() => {
+  if (!latestProvisionerVersion.value) return false
+  const source = listedNode.value || computeNode.value
+  return source?.updateAvailable === true
+})
 
-function startEditingDeployment() {
-  deploymentForm.value = {
-    provisionerImage: computeNode.value?.provisionerImage || '',
-    provisionerImageTag: computeNode.value?.provisionerImageTag || ''
-  }
-  isEditingDeployment.value = true
-}
-
-function cancelEditingDeployment() {
-  isEditingDeployment.value = false
-  deploymentForm.value = { provisionerImage: '', provisionerImageTag: '' }
-}
-
-async function saveDeployment() {
-  if (!deploymentForm.value.provisionerImage || !deploymentForm.value.provisionerImageTag) {
-    ElMessage.warning('Both image and tag are required')
-    return
-  }
+async function updateProvisioner() {
+  const targetTag = latestProvisionerVersion.value
+  if (!targetTag) return
   isUpdatingDeployment.value = true
   try {
     await computeResourcesStore.updateComputeNodeDeployment(nodeUuid.value, {
-      provisionerImage: deploymentForm.value.provisionerImage,
-      provisionerImageTag: deploymentForm.value.provisionerImageTag
+      provisionerImage: computeNode.value?.provisionerImage || computeResourcesStore.DEFAULT_PROVISIONER_IMAGE,
+      provisionerImageTag: targetTag
     })
-    ElMessage.success('Compute node update initiated')
-    isEditingDeployment.value = false
+    await fetchComputeNode()
+    ElMessage.success(`Updating compute node to ${targetTag}. This typically takes 6-8 minutes.`)
   } catch (error) {
-    console.error('Failed to update deployment:', error)
-    ElMessage.error('Failed to update compute node deployment')
+    console.error('Failed to update provisioner:', error)
+    ElMessage.error('Failed to update compute node')
   } finally {
     isUpdatingDeployment.value = false
   }
@@ -656,16 +651,10 @@ async function saveConfig() {
       <div class="management-section">
         <div class="section-header">
           <h2>Deployment Configuration</h2>
-          <div class="section-actions" v-if="canManagePermissions">
-            <template v-if="!isEditingDeployment">
-              <button class="processor-edit-button" @click="startEditingDeployment">Update</button>
-            </template>
-            <template v-else>
-              <button class="processor-edit-button" :disabled="isUpdatingDeployment" @click="saveDeployment">
-                {{ isUpdatingDeployment ? 'Updating...' : 'Update' }}
-              </button>
-              <button class="processor-cancel-button" @click="cancelEditingDeployment">Cancel</button>
-            </template>
+          <div class="section-actions" v-if="canManagePermissions && provisionerUpdateAvailable">
+            <button class="processor-edit-button" :disabled="isUpdatingDeployment" @click="updateProvisioner">
+              {{ isUpdatingDeployment ? 'Updating...' : 'Update node' }}
+            </button>
           </div>
         </div>
         <div class="info-content">
@@ -685,24 +674,20 @@ async function saveConfig() {
 
           <div class="info-row">
             <span class="info-label">Provisioner:</span>
-            <template v-if="isEditingDeployment">
-              <span class="info-value">
-                <div class="deployment-form">
-                  <div class="deployment-form-row">
-                    <label class="deployment-form-label">Image</label>
-                    <el-input v-model="deploymentForm.provisionerImage" placeholder="e.g. pennsieve/compute-node-aws-provisioner-v2" size="default" />
-                  </div>
-                  <div class="deployment-form-row">
-                    <label class="deployment-form-label">Tag</label>
-                    <el-input v-model="deploymentForm.provisionerImageTag" placeholder="e.g. 20260310-1" size="default" />
-                  </div>
-                </div>
-              </span>
-            </template>
-            <template v-else>
-              <span v-if="computeNode.provisionerImage" class="info-value mono">{{ computeNode.provisionerImage }}:{{ computeNode.provisionerImageTag }}</span>
-              <span v-else class="info-value empty-value">Not set</span>
-            </template>
+            <span class="info-value provisioner-value">
+              <span v-if="computeNode.provisionerImage" class="provisioner-image">{{ computeNode.provisionerImage }}:{{ computeNode.provisionerImageTag }}</span>
+              <span v-else class="empty-value">Not set</span>
+              <el-tooltip
+                v-if="provisionerUpdateAvailable"
+                :content="`This node is running version ${computeNode.provisionerImageTag || 'latest'}. Version ${latestProvisionerVersion} is available. Updating re-provisions the node with the latest infrastructure changes in your cloud account and typically takes 6-8 minutes.`"
+                placement="top"
+                :show-after="300"
+                :popper-style="{ maxWidth: '320px' }"
+              >
+                <span class="version-badge outdated">Update available</span>
+              </el-tooltip>
+              <span v-else-if="latestProvisionerVersion" class="version-badge current">Up to date</span>
+            </span>
           </div>
         </div>
       </div>
@@ -1400,6 +1385,41 @@ async function saveConfig() {
         padding: 4px 8px;
         border-radius: 4px;
         display: inline-block;
+      }
+
+      &.provisioner-value {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .provisioner-image {
+        font-family: 'Courier New', monospace;
+        font-size: 13px;
+        background: theme.$gray_1;
+        padding: 4px 8px;
+        border-radius: 4px;
+      }
+
+      .version-badge {
+        display: inline-block;
+        padding: 2px 8px;
+        border-radius: 3px;
+        font-size: 11px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+
+        &.outdated {
+          background: rgba(#F59E0B, 0.12);
+          color: #B45309;
+        }
+
+        &.current {
+          background: rgba(#10B981, 0.1);
+          color: #059669;
+        }
       }
 
       .empty-value {

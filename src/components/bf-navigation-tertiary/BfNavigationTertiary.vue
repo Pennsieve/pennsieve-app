@@ -1,5 +1,10 @@
 <template>
   <div class="bf-navigation-tertiary">
+    <downloads-nav-button
+      v-if="showDownloads"
+      :condensed="railCondensed"
+      :style-color="navStyleColor"
+    />
 
 
 
@@ -64,6 +69,9 @@
   import IconDelete from "@/components/icons/IconDelete.vue";
   import IconCommunity from "@/components/icons/IconCommunity.vue";
   import IconArrowRight from "@/components/icons/IconArrowRight.vue";
+  import DownloadsNavButton from "@/components/downloads/DownloadsNavButton.vue";
+  import { useDownloadsStore } from "@/stores/downloadsStore";
+  import { downloadServiceUrl } from "@/utils/downloadService";
 
   // const SearchMenu = () => import('@/components/bf-navigation/SearchMenu/SearchMenu.vue')
 
@@ -97,7 +105,8 @@
       HelpMenu,
       UserMenu,
       IconOrganization,
-      BfNavigationItem
+      BfNavigationItem,
+      DownloadsNavButton,
       // SearchMenu
     },
 
@@ -111,7 +120,14 @@
         'pageNotFound',
         'activeOrganization',
         'primaryNavCondensed',
+        'secondaryNavOpen',
       ]),
+      // The same rule as BfNavigation's condensed class: the rail is narrow
+      // whenever a secondary nav is open (the dataset view), not only when
+      // the primary nav is collapsed.
+      railCondensed: function() {
+        return this.primaryNavCondensed || this.pageNotFound || this.secondaryNavOpen
+      },
       /**
        * Compute active organization id
        * @returns {String}
@@ -121,6 +137,11 @@
       },
       hasCustomTheme: function() {
         return true
+      },
+      // Only in a workspace's navigation (downloads are per workspace), and
+      // only while the downloads panel has something to show.
+      showDownloads: function() {
+        return Boolean(this.orgId && downloadServiceUrl() && useDownloadsStore().panelDownloads.length)
       },
       navStyleColor: function() {
         if (this.hasCustomTheme) {
