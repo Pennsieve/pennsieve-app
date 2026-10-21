@@ -111,8 +111,8 @@ export default {
 @use '../../../styles/theme';
 @use '../../../styles/element/dropdown';
 
-// The base button style sets no color, which leaves the browser's default black
 .dataset-filter-dropdown {
   color: theme.$text-color;
+  padding: 0;
 }
 </style>

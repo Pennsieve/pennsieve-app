@@ -81,7 +81,6 @@
         }
 
         return classString
-        // return this.$slots['actions']? "bf-stage-content" : "bf-stage-content no-actions"
       }
     },
 

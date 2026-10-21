@@ -145,10 +145,6 @@ export default {
       return this.proposal.emailAddress?.trim() || "";
     },
 
-    storage: function () {
-      return 0;
-    },
-
     DatasetProposalAction: function () {
       return DatasetProposalAction;
     },
@@ -173,65 +169,15 @@ export default {
 @use "../../../styles/theme";
 @use "../../../styles/list-item";
 
-.list-item-status-wrapper {
-  color: theme.$gray_4;
-  font-size: 12px;
-  line-height: 18px;
-  font-weight: normal;
-  border-radius: 3px;
-  width: 160px;
-  padding-top: 3px;
-  height: fit-content;
-
-  p {
-    margin: 0 0 2px !important;
-    overflow: hidden;
-    white-space: nowrap;
-    text-overflow: ellipsis;
-    padding-left: 20px;
-    max-width: 134px;
-  }
-}
-.publishing-notice {
-  display: flex;
-  flex-direction: column;
-  .publishing-notice-icon-line {
-    display: flex;
-    :first-child {
-      margin-top: -1px;
-    }
-  }
-}
-
 .dataset-actions {
   display: flex;
   justify-content: flex-end;
-}
-
-.publishing-info {
-  margin: 24px 0 0 104px;
-}
-.error-notice {
-  align-items: center;
-  display: flex;
-}
-
-.error-notice-text {
-  display: flex;
-  flex-direction: column;
-  .error-notice-icon-line {
-    display: flex;
-    :first-child {
-      margin-top: -1px;
-    }
-  }
 }
 
 .proposal-status {
   text-align: left;
 }
 
-// Same label/value treatment as the .dataset-meta lines on the left
 .status-label {
   color: theme.$gray_4;
   display: block;
@@ -247,17 +193,5 @@ export default {
   flex-direction: column;
   gap: 16px;
   width: 160px;
-}
-
-@media only screen and (max-width: 1200px) {
-  .list-item-status-wrapper {
-    width: 70px;
-    height: fit-content;
-    padding-left: 5px;
-
-    p {
-      word-break: break-word;
-    }
-  }
 }
 </style>
