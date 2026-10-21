@@ -24,7 +24,7 @@
           class="bf-menu"
         >
           <el-dropdown-item
-            v-for="option in options"
+            v-for="option in visibleOptions"
             :key="option.value"
             class="icon-item"
             :command="option"
@@ -62,6 +62,10 @@ export default {
     orderBy: {
       type: String,
       default: ''
+    },
+    excludedOptions: {
+      type: Array,
+      default: () => []
     }
   },
 
@@ -86,6 +90,10 @@ export default {
   },
 
   computed: {
+    visibleOptions: function() {
+      return this.options.filter(option => !this.excludedOptions.includes(option.value))
+    },
+
     /**
      * Compute dataset filter arrow direction
      * @returns {String}
