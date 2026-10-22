@@ -29,6 +29,12 @@ const teams = computed(() => store.state.teams || [])
 const nodeUuid = computed(() => route.params.nodeId)
 const orgId = computed(() => route.params.orgId)
 
+// Shown in a workspace (/:orgId/analysis/compute-nodes/:nodeId) or in My
+// Workspace (/my-workspace/compute-nodes/:nodeId), which has no orgId.
+const listRoute = computed(() => orgId.value
+  ? { name: 'compute-nodes', params: { orgId: orgId.value } }
+  : { name: 'my-compute-nodes' })
+
 // Component state
 const computeNode = ref(null)
 const isLoading = ref(false)
@@ -60,6 +66,10 @@ const isNodeOwner = computed(() => {
 })
 
 const canManagePermissions = computed(() => isNodeOwner.value)
+
+// A node with no organization is the owner's alone: it can't be shared with
+// users, teams or a workspace, and the API refuses any attempt.
+const isPersonalNode = computed(() => !!computeNode.value && !computeNode.value.organizationId)
 
 const deploymentModeDescription = computed(() => {
   const mode = (computeNode.value?.deploymentMode || 'basic').toLowerCase()
@@ -183,7 +193,9 @@ function getStatusForNode(node) {
 onMounted(async () => {
   await fetchComputeNode()
   await Promise.all([
-    computeResourcesStore.fetchComputeNodes(orgId.value).catch(() => {}),
+    (orgId.value
+      ? computeResourcesStore.fetchComputeNodes(orgId.value)
+      : computeResourcesStore.fetchUserOwnedComputeNodes()).catch(() => {}),
     computeResourcesStore.fetchNodePermissions(nodeUuid.value),
     computeResourcesStore.fetchAllowedProcessors(nodeUuid.value),
     computeResourcesStore.fetchGpuTiers(activeOrganization.value?.organization?.id).then(tiers => {
@@ -208,12 +220,12 @@ async function fetchComputeNode() {
       computeNode.value = await response.json()
     } else {
       ElMessage.error('Failed to load compute node details')
-      router.push({ name: 'compute-nodes', params: { orgId: orgId.value } })
+      router.push(listRoute.value)
     }
   } catch (error) {
     console.error('Failed to fetch compute node:', error)
     ElMessage.error('Failed to load compute node details')
-    router.push({ name: 'compute-nodes', params: { orgId: orgId.value } })
+    router.push(listRoute.value)
   } finally {
     isLoading.value = false
   }
@@ -444,7 +456,7 @@ async function confirmDestroyNode() {
     await computeResourcesStore.deleteComputeNode(nodeUuid.value)
     ElMessage.success('Compute node destroyed successfully')
     showDestroyDialog.value = false
-    router.push({ name: 'compute-nodes', params: { orgId: orgId.value } })
+    router.push(listRoute.value)
   } catch (error) {
     console.error('Failed to destroy compute node:', error)
     ElMessage.error('Failed to destroy compute node')
@@ -522,7 +534,7 @@ async function saveConfig() {
     <div class="compute-node-management" v-if="computeNode">
       <!-- Back link -->
       <div class="node-breadcrumb">
-        <router-link :to="{ name: 'compute-nodes' }" class="back-link">
+        <router-link :to="listRoute" class="back-link">
           &larr; Back to all compute nodes
         </router-link>
       </div>
@@ -836,7 +848,7 @@ async function saveConfig() {
 
       <!-- Per-user chat LLM quotas. Anchor `#quotas` is what the chat
            panel's "Manage quotas" link targets. -->
-      <div id="quotas" class="management-section" v-if="canManagePermissions && computeNode?.enableLLMAccess">
+      <div id="quotas" class="management-section" v-if="canManagePermissions && computeNode?.enableLLMAccess && !isPersonalNode">
         <div class="section-header">
           <h2>Per-user LLM Quotas</h2>
         </div>
@@ -863,8 +875,14 @@ async function saveConfig() {
             <div class="info-row">
               <span class="info-label">Access Scope:</span>
               <span class="info-value">
+                <template v-if="isPersonalNode">
+                  <span class="access-scope-badge private">Private</span>
+                  <span class="scope-description-text">
+                    A personal compute node: only you can use it, and it can't be shared.
+                  </span>
+                </template>
                 <el-select
-                  v-if="canManagePermissions"
+                  v-else-if="canManagePermissions"
                   v-model="localAccessScope"
                   @change="handleAccessScopeChange"
                   :loading="isUpdatingPermissions"
@@ -878,7 +896,7 @@ async function saveConfig() {
                 <span v-else class="access-scope-badge" :class="localAccessScope">
                   {{ localAccessScope === 'private' ? 'Private' : localAccessScope === 'workspace' ? 'Workspace' : 'Shared' }}
                 </span>
-                <span v-if="!canManagePermissions" class="scope-description-text">
+                <span v-if="!canManagePermissions && !isPersonalNode" class="scope-description-text">
                   <span v-if="localAccessScope === 'private'">Only the owner can access this compute node</span>
                   <span v-else-if="localAccessScope === 'workspace'">All workspace members can access this compute node</span>
                   <span v-else>Shared with specific users and teams</span>
@@ -888,7 +906,7 @@ async function saveConfig() {
           </div>
 
           <!-- Shared Users -->
-          <div v-if="localAccessScope === 'shared'" class="sharing-section">
+          <div v-if="localAccessScope === 'shared' && !isPersonalNode" class="sharing-section">
             <div class="shared-subsection">
               <div class="subsection-header">
                 <h3>Shared Users</h3>

@@ -47,6 +47,7 @@ export default {
       if (this.isPublishingSection) return 'Data Publishing';
       if (this.isCollectionsSection) return 'Collections';
       if (this.isCodeSection) return 'My Code';
+      if (this.isComputeSection) return 'Compute Nodes';
       if (this.myDataSection) return this.myDataSection.name;
 
       // Top-level pages
@@ -62,6 +63,7 @@ export default {
       if (this.isPublishingSection) return { name: 'data-publishing' };
       if (this.isCollectionsSection) return { name: 'collections-list' };
       if (this.isCodeSection) return { name: 'my-code' };
+      if (this.isComputeSection) return { name: 'my-compute-nodes' };
       if (this.myDataSection) return this.myDataSection.route;
       return null;
     },
@@ -128,6 +130,11 @@ export default {
         return [];
       }
 
+      // Compute node detail page
+      if (routeName === 'my-compute-node-management') {
+        return [{ name: 'Compute Node' }];
+      }
+
       // My Code sub-pages
       if (this.isCodeSection) {
         if (routeName === 'published-app-details') {
@@ -141,6 +148,10 @@ export default {
 
     isCodeSection() {
       return this.routeName === 'published-app-details';
+    },
+
+    isComputeSection() {
+      return this.routeName === 'my-compute-nodes' || this.routeName === 'my-compute-node-management';
     },
 
     // The "My Data" routes are now separate primary-nav entries; each shows
