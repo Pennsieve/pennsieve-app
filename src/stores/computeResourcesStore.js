@@ -6,7 +6,7 @@ import * as siteConfig from '@/site-config/site.json'
 
 export const useComputeResourcesStore = defineStore('computeResources', () => {
   // Scoped compute nodes cache - tracks different contexts
-  const scopedComputeNodes = ref(new Map()) // Key: scope (e.g., 'account-owner', 'workspace:orgId')
+  const scopedComputeNodes = ref(new Map()) // Key: scope ('account-owner', 'user-owned', 'workspace:orgId')
   const scopedNodesLastFetched = ref(new Map()) // Track fetch times per scope
   const scopedNodesLoading = ref(new Map()) // Track loading states per scope
   
@@ -198,6 +198,13 @@ export const useComputeResourcesStore = defineStore('computeResources', () => {
   const fetchComputeNodes = async (organizationId = null, forceRefresh = false) => {
     const scope = organizationId ? `workspace:${organizationId}` : 'account-owner'
     return fetchScopedComputeNodes(scope, organizationId, forceRefresh)
+  }
+
+  // The caller's own nodes outside any workspace (organization-independent),
+  // as listed in My Workspace. Unlike 'account-owner', which lists every node
+  // on accounts the caller owns, this excludes workspace nodes.
+  const fetchUserOwnedComputeNodes = async (forceRefresh = false) => {
+    return fetchScopedComputeNodes('user-owned', null, forceRefresh)
   }
 
   const fetchComputeAccounts = async (forceRefresh = false) => {
@@ -736,8 +743,9 @@ export const useComputeResourcesStore = defineStore('computeResources', () => {
         
         // Add the new node to relevant scoped caches and sort them
         for (const [scope, scopedNodes] of scopedComputeNodes.value.entries()) {
-          // Add to account-owner scope (always relevant for user's nodes)
-          if (scope === 'account-owner') {
+          // Add to account-owner scope (always relevant for user's nodes),
+          // and to user-owned when the node has no organization
+          if (scope === 'account-owner' || (scope === 'user-owned' && !createdNode.organizationId)) {
             const updatedNodes = [...scopedNodes, createdNode].sort((a, b) => {
               const nameA = (a.name || '').toLowerCase()
               const nameB = (b.name || '').toLowerCase()
@@ -882,6 +890,8 @@ export const useComputeResourcesStore = defineStore('computeResources', () => {
       // Build URL based on scope
       if (scope === 'account-owner') {
         url += '?account_owner=true'
+      } else if (scope === 'user-owned') {
+        // No query: the API lists the caller's organization-independent nodes
       } else if (scope.startsWith('workspace:') && organizationId) {
         url += `?organization_id=${organizationId}`
       } else {
@@ -1394,7 +1404,9 @@ export const useComputeResourcesStore = defineStore('computeResources', () => {
     if (gpuTiersLoaded.value) return gpuTiers.value
     try {
       const token = await useGetToken()
-      const url = `${siteConfig.api2Url}/compute/resources/gpu-tiers?organization_id=${orgId}`
+      const url = orgId
+        ? `${siteConfig.api2Url}/compute/resources/gpu-tiers?organization_id=${orgId}`
+        : `${siteConfig.api2Url}/compute/resources/gpu-tiers`
       const response = await fetch(url, {
         method: 'GET',
         headers: {
@@ -1539,6 +1551,7 @@ export const useComputeResourcesStore = defineStore('computeResources', () => {
     // Actions - Nodes
     clearCache,
     fetchComputeNodes,
+    fetchUserOwnedComputeNodes,
     fetchScopedComputeNodes,
     fetchNodePermissions,
     updateNodeStatus,

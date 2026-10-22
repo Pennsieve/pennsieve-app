@@ -22,13 +22,17 @@ const profile = computed(() => store.state.profile)
 const activeOrganization = computed(() => store.getters.activeOrganization)
 const orgMembers = computed(() => store.state.orgMembers || [])
 const orgId = computed(() => props.orgId)
+// Rendered in a workspace (/:orgId/analysis/compute-nodes) and in My Workspace
+// (/my-workspace/compute-nodes), where it lists the user's own nodes outside
+// any workspace.
+const isMyWorkspace = computed(() => !orgId.value)
+const scope = computed(() => isMyWorkspace.value ? 'user-owned' : `workspace:${orgId.value}`)
 
 // Use Pinia store for compute nodes data - use scoped system
 const statusOrder = { 'enabled': 0, 'active': 0, 'running': 0, 'ready': 0, 'paused': 1, 'stopped': 1, 'disabled': 1, 'destroying': 2, 'pending': 3 }
 
 const computeNodes = computed(() => {
-  const scope = orgId.value ? `workspace:${orgId.value}` : 'account-owner'
-  const nodes = computeResourcesStore.getScopedComputeNodes(scope) || []
+  const nodes = computeResourcesStore.getScopedComputeNodes(scope.value) || []
   return [...nodes].sort((a, b) => {
     const statusA = statusOrder[(a.status || 'pending').toLowerCase()] ?? 4
     const statusB = statusOrder[(b.status || 'pending').toLowerCase()] ?? 4
@@ -36,10 +40,7 @@ const computeNodes = computed(() => {
     return (a.name || '').toLowerCase().localeCompare((b.name || '').toLowerCase())
   })
 })
-const isLoading = computed(() => {
-  const scope = orgId.value ? `workspace:${orgId.value}` : 'account-owner'
-  return computeResourcesStore.isScopeLoading(scope)
-})
+const isLoading = computed(() => computeResourcesStore.isScopeLoading(scope.value))
 
 const expandedNodes = ref(new Set())
 const editingNodes = ref(new Set())
@@ -61,6 +62,9 @@ const hasAdminRights = computed(() => {
   }
   return false
 })
+
+// In My Workspace anyone may create a node, on an account they own
+const canCreate = computed(() => isMyWorkspace.value || hasAdminRights.value)
 
 // Check if user is owner
 const isOwner = computed(() => activeOrganization.value?.isOwner || false)
@@ -121,11 +125,15 @@ onMounted(() => {
   fetchComputeNodes()
 })
 
-async function fetchComputeNodes() {
+async function fetchComputeNodes(forceRefresh = false) {
   try {
+    if (isMyWorkspace.value) {
+      await computeResourcesStore.fetchUserOwnedComputeNodes(forceRefresh)
+      return
+    }
     // Get organization ID from Vuex store
     const orgId = currentOrganization.value?.nodeId || currentOrganization.value?.id
-    await computeResourcesStore.fetchComputeNodes(orgId)
+    await computeResourcesStore.fetchComputeNodes(orgId, forceRefresh)
   } catch (error) {
     console.error('Failed to fetch compute nodes:', error)
   }
@@ -204,7 +212,7 @@ async function saveChanges(node) {
       const updatedNode = await response.json()
       
       // Refresh the compute nodes to get the updated data
-      await fetchComputeNodes()
+      await fetchComputeNodes(true)
       
       // Exit editing mode
       cancelEditing(nodeUuid)
@@ -253,7 +261,7 @@ function openCreateDialog() {
 function closeCreateDialog() {
   createComputeNodeDialogVisible.value = false
   // Refresh the list after creating
-  fetchComputeNodes()
+  fetchComputeNodes(true)
 }
 
 function openDeleteDialog(node) {
@@ -283,7 +291,7 @@ async function confirmDeleteNode() {
     
     if (response.ok) {
       // Refresh the compute nodes list after deletion
-      await fetchComputeNodes()
+      await fetchComputeNodes(true)
       
       ElMessage.success('Compute node deleted successfully')
       closeDeleteDialog()
@@ -302,7 +310,7 @@ async function confirmDeleteNode() {
   <bf-stage element-loading-background="transparent">
     <template #actions>
       <bf-button
-        :disabled="!hasAdminRights"
+        :disabled="!canCreate"
         @click="openCreateDialog"
       >
         Create Compute Node
@@ -313,7 +321,29 @@ async function confirmDeleteNode() {
       <div class="nodes-content">
         <!-- Setup Information Section -->
         <div class="info-section">
-          <div class="info-card">
+          <div v-if="isMyWorkspace" class="info-card">
+            <h3>Your Compute Nodes</h3>
+            <p>
+              These are your personal compute nodes, outside any workspace. Each runs on an AWS account you registered
+              as a Compute Resource with the Pennsieve agent (<code>pennsieve account register</code>), and is private to you:
+              it can't be shared with other users or workspaces.
+            </p>
+            <div class="setup-steps" v-if="hasNoResources">
+              <h4>Quick Setup Guide:</h4>
+              <ol>
+                <li>Register your AWS account with <code>pennsieve account register</code></li>
+                <li>Click "Create Compute Node" and choose that account</li>
+                <li>Configure the node with a name and description</li>
+              </ol>
+            </div>
+            <div class="documentation-link">
+              <router-link :to="{ name: 'user-compute-resource' }" class="doc-link">
+                Your Compute Resources
+                <IconArrowRight :width="14" :height="14" style="margin-left: 4px;" />
+              </router-link>
+            </div>
+          </div>
+          <div v-else class="info-card">
             <h3>Managing Compute Nodes</h3>
             <p>
               Compute nodes are computational resources deployed on individual user's cloud accounts that process and analyze Pennsieve data.
@@ -353,7 +383,13 @@ async function confirmDeleteNode() {
                 width="247"
                 alt="Teams illustration"
               />
-              <div v-if="hasAdminRights" class="copy">
+              <div v-if="isMyWorkspace" class="copy">
+                <h2>You don't have any personal compute nodes yet.</h2>
+                <p>
+                  Click "Create Compute Node" above to create one on an AWS account you registered.
+                </p>
+              </div>
+              <div v-else-if="hasAdminRights" class="copy">
                 <h2>There are no Compute Nodes registered for {{ orgName }} yet.</h2>
                 <p>
                   Compute Nodes are created from user-owned Compute Resources (cloud accounts) and can be shared
@@ -387,6 +423,7 @@ async function confirmDeleteNode() {
     <!-- Create Compute Node Dialog -->
     <create-compute-node-dialog
       :dialog-visible="createComputeNodeDialogVisible"
+      :personal="isMyWorkspace"
       @close="closeCreateDialog"
     />
     
