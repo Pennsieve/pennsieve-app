@@ -1,18 +1,22 @@
 <template>
   <div class="proposed-dataset-list-item">
-    
-    <el-row type="flex" :gutter="4">
+    <el-row type="flex" align="middle" :gutter="32">
       <el-col :sm="16">
         <div class="dataset-info">
           <div>
-            <h2>
-              <a
-                href="#"
-                @click.prevent="triggerRequest(DatasetProposalAction.VIEW)"
-              >
-                {{ proposalName }}
-              </a>
-            </h2>
+            <div class="proposal-title">
+              <h2>
+                <a
+                  href="#"
+                  @click.prevent="triggerRequest(DatasetProposalAction.VIEW)"
+                >
+                  {{ proposalName }}
+                </a>
+              </h2>
+              <bf-pill v-if="status" :class="statusPillColor">
+                {{ status }}
+              </bf-pill>
+            </div>
             <p class="dataset-meta">
               Submitted by
               <strong>{{ owner }}</strong>
@@ -29,39 +33,20 @@
         </div>
       </el-col>
 
-      <el-col :sm="4">
-        <div class="bf-dataset-list-item-storage">
-          <p class="bf-dataset-list-item-stat">
-            <strong class="col-label publication-type">
-              {{ publicationType }}
-            </strong>
-            Request Type
-          </p>
-        </div>
-      </el-col>
-
-      <el-col :span="4">
-        <div class="bf-dataset-list-item-stat-align">
-          <div v-if="isUserPublisher" class="dataset-actions">
-            <div class="button-wrapper">
-              <p>
-                <a
-                  href="#"
-                  @click.prevent="triggerRequest(DatasetProposalAction.ACCEPT)"
-                >
-                  Accept Request
-                </a>
-              </p>
-              <p>
-                <a
-                  href="#"
-                  @click.prevent="triggerRequest(DatasetProposalAction.REJECT)"
-                >
-                  Reject Request
-                </a>
-              </p>
-            </div>
-          </div>
+      <el-col :sm="8">
+        <div v-if="canReview" class="dataset-actions">
+          <bf-button
+            class="compact"
+            @click="triggerRequest(DatasetProposalAction.ACCEPT)"
+          >
+            Accept Request
+          </bf-button>
+          <bf-button
+            class="secondary compact"
+            @click="triggerRequest(DatasetProposalAction.REJECT)"
+          >
+            Reject Request
+          </bf-button>
         </div>
       </el-col>
     </el-row>
@@ -70,10 +55,17 @@
 <script>
 import { mapGetters } from "vuex";
 import FormatDate from "../../../mixins/format-date";
-import { DatasetProposalAction } from "../../../utils/constants";
+import { DatasetProposalAction, ProposalStatus } from "../../../utils/constants";
+import BfButton from "@/components/shared/bf-button/BfButton.vue";
+import BfPill from "@/components/shared/BfPill/BfPill.vue";
 
 export default {
   name: "PublishingProposalsListItem",
+
+  components: {
+    BfButton,
+    BfPill,
+  },
 
   mixins: [FormatDate],
 
@@ -86,6 +78,40 @@ export default {
 
   computed: {
     ...mapGetters(["isUserPublisher"]),
+
+    /**
+     * Only a proposal still awaiting review can be accepted or rejected; the
+     * list also shows already-decided proposals.
+     */
+    canReview: function () {
+      return (
+        this.isUserPublisher &&
+        this.proposal.proposalStatus === ProposalStatus.SUBMITTED
+      );
+    },
+
+    status: function () {
+      const labels = {
+        [ProposalStatus.SUBMITTED]: "Awaiting review",
+        [ProposalStatus.ACCEPTED]: "Accepted",
+        [ProposalStatus.REJECTED]: "Rejected",
+        [ProposalStatus.WITHDRAWN]: "Withdrawn",
+        [ProposalStatus.DRAFT]: "Draft",
+      };
+      const proposalStatus = this.proposal.proposalStatus;
+      return proposalStatus
+        ? labels[proposalStatus] || proposalStatus
+        : "";
+    },
+
+    statusPillColor: function () {
+      const pillColors = {
+        [ProposalStatus.SUBMITTED]: "yellow",
+        [ProposalStatus.ACCEPTED]: "green",
+        [ProposalStatus.REJECTED]: "red",
+      };
+      return pillColors[this.proposal.proposalStatus] || "";
+    },
 
     /**
      * Compute title of dataset proposl
@@ -119,14 +145,6 @@ export default {
       return this.proposal.emailAddress?.trim() || "";
     },
 
-    storage: function () {
-      return 0;
-    },
-
-    publicationType: function () {
-      return "proposal";
-    },
-
     DatasetProposalAction: function () {
       return DatasetProposalAction;
     },
@@ -151,87 +169,16 @@ export default {
 @use "../../../styles/theme";
 @use "../../../styles/list-item";
 
-.list-item-status-wrapper {
-  color: theme.$gray_4;
-  font-size: 12px;
-  line-height: 18px;
-  font-weight: normal;
-  border-radius: 3px;
-  width: 160px;
-  padding-top: 3px;
-  height: fit-content;
-
-  p {
-    margin: 0 0 2px !important;
-    overflow: hidden;
-    white-space: nowrap;
-    text-overflow: ellipsis;
-    padding-left: 20px;
-    max-width: 134px;
-  }
-}
-.publishing-notice {
+.proposal-title {
+  align-items: center;
   display: flex;
-  flex-direction: column;
-  .publishing-notice-icon-line {
-    display: flex;
-    :first-child {
-      margin-top: -1px;
-    }
-  }
+  gap: 8px;
 }
 
 .dataset-actions {
   display: flex;
   flex-wrap: wrap;
-  justify-content: space-around;
-  .secondary {
-    margin-left: 16px;
-  }
-}
-
-.publishing-info {
-  margin: 24px 0 0 104px;
-}
-.error-notice {
-  align-items: center;
-  display: flex;
-}
-
-.error-notice-text {
-  display: flex;
-  flex-direction: column;
-  .error-notice-icon-line {
-    display: flex;
-    :first-child {
-      margin-top: -1px;
-    }
-  }
-}
-
-.publication-type {
-  text-transform: capitalize;
-}
-
-.button-wrapper {
-  display: flex;
-  flex-direction: column;
+  gap: 16px;
   justify-content: flex-end;
-
-  a {
-    margin-bottom: 12px;
-  }
-}
-
-@media only screen and (max-width: 1200px) {
-  .list-item-status-wrapper {
-    width: 70px;
-    height: fit-content;
-    padding-left: 5px;
-
-    p {
-      word-break: break-word;
-    }
-  }
 }
 </style>
