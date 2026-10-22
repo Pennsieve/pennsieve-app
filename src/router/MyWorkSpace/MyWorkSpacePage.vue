@@ -34,6 +34,14 @@ export default {
 
   mounted() {
     this.$store.commit('UPDATE_ACTIVE_ORGANIZATION', {})
+    // Analysis data (compute nodes, runs, workflows, applications) is cached per
+    // context. Drop the last workspace's on the way in, and My Workspace's own on
+    // the way out, so neither shows the other's.
+    this.$store.commit('analysisModule/CLEAR_STATE')
+  },
+
+  beforeUnmount() {
+    this.$store.commit('analysisModule/CLEAR_STATE')
   },
 
   computed: {
@@ -139,6 +147,15 @@ export default {
           return [
             { name: 'Notebooks', route: { name: 'my-notebooks' } },
             { name: 'Notebook' }
+          ];
+        }
+        if (routeName === 'my-workflows') {
+          return [{ name: 'Workflows' }];
+        }
+        if (routeName === 'my-workflow-create' || routeName === 'my-workflow-detail') {
+          return [
+            { name: 'Workflows', route: { name: 'my-workflows' } },
+            { name: routeName === 'my-workflow-create' ? 'New Workflow' : 'Workflow' }
           ];
         }
         if (routeName === 'my-compute-nodes') {
