@@ -525,6 +525,7 @@ const router = createRouter({
         {
           name: 'my-analysis',
           path: 'analysis',
+          redirect: { name: 'my-compute-nodes' },
           components: {
             stage: MyAnalysis,
             navigation: UserNavigation,
@@ -537,42 +538,33 @@ const router = createRouter({
             hideSecondaryNav: true,
             title: 'My Analysis',
             description: 'Advanced data analysis and visualization tools for your research datasets.'
-          }
-        },
-        {
-          name: 'my-compute-nodes',
-          path: 'compute-nodes',
-          components: {
-            stage: ComputeNodesList,
-            navigation: UserNavigation,
           },
-          props: {
-            stage: true,
-            navigation: true
-          },
-          meta: {
-            hideSecondaryNav: true,
-            title: 'Compute Nodes',
-            description: 'Your personal compute nodes, on AWS accounts you registered. They are private to you.'
-          }
-        },
-        {
-          name: 'my-compute-node-management',
-          path: 'compute-nodes/:nodeId',
-          components: {
-            stage: ComputeNodeManagement,
-            navigation: UserNavigation,
-          },
-          props: {
-            stage: true,
-            navigation: true
-          },
-          meta: {
-            hideSecondaryNav: true,
-            backLink: { name: 'my-compute-nodes' },
-            title: 'Compute Node',
-            description: 'Configure your personal compute node.'
-          }
+          // Tabs, as in a workspace's Analysis page
+          children: [
+            {
+              name: 'my-compute-nodes',
+              path: 'compute-nodes',
+              component: ComputeNodesList,
+              props: true,
+              meta: {
+                hideSecondaryNav: true,
+                title: 'Compute Nodes',
+                description: 'Your personal compute nodes, on AWS accounts you registered. They are private to you.'
+              }
+            },
+            {
+              name: 'my-compute-node-management',
+              path: 'compute-nodes/:nodeId',
+              component: ComputeNodeManagement,
+              props: true,
+              meta: {
+                hideSecondaryNav: true,
+                backLink: { name: 'my-compute-nodes' },
+                title: 'Compute Node',
+                description: 'Configure your personal compute node.'
+              }
+            }
+          ]
         },
         {
           name: 'shared-workspaces',

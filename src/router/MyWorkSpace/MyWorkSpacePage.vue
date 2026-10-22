@@ -47,7 +47,7 @@ export default {
       if (this.isPublishingSection) return 'Data Publishing';
       if (this.isCollectionsSection) return 'Collections';
       if (this.isCodeSection) return 'My Code';
-      if (this.isComputeSection) return 'Compute Nodes';
+      if (this.isAnalysisSection) return 'My Analysis';
       if (this.myDataSection) return this.myDataSection.name;
 
       // Top-level pages
@@ -63,7 +63,7 @@ export default {
       if (this.isPublishingSection) return { name: 'data-publishing' };
       if (this.isCollectionsSection) return { name: 'collections-list' };
       if (this.isCodeSection) return { name: 'my-code' };
-      if (this.isComputeSection) return { name: 'my-compute-nodes' };
+      if (this.isAnalysisSection) return { name: 'my-analysis' };
       if (this.myDataSection) return this.myDataSection.route;
       return null;
     },
@@ -130,9 +130,18 @@ export default {
         return [];
       }
 
-      // Compute node detail page
-      if (routeName === 'my-compute-node-management') {
-        return [{ name: 'Compute Node' }];
+      // My Analysis tabs
+      if (this.isAnalysisSection) {
+        if (routeName === 'my-compute-nodes') {
+          return [{ name: 'Compute Nodes' }];
+        }
+        if (routeName === 'my-compute-node-management') {
+          return [
+            { name: 'Compute Nodes', route: { name: 'my-compute-nodes' } },
+            { name: 'Compute Node' }
+          ];
+        }
+        return [];
       }
 
       // My Code sub-pages
@@ -150,8 +159,8 @@ export default {
       return this.routeName === 'published-app-details';
     },
 
-    isComputeSection() {
-      return this.routeName === 'my-compute-nodes' || this.routeName === 'my-compute-node-management';
+    isAnalysisSection() {
+      return this.$route.matched.some(r => r.name === 'my-analysis');
     },
 
     // The "My Data" routes are now separate primary-nav entries; each shows
