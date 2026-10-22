@@ -4,7 +4,7 @@
       <div class="node-info">
         <h3>
           <router-link
-            :to="{ name: 'compute-node-management', params: { nodeId: node.uuid } }"
+            :to="detailRoute"
             class="node-name-link"
           >
             {{ node.name }}
@@ -99,7 +99,7 @@
         </button>
       </el-tooltip>
       <router-link
-        :to="{ name: 'compute-node-management', params: { nodeId: node.uuid } }"
+        :to="detailRoute"
         class="card-action-link"
       >
         <span>View details</span>
@@ -112,6 +112,7 @@
 <script setup>
 import { computed } from 'vue'
 import { useStore } from 'vuex'
+import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { useComputeResourcesStore } from '@/stores/computeResourcesStore'
 
@@ -135,6 +136,14 @@ const computeResourcesStore = useComputeResourcesStore()
 const profile = computed(() => store.state.profile)
 
 const isUpdatingPermissions = computed(() => computeResourcesStore.isNodeUpdating(props.node.uuid))
+
+// Link to the node's page in the current context: the workspace's route under
+// /:orgId, or My Workspace's when there is no workspace.
+const route = useRoute()
+const detailRoute = computed(() => ({
+  name: route.params.orgId ? 'compute-node-management' : 'my-compute-node-management',
+  params: { nodeId: props.node.uuid }
+}))
 
 const isNodeOwner = computed(() => {
   return props.node.ownerId === profile.value?.id

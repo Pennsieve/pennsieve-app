@@ -103,6 +103,17 @@
         </template>
       </user-navigation-item>
 
+      <user-navigation-item
+        :link="{ name: 'my-compute-nodes' }"
+        label="Compute Nodes"
+        :condensed="primaryNavCondensed"
+        :active-for-routes="['my-compute-node-management']"
+      >
+        <template v-slot:icon>
+          <IconActivity :width="20" :height="20" color="currentColor" />
+        </template>
+      </user-navigation-item>
+
       <div class="nav-divider" />
 
       <user-navigation-item
@@ -164,6 +175,7 @@ import IconCollection from "@/components/icons/IconCollection.vue";
 import IconOrganization from "@/components/icons/IconOrganization.vue";
 import IconGlobeCheck from "@/components/icons/IconGlobeCheck.vue";
 import IconDocumentation from "@/components/icons/IconDocumentation.vue";
+import IconActivity from "@/components/icons/IconActivity.vue";
 
 export default {
   name: 'UserNavigation',
@@ -182,7 +194,8 @@ export default {
     IconShare,
     IconOrganization,
     IconGlobeCheck,
-    IconDocumentation
+    IconDocumentation,
+    IconActivity
   },
 
   computed: {

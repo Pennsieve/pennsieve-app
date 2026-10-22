@@ -540,6 +540,41 @@ const router = createRouter({
           }
         },
         {
+          name: 'my-compute-nodes',
+          path: 'compute-nodes',
+          components: {
+            stage: ComputeNodesList,
+            navigation: UserNavigation,
+          },
+          props: {
+            stage: true,
+            navigation: true
+          },
+          meta: {
+            hideSecondaryNav: true,
+            title: 'Compute Nodes',
+            description: 'Your personal compute nodes, on AWS accounts you registered. They are private to you.'
+          }
+        },
+        {
+          name: 'my-compute-node-management',
+          path: 'compute-nodes/:nodeId',
+          components: {
+            stage: ComputeNodeManagement,
+            navigation: UserNavigation,
+          },
+          props: {
+            stage: true,
+            navigation: true
+          },
+          meta: {
+            hideSecondaryNav: true,
+            backLink: { name: 'my-compute-nodes' },
+            title: 'Compute Node',
+            description: 'Configure your personal compute node.'
+          }
+        },
+        {
           name: 'shared-workspaces',
           path: 'shared-workspaces',
           components: {
