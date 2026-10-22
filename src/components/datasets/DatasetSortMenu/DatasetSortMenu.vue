@@ -14,7 +14,7 @@
         <IconArrowUp
           class="ml-8 arrow-style"
           :class="[ menuArrowDir === 'down' ? 'svg-flip' : '' ]"
-          color="black"
+          color="currentColor"
         />
 
       </button>
@@ -24,7 +24,7 @@
           class="bf-menu"
         >
           <el-dropdown-item
-            v-for="option in options"
+            v-for="option in visibleOptions"
             :key="option.value"
             class="icon-item"
             :command="option"
@@ -36,7 +36,7 @@
               class="item-icon-check"
               :width="20"
               :height="20"
-              color="black"
+              color="currentColor"
             />
           </el-dropdown-item>
         </el-dropdown-menu>
@@ -62,6 +62,10 @@ export default {
     orderBy: {
       type: String,
       default: ''
+    },
+    excludedOptions: {
+      type: Array,
+      default: () => []
     }
   },
 
@@ -86,6 +90,10 @@ export default {
   },
 
   computed: {
+    visibleOptions: function() {
+      return this.options.filter(option => !this.excludedOptions.includes(option.value))
+    },
+
     /**
      * Compute dataset filter arrow direction
      * @returns {String}
@@ -108,5 +116,11 @@ export default {
 }
 </script>
 <style scoped lang="scss">
+@use '../../../styles/theme';
 @use '../../../styles/element/dropdown';
+
+.dataset-filter-dropdown {
+  color: theme.$text-color;
+  padding: 0;
+}
 </style>
