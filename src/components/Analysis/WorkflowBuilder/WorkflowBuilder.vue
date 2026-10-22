@@ -2,7 +2,7 @@
 import { computed, ref, reactive, onMounted, nextTick } from "vue";
 
 import { useStore } from "vuex";
-import { useRouter } from "vue-router";
+import { useRouter, useRoute } from "vue-router";
 
 // Vue Flow Imports
 import { useVueFlow, VueFlow, Handle, Position } from "@vue-flow/core";
@@ -43,6 +43,11 @@ const props = defineProps({
 });
 
 const router = useRouter();
+const route = useRoute();
+// My Workspace's workflow pages live under My Analysis, with no orgId
+const workflowsRoute = computed(() =>
+  route.params.orgId ? { name: "workflows" } : { name: "my-workflows" }
+);
 
 /*
 Local State
@@ -1291,8 +1296,11 @@ const saveWorkflow = async () => {
       },
     });
     clearWorkflow();
-    await store.dispatch("analysisModule/fetchWorkflows");
     mode.value = "browse";
+    // The workflow is created; a failed refresh of the list isn't a failed create
+    store.dispatch("analysisModule/fetchWorkflows").catch((err) =>
+      console.error("Failed to refresh workflows:", err)
+    );
   } catch (error) {
     console.error(error);
     EventBus.$emit("toast", {
@@ -1405,7 +1413,7 @@ const openNodeSettings = (id) => {
     <!-- Header (browse mode) -->
     <div class="builder-header" v-if="isReadOnly">
       <span class="header-title">
-        <router-link :to="{ name: 'workflows' }" class="header-back-link">
+        <router-link :to="workflowsRoute" class="header-back-link">
           &larr; Workflows
         </router-link>
         <span class="header-breadcrumb-sep">/</span>

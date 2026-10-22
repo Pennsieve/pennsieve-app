@@ -1134,13 +1134,15 @@ export const actions = {
     try {
       const userToken = await useGetToken();
       // Public discovery lists the cross-organization catalog, so it must NOT be
-      // scoped to the active workspace. Otherwise list the active workspace.
+      // scoped to the active workspace. Otherwise list the active workspace, or,
+      // outside one (My Workspace), the user's own workflows made outside any.
       const params = new URLSearchParams();
       if (visibility === "public") {
         params.set("visibility", "public");
         if (official) params.set("official", "true");
       } else {
-        params.set("organization_id", rootState.activeOrganization.organization.id);
+        const orgId = rootState.activeOrganization?.organization?.id;
+        if (orgId) params.set("organization_id", orgId);
       }
       if (limit) params.set("limit", limit);
       if (search) params.set("search", search);
