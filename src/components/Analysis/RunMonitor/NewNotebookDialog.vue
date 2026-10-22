@@ -25,6 +25,11 @@ const props = defineProps({
   // The published notebook workflows (one per kernel). Provided by the parent,
   // which already fetched them to gate the "New Notebook" button.
   notebookWorkflows: { type: Array, default: () => [] },
+  // Launched from My Workspace, on the user's own compute node. There is no
+  // dataset to pick there yet (public and cross-workspace datasets are to come),
+  // so the dataset and input-file steps are shown disabled and the notebook
+  // starts with an empty input folder.
+  personal: { type: Boolean, default: false },
 });
 const emit = defineEmits(["update:modelValue", "created"]);
 
@@ -211,9 +216,9 @@ const canNext = computed(() => {
     case 3:
       return true; // environment layer is optional
     case 4:
-      return !!form.value.datasetId;
+      return props.personal || !!form.value.datasetId;
     case 5:
-      return dataSourcesComplete.value;
+      return props.personal || dataSourcesComplete.value;
     case 6:
       return dataTargetsComplete.value;
     default:
@@ -433,7 +438,7 @@ function reset() {
 watch(visible, (open) => {
   if (open) {
     reset();
-    fetchDatasetOptions();
+    if (!props.personal) fetchDatasetOptions();
   }
 });
 
@@ -489,8 +494,8 @@ async function execute() {
         computeNodeId: form.value.computeNodeId,
         ...(processorConfigs.length > 0 && { processorConfigs }),
       },
-      datasetId: form.value.datasetId,
-      dataSources,
+      ...(!props.personal && { datasetId: form.value.datasetId }),
+      dataSources: props.personal ? {} : dataSources,
       ...(name && { name }),
       ...(Object.keys(dataTargets).length > 0 && { dataTargets }),
       // Mount the selected environment layer (python-env / r-env). `layers` is a
@@ -525,7 +530,7 @@ async function execute() {
   <el-dialog
     v-model="visible"
     :title="stepTitles[step]"
-    :width="step === 5 ? '840px' : '560px'"
+    :width="step === 5 && !personal ? '840px' : '560px'"
     :close-on-click-modal="false"
   >
     <div class="wizard-body">
@@ -652,7 +657,15 @@ async function execute() {
       </div>
 
       <!-- Step 4: Dataset -->
-      <div v-if="step === 4" class="wizard-step">
+      <div v-if="step === 4 && personal" class="wizard-step wizard-step--disabled">
+        <p class="wizard-step-desc">
+          Selecting a dataset isn't available outside a workspace yet. Public
+          datasets, and datasets from your workspaces, will be selectable here.
+          For now the notebook starts without input data.
+        </p>
+        <el-input placeholder="Search datasets..." disabled class="wizard-search" />
+      </div>
+      <div v-else-if="step === 4" class="wizard-step">
         <p class="wizard-step-desc">Select the dataset to work with.</p>
         <div v-if="selectedDataset" class="wizard-selection">
           <div class="wizard-selection-header">
@@ -699,7 +712,13 @@ async function execute() {
       </div>
 
       <!-- Step 5: Input files -->
-      <div v-if="step === 5" class="wizard-step">
+      <div v-if="step === 5 && personal" class="wizard-step wizard-step--disabled">
+        <p class="wizard-step-desc">
+          No input files: without a dataset, the notebook's <code>input/</code>
+          folder starts empty.
+        </p>
+      </div>
+      <div v-else-if="step === 5" class="wizard-step">
         <div v-if="definitionLoading" class="wizard-cards-loading">
           Loading notebook inputs...
         </div>
@@ -880,6 +899,9 @@ async function execute() {
 }
 .wizard-dot.done {
   background: theme.$green_1;
+}
+.wizard-step--disabled {
+  opacity: 0.6;
 }
 .wizard-step-desc {
   color: theme.$gray_5;

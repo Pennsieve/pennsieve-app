@@ -23,8 +23,11 @@ const expanded = ref(null);
 const manageLayersRoute = computed(() =>
   selectedNodeId.value
     ? {
-        name: "compute-node-management",
-        params: { orgId: route.params.orgId, nodeId: selectedNodeId.value },
+        // My Workspace has no orgId; its node pages live under My Analysis
+        name: route.params.orgId ? "compute-node-management" : "my-compute-node-management",
+        params: route.params.orgId
+          ? { orgId: route.params.orgId, nodeId: selectedNodeId.value }
+          : { nodeId: selectedNodeId.value },
         hash: "#persistent-layers",
       }
     : null

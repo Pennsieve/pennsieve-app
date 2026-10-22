@@ -132,6 +132,15 @@ export default {
 
       // My Analysis tabs
       if (this.isAnalysisSection) {
+        if (routeName === 'my-notebooks') {
+          return [{ name: 'Notebooks' }];
+        }
+        if (routeName === 'my-run-notebook') {
+          return [
+            { name: 'Notebooks', route: { name: 'my-notebooks' } },
+            { name: 'Notebook' }
+          ];
+        }
         if (routeName === 'my-compute-nodes') {
           return [{ name: 'Compute Nodes' }];
         }
@@ -160,7 +169,8 @@ export default {
     },
 
     isAnalysisSection() {
-      return this.$route.matched.some(r => r.name === 'my-analysis');
+      return this.routeName === 'my-run-notebook' ||
+        this.$route.matched.some(r => r.name === 'my-analysis');
     },
 
     // The "My Data" routes are now separate primary-nav entries; each shows

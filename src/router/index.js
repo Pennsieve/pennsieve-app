@@ -511,7 +511,7 @@ const router = createRouter({
         {
           name: 'my-analysis',
           path: 'analysis',
-          redirect: { name: 'my-compute-nodes' },
+          redirect: { name: 'my-notebooks' },
           components: {
             stage: MyAnalysis,
             navigation: UserNavigation,
@@ -527,6 +527,17 @@ const router = createRouter({
           },
           // Tabs, as in a workspace's Analysis page
           children: [
+            {
+              name: 'my-notebooks',
+              path: 'notebooks',
+              component: NotebooksOverview,
+              props: true,
+              meta: {
+                hideSecondaryNav: true,
+                title: 'Notebooks',
+                description: 'Interactive notebooks on your personal compute nodes.'
+              }
+            },
             {
               name: 'my-compute-nodes',
               path: 'compute-nodes',
@@ -551,6 +562,26 @@ const router = createRouter({
               }
             }
           ]
+        },
+        {
+          // A notebook session outside any workspace. Like 'run-notebook', its own
+          // page rather than a My Analysis tab, so the tab bar doesn't show.
+          name: 'my-run-notebook',
+          path: 'analysis/notebooks/:runId',
+          components: {
+            stage: NotebookSession,
+            navigation: UserNavigation,
+          },
+          props: {
+            stage: true,
+            navigation: true
+          },
+          meta: {
+            hideSecondaryNav: true,
+            backLink: { name: 'my-notebooks' },
+            title: 'Notebook',
+            description: 'An interactive notebook on your personal compute node.'
+          }
         },
         {
           name: 'shared-workspaces',
