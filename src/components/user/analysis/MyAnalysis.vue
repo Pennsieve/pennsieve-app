@@ -2,9 +2,12 @@
 import RouterTabs from '@/components/shared/routerTabs/routerTabs.vue'
 
 // Analysis outside any workspace, laid out like a workspace's Analysis page.
-// Compute Nodes is the only tab so far; runs, workflows and applications
-// need the run-tenant work before they make sense here.
+// Runs, workflows and applications are still to come.
 const tabs = [
+  {
+    name: 'Notebooks',
+    to: 'my-notebooks',
+  },
   {
     name: 'Compute Nodes',
     to: 'my-compute-nodes',

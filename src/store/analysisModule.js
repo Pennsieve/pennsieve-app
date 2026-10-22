@@ -252,7 +252,12 @@ export const actions = {
     if (!force && state.computeNodesLoaded) return;
     return useGetToken()
       .then((token) => {
-        const url = `${rootState.config.api2Url}/compute/resources/compute-nodes?organization_id=${rootState.activeOrganization.organization.id}`;
+        // Outside a workspace (My Workspace) there is no organization: the API
+        // then lists the user's own nodes outside any workspace.
+        const orgId = rootState.activeOrganization?.organization?.id;
+        const url = orgId
+          ? `${rootState.config.api2Url}/compute/resources/compute-nodes?organization_id=${orgId}`
+          : `${rootState.config.api2Url}/compute/resources/compute-nodes`;
         return fetch(url, {
           method: "GET",
           headers: {
@@ -662,9 +667,11 @@ export const actions = {
   },
   fetchWorkflowInstances: async ({ commit, rootState }, { status, workflowId, limit, startDate, endDate } = {}) => {
     try {
-      const params = new URLSearchParams({
-        organization_id: rootState.activeOrganization.organization.id,
-      });
+      // Outside a workspace (My Workspace) there is no organization: the API
+      // then lists the runs the user created outside any workspace.
+      const params = new URLSearchParams();
+      const orgId = rootState.activeOrganization?.organization?.id;
+      if (orgId) params.set("organization_id", orgId);
       if (status) params.set("status", status);
       if (workflowId) params.set("workflow_id", workflowId);
       if (limit) params.set("limit", limit);
