@@ -1,7 +1,7 @@
 <script setup>
 import { computed, ref, watch, onMounted } from "vue";
 import { useStore } from "vuex";
-import { useRouter } from "vue-router";
+import { useRouter, useRoute } from "vue-router";
 
 import BfButton from "../../shared/bf-button/BfButton.vue";
 import IconAnalysis from "../../icons/IconAnalysis.vue";
@@ -9,6 +9,12 @@ import IconPennsieveMark from "../../icons/IconPennsieveMark.vue";
 
 const store = useStore();
 const router = useRouter();
+const route = useRoute();
+
+// Shown in a workspace (/:orgId/analysis/workflows) and in My Workspace
+// (/my-workspace/analysis/workflows), where "mine" is the user's own workflows
+// made outside any workspace.
+const isMyWorkspace = computed(() => !route.params.orgId);
 
 const searchQuery = ref("");
 const statusFilter = ref("active");
@@ -30,10 +36,10 @@ const filterOptions = [
   { label: "All", value: "all" },
 ];
 
-const scopeOptions = [
-  { label: "This workspace", value: "workspace" },
+const scopeOptions = computed(() => [
+  { label: isMyWorkspace.value ? "My workflows" : "This workspace", value: "workspace" },
   { label: "Public", value: "public" },
-];
+]);
 
 const isPublicScope = computed(() => scopeFilter.value === "public");
 
@@ -140,11 +146,14 @@ const lastRunStatusKey = (status, successRate) => {
 };
 
 const goToCreate = () => {
-  router.push({ name: "workflow-create" });
+  router.push({ name: isMyWorkspace.value ? "my-workflow-create" : "workflow-create" });
 };
 
 const goToDetail = (wf) => {
-  router.push({ name: "workflow-detail", params: { uuid: wf.uuid } });
+  router.push({
+    name: isMyWorkspace.value ? "my-workflow-detail" : "workflow-detail",
+    params: { uuid: wf.uuid },
+  });
 };
 
 const getStatusParam = () => {

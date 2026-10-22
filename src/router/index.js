@@ -539,6 +539,39 @@ const router = createRouter({
               }
             },
             {
+              name: 'my-workflows',
+              path: 'workflows',
+              component: WorkflowsGrid,
+              meta: {
+                hideSecondaryNav: true,
+                title: 'Workflows',
+                description: 'Your own workflows, and public ones.'
+              }
+            },
+            {
+              name: 'my-workflow-create',
+              path: 'workflows/new',
+              component: WorkflowBuilder,
+              meta: {
+                hideSecondaryNav: true,
+                backLink: { name: 'my-workflows' },
+                title: 'New Workflow',
+                description: 'Create a workflow of your own, outside any workspace.'
+              }
+            },
+            {
+              name: 'my-workflow-detail',
+              path: 'workflows/:uuid',
+              component: WorkflowBuilder,
+              props: true,
+              meta: {
+                hideSecondaryNav: true,
+                backLink: { name: 'my-workflows' },
+                title: 'Workflow',
+                description: 'A workflow of your own, or a public one.'
+              }
+            },
+            {
               name: 'my-compute-nodes',
               path: 'compute-nodes',
               component: ComputeNodesList,

@@ -32,6 +32,11 @@ export function useMetricsCounters({ scope, id, range: timeRange } = {}) {
     const idVal = toValue(id)
     // For scoped calls, require an id
     if (scopeVal && !idVal) return
+    // Counters are kept per organization; outside one (My Workspace) there are none yet
+    if (!store.state.activeOrganization?.organization?.id) {
+      counters.value = null
+      return
+    }
 
     isLoading.value = true
     error.value = null
