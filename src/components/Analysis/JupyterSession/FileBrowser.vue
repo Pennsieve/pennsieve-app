@@ -6,6 +6,7 @@
 // refresh() after cell runs).
 import { ref, watch } from "vue";
 import FileNode from "./FileNode.vue";
+import { fileIconForPath } from "@/utils/fileIconForPath";
 
 const props = defineProps({
   listDir: { type: Function, required: true },
@@ -138,10 +139,9 @@ function fmtTime(t) {
   }
 }
 
+// The Pennsieve file icon for a node, as the dataset files table shows.
 function icon(node) {
-  if (node.type === "directory") return node.open ? "📂" : "📁";
-  if (node.type === "notebook") return "📓";
-  return "📄";
+  return fileIconForPath(node.name, { folder: node.type === "directory" });
 }
 
 function copyPath(node) {

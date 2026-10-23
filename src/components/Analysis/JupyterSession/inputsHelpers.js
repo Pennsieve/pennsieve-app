@@ -79,3 +79,11 @@ export function pendingFiles(sources, selected, states) {
   }
   return [...out.values()];
 }
+
+// A long name shortened in the middle, so names that differ only at the end
+// (sub-01_run-1.nii, sub-01_run-2.nii) stay apart.
+export function middleTruncate(name, max = 30) {
+  if (!name || name.length <= max) return name;
+  const tail = Math.ceil((max - 1) / 2);
+  return `${name.slice(0, max - 1 - tail)}…${name.slice(-tail)}`;
+}
