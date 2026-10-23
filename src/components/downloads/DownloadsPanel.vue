@@ -24,7 +24,7 @@
 </template>
 
 <script setup>
-import { computed, ref, watch } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useStore } from "vuex";
 import { useRoute } from "vue-router";
 import { pathOr } from "ramda";
@@ -57,6 +57,20 @@ watch(
   },
   { immediate: true }
 );
+
+// Run results are made on the node, not asked for from this tab, so nothing
+// here hears about a new one. Look again when the user comes back to the tab,
+// at most once a minute.
+const RUNS_REFRESH_MS = 60 * 1000;
+let runsLoadedAt = 0;
+function onVisible() {
+  if (document.visibilityState !== "visible" || !userId.value) return;
+  if (Date.now() - runsLoadedAt < RUNS_REFRESH_MS) return;
+  runsLoadedAt = Date.now();
+  store.loadRuns().catch(() => {});
+}
+onMounted(() => document.addEventListener("visibilitychange", onVisible));
+onBeforeUnmount(() => document.removeEventListener("visibilitychange", onVisible));
 
 const recent = computed(() => store.panelDownloads.slice(0, 5));
 
