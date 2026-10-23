@@ -21,6 +21,10 @@ import AnalysisFilesTable from "../../FilesTable/AnalysisFilesTable.vue";
 import BreadcrumbNavigation from "../../datasets/files/BreadcrumbNavigation/BreadcrumbNavigation.vue";
 import { useGetToken } from "@/composables/useGetToken";
 import { getView } from "@/utils/viewsService";
+import CompactFlowNode from "../WorkflowGraph/CompactFlowNode.vue";
+import GraphDensityToggle from "../WorkflowGraph/GraphDensityToggle.vue";
+import { layoutBox, useGraphDensity } from "../WorkflowGraph/graphDensity";
+import { formatResources, formatRunTime, nodeDurationSec } from "../WorkflowGraph/nodeFacts";
 import { useSendXhr } from "@/mixins/request/request_composable";
 import toQueryParams from "@/utils/toQueryParams";
 import LayerNameSelector from "./LayerNameSelector.vue";
@@ -416,19 +420,36 @@ const allDataSourcesHaveFiles = computed(() => {
 /*
   DAG Layout
 */
+// Compact (one line) or detailed nodes: the viewer's choice, shared with
+// the workflow builder. Laid out with the box of the current choice.
+const { detailed, setDetailed } = useGraphDensity();
+const DETAILED_BOX = { width: NODE_WIDTH, height: NODE_HEIGHT, nodesep: 120, ranksep: 150 };
+
 const autoLayout = () => {
   if (nodes.value.length === 0) return;
+  const box = layoutBox(detailed.value, DETAILED_BOX);
   const g = new dagre.graphlib.Graph();
   g.setDefaultEdgeLabel(() => ({}));
-  g.setGraph({ rankdir: "TB", nodesep: 120, ranksep: 150 });
-  for (const node of nodes.value) g.setNode(node.id, { width: NODE_WIDTH, height: NODE_HEIGHT });
+  g.setGraph({ rankdir: "TB", nodesep: box.nodesep, ranksep: box.ranksep });
+  for (const node of nodes.value) g.setNode(node.id, { width: box.width, height: box.height });
   for (const edge of edges.value) g.setEdge(edge.source, edge.target);
   dagre.layout(g);
   nodes.value = nodes.value.map((node) => {
     const pos = g.node(node.id);
-    return { ...node, position: { x: pos.x - NODE_WIDTH / 2, y: pos.y - NODE_HEIGHT / 2 } };
+    return { ...node, position: { x: pos.x - box.width / 2, y: pos.y - box.height / 2 } };
   });
   setTimeout(() => fitView({ padding: 0.2, maxZoom: 1 }), 50);
+};
+
+// This page saves no positions, so a graph is laid out for its node size:
+// compact always gets a tight layout of its own; detailed keeps the
+// definition's saved positions, where it has them.
+const needsLayout = (result) => result.needsAutoLayout || !detailed.value;
+
+const changeDensity = (value) => {
+  if (value === detailed.value) return;
+  setDetailed(value);
+  autoLayout();
 };
 
 /*
@@ -505,6 +526,8 @@ const runToNodesAndEdges = (run) => {
     } else {
       const cfg = runProcessorConfigs.find((c) => c.nodeId === d.id);
       extra.executionTarget = cfg?.executionTarget || null;
+      extra.cpu = cfg?.cpu || null;
+      extra.memory = cfg?.memory || null;
       const nodeParams = runProcessorParams[d.id] || {};
       extra.params = Object.entries(nodeParams).map(([key, value]) => ({ key, value: String(value) }));
     }
@@ -664,7 +687,7 @@ const loadRun = async (runId) => {
       const result = runToNodesAndEdges(activity);
       nodes.value = result.nodes;
       edges.value = result.edges;
-      if (result.needsAutoLayout) autoLayout();
+      if (needsLayout(result)) autoLayout();
       else setTimeout(() => fitView({ padding: 0.2, maxZoom: 1 }), 50);
     }
     if (activity?.datasetId) {
@@ -822,7 +845,7 @@ const initiateWorkflowFromConfig = async (pendingConfig) => {
     const result = definitionToNodesAndEdges(definition);
     nodes.value = result.nodes;
     edges.value = result.edges;
-    if (result.needsAutoLayout) autoLayout();
+    if (needsLayout(result)) autoLayout();
     else setTimeout(() => fitView({ padding: 0.2, maxZoom: 1 }), 50);
 
     mode.value = "configure";
@@ -1184,6 +1207,15 @@ const fetchViewInfo = async ({ viewId }) => {
   }
 };
 
+// Public dataset sources name their dataset on the card.
+watch(
+  () => nodes.value.filter((n) => n.data?.view).map((n) => n.data.view.viewId).join(","),
+  () => {
+    for (const n of nodes.value) if (n.data?.view) fetchViewInfo(n.data.view);
+  },
+  { immediate: true }
+);
+
 const formatViewSize = (bytes) => {
   if (!bytes) return "0 B";
   const units = ["B", "KB", "MB", "GB", "TB"];
@@ -1319,6 +1351,32 @@ const nodeMetricLabel = (nodeId) => {
   if (!activity?.dag) return nodeId;
   const d = activity.dag.find((n) => n.id === nodeId);
   return d ? labelForDagNode(d, availableApplications.value, targetTypes.value) : nodeId;
+};
+
+// Detailed cards: how long a step ran (ticking while it runs), its resources
+// and, once the run's metrics are in, its cost.
+const nowTick = ref(Date.now());
+let nowTimer = null;
+onMounted(() => {
+  nowTimer = setInterval(() => (nowTick.value = Date.now()), 15000);
+});
+onBeforeUnmount(() => clearInterval(nowTimer));
+
+const nodeCostLabel = (nodeId) => {
+  const nm = runMetrics.value?.nodeMetrics?.find((m) => m.nodeId === nodeId);
+  const cost = Number(nm?.estimatedCost);
+  return nm && cost > 0 ? formatCost(cost) : "";
+};
+const nodeRunTime = (data) => formatRunTime(nodeDurationSec(data, nowTick.value));
+const processorFacts = (id, data) =>
+  [data.version, formatResources(data.cpu, data.memory), nodeRunTime(data), nodeCostLabel(id)].filter(Boolean);
+const targetFacts = (data) => [nodeRunTime(data)].filter(Boolean);
+const viewSourceLabel = (view) => {
+  const info = view && browseViewInfo.value[view.viewId];
+  if (!info || info.error) return "Public dataset";
+  return [info.name, info.version && `v${info.version}`, info.entryCount != null && `${info.entryCount} files`]
+    .filter(Boolean)
+    .join(" · ");
 };
 
 const selectedNodeMetrics = computed(() => {
@@ -1546,6 +1604,7 @@ onUnmounted(() => {
               <span v-if="mode === 'browse'" class="header-status-badge" :class="statusDotClass(selectedWorkflowActivity?.status)">
                 {{ statusLabel(selectedWorkflowActivity?.status) }}
               </span>
+              <GraphDensityToggle :detailed="detailed" @update:detailed="changeDensity" />
               <button class="auto-layout-btn" @click="autoLayout">
                 Auto Layout
               </button>
@@ -1555,7 +1614,35 @@ onUnmounted(() => {
             <template #node-default="{ data, id }">
               <div :style="{ '--node-border-color': mode === 'browse' ? statusBorderColor(data.status) : '#cccccc', '--handle-target-color': incomingEdgeColor(id) }">
                 <Handle type="target" :position="Position.Top" />
-                <div class="custom-node" :class="mode === 'browse' ? statusClass(data.status) : ''">
+                <CompactFlowNode
+                  v-if="!detailed"
+                  kind="processor"
+                  :label="data.label"
+                  :status="mode === 'browse' ? data.status : ''"
+                  :runtime="mode === 'browse' ? data.executionTarget : nodeConfigs[id]?.executionTarget"
+                  :unmet="nodeUnmetCount(id, 'processor')"
+                  :actions-on-hover="false"
+                >
+                  <template v-if="mode === 'browse' && interactiveSessionAvailable && id === interactiveProcessor?.id">
+                    <button
+                      class="node-action node-action--end"
+                      title="End session — resumes the workflow"
+                      :disabled="endingSession"
+                      @click="endSession"
+                    >
+                      <IconXCircle :width="14" :height="14" color="#c14d49" />
+                    </button>
+                    <button
+                      class="node-action node-action--play"
+                      :class="{ 'node-action--waiting': data.status === 'STARTED' }"
+                      title="Interactive notebook is waiting for you — open it"
+                      @click="openNotebook"
+                    >
+                      <IconControllerPlay :width="18" :height="11" color="#011f5b" />
+                    </button>
+                  </template>
+                </CompactFlowNode>
+                <div v-else class="custom-node" :class="mode === 'browse' ? statusClass(data.status) : ''">
                   <span v-if="nodeUnmetCount(id, 'processor') > 0" class="node-unmet-badge">{{ nodeUnmetCount(id, 'processor') }}</span>
                   <div
                     v-if="mode === 'browse' && interactiveSessionAvailable && id === interactiveProcessor?.id"
@@ -1583,9 +1670,13 @@ onUnmounted(() => {
                     <span class="node-title">{{ data.label }}</span>
                   </div>
                   <div class="node-tags">
+                    <span class="node-type-badge processor-badge">Processor</span>
                     <span v-if="mode === 'browse' && data.executionTarget" class="node-type-badge exec-badge">{{ data.executionTarget }}</span>
                     <span v-if="mode === 'configure' && nodeConfigs[id]?.executionTarget" class="node-type-badge exec-badge">{{ nodeConfigs[id].executionTarget }}</span>
                     <span v-if="mode === 'browse'" class="node-status-badge" :class="statusDotClass(data.status)">{{ statusLabel(data.status) }}</span>
+                  </div>
+                  <div v-if="mode === 'browse' && processorFacts(id, data).length" class="node-facts">
+                    {{ processorFacts(id, data).join(" · ") }}
                   </div>
                   <div v-if="(mode === 'browse' && data.params?.length > 0) || (mode === 'configure' && nodeConfigs[id])" class="node-config-summary">
                     <div v-if="mode === 'browse' && data.params?.length > 0" class="param-preview">
@@ -1614,15 +1705,28 @@ onUnmounted(() => {
             <!-- Data-source node template -->
             <template #node-data-source="{ data, id }">
               <div :style="{ '--node-border-color': mode === 'configure' && fileCountForNode(id) > 0 ? '#17BB62' : '#6366f1' }">
-                <div class="custom-node data-source-node" :class="{ 'has-files': mode === 'configure' && fileCountForNode(id) > 0 }">
+                <CompactFlowNode
+                  v-if="!detailed"
+                  kind="source"
+                  :label="data.label"
+                  :unmet="nodeUnmetCount(id, 'data-source')"
+                  :detail="mode === 'configure'
+                    ? `${fileCountForNode(id)} file${fileCountForNode(id) !== 1 ? 's' : ''} selected`
+                    : data.view
+                    ? 'Public dataset'
+                    : data.packageCount != null
+                    ? `${data.packageCount} file${data.packageCount !== 1 ? 's' : ''}`
+                    : ''"
+                />
+                <div v-else class="custom-node data-source-node" :class="{ 'has-files': mode === 'configure' && fileCountForNode(id) > 0 }">
                   <span v-if="nodeUnmetCount(id, 'data-source') > 0" class="node-unmet-badge">{{ nodeUnmetCount(id, 'data-source') }}</span>
                   <div class="node-header">
                     <span class="node-title">{{ data.label }}</span>
                   </div>
                   <div class="node-tags">
                     <span class="node-type-badge source-badge">Source</span>
-                    <span v-if="mode === 'browse' && data.view" class="node-tag-info">
-                      Public dataset
+                    <span v-if="mode === 'browse' && data.view" class="node-tag-info" :title="viewSourceLabel(data.view)">
+                      {{ viewSourceLabel(data.view) }}
                     </span>
                     <span v-else-if="mode === 'browse' && data.packageCount != null" class="node-tag-info">
                       {{ data.packageCount }} file{{ data.packageCount !== 1 ? 's' : '' }}
@@ -1643,7 +1747,15 @@ onUnmounted(() => {
             <template #node-data-target="{ data, id }">
               <div :style="{ '--node-border-color': mode === 'browse' ? (data.status && data.status !== 'NOT_STARTED' ? statusBorderColor(data.status) : '#64748b') : '#64748b', '--handle-target-color': incomingEdgeColor(id) }">
                 <Handle type="target" :position="Position.Top" />
-                <div class="custom-node data-target-node" :class="mode === 'browse' ? statusClass(data.status) : ''">
+                <CompactFlowNode
+                  v-if="!detailed"
+                  kind="target"
+                  :label="data.targetType || data.label"
+                  :status="mode === 'browse' ? data.status : ''"
+                  :runtime="nodeConfigs[id]?.computeType || data.computeType"
+                  :unmet="nodeUnmetCount(id, 'data-target')"
+                />
+                <div v-else class="custom-node data-target-node" :class="mode === 'browse' ? statusClass(data.status) : ''">
                   <span v-if="nodeUnmetCount(id, 'data-target') > 0" class="node-unmet-badge">{{ nodeUnmetCount(id, 'data-target') }}</span>
                   <div class="node-header">
                     <span class="node-title">{{ data.targetType || data.label }}</span>
@@ -1654,6 +1766,9 @@ onUnmounted(() => {
                       {{ nodeConfigs[id]?.computeType || data.computeType }}
                     </span>
                     <span v-if="mode === 'browse'" class="node-status-badge" :class="statusDotClass(data.status)">{{ statusLabel(data.status) }}</span>
+                  </div>
+                  <div v-if="mode === 'browse' && targetFacts(data).length" class="node-facts">
+                    {{ targetFacts(data).join(" · ") }}
                   </div>
                   <div class="node-body">
                     <div v-if="mode === 'browse' && data.params?.length > 0" class="param-preview">
@@ -3141,6 +3256,19 @@ onUnmounted(() => {
     font-size: 10px;
     color: theme.$gray_4;
     white-space: nowrap;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  // Run time, resources and cost under a detailed card's badges.
+  .node-facts {
+    margin-top: 6px;
+    font-size: 11px;
+    color: theme.$gray_4;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .node-meta {
@@ -3281,6 +3409,7 @@ onUnmounted(() => {
     flex-shrink: 0;
 
     &.source-badge { background: #6366f1; color: white; }
+    &.processor-badge { background: theme.$orange_2; color: white; }
     &.target-badge { background: #64748b; color: white; }
     &.exec-badge { background: rgba(5, 150, 105, 0.12); color: #047857; }
   }
