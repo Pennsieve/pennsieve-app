@@ -555,74 +555,6 @@ const kernelPill = computed(() => {
 
 <template>
   <div class="nb">
-    <!-- toolbar -->
-    <div class="nb-toolbar" v-if="status === 'ready'">
-      <el-tooltip content="Save (⌘/Ctrl+S)" :show-after="400">
-        <el-button size="small" :icon="Document" :loading="saving" @click="saveAndRefresh">
-          Save<span v-if="dirty" class="nb-dirty">•</span>
-        </el-button>
-      </el-tooltip>
-
-      <el-dropdown trigger="click" @command="addCellFromMenu">
-        <el-button size="small" :icon="Plus">
-          Add<el-icon class="nb-caret"><ArrowDown /></el-icon>
-        </el-button>
-        <template #dropdown>
-          <el-dropdown-menu>
-            <el-dropdown-item command="code">Code cell</el-dropdown-item>
-            <el-dropdown-item command="markdown">Markdown cell</el-dropdown-item>
-          </el-dropdown-menu>
-        </template>
-      </el-dropdown>
-
-      <span class="nb-div" />
-
-      <el-tooltip content="Run selected (Shift+Enter)" :show-after="400">
-        <el-button size="small" type="primary" :icon="VideoPlay" @click="runSelected">Run</el-button>
-      </el-tooltip>
-      <el-tooltip content="Run all cells" :show-after="400">
-        <el-button size="small" :icon="DArrowRight" @click="runAll">Run all</el-button>
-      </el-tooltip>
-
-      <el-dropdown trigger="click" @command="onKernelCommand">
-        <el-button size="small" :icon="RefreshRight">
-          Kernel<el-icon class="nb-caret"><ArrowDown /></el-icon>
-        </el-button>
-        <template #dropdown>
-          <el-dropdown-menu>
-            <el-dropdown-item command="interrupt">Interrupt</el-dropdown-item>
-            <el-dropdown-item command="restart">Restart</el-dropdown-item>
-            <el-dropdown-item command="restartRunAll">Restart &amp; run all</el-dropdown-item>
-            <el-dropdown-item command="clear" divided>Clear all outputs</el-dropdown-item>
-          </el-dropdown-menu>
-        </template>
-      </el-dropdown>
-
-      <span v-if="notebookSourceLabel" class="nb-source" :title="notebookSource">
-        <el-icon class="nb-source__icon"><Document /></el-icon>
-        editing: {{ notebookSourceLabel }}
-      </span>
-
-      <span class="nb-spacer" />
-
-      <span class="nb-kernel" :class="`nb-kernel--${kernelPill.cls}`">
-        <el-icon v-if="kernelPill.cls === 'busy'" class="nb-kernel__spin"><Loading /></el-icon>
-        <span class="nb-kernel__dot" />
-        {{ kernelName || "Kernel" }} · {{ kernelPill.label }}
-      </span>
-
-      <el-button
-        size="small"
-        type="danger"
-        plain
-        :icon="SwitchButton"
-        :loading="ending"
-        @click="confirmEnd = true"
-      >
-        End session
-      </el-button>
-    </div>
-
     <!-- End-session confirmation (Pennsieve dialog, not the browser prompt) -->
     <el-dialog
       v-model="confirmEnd"
@@ -773,46 +705,6 @@ const kernelPill = computed(() => {
       <router-link :to="runRoute" class="nb-empty__link">View the run →</router-link>
     </div>
 
-    <!-- Offer to open an existing notebook staged in input/ -->
-    <div v-if="status === 'ready' && showInputBanner" class="nb-open-banner">
-      <span class="nb-open-banner__text">
-        <template v-if="inputNotebooks.length === 1">
-          Found a notebook in your input files:
-          <strong>{{ inputNotebooks[0].name }}</strong>
-        </template>
-        <template v-else>
-          Found {{ inputNotebooks.length }} notebooks in your input files —
-          choose one to open.
-        </template>
-      </span>
-      <el-select
-        v-if="inputNotebooks.length > 1"
-        v-model="inputChoice"
-        size="small"
-        placeholder="Choose a notebook"
-        class="nb-open-banner__select"
-      >
-        <el-option
-          v-for="nb in inputNotebooks"
-          :key="nb.path"
-          :label="nb.name"
-          :value="nb.path"
-        />
-      </el-select>
-      <el-button
-        size="small"
-        type="primary"
-        :loading="opening"
-        :disabled="!inputChoice"
-        @click="openFromBanner"
-      >
-        Open
-      </el-button>
-      <el-button size="small" text @click="showInputBanner = false">
-        Dismiss
-      </el-button>
-    </div>
-
     <!-- file browser + notebook -->
     <div v-if="status === 'ready'" class="nb-main">
       <aside
@@ -872,32 +764,144 @@ const kernelPill = computed(() => {
         />
       </aside>
 
-      <div class="nb-doc">
-        <NotebookCell
-          v-for="(cell, i) in cells"
-          :key="cell.id"
-          :ref="(el) => setCellRef(cell.id, el)"
-          :cell="cell"
-          :selected="cell.id === selectedId"
-          :is-first="i === 0"
-          :is-last="i === cells.length - 1"
-          @select="select(cell.id)"
-          @update:source="setSource(cell.id, $event)"
-          @run="onRun(cell, $event)"
-          @edit="cell._editing = true"
-          @add-below="select(addCell(cell.id, 'code'))"
-          @delete="deleteCell(cell.id)"
-          @move-up="moveCell(cell.id, -1)"
-          @move-down="moveCell(cell.id, 1)"
-          @change-type="onChangeType(cell, $event)"
-          @focus-prev="selectRel(-1)"
-          @focus-next="selectRel(1)"
-        />
-        <div class="nb-add-row">
-          <el-button size="small" :icon="Plus" @click="focusCell(addCell(null, 'code'))">
-            Add cell
+      <!-- The notebook pane: its toolbar and banner sit over the notebook only,
+           so the sidebar runs the full height beside them. -->
+      <div class="nb-pane">
+        <!-- toolbar -->
+        <div class="nb-toolbar" v-if="status === 'ready'">
+          <el-tooltip content="Save (⌘/Ctrl+S)" :show-after="400">
+            <el-button size="small" :icon="Document" :loading="saving" @click="saveAndRefresh">
+              Save<span v-if="dirty" class="nb-dirty">•</span>
+            </el-button>
+          </el-tooltip>
+
+          <el-dropdown trigger="click" @command="addCellFromMenu">
+            <el-button size="small" :icon="Plus">
+              Add<el-icon class="nb-caret"><ArrowDown /></el-icon>
+            </el-button>
+            <template #dropdown>
+              <el-dropdown-menu>
+                <el-dropdown-item command="code">Code cell</el-dropdown-item>
+                <el-dropdown-item command="markdown">Markdown cell</el-dropdown-item>
+              </el-dropdown-menu>
+            </template>
+          </el-dropdown>
+
+          <span class="nb-div" />
+
+          <el-tooltip content="Run selected (Shift+Enter)" :show-after="400">
+            <el-button size="small" type="primary" :icon="VideoPlay" @click="runSelected">Run</el-button>
+          </el-tooltip>
+          <el-tooltip content="Run all cells" :show-after="400">
+            <el-button size="small" :icon="DArrowRight" @click="runAll">Run all</el-button>
+          </el-tooltip>
+
+          <el-dropdown trigger="click" @command="onKernelCommand">
+            <el-button size="small" :icon="RefreshRight">
+              Kernel<el-icon class="nb-caret"><ArrowDown /></el-icon>
+            </el-button>
+            <template #dropdown>
+              <el-dropdown-menu>
+                <el-dropdown-item command="interrupt">Interrupt</el-dropdown-item>
+                <el-dropdown-item command="restart">Restart</el-dropdown-item>
+                <el-dropdown-item command="restartRunAll">Restart &amp; run all</el-dropdown-item>
+                <el-dropdown-item command="clear" divided>Clear all outputs</el-dropdown-item>
+              </el-dropdown-menu>
+            </template>
+          </el-dropdown>
+
+          <span v-if="notebookSourceLabel" class="nb-source" :title="notebookSource">
+            <el-icon class="nb-source__icon"><Document /></el-icon>
+            editing: {{ notebookSourceLabel }}
+          </span>
+
+          <span class="nb-spacer" />
+
+          <span class="nb-kernel" :class="`nb-kernel--${kernelPill.cls}`">
+            <el-icon v-if="kernelPill.cls === 'busy'" class="nb-kernel__spin"><Loading /></el-icon>
+            <span class="nb-kernel__dot" />
+            {{ kernelName || "Kernel" }} · {{ kernelPill.label }}
+          </span>
+
+          <el-button
+            size="small"
+            type="danger"
+            plain
+            :icon="SwitchButton"
+            :loading="ending"
+            @click="confirmEnd = true"
+          >
+            End session
           </el-button>
-          <span v-if="error" class="nb-inline-err">{{ error }}</span>
+        </div>
+
+        <!-- Offer to open an existing notebook staged in input/ -->
+        <div v-if="status === 'ready' && showInputBanner" class="nb-open-banner">
+          <span class="nb-open-banner__text">
+            <template v-if="inputNotebooks.length === 1">
+              Found a notebook in your input files:
+              <strong>{{ inputNotebooks[0].name }}</strong>
+            </template>
+            <template v-else>
+              Found {{ inputNotebooks.length }} notebooks in your input files —
+              choose one to open.
+            </template>
+          </span>
+          <el-select
+            v-if="inputNotebooks.length > 1"
+            v-model="inputChoice"
+            size="small"
+            placeholder="Choose a notebook"
+            class="nb-open-banner__select"
+          >
+            <el-option
+              v-for="nb in inputNotebooks"
+              :key="nb.path"
+              :label="nb.name"
+              :value="nb.path"
+            />
+          </el-select>
+          <el-button
+            size="small"
+            type="primary"
+            :loading="opening"
+            :disabled="!inputChoice"
+            @click="openFromBanner"
+          >
+            Open
+          </el-button>
+          <el-button size="small" text @click="showInputBanner = false">
+            Dismiss
+          </el-button>
+        </div>
+
+        <div class="nb-doc">
+          <NotebookCell
+            v-for="(cell, i) in cells"
+            :key="cell.id"
+            :ref="(el) => setCellRef(cell.id, el)"
+            :cell="cell"
+            :selected="cell.id === selectedId"
+            :is-first="i === 0"
+            :is-last="i === cells.length - 1"
+            @select="select(cell.id)"
+            @update:source="setSource(cell.id, $event)"
+            @run="onRun(cell, $event)"
+            @edit="cell._editing = true"
+            @add-below="select(addCell(cell.id, 'code'))"
+            @delete="deleteCell(cell.id)"
+            @move-up="moveCell(cell.id, -1)"
+            @move-down="moveCell(cell.id, 1)"
+            @change-type="onChangeType(cell, $event)"
+            @focus-prev="selectRel(-1)"
+            @focus-next="selectRel(1)"
+          />
+          <div class="nb-add-row">
+            <el-button size="small" :icon="Plus" @click="focusCell(addCell(null, 'code'))">
+              Add cell
+            </el-button>
+            <span v-if="error" class="nb-inline-err">{{ error }}</span>
+          </div>
         </div>
       </div>
     </div>
@@ -1034,6 +1038,13 @@ const kernelPill = computed(() => {
 }
 .nb-files__browser {
   flex: 1;
+  min-height: 0;
+}
+.nb-pane {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
   min-height: 0;
 }
 .nb-doc {
