@@ -1,6 +1,7 @@
 <script setup>
 import { computed, ref, watch } from "vue";
 import { useStore } from "vuex";
+import { useRoute } from "vue-router";
 import { marked } from "marked";
 import DOMPurify from "dompurify";
 import { load as loadYaml } from "js-yaml";
@@ -37,6 +38,11 @@ const versionsPage = ref(1);
   Store computed
 */
 const store = useStore();
+const route = useRoute();
+// Shown in a workspace and in My Workspace (My Analysis), where there's no
+// organization in the route and route names carry a "my-" prefix.
+const isMyWorkspace = computed(() => !route.params.orgId);
+const scopedRoute = (name, params = {}) => ({ name: isMyWorkspace.value ? `my-${name}` : name, params });
 
 const profile = computed(() => store.state.profile);
 const orgMembers = computed(() => store.state.orgMembers || []);
@@ -347,10 +353,8 @@ watch(hasManifest, (has) => {
 // They are not always preloaded when navigating directly to this page;
 // fall back to fetching them here.
 const ensureOrgData = async () => {
-  const orgId =
-    store.state.activeOrganization?.organization?.id ||
-    store.state.profile?.preferredOrganization ||
-    store.state.organizations?.[0]?.organization?.id;
+  // Only the workspace being viewed; outside one there are no members to load.
+  const orgId = store.state.activeOrganization?.organization?.id;
   if (!orgId) return;
   const needsMembers = !store.state.orgMembers?.length;
   const needsTeams = !store.state.teams?.length;
@@ -423,7 +427,7 @@ watch(
     <!-- Header -->
     <div class="builder-header">
       <span class="header-title">
-        <router-link :to="{ name: 'applications' }" class="header-back-link">Applications</router-link>
+        <router-link :to="scopedRoute('applications')" class="header-back-link">Applications</router-link>
         <template v-if="detail">
           <span class="header-breadcrumb-sep">/</span>
           <span class="header-detail-name">{{ repoName }}</span>
@@ -439,7 +443,7 @@ watch(
     <!-- Error / Not Found -->
     <div v-else-if="detailError || !detail" class="app-not-found">
       <p>{{ detailError || "Application not found." }}</p>
-      <router-link :to="{ name: 'applications' }" class="back-link">
+      <router-link :to="scopedRoute('applications')" class="back-link">
         &larr; Back to Applications
       </router-link>
     </div>
@@ -837,7 +841,7 @@ watch(
                 </div>
                 <p class="manifest-error-detail">{{ manifestParsed.error }}</p>
                 <router-link
-                  :to="{ name: 'application-manifest-builder' }"
+                  :to="scopedRoute('application-manifest-builder')"
                   class="manifest-cta"
                 >
                   Rebuild with the manifest builder
@@ -856,13 +860,13 @@ watch(
                   parameters, and inputs/outputs.
                 </p>
                 <router-link
-                  :to="{ name: 'application-manifest-builder' }"
+                  :to="scopedRoute('application-manifest-builder')"
                   class="manifest-cta manifest-cta-primary"
                 >
                   Generate an app.yml
                 </router-link>
                 <router-link
-                  :to="{ name: 'application-manifest-guide' }"
+                  :to="scopedRoute('application-manifest-guide')"
                   class="manifest-cta-secondary"
                 >
                   Read the manifest guide

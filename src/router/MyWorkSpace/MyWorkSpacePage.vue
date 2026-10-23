@@ -34,6 +34,14 @@ export default {
 
   mounted() {
     this.$store.commit('UPDATE_ACTIVE_ORGANIZATION', {})
+    // Analysis data (compute nodes, runs, workflows, applications) is cached per
+    // context. Drop the last workspace's on the way in, and My Workspace's own on
+    // the way out, so neither shows the other's.
+    this.$store.commit('analysisModule/CLEAR_STATE')
+  },
+
+  beforeUnmount() {
+    this.$store.commit('analysisModule/CLEAR_STATE')
   },
 
   computed: {
@@ -47,6 +55,7 @@ export default {
       if (this.isPublishingSection) return 'Data Publishing';
       if (this.isCollectionsSection) return 'Collections';
       if (this.isCodeSection) return 'My Code';
+      if (this.isAnalysisSection) return 'My Analysis';
       if (this.myDataSection) return this.myDataSection.name;
 
       // Top-level pages
@@ -62,6 +71,7 @@ export default {
       if (this.isPublishingSection) return { name: 'data-publishing' };
       if (this.isCollectionsSection) return { name: 'collections-list' };
       if (this.isCodeSection) return { name: 'my-code' };
+      if (this.isAnalysisSection) return { name: 'my-analysis' };
       if (this.myDataSection) return this.myDataSection.route;
       return null;
     },
@@ -128,6 +138,38 @@ export default {
         return [];
       }
 
+      // My Analysis tabs
+      if (this.isAnalysisSection) {
+        if (routeName === 'my-notebooks') {
+          return [{ name: 'Notebooks' }];
+        }
+        if (routeName === 'my-run-notebook') {
+          return [
+            { name: 'Notebooks', route: { name: 'my-notebooks' } },
+            { name: 'Notebook' }
+          ];
+        }
+        if (routeName === 'my-workflows') {
+          return [{ name: 'Workflows' }];
+        }
+        if (routeName === 'my-workflow-create' || routeName === 'my-workflow-detail') {
+          return [
+            { name: 'Workflows', route: { name: 'my-workflows' } },
+            { name: routeName === 'my-workflow-create' ? 'New Workflow' : 'Workflow' }
+          ];
+        }
+        if (routeName === 'my-compute-nodes') {
+          return [{ name: 'Compute Nodes' }];
+        }
+        if (routeName === 'my-compute-node-management') {
+          return [
+            { name: 'Compute Nodes', route: { name: 'my-compute-nodes' } },
+            { name: 'Compute Node' }
+          ];
+        }
+        return [];
+      }
+
       // My Code sub-pages
       if (this.isCodeSection) {
         if (routeName === 'published-app-details') {
@@ -141,6 +183,11 @@ export default {
 
     isCodeSection() {
       return this.routeName === 'published-app-details';
+    },
+
+    isAnalysisSection() {
+      return this.routeName === 'my-run-notebook' ||
+        this.$route.matched.some(r => r.name === 'my-analysis');
     },
 
     // The "My Data" routes are now separate primary-nav entries; each shows

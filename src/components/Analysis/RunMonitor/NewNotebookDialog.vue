@@ -1,6 +1,7 @@
 <script setup>
 // Self-contained "New Notebook" launcher. A guided flow:
 //   Kernel → Compute Node → Dataset → Input Files → Output → Review & Start.
+// Outside a workspace the dataset is a public one (see the `personal` prop).
 // It references a published notebook workflow (the recipe lives there), reuses
 // the standard file picker, and assembles the createRun payload directly —
 // no detour through the generic run-configure screen.
@@ -13,18 +14,27 @@ import BfButton from "../../shared/bf-button/BfButton.vue";
 import AnalysisFilesTable from "../../FilesTable/AnalysisFilesTable.vue";
 import BreadcrumbNavigation from "../../datasets/files/BreadcrumbNavigation/BreadcrumbNavigation.vue";
 import EnvironmentLayerSelector from "./EnvironmentLayerSelector.vue";
+import IconCompass from "@/components/icons/IconCompass.vue";
 import { useGetToken } from "@/composables/useGetToken";
 import { useSendXhr } from "@/mixins/request/request_composable";
 import toQueryParams from "@/utils/toQueryParams";
 import EventBus from "@/utils/event-bus";
 import { notebookKernel, kernelLabel, interactiveCapable } from "./notebookHelpers";
 import { STANDARD_CPU_OPTIONS, getStandardMemoryOptions } from "./runHelpers";
+import * as siteConfig from "@/site-config/site.json";
+import { viewsServiceUrl, viewForDataset, viewDataSource } from "@/utils/viewsService";
 
 const props = defineProps({
   modelValue: { type: Boolean, default: false },
   // The published notebook workflows (one per kernel). Provided by the parent,
   // which already fetched them to gate the "New Notebook" button.
   notebookWorkflows: { type: Array, default: () => [] },
+  // Launched from My Workspace, on the user's own compute node. There the
+  // input is a public (Discover) dataset version, where the site has
+  // views-service, or none. Its files aren't picked here: the notebook starts
+  // with the dataset's file list, and the user downloads files from the
+  // notebook's Inputs panel.
+  personal: { type: Boolean, default: false },
 });
 const emit = defineEmits(["update:modelValue", "created"]);
 
@@ -211,9 +221,9 @@ const canNext = computed(() => {
     case 3:
       return true; // environment layer is optional
     case 4:
-      return !!form.value.datasetId;
+      return props.personal || !!form.value.datasetId;
     case 5:
-      return dataSourcesComplete.value;
+      return props.personal || dataSourcesComplete.value;
     case 6:
       return dataTargetsComplete.value;
     default:
@@ -248,6 +258,97 @@ const fetchDatasetOptions = async (query = "") => {
 const onDatasetSearch = (query) => {
   clearTimeout(datasetSearchTimer);
   datasetSearchTimer = setTimeout(() => fetchDatasetOptions(query), 300);
+};
+
+/* ------------------------------------------------ public dataset search ---- */
+// Outside a workspace the input is a published dataset version, taken in as a
+// view (utils/viewsService). Discover is read anonymously, as on the public
+// dataset pages.
+const publicInputs = !!viewsServiceUrl();
+const publicQuery = ref("");
+const publicResults = ref([]);
+const publicLoading = ref(false);
+const publicDataset = ref(null); // { id, name, version, doi, fileCount, size }
+const publicVersions = ref([]);
+const publicVersion = ref(null);
+let publicSearchTimer = null;
+
+// The first two contributors, then "et al.": enough to tell datasets apart.
+const authorsLine = (contributors = []) => {
+  const names = (contributors || [])
+    .map((c) => [c.firstName, c.lastName].filter(Boolean).join(" "))
+    .filter(Boolean);
+  if (names.length <= 2) return names.join(", ");
+  return `${names.slice(0, 2).join(", ")}, et al.`;
+};
+
+const toPublicDataset = (d) => ({
+  id: d.id,
+  name: d.name,
+  version: d.version,
+  doi: d.doi,
+  fileCount: d.fileCount || 0,
+  size: d.size || 0,
+  description: d.description || "",
+  banner: d.banner || "",
+  organizationName: d.organizationName || "",
+  authors: authorsLine(d.contributors),
+  embargo: !!d.embargo,
+});
+
+async function searchPublicDatasets(query = "") {
+  publicLoading.value = true;
+  try {
+    const base = siteConfig.discoverUrl;
+    const url = query
+      ? `${base}/search/datasets?limit=25&offset=0&query=${encodeURIComponent(query)}`
+      : `${base}/datasets?limit=25&offset=0&datasetType=research&embargo=false`;
+    const response = await useSendXhr(url, { method: "GET" });
+    // Views take only openly published versions.
+    publicResults.value = (response?.datasets || [])
+      .map(toPublicDataset)
+      .filter((d) => !d.embargo);
+  } catch (err) {
+    console.error("Failed to search public datasets:", err);
+    publicResults.value = [];
+  } finally {
+    publicLoading.value = false;
+  }
+}
+
+const onPublicSearch = () => {
+  clearTimeout(publicSearchTimer);
+  publicSearchTimer = setTimeout(() => searchPublicDatasets(publicQuery.value), 300);
+};
+
+async function selectPublicDataset(d) {
+  publicDataset.value = d;
+  publicVersion.value = d.version;
+  publicVersions.value = [d.version];
+  try {
+    const url = `${siteConfig.discoverUrl}/datasets/${d.id}/versions`;
+    const response = await useSendXhr(url, { method: "GET" });
+    const versions = (Array.isArray(response) ? response : [])
+      .map((v) => v.version)
+      .filter((v) => Number.isInteger(v))
+      .sort((a, b) => b - a);
+    if (versions.length) publicVersions.value = versions;
+  } catch (err) {
+    console.error("Failed to load the dataset's versions:", err);
+  }
+}
+
+function clearPublicDataset() {
+  publicDataset.value = null;
+  publicVersion.value = null;
+  publicVersions.value = [];
+}
+
+const formatSize = (bytes) => {
+  if (!bytes) return "0 B";
+  const units = ["B", "KB", "MB", "GB", "TB"];
+  const i = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
+  return `${(bytes / 1024 ** i).toFixed(i ? 1 : 0)} ${units[i]}`;
 };
 
 /* ------------------------------------------------- definition + targets ----- */
@@ -413,6 +514,8 @@ function reset() {
   nameTouched.value = false;
   computeNodeSearch.value = "";
   datasetSearchQuery.value = "";
+  publicQuery.value = "";
+  clearPublicDataset();
   resourceCpu.value = DEFAULT_CPU;
   resourceMemory.value = AUTO_MEMORY;
   step.value = 0;
@@ -433,16 +536,26 @@ function reset() {
 watch(visible, (open) => {
   if (open) {
     reset();
-    fetchDatasetOptions();
+    if (!props.personal) fetchDatasetOptions();
+    else if (publicInputs) searchPublicDatasets();
   }
 });
 
+// Outside a workspace there are no input files to pick: the user downloads a
+// public dataset's files from the notebook itself.
+const INPUT_FILES_STEP = 5;
+const skipsStep = (i) => props.personal && i === INPUT_FILES_STEP;
+
 const next = async () => {
   if (step.value === 4) await loadDefinition(); // leaving Dataset → load inputs
-  if (step.value < stepTitles.length - 1) step.value++;
+  let n = step.value + 1;
+  while (skipsStep(n)) n++;
+  if (n < stepTitles.length) step.value = n;
 };
 const back = () => {
-  if (step.value > 0) step.value--;
+  let n = step.value - 1;
+  while (n > 0 && skipsStep(n)) n--;
+  if (n >= 0) step.value = n;
 };
 
 async function execute() {
@@ -482,6 +595,18 @@ async function execute() {
       });
     }
 
+    // Outside a workspace, the public dataset is the first data source's view.
+    // It's a source's only input: the session downloads its files into it.
+    const personalSources = {};
+    if (props.personal && publicDataset.value && dataSourceNodes.value.length) {
+      const view = await viewForDataset({
+        datasetId: publicDataset.value.id,
+        version: publicVersion.value,
+        name: publicDataset.value.name,
+      });
+      personalSources[dataSourceNodes.value[0].id] = viewDataSource(view);
+    }
+
     const name = runName.value.trim();
     const payload = {
       workflowInstanceConfiguration: {
@@ -489,8 +614,8 @@ async function execute() {
         computeNodeId: form.value.computeNodeId,
         ...(processorConfigs.length > 0 && { processorConfigs }),
       },
-      datasetId: form.value.datasetId,
-      dataSources,
+      ...(!props.personal && { datasetId: form.value.datasetId }),
+      dataSources: props.personal ? personalSources : dataSources,
       ...(name && { name }),
       ...(Object.keys(dataTargets).length > 0 && { dataTargets }),
       // Mount the selected environment layer (python-env / r-env). `layers` is a
@@ -525,13 +650,14 @@ async function execute() {
   <el-dialog
     v-model="visible"
     :title="stepTitles[step]"
-    :width="step === 5 ? '840px' : '560px'"
+    :width="step === 5 && !personal ? '840px' : '560px'"
     :close-on-click-modal="false"
   >
     <div class="wizard-body">
       <div class="wizard-progress">
         <span
           v-for="(title, i) in stepTitles"
+          v-show="!skipsStep(i)"
           :key="i"
           class="wizard-dot"
           :class="{ active: step === i, done: step > i }"
@@ -652,7 +778,105 @@ async function execute() {
       </div>
 
       <!-- Step 4: Dataset -->
-      <div v-if="step === 4" class="wizard-step">
+      <div v-if="step === 4 && personal && publicInputs" class="wizard-step">
+        <p class="wizard-step-desc">
+          Optionally choose a public dataset to work with. You pick which of
+          its files to download from the notebook. Skip this step to start
+          without input data.
+        </p>
+        <div v-if="publicDataset" class="wizard-selection public-selection">
+          <div class="public-row">
+            <div class="public-banner">
+              <img v-if="publicDataset.banner" :src="publicDataset.banner" alt="" />
+              <div v-else class="public-banner-placeholder">
+                <IconCompass :width="20" :height="20" color="#b3bcce" />
+              </div>
+            </div>
+            <div class="public-info">
+              <div class="wizard-selection-header">
+                <span class="wizard-selection-name">{{ publicDataset.name }}</span>
+                <button class="wizard-selection-clear" @click="clearPublicDataset">
+                  &times;
+                </button>
+              </div>
+              <div v-if="publicDataset.authors" class="public-authors">
+                {{ publicDataset.authors }}
+              </div>
+              <div v-if="publicDataset.organizationName" class="public-org">
+                {{ publicDataset.organizationName }}
+              </div>
+              <div class="public-meta">
+                <span>{{ publicDataset.fileCount }} files</span>
+                <span>{{ formatSize(publicDataset.size) }}</span>
+                <span v-if="publicDataset.doi">DOI {{ publicDataset.doi }}</span>
+              </div>
+            </div>
+          </div>
+          <div class="public-version">
+            <label class="resource-label">Version</label>
+            <el-select v-model="publicVersion" size="small" style="width: 140px">
+              <el-option
+                v-for="v in publicVersions"
+                :key="v"
+                :label="`Version ${v}`"
+                :value="v"
+              />
+            </el-select>
+          </div>
+        </div>
+        <template v-else>
+          <el-input
+            v-model="publicQuery"
+            placeholder="Search public datasets..."
+            clearable
+            class="wizard-search"
+            @input="onPublicSearch"
+          />
+          <div class="wizard-cards">
+            <div v-if="publicLoading" class="wizard-cards-loading">Searching...</div>
+            <div
+              v-for="ds in publicResults"
+              :key="ds.id"
+              class="wizard-card public-row"
+              @click="selectPublicDataset(ds)"
+            >
+              <div class="public-banner">
+                <img v-if="ds.banner" :src="ds.banner" alt="" loading="lazy" />
+                <div v-else class="public-banner-placeholder">
+                  <IconCompass :width="20" :height="20" color="#b3bcce" />
+                </div>
+              </div>
+              <div class="public-info">
+                <div class="wizard-card-name public-name">{{ ds.name }}</div>
+                <div v-if="ds.authors" class="public-authors">{{ ds.authors }}</div>
+                <div v-if="ds.organizationName" class="public-org">
+                  {{ ds.organizationName }}
+                </div>
+                <div class="public-meta">
+                  <span>Version {{ ds.version }}</span>
+                  <span>{{ ds.fileCount }} files</span>
+                  <span>{{ formatSize(ds.size) }}</span>
+                </div>
+              </div>
+            </div>
+            <div
+              v-if="!publicLoading && publicResults.length === 0"
+              class="wizard-cards-loading"
+            >
+              No public datasets found
+            </div>
+          </div>
+        </template>
+      </div>
+      <div v-else-if="step === 4 && personal" class="wizard-step wizard-step--disabled">
+        <p class="wizard-step-desc">
+          Selecting a dataset isn't available outside a workspace yet. Public
+          datasets, and datasets from your workspaces, will be selectable here.
+          For now the notebook starts without input data.
+        </p>
+        <el-input placeholder="Search datasets..." disabled class="wizard-search" />
+      </div>
+      <div v-else-if="step === 4" class="wizard-step">
         <p class="wizard-step-desc">Select the dataset to work with.</p>
         <div v-if="selectedDataset" class="wizard-selection">
           <div class="wizard-selection-header">
@@ -699,7 +923,7 @@ async function execute() {
       </div>
 
       <!-- Step 5: Input files -->
-      <div v-if="step === 5" class="wizard-step">
+      <div v-if="step === 5 && !personal" class="wizard-step">
         <div v-if="definitionLoading" class="wizard-cards-loading">
           Loading notebook inputs...
         </div>
@@ -813,11 +1037,17 @@ async function execute() {
             <span class="wizard-summary-label">Environment</span>
             <span class="wizard-summary-value">{{ form.environmentLayer || "None" }}</span>
           </div>
-          <div class="wizard-summary-row">
+          <div v-if="personal" class="wizard-summary-row">
+            <span class="wizard-summary-label">Public dataset</span>
+            <span class="wizard-summary-value">{{
+              publicDataset ? `${publicDataset.name} (version ${publicVersion})` : "None"
+            }}</span>
+          </div>
+          <div v-if="!personal" class="wizard-summary-row">
             <span class="wizard-summary-label">Dataset</span>
             <span class="wizard-summary-value">{{ selectedDataset?.content?.name }}</span>
           </div>
-          <div class="wizard-summary-row">
+          <div v-if="!personal" class="wizard-summary-row">
             <span class="wizard-summary-label">Input files</span>
             <span class="wizard-summary-value">
               {{ dataSourceNodes.reduce((n, d) => n + fileCountForNode(d.id), 0) }}
@@ -825,6 +1055,15 @@ async function execute() {
             </span>
           </div>
         </div>
+        <p v-if="personal && publicDataset && !dataSourceNodes.length" class="public-warning">
+          This notebook has no input to attach {{ publicDataset.name }} to, so
+          it would start without it.
+        </p>
+        <p v-else-if="personal && publicDataset" class="resource-hint">
+          The notebook starts with the dataset's file list in
+          <code>input/</code>. Choose which files to download from its
+          <strong>Inputs</strong> panel.
+        </p>
         <label class="name-label">Name</label>
         <el-input
           v-model="runName"
@@ -880,6 +1119,9 @@ async function execute() {
 }
 .wizard-dot.done {
   background: theme.$green_1;
+}
+.wizard-step--disabled {
+  opacity: 0.6;
 }
 .wizard-step-desc {
   color: theme.$gray_5;
@@ -1051,6 +1293,97 @@ async function execute() {
   font-weight: 600;
   color: theme.$gray_5;
   margin-bottom: 6px;
+}
+.public-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+.wizard-card.public-row {
+  transition: border-color 0.15s ease, background 0.15s ease;
+
+  &:hover {
+    border-color: theme.$purple_1;
+    background: theme.$purple_tint;
+  }
+}
+.public-banner {
+  flex-shrink: 0;
+  width: 56px;
+  height: 56px;
+  border-radius: 4px;
+  overflow: hidden;
+  border: 1px solid theme.$gray_2;
+  background: theme.$gray_1;
+
+  img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+}
+.public-banner-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.public-info {
+  flex: 1;
+  min-width: 0;
+}
+.public-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  line-height: 1.3;
+}
+.public-authors {
+  font-size: 12px;
+  color: theme.$gray_6;
+  margin-top: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.public-org {
+  font-size: 12px;
+  color: theme.$gray_5;
+  margin-top: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.public-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  font-size: 12px;
+  color: theme.$gray_4;
+  margin-top: 4px;
+}
+.public-selection .public-version {
+  padding-left: 68px;
+}
+.public-warning {
+  font-size: 12px;
+  color: theme.$red_2;
+  line-height: 1.5;
+  margin: 14px 0 0;
+}
+.public-version {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+
+  .resource-label {
+    margin-bottom: 0;
+  }
 }
 .resource-hint {
   font-size: 12px;

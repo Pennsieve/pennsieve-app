@@ -177,6 +177,30 @@ export function deletePublicArchive({ id }, options = {}) {
   return publicDownloadsRequest(`/archives/${encodeURIComponent(id)}`, { ...options, method: 'DELETE' })
 }
 
+// A compute run's results, zipped by the service when the run's download
+// data target asks for it. Its record has scope "run" and runId. A run
+// archive is its creator's, outside any dataset and whatever workspace the
+// run was in, so these routes name only the archive: the user's token is
+// enough.
+export async function listRunArchives(options = {}) {
+  const data = await downloadServiceRequest('/runs/archives', options)
+  return data.downloads || []
+}
+
+// Polling an active run archive also tells the service its creator is
+// watching, so it skips the email.
+export function getRunArchive({ id }, options = {}) {
+  return downloadServiceRequest(`/runs/archives/${encodeURIComponent(id)}`, options)
+}
+
+export function getRunArchiveUrl({ id }, options = {}) {
+  return downloadServiceRequest(`/runs/archives/${encodeURIComponent(id)}/url`, options)
+}
+
+export function deleteRunArchive({ id }, options = {}) {
+  return downloadServiceRequest(`/runs/archives/${encodeURIComponent(id)}`, { ...options, method: 'DELETE' })
+}
+
 // Selections too large to zip download with the Pennsieve agent instead.
 export const AGENT_MIN_VERSION = '2.2.1'
 export const AGENT_DOCS_URL = 'https://docs.pennsieve.io/docs/the-pennsieve-agent'

@@ -1,15 +1,17 @@
 <script setup>
 // JupyterLab-style file browser for the kernel's filesystem (the per-run EFS
 // mount). Lazily expands directories via the Contents API, shows size/modified,
-// and lets the user copy a path, insert it into the notebook, or download a
-// file (e.g. results from output/). Refreshes on demand (and the parent calls
-// refresh() after cell runs).
+// and lets the user copy a path or insert it into the notebook. Files leave
+// the session only through the run's data targets (e.g. a download target's
+// zip), not from here. Refreshes on demand (and the parent calls refresh()
+// after cell runs).
 import { ref, watch } from "vue";
 import FileNode from "./FileNode.vue";
+import { ArrowRight } from "@element-plus/icons-vue";
+import { fileIconForPath } from "@/utils/fileIconForPath";
 
 const props = defineProps({
   listDir: { type: Function, required: true },
-  downloadFile: { type: Function, required: true },
   ready: { type: Boolean, default: false },
 });
 
@@ -17,6 +19,7 @@ const emit = defineEmits(["insert-path", "open-notebook"]);
 
 // Tree node: { name, path, type, size, last_modified, children, open, loading }
 const roots = ref([]);
+const collapsed = ref(false);
 const loading = ref(false);
 const error = ref(null);
 
@@ -138,36 +141,29 @@ function fmtTime(t) {
   }
 }
 
+// The Pennsieve file icon for a node, as the dataset files table shows.
 function icon(node) {
-  if (node.type === "directory") return node.open ? "📂" : "📁";
-  if (node.type === "notebook") return "📓";
-  return "📄";
+  return fileIconForPath(node.name, { folder: node.type === "directory" });
 }
 
 function copyPath(node) {
   navigator.clipboard?.writeText(node.path).catch(() => {});
 }
 
-async function download(node) {
-  const blob = await props.downloadFile(node.path);
-  if (!blob) return;
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = node.name;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  URL.revokeObjectURL(url);
-}
 </script>
 
 <template>
   <div class="fb">
-    <div class="fb__head">
-      <span class="fb__title">Files</span>
-      <button class="fb__refresh" title="Refresh" :disabled="loading" @click="refresh">⟳</button>
+    <div class="fb__head" @click="collapsed = !collapsed">
+      <span class="fb__title" title="What's on the session's disk: input/, output/ and your notebook">Session files</span>
+      <span class="fb__head-actions">
+        <button class="fb__refresh" title="Refresh" :disabled="loading" @click.stop="refresh">⟳</button>
+        <button class="fb__fold" :aria-expanded="!collapsed" aria-label="Fold session files" @click.stop="collapsed = !collapsed">
+          <el-icon class="fb__chevron" :class="{ 'is-open': !collapsed }"><ArrowRight /></el-icon>
+        </button>
+      </span>
     </div>
+    <template v-if="!collapsed">
 
     <p v-if="!ready" class="fb__msg">Connecting…</p>
     <p v-else-if="loading && !roots.length" class="fb__msg">Loading…</p>
@@ -185,21 +181,23 @@ async function download(node) {
         :fmt-time="fmtTime"
         @toggle="toggle"
         @copy="copyPath"
-        @download="download"
         @insert="emit('insert-path', $event)"
         @open="emit('open-notebook', $event)"
       />
     </ul>
+    </template>
   </div>
 </template>
 
-<style scoped>
+<style scoped lang="scss">
+@use "../../../styles/theme";
+
 .fb {
   display: flex;
   flex-direction: column;
   height: 100%;
-  border-right: 1px solid #e5e5e5;
-  background: #f7f7f7;
+  border-right: 1px solid theme.$gray_2;
+  background: theme.$gray_1;
   font-size: 13px;
   min-width: 0;
 }
@@ -207,26 +205,45 @@ async function download(node) {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 8px 10px;
-  border-bottom: 1px solid #e5e5e5;
+  padding: 10px 10px;
+  cursor: pointer;
+  border-bottom: 1px solid theme.$gray_2;
 }
 .fb__title {
   font-weight: 600;
-  font-size: 12px;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: #4d4d4d;
+  font-size: 13px;
+  color: theme.$gray_6;
+}
+.fb__head-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.fb__fold {
+  display: flex;
+  align-items: center;
+  border: none;
+  background: none;
+  padding: 2px 4px;
+  cursor: pointer;
+  color: theme.$gray_5;
+}
+.fb__chevron {
+  transition: transform 0.2s ease;
+}
+.fb__chevron.is-open {
+  transform: rotate(90deg);
 }
 .fb__refresh {
   border: none;
   background: none;
   cursor: pointer;
   font-size: 14px;
-  color: #4d4d4d;
+  color: theme.$gray_5;
   border-radius: 4px;
   padding: 2px 6px;
 }
-.fb__refresh:hover { background: #e6e9ef; } /* purple_tint */
+.fb__refresh:hover { background: theme.$purple_tint; }
 .fb__tree {
   list-style: none;
   margin: 0;
@@ -236,8 +253,8 @@ async function download(node) {
 }
 .fb__msg {
   padding: 10px;
-  color: #999;
+  color: theme.$gray_4;
   font-size: 12px;
 }
-.fb__msg--error { color: #c14d49; }
+.fb__msg--error { color: theme.$red_2; }
 </style>
