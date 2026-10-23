@@ -539,14 +539,14 @@ const kernelPill = computed(() => {
   <div class="nb">
     <!-- toolbar -->
     <div class="nb-toolbar" v-if="status === 'ready'">
-      <el-tooltip content="Show or hide the inputs and session files" :show-after="400">
+      <el-tooltip content="Show or hide the sidebar: inputs and session files" :show-after="400">
         <el-button
           size="small"
           :type="showFiles ? 'primary' : 'default'"
           :icon="FolderOpened"
           @click="showFiles = !showFiles"
         >
-          Files
+          Sidebar
         </el-button>
       </el-tooltip>
 
