@@ -27,6 +27,8 @@ const props = defineProps({
   fetchInputs: { type: Function, required: true },
   inputsStatus: { type: Function, required: true },
   ready: { type: Boolean, default: false },
+  // The sidebar's width in px: long names are shortened to fit it.
+  width: { type: Number, default: 300 },
 });
 // downloaded: files finished downloading, so the file browser can refresh.
 const emit = defineEmits(["downloaded"]);
@@ -150,6 +152,10 @@ function up(source) {
   source.folder = parts.length ? `${parts.join("/")}/` : "";
 }
 
+// About how many characters of a name fit beside a row's checkbox, icon and
+// size, at 12-13px type.
+const labelChars = computed(() => Math.max(16, Math.floor((props.width - 120) / 7)));
+
 // Each source's current folder, its rows with download badges. Computed once
 // per change, not per row: a view can have thousands of files.
 const panes = computed(() =>
@@ -168,7 +174,7 @@ const panes = computed(() =>
       const summary = summarize(files, stateOf);
       return {
         ...row,
-        label: middleTruncate(row.name, 26),
+        label: middleTruncate(row.name, labelChars.value),
         status: rowStatus(summary),
         done: summary.total > 0 && summary.done === summary.total,
         failed,

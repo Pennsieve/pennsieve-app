@@ -146,6 +146,57 @@ const cellRefs = new Map();
 const ending = ref(false);
 const confirmEnd = ref(false);
 const showFiles = ref(true);
+
+// The sidebar's width, dragged from its right edge and remembered in this
+// browser (a convenience only: it may not persist).
+const SIDEBAR_KEY = "pennsieve.notebook.sidebarWidth";
+const SIDEBAR_MIN = 220;
+const SIDEBAR_MAX = 520;
+const SIDEBAR_DEFAULT = 300;
+const clampWidth = (w) => Math.min(SIDEBAR_MAX, Math.max(SIDEBAR_MIN, Math.round(w)));
+function storedWidth() {
+  try {
+    const w = parseInt(localStorage.getItem(SIDEBAR_KEY), 10);
+    return Number.isFinite(w) ? clampWidth(w) : SIDEBAR_DEFAULT;
+  } catch {
+    return SIDEBAR_DEFAULT;
+  }
+}
+const sidebarWidth = ref(storedWidth());
+const resizingSidebar = ref(false);
+let resizeStart = null;
+
+function onSidebarMove(e) {
+  if (!resizeStart) return;
+  sidebarWidth.value = clampWidth(resizeStart.width + e.clientX - resizeStart.x);
+}
+function endSidebarResize() {
+  if (!resizeStart) return;
+  resizeStart = null;
+  resizingSidebar.value = false;
+  window.removeEventListener("pointermove", onSidebarMove);
+  window.removeEventListener("pointerup", endSidebarResize);
+  try {
+    localStorage.setItem(SIDEBAR_KEY, String(sidebarWidth.value));
+  } catch {
+    // not remembered; the width still applies to this page
+  }
+}
+function startSidebarResize(e) {
+  resizeStart = { x: e.clientX, width: sidebarWidth.value };
+  resizingSidebar.value = true;
+  window.addEventListener("pointermove", onSidebarMove);
+  window.addEventListener("pointerup", endSidebarResize);
+}
+// Arrow keys on the focused handle resize it too.
+function nudgeSidebar(delta) {
+  sidebarWidth.value = clampWidth(sidebarWidth.value + delta);
+  try {
+    localStorage.setItem(SIDEBAR_KEY, String(sidebarWidth.value));
+  } catch {
+    // not remembered
+  }
+}
 const fileBrowserRef = ref(null);
 let lastD = 0;
 
@@ -243,6 +294,7 @@ onMounted(async () => {
 });
 
 onBeforeUnmount(() => {
+  endSidebarResize();
   window.removeEventListener("keydown", onKeydown, true);
   window.removeEventListener("beforeunload", onBeforeUnload);
   stopProgress();
@@ -758,12 +810,18 @@ const kernelPill = computed(() => {
 
     <!-- file browser + notebook -->
     <div v-if="status === 'ready'" class="nb-main">
-      <aside v-show="showFiles" class="nb-files">
+      <aside
+        v-show="showFiles"
+        class="nb-files"
+        :class="{ 'is-resizing': resizingSidebar }"
+        :style="{ width: `${sidebarWidth}px`, flexBasis: `${sidebarWidth}px` }"
+      >
         <InputsPanel
           :run-id="runId"
           :fetch-inputs="fetchInputs"
           :inputs-status="inputsStatus"
           :ready="status === 'ready'"
+          :width="sidebarWidth"
           @downloaded="fileBrowserRef?.refresh?.()"
         />
         <div class="nb-files__browser">
@@ -775,6 +833,20 @@ const kernelPill = computed(() => {
             @open-notebook="requestOpen"
           />
         </div>
+        <div
+          class="nb-files__resize"
+          role="separator"
+          aria-orientation="vertical"
+          aria-label="Resize the sidebar"
+          :aria-valuenow="sidebarWidth"
+          :aria-valuemin="SIDEBAR_MIN"
+          :aria-valuemax="SIDEBAR_MAX"
+          tabindex="0"
+          @pointerdown.prevent="startSidebarResize"
+          @dblclick="nudgeSidebar(SIDEBAR_DEFAULT - sidebarWidth)"
+          @keydown.left.prevent="nudgeSidebar(-20)"
+          @keydown.right.prevent="nudgeSidebar(20)"
+        />
       </aside>
 
       <div class="nb-doc">
@@ -896,12 +968,32 @@ const kernelPill = computed(() => {
   overflow: hidden;
 }
 .nb-files {
-  flex: 0 0 250px;
-  width: 250px;
+  position: relative;
+  flex: 0 0 300px;
+  width: 300px;
   min-height: 0;
   overflow: hidden;
   display: flex;
   flex-direction: column;
+}
+.nb-files.is-resizing {
+  user-select: none;
+}
+/* A thin grab strip on the sidebar's right edge; double-click resets it. */
+.nb-files__resize {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 6px;
+  cursor: col-resize;
+  z-index: 2;
+}
+.nb-files__resize:hover,
+.nb-files__resize:focus-visible,
+.nb-files.is-resizing .nb-files__resize {
+  background: #808fad; /* purple_1 */
+  outline: none;
 }
 .nb-files__browser {
   flex: 1;
