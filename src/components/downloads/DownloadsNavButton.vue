@@ -12,7 +12,7 @@
       :style="styleColor ? { '--color-hover': styleColor } : {}"
       :aria-expanded="store.panelOpen"
       :aria-label="store.attentionCount ? `${label}: ${store.attentionCount} to check` : label"
-      @click="store.panelOpen = !store.panelOpen"
+      @click="toggle"
     >
       <div class="svg-icon svg-fill icon-main">
         <IconDirectDownload :width="20" :height="20" color="currentColor" />
@@ -43,6 +43,13 @@ defineProps({
 
 const store = useDownloadsStore();
 const label = "Downloads";
+
+// Opening the panel also looks for run results made since they were last
+// loaded.
+function toggle() {
+  store.panelOpen = !store.panelOpen;
+  if (store.panelOpen) store.loadRuns().catch(() => {});
+}
 </script>
 
 <style lang="scss" scoped>

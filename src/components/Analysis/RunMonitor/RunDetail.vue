@@ -325,6 +325,39 @@ watch(
   { immediate: true }
 );
 
+// A results zip made just now (the run finished while, or just before, this
+// page was open) is announced: the downloads panel opens on it and a toast
+// says so. Older zips are only listed under Results. Once per zip per tab,
+// remembered in sessionStorage (a convenience: without it, at most once per
+// visit to the page).
+const ANNOUNCE_WITHIN_MS = 5 * 60 * 1000;
+const ANNOUNCED_KEY = "pennsieve.runArchivesAnnounced";
+const wasAnnounced = (id) => {
+  try {
+    return JSON.parse(sessionStorage.getItem(ANNOUNCED_KEY) || "[]").includes(id);
+  } catch {
+    return false;
+  }
+};
+const markAnnounced = (id) => {
+  try {
+    const ids = JSON.parse(sessionStorage.getItem(ANNOUNCED_KEY) || "[]");
+    sessionStorage.setItem(ANNOUNCED_KEY, JSON.stringify([...ids, id].slice(-50)));
+  } catch {
+    // not remembered
+  }
+};
+watch(runArchive, (archive, previous) => {
+  if (!archive || previous?.id === archive.id || wasAnnounced(archive.id)) return;
+  const age = Date.now() - Date.parse(archive.createdAt || 0);
+  if (!(age >= 0 && age < ANNOUNCE_WITHIN_MS)) return;
+  markAnnounced(archive.id);
+  downloads.panelOpen = true;
+  EventBus.$emit("toast", {
+    detail: { type: "success", msg: "The run's results are ready to download." },
+  });
+});
+
 const interactiveSessionAvailable = computed(() => {
   const activity = selectedWorkflowActivity.value;
   if (!activity?.uuid || !interactiveProcessor.value) return false;
@@ -520,6 +553,45 @@ const parseEventData = (data) => {
   return data;
 };
 
+// Re-reads the shown run (its status and its steps') and redraws the graph,
+// keeping where the user placed the nodes.
+const refreshSelectedRun = async () => {
+  await store.dispatch("analysisModule/setSelectedWorkflowActivity", selectedWorkflowActivity.value);
+  const activity = selectedWorkflowActivity.value;
+  if (activity?.dag?.length > 0) {
+    const result = runToNodesAndEdges(activity);
+    const posMap = new Map();
+    nodes.value.forEach((n) => posMap.set(n.id, n.position));
+    nodes.value = result.nodes.map((n) => ({
+      ...n,
+      position: posMap.get(n.id) || n.position,
+    }));
+    if (result.edges.length > 0) edges.value = result.edges;
+  }
+};
+
+// A fallback for live updates: while the shown run isn't finished, check it
+// now and then. An update sent before the page subscribed, or lost on a
+// reconnect, would otherwise leave it looking stuck until a reload.
+const RUN_POLL_MS = 20000;
+let runPollTimer = null;
+const scheduleRunPoll = () => {
+  clearTimeout(runPollTimer);
+  runPollTimer = null;
+  const activity = selectedWorkflowActivity.value;
+  if (mode.value !== "browse" || !activity?.uuid || isTerminalStatus(activity.status)) return;
+  runPollTimer = setTimeout(async () => {
+    if (document.visibilityState === "visible") {
+      try {
+        await refreshSelectedRun();
+      } catch (err) {
+        console.warn("Run refresh failed:", err?.message || err);
+      }
+    }
+    scheduleRunPoll();
+  }, RUN_POLL_MS);
+};
+
 const onRunStatusUpdate = async (raw) => {
   const data = parseEventData(raw);
   store.commit("analysisModule/UPDATE_RUN_STATUS", { runId: data.runId, status: data.status });
@@ -531,18 +603,7 @@ const onRunStatusUpdate = async (raw) => {
         ...selectedWorkflowActivity.value,
         status: data.status,
       });
-      await store.dispatch("analysisModule/setSelectedWorkflowActivity", selectedWorkflowActivity.value);
-      const activity = selectedWorkflowActivity.value;
-      if (activity?.dag?.length > 0) {
-        const result = runToNodesAndEdges(activity);
-        const posMap = new Map();
-        nodes.value.forEach((n) => posMap.set(n.id, n.position));
-        nodes.value = result.nodes.map((n) => ({
-          ...n,
-          position: posMap.get(n.id) || n.position,
-        }));
-        if (result.edges.length > 0) edges.value = result.edges;
-      }
+      await refreshSelectedRun();
     } else {
       store.commit("analysisModule/SET_SELECTED_WORKFLOW_ACTIVITY", {
         ...selectedWorkflowActivity.value,
@@ -1311,6 +1372,20 @@ const fetchDatasetOptions = async (query = "") => {
   Lifecycle
 */
 onMounted(async () => {
+  // Live updates for every run in the workspace (or the user's own runs).
+  // Subscribed before anything loads, so an update sent while the page is
+  // loading isn't missed.
+  if (realtime) {
+    analyticsChannel = realtime.subscribe(
+      // The route's workspace, not activeOrganization: that stays set in My
+      // Workspace, where a personal run's events go to the user's channel.
+      runScopeChannel(route.params.orgId, store.state.profile?.id)
+    );
+    store.commit("analysisModule/SET_ANALYTICS_CHANNEL", analyticsChannel);
+    analyticsChannel.bind("workflow-run-status", onRunStatusUpdate);
+    analyticsChannel.bind("workflow-processor-status", onProcessorStatusUpdate);
+  }
+
   await Promise.all([
     store.dispatch("analysisModule/fetchComputeNodes"),
     store.dispatch("analysisModule/fetchTargetTypes"),
@@ -1328,23 +1403,13 @@ onMounted(async () => {
       await store.dispatch("analysisModule/fetchWorkflowInstances");
     }
     await loadRun(props.runId);
+    scheduleRunPoll();
   } else {
     // No pending config and no runId — nothing to show, redirect to runs
     router.replace(scopedRoute("runs"));
     return;
   }
 
-  // Live updates for every run in the workspace (or the user's own runs)
-  if (realtime) {
-    analyticsChannel = realtime.subscribe(
-      // The route's workspace, not activeOrganization: that stays set in My
-      // Workspace, where a personal run's events go to the user's channel.
-      runScopeChannel(route.params.orgId, store.state.profile?.id)
-    );
-    store.commit("analysisModule/SET_ANALYTICS_CHANNEL", analyticsChannel);
-    analyticsChannel.bind("workflow-run-status", onRunStatusUpdate);
-    analyticsChannel.bind("workflow-processor-status", onProcessorStatusUpdate);
-  }
 });
 
 // Handle same-component navigation (e.g. run-detail → run-configure)
@@ -1363,6 +1428,7 @@ watch(
 );
 
 onBeforeUnmount(() => {
+  clearTimeout(runPollTimer);
   if (analyticsChannel) {
     analyticsChannel.unbind("workflow-run-status", onRunStatusUpdate);
     analyticsChannel.unbind(
