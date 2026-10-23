@@ -711,10 +711,10 @@ export const actions = {
     const cursor = state.workflowInstancesCursor;
     if (!cursor) return;
     try {
-      const params = new URLSearchParams({
-        organization_id: rootState.activeOrganization.organization.id,
-        cursor,
-      });
+      // As in fetchWorkflowInstances: no organization outside a workspace.
+      const params = new URLSearchParams({ cursor });
+      const orgId = rootState.activeOrganization?.organization?.id;
+      if (orgId) params.set("organization_id", orgId);
       if (status) params.set("status", status);
       if (workflowId) params.set("workflow_id", workflowId);
       if (limit) params.set("limit", limit);

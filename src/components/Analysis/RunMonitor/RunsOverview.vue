@@ -41,9 +41,53 @@ const hasMoreRuns = computed(
 const computeNodes = computed(
   () => store.getters["analysisModule/computeNodes"] || []
 );
-const workflows = computed(
-  () => store.state.analysisModule.workflows || []
-);
+// Shown in a workspace (/:orgId/analysis/runs) and in My Workspace
+// (/my-workspace/analysis/runs), where there's no organization: runs, nodes and
+// workflows are the user's own outside any workspace, and a run can't use a
+// dataset yet.
+const isMyWorkspace = computed(() => !route.params.orgId);
+const runRoute = (name, runId) =>
+  isMyWorkspace.value
+    ? { name: `my-${name}`, params: runId ? { runId } : {} }
+    : { name, params: runId ? { runId } : {} };
+
+// My Workspace offers the user's own workflows (the store's list there) and
+// public ones, as its Workflow Library does.
+const publicWorkflows = ref([]);
+const fetchPublicWorkflows = async () => {
+  try {
+    const token = await useGetToken();
+    const resp = await fetch(`${config.value.api2Url}/compute/workflows/definitions?visibility=public`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const result = await resp.json();
+    publicWorkflows.value = Array.isArray(result) ? result : result.workflows || [];
+  } catch (err) {
+    console.error("Failed to fetch public workflows:", err);
+    publicWorkflows.value = [];
+  }
+};
+const workflows = computed(() => {
+  const own = store.state.analysisModule.workflows || [];
+  if (!isMyWorkspace.value) return own;
+  const byId = new Map(own.map((w) => [w.uuid, w]));
+  for (const w of publicWorkflows.value) if (w?.uuid && !byId.has(w.uuid)) byId.set(w.uuid, w);
+  return [...byId.values()];
+});
+
+// Outside a workspace a run has no dataset, so a workflow can't run there yet
+// if it reads from one (data-source nodes) or writes to one (data targets
+// other than the ones listed here, which need no dataset).
+const TARGETS_WITHOUT_DATASET = new Set(["persistent-layer"]);
+const needsDataset = (wf) =>
+  (wf?.dag || []).some(
+    (d) =>
+      d.type === "data-source" ||
+      (d.type === "data-target" && !TARGETS_WITHOUT_DATASET.has(d.targetType))
+  );
+const wizardWorkflowSelectable = (wf) =>
+  wf.isActive && !(isMyWorkspace.value && needsDataset(wf));
 const profile = computed(() => store.state.profile);
 const orgMembers = computed(() => store.state.orgMembers || []);
 const config = computed(() => store.state.config);
@@ -182,13 +226,17 @@ watch(dashboardRange, () => {
   Navigation
 */
 const selectRun = (run) => {
-  router.push({ name: "run-detail", params: { runId: run.uuid } });
+  router.push(runRoute("run-detail", run.uuid));
 };
 
 // Open the interactive notebook for a run waiting on a user session. run-notebook
 // is a top-level route, so orgId must be passed explicitly (route param, with a
 // store fallback).
 const openNotebook = (run) => {
+  if (isMyWorkspace.value) {
+    router.push({ name: "my-run-notebook", params: { runId: run.uuid } });
+    return;
+  }
   const orgId =
     route.params.orgId || store.state.activeOrganization?.organization?.id;
   router.push({ name: "run-notebook", params: { orgId, runId: run.uuid } });
@@ -233,6 +281,11 @@ const datasetSearchLoading = ref(false);
 const datasetSearchQuery = ref("");
 let datasetSearchTimer = null;
 const wizardStepTitles = ["Select Workflow", "Select Compute Node", "Select Dataset", "Ready to Configure"];
+// Step 2 (dataset) is skipped in My Workspace.
+const wizardSkipsStep = (i) => isMyWorkspace.value && i === 2;
+const wizardVisibleSteps = computed(() =>
+  wizardStepTitles.map((title, i) => ({ title, i })).filter(({ i }) => !wizardSkipsStep(i))
+);
 
 const filteredWizardWorkflows = computed(() => {
   const q = workflowSearch.value.toLowerCase().trim();
@@ -304,7 +357,7 @@ const openWizardDialog = () => {
   wizardStep.value = 0;
   rerunSource.value = null;
   wizardVisible.value = true;
-  fetchDatasetOptions();
+  if (!isMyWorkspace.value) fetchDatasetOptions();
 };
 
 const rerunFromRun = async (run) => {
@@ -325,15 +378,17 @@ const rerunFromRun = async (run) => {
   computeNodeSearch.value = "";
   wizardStep.value = 3;
   wizardVisible.value = true;
-  fetchDatasetOptions();
+  if (!isMyWorkspace.value) fetchDatasetOptions();
 };
 
 const wizardNext = () => {
   if (wizardStep.value < 3) wizardStep.value++;
+  if (wizardSkipsStep(wizardStep.value)) wizardStep.value++;
 };
 
 const wizardBack = () => {
   if (wizardStep.value > 0) wizardStep.value--;
+  if (wizardSkipsStep(wizardStep.value)) wizardStep.value--;
 };
 
 const wizardConfirm = () => {
@@ -344,7 +399,7 @@ const wizardConfirm = () => {
     rerunSource: rerunSource.value,
   });
   wizardVisible.value = false;
-  router.push({ name: "run-configure" });
+  router.push(runRoute("run-configure"));
 };
 
 /*
@@ -376,6 +431,7 @@ onMounted(async () => {
       store.dispatch("analysisModule/fetchComputeNodes"),
       store.dispatch("analysisModule/fetchWorkflows"),
       fetchOrgCounters(),
+      ...(isMyWorkspace.value ? [fetchPublicWorkflows()] : []),
     ]);
   } catch (err) {
     console.error("Failed to load data:", err);
@@ -524,7 +580,10 @@ onBeforeUnmount(() => {
         </div>
 
         <!-- Empty fallback -->
-        <div v-if="!dashboardStats && activeRuns.length === 0" class="empty-canvas">
+        <div
+          v-if="!dashboardStats && activeRuns.length === 0 && (!isMyWorkspace || workflowInstances.length === 0)"
+          class="empty-canvas"
+        >
           <h3>No runs yet</h3>
           <p>Initiate a workflow to see run activity here</p>
         </div>
@@ -658,10 +717,10 @@ onBeforeUnmount(() => {
         <!-- Progress dots -->
         <div class="wizard-progress">
           <span
-            v-for="(title, i) in wizardStepTitles"
-            :key="i"
+            v-for="step in wizardVisibleSteps"
+            :key="step.i"
             class="wizard-dot"
-            :class="{ active: wizardStep === i, done: wizardStep > i }"
+            :class="{ active: wizardStep === step.i, done: wizardStep > step.i }"
           ></span>
         </div>
 
@@ -688,14 +747,19 @@ onBeforeUnmount(() => {
                 v-for="wf in filteredWizardWorkflows"
                 :key="wf.uuid"
                 class="wizard-card"
-                :class="{ disabled: !wf.isActive }"
-                @click="wf.isActive && (wizardForm.workflowId = wf.uuid, workflowSearch = '')"
+                :class="{ disabled: !wizardWorkflowSelectable(wf) }"
+                @click="wizardWorkflowSelectable(wf) && (wizardForm.workflowId = wf.uuid, workflowSearch = '')"
               >
                 <div class="wizard-card-name">{{ wf.name }}</div>
                 <div v-if="wf.description" class="wizard-card-desc">{{ wf.description }}</div>
                 <div class="wizard-card-meta">
                   {{ (wf.dag || []).length }} processors
                   <span v-if="!wf.isActive" class="wizard-card-badge">Archived</span>
+                  <span
+                    v-else-if="isMyWorkspace && needsDataset(wf)"
+                    class="wizard-card-badge"
+                    title="This workflow reads from or writes to a dataset, which isn't available outside a workspace yet"
+                  >Needs a dataset</span>
                 </div>
               </div>
               <div v-if="filteredWizardWorkflows.length === 0" class="wizard-cards-loading">No workflows found</div>
@@ -781,12 +845,15 @@ onBeforeUnmount(() => {
               <span class="wizard-summary-label">Compute Node</span>
               <span class="wizard-summary-value">{{ wizardSelectedComputeNode?.name || wizardForm.computeNodeId }}</span>
             </div>
-            <div class="wizard-summary-row">
+            <div v-if="!isMyWorkspace" class="wizard-summary-row">
               <span class="wizard-summary-label">Dataset</span>
               <span class="wizard-summary-value">{{ wizardSelectedDataset?.content?.name || wizardForm.datasetId }}</span>
             </div>
           </div>
-          <div v-if="rerunSource" class="wizard-hint">
+          <div v-if="isMyWorkspace" class="wizard-hint">
+            After clicking <strong>Configure</strong>, you can click on <strong>processor</strong> nodes to adjust settings before executing the run.
+          </div>
+          <div v-else-if="rerunSource" class="wizard-hint">
             All processor parameters and execution targets will be copied from the previous run. You will still need to configure <strong>data source</strong> nodes to select files before executing.
           </div>
           <div v-else class="wizard-hint">
