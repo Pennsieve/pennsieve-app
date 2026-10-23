@@ -47,31 +47,43 @@ export async function endInteractiveSession(runId) {
   }
   const conn = await resp.json(); // { kernelUrl, token }
   const kernelBaseUrl = trimSlash(conn.kernelUrl);
-  // Closing shuts the kernel server down, which tears the whole task (sidecar
-  // included) down mid-response — so the POST very often fails with a network/
-  // CORS error and NO HTTP response. That's the success path: treat a thrown
-  // fetch error as closed (mirrors the in-session close()). Only an actual
-  // non-OK HTTP response means the sidecar reached us and refused (e.g. auth),
-  // i.e. the kernel is genuinely still running.
+  // See postSessionClose for how a close that tears the task down reads.
+  const result = await postSessionClose(kernelBaseUrl, conn.token);
+  if (!result.closed) {
+    throw new Error(`Could not end the session (${result.status}).`);
+  }
+}
+
+// POSTs the sidecar's close. Shutting the kernel server down tears the whole
+// task (sidecar included) down mid-response, so the request rarely ends
+// cleanly, and how it fails says whether the session ended:
+//   - no HTTP response (network/CORS error), or none within
+//     CLOSE_TIMEOUT_MS: the task went away, i.e. closed;
+//   - 502/503/504: the platform's interactive gateway (basic mode) or the
+//     ALB answering for a task that went away, i.e. closed;
+//   - any other non-OK status: the sidecar answered and refused (e.g. 401),
+//     so the kernel is still running.
+// Resolves to { closed: true } or { closed: false, status }.
+const CLOSE_TIMEOUT_MS = 15000;
+const UPSTREAM_GONE = [502, 503, 504];
+
+export async function postSessionClose(kernelBaseUrl, token, { fetchFn = globalThis.fetch, timeoutMs = CLOSE_TIMEOUT_MS } = {}) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const closeResp = await fetch(`${kernelBaseUrl}/pennsieve/close`, {
+    const resp = await fetchFn(`${kernelBaseUrl}/pennsieve/close`, {
       method: "POST",
       credentials: "include",
-      headers: { Authorization: `Bearer ${conn.token}` },
+      headers: { Authorization: `Bearer ${token}` },
+      signal: controller.signal,
     });
-    if (!closeResp.ok) {
-      throw new Error(`Could not end the session (${closeResp.status}).`);
-    }
+    if (resp.ok || UPSTREAM_GONE.includes(resp.status)) return { closed: true };
+    return { closed: false, status: resp.status };
   } catch (e) {
-    // Re-throw our own non-OK error; swallow a fetch/network failure (the task
-    // tore itself down, which is exactly what ending the session does).
-    if (e instanceof Error && /Could not end the session/.test(e.message)) {
-      throw e;
-    }
-    console.warn(
-      "[notebook] end-session close did not return cleanly (task likely torn down):",
-      e?.message || e
-    );
+    console.warn("[notebook] close request did not return cleanly (task likely torn down):", e?.message || e);
+    return { closed: true };
+  } finally {
+    clearTimeout(timer);
   }
 }
 
@@ -868,29 +880,13 @@ export function useJupyterSession() {
     // kernel down is what makes the container return the task token and resume
     // the workflow — so if this request fails, the session is NOT closed and we
     // must surface that rather than silently flip the UI to "closed".
-    try {
-      const resp = await fetch(`${kernelBaseUrl}/pennsieve/close`, {
-        method: "POST",
-        credentials: "include",
-        headers: { Authorization: `Bearer ${sessionToken}` },
-      });
-      if (!resp.ok) {
-        // The sidecar answered with an error status (e.g. auth) — the request
-        // reached it and it refused, so the kernel is genuinely still running.
-        error.value = `Could not end the session (${resp.status}). The kernel is still running — try again.`;
-        return;
-      }
-    } catch (e) {
-      // A network/CORS failure (no HTTP response) almost always means the close
-      // succeeded and the task tore itself down mid-response — shutting the
-      // kernel server down stops the whole task, including the sidecar serving
-      // this request. Treat it as closed rather than blocking the UI. (A genuine
-      // "couldn't reach it" failure resolves the same way the workflow does:
-      // heartbeat/idle timeout reclaims it.)
-      console.warn(
-        "[notebook] close request did not return cleanly (task likely torn down):",
-        e?.message || e
-      );
+    // See postSessionClose for how its failures read. (A genuine "couldn't
+    // reach it" resolves the way the workflow does: the heartbeat/idle timeout
+    // reclaims the task.)
+    const result = await postSessionClose(kernelBaseUrl, sessionToken);
+    if (!result.closed) {
+      error.value = `Could not end the session (${result.status}). The kernel is still running — try again.`;
+      return;
     }
     disconnect();
     kernelStatus.value = "dead";
