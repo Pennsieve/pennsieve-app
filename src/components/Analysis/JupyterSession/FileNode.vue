@@ -5,6 +5,7 @@ export default { name: "FileNode" };
 </script>
 
 <script setup>
+import { CRATE_FILE } from "@/composables/useJupyterSession";
 defineProps({
   node: { type: Object, required: true },
   depth: { type: Number, default: 0 },
@@ -43,6 +44,12 @@ const isNotebook = (node) =>
         class="fn__tag fn__tag--in"
         title="Files staged from previous workflow steps (INPUT_DIR)"
         >← previous step</span
+      >
+      <span
+        v-else-if="node.name === CRATE_FILE"
+        class="fn__tag fn__tag--crate"
+        title="The dataset's RO-Crate: every file in it, with checksums and its source. Download files from Inputs."
+        >dataset file list</span
       >
       <span v-if="node.type !== 'directory' && node.size != null" class="fn__size">
         {{ fmtSize(node.size) }}
@@ -132,6 +139,9 @@ const isNotebook = (node) =>
 }
 .fn__tag--in {
   color: #6b87b3; /* muted navy */
+}
+.fn__tag--crate {
+  color: #999999; /* gray_4 */
 }
 .fn__tag--out {
   color: #14a758; /* green_2 */
