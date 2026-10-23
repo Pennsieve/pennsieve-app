@@ -189,13 +189,15 @@ function copyPath(node) {
   </div>
 </template>
 
-<style scoped>
+<style scoped lang="scss">
+@use "../../../styles/theme";
+
 .fb {
   display: flex;
   flex-direction: column;
   height: 100%;
-  border-right: 1px solid #e5e5e5;
-  background: #f7f7f7;
+  border-right: 1px solid theme.$gray_2;
+  background: theme.$gray_1;
   font-size: 13px;
   min-width: 0;
 }
@@ -205,12 +207,12 @@ function copyPath(node) {
   justify-content: space-between;
   padding: 10px 10px;
   cursor: pointer;
-  border-bottom: 1px solid #e5e5e5;
+  border-bottom: 1px solid theme.$gray_2;
 }
 .fb__title {
   font-weight: 600;
   font-size: 13px;
-  color: #333333; /* gray_6 */
+  color: theme.$gray_6;
 }
 .fb__head-actions {
   display: flex;
@@ -224,7 +226,7 @@ function copyPath(node) {
   background: none;
   padding: 2px 4px;
   cursor: pointer;
-  color: #4d4d4d; /* gray_5 */
+  color: theme.$gray_5;
 }
 .fb__chevron {
   transition: transform 0.2s ease;
@@ -237,11 +239,11 @@ function copyPath(node) {
   background: none;
   cursor: pointer;
   font-size: 14px;
-  color: #4d4d4d;
+  color: theme.$gray_5;
   border-radius: 4px;
   padding: 2px 6px;
 }
-.fb__refresh:hover { background: #e6e9ef; } /* purple_tint */
+.fb__refresh:hover { background: theme.$purple_tint; }
 .fb__tree {
   list-style: none;
   margin: 0;
@@ -251,8 +253,8 @@ function copyPath(node) {
 }
 .fb__msg {
   padding: 10px;
-  color: #999;
+  color: theme.$gray_4;
   font-size: 12px;
 }
-.fb__msg--error { color: #c14d49; }
+.fb__msg--error { color: theme.$red_2; }
 </style>
