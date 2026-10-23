@@ -271,7 +271,9 @@ onMounted(async () => {
   // Live updates for every run in the workspace (or the user's own runs)
   if (realtime) {
     analyticsChannel = realtime.subscribe(
-      runScopeChannel(store.state.activeOrganization?.organization?.id, store.state.profile?.id)
+      // The route's workspace, not activeOrganization: that stays set in My
+      // Workspace, where a personal run's events go to the user's channel.
+      runScopeChannel(route.params.orgId, store.state.profile?.id)
     );
     analyticsChannel.bind("workflow-run-status", onRunStatusUpdate);
   }

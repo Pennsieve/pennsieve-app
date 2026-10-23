@@ -5,7 +5,7 @@
 // surface (code + markdown cells, per-cell run, run-all, restart, command-mode
 // keyboard shortcuts).
 import { onMounted, onBeforeUnmount, nextTick, ref, computed, watch } from "vue";
-import { useRoute, onBeforeRouteLeave } from "vue-router";
+import { useRoute, useRouter, onBeforeRouteLeave } from "vue-router";
 import { useJupyterSession } from "@/composables/useJupyterSession";
 import NotebookCell from "./NotebookCell.vue";
 import FileBrowser from "./FileBrowser.vue";
@@ -25,13 +25,16 @@ const props = defineProps({
   runId: { type: String, required: true },
 });
 
-// Route to the Analysis tab (orgId from the current route) — offered as a way
-// back once the session has ended and the notebook surface is gone.
+// The run's page: where ending the session leads, since the run carries on
+// (its next steps, e.g. a download target's zip, show there). In its
+// workspace, or in My Analysis for a personal run (no orgId).
 const route = useRoute();
-const analysisRoute = computed(() => ({
-  name: "analysis",
-  params: { orgId: route.params.orgId },
-}));
+const router = useRouter();
+const runRoute = computed(() =>
+  route.params.orgId
+    ? { name: "run-detail", params: { orgId: route.params.orgId, runId: props.runId } }
+    : { name: "my-run-detail", params: { runId: props.runId } }
+);
 
 const {
   status,
@@ -376,6 +379,7 @@ async function endSession(saveFirst) {
     ending.value = false;
     if (status.value === "closed") confirmEnd.value = false;
   }
+  if (status.value === "closed") router.replace(runRoute.value);
 }
 
 // Command-mode keyboard shortcuts (ignored while a CodeMirror editor has focus).
@@ -707,7 +711,7 @@ const kernelPill = computed(() => {
       />
       <h2 class="nb-empty__title">Session ended</h2>
       <p class="nb-empty__msg">Your kernel has been shut down and the workflow will continue at the next step.</p>
-      <router-link :to="analysisRoute" class="nb-empty__link">Return to Analysis →</router-link>
+      <router-link :to="runRoute" class="nb-empty__link">View the run →</router-link>
     </div>
 
     <!-- Offer to open an existing notebook staged in input/ -->
