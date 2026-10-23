@@ -1,7 +1,7 @@
 <script setup>
-import { computed, ref, watch } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import { useStore } from "vuex";
-import { useRouter } from "vue-router";
+import { useRouter, useRoute } from "vue-router";
 
 import IconAnalysis from "../../icons/IconAnalysis.vue";
 
@@ -33,6 +33,11 @@ const statusOptions = [
 */
 const store = useStore();
 const router = useRouter();
+const route = useRoute();
+// Shown in a workspace and in My Workspace (My Analysis), where there's no
+// organization in the route and route names carry a "my-" prefix.
+const isMyWorkspace = computed(() => !route.params.orgId);
+const scopedRoute = (name, params = {}) => ({ name: isMyWorkspace.value ? `my-${name}` : name, params });
 
 const applications = computed(
   () => store.state.analysisModule.applications || []
@@ -176,6 +181,14 @@ watch(filteredApplications, () => {
   currentPage.value = 1;
 });
 
+// Load the list if nothing has yet: My Workspace clears the analysis cache on
+// entry, and in a workspace this is a no-op once the list is loaded.
+onMounted(() => {
+  store
+    .dispatch("analysisModule/fetchApplications", { includeArchived: statusFilter.value !== "active" })
+    .catch(() => {});
+});
+
 // Archived applications are excluded from the default list response, so any
 // view that includes them must refetch with the includeArchived flag.
 watch(statusFilter, (val) => {
@@ -209,11 +222,11 @@ const statusLabel = (status) => {
   Navigation
 */
 const goToDetail = (app) => {
-  router.push({ name: "application-detail", params: { uuid: app.uuid } });
+  router.push(scopedRoute("application-detail", { uuid: app.uuid }));
 };
 
 const goToManifestBuilder = () => {
-  router.push({ name: "application-manifest-builder" });
+  router.push(scopedRoute("application-manifest-builder"));
 };
 </script>
 
@@ -224,7 +237,11 @@ const goToManifestBuilder = () => {
       <div class="info-card">
         <h3>Applications</h3>
         <p>
-          Browse the applications available in this workspace. Each
+          <template v-if="isMyWorkspace">
+            Browse the public applications, your own, and the ones shared
+            with you directly. Each
+          </template>
+          <template v-else>Browse the applications available in this workspace. Each</template>
           application is sourced from a GitHub repository published to the
           Pennsieve App Store and can be wired into compute workflows.
         </p>
@@ -243,7 +260,7 @@ const goToManifestBuilder = () => {
           <strong>Configure your application's defaults.</strong>
           Generate an <code>app.yml</code> manifest with the
           <router-link
-            :to="{ name: 'application-manifest-builder' }"
+            :to="scopedRoute('application-manifest-builder')"
             class="info-link"
           >
             manifest builder
@@ -251,7 +268,7 @@ const goToManifestBuilder = () => {
           to declare your application's runtime, resources, parameters, and
           inputs/outputs, then add it to your repository. See the
           <router-link
-            :to="{ name: 'application-manifest-guide' }"
+            :to="scopedRoute('application-manifest-guide')"
             class="info-link"
           >
             manifest guide

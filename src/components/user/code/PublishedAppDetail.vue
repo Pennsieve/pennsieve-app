@@ -167,11 +167,9 @@ const loadDetail = async (uuid) => {
   try {
     // Ensure org members and teams are loaded — getPrimaryData() in main.js
     // may not have run if the user navigated here via a userRoute (e.g. my-workspace).
-    // The permissions editor relies on this data. Fall back to
-    // preferredOrganization / first org when activeOrganization is not set.
+    // The permissions editor relies on this data. Only the active workspace:
+    // never the preferred organization (deprecated) or the first one.
     const orgId = store.state.activeOrganization?.organization?.id
-      || store.state.profile?.preferredOrganization
-      || store.state.organizations?.[0]?.organization?.id
     const needsMembers = orgId && !store.state.orgMembers?.length
     const needsTeams = orgId && !store.state.teams?.length
     const orgDataPromise = (needsMembers || needsTeams)

@@ -301,16 +301,17 @@ export const actions = {
     try {
       const userToken = await useGetToken();
 
-      // /applications/store requires organization_id. On user routes (My Workspace)
-      // there is no activeOrganization, so fall back to preferredOrganization
-      // or the first org so we can still populate app data for repo cards.
-      const orgId = rootState.activeOrganization?.organization?.id
-        || rootState.profile?.preferredOrganization
-        || rootState.organizations?.[0]?.organization?.id;
-      if (!orgId) return;
+      // In a workspace: the apps usable there (including apps shared with the
+      // workspace or your teams in it). Outside one (My Workspace): public
+      // apps, your own, and apps shared with you directly. Never another
+      // workspace's, e.g. the preferred organization's (deprecated).
+      const orgId = rootState.activeOrganization?.organization?.id;
+      const params = new URLSearchParams();
+      if (orgId) params.set("organization_id", orgId);
       // Archived applications are excluded by default; opt in with includeArchived.
-      let url = `${rootState.config.api2Url}/applications/store?organization_id=${orgId}`;
-      if (includeArchived) url += `&includeArchived=true`;
+      if (includeArchived) params.set("includeArchived", "true");
+      const path = orgId ? "store" : "store/personal";
+      const url = `${rootState.config.api2Url}/applications/${path}?${params}`;
       const resp = await fetch(url, {
         method: "GET",
         headers: {
