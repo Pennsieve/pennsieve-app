@@ -154,7 +154,7 @@ const isNotebook = (node) =>
   font-size: 12px;
   color: #4d4d4d; /* gray_5 */
   padding: 1px 5px;
-  border-radius: 4px;
+  border-radius: 2px;
 }
 /* The row's own hover is purple_tint, so an action stands out from it in
    white with a hairline, and the same for keyboard focus. */
