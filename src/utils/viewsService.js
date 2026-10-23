@@ -76,8 +76,10 @@ export function viewDataSource(view) {
   return { kind: 'viewVersion', viewId: view.id, viewVersion: view.version }
 }
 
-export function getView(viewId, options = {}) {
-  return viewsRequest(`/${encodeURIComponent(viewId)}`, options)
+// A view at its latest version (the summary listMyViews gives).
+export async function getView(viewId, options = {}) {
+  const { view } = await viewsRequest(`/${encodeURIComponent(viewId)}`, options)
+  return view
 }
 
 // Every entry of a view version, read a page at a time. Each entry has

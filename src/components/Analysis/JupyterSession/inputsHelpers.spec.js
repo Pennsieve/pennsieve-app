@@ -3,6 +3,7 @@ import {
   folderContents,
   filesUnder,
   inputKey,
+  middleTruncate,
   pendingFiles,
   rowStatus,
   summarize,
@@ -78,5 +79,16 @@ describe("pendingFiles", () => {
 
   it("ignores another source's selection", () => {
     expect(pendingFiles(sources, new Set([inputKey("other", "files/")]), {})).toEqual([]);
+  });
+});
+
+describe("middleTruncate", () => {
+  it("keeps both ends of a long name", () => {
+    const name = "H2192cG1a_Hu_NOS_ChAT_5-HT_1st_layer.tif";
+    const short = middleTruncate(name, 24);
+    expect(short).toHaveLength(24);
+    expect(short.startsWith("H2192cG1a")).toBe(true);
+    expect(short.endsWith("layer.tif")).toBe(true);
+    expect(middleTruncate("short.csv", 24)).toBe("short.csv");
   });
 });

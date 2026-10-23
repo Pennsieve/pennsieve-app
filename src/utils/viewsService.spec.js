@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import {
+  getView,
   viewsServiceUrl,
   viewForDataset,
   viewDataSource,
@@ -73,5 +74,12 @@ describe("listEntries", () => {
     const entries = await listEntries("v1", 2, { config, getToken, fetchFn });
     expect(entries).toHaveLength(1500);
     expect(fetchFn.mock.calls[1][0]).toBe("https://api2.pennsieve.net/views/v1/versions/2/entries?offset=1000&limit=1000");
+  });
+});
+
+describe("getView", () => {
+  it("is the view's summary", async () => {
+    const fetchFn = respond([200, { view: { id: "v1", name: "Study" }, versions: [1] }]);
+    expect(await getView("v1", { config, getToken, fetchFn })).toEqual({ id: "v1", name: "Study" });
   });
 });
