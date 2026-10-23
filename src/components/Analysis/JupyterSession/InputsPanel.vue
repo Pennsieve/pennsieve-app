@@ -333,7 +333,7 @@ function fmtSize(bytes) {
               <span class="inp__text">{{ row.label }}</span>
             </span>
 
-            <span v-if="row.status?.cls === 'done'" class="inp__state inp__state--done" title="In the session">
+            <span v-if="row.status?.cls === 'done'" class="inp__state inp__state--done" title="In the session's input folder">
               <IconDoneCheckCircle :width="14" :height="14" />
             </span>
             <span
@@ -366,9 +366,11 @@ function fmtSize(bytes) {
           :loading="requesting"
           @click="download"
         >
-          Download {{ pending.length }} file{{ pending.length === 1 ? "" : "s" }} ({{ fmtSize(pendingSize) }})
+          Add {{ pending.length }} file{{ pending.length === 1 ? "" : "s" }} to session ({{ fmtSize(pendingSize) }})
         </el-button>
-        <p v-else class="inp__hint">Select folders or files to download them into the session.</p>
+        <p v-else class="inp__hint">
+          Select folders or files to add. They're copied into the notebook's input folder.
+        </p>
       </div>
     </template>
   </div>
