@@ -153,7 +153,7 @@ function copyPath(node) {
 <template>
   <div class="fb">
     <div class="fb__head">
-      <span class="fb__title">Files</span>
+      <span class="fb__title" title="What's on the session's disk: input/, output/ and your notebook">Session files</span>
       <button class="fb__refresh" title="Refresh" :disabled="loading" @click="refresh">⟳</button>
     </div>
 

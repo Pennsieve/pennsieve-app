@@ -539,7 +539,7 @@ const kernelPill = computed(() => {
   <div class="nb">
     <!-- toolbar -->
     <div class="nb-toolbar" v-if="status === 'ready'">
-      <el-tooltip content="Toggle file browser" :show-after="400">
+      <el-tooltip content="Show or hide the inputs and session files" :show-after="400">
         <el-button
           size="small"
           :type="showFiles ? 'primary' : 'default'"
