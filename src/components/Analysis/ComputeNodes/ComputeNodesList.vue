@@ -125,7 +125,11 @@ async function fetchComputeNodes() {
   try {
     // Get organization ID from Vuex store
     const orgId = currentOrganization.value?.nodeId || currentOrganization.value?.id
-    await computeResourcesStore.fetchComputeNodes(orgId)
+    // Admins need the workspace's account enablements to know which nodes are Admin Managed
+    const accountsRequest = hasAdminRights.value && orgId
+      ? computeResourcesStore.fetchWorkspaceComputeAccounts(orgId)
+      : Promise.resolve()
+    await Promise.all([computeResourcesStore.fetchComputeNodes(orgId), accountsRequest])
   } catch (error) {
     console.error('Failed to fetch compute nodes:', error)
   }
