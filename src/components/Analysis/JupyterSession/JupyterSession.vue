@@ -156,6 +156,22 @@ function storedOpen() {
   }
 }
 const showFiles = ref(storedOpen());
+
+// Below this toolbar width the buttons keep only their icons (each has a
+// tooltip), so the toolbar stays on one line beside the sidebar.
+const COMPACT_TOOLBAR_PX = 900;
+const toolbarRef = ref(null);
+const compactToolbar = ref(false);
+let toolbarObserver = null;
+watch(toolbarRef, (el) => {
+  toolbarObserver?.disconnect();
+  toolbarObserver = null;
+  if (!el || typeof ResizeObserver === "undefined") return;
+  toolbarObserver = new ResizeObserver(([entry]) => {
+    compactToolbar.value = entry.contentRect.width < COMPACT_TOOLBAR_PX;
+  });
+  toolbarObserver.observe(el);
+});
 function toggleSidebar() {
   showFiles.value = !showFiles.value;
   try {
@@ -312,6 +328,7 @@ onMounted(async () => {
 });
 
 onBeforeUnmount(() => {
+  toolbarObserver?.disconnect();
   endSidebarResize();
   window.removeEventListener("keydown", onKeydown, true);
   window.removeEventListener("beforeunload", onBeforeUnload);
@@ -753,7 +770,7 @@ const kernelPill = computed(() => {
            so the sidebar runs the full height beside them. -->
       <div class="nb-pane">
         <!-- toolbar -->
-        <div class="nb-toolbar" v-if="status === 'ready'">
+        <div ref="toolbarRef" class="nb-toolbar" :class="{ 'is-compact': compactToolbar }" v-if="status === 'ready'">
           <el-tooltip :content="showFiles ? 'Hide inputs and session files' : 'Show inputs and session files'" :show-after="400">
             <el-button
               size="small"
@@ -768,14 +785,14 @@ const kernelPill = computed(() => {
           </el-tooltip>
           <span class="nb-div" />
           <el-tooltip content="Save (⌘/Ctrl+S)" :show-after="400">
-            <el-button size="small" :icon="Document" :loading="saving" @click="saveAndRefresh">
-              Save<span v-if="dirty" class="nb-dirty">•</span>
+            <el-button size="small" :icon="Document" :loading="saving" aria-label="Save" @click="saveAndRefresh">
+              <span v-if="!compactToolbar">Save</span><span v-if="dirty" class="nb-dirty">•</span>
             </el-button>
           </el-tooltip>
 
           <el-dropdown trigger="click" @command="addCellFromMenu">
-            <el-button size="small" :icon="Plus">
-              Add<el-icon class="nb-caret"><ArrowDown /></el-icon>
+            <el-button size="small" :icon="Plus" aria-label="Add a cell" :title="compactToolbar ? 'Add a cell' : undefined">
+              <span v-if="!compactToolbar">Add</span><el-icon class="nb-caret"><ArrowDown /></el-icon>
             </el-button>
             <template #dropdown>
               <el-dropdown-menu>
@@ -788,15 +805,19 @@ const kernelPill = computed(() => {
           <span class="nb-div" />
 
           <el-tooltip content="Run selected (Shift+Enter)" :show-after="400">
-            <el-button size="small" type="primary" :icon="VideoPlay" @click="runSelected">Run</el-button>
+            <el-button size="small" type="primary" :icon="VideoPlay" aria-label="Run" @click="runSelected">
+              <span v-if="!compactToolbar">Run</span>
+            </el-button>
           </el-tooltip>
           <el-tooltip content="Run all cells" :show-after="400">
-            <el-button size="small" :icon="DArrowRight" @click="runAll">Run all</el-button>
+            <el-button size="small" :icon="DArrowRight" aria-label="Run all" @click="runAll">
+              <span v-if="!compactToolbar">Run all</span>
+            </el-button>
           </el-tooltip>
 
           <el-dropdown trigger="click" @command="onKernelCommand">
-            <el-button size="small" :icon="RefreshRight">
-              Kernel<el-icon class="nb-caret"><ArrowDown /></el-icon>
+            <el-button size="small" :icon="RefreshRight" aria-label="Kernel" :title="compactToolbar ? 'Kernel' : undefined">
+              <span v-if="!compactToolbar">Kernel</span><el-icon class="nb-caret"><ArrowDown /></el-icon>
             </el-button>
             <template #dropdown>
               <el-dropdown-menu>
@@ -808,29 +829,36 @@ const kernelPill = computed(() => {
             </template>
           </el-dropdown>
 
-          <span v-if="notebookSourceLabel" class="nb-source" :title="notebookSource">
+          <span v-if="notebookSourceLabel" class="nb-source" :title="`Editing ${notebookSource}`">
             <el-icon class="nb-source__icon"><Document /></el-icon>
-            editing: {{ notebookSourceLabel }}
+            <template v-if="!compactToolbar">editing: {{ notebookSourceLabel }}</template>
           </span>
 
           <span class="nb-spacer" />
 
-          <span class="nb-kernel" :class="`nb-kernel--${kernelPill.cls}`">
+          <span
+            class="nb-kernel"
+            :class="`nb-kernel--${kernelPill.cls}`"
+            :title="`${kernelName || 'Kernel'} · ${kernelPill.label}`"
+          >
             <el-icon v-if="kernelPill.cls === 'busy'" class="nb-kernel__spin"><Loading /></el-icon>
             <span class="nb-kernel__dot" />
-            {{ kernelName || "Kernel" }} · {{ kernelPill.label }}
+            <template v-if="!compactToolbar">{{ kernelName || "Kernel" }} · </template>{{ kernelPill.label }}
           </span>
 
-          <el-button
-            size="small"
-            type="danger"
-            plain
-            :icon="SwitchButton"
-            :loading="ending"
-            @click="confirmEnd = true"
-          >
-            End session
-          </el-button>
+          <el-tooltip content="End session" :show-after="400" :disabled="!compactToolbar">
+            <el-button
+              size="small"
+              type="danger"
+              plain
+              :icon="SwitchButton"
+              :loading="ending"
+              aria-label="End session"
+              @click="confirmEnd = true"
+            >
+              <span v-if="!compactToolbar">End session</span>
+            </el-button>
+          </el-tooltip>
         </div>
 
         <!-- Offer to open an existing notebook staged in input/ -->
@@ -955,6 +983,15 @@ const kernelPill = computed(() => {
   background: #e6e9ef; /* purple_tint */
   border-color: #808fad; /* purple_1 */
   color: #011f5b; /* purple_3 */
+}
+.nb-toolbar.is-compact {
+  flex-wrap: nowrap;
+  gap: 6px;
+}
+/* An icon-only button still renders its (now empty) label wrapper, whose left
+   margin would push the icon off centre. */
+.nb-toolbar.is-compact :deep(.el-button > span:empty) {
+  display: none;
 }
 .nb-div { width: 1px; align-self: stretch; margin: 2px 4px; background: #e5e5e5; }
 .nb-spacer { flex: 1; }
