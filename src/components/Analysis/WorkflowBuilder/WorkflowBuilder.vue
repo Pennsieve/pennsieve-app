@@ -26,6 +26,9 @@ import {
 } from "../RunMonitor/runHelpers";
 import BfButton from "../../shared/bf-button/BfButton.vue";
 import MetricsDashboard from "../Metrics/MetricsDashboard.vue";
+import CompactFlowNode from "../WorkflowGraph/CompactFlowNode.vue";
+import GraphDensityToggle from "../WorkflowGraph/GraphDensityToggle.vue";
+import { COMPACT_BOX, layoutBox, overlaps, recenter, useGraphDensity } from "../WorkflowGraph/graphDensity";
 import {
   toParamSchema,
   validateAppConnection,
@@ -178,7 +181,7 @@ const saveWorkflowChanges = async () => {
       updated,
       availableApplications.value,
     );
-    nodes.value = result.nodes;
+    nodes.value = result.needsAutoLayout ? result.nodes : placeSaved(result.nodes);
     edges.value = result.edges;
     snapshotDefaultParams();
     hydrateManifestPorts();
@@ -763,7 +766,7 @@ const selectWorkflow = (workflow) => {
     workflow,
     availableApplications.value,
   );
-  nodes.value = result.nodes;
+  nodes.value = result.needsAutoLayout ? result.nodes : placeSaved(result.nodes);
   edges.value = result.edges;
   snapshotDefaultParams();
   // Fire-and-forget: the manifests patch the nodes and re-run the check.
@@ -1161,15 +1164,37 @@ const clearWorkflow = () => {
 const NODE_WIDTH = 280;
 const NODE_HEIGHT = 100;
 
+// Compact (one line) or detailed nodes: the viewer's choice, shared with the
+// run page. Laid out with the box of the current choice. Saved positions are
+// always for detailed nodes, so a definition looks the same in either.
+const { detailed, setDetailed } = useGraphDensity();
+const DETAILED_BOX = { width: NODE_WIDTH, height: NODE_HEIGHT, nodesep: 120, ranksep: 150 };
+const placeSaved = (laidOut) => (detailed.value ? laidOut : recenter(laidOut, DETAILED_BOX, COMPACT_BOX));
+const positionToSave = (node) =>
+  detailed.value ? node.position : recenter([node], COMPACT_BOX, DETAILED_BOX)[0].position;
+
+// Switching keeps the arrangement (each node keeps its centre); growing to
+// detailed lays the graph out again only if the bigger cards would overlap.
+const changeDensity = (value) => {
+  if (value === detailed.value) return;
+  const from = layoutBox(detailed.value, DETAILED_BOX);
+  const to = layoutBox(value, DETAILED_BOX);
+  setDetailed(value);
+  nodes.value = recenter(nodes.value, from, to);
+  if (value && overlaps(nodes.value, to)) autoLayout();
+  else setTimeout(() => fitView({ padding: 0.2, maxZoom: 1 }), 50);
+};
+
 const autoLayout = () => {
   if (nodes.value.length === 0) return;
+  const box = layoutBox(detailed.value, DETAILED_BOX);
 
   const g = new dagre.graphlib.Graph();
   g.setDefaultEdgeLabel(() => ({}));
-  g.setGraph({ rankdir: "TB", nodesep: 120, ranksep: 150 });
+  g.setGraph({ rankdir: "TB", nodesep: box.nodesep, ranksep: box.ranksep });
 
   for (const node of nodes.value) {
-    g.setNode(node.id, { width: NODE_WIDTH, height: NODE_HEIGHT });
+    g.setNode(node.id, { width: box.width, height: box.height });
   }
   for (const edge of edges.value) {
     g.setEdge(edge.source, edge.target);
@@ -1182,8 +1207,8 @@ const autoLayout = () => {
     return {
       ...node,
       position: {
-        x: pos.x - NODE_WIDTH / 2,
-        y: pos.y - NODE_HEIGHT / 2,
+        x: pos.x - box.width / 2,
+        y: pos.y - box.height / 2,
       },
     };
   });
@@ -1237,7 +1262,8 @@ const saveWorkflow = async () => {
       .filter((e) => e.target === node.id)
       .map((e) => e.source);
 
-    const position = { x: node.position.x, y: node.position.y };
+    const saved = positionToSave(node);
+    const position = { x: saved.x, y: saved.y };
 
     if (node.type === "data-source") {
       return {
@@ -1518,6 +1544,11 @@ const openNodeSettings = (id) => {
               <Controls position="top-left" />
 
               <div class="canvas-toolbar">
+                <GraphDensityToggle
+                  v-if="nodes.length > 0"
+                  :detailed="detailed"
+                  @update:detailed="changeDensity"
+                />
                 <button
                   v-if="nodes.length > 0"
                   class="auto-layout-btn"
@@ -1529,7 +1560,29 @@ const openNodeSettings = (id) => {
 
               <template #node-default="{ data, id }">
                 <Handle id="target" type="target" :position="Position.Top" />
-                <div class="custom-node">
+                <CompactFlowNode
+                  v-if="!detailed"
+                  kind="processor"
+                  :label="data.label"
+                  :runtime="data.computeType"
+                >
+                    <button
+                      v-if="!isReadOnly"
+                      class="settings-btn"
+                      @click.stop="openNodeSettings(id)"
+                      title="Configure"
+                    >
+                      <IconPencil :width="12" :height="12" />
+                    </button>
+                    <button
+                      v-if="!isReadOnly"
+                      class="remove-btn"
+                      @click.stop="removeNode(id)"
+                    >
+                      &times;
+                    </button>
+                </CompactFlowNode>
+                <div v-else class="custom-node">
                   <div class="node-header">
                     <span class="node-title">{{ data.label }}</span>
                     <button
@@ -1584,7 +1637,20 @@ const openNodeSettings = (id) => {
 
               <template #node-input="{ data, id }">
                 <Handle id="target" type="target" :position="Position.Top" />
-                <div class="custom-node input-node">
+                <CompactFlowNode
+                  v-if="!detailed"
+                  kind="processor"
+                  :label="data.label"
+                >
+                    <button
+                      v-if="!isReadOnly"
+                      class="remove-btn"
+                      @click.stop="removeNode(id)"
+                    >
+                      &times;
+                    </button>
+                </CompactFlowNode>
+                <div v-else class="custom-node input-node">
                   <div class="node-header">
                     <span class="node-title">{{ data.label }}</span>
                     <button
@@ -1628,7 +1694,20 @@ const openNodeSettings = (id) => {
 
               <template #node-output="{ data, id }">
                 <Handle id="target" type="target" :position="Position.Top" />
-                <div class="custom-node output-node">
+                <CompactFlowNode
+                  v-if="!detailed"
+                  kind="processor"
+                  :label="data.label"
+                >
+                    <button
+                      v-if="!isReadOnly"
+                      class="remove-btn"
+                      @click.stop="removeNode(id)"
+                    >
+                      &times;
+                    </button>
+                </CompactFlowNode>
+                <div v-else class="custom-node output-node">
                   <div class="node-header">
                     <span class="node-title">{{ data.label }}</span>
                     <button
@@ -1672,7 +1751,20 @@ const openNodeSettings = (id) => {
 
               <!-- Data Source Node: output only (feeds into processors) -->
               <template #node-data-source="{ data, id }">
-                <div class="custom-node data-source-node">
+                <CompactFlowNode
+                  v-if="!detailed"
+                  kind="source"
+                  :label="data.label"
+                >
+                    <button
+                      v-if="!isReadOnly"
+                      class="remove-btn"
+                      @click.stop="removeNode(id)"
+                    >
+                      &times;
+                    </button>
+                </CompactFlowNode>
+                <div v-else class="custom-node data-source-node">
                   <div class="node-header">
                     <span class="node-type-badge source-badge">Source</span>
                     <span class="node-title">{{ data.label }}</span>
@@ -1691,7 +1783,29 @@ const openNodeSettings = (id) => {
               <!-- Data Target Node: input only (receives from processors) -->
               <template #node-data-target="{ data, id }">
                 <Handle id="target" type="target" :position="Position.Top" />
-                <div class="custom-node data-target-node">
+                <CompactFlowNode
+                  v-if="!detailed"
+                  kind="target"
+                  :label="getTargetTypeLabel(data.targetType)"
+                  :runtime="data.computeType"
+                >
+                    <button
+                      v-if="!isReadOnly"
+                      class="settings-btn"
+                      @click.stop="openNodeSettings(id)"
+                      title="Configure"
+                    >
+                      <IconPencil :width="12" :height="12" />
+                    </button>
+                    <button
+                      v-if="!isReadOnly"
+                      class="remove-btn"
+                      @click.stop="removeNode(id)"
+                    >
+                      &times;
+                    </button>
+                </CompactFlowNode>
+                <div v-else class="custom-node data-target-node">
                   <div class="node-header">
                     <span class="node-type-badge target-badge">Target</span>
                     <span class="node-title">{{
