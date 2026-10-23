@@ -12,6 +12,16 @@ const extractErrorMessage = async (response) => {
   return `Error ${response.status}: ${response.statusText}`;
 };
 
+// app-deploy-service's token_auth routes take the workspace from the request
+// (organization_id) and verify it; without one they work in your personal
+// scope. Pass the workspace being viewed, never a preferred organization
+// (deprecated).
+const withWorkspace = (url, rootState) => {
+  const orgId = rootState.activeOrganization?.organization?.id;
+  if (!orgId) return url;
+  return `${url}${url.includes("?") ? "&" : "?"}organization_id=${encodeURIComponent(orgId)}`;
+};
+
 const initialState = () => ({
   computeNodes: [],
   computeNodesLoaded: false,
@@ -346,7 +356,7 @@ export const actions = {
   },
   fetchApplication: async ({ rootState }, uuid) => {
     if (!uuid) throw new Error("Missing application uuid");
-    const url = `${rootState.config.api2Url}/applications/store/${uuid}`;
+    const url = withWorkspace(`${rootState.config.api2Url}/applications/store/${uuid}`, rootState);
     const userToken = await useGetToken();
     const resp = await fetch(url, {
       method: "GET",
@@ -361,7 +371,7 @@ export const actions = {
   },
   fetchApplicationPermissions: async ({ rootState }, uuid) => {
     if (!uuid) throw new Error("Missing application uuid");
-    const url = `${rootState.config.api2Url}/applications/store/${uuid}/permissions`;
+    const url = withWorkspace(`${rootState.config.api2Url}/applications/store/${uuid}/permissions`, rootState);
     const userToken = await useGetToken();
     const resp = await fetch(url, {
       method: "GET",
@@ -636,7 +646,8 @@ export const actions = {
   },
   // Note that this to to deploy application, there is another action for editing application
   updateApplication: async ({ commit, rootState }, newApplication) => {
-    const url = `${rootState.config.api2Url}/applications/deploy`;
+    // Deploying acts in the workspace being viewed (required by the API).
+    const url = withWorkspace(`${rootState.config.api2Url}/applications/deploy`, rootState);
     const userToken = await useGetToken();
 
     try {
@@ -945,7 +956,8 @@ export const actions = {
     if (!uuid) return;
     commit("ADD_DELETING_APPLICATION", uuid);
     try {
-      const url = `${rootState.config.api2Url}/applications/${uuid}`;
+      // Deleting acts in the workspace being viewed (required by the API).
+      const url = withWorkspace(`${rootState.config.api2Url}/applications/${uuid}`, rootState);
       const userToken = await useGetToken();
       const response = await fetch(url, {
         method: "DELETE",
