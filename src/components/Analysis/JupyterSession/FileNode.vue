@@ -14,7 +14,7 @@ defineProps({
   fmtTime: { type: Function, required: true },
 });
 
-const emit = defineEmits(["toggle", "copy", "download", "insert", "open"]);
+const emit = defineEmits(["toggle", "copy", "insert", "open"]);
 
 const isNotebook = (node) =>
   node.type === "notebook" || /\.ipynb$/i.test(node.name || "");
@@ -66,14 +66,6 @@ const isNotebook = (node) =>
         </button>
         <button class="fn__act" title="Insert path into a cell" @click="emit('insert', node.path)">↩</button>
         <button class="fn__act" title="Copy path" @click="emit('copy', node)">⧉</button>
-        <button
-          v-if="node.type !== 'directory'"
-          class="fn__act"
-          title="Download"
-          @click="emit('download', node)"
-        >
-          ⬇
-        </button>
       </span>
     </div>
 
@@ -92,7 +84,6 @@ const isNotebook = (node) =>
         :fmt-time="fmtTime"
         @toggle="emit('toggle', $event)"
         @copy="emit('copy', $event)"
-        @download="emit('download', $event)"
         @insert="emit('insert', $event)"
         @open="emit('open', $event)"
       />

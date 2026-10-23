@@ -625,25 +625,6 @@ export function useJupyterSession() {
       });
   }
 
-  // Fetch a file's bytes via the Contents API (base64 for binary) as a Blob the
-  // browser can download — used by the file browser's download action.
-  async function downloadFile(path) {
-    if (!contents) return null;
-    const model = await contents.get(path, { content: true });
-    if (model.format === "base64") {
-      const bin = atob(model.content);
-      const bytes = new Uint8Array(bin.length);
-      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-      return new Blob([bytes], {
-        type: model.mimetype || "application/octet-stream",
-      });
-    }
-    const text =
-      typeof model.content === "string"
-        ? model.content
-        : JSON.stringify(model.content, null, 2);
-    return new Blob([text], { type: model.mimetype || "text/plain" });
-  }
 
   // ---- cell mutations -------------------------------------------------------
 
@@ -976,7 +957,6 @@ export function useJupyterSession() {
     findInputNotebooks,
     // files
     listDir,
-    downloadFile,
     fetchInputs,
     inputsStatus,
     // cells

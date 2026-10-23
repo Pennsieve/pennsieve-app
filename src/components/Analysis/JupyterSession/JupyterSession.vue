@@ -55,7 +55,6 @@ const {
   openNotebookFrom,
   findInputNotebooks,
   listDir,
-  downloadFile,
   fetchInputs,
   inputsStatus,
   setSource,
@@ -771,7 +770,6 @@ const kernelPill = computed(() => {
           <FileBrowser
             ref="fileBrowserRef"
             :list-dir="listDir"
-            :download-file="downloadFile"
             :ready="status === 'ready'"
             @insert-path="insertPath"
             @open-notebook="requestOpen"
