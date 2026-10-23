@@ -100,11 +100,12 @@ const tooltip = computed(() =>
     background: var(--cfn-strip);
   }
 }
+// The detailed cards' tints (RunDetail .data-source-node, .data-target-node).
 .cfn--source {
-  background: #eef0fe; // the detailed source card's tint
+  background: #eef2ff;
 }
 .cfn--target {
-  background: theme.$gray_1;
+  background: #f1f5f9;
 }
 .cfn__label {
   flex: 1;
