@@ -101,7 +101,7 @@ const INPUTS_BATCH = 1000;
 async function inputsResponse(resp) {
   if (!resp.ok) {
     const text = await resp.text().catch(() => "");
-    throw new Error(text.trim() || `The session refused the download (${resp.status}).`);
+    throw new Error(text.trim() || `The session couldn't add the files (${resp.status}).`);
   }
   const body = await resp.json();
   return body.files || [];
