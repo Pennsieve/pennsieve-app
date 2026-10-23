@@ -9,16 +9,17 @@ vi.mock("@/utils/downloadService", () => ({
   listArchives: vi.fn(),
   getArchiveUrl: vi.fn(),
   deleteArchive: vi.fn(),
+  listRunArchives: vi.fn(),
 }));
 
 import DownloadsPanel from "./DownloadsPanel.vue";
 import { useDownloadsStore } from "@/stores/downloadsStore";
-import { listArchives } from "@/utils/downloadService";
+import { listArchives, listRunArchives } from "@/utils/downloadService";
 
 const org = (id) => ({ organization: { id } });
 
-function mountPanel(activeOrganization) {
-  const vuex = createStore({ state: { activeOrganization } });
+function mountPanel(activeOrganization, profile = {}) {
+  const vuex = createStore({ state: { activeOrganization, profile } });
   const pinia = createPinia();
   setActivePinia(pinia);
   return {
@@ -58,5 +59,18 @@ describe("DownloadsPanel", () => {
     vuex.state.activeOrganization = org("N:organization:2");
     await flushPromises();
     expect(listArchives).toHaveBeenCalledTimes(1);
+  });
+
+  it("loads the user's run results once they're signed in, whatever the workspace", async () => {
+    listArchives.mockResolvedValue([]);
+    listRunArchives.mockResolvedValue([{ id: "ra_1", scope: "run", runId: "run-1", status: "READY", fileCount: 1 }]);
+    const { vuex } = mountPanel(null);
+    await flushPromises();
+    expect(listRunArchives).not.toHaveBeenCalled();
+
+    vuex.state.profile = { id: "N:user:1" };
+    await flushPromises();
+    expect(listRunArchives).toHaveBeenCalledTimes(1);
+    expect(useDownloadsStore().attentionCount, "a ready run archive is badged").toBe(1);
   });
 });

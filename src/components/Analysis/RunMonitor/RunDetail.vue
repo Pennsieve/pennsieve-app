@@ -23,8 +23,16 @@ import { useGetToken } from "@/composables/useGetToken";
 import { useSendXhr } from "@/mixins/request/request_composable";
 import toQueryParams from "@/utils/toQueryParams";
 import LayerNameSelector from "./LayerNameSelector.vue";
+import DownloadItem from "@/components/downloads/DownloadItem.vue";
+import { useDownloadsStore } from "@/stores/downloadsStore";
 
 const ASSET_TYPE_OPTIONS = ["timeseries-zarr","ome-zarr", "thumb"];
+// The download target's notify param (download-service's notify).
+const DOWNLOAD_NOTIFY_OPTIONS = [
+  { value: "auto", label: "Email me unless I'm watching" },
+  { value: "email", label: "Always email me" },
+  { value: "none", label: "Don't email me" },
+];
 const ASSET_TYPE_CUSTOM = "__custom__";
 const customAssetTypeNodes = reactive(new Set());
 
@@ -283,6 +291,38 @@ const interactiveProcessor = computed(() => {
   const dag = selectedWorkflowActivity.value?.dag || [];
   return dag.find((d) => d.runtimeConfig?.interactive || d.interactive) || null;
 });
+
+/*
+  Results download: a run whose DAG ends in a download target gets a zip of
+  its results from download-service, its creator's. The downloads store
+  follows the archive (polling it while it's prepared, which also tells the
+  service not to email).
+*/
+const downloads = useDownloadsStore();
+const downloadTarget = computed(() => {
+  const dag = selectedWorkflowActivity.value?.dag || [];
+  return dag.find((d) => d.type === "data-target" && d.targetType === "download") || null;
+});
+const runArchive = computed(() => {
+  const runId = selectedWorkflowActivity.value?.uuid;
+  return runId && downloadTarget.value ? downloads.forRun(runId) : null;
+});
+const resultsHint = computed(() => {
+  const status = selectedWorkflowActivity.value?.status;
+  if (isTerminalStatus(status) && status !== "SUCCEEDED") {
+    return "The run ended before its results were packaged.";
+  }
+  return "A zip of the results appears here when the run's download step finishes.";
+});
+// The archive exists once the download target has asked for it: look again
+// when the run or the target's status changes, until it's found.
+watch(
+  () => [selectedWorkflowActivity.value?.uuid, selectedWorkflowActivity.value?.status, downloadTarget.value?.status],
+  ([runId]) => {
+    if (runId && downloadTarget.value && !runArchive.value) downloads.loadRuns().catch(() => {});
+  },
+  { immediate: true }
+);
 
 const interactiveSessionAvailable = computed(() => {
   const activity = selectedWorkflowActivity.value;
@@ -1838,6 +1878,19 @@ onUnmounted(() => {
                       v-model="param.value"
                       :compute-node-id="initiateForm.computeNodeId"
                     />
+                    <el-select
+                      v-else-if="nodeConfigs[selectedNode.id].targetType === 'download' && param.name === 'notify'"
+                      v-model="param.value"
+                      size="small"
+                      style="width: 100%"
+                    >
+                      <el-option
+                        v-for="o in DOWNLOAD_NOTIFY_OPTIONS"
+                        :key="o.value"
+                        :label="o.label"
+                        :value="o.value"
+                      />
+                    </el-select>
                     <template v-else-if="param.name === 'ASSET_TYPE'">
                       <el-select
                         :model-value="
@@ -2142,6 +2195,13 @@ onUnmounted(() => {
                   <span class="info-value">{{ formatDuration(selectedWorkflowActivity.startedAt, selectedWorkflowActivity.completedAt) }}</span>
                 </div>
               </div>
+              <template v-if="downloadTarget">
+                <h4 class="sidebar-section-title">Results</h4>
+                <div class="info-card results-card">
+                  <DownloadItem v-if="runArchive" :download="runArchive" />
+                  <p v-else class="results-hint">{{ resultsHint }}</p>
+                </div>
+              </template>
               <!-- Metrics summary -->
               <template v-if="runMetrics">
                 <h4 class="sidebar-section-title">Metrics</h4>
@@ -3105,6 +3165,14 @@ onUnmounted(() => {
 
 .new-workflow-btn { width: 100%; }
 .sidebar-accordion { border-top: none; }
+
+.results-card {
+  .results-hint {
+    margin: 0;
+    font-size: 13px;
+    color: theme.$gray_4;
+  }
+}
 
 .sidebar-section-title {
   margin: 10px 0 6px 0;
