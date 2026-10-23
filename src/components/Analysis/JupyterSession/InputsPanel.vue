@@ -485,10 +485,13 @@ function fmtSize(bytes) {
   background: none;
   padding: 0;
   cursor: pointer;
-  color: theme.$purple_2;
+  color: theme.$link-color;
   overflow: hidden;
   text-overflow: ellipsis;
   max-width: 90px;
+}
+.inp__crumb:not(.is-current):hover {
+  color: theme.$link-color-hover;
 }
 .inp__crumb.is-current {
   color: theme.$purple_3;
@@ -547,7 +550,7 @@ function fmtSize(bytes) {
   color: inherit;
 }
 .inp__label--folder:hover .inp__text {
-  color: theme.$purple_2;
+  color: theme.$link-color;
   text-decoration: underline;
 }
 .inp__icon {
