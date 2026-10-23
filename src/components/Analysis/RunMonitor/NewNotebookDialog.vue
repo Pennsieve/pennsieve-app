@@ -541,12 +541,21 @@ watch(visible, (open) => {
   }
 });
 
+// Outside a workspace there are no input files to pick: the user downloads a
+// public dataset's files from the notebook itself.
+const INPUT_FILES_STEP = 5;
+const skipsStep = (i) => props.personal && i === INPUT_FILES_STEP;
+
 const next = async () => {
   if (step.value === 4) await loadDefinition(); // leaving Dataset → load inputs
-  if (step.value < stepTitles.length - 1) step.value++;
+  let n = step.value + 1;
+  while (skipsStep(n)) n++;
+  if (n < stepTitles.length) step.value = n;
 };
 const back = () => {
-  if (step.value > 0) step.value--;
+  let n = step.value - 1;
+  while (n > 0 && skipsStep(n)) n--;
+  if (n >= 0) step.value = n;
 };
 
 async function execute() {
@@ -648,6 +657,7 @@ async function execute() {
       <div class="wizard-progress">
         <span
           v-for="(title, i) in stepTitles"
+          v-show="!skipsStep(i)"
           :key="i"
           class="wizard-dot"
           :class="{ active: step === i, done: step > i }"
@@ -913,28 +923,7 @@ async function execute() {
       </div>
 
       <!-- Step 5: Input files -->
-      <div v-if="step === 5 && personal && publicDataset" class="wizard-step">
-        <div v-if="definitionLoading" class="wizard-cards-loading">
-          Loading notebook inputs...
-        </div>
-        <p v-else-if="dataSourceNodes.length === 0" class="wizard-step-desc">
-          This notebook takes no input data, so it starts without
-          {{ publicDataset.name }}.
-        </p>
-        <p v-else class="wizard-step-desc">
-          The notebook starts with the file list of
-          <strong>{{ publicDataset.name }}</strong> (version {{ publicVersion }})
-          in its <code>input/</code> folder. Choose which folders or files to
-          download from the notebook's <strong>Inputs</strong> panel.
-        </p>
-      </div>
-      <div v-else-if="step === 5 && personal" class="wizard-step wizard-step--disabled">
-        <p class="wizard-step-desc">
-          No input files: without a dataset, the notebook's <code>input/</code>
-          folder starts empty.
-        </p>
-      </div>
-      <div v-else-if="step === 5" class="wizard-step">
+      <div v-if="step === 5 && !personal" class="wizard-step">
         <div v-if="definitionLoading" class="wizard-cards-loading">
           Loading notebook inputs...
         </div>
@@ -1051,9 +1040,7 @@ async function execute() {
           <div v-if="personal" class="wizard-summary-row">
             <span class="wizard-summary-label">Public dataset</span>
             <span class="wizard-summary-value">{{
-              publicDataset && dataSourceNodes.length
-                ? `${publicDataset.name} (version ${publicVersion})`
-                : "None"
+              publicDataset ? `${publicDataset.name} (version ${publicVersion})` : "None"
             }}</span>
           </div>
           <div v-if="!personal" class="wizard-summary-row">
@@ -1068,6 +1055,15 @@ async function execute() {
             </span>
           </div>
         </div>
+        <p v-if="personal && publicDataset && !dataSourceNodes.length" class="public-warning">
+          This notebook has no input to attach {{ publicDataset.name }} to, so
+          it would start without it.
+        </p>
+        <p v-else-if="personal && publicDataset" class="resource-hint">
+          The notebook starts with the dataset's file list in
+          <code>input/</code>. Choose which files to download from its
+          <strong>Inputs</strong> panel.
+        </p>
         <label class="name-label">Name</label>
         <el-input
           v-model="runName"
@@ -1372,6 +1368,12 @@ async function execute() {
 }
 .public-selection .public-version {
   padding-left: 68px;
+}
+.public-warning {
+  font-size: 12px;
+  color: theme.$red_2;
+  line-height: 1.5;
+  margin: 14px 0 0;
 }
 .public-version {
   display: flex;

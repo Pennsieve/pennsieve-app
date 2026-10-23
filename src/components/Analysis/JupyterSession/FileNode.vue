@@ -30,7 +30,7 @@ const isNotebook = (node) =>
       <span class="fn__caret">
         <template v-if="node.type === 'directory'">{{ node.open ? "▾" : "▸" }}</template>
       </span>
-      <span class="fn__icon">{{ iconOf(node) }}</span>
+      <img class="fn__icon" :src="iconOf(node)" alt="" />
       <span class="fn__name">{{ node.name }}</span>
       <span
         v-if="depth === 0 && node.type === 'directory' && node.name === 'output'"
@@ -114,7 +114,7 @@ const isNotebook = (node) =>
 }
 .fn__row:hover { background: #e6e9ef; } /* purple_tint */
 .fn__caret { width: 12px; color: #999; font-size: 10px; flex: 0 0 12px; } /* gray_4 */
-.fn__icon { flex: 0 0 auto; }
+.fn__icon { flex: 0 0 auto; width: 16px; height: 16px; }
 .fn__name {
   overflow: hidden;
   text-overflow: ellipsis;
