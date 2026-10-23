@@ -7,6 +7,7 @@
 // after cell runs).
 import { ref, watch } from "vue";
 import FileNode from "./FileNode.vue";
+import { ArrowRight } from "@element-plus/icons-vue";
 import { fileIconForPath } from "@/utils/fileIconForPath";
 
 const props = defineProps({
@@ -18,6 +19,7 @@ const emit = defineEmits(["insert-path", "open-notebook"]);
 
 // Tree node: { name, path, type, size, last_modified, children, open, loading }
 const roots = ref([]);
+const collapsed = ref(false);
 const loading = ref(false);
 const error = ref(null);
 
@@ -152,10 +154,16 @@ function copyPath(node) {
 
 <template>
   <div class="fb">
-    <div class="fb__head">
+    <div class="fb__head" @click="collapsed = !collapsed">
       <span class="fb__title" title="What's on the session's disk: input/, output/ and your notebook">Session files</span>
-      <button class="fb__refresh" title="Refresh" :disabled="loading" @click="refresh">⟳</button>
+      <span class="fb__head-actions">
+        <button class="fb__refresh" title="Refresh" :disabled="loading" @click.stop="refresh">⟳</button>
+        <button class="fb__fold" :aria-expanded="!collapsed" aria-label="Fold session files" @click.stop="collapsed = !collapsed">
+          <el-icon class="fb__chevron" :class="{ 'is-open': !collapsed }"><ArrowRight /></el-icon>
+        </button>
+      </span>
     </div>
+    <template v-if="!collapsed">
 
     <p v-if="!ready" class="fb__msg">Connecting…</p>
     <p v-else-if="loading && !roots.length" class="fb__msg">Loading…</p>
@@ -177,6 +185,7 @@ function copyPath(node) {
         @open="emit('open-notebook', $event)"
       />
     </ul>
+    </template>
   </div>
 </template>
 
@@ -194,15 +203,34 @@ function copyPath(node) {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 8px 10px;
+  padding: 10px 10px;
+  cursor: pointer;
   border-bottom: 1px solid #e5e5e5;
 }
 .fb__title {
   font-weight: 600;
-  font-size: 12px;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: #4d4d4d;
+  font-size: 13px;
+  color: #333333; /* gray_6 */
+}
+.fb__head-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.fb__fold {
+  display: flex;
+  align-items: center;
+  border: none;
+  background: none;
+  padding: 2px 4px;
+  cursor: pointer;
+  color: #4d4d4d; /* gray_5 */
+}
+.fb__chevron {
+  transition: transform 0.2s ease;
+}
+.fb__chevron.is-open {
+  transform: rotate(90deg);
 }
 .fb__refresh {
   border: none;

@@ -9,6 +9,7 @@ import * as siteConfig from "@/site-config/site.json";
 import { useGetToken } from "@/composables/useGetToken";
 import { getView, listEntries } from "@/utils/viewsService";
 import { fileIconForPath } from "@/utils/fileIconForPath";
+import { ArrowRight } from "@element-plus/icons-vue";
 import IconArrowUp from "@/components/icons/IconArrowUp.vue";
 import IconDoneCheckCircle from "@/components/icons/IconDoneCheckCircle.vue";
 import IconWarningCircle from "@/components/icons/IconWarningCircle.vue";
@@ -248,12 +249,10 @@ function fmtSize(bytes) {
 
 <template>
   <div v-if="loading || sources.length || (error && hasViews)" class="inp" :class="{ 'inp--collapsed': collapsed }">
-    <div class="inp__head">
-      <button class="inp__toggle" :aria-expanded="!collapsed" @click="collapsed = !collapsed">
-        <span class="inp__caret">{{ collapsed ? "▸" : "▾" }}</span>
-        <span class="inp__title">Inputs</span>
-      </button>
-    </div>
+    <button class="inp__head" :aria-expanded="!collapsed" @click="collapsed = !collapsed">
+      <span class="inp__title">Inputs</span>
+      <el-icon class="inp__chevron" :class="{ 'is-open': !collapsed }"><ArrowRight /></el-icon>
+    </button>
 
     <template v-if="!collapsed">
       <p v-if="loading" class="inp__msg">Loading the dataset's files…</p>
@@ -398,29 +397,31 @@ function fmtSize(bytes) {
 .inp--collapsed {
   max-height: none;
 }
+/* Section header as the app's side-panel accordions: title, chevron right. */
 .inp__head {
-  padding: 8px 10px;
-  border-bottom: 1px solid theme.$gray_2;
-}
-.inp__toggle {
   display: flex;
   align-items: center;
-  gap: 4px;
+  justify-content: space-between;
+  width: 100%;
+  padding: 10px 10px;
   border: none;
+  border-bottom: 1px solid theme.$gray_2;
   background: none;
   cursor: pointer;
-  padding: 0;
-  color: theme.$gray_5;
-}
-.inp__caret {
-  width: 10px;
-  font-size: 11px;
+  font: inherit;
+  text-align: left;
 }
 .inp__title {
   font-weight: 600;
-  font-size: 12px;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
+  font-size: 13px;
+  color: theme.$gray_6;
+}
+.inp__chevron {
+  color: theme.$gray_5;
+  transition: transform 0.2s ease;
+}
+.inp__chevron.is-open {
+  transform: rotate(90deg);
 }
 .inp__source {
   display: flex;

@@ -13,7 +13,6 @@ import InputsPanel from "./InputsPanel.vue";
 import {
   VideoPlay,
   DArrowRight,
-  DArrowLeft,
   FolderOpened,
   RefreshRight,
   Document,
@@ -146,8 +145,8 @@ const selectedId = ref(null);
 const cellRefs = new Map();
 const ending = ref(false);
 const confirmEnd = ref(false);
-// The sidebar collapses from its own header and reopens from the notebook
-// toolbar, and stays as the user left it in this browser.
+// The sidebar shows or hides from the folder button at the start of the
+// notebook toolbar, and stays as the user left it in this browser.
 const SIDEBAR_OPEN_KEY = "pennsieve.notebook.sidebarOpen";
 function storedOpen() {
   try {
@@ -715,20 +714,6 @@ const kernelPill = computed(() => {
         :class="{ 'is-resizing': resizingSidebar }"
         :style="{ width: `${sidebarWidth}px`, flexBasis: `${sidebarWidth}px` }"
       >
-        <!-- Level with the notebook toolbar, so the two read as one header. -->
-        <div class="nb-files__bar">
-          <el-tooltip content="Hide inputs and session files" :show-after="400">
-            <el-button
-              size="small"
-              text
-              :icon="DArrowLeft"
-              aria-label="Hide the sidebar"
-              aria-controls="nb-sidebar"
-              :aria-expanded="true"
-              @click="toggleSidebar"
-            />
-          </el-tooltip>
-        </div>
         <div class="nb-files__content">
         <InputsPanel
           :run-id="runId"
@@ -769,19 +754,19 @@ const kernelPill = computed(() => {
       <div class="nb-pane">
         <!-- toolbar -->
         <div class="nb-toolbar" v-if="status === 'ready'">
-          <template v-if="!showFiles">
-            <el-tooltip content="Show inputs and session files" :show-after="400">
-              <el-button
-                size="small"
-                :icon="FolderOpened"
-                aria-label="Show the sidebar"
-                aria-controls="nb-sidebar"
-                :aria-expanded="false"
-                @click="toggleSidebar"
-              />
-            </el-tooltip>
-            <span class="nb-div" />
-          </template>
+          <el-tooltip :content="showFiles ? 'Hide inputs and session files' : 'Show inputs and session files'" :show-after="400">
+            <el-button
+              size="small"
+              :type="showFiles ? 'primary' : 'default'"
+              :plain="showFiles"
+              :icon="FolderOpened"
+              :aria-label="showFiles ? 'Hide the sidebar' : 'Show the sidebar'"
+              aria-controls="nb-sidebar"
+              :aria-expanded="showFiles"
+              @click="toggleSidebar"
+            />
+          </el-tooltip>
+          <span class="nb-div" />
           <el-tooltip content="Save (⌘/Ctrl+S)" :show-after="400">
             <el-button size="small" :icon="Document" :loading="saving" @click="saveAndRefresh">
               Save<span v-if="dirty" class="nb-dirty">•</span>
@@ -1021,17 +1006,6 @@ const kernelPill = computed(() => {
   overflow: hidden;
   display: flex;
   flex-direction: column;
-}
-.nb-files__bar {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  min-height: 48px;
-  padding: 0 8px;
-  border-bottom: 1px solid #cccccc; /* gray_3, as the toolbar's */
-  border-right: 1px solid #e5e5e5; /* gray_2 */
-  background: #f7f7f7; /* gray_1 */
-  box-sizing: border-box;
 }
 .nb-files.is-resizing {
   user-select: none;
