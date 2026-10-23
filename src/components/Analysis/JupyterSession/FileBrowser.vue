@@ -1,16 +1,16 @@
 <script setup>
 // JupyterLab-style file browser for the kernel's filesystem (the per-run EFS
 // mount). Lazily expands directories via the Contents API, shows size/modified,
-// and lets the user copy a path, insert it into the notebook, or download a
-// file (e.g. results from output/). Refreshes on demand (and the parent calls
-// refresh() after cell runs).
+// and lets the user copy a path or insert it into the notebook. Files leave
+// the session only through the run's data targets (e.g. a download target's
+// zip), not from here. Refreshes on demand (and the parent calls refresh()
+// after cell runs).
 import { ref, watch } from "vue";
 import FileNode from "./FileNode.vue";
 import { fileIconForPath } from "@/utils/fileIconForPath";
 
 const props = defineProps({
   listDir: { type: Function, required: true },
-  downloadFile: { type: Function, required: true },
   ready: { type: Boolean, default: false },
 });
 
@@ -148,18 +148,6 @@ function copyPath(node) {
   navigator.clipboard?.writeText(node.path).catch(() => {});
 }
 
-async function download(node) {
-  const blob = await props.downloadFile(node.path);
-  if (!blob) return;
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = node.name;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  URL.revokeObjectURL(url);
-}
 </script>
 
 <template>
@@ -185,7 +173,6 @@ async function download(node) {
         :fmt-time="fmtTime"
         @toggle="toggle"
         @copy="copyPath"
-        @download="download"
         @insert="emit('insert-path', $event)"
         @open="emit('open-notebook', $event)"
       />
