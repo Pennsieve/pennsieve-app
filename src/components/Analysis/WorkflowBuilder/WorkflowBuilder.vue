@@ -3152,9 +3152,13 @@ const openNodeSettings = (id) => {
   top: 10px;
   right: 10px;
   z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
-/* Sits under the Auto Layout button, which owns the top-right corner. */
+/* Sits under the toolbar (node size switch and Auto Layout), which owns the
+   top-right corner. */
 .compat-panel {
   position: absolute;
   top: 52px;
