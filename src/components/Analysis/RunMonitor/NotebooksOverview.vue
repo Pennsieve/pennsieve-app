@@ -37,6 +37,21 @@ const router = useRouter();
 const route = useRoute();
 const realtime = getCurrentInstance()?.appContext.config.globalProperties.$realtime;
 
+// Shown in a workspace (/:orgId/analysis/notebooks) and in My Workspace
+// (/my-workspace/analysis/notebooks), where notebooks run on the user's own
+// compute nodes and there is no dataset to pick yet.
+const isMyWorkspace = computed(() => !route.params.orgId);
+const notebookRoute = (runId) =>
+  isMyWorkspace.value
+    ? { name: "my-run-notebook", params: { runId } }
+    : {
+        name: "run-notebook",
+        params: {
+          orgId: route.params.orgId || store.state.activeOrganization?.organization?.id,
+          runId,
+        },
+      };
+
 /* ----------------------------------------------------------------- store ---- */
 const workflowInstances = computed(
   () => store.getters["analysisModule/workflowInstances"] || []
@@ -180,19 +195,20 @@ const onNotebookCreated = async (newRun) => {
     return;
   }
 
-  const orgId =
-    route.params.orgId || store.state.activeOrganization?.organization?.id;
-  router.push({ name: "run-notebook", params: { orgId, runId: run.uuid } });
+  router.push(notebookRoute(run.uuid));
 };
 
 /* ----------------------------------------------------------- navigation ----- */
+// My Workspace has no run detail page yet; a run opens its notebook there.
 const selectRun = (run) => {
+  if (isMyWorkspace.value) {
+    router.push(notebookRoute(run.uuid));
+    return;
+  }
   router.push({ name: "run-detail", params: { runId: run.uuid } });
 };
 const openNotebook = (run) => {
-  const orgId =
-    route.params.orgId || store.state.activeOrganization?.organization?.id;
-  router.push({ name: "run-notebook", params: { orgId, runId: run.uuid } });
+  router.push(notebookRoute(run.uuid));
 };
 // End a notebook session, confirmed via the in-app Pennsieve dialog (not the
 // browser prompt). `endRun` opens the dialog; `confirmEndRun` does the work.
@@ -244,7 +260,8 @@ onMounted(async () => {
   try {
     await Promise.all([
       store.dispatch("analysisModule/fetchWorkflowInstances"),
-      store.dispatch("analysisModule/fetchComputeNodes"),
+      // Forced in My Workspace: the cached list may be a workspace's nodes
+      store.dispatch("analysisModule/fetchComputeNodes", { force: isMyWorkspace.value }),
       store.dispatch("analysisModule/fetchTargetTypes"),
       fetchNotebookWorkflows(),
     ]);
@@ -254,7 +271,9 @@ onMounted(async () => {
   // Live updates for every run in the workspace (or the user's own runs)
   if (realtime) {
     analyticsChannel = realtime.subscribe(
-      runScopeChannel(store.state.activeOrganization?.organization?.id, store.state.profile?.id)
+      // The route's workspace, not activeOrganization: that stays set in My
+      // Workspace, where a personal run's events go to the user's channel.
+      runScopeChannel(route.params.orgId, store.state.profile?.id)
     );
     analyticsChannel.bind("workflow-run-status", onRunStatusUpdate);
   }
@@ -280,9 +299,9 @@ onBeforeUnmount(() => {
             <code>requirements.txt</code> to preinstall the Python or R packages
             you need, then attach it when you launch a notebook. For multi-step
             analyses, add a notebook step to a custom workflow under
-            <router-link :to="{ name: 'workflows' }" class="info-card-link">
+            <router-link v-if="!isMyWorkspace" :to="{ name: 'workflows' }" class="info-card-link">
               Workflows</router-link
-            >.
+            ><template v-else>a workspace's Workflows</template>.
           </p>
           <div class="info-card-actions">
             <bf-button
@@ -400,6 +419,7 @@ onBeforeUnmount(() => {
     <new-notebook-dialog
       v-model="dialogVisible"
       :notebook-workflows="notebookWorkflows"
+      :personal="isMyWorkspace"
       @created="onNotebookCreated"
     />
 

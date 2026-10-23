@@ -138,10 +138,10 @@
       hasCustomTheme: function() {
         return true
       },
-      // Only in a workspace's navigation (downloads are per workspace), and
-      // only while the downloads panel has something to show.
+      // Only while the downloads panel has something to show. Also outside a
+      // workspace: a run's results are the user's, not a workspace's.
       showDownloads: function() {
-        return Boolean(this.orgId && downloadServiceUrl() && useDownloadsStore().panelDownloads.length)
+        return Boolean(downloadServiceUrl() && useDownloadsStore().panelDownloads.length)
       },
       navStyleColor: function() {
         if (this.hasCustomTheme) {

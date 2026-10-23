@@ -1,12 +1,46 @@
 <script setup>
-import ComingSoon from '../coming-soon/ComingSoon.vue'
-import IconAnalysis from '../../icons/IconAnalysis.vue'
+import RouterTabs from '@/components/shared/routerTabs/routerTabs.vue'
+
+// Analysis outside any workspace, laid out like a workspace's Analysis page.
+const tabs = [
+  {
+    name: 'Notebooks',
+    to: 'my-notebooks',
+  },
+  {
+    name: 'Runs',
+    to: 'my-runs',
+  },
+  {
+    name: 'Workflows',
+    to: 'my-workflows',
+  },
+  {
+    name: 'Applications',
+    to: 'my-applications',
+  },
+  {
+    name: 'Compute Nodes',
+    to: 'my-compute-nodes',
+  },
+]
 </script>
 
 <template>
-  <ComingSoon 
-    title="Analysis Tools"
-    description="Advanced data analysis and visualization tools for your research datasets."
-    :icon-component="IconAnalysis"
-  />
+  <div class="my-analysis">
+    <div class="content-tabs">
+      <router-tabs :tabs="tabs" />
+    </div>
+    <router-view />
+  </div>
 </template>
+
+<style scoped lang="scss">
+@use '@/styles/theme';
+
+.content-tabs {
+  background: white;
+  border-bottom: 1px solid theme.$gray_2;
+  padding: 0 32px;
+}
+</style>

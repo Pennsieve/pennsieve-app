@@ -121,6 +121,7 @@ const SharedWorkspaces = () => import('../components/user/shared/SharedWorkspace
 const SharedDatasets = () => import('../components/user/shared/SharedDatasets.vue')
 const Downloads = () => import('./downloads/Downloads.vue')
 const WorkspaceDownloads = () => import('../components/downloads/WorkspaceDownloads.vue')
+const MyDownloads = () => import('../components/downloads/MyDownloads.vue')
 const PublicDatasetList = () => import('../components/user/shared/PublicDatasetList.vue')
 const PublicDatasetDetail = () => import('../components/datasets/PublicDataset/PublicDatasetDetail.vue')
 const PublicDatasetOverview = () => import('../components/datasets/PublicDataset/PublicDatasetOverview.vue')
@@ -511,6 +512,7 @@ const router = createRouter({
         {
           name: 'my-analysis',
           path: 'analysis',
+          redirect: { name: 'my-notebooks' },
           components: {
             stage: MyAnalysis,
             navigation: UserNavigation,
@@ -523,6 +525,175 @@ const router = createRouter({
             hideSecondaryNav: true,
             title: 'My Analysis',
             description: 'Advanced data analysis and visualization tools for your research datasets.'
+          },
+          // Tabs, as in a workspace's Analysis page
+          children: [
+            {
+              name: 'my-notebooks',
+              path: 'notebooks',
+              component: NotebooksOverview,
+              props: true,
+              meta: {
+                hideSecondaryNav: true,
+                title: 'Notebooks',
+                description: 'Interactive notebooks on your personal compute nodes.'
+              }
+            },
+            {
+              name: 'my-runs',
+              path: 'runs',
+              component: RunsOverview,
+              meta: {
+                hideSecondaryNav: true,
+                title: 'Runs',
+                description: 'Your runs outside any workspace.'
+              }
+            },
+            {
+              // Before 'runs/:runId', which would otherwise match 'configure'
+              name: 'my-run-configure',
+              path: 'runs/configure',
+              component: RunDetail,
+              meta: {
+                hideSecondaryNav: true,
+                backLink: { name: 'my-runs' },
+                title: 'New Run',
+                description: 'Run one of your workflows, or a public one, on a personal compute node.'
+              }
+            },
+            {
+              name: 'my-run-detail',
+              path: 'runs/:runId',
+              component: RunDetail,
+              props: true,
+              meta: {
+                hideSecondaryNav: true,
+                backLink: { name: 'my-runs' },
+                title: 'Run',
+                description: 'A run outside any workspace.'
+              }
+            },
+            {
+              name: 'my-applications',
+              path: 'applications',
+              component: ApplicationsGrid,
+              meta: {
+                hideSecondaryNav: true,
+                title: 'Applications',
+                description: 'Public applications, your own, and applications shared with you.'
+              }
+            },
+            {
+              // Static paths before 'applications/:uuid'
+              name: 'my-application-manifest-guide',
+              path: 'applications/manifest-guide',
+              component: AppManifestGuide,
+              meta: {
+                hideSecondaryNav: true,
+                backLink: { name: 'my-applications' },
+                title: 'Manifest Guide',
+                description: 'The app.yml manifest specification.'
+              }
+            },
+            {
+              name: 'my-application-manifest-builder',
+              path: 'applications/manifest-builder',
+              component: AppManifestBuilder,
+              meta: {
+                hideSecondaryNav: true,
+                backLink: { name: 'my-applications' },
+                title: 'Manifest Builder',
+                description: 'Generate an app.yml manifest for your application.'
+              }
+            },
+            {
+              name: 'my-application-detail',
+              path: 'applications/:uuid',
+              component: ApplicationDetail,
+              props: true,
+              meta: {
+                hideSecondaryNav: true,
+                backLink: { name: 'my-applications' },
+                title: 'Application',
+                description: 'An application from the Pennsieve App Store.'
+              }
+            },
+            {
+              name: 'my-workflows',
+              path: 'workflows',
+              component: WorkflowsGrid,
+              meta: {
+                hideSecondaryNav: true,
+                title: 'Workflows',
+                description: 'Your own workflows, and public ones.'
+              }
+            },
+            {
+              name: 'my-workflow-create',
+              path: 'workflows/new',
+              component: WorkflowBuilder,
+              meta: {
+                hideSecondaryNav: true,
+                backLink: { name: 'my-workflows' },
+                title: 'New Workflow',
+                description: 'Create a workflow of your own, outside any workspace.'
+              }
+            },
+            {
+              name: 'my-workflow-detail',
+              path: 'workflows/:uuid',
+              component: WorkflowBuilder,
+              props: true,
+              meta: {
+                hideSecondaryNav: true,
+                backLink: { name: 'my-workflows' },
+                title: 'Workflow',
+                description: 'A workflow of your own, or a public one.'
+              }
+            },
+            {
+              name: 'my-compute-nodes',
+              path: 'compute-nodes',
+              component: ComputeNodesList,
+              props: true,
+              meta: {
+                hideSecondaryNav: true,
+                title: 'Compute Nodes',
+                description: 'Your personal compute nodes, on AWS accounts you registered. They are private to you.'
+              }
+            },
+            {
+              name: 'my-compute-node-management',
+              path: 'compute-nodes/:nodeId',
+              component: ComputeNodeManagement,
+              props: true,
+              meta: {
+                hideSecondaryNav: true,
+                backLink: { name: 'my-compute-nodes' },
+                title: 'Compute Node',
+                description: 'Configure your personal compute node.'
+              }
+            }
+          ]
+        },
+        {
+          // A notebook session outside any workspace. Like 'run-notebook', its own
+          // page rather than a My Analysis tab, so the tab bar doesn't show.
+          name: 'my-run-notebook',
+          path: 'analysis/notebooks/:runId',
+          components: {
+            stage: NotebookSession,
+            navigation: UserNavigation,
+          },
+          props: {
+            stage: true,
+            navigation: true
+          },
+          meta: {
+            hideSecondaryNav: true,
+            backLink: { name: 'my-notebooks' },
+            title: 'Notebook',
+            description: 'An interactive notebook on your personal compute node.'
           }
         },
         {
@@ -623,6 +794,22 @@ const router = createRouter({
               component: PublicDatasetRecord,
             },
           ]
+        },
+        // Run archives (download targets). download-service's emails for
+        // them link here.
+        {
+          name: 'my-downloads',
+          path: 'downloads',
+          components: {
+            stage: MyDownloads,
+            navigation: UserNavigation,
+          },
+          props: true,
+          meta: {
+            hideSecondaryNav: true,
+            title: 'Downloads',
+            description: 'Results of your runs, ready to download.'
+          },
         },
         {
           name: 'my-collections',

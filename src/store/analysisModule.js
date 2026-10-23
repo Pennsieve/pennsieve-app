@@ -262,7 +262,12 @@ export const actions = {
     if (!force && state.computeNodesLoaded) return;
     return useGetToken()
       .then((token) => {
-        const url = `${rootState.config.api2Url}/compute/resources/compute-nodes?organization_id=${rootState.activeOrganization.organization.id}`;
+        // Outside a workspace (My Workspace) there is no organization: the API
+        // then lists the user's own nodes outside any workspace.
+        const orgId = rootState.activeOrganization?.organization?.id;
+        const url = orgId
+          ? `${rootState.config.api2Url}/compute/resources/compute-nodes?organization_id=${orgId}`
+          : `${rootState.config.api2Url}/compute/resources/compute-nodes`;
         return fetch(url, {
           method: "GET",
           headers: {
@@ -296,16 +301,17 @@ export const actions = {
     try {
       const userToken = await useGetToken();
 
-      // /applications/store requires organization_id. On user routes (My Workspace)
-      // there is no activeOrganization, so fall back to preferredOrganization
-      // or the first org so we can still populate app data for repo cards.
-      const orgId = rootState.activeOrganization?.organization?.id
-        || rootState.profile?.preferredOrganization
-        || rootState.organizations?.[0]?.organization?.id;
-      if (!orgId) return;
+      // In a workspace: the apps usable there (including apps shared with the
+      // workspace or your teams in it). Outside one (My Workspace): public
+      // apps, your own, and apps shared with you directly. Never another
+      // workspace's, e.g. the preferred organization's (deprecated).
+      const orgId = rootState.activeOrganization?.organization?.id;
+      const params = new URLSearchParams();
+      if (orgId) params.set("organization_id", orgId);
       // Archived applications are excluded by default; opt in with includeArchived.
-      let url = `${rootState.config.api2Url}/applications/store?organization_id=${orgId}`;
-      if (includeArchived) url += `&includeArchived=true`;
+      if (includeArchived) params.set("includeArchived", "true");
+      const path = orgId ? "store" : "store/me";
+      const url = `${rootState.config.api2Url}/applications/${path}?${params}`;
       const resp = await fetch(url, {
         method: "GET",
         headers: {
@@ -673,9 +679,11 @@ export const actions = {
   },
   fetchWorkflowInstances: async ({ commit, rootState }, { status, workflowId, limit, startDate, endDate } = {}) => {
     try {
-      const params = new URLSearchParams({
-        organization_id: rootState.activeOrganization.organization.id,
-      });
+      // Outside a workspace (My Workspace) there is no organization: the API
+      // then lists the runs the user created outside any workspace.
+      const params = new URLSearchParams();
+      const orgId = rootState.activeOrganization?.organization?.id;
+      if (orgId) params.set("organization_id", orgId);
       if (status) params.set("status", status);
       if (workflowId) params.set("workflow_id", workflowId);
       if (limit) params.set("limit", limit);
@@ -715,10 +723,10 @@ export const actions = {
     const cursor = state.workflowInstancesCursor;
     if (!cursor) return;
     try {
-      const params = new URLSearchParams({
-        organization_id: rootState.activeOrganization.organization.id,
-        cursor,
-      });
+      // As in fetchWorkflowInstances: no organization outside a workspace.
+      const params = new URLSearchParams({ cursor });
+      const orgId = rootState.activeOrganization?.organization?.id;
+      if (orgId) params.set("organization_id", orgId);
       if (status) params.set("status", status);
       if (workflowId) params.set("workflow_id", workflowId);
       if (limit) params.set("limit", limit);
@@ -1139,13 +1147,15 @@ export const actions = {
     try {
       const userToken = await useGetToken();
       // Public discovery lists the cross-organization catalog, so it must NOT be
-      // scoped to the active workspace. Otherwise list the active workspace.
+      // scoped to the active workspace. Otherwise list the active workspace, or,
+      // outside one (My Workspace), the user's own workflows made outside any.
       const params = new URLSearchParams();
       if (visibility === "public") {
         params.set("visibility", "public");
         if (official) params.set("official", "true");
       } else {
-        params.set("organization_id", rootState.activeOrganization.organization.id);
+        const orgId = rootState.activeOrganization?.organization?.id;
+        if (orgId) params.set("organization_id", orgId);
       }
       if (limit) params.set("limit", limit);
       if (search) params.set("search", search);

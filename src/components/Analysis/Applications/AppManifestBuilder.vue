@@ -1,6 +1,6 @@
 <script setup>
 import { computed, reactive, ref } from "vue";
-import { useRouter } from "vue-router";
+import { useRouter, useRoute } from "vue-router";
 
 import ApplicationSchemaEditor from "./ApplicationSchemaEditor.vue";
 import {
@@ -12,6 +12,7 @@ import {
 } from "./applicationSchema";
 
 const router = useRouter();
+const route = useRoute();
 
 /*
   Form state
@@ -80,7 +81,9 @@ const downloadManifest = () => {
   URL.revokeObjectURL(url);
 };
 
-const goToGuide = () => router.push({ name: "application-manifest-guide" });
+// The guide next to this builder: My Analysis's outside a workspace.
+const goToGuide = () =>
+  router.push({ name: route.params.orgId ? "application-manifest-guide" : "my-application-manifest-guide" });
 </script>
 
 <template>
