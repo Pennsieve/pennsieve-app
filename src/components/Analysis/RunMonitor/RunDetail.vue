@@ -24,6 +24,7 @@ import { getView } from "@/utils/viewsService";
 import CompactFlowNode from "../WorkflowGraph/CompactFlowNode.vue";
 import GraphDensityToggle from "../WorkflowGraph/GraphDensityToggle.vue";
 import { layoutBox, useGraphDensity } from "../WorkflowGraph/graphDensity";
+import { formatResources, formatRunTime, nodeDurationSec } from "../WorkflowGraph/nodeFacts";
 import { useSendXhr } from "@/mixins/request/request_composable";
 import toQueryParams from "@/utils/toQueryParams";
 import LayerNameSelector from "./LayerNameSelector.vue";
@@ -525,6 +526,8 @@ const runToNodesAndEdges = (run) => {
     } else {
       const cfg = runProcessorConfigs.find((c) => c.nodeId === d.id);
       extra.executionTarget = cfg?.executionTarget || null;
+      extra.cpu = cfg?.cpu || null;
+      extra.memory = cfg?.memory || null;
       const nodeParams = runProcessorParams[d.id] || {};
       extra.params = Object.entries(nodeParams).map(([key, value]) => ({ key, value: String(value) }));
     }
@@ -1204,6 +1207,15 @@ const fetchViewInfo = async ({ viewId }) => {
   }
 };
 
+// Public dataset sources name their dataset on the card.
+watch(
+  () => nodes.value.filter((n) => n.data?.view).map((n) => n.data.view.viewId).join(","),
+  () => {
+    for (const n of nodes.value) if (n.data?.view) fetchViewInfo(n.data.view);
+  },
+  { immediate: true }
+);
+
 const formatViewSize = (bytes) => {
   if (!bytes) return "0 B";
   const units = ["B", "KB", "MB", "GB", "TB"];
@@ -1339,6 +1351,32 @@ const nodeMetricLabel = (nodeId) => {
   if (!activity?.dag) return nodeId;
   const d = activity.dag.find((n) => n.id === nodeId);
   return d ? labelForDagNode(d, availableApplications.value, targetTypes.value) : nodeId;
+};
+
+// Detailed cards: how long a step ran (ticking while it runs), its resources
+// and, once the run's metrics are in, its cost.
+const nowTick = ref(Date.now());
+let nowTimer = null;
+onMounted(() => {
+  nowTimer = setInterval(() => (nowTick.value = Date.now()), 15000);
+});
+onBeforeUnmount(() => clearInterval(nowTimer));
+
+const nodeCostLabel = (nodeId) => {
+  const nm = runMetrics.value?.nodeMetrics?.find((m) => m.nodeId === nodeId);
+  const cost = Number(nm?.estimatedCost);
+  return nm && cost > 0 ? formatCost(cost) : "";
+};
+const nodeRunTime = (data) => formatRunTime(nodeDurationSec(data, nowTick.value));
+const processorFacts = (id, data) =>
+  [data.version, formatResources(data.cpu, data.memory), nodeRunTime(data), nodeCostLabel(id)].filter(Boolean);
+const targetFacts = (data) => [nodeRunTime(data)].filter(Boolean);
+const viewSourceLabel = (view) => {
+  const info = view && browseViewInfo.value[view.viewId];
+  if (!info || info.error) return "Public dataset";
+  return [info.name, info.version && `v${info.version}`, info.entryCount != null && `${info.entryCount} files`]
+    .filter(Boolean)
+    .join(" · ");
 };
 
 const selectedNodeMetrics = computed(() => {
@@ -1632,9 +1670,13 @@ onUnmounted(() => {
                     <span class="node-title">{{ data.label }}</span>
                   </div>
                   <div class="node-tags">
+                    <span class="node-type-badge processor-badge">Processor</span>
                     <span v-if="mode === 'browse' && data.executionTarget" class="node-type-badge exec-badge">{{ data.executionTarget }}</span>
                     <span v-if="mode === 'configure' && nodeConfigs[id]?.executionTarget" class="node-type-badge exec-badge">{{ nodeConfigs[id].executionTarget }}</span>
                     <span v-if="mode === 'browse'" class="node-status-badge" :class="statusDotClass(data.status)">{{ statusLabel(data.status) }}</span>
+                  </div>
+                  <div v-if="mode === 'browse' && processorFacts(id, data).length" class="node-facts">
+                    {{ processorFacts(id, data).join(" · ") }}
                   </div>
                   <div v-if="(mode === 'browse' && data.params?.length > 0) || (mode === 'configure' && nodeConfigs[id])" class="node-config-summary">
                     <div v-if="mode === 'browse' && data.params?.length > 0" class="param-preview">
@@ -1683,8 +1725,8 @@ onUnmounted(() => {
                   </div>
                   <div class="node-tags">
                     <span class="node-type-badge source-badge">Source</span>
-                    <span v-if="mode === 'browse' && data.view" class="node-tag-info">
-                      Public dataset
+                    <span v-if="mode === 'browse' && data.view" class="node-tag-info" :title="viewSourceLabel(data.view)">
+                      {{ viewSourceLabel(data.view) }}
                     </span>
                     <span v-else-if="mode === 'browse' && data.packageCount != null" class="node-tag-info">
                       {{ data.packageCount }} file{{ data.packageCount !== 1 ? 's' : '' }}
@@ -1724,6 +1766,9 @@ onUnmounted(() => {
                       {{ nodeConfigs[id]?.computeType || data.computeType }}
                     </span>
                     <span v-if="mode === 'browse'" class="node-status-badge" :class="statusDotClass(data.status)">{{ statusLabel(data.status) }}</span>
+                  </div>
+                  <div v-if="mode === 'browse' && targetFacts(data).length" class="node-facts">
+                    {{ targetFacts(data).join(" · ") }}
                   </div>
                   <div class="node-body">
                     <div v-if="mode === 'browse' && data.params?.length > 0" class="param-preview">
@@ -3211,6 +3256,19 @@ onUnmounted(() => {
     font-size: 10px;
     color: theme.$gray_4;
     white-space: nowrap;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  // Run time, resources and cost under a detailed card's badges.
+  .node-facts {
+    margin-top: 6px;
+    font-size: 11px;
+    color: theme.$gray_4;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .node-meta {
@@ -3351,6 +3409,7 @@ onUnmounted(() => {
     flex-shrink: 0;
 
     &.source-badge { background: #6366f1; color: white; }
+    &.processor-badge { background: theme.$orange_2; color: white; }
     &.target-badge { background: #64748b; color: white; }
     &.exec-badge { background: rgba(5, 150, 105, 0.12); color: #047857; }
   }

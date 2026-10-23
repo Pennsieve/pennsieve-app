@@ -1584,6 +1584,7 @@ const openNodeSettings = (id) => {
                 </CompactFlowNode>
                 <div v-else class="custom-node">
                   <div class="node-header">
+                    <span class="node-type-badge processor-badge">Processor</span>
                     <span class="node-title">{{ data.label }}</span>
                     <button
                       v-if="!isReadOnly"
@@ -3494,6 +3495,11 @@ const openNodeSettings = (id) => {
 
     &.source-badge {
       background: #6366f1;
+      color: white;
+    }
+
+    &.processor-badge {
+      background: theme.$orange_2;
       color: white;
     }
 
