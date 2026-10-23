@@ -599,8 +599,8 @@ export function useJupyterSession() {
   // ---- file browser (Contents API) -----------------------------------------
 
   // List a directory on the kernel's filesystem (EFS). Returns entries sorted
-  // folders-first, then by name, with a dataset view's crate (its file list,
-  // not data) last. path "" = the notebook root (execution dir).
+  // folders-first, then by name, with a dataset view's crate (the input's
+  // manifest, not data) last. path "" = the notebook root (execution dir).
   async function listDir(path = "") {
     if (!contents) return [];
     const model = await contents.get(path, { content: true });

@@ -48,8 +48,8 @@ const isNotebook = (node) =>
       <span
         v-else-if="node.name === CRATE_FILE"
         class="fn__tag fn__tag--crate"
-        title="The dataset's RO-Crate: every file in it, with checksums and its source. Download files from Inputs."
-        >dataset file list</span
+        title="The input's RO-Crate manifest: every file of the dataset, with sizes, checksums and its source. Add files from Inputs."
+        >input manifest</span
       >
       <span v-if="node.type !== 'directory' && node.size != null" class="fn__size">
         {{ fmtSize(node.size) }}
