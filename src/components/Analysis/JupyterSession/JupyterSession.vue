@@ -996,6 +996,9 @@ const kernelPill = computed(() => {
 }
 .nb-files {
   position: relative;
+  /* Above the notebook pane's sticky toolbar (z-index 5): the collapse
+     chevron overhangs the sidebar's edge onto it. */
+  z-index: 6;
   flex: 0 0 300px;
   width: 300px;
   min-height: 0;
