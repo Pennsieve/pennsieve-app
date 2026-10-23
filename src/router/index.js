@@ -553,6 +553,40 @@ const router = createRouter({
               }
             },
             {
+              name: 'my-runs',
+              path: 'runs',
+              component: RunsOverview,
+              meta: {
+                hideSecondaryNav: true,
+                title: 'Runs',
+                description: 'Your runs outside any workspace.'
+              }
+            },
+            {
+              // Before 'runs/:runId', which would otherwise match 'configure'
+              name: 'my-run-configure',
+              path: 'runs/configure',
+              component: RunDetail,
+              meta: {
+                hideSecondaryNav: true,
+                backLink: { name: 'my-runs' },
+                title: 'New Run',
+                description: 'Run one of your workflows, or a public one, on a personal compute node.'
+              }
+            },
+            {
+              name: 'my-run-detail',
+              path: 'runs/:runId',
+              component: RunDetail,
+              props: true,
+              meta: {
+                hideSecondaryNav: true,
+                backLink: { name: 'my-runs' },
+                title: 'Run',
+                description: 'A run outside any workspace.'
+              }
+            },
+            {
               name: 'my-workflows',
               path: 'workflows',
               component: WorkflowsGrid,
