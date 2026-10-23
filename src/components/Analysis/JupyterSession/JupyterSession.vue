@@ -10,11 +10,11 @@ import { useJupyterSession } from "@/composables/useJupyterSession";
 import NotebookCell from "./NotebookCell.vue";
 import FileBrowser from "./FileBrowser.vue";
 import InputsPanel from "./InputsPanel.vue";
+import IconArrowLeft from "@/components/icons/IconArrowLeft.vue";
 import {
   VideoPlay,
   DArrowRight,
   RefreshRight,
-  FolderOpened,
   Document,
   Plus,
   ArrowDown,
@@ -145,7 +145,25 @@ const selectedId = ref(null);
 const cellRefs = new Map();
 const ending = ref(false);
 const confirmEnd = ref(false);
-const showFiles = ref(true);
+// The sidebar collapses to a slim rail from the chevron on its edge, like the
+// app's navigation, and stays as the user left it in this browser.
+const SIDEBAR_OPEN_KEY = "pennsieve.notebook.sidebarOpen";
+function storedOpen() {
+  try {
+    return localStorage.getItem(SIDEBAR_OPEN_KEY) !== "false";
+  } catch {
+    return true;
+  }
+}
+const showFiles = ref(storedOpen());
+function toggleSidebar() {
+  showFiles.value = !showFiles.value;
+  try {
+    localStorage.setItem(SIDEBAR_OPEN_KEY, String(showFiles.value));
+  } catch {
+    // not remembered
+  }
+}
 
 // The sidebar's width, dragged from its right edge and remembered in this
 // browser (a convenience only: it may not persist).
@@ -539,19 +557,6 @@ const kernelPill = computed(() => {
   <div class="nb">
     <!-- toolbar -->
     <div class="nb-toolbar" v-if="status === 'ready'">
-      <el-tooltip content="Show or hide the sidebar: inputs and session files" :show-after="400">
-        <el-button
-          size="small"
-          :type="showFiles ? 'primary' : 'default'"
-          :icon="FolderOpened"
-          @click="showFiles = !showFiles"
-        >
-          Sidebar
-        </el-button>
-      </el-tooltip>
-
-      <span class="nb-div" />
-
       <el-tooltip content="Save (⌘/Ctrl+S)" :show-after="400">
         <el-button size="small" :icon="Document" :loading="saving" @click="saveAndRefresh">
           Save<span v-if="dirty" class="nb-dirty">•</span>
@@ -811,11 +816,27 @@ const kernelPill = computed(() => {
     <!-- file browser + notebook -->
     <div v-if="status === 'ready'" class="nb-main">
       <aside
-        v-show="showFiles"
         class="nb-files"
-        :class="{ 'is-resizing': resizingSidebar }"
-        :style="{ width: `${sidebarWidth}px`, flexBasis: `${sidebarWidth}px` }"
+        :class="{ 'is-resizing': resizingSidebar, 'is-collapsed': !showFiles }"
+        :style="showFiles ? { width: `${sidebarWidth}px`, flexBasis: `${sidebarWidth}px` } : {}"
+        @click="!showFiles && toggleSidebar()"
       >
+        <button
+          class="nb-files__collapse"
+          :aria-label="showFiles ? 'Collapse the sidebar' : 'Expand the sidebar'"
+          :aria-expanded="showFiles"
+          :title="showFiles ? 'Hide inputs and session files' : 'Show inputs and session files'"
+          @click.stop="toggleSidebar"
+        >
+          <IconArrowLeft
+            class="collapse-chevron"
+            :class="{ 'is-flipped': !showFiles }"
+            :width="6"
+            :height="10"
+            color="currentColor"
+          />
+        </button>
+        <div v-show="showFiles" class="nb-files__content">
         <InputsPanel
           :run-id="runId"
           :fetch-inputs="fetchInputs"
@@ -833,7 +854,9 @@ const kernelPill = computed(() => {
             @open-notebook="requestOpen"
           />
         </div>
+        </div>
         <div
+          v-if="showFiles"
           class="nb-files__resize"
           role="separator"
           aria-orientation="vertical"
@@ -972,9 +995,23 @@ const kernelPill = computed(() => {
   flex: 0 0 300px;
   width: 300px;
   min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.nb-files__content {
+  flex: 1;
+  min-height: 0;
   overflow: hidden;
   display: flex;
   flex-direction: column;
+}
+/* Collapsed: a slim rail that keeps the chevron reachable; clicking it opens. */
+.nb-files.is-collapsed {
+  flex: 0 0 12px;
+  width: 12px;
+  background: #f7f7f7; /* gray_1 */
+  border-right: 1px solid #e5e5e5; /* gray_2 */
+  cursor: pointer;
 }
 .nb-files.is-resizing {
   user-select: none;
@@ -1162,4 +1199,19 @@ const kernelPill = computed(() => {
 }
 .nb-open-banner__text { flex: 1; min-width: 180px; }
 .nb-open-banner__select { width: 240px; }
+</style>
+
+<style scoped lang="scss">
+@use "../../../styles/collapse-handle";
+
+// The same collapse control as the app's navigation: a round chevron on the
+// sidebar's edge, shown when the sidebar is hovered or the control focused.
+.nb-files__collapse {
+  @include collapse-handle.collapse-handle(".nb-files");
+  z-index: 3;
+}
+// A collapsed rail is only 12px wide: keep the chevron visible there.
+.nb-files.is-collapsed .nb-files__collapse {
+  opacity: 1;
+}
 </style>
