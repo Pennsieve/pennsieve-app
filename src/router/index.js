@@ -121,6 +121,7 @@ const SharedWorkspaces = () => import('../components/user/shared/SharedWorkspace
 const SharedDatasets = () => import('../components/user/shared/SharedDatasets.vue')
 const Downloads = () => import('./downloads/Downloads.vue')
 const WorkspaceDownloads = () => import('../components/downloads/WorkspaceDownloads.vue')
+const MyDownloads = () => import('../components/downloads/MyDownloads.vue')
 const PublicDatasetList = () => import('../components/user/shared/PublicDatasetList.vue')
 const PublicDatasetDetail = () => import('../components/datasets/PublicDataset/PublicDatasetDetail.vue')
 const PublicDatasetOverview = () => import('../components/datasets/PublicDataset/PublicDatasetOverview.vue')
@@ -793,6 +794,22 @@ const router = createRouter({
               component: PublicDatasetRecord,
             },
           ]
+        },
+        // Run archives (download targets). download-service's emails for
+        // them link here.
+        {
+          name: 'my-downloads',
+          path: 'downloads',
+          components: {
+            stage: MyDownloads,
+            navigation: UserNavigation,
+          },
+          props: true,
+          meta: {
+            hideSecondaryNav: true,
+            title: 'Downloads',
+            description: 'Results of your runs, ready to download.'
+          },
         },
         {
           name: 'my-collections',
