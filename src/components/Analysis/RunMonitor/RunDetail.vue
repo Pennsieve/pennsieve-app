@@ -20,6 +20,7 @@ import { endInteractiveSession } from "@/composables/useJupyterSession";
 import AnalysisFilesTable from "../../FilesTable/AnalysisFilesTable.vue";
 import BreadcrumbNavigation from "../../datasets/files/BreadcrumbNavigation/BreadcrumbNavigation.vue";
 import { useGetToken } from "@/composables/useGetToken";
+import { getView } from "@/utils/viewsService";
 import { useSendXhr } from "@/mixins/request/request_composable";
 import toQueryParams from "@/utils/toQueryParams";
 import LayerNameSelector from "./LayerNameSelector.vue";
@@ -455,8 +456,13 @@ const runToNodesAndEdges = (run) => {
     const extra = {};
     if (d.type === "data-source") {
       const src = runDataSources[d.id];
-      extra.packageIds = src?.packageIds || [];
-      extra.packageCount = extra.packageIds.length;
+      if (src?.kind === "viewVersion") {
+        // A public dataset, taken in as a dataset view (viewsService).
+        extra.view = { viewId: src.viewId, viewVersion: src.viewVersion };
+      } else {
+        extra.packageIds = src?.packageIds || [];
+        extra.packageCount = extra.packageIds.length;
+      }
     } else if (d.type === "data-target") {
       extra.targetType = d.targetType || null;
       const cfg = runProcessorConfigs.find((c) => c.nodeId === d.id);
@@ -1089,8 +1095,40 @@ watch(
     if (node?.type === "data-source" && mode.value === "browse" && node.data?.packageIds?.length > 0) {
       fetchPackageNames(node.data.packageIds);
     }
+    if (node?.type === "data-source" && mode.value === "browse" && node.data?.view) {
+      fetchViewInfo(node.data.view);
+    }
   }
 );
+
+// Browse mode: a view source's dataset, by view id. The view summary names
+// its source dataset version: { name, version, doi, entryCount, totalSize }.
+const browseViewInfo = ref({});
+
+const fetchViewInfo = async ({ viewId }) => {
+  if (browseViewInfo.value[viewId]) return;
+  try {
+    const view = await getView(viewId);
+    const src = view.sources?.[0] || {};
+    browseViewInfo.value[viewId] = {
+      datasetId: src.datasetId,
+      name: src.name || view.name,
+      version: src.version,
+      doi: src.doi,
+      entryCount: view.entryCount,
+      totalSize: view.totalSize,
+    };
+  } catch (err) {
+    browseViewInfo.value[viewId] = { error: err?.message || "Could not read the dataset." };
+  }
+};
+
+const formatViewSize = (bytes) => {
+  if (!bytes) return "0 B";
+  const units = ["B", "KB", "MB", "GB", "TB"];
+  const i = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
+  return `${(bytes / 1024 ** i).toFixed(i ? 1 : 0)} ${units[i]}`;
+};
 
 /*
   Node params helpers (configure mode)
@@ -1517,7 +1555,10 @@ onUnmounted(() => {
                   </div>
                   <div class="node-tags">
                     <span class="node-type-badge source-badge">Source</span>
-                    <span v-if="mode === 'browse' && data.packageCount != null" class="node-tag-info">
+                    <span v-if="mode === 'browse' && data.view" class="node-tag-info">
+                      Public dataset
+                    </span>
+                    <span v-else-if="mode === 'browse' && data.packageCount != null" class="node-tag-info">
                       {{ data.packageCount }} file{{ data.packageCount !== 1 ? 's' : '' }}
                     </span>
                     <template v-if="mode === 'configure'">
@@ -2032,6 +2073,52 @@ onUnmounted(() => {
             <!-- BROWSE MODE: Selected Data Source Node -->
             <template v-else-if="mode === 'browse' && selectedNode && selectedNode.type === 'data-source'">
               <h4 class="sidebar-section-title">Data Source</h4>
+              <template v-if="selectedNode.data?.view">
+                <div class="info-card">
+                  <div class="info-row">
+                    <span class="info-label">Name</span>
+                    <span class="info-value">{{ selectedNode.data?.label || 'Unnamed' }}</span>
+                  </div>
+                  <template v-for="info in [browseViewInfo[selectedNode.data.view.viewId]]" :key="selectedNode.data.view.viewId">
+                    <div v-if="!info" class="info-row">
+                      <span class="info-value">Loading…</span>
+                    </div>
+                    <div v-else-if="info.error" class="info-row">
+                      <span class="info-value">{{ info.error }}</span>
+                    </div>
+                    <template v-else>
+                      <div class="info-row">
+                        <span class="info-label">Public dataset</span>
+                        <span class="info-value">
+                          <router-link
+                            v-if="info.datasetId"
+                            :to="{ name: 'public-dataset', params: { datasetId: info.datasetId } }"
+                          >{{ info.name }}</router-link>
+                          <template v-else>{{ info.name }}</template>
+                        </span>
+                      </div>
+                      <div class="info-row">
+                        <span class="info-label">Version</span>
+                        <span class="info-value">{{ info.version }}</span>
+                      </div>
+                      <div v-if="info.doi" class="info-row">
+                        <span class="info-label">DOI</span>
+                        <span class="info-value">
+                          <a :href="`https://doi.org/${info.doi}`" target="_blank" rel="noopener">{{ info.doi }}</a>
+                        </span>
+                      </div>
+                      <div class="info-row">
+                        <span class="info-label">Files</span>
+                        <span class="info-value">{{ info.entryCount }} · {{ formatViewSize(info.totalSize) }}</span>
+                      </div>
+                    </template>
+                  </template>
+                </div>
+                <p class="configure-hint">
+                  The notebook downloads the files it needs from this dataset.
+                </p>
+              </template>
+              <template v-else>
               <div class="info-card">
                 <div class="info-row">
                   <span class="info-label">Name</span>
@@ -2054,6 +2141,7 @@ onUnmounted(() => {
                   <span class="selected-file-name">{{ browseFileInfo[pkgId]?.name || pkgId }}</span>
                 </div>
               </div>
+              </template>
               <div class="info-actions">
                 <button class="text-link-btn" @click="selectedNode = null">
                   Clear selection
