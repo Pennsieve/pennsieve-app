@@ -156,7 +156,16 @@ const isNotebook = (node) =>
   padding: 1px 5px;
   border-radius: 4px;
 }
-.fn__act:hover { background: #e6e9ef; color: #011f5b; } /* purple_tint / purple_3 */
+/* The row's own hover is purple_tint, so an action stands out from it in
+   white with a hairline, and the same for keyboard focus. */
+.fn__act:hover,
+.fn__act:focus-visible {
+  background: #ffffff;
+  color: #011f5b; /* purple_3 */
+  box-shadow: inset 0 0 0 1px #cccccc; /* gray_3 */
+  outline: none;
+}
+.fn__act:active { background: #f2f2f2; } /* gray_0 */
 .fn__act--open { color: #011f5b; font-weight: 700; } /* purple_3 — primary file action */
 .fn__loading,
 .fn__empty {
