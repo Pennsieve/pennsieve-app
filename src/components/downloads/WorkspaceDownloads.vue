@@ -17,28 +17,34 @@
         <el-button size="small" @click="load">Try again</el-button>
       </div>
 
-      <div v-else-if="store.downloads.length === 0" class="empty-state">
+      <div v-else-if="workspaceDownloads.length === 0" class="empty-state">
         <h3>No downloads</h3>
         <p>When you download several files or a folder, the archive appears here.</p>
       </div>
 
       <div v-else class="download-list">
-        <download-item v-for="d in store.downloads" :key="d.id" :download="d" />
+        <download-item v-for="d in workspaceDownloads" :key="d.id" :download="d" />
       </div>
     </div>
   </bf-stage>
 </template>
 
 <script setup>
-import { ref, watch } from "vue";
+import { computed, ref, watch } from "vue";
 import { useRoute } from "vue-router";
-import { useDownloadsStore } from "@/stores/downloadsStore";
+import { useDownloadsStore, isRun } from "@/stores/downloadsStore";
 import DownloadItem from "@/components/downloads/DownloadItem.vue";
 
 const route = useRoute();
 const store = useDownloadsStore();
 const loading = ref(false);
 const failed = ref(false);
+
+// The store also holds the user's run archives from every workspace: only
+// this workspace's runs are shown here (all of them are in My Workspace).
+const workspaceDownloads = computed(() =>
+  store.downloads.filter((d) => !isRun(d) || d.organizationNodeId === route.params.orgId)
+);
 
 async function load() {
   loading.value = true;
