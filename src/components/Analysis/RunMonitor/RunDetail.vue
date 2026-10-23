@@ -57,6 +57,12 @@ import {
   RUN_NAME_MAX_LENGTH,
 } from "./runHelpers";
 
+// Shown in a workspace (/:orgId/analysis/runs/...) and in My Workspace
+// (/my-workspace/analysis/runs/...), where there's no organization and a run
+// has no dataset. Route names there carry a "my-" prefix.
+const isMyWorkspace = computed(() => !route.params.orgId);
+const scopedRoute = (name, params = {}) => ({ name: isMyWorkspace.value ? `my-${name}` : name, params });
+
 const props = defineProps({
   runId: { type: String, default: "" },
 });
@@ -287,10 +293,11 @@ const interactiveSessionAvailable = computed(() => {
 const openNotebook = () => {
   const activity = selectedWorkflowActivity.value;
   if (!activity?.uuid) return;
-  router.push({
-    name: "run-notebook",
-    params: { orgId: route.params.orgId, runId: activity.uuid },
-  });
+  router.push(
+    isMyWorkspace.value
+      ? { name: "my-run-notebook", params: { runId: activity.uuid } }
+      : { name: "run-notebook", params: { orgId: route.params.orgId, runId: activity.uuid } }
+  );
 };
 
 // Terminate the interactive session without opening the notebook: ends it
@@ -577,7 +584,7 @@ const copyRunId = async () => {
 
 const goBack = () => {
   store.dispatch("analysisModule/setSelectedWorkflowActivity", null);
-  router.push({ name: "runs" });
+  router.push(scopedRoute("runs"));
 };
 
 /*
@@ -717,7 +724,7 @@ const initiateWorkflowFromConfig = async (pendingConfig) => {
   } catch (err) {
     console.error("Failed to load workflow definition:", err);
     EventBus.$emit("toast", { detail: { type: "error", msg: "Failed to load workflow definition." } });
-    router.push({ name: "runs" });
+    router.push(scopedRoute("runs"));
   }
 };
 
@@ -730,7 +737,7 @@ const cancelConfigure = () => {
   nodes.value = [];
   edges.value = [];
   selectedNode.value = null;
-  router.push({ name: "runs" });
+  router.push(scopedRoute("runs"));
 };
 
 /*
@@ -862,7 +869,7 @@ const executeWorkflow = async () => {
     await store.dispatch("analysisModule/createRun", payload);
     EventBus.$emit("toast", { detail: { type: "success", msg: "Workflow executed successfully." } });
 
-    router.push({ name: "runs" });
+    router.push(scopedRoute("runs"));
   } catch (err) {
     console.error("Failed to execute workflow:", err);
     const msg = err?.message || "Failed to execute workflow.";
@@ -1197,7 +1204,7 @@ const rerunFromRun = async () => {
     datasetId: activity.datasetId || "",
     rerunSource: activity,
   });
-  router.push({ name: "run-configure" });
+  router.push(scopedRoute("run-configure"));
 };
 
 /*
@@ -1236,7 +1243,7 @@ onMounted(async () => {
   const pendingConfig = store.state.analysisModule.pendingRunConfig;
   if (pendingConfig) {
     store.commit("analysisModule/CLEAR_PENDING_RUN_CONFIG");
-    fetchDatasetOptions();
+    if (!isMyWorkspace.value) fetchDatasetOptions();
     await initiateWorkflowFromConfig(pendingConfig);
   } else if (props.runId) {
     if (!store.getters["analysisModule/workflowInstances"]?.length) {
@@ -1245,7 +1252,7 @@ onMounted(async () => {
     await loadRun(props.runId);
   } else {
     // No pending config and no runId — nothing to show, redirect to runs
-    router.replace({ name: "runs" });
+    router.replace(scopedRoute("runs"));
     return;
   }
 
@@ -1264,11 +1271,11 @@ onMounted(async () => {
 watch(
   () => route.name,
   async (newName) => {
-    if (newName === "run-configure") {
+    if (newName === "run-configure" || newName === "my-run-configure") {
       const pendingConfig = store.state.analysisModule.pendingRunConfig;
       if (pendingConfig) {
         store.commit("analysisModule/CLEAR_PENDING_RUN_CONFIG");
-        fetchDatasetOptions();
+        if (!isMyWorkspace.value) fetchDatasetOptions();
         await initiateWorkflowFromConfig(pendingConfig);
       }
     }
@@ -1356,7 +1363,7 @@ onUnmounted(() => {
         {{ errorBanner }}
         <router-link
           v-if="errorBannerNodeId"
-          :to="{ name: 'compute-node-management', params: { nodeId: errorBannerNodeId } }"
+          :to="scopedRoute('compute-node-management', { nodeId: errorBannerNodeId })"
           class="error-banner-link"
         >View allowed processors</router-link>
       </span>
@@ -1949,7 +1956,7 @@ onUnmounted(() => {
                   <span class="info-label">Compute Node</span>
                   <span class="info-value">{{ computeNodeName(initiateForm.computeNodeId) }}</span>
                 </div>
-                <div class="info-row">
+                <div v-if="!isMyWorkspace" class="info-row">
                   <span class="info-label">Dataset</span>
                   <span class="info-value">
                     {{ datasetOptions.find(d => d.content?.id === initiateForm.datasetId)?.content?.name || initiateForm.datasetId }}
@@ -2071,7 +2078,7 @@ onUnmounted(() => {
                   <span class="info-value truncate-value">
                     <router-link
                       v-if="selectedWorkflowActivity.workflowUuid"
-                      :to="{ name: 'workflow-detail', params: { uuid: selectedWorkflowActivity.workflowUuid } }"
+                      :to="scopedRoute('workflow-detail', { uuid: selectedWorkflowActivity.workflowUuid })"
                       :title="runWorkflowName"
                       class="truncate-text"
                     >
@@ -2110,7 +2117,7 @@ onUnmounted(() => {
                   <span class="info-label">Compute Node</span>
                   <span class="info-value truncate-value">
                     <router-link
-                      :to="{ name: 'compute-node-management', params: { nodeId: selectedWorkflowActivity.computeNodeUuid } }"
+                      :to="scopedRoute('compute-node-management', { nodeId: selectedWorkflowActivity.computeNodeUuid })"
                       :title="computeNodeName(selectedWorkflowActivity.computeNodeUuid)"
                       class="truncate-text"
                     >
