@@ -310,7 +310,7 @@ export const actions = {
       if (orgId) params.set("organization_id", orgId);
       // Archived applications are excluded by default; opt in with includeArchived.
       if (includeArchived) params.set("includeArchived", "true");
-      const path = orgId ? "store" : "store/personal";
+      const path = orgId ? "store" : "store/me";
       const url = `${rootState.config.api2Url}/applications/${path}?${params}`;
       const resp = await fetch(url, {
         method: "GET",
