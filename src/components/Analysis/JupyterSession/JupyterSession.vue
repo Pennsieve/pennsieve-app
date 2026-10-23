@@ -757,8 +757,8 @@ const kernelPill = computed(() => {
           <el-tooltip :content="showFiles ? 'Hide inputs and session files' : 'Show inputs and session files'" :show-after="400">
             <el-button
               size="small"
-              :type="showFiles ? 'primary' : 'default'"
-              :plain="showFiles"
+              class="nb-sidebar-toggle"
+              :class="{ 'is-on': showFiles }"
               :icon="FolderOpened"
               :aria-label="showFiles ? 'Hide the sidebar' : 'Show the sidebar'"
               aria-controls="nb-sidebar"
@@ -948,6 +948,13 @@ const kernelPill = computed(() => {
 .nb-caret {
   margin-left: 4px;
   vertical-align: middle;
+}
+/* The sidebar toggle: a plain button, tinted while the sidebar is open (the
+   app's primary style would paint the icon the same navy as its fill). */
+.nb-sidebar-toggle.is-on {
+  background: #e6e9ef; /* purple_tint */
+  border-color: #808fad; /* purple_1 */
+  color: #011f5b; /* purple_3 */
 }
 .nb-div { width: 1px; align-self: stretch; margin: 2px 4px; background: #e5e5e5; }
 .nb-spacer { flex: 1; }
