@@ -27,9 +27,9 @@ const props = defineProps({
 });
 
 // Source and target: the detailed cards' colours. Processor: the theme's
-// orange_1, so the user's own code stands out (the detailed processor card
+// orange_2, so the user's own code stands out (the detailed processor card
 // has no type colour, only status).
-const KIND_COLOR = { source: "#6366f1", processor: "#F9A23A", target: "#64748b" };
+const KIND_COLOR = { source: "#6366f1", processor: "#E0912A", target: "#64748b" };
 const KIND_LABEL = { source: "Source", processor: "Processor", target: "Target" };
 
 const stripColor = computed(() => KIND_COLOR[props.kind] || KIND_COLOR.processor);
