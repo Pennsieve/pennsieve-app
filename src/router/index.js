@@ -573,6 +573,51 @@ const router = createRouter({
               }
             },
             {
+              name: 'my-applications',
+              path: 'applications',
+              component: ApplicationsGrid,
+              meta: {
+                hideSecondaryNav: true,
+                title: 'Applications',
+                description: 'Public applications, your own, and applications shared with you.'
+              }
+            },
+            {
+              // Static paths before 'applications/:uuid'
+              name: 'my-application-manifest-guide',
+              path: 'applications/manifest-guide',
+              component: AppManifestGuide,
+              meta: {
+                hideSecondaryNav: true,
+                backLink: { name: 'my-applications' },
+                title: 'Manifest Guide',
+                description: 'The app.yml manifest specification.'
+              }
+            },
+            {
+              name: 'my-application-manifest-builder',
+              path: 'applications/manifest-builder',
+              component: AppManifestBuilder,
+              meta: {
+                hideSecondaryNav: true,
+                backLink: { name: 'my-applications' },
+                title: 'Manifest Builder',
+                description: 'Generate an app.yml manifest for your application.'
+              }
+            },
+            {
+              name: 'my-application-detail',
+              path: 'applications/:uuid',
+              component: ApplicationDetail,
+              props: true,
+              meta: {
+                hideSecondaryNav: true,
+                backLink: { name: 'my-applications' },
+                title: 'Application',
+                description: 'An application from the Pennsieve App Store.'
+              }
+            },
+            {
               name: 'my-workflows',
               path: 'workflows',
               component: WorkflowsGrid,

@@ -2,7 +2,6 @@
 import RouterTabs from '@/components/shared/routerTabs/routerTabs.vue'
 
 // Analysis outside any workspace, laid out like a workspace's Analysis page.
-// Applications are still to come.
 const tabs = [
   {
     name: 'Notebooks',
@@ -15,6 +14,10 @@ const tabs = [
   {
     name: 'Workflows',
     to: 'my-workflows',
+  },
+  {
+    name: 'Applications',
+    to: 'my-applications',
   },
   {
     name: 'Compute Nodes',
