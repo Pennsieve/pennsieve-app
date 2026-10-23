@@ -87,6 +87,48 @@ export async function postSessionClose(kernelBaseUrl, token, { fetchFn = globalT
   }
 }
 
+// A view's files, downloaded into the session on request. The sidecar signs
+// them itself with the run's own credential; the browser only says which:
+//   POST {session}/pennsieve/inputs/fetch {"files": [{source, path}]} -> 202
+//   GET  {session}/pennsieve/inputs/fetch -> 200
+// Both answer with every file asked for so far:
+// { files: [{ source, path, state: queued|downloading|done|failed, size, bytes, error }] }.
+// source is the run's data-source node; path a crate path of its view.
+const INPUTS_PATH = "/pennsieve/inputs/fetch";
+// The sidecar takes at most this many files per request.
+const INPUTS_BATCH = 1000;
+
+async function inputsResponse(resp) {
+  if (!resp.ok) {
+    const text = await resp.text().catch(() => "");
+    throw new Error(text.trim() || `The session refused the download (${resp.status}).`);
+  }
+  const body = await resp.json();
+  return body.files || [];
+}
+
+export async function postInputsFetch(kernelBaseUrl, token, files, { fetchFn = globalThis.fetch } = {}) {
+  let status = [];
+  for (let i = 0; i < files.length; i += INPUTS_BATCH) {
+    const resp = await fetchFn(`${kernelBaseUrl}${INPUTS_PATH}`, {
+      method: "POST",
+      credentials: "include",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ files: files.slice(i, i + INPUTS_BATCH) }),
+    });
+    status = await inputsResponse(resp);
+  }
+  return status;
+}
+
+export async function getInputsFetch(kernelBaseUrl, token, { fetchFn = globalThis.fetch } = {}) {
+  const resp = await fetchFn(`${kernelBaseUrl}${INPUTS_PATH}`, {
+    credentials: "include",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  return inputsResponse(resp);
+}
+
 // Default path for a brand-new notebook: under output/ (a symlink to OUTPUT_DIR,
 // relative to the workspace root_dir) so it's persisted as a run output and
 // passed to the next workflow step — not left in the ephemeral workspace root.
@@ -861,6 +903,17 @@ export function useJupyterSession() {
   // nothing — the whole session's results (notebook + any generated files) are
   // thrown away, matching the user's explicit choice. (An involuntary
   // idle/timeout reclaim never runs this, so it still keeps the autosaved work.)
+  // Downloads of the run's view files into input/ (see postInputsFetch).
+  function fetchInputs(files) {
+    if (!kernelBaseUrl) throw new Error("The session isn't connected.");
+    return postInputsFetch(kernelBaseUrl, sessionToken, files);
+  }
+
+  function inputsStatus() {
+    if (!kernelBaseUrl) throw new Error("The session isn't connected.");
+    return getInputsFetch(kernelBaseUrl, sessionToken);
+  }
+
   async function close({ discardOutput = false } = {}) {
     if (discardOutput) {
       // Stop autosave and mark clean so nothing re-creates output/notebook.ipynb
@@ -917,6 +970,8 @@ export function useJupyterSession() {
     // files
     listDir,
     downloadFile,
+    fetchInputs,
+    inputsStatus,
     // cells
     setSource,
     addCell,

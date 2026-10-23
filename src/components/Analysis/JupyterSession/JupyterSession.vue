@@ -9,6 +9,7 @@ import { useRoute, useRouter, onBeforeRouteLeave } from "vue-router";
 import { useJupyterSession } from "@/composables/useJupyterSession";
 import NotebookCell from "./NotebookCell.vue";
 import FileBrowser from "./FileBrowser.vue";
+import InputsPanel from "./InputsPanel.vue";
 import {
   VideoPlay,
   DArrowRight,
@@ -55,6 +56,8 @@ const {
   findInputNotebooks,
   listDir,
   downloadFile,
+  fetchInputs,
+  inputsStatus,
   setSource,
   addCell,
   addCellAbove,
@@ -757,14 +760,23 @@ const kernelPill = computed(() => {
     <!-- file browser + notebook -->
     <div v-if="status === 'ready'" class="nb-main">
       <aside v-show="showFiles" class="nb-files">
-        <FileBrowser
-          ref="fileBrowserRef"
-          :list-dir="listDir"
-          :download-file="downloadFile"
+        <InputsPanel
+          :run-id="runId"
+          :fetch-inputs="fetchInputs"
+          :inputs-status="inputsStatus"
           :ready="status === 'ready'"
-          @insert-path="insertPath"
-          @open-notebook="requestOpen"
+          @downloaded="fileBrowserRef?.refresh?.()"
         />
+        <div class="nb-files__browser">
+          <FileBrowser
+            ref="fileBrowserRef"
+            :list-dir="listDir"
+            :download-file="downloadFile"
+            :ready="status === 'ready'"
+            @insert-path="insertPath"
+            @open-notebook="requestOpen"
+          />
+        </div>
       </aside>
 
       <div class="nb-doc">
@@ -890,6 +902,12 @@ const kernelPill = computed(() => {
   width: 250px;
   min-height: 0;
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.nb-files__browser {
+  flex: 1;
+  min-height: 0;
 }
 .nb-doc {
   flex: 1;
