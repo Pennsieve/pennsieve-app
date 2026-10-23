@@ -138,6 +138,9 @@ export async function getInputsFetch(kernelBaseUrl, token, { fetchFn = globalThi
 // (notebookPath inside the composable), not this module-level default.
 const DEFAULT_NOTEBOOK_PATH = "output/notebook.ipynb";
 
+// A dataset view's RO-Crate metadata, staged at the root of its input folder.
+export const CRATE_FILE = "ro-crate-metadata.json";
+
 let cellSeq = 0;
 const newId = () => `cell-${Date.now().toString(36)}-${cellSeq++}`;
 
@@ -596,7 +599,8 @@ export function useJupyterSession() {
   // ---- file browser (Contents API) -----------------------------------------
 
   // List a directory on the kernel's filesystem (EFS). Returns entries sorted
-  // folders-first, then by name. path "" = the notebook root (execution dir).
+  // folders-first, then by name, with a dataset view's crate (its file list,
+  // not data) last. path "" = the notebook root (execution dir).
   async function listDir(path = "") {
     if (!contents) return [];
     const model = await contents.get(path, { content: true });
@@ -613,6 +617,9 @@ export function useJupyterSession() {
       .sort((a, b) => {
         if ((a.type === "directory") !== (b.type === "directory")) {
           return a.type === "directory" ? -1 : 1;
+        }
+        if ((a.name === CRATE_FILE) !== (b.name === CRATE_FILE)) {
+          return a.name === CRATE_FILE ? 1 : -1;
         }
         return a.name.localeCompare(b.name);
       });
