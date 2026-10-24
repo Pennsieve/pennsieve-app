@@ -526,8 +526,10 @@ function fmtSize(bytes) {
 .inp__row.is-selected {
   background: theme.$purple_tint;
 }
-.inp__row.is-done .inp__text {
-  color: theme.$gray_4;
+/* A file in the session is shown as usual, with its check; it has nothing
+   left to select, so its checkbox keeps only its place. */
+.inp__row.is-done input[type="checkbox"] {
+  visibility: hidden;
 }
 .inp__label {
   display: flex;

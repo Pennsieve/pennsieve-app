@@ -32,7 +32,12 @@ const isNotebook = (node) =>
         <template v-if="node.type === 'directory'">{{ node.open ? "▾" : "▸" }}</template>
       </span>
       <img class="fn__icon" :src="iconOf(node)" alt="" />
-      <span class="fn__name">{{ node.name }}</span>
+      <!-- The crate is shown by what it is; its file name is in the row's title. -->
+      <span
+        class="fn__name"
+        :title="node.name === CRATE_FILE ? 'The input\'s RO-Crate manifest (ro-crate-metadata.json): every file of the dataset, with sizes, checksums and its source. Add files from Inputs.' : undefined"
+        >{{ node.name === CRATE_FILE ? "input manifest" : node.name }}</span
+      >
       <span
         v-if="depth === 0 && node.type === 'directory' && node.name === 'output'"
         class="fn__tag fn__tag--out"
@@ -44,12 +49,6 @@ const isNotebook = (node) =>
         class="fn__tag fn__tag--in"
         title="Files staged from previous workflow steps (INPUT_DIR)"
         >← previous step</span
-      >
-      <span
-        v-else-if="node.name === CRATE_FILE"
-        class="fn__tag fn__tag--crate"
-        title="The input's RO-Crate manifest: every file of the dataset, with sizes, checksums and its source. Add files from Inputs."
-        >input manifest</span
       >
       <span v-if="node.type !== 'directory' && node.size != null" class="fn__size">
         {{ fmtSize(node.size) }}
@@ -132,9 +131,6 @@ const isNotebook = (node) =>
 }
 .fn__tag--in {
   color: theme.$purple_1;
-}
-.fn__tag--crate {
-  color: theme.$gray_4;
 }
 .fn__tag--out {
   color: theme.$green_2;
