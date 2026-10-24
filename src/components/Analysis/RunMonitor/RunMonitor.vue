@@ -21,7 +21,7 @@ import toQueryParams from "@/utils/toQueryParams";
 import LayerNameSelector from "./LayerNameSelector.vue";
 import TargetDatasetField from "./TargetDatasetField.vue";
 import { targetWritesToDataset, targetParamFields, buildDataTargets, targetDatasetId, datasetName } from "./dataTargets";
-import { validateRunName, runDisplayName, RUN_NAME_MAX_LENGTH } from "./runHelpers";
+import { validateRunName, runDisplayName, RUN_NAME_MAX_LENGTH, targetTypeName } from "./runHelpers";
 
 const { onNodeClick, onPaneClick, fitView, updateNodeData } = useVueFlow();
 
@@ -451,11 +451,8 @@ const findAppByUrl = (sourceUrl) => {
   );
 };
 
-const getTargetTypeLabel = (targetType) => {
-  if (!targetType) return "Data Target";
-  const tt = targetTypes.value.find((t) => t.targetType === targetType);
-  return tt?.label || targetType;
-};
+const getTargetTypeLabel = (targetType) =>
+  targetType ? targetTypeName(targetType, targetTypes.value) : "Data Target";
 
 const labelForDagNode = (d) => {
   if (d.type === "data-source") return "Data Source";
@@ -1895,7 +1892,7 @@ onUnmounted(() => {
                 <div class="custom-node data-target-node" :class="mode === 'browse' ? statusClass(data.status) : ''">
                   <span v-if="nodeUnmetCount(id, 'data-target') > 0" class="node-unmet-badge">{{ nodeUnmetCount(id, 'data-target') }}</span>
                   <div class="node-header">
-                    <span class="node-title">{{ data.targetType || data.label }}</span>
+                    <span class="node-title">{{ data.targetType ? getTargetTypeLabel(data.targetType) : data.label }}</span>
                   </div>
                   <div class="node-tags">
                     <span class="node-type-badge target-badge">Target</span>

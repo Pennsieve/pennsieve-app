@@ -106,7 +106,7 @@ function cancelCreating() {
 
 async function createLayer() {
   if (!isValidName.value) {
-    ElMessage.error('Layer name must be lowercase with dashes (e.g., hg38-reference)')
+    ElMessage.error('Names are lowercase letters, numbers and dashes (e.g., hg38-reference)')
     return
   }
 
@@ -116,12 +116,12 @@ async function createLayer() {
       layerName: newLayerName.value,
       description: newLayerDescription.value || undefined
     })
-    ElMessage.success(`Layer "${newLayerName.value}" created`)
+    ElMessage.success(`Reference "${newLayerName.value}" created`)
     isCreating.value = false
     newLayerName.value = ''
     newLayerDescription.value = ''
   } catch (err) {
-    ElMessage.error(err.message || 'Failed to create layer')
+    ElMessage.error(err.message || 'Failed to create the reference')
   } finally {
     isSaving.value = false
   }
@@ -130,15 +130,15 @@ async function createLayer() {
 async function confirmDeleteLayer(layer) {
   try {
     await ElMessageBox.confirm(
-      `Delete layer "${layer.layerName}"? This will remove the layer metadata. EFS data cleanup is handled separately.`,
-      'Delete Layer',
+      `Delete reference "${layer.layerName}"? Its data is removed from this node.`,
+      'Delete reference',
       { confirmButtonText: 'Delete', cancelButtonText: 'Cancel', type: 'warning' }
     )
     await computeResourcesStore.deleteNodeLayer(props.nodeId, layer.layerName)
-    ElMessage.success(`Layer "${layer.layerName}" deleted`)
+    ElMessage.success(`Reference "${layer.layerName}" deleted`)
   } catch (err) {
     if (err !== 'cancel') {
-      ElMessage.error(err.message || 'Failed to delete layer')
+      ElMessage.error(err.message || 'Failed to delete the reference')
     }
   }
 }
@@ -149,19 +149,19 @@ async function confirmDeleteLayer(layer) {
     <div class="layers-header">
       <div>
         <p class="layers-description">
-          Persistent layers store reusable datasets on EFS that survive between workflow executions.
+          Read-only data that workflows on this node can use, such as genomes and indexes. It stays on the node between runs.
         </p>
       </div>
       <div class="layers-actions" v-if="isOwner && !isCreating">
-        <button @click="startCreating" class="create-button">Create Layer</button>
+        <button @click="startCreating" class="create-button">New reference</button>
       </div>
     </div>
 
-    <!-- Create Layer Form -->
+    <!-- New reference form -->
     <div v-if="isCreating" class="create-form">
       <div class="create-form-row">
         <div class="create-form-field">
-          <label>Layer Name <span class="required">*</span></label>
+          <label>Name <span class="required">*</span></label>
           <input
             v-model="newLayerName"
             placeholder="hg38-reference"
@@ -229,7 +229,7 @@ async function confirmDeleteLayer(layer) {
             <td>{{ formatRelativeTime(layer.lastAccessed) }}</td>
             <td>{{ formatRelativeTime(layer.createdAt) }}</td>
             <td v-if="isOwner">
-              <button class="delete-button" @click.stop="confirmDeleteLayer(layer)" title="Delete layer">&times;</button>
+              <button class="delete-button" @click.stop="confirmDeleteLayer(layer)" title="Delete reference">&times;</button>
             </td>
           </tr>
           <tr v-if="expandedLayer === layer.layerName" class="layer-detail-row">
@@ -247,7 +247,7 @@ async function confirmDeleteLayer(layer) {
                 </div>
 
                 <div class="detail-empty">
-                  Data layer — {{ formatFileCount(layer.fileCount) }} files, {{ formatSize(layer.sizeBytes) }}.
+                  Reference data: {{ formatFileCount(layer.fileCount) }} files, {{ formatSize(layer.sizeBytes) }}.
                 </div>
               </div>
             </td>
@@ -269,7 +269,7 @@ async function confirmDeleteLayer(layer) {
 
     <!-- Empty State -->
     <div v-else class="layers-empty">
-      No persistent layers configured. Create a layer and populate it by running a workflow with a <code>persistent-layer</code> data target.
+      No reference data on this node yet. Create a reference, then fill it by running a workflow whose data target is reference data.
     </div>
   </div>
 </template>

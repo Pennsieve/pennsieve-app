@@ -25,6 +25,7 @@ import {
   LAMBDA_MEMORY_OPTIONS,
   getCpuForMemory,
   formatResourceLabel,
+  targetTypeName,
 } from "../RunMonitor/runHelpers";
 import BfButton from "../../shared/bf-button/BfButton.vue";
 import MetricsDashboard from "../Metrics/MetricsDashboard.vue";
@@ -513,11 +514,8 @@ const getTargetTypeParams = (targetType) => {
   return tt?.params || [];
 };
 
-const getTargetTypeLabel = (targetType) => {
-  if (!targetType) return "No target selected";
-  const tt = targetTypes.value.find((t) => t.targetType === targetType);
-  return tt?.label || targetType;
-};
+const getTargetTypeLabel = (targetType) =>
+  targetType ? targetTypeName(targetType, targetTypes.value) : "No target selected";
 
 const onTargetTypeChange = (data) => {
   const types = getComputeTypesForTarget(data.targetType);
@@ -2553,7 +2551,7 @@ const openNodeSettings = (id) => {
                       <el-option
                         v-for="tt in targetTypes"
                         :key="tt.targetType"
-                        :label="tt.label || tt.targetType"
+                        :label="targetTypeName(tt.targetType, targetTypes)"
                         :value="tt.targetType"
                       />
                     </el-select>

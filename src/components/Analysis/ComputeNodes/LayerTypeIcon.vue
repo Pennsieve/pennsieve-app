@@ -7,7 +7,7 @@ const props = defineProps({
   size: { type: [Number, String], default: 18 },
 });
 
-const label = "Data layer";
+const label = "Reference data";
 const px = computed(() =>
   typeof props.size === "number" ? `${props.size}px` : props.size
 );

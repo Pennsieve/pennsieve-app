@@ -2250,7 +2250,7 @@ onUnmounted(() => {
                   </span>
                 </div>
                 <div v-if="configLayers.length" class="info-row">
-                  <span class="info-label">Data layers</span>
+                  <span class="info-label">Reference data</span>
                   <span class="info-value">{{ configLayers.join(', ') }}</span>
                 </div>
               </div>
