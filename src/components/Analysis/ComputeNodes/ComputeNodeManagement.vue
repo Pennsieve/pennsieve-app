@@ -221,7 +221,7 @@ const STATUS_TEXT = { Enabled: 'Running', Paused: 'Paused', Pending: 'Setting up
             <ComputeNodeLLMBudget :node-id="nodeUuid" :is-owner="canManage" :per-user="!isPersonalNode" />
           </section>
           <p v-else class="cn-muted">
-            The AI budget appears here once AI models are turned on, on the Overview tab.
+            Turn on AI models (Overview) to set an AI budget.
           </p>
         </template>
       </div>

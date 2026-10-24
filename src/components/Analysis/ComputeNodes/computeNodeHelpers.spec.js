@@ -8,6 +8,7 @@ import {
   relativeTime,
   formatAccountId,
   deploymentMode,
+  limitSummary,
 } from "./computeNodeHelpers";
 
 describe("compute node page", () => {
@@ -64,5 +65,13 @@ describe("compute node page", () => {
     expect(relativeTime("2026-10-20T12:00:00Z", now)).toBe("4 d ago");
     expect(relativeTime("", now)).toBe("");
     expect(formatAccountId("123456789012")).toBe("1234-5678-9012");
+  });
+
+  it("sums up a budget row's limits in one line", () => {
+    expect(limitSummary({ dailyCostUsd: 5, monthlyCostUsd: null, maxConcurrentRuns: 3 })).toBe("$5.00 a day · 3 runs at once");
+    expect(limitSummary({ maxConcurrentRuns: 1 })).toBe("1 run at once");
+    expect(limitSummary({ dailyCostUsd: 0 })).toBe("$0.00 a day");
+    expect(limitSummary({})).toBe("");
+    expect(limitSummary(null)).toBe("");
   });
 });
