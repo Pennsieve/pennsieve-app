@@ -9,7 +9,20 @@
 # drop the header (the previous version of this file never served its CSP).
 #
 # Enforced. A new third party or platform host has to be added here (and to
-# prod's list if prod uses it too), or the browser blocks it.
+# prod's list if prod uses it too), or the browser blocks it. Third parties
+# are only those clin actually loads (POAM-006): Google reCAPTCHA (sign-up),
+# Google Fonts, Google Analytics 4 (gtag.js from Tag Manager; sanitized page
+# paths only, see src/utils/analytics.js), DuckDB-WASM (jsDelivr bundles,
+# extensions.duckdb.org), ORCID, DOI citations (doi.org redirects to Crosscite,
+# DataCite or Crossref by registrar), GitHub (app READMEs) and Cognito. Clin
+# has no Sentry, ProdPad, New Relic or maps.
+#
+# 'unsafe-eval' stays: ajv compiles JSON schemas to functions
+# (RecordSpecGenerator) and plotly's WebGL traces generate code at runtime.
+#
+# The Report-Only policy is the enforced one without 'unsafe-inline' and data:
+# in script-src. Browsers report what it would block in the console without
+# blocking it; once clin shows no reports, it replaces the enforced policy.
 customHeaders:
   - pattern: "**"
     headers:
@@ -23,38 +36,22 @@ customHeaders:
             'wasm-unsafe-eval'
             'self'
             data:
-            https://www.gstatic.com
-            https://www.google.com/recaptcha/api.js
+            https://www.google.com/recaptcha/
+            https://www.gstatic.com/recaptcha/
             https://www.googletagmanager.com
-            https://maps.googleapis.com
-            https://www.google-analytics.com
-            https://api.tiles.mapbox.com
-            https://code.jquery.com
-            https://cdnjs.cloudflare.com
-            https://stackpath.bootstrapcdn.com
-            https://cdn.jsdelivr.net/npm/@duckdb/
-            https://use.fontawesome.com;
+            https://cdn.jsdelivr.net/npm/@duckdb/;
             style-src
             'unsafe-inline'
             'self'
-            https://fonts.googleapis.com
-            https://api.tiles.mapbox.com
-            https://stackpath.bootstrapcdn.com;
+            https://fonts.googleapis.com;
             worker-src
             'self'
             blob:
-            https://www.youtube.com
-            https://player.vimeo.com
-            https://fast.wistia.net
             https://cdn.jsdelivr.net/npm/@duckdb/;
             img-src
             'self'
             data:
             blob:
-            https://stats.g.doubleclick.net
-            https://maps.gstatic.com
-            https://www.google-analytics.com
-            http://gravatar.com
             https://api.pennsieve.ai
             https://api2.pennsieve.ai
             https://workspace-assets.pennsieve.ai
@@ -64,7 +61,10 @@ customHeaders:
             https://*.s3.us-east-1.amazonaws.com
             https://*.s3.af-south-1.amazonaws.com
             https://raw.githubusercontent.com
-            https://*.githubusercontent.com;
+            https://*.githubusercontent.com
+            https://www.googletagmanager.com
+            https://*.google-analytics.com
+            https://*.analytics.google.com;
             font-src
             'self'
             data:
@@ -78,23 +78,123 @@ customHeaders:
             https://*.s3.us-east-1.amazonaws.com
             https://*.s3.af-south-1.amazonaws.com;
             frame-src
-            https://www.google.com
+            https://www.google.com/recaptcha/
             https://api.pennsieve.ai
             https://api2.pennsieve.ai
             https://orthogonal-viewer.pennsieve.ai;
             connect-src
             'self'
             wss://events.pennsieve.ai
-            https://pub.sandbox.orcid.org
             https://pub.orcid.org
-            https://citation.crosscite.org
-            https://data.datacite.org
             https://doi.org
-            https://api.maptiler.com
-            https://maps.tilehosting.com
-            https://www.google-analytics.com
-            https://app.getsentry.com
-            https://api.prodpad.com
+            https://citation.doi.org
+            https://citation.crosscite.org
+            https://data.crosscite.org
+            https://data.datacite.org
+            https://api.datacite.org
+            https://api.crossref.org
+            https://www.googletagmanager.com
+            https://*.google-analytics.com
+            https://*.analytics.google.com
+            https://api.pennsieve.ai
+            wss://api.pennsieve.ai
+            https://api2.pennsieve.ai
+            https://cde-catalog.pennsieve.ai
+            wss://chat.pennsieve.ai
+            https://workspace-assets.pennsieve.ai
+            https://assets.pennsieve.ai
+            https://cognito-idp.us-east-1.amazonaws.com
+            https://cognito-identity.us-east-1.amazonaws.com
+            https://pennsieve-clin-users.auth.us-east-1.amazoncognito.com
+            https://api.pennsieve.io
+            https://downloads.pennsieve.io
+            https://discover.pennsieve.io
+            https://assets.discover.pennsieve.io
+            https://extensions.duckdb.org
+            https://cdn.jsdelivr.net/npm/@duckdb/
+            https://s3.amazonaws.com
+            https://*.s3.amazonaws.com
+            https://*.s3.us-east-1.amazonaws.com
+            https://*.s3.af-south-1.amazonaws.com
+            https://compute.pennsieve.ai
+            https://*.compute.pennsieve.ai
+            wss://compute.pennsieve.ai
+            wss://*.compute.pennsieve.ai;
+            object-src
+            'self';
+            base-uri
+            'self';
+            form-action
+            'self'
+            https://api.pennsieve.ai;
+      - key: "Content-Security-Policy-Report-Only"
+        value: >-
+            default-src
+            'self';
+            script-src
+            'unsafe-eval'
+            'wasm-unsafe-eval'
+            'self'
+            https://www.google.com/recaptcha/
+            https://www.gstatic.com/recaptcha/
+            https://www.googletagmanager.com
+            https://cdn.jsdelivr.net/npm/@duckdb/;
+            style-src
+            'unsafe-inline'
+            'self'
+            https://fonts.googleapis.com;
+            worker-src
+            'self'
+            blob:
+            https://cdn.jsdelivr.net/npm/@duckdb/;
+            img-src
+            'self'
+            data:
+            blob:
+            https://api.pennsieve.ai
+            https://api2.pennsieve.ai
+            https://workspace-assets.pennsieve.ai
+            https://assets.pennsieve.ai
+            https://assets.discover.pennsieve.io
+            https://*.s3.amazonaws.com
+            https://*.s3.us-east-1.amazonaws.com
+            https://*.s3.af-south-1.amazonaws.com
+            https://raw.githubusercontent.com
+            https://*.githubusercontent.com
+            https://www.googletagmanager.com
+            https://*.google-analytics.com
+            https://*.analytics.google.com;
+            font-src
+            'self'
+            data:
+            blob:
+            https://fonts.gstatic.com;
+            media-src
+            blob:
+            https://api.pennsieve.ai
+            https://api2.pennsieve.ai
+            https://*.s3.amazonaws.com
+            https://*.s3.us-east-1.amazonaws.com
+            https://*.s3.af-south-1.amazonaws.com;
+            frame-src
+            https://www.google.com/recaptcha/
+            https://api.pennsieve.ai
+            https://api2.pennsieve.ai
+            https://orthogonal-viewer.pennsieve.ai;
+            connect-src
+            'self'
+            wss://events.pennsieve.ai
+            https://pub.orcid.org
+            https://doi.org
+            https://citation.doi.org
+            https://citation.crosscite.org
+            https://data.crosscite.org
+            https://data.datacite.org
+            https://api.datacite.org
+            https://api.crossref.org
+            https://www.googletagmanager.com
+            https://*.google-analytics.com
+            https://*.analytics.google.com
             https://api.pennsieve.ai
             wss://api.pennsieve.ai
             https://api2.pennsieve.ai
