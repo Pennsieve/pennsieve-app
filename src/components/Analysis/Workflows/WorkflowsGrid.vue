@@ -9,6 +9,7 @@ import IconPennsieveMark from "../../icons/IconPennsieveMark.vue";
 import WorkflowThumbnail from "../WorkflowGraph/WorkflowThumbnail.vue";
 import { ioSummary, appNames, usageLine } from "./workflowSummary";
 import { applyFilters, outputOptions, sortWorkflows, SORTS } from "./galleryFilter";
+import { isNotebookWorkflow } from "../RunMonitor/notebookHelpers";
 
 defineProps({
   // Inside the Gallery, whose toolbar has the New Workflow button.
@@ -221,8 +222,13 @@ const fetchAllWorkflows = async () => {
 
 
 // Run from a card: the Workflows tab's Live view, with the run wizard open on
-// this workflow.
+// this workflow; a notebook starts on the Notebooks tab instead, in its New
+// notebook dialog on this kernel.
 const runWorkflow = (wf) => {
+  if (isNotebookWorkflow(wf)) {
+    router.push({ name: isMyWorkspace.value ? "my-notebooks" : "notebooks", query: { start: wf.uuid } });
+    return;
+  }
   router.push({ name: isMyWorkspace.value ? "my-workflows" : "workflows", query: { run: wf.uuid } });
 };
 
@@ -357,7 +363,7 @@ onMounted(async () => {
               <span class="wf-actions" @click.stop>
                 <button type="button" class="wf-action" @click="goToDetail(wf)">Open</button>
                 <button v-if="wf.isActive" type="button" class="wf-action wf-action--run" @click="runWorkflow(wf)">
-                  ▶ Run
+                  {{ isNotebookWorkflow(wf) ? "▶ Start notebook" : "▶ Run" }}
                 </button>
               </span>
             </div>

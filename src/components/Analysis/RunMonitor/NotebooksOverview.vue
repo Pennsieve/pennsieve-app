@@ -8,6 +8,7 @@ import {
   onMounted,
   onBeforeUnmount,
   getCurrentInstance,
+  watch,
 } from "vue";
 import { runScopeChannel } from "@/realtime/channels";
 import { useStore } from "vuex";
@@ -81,14 +82,30 @@ const takenEnvNames = computed(() => environmentsRef.value?.ownNames || []);
 // "Use in a notebook": a new notebook, where the environment is picked from
 // the session's sidebar once it runs.
 function onEnvUse() {
-  view.value = "live";
-  dialogVisible.value = true;
+  openNewNotebook();
 }
 function onEnvCreated() {
   environmentsRef.value?.refresh?.();
 }
 const isLoading = ref(false);
 const dialogVisible = ref(false);
+// The kernel the New notebook dialog opens on: a Gallery card's "Start
+// notebook" lands here with ?start=<workflow>. The query goes once it's
+// open, so a reload doesn't open it again.
+const startWorkflowId = ref("");
+function openNewNotebook(workflowId = "") {
+  view.value = "live";
+  startWorkflowId.value = workflowId;
+  dialogVisible.value = true;
+}
+function openFromQuery() {
+  const id = route.query.start;
+  if (!id || !notebookWorkflowIds.value.has(String(id))) return;
+  const { start, ...rest } = route.query;
+  router.replace({ query: rest });
+  openNewNotebook(String(id));
+}
+watch(() => route.query.start, openFromQuery);
 // The sub-tab, kept in the URL so it can be linked to and survives reloads.
 // Environments only where the site has environments-service.
 const VIEWS = [
@@ -293,6 +310,7 @@ onMounted(async () => {
   } finally {
     isLoading.value = false;
   }
+  openFromQuery();
   // Live updates for every run in the workspace (or the user's own runs)
   if (realtime) {
     analyticsChannel = realtime.subscribe(
@@ -330,7 +348,7 @@ onBeforeUnmount(() => {
             {{ v.label }}
           </button>
         </div>
-        <bf-button v-if="view === 'live'" :disabled="notebookWorkflows.length === 0" @click="dialogVisible = true">
+        <bf-button v-if="view === 'live'" :disabled="notebookWorkflows.length === 0" @click="openNewNotebook()">
           + New Notebook
         </bf-button>
         <bf-button v-else @click="openCreateEnvironment()">+ New Environment</bf-button>
@@ -436,6 +454,7 @@ onBeforeUnmount(() => {
     <new-notebook-dialog
       v-model="dialogVisible"
       :notebook-workflows="notebookWorkflows"
+      :initial-workflow-id="startWorkflowId"
       :personal="isMyWorkspace"
       @created="onNotebookCreated"
     />

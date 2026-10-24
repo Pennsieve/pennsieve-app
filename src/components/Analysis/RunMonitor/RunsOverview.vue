@@ -325,10 +325,12 @@ const wizardVisibleSteps = computed(() =>
   wizardStepTitles.map((title, i) => ({ title, i })).filter(({ i }) => !wizardSkipsStep(i))
 );
 
+// Notebooks start on the Notebooks tab, so the run wizard leaves them out.
 const filteredWizardWorkflows = computed(() => {
   const q = workflowSearch.value.toLowerCase().trim();
-  if (!q) return workflows.value;
-  return workflows.value.filter(w =>
+  const runnable = workflows.value.filter((w) => !isNotebookWorkflow(w));
+  if (!q) return runnable;
+  return runnable.filter(w =>
     w.name?.toLowerCase().includes(q) || w.description?.toLowerCase().includes(q)
   );
 });
@@ -512,7 +514,7 @@ onBeforeUnmount(() => {
     <!-- Header -->
     <div v-if="!embedded" class="builder-header">
       <div class="header-actions">
-        <bf-button @click="openWizardDialog">Initiate Workflow</bf-button>
+        <bf-button @click="openWizardDialog">+ Run Workflow</bf-button>
       </div>
     </div>
 
@@ -575,11 +577,11 @@ onBeforeUnmount(() => {
             When you run a workflow, it shows here: live while it runs, then with its status, logs and cost.
           </p>
           <div class="runs-welcome-actions">
+            <bf-button @click="openWizardDialog">Run a workflow</bf-button>
             <template v-if="embedded">
-              <bf-button @click="toBuilder">Build a workflow</bf-button>
+              <bf-button class="secondary" @click="toBuilder">Build a workflow</bf-button>
               <router-link :to="galleryRoute" class="runs-welcome-link">Browse the Gallery</router-link>
             </template>
-            <bf-button v-else @click="openWizardDialog">Initiate Workflow</bf-button>
           </div>
         </div>
 

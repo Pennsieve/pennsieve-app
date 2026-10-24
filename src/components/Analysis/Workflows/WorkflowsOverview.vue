@@ -63,7 +63,7 @@ watch(() => route.query.run, openRunFromQuery);
       </div>
       <div v-if="view === 'live'" class="wf-actions">
         <el-checkbox v-model="includeNotebooks" size="small">Include notebooks</el-checkbox>
-        <bf-button @click="runsRef?.openWizardDialog()">Run Workflow</bf-button>
+        <bf-button @click="runsRef?.openWizardDialog()">+ Run Workflow</bf-button>
       </div>
       <!-- The builder's bar (name, readiness, Save) goes here, so the canvas
            starts right below one bar. -->
