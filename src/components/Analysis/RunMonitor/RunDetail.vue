@@ -2082,7 +2082,7 @@ onUnmounted(() => {
 
                 <!-- Which dataset the target writes to (the run's, by default) -->
                 <div
-                  v-if="targetWritesToDataset(selectedNode.data?.targetType) && initiateForm.datasetId"
+                  v-if="targetWritesToDataset(selectedNode.data?.targetType)"
                   class="config-field"
                 >
                   <TargetDatasetField
