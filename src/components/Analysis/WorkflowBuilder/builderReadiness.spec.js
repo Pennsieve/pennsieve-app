@@ -45,7 +45,7 @@ describe("builderReadiness", () => {
 
 describe("requiredUnset", () => {
   it("is the parameters with neither a default nor a value", () => {
-    const n = app({ paramSchema: [{ name: "a" }, { name: "b", defaultValue: "1" }, { name: "c", required: false }], defaultParams: {} });
+    const n = app({ paramSchema: [{ name: "a" }, { name: "b", defaultValue: "1" }, { name: "c", required: false }], defaultParams: { c: "x" } });
     expect(requiredUnset(n)).toEqual(["a"]);
   });
 });

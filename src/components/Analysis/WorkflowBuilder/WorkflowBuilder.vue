@@ -36,6 +36,9 @@ import {
 } from "../Applications/applicationSchema";
 import { useAppManifest } from "@/composables/useAppManifest";
 import BuilderBar from "./BuilderBar.vue";
+import BuilderPalette from "./BuilderPalette.vue";
+import ParamField from "./ParamField.vue";
+import { ioLine, versionManifest } from "./appManifestInfo";
 import { builderReadiness } from "./builderReadiness";
 import StepPicker from "./StepPicker.vue";
 import { useGraphHistory } from "./graphHistory";
@@ -103,6 +106,9 @@ const selectedNodeParamSchema = computed(() => {
   if (!node || node.type !== "default") return [];
   // In browse mode: use paramSchema from the workflow definition DAG node
   if (node.data?.paramSchema?.length > 0) return node.data.paramSchema;
+  // Else the pinned version's app.yml (per-version manifests)
+  const manifestParams = versionManifest(node.data?.application, node.data?.tag)?.parameters;
+  if (manifestParams?.length) return toParamSchema(manifestParams);
   // In create mode: use params from the application (flat key-value object)
   const appParams = node.data?.application?.params;
   if (appParams && typeof appParams === "object" && !Array.isArray(appParams)) {
@@ -203,6 +209,41 @@ const saveWorkflowChanges = async () => {
       detail: { type: "error", msg: "Failed to save workflow changes." },
     });
   }
+};
+
+// An app's name: its app.yml's, else its repository's.
+const appDisplayName = (app) => versionManifest(app)?.name || repoName(app);
+
+// The selected app step's manifest: its pinned version's.
+const stepManifest = computed(() => {
+  const node = selectedNode.value;
+  if (node?.type !== "default") return null;
+  return versionManifest(node.data?.application, node.data?.tag);
+});
+const manifestsKnown = computed(() =>
+  (availableApplications.value || []).some((a) => (a.versions || []).some((v) => v.manifest)),
+);
+const ioTypes = (port) => ioLine({ inputs: [port], outputs: [] }).replace(/ → .*$/, "");
+const showAdvanced = ref(false);
+
+// app.yml as written, in a dialog.
+const appYml = ref(null); // { title, text }
+const viewAppYml = async (node) => {
+  const app = node?.data?.application;
+  if (!app?.uuid) return;
+  appYml.value = { title: `${node.data.label}: app.yml`, text: "Loading…" };
+  const parsed = await loadManifest(app.uuid);
+  if (appYml.value) appYml.value.text = parsed?.raw || "This app has no app.yml.";
+};
+
+// Set (or, with undefined, clear) a step's override of a parameter.
+const setDefaultParam = (paramName, value) => {
+  const node = selectedNode.value;
+  if (!node) return;
+  const updated = { ...(node.data.defaultParams || {}) };
+  if (value === undefined) delete updated[paramName];
+  else updated[paramName] = value;
+  node.data.defaultParams = updated;
 };
 
 // Remove a defaultParam override (reverts to app default)
@@ -878,7 +919,7 @@ const makeNode = (type, app, position) => {
     id,
     type: "default",
     data: {
-      label: repoName(app),
+      label: appDisplayName(app),
       application: app,
       computeType: "standard",
       cpu: "",
@@ -1631,7 +1672,19 @@ const openNodeSettings = (id) => {
     </div>
 
     <div class="builder-content">
-      <!-- Left: Main Panel -->
+      <!-- Left: what can be added (create and edit) -->
+      <BuilderPalette
+        v-if="!isReadOnly"
+        :applications="availableApplications"
+        :app-name="appDisplayName"
+        :step-ports="selectedNode?.type === 'default' ? selectedNode.data?.manifestPorts || null : null"
+        :step-label="selectedNode?.data?.label || ''"
+        :loading="isLoading"
+        @add="(type, app) => addStep(type, app)"
+        @dragstart="(app, event, type) => onDragStart(app, event, type)"
+      />
+
+      <!-- Middle: the canvas -->
       <div class="main-panel">
         <!-- Workflow Canvas -->
         <div class="workflow-canvas" @drop="onDrop" @dragover="onDragOver">
@@ -2043,10 +2096,10 @@ const openNodeSettings = (id) => {
       <div ref="sidebarRef" class="applications-sidebar">
         <el-collapse v-model="accordionActiveNames" class="sidebar-accordion">
           <!-- Information Section -->
-          <el-collapse-item title="Information" name="information">
+          <el-collapse-item :title="selectedNode ? 'Step' : 'Workflow'" name="information">
             <!-- Selected Node Info -->
             <template v-if="selectedNode">
-              <h4 class="sidebar-section-title">Selected Node</h4>
+              <h4 class="sidebar-section-title">{{ selectedNode.data?.label || "Step" }}</h4>
               <div class="info-card">
                 <div class="info-row">
                   <span class="info-label">Name</span>
@@ -2055,8 +2108,10 @@ const openNodeSettings = (id) => {
                   }}</span>
                 </div>
                 <div class="info-row">
-                  <span class="info-label">Type</span>
-                  <span class="info-value">{{ selectedNode.type }}</span>
+                  <span class="info-label">Kind</span>
+                  <span class="info-value">{{
+                    { "data-source": "Input data", "data-target": "Output", default: "App" }[selectedNode.type] || selectedNode.type
+                  }}</span>
                 </div>
                 <template v-if="selectedNode.data?.application?.description">
                   <div class="info-row">
@@ -2108,6 +2163,47 @@ const openNodeSettings = (id) => {
                   </div>
                 </template>
               </div>
+
+              <!-- About an app step: from its app.yml -->
+              <template v-if="selectedNode.type === 'default'">
+                <div class="about">
+                  <p v-if="stepManifest?.description" class="about-desc">{{ stepManifest.description }}</p>
+                  <template v-if="stepManifest">
+                    <div v-if="(stepManifest.inputs || []).length" class="about-ports">
+                      <span class="about-label">Takes</span>
+                      <span v-for="p in stepManifest.inputs" :key="'i' + p.name" class="about-port" :title="p.description">
+                        {{ p.name }}<template v-if="(p.mediaTypes || []).length"> · {{ ioTypes(p) }}</template>
+                      </span>
+                    </div>
+                    <div v-if="(stepManifest.outputs || []).length" class="about-ports">
+                      <span class="about-label">Produces</span>
+                      <span v-for="p in stepManifest.outputs" :key="'o' + p.name" class="about-port" :title="p.description">
+                        {{ p.name }}<template v-if="(p.mediaTypes || []).length"> · {{ ioTypes(p) }}</template>
+                      </span>
+                    </div>
+                  </template>
+                  <p v-else-if="manifestsKnown" class="about-none">
+                    This app has no app.yml, so its inputs, outputs and parameters aren't described.
+                    <router-link
+                      v-if="selectedNode.data.application?.ownerId === profile?.id"
+                      :to="{ name: route.params.orgId ? 'application-manifest-builder' : 'my-application-manifest-builder' }"
+                    >Create one with the manifest builder</router-link>
+                  </p>
+                  <div class="about-links">
+                    <button v-if="selectedNode.data.application?.uuid" type="button" class="text-link-btn" @click="viewAppYml(selectedNode)">
+                      View app.yml
+                    </button>
+                    <router-link
+                      v-if="selectedNode.data.application?.uuid"
+                      :to="{
+                        name: route.params.orgId ? 'application-detail' : 'my-application-detail',
+                        params: { ...(route.params.orgId && { orgId: route.params.orgId }), uuid: selectedNode.data.application.uuid },
+                      }"
+                      class="text-link-btn"
+                    >App page →</router-link>
+                  </div>
+                </div>
+              </template>
 
               <!-- Data target runtime config (editable in create mode) -->
               <template
@@ -2248,10 +2344,14 @@ const openNodeSettings = (id) => {
                 </div>
               </template>
 
-              <!-- Processor settings (editable in create mode) -->
+              <!-- Processor settings (editable in create mode): folded, as
+                   the app's own resources usually do. -->
               <template v-if="selectedNode.type === 'default' && !isReadOnly">
-                <h4 class="sidebar-section-title">Runtime Configuration</h4>
-                <div class="info-card">
+                <button type="button" class="advanced-toggle" :aria-expanded="showAdvanced" @click="showAdvanced = !showAdvanced">
+                  <span class="advanced-caret" :class="{ open: showAdvanced }">▸</span>
+                  Advanced: compute and resources
+                </button>
+                <div v-show="showAdvanced" class="info-card">
                   <div class="info-row">
                     <span class="info-label">
                       Compute Type
@@ -2363,7 +2463,7 @@ const openNodeSettings = (id) => {
                 </div>
               </template>
 
-              <!-- Parameters for processor nodes -->
+              <!-- Parameters, from the app's app.yml (ParamField). -->
               <template
                 v-if="
                   selectedNode.type === 'default' &&
@@ -2372,125 +2472,14 @@ const openNodeSettings = (id) => {
               >
                 <h4 class="sidebar-section-title">Parameters</h4>
                 <div class="info-card">
-                  <div
+                  <ParamField
                     v-for="param in selectedNodeParamSchema"
                     :key="param.name"
-                    class="info-row"
-                  >
-                    <span class="info-label">
-                      {{ param.name }}
-                      <el-tooltip
-                        v-if="
-                          param.defaultValue == null &&
-                          !selectedNode.data.defaultParams?.[param.name]
-                        "
-                        content="No default — must be set here or at run time"
-                        placement="left"
-                      >
-                        <span class="param-required-badge"
-                          >required at run</span
-                        >
-                      </el-tooltip>
-                    </span>
-                    <template v-if="canEditConfig">
-                    <!-- Has app default: show value with edit toggle -->
-                    <template v-if="param.defaultValue != null">
-                      <template
-                        v-if="param.name in selectedNode.data.defaultParams"
-                      >
-                        <div class="param-edit-row">
-                          <el-input
-                            :model-value="
-                              selectedNode.data.defaultParams[param.name]
-                            "
-                            size="small"
-                            :placeholder="param.defaultValue"
-                            class="info-inline-select"
-                            @update:model-value="
-                              (val) => {
-                                selectedNode.data.defaultParams[param.name] =
-                                  val;
-                              }
-                            "
-                          />
-                          <button
-                            class="param-revert-btn"
-                            title="Revert to app default"
-                            @click="clearDefaultParam(param.name)"
-                          >
-                            &times;
-                          </button>
-                        </div>
-                      </template>
-                      <template v-else>
-                        <span
-                          class="param-default-display"
-                          @click="
-                            selectedNode.data.defaultParams[param.name] =
-                              param.defaultValue
-                          "
-                        >
-                          {{ param.defaultValue }}
-                          <span class="param-edit-icon" title="Override"
-                            >&#9998;</span
-                          >
-                        </span>
-                      </template>
-                    </template>
-                    <!-- No app default: always show input -->
-                    <template v-else>
-                      <el-input
-                        v-if="
-                          !param.validValues || param.validValues.length === 0
-                        "
-                        :model-value="
-                          selectedNode.data.defaultParams[param.name] ?? ''
-                        "
-                        size="small"
-                        placeholder="Set default..."
-                        class="info-inline-select"
-                        @update:model-value="
-                          (val) => {
-                            selectedNode.data.defaultParams[param.name] = val;
-                          }
-                        "
-                      />
-                      <el-select
-                        v-else
-                        :model-value="
-                          selectedNode.data.defaultParams[param.name] ?? ''
-                        "
-                        size="small"
-                        placeholder="Select..."
-                        clearable
-                        class="info-inline-select"
-                        @update:model-value="
-                          (val) => {
-                            selectedNode.data.defaultParams[param.name] = val;
-                          }
-                        "
-                      >
-                        <el-option
-                          v-for="v in param.validValues"
-                          :key="v"
-                          :label="v"
-                          :value="v"
-                        />
-                      </el-select>
-                    </template>
-                    </template>
-                    <!-- Read-only for non-creators -->
-                    <template v-else>
-                      <span class="info-value param-value-truncate">
-                        {{
-                          selectedNode.data.defaultParams?.[param.name] ??
-                          (param.defaultValue != null
-                            ? param.defaultValue
-                            : "—")
-                        }}
-                      </span>
-                    </template>
-                  </div>
+                    :param="param"
+                    :editable="canEditConfig"
+                    :model-value="selectedNode.data.defaultParams?.[param.name]"
+                    @update:model-value="(v) => setDefaultParam(param.name, v)"
+                  />
                 </div>
               </template>
 
@@ -2566,7 +2555,7 @@ const openNodeSettings = (id) => {
             </template>
 
             <!-- Workflow Details -->
-            <template v-if="selectedWorkflow">
+            <template v-if="selectedWorkflow && !selectedNode">
               <h4 class="sidebar-section-title">Workflow Details</h4>
               <template v-if="isEditingDetails">
                 <div class="info-edit-form">
@@ -2674,7 +2663,7 @@ const openNodeSettings = (id) => {
 
           <!-- Workflow Metrics Section -->
           <el-collapse-item
-            v-if="mode === 'browse' && selectedWorkflow"
+            v-if="mode === 'browse' && selectedWorkflow && !selectedNode"
             title="Workflow Metrics"
             name="workflow-metrics"
           >
@@ -2702,102 +2691,9 @@ const openNodeSettings = (id) => {
             />
           </el-collapse-item>
 
-          <!-- Data & Applications Section (create mode only) -->
-          <el-collapse-item
-            v-if="mode === 'create'"
-            title="Data & Applications"
-            name="data-and-apps"
-          >
-            <!-- Data Section -->
-            <h4 class="sidebar-section-title">Data</h4>
-            <div class="data-items-list">
-              <div
-                class="data-item data-source-item"
-                :class="{ disabled: isReadOnly }"
-                :draggable="!isReadOnly"
-                @dragstart="onDragStart(null, $event, 'data-source')"
-                @click="addStep('data-source', null, null)"
-              >
-                <IconFile class="data-item-icon" :width="20" :height="20" />
-                <div class="data-item-info">
-                  <div class="data-item-name">Source</div>
-                  <div class="data-item-description">Select input sources</div>
-                </div>
-              </div>
-              <div
-                class="data-item data-target-item"
-                :class="{ disabled: isReadOnly }"
-                :draggable="!isReadOnly"
-                @dragstart="onDragStart(null, $event, 'data-target')"
-                @click="addStep('data-target', null)"
-              >
-                <IconCollection
-                  class="data-item-icon"
-                  :width="20"
-                  :height="20"
-                />
-                <div class="data-item-info">
-                  <div class="data-item-name">Target</div>
-                  <div class="data-item-description">Select output target</div>
-                </div>
-              </div>
-            </div>
-
-            <!-- Applications Section -->
-            <h4 class="sidebar-section-title">Applications</h4>
-            <div v-if="isLoading" class="loading">Loading applications...</div>
-            <template v-else>
-              <el-input
-                v-model="applicationSearch"
-                size="small"
-                clearable
-                placeholder="Search applications"
-                class="application-search"
-              />
-              <div
-                v-if="!filteredApplications.length"
-                class="applications-empty"
-              >
-                <template v-if="availableApplications.length">
-                  No application matches &ldquo;{{ applicationSearch }}&rdquo;.
-                </template>
-                <template v-else>No applications available.</template>
-              </div>
-              <div class="applications-list">
-                <div
-                  v-for="app in filteredApplications"
-                  :key="app.uuid"
-                  class="application-item"
-                  :class="{ disabled: isReadOnly }"
-                  :draggable="!isReadOnly"
-                  @dragstart="onDragStart(app, $event, 'application')"
-                  @click="addStep('default', app)"
-                >
-                  <IconAnalysis class="app-icon" :width="20" :height="20" />
-                  <div class="app-info">
-                    <div class="app-name">{{ repoName(app) }}</div>
-                    <span
-                      v-if="visibilityLabel(app)"
-                      class="app-type-badge"
-                    >{{ visibilityLabel(app) }}</span>
-                    <div class="app-description">
-                      {{ (app.versions || []).length }}
-                      {{
-                        (app.versions || []).length === 1 ? "version" : "versions"
-                      }}
-                      <template v-if="latestVersion(app)">
-                        &middot; latest {{ latestVersion(app).version }}
-                      </template>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </template>
-          </el-collapse-item>
-
           <!-- Danger Zone (always last) -->
           <el-collapse-item
-            v-if="mode === 'browse' && selectedWorkflow"
+            v-if="mode === 'browse' && selectedWorkflow && !selectedNode"
             title="Danger Zone"
             name="danger-zone"
             class="danger-collapse-item"
@@ -2857,11 +2753,20 @@ const openNodeSettings = (id) => {
       :open="!!pickerFor"
       :title="pickerTitle"
       :applications="filteredApplications"
-      :app-name="repoName"
-      :app-line="(app) => app.description || ''"
+      :app-name="appDisplayName"
+      :app-line="(app) => [ioLine(versionManifest(app)), versionManifest(app)?.description || app.description].filter(Boolean).join(' · ')"
       @pick="onStepPicked"
       @close="pickerFor = null"
     />
+    <el-dialog
+      :model-value="!!appYml"
+      :title="appYml?.title"
+      width="640px"
+      append-to-body
+      @update:model-value="(v) => v || (appYml = null)"
+    >
+      <pre class="app-yml">{{ appYml?.text }}</pre>
+    </el-dialog>
   </div>
 </template>
 
@@ -3399,6 +3304,75 @@ const openNodeSettings = (id) => {
   font-size: 13px;
   color: theme.$gray_5;
   pointer-events: none;
+}
+
+.about {
+  margin: 4px 0 10px;
+  font-size: 12px;
+}
+.about-desc {
+  margin: 0 0 8px;
+  line-height: 1.4;
+  color: theme.$gray_6;
+}
+.about-ports {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 4px;
+}
+.about-label {
+  width: 62px;
+  color: theme.$gray_4;
+}
+.about-port {
+  padding: 1px 6px;
+  border-radius: 3px;
+  background: theme.$gray_0;
+  color: theme.$gray_6;
+}
+.about-none {
+  margin: 0 0 6px;
+  font-style: italic;
+  color: theme.$gray_4;
+}
+.about-links {
+  display: flex;
+  gap: 12px;
+  margin-top: 6px;
+}
+.advanced-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  margin: 12px 0 6px;
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  color: theme.$gray_5;
+  cursor: pointer;
+}
+.advanced-caret {
+  font-size: 10px;
+  transition: transform 0.12s ease;
+
+  &.open {
+    transform: rotate(90deg);
+  }
+}
+.app-yml {
+  max-height: 60vh;
+  margin: 0;
+  padding: 10px 12px;
+  overflow: auto;
+  background: theme.$gray_1;
+  border: 1px solid theme.$gray_2;
+  font-size: 12px;
 }
 
 .canvas-toolbar {
