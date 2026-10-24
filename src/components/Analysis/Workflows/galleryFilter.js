@@ -3,6 +3,7 @@
 import { appNames, ioSummary, outputLabel } from "./workflowSummary";
 import { normalizeUrl } from "../RunMonitor/runHelpers";
 import { versionManifest } from "../WorkflowBuilder/appManifestInfo";
+import { isNotebookWorkflow } from "../RunMonitor/notebookHelpers";
 
 // Whether a workflow matches a search: its name, description, the apps it
 // runs, or what goes in and comes out ("spike" finds the one running
@@ -34,10 +35,16 @@ export function outputOptions(list, targetTypes = []) {
     .sort((a, b) => a.label.localeCompare(b.label));
 }
 
-export function applyFilters(list, { query, input = "any", output = "any", officialOnly = false, ...context } = {}) {
+// officialOnly keeps Pennsieve's; notebooksOnly its notebooks (a notebook
+// kernel must be official, as on the Notebooks tab).
+export function applyFilters(
+  list,
+  { query, input = "any", output = "any", officialOnly = false, notebooksOnly = false, ...context } = {}
+) {
   return list.filter(
     (wf) =>
       (!officialOnly || wf.official) &&
+      (!notebooksOnly || (wf.official && isNotebookWorkflow(wf))) &&
       (input === "any" || inputKind(wf) === input) &&
       (output === "any" || outputTypes(wf).includes(output)) &&
       matchesSearch(wf, query, context)
