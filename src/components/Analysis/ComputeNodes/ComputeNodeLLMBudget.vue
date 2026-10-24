@@ -1,119 +1,49 @@
 <template>
   <div class="llm-budget-admin" v-loading="isLoading">
-    <p class="section-blurb">
-      Caps what this node may spend on LLM calls. Enforced at the governor: once
-      a cap is reached, every further invocation is rejected until the period
-      rolls over.
-      <span class="propagation-note">
-        Node budget changes take effect within ~60 seconds (the governor caches
-        the value). Unset per-user fields fall back to the platform safety cap.
-      </span>
+    <p class="cn-blurb">
+      What AI models may cost on this node, for chat and apps. Changes apply
+      within a minute.
+    </p>
+    <!-- No budget here isn't unlimited: AI calls are refused until one is set. -->
+    <p v-if="!nodeConfig && !isLoading" class="budget-warning">
+      No budget set, so AI calls on this node are refused.
     </p>
 
-    <!-- Node-wide pot: all callers combined, chat and workflow applications
-         alike. Listed first because it outranks the per-user axes — if this is
-         exhausted, raising one user's cap achieves nothing. It is also the only
-         layer that catches non-chat callers. -->
-    <div class="policy-card">
-      <div class="policy-card-head">
-        <div>
-          <h3 class="policy-title">Node-wide budget</h3>
-          <p class="policy-subtitle">
-            Total across all callers on this node — chat <em>and</em> workflow
-            applications.
-          </p>
-        </div>
-        <button type="button" v-if="isOwner" class="cn-action" @click="openEditNode">
-          {{ nodeConfig ? 'Edit' : 'Set' }}
-        </button>
-      </div>
-      <div class="caps-grid">
-        <div class="cap-cell">
-          <span class="cap-label">Budget cap</span>
-          <span class="cap-value" :class="{ unset: !nodeConfig }">
-            {{ nodeConfig ? formatUsd(nodeConfig.budgetUsd) : '—' }}
+    <ul class="cn-list">
+      <li class="budget-row">
+        <span class="budget-who">Whole node</span>
+        <span class="budget-limits" :class="{ unset: !nodeConfig }">
+          {{ nodeConfig ? `${formatUsd(nodeConfig.budgetUsd)} ${periodPhrase(nodeConfig.budgetPeriod)}` : 'Not set' }}
+        </span>
+        <span v-if="isOwner" class="budget-actions">
+          <button type="button" class="cn-action" @click="openEditNode">{{ nodeConfig ? 'Edit' : 'Set' }}</button>
+        </span>
+      </li>
+      <!-- Per user: chat only; apps count against the node's budget alone. -->
+      <li v-if="perUser" class="budget-row" :title="defaultRow?.notes || 'Limits chat only; apps count against the whole node.'">
+        <span class="budget-who">Each user's chat</span>
+        <span class="budget-limits" :class="{ unset: !limitSummary(defaultRow) }">{{ limitSummary(defaultRow) || 'Platform default' }}</span>
+        <span v-if="isOwner" class="budget-actions">
+          <button type="button" class="cn-action" @click="openEditDefault">{{ defaultRow ? 'Edit' : 'Set' }}</button>
+        </span>
+      </li>
+      <!-- #quotas is what the chat panel's "Manage quotas" link opens. -->
+      <template v-if="perUser">
+        <li v-for="(row, i) in userRows" :id="i === 0 ? 'quotas' : undefined" :key="row.userId" class="budget-row" :title="row.notes || undefined">
+          <span class="budget-who">{{ getUserName(row.userId) }}</span>
+          <span class="budget-limits" :class="{ unset: !limitSummary(row) }">{{ limitSummary(row) || 'Platform default' }}</span>
+          <span v-if="isOwner" class="budget-actions">
+            <button type="button" class="cn-action" @click="openEditUser(row)">Edit</button>
+            <button type="button" class="cn-icon-button" title="Remove" @click="confirmDelete(row)">&times;</button>
           </span>
-        </div>
-        <div class="cap-cell">
-          <span class="cap-label">Period</span>
-          <span class="cap-value" :class="{ unset: !nodeConfig }">
-            {{ nodeConfig ? periodLabel(nodeConfig.budgetPeriod) : '—' }}
-          </span>
-        </div>
-      </div>
-      <!-- Unlike the pipeline axes, no budget here is not "unlimited" — the
-           governor rejects everything until a cap exists. Worth saying plainly. -->
-      <p v-if="!nodeConfig && !isLoading" class="empty-warning">
-        No budget configured. The governor will reject all LLM calls on this
-        node until a cap is set.
-      </p>
-    </div>
+        </li>
+        <li v-if="isOwner" :id="userRows.length ? undefined : 'quotas'" class="budget-add">
+          <button type="button" class="cn-link-button" @click="openAddUser">+ A limit for one user</button>
+        </li>
+      </template>
+    </ul>
 
-    <!-- Per-user default. Chat only: workflow applications are governed solely
-         by the node budget above. -->
-    <div v-if="perUser" class="policy-card">
-      <div class="policy-card-head">
-        <div>
-          <h3 class="policy-title">Default per user</h3>
-          <p class="policy-subtitle">
-            Applies to each user individually, unless they have an override
-            below. Gates chat only — workflow applications are governed solely
-            by the node budget.
-          </p>
-        </div>
-        <button type="button" v-if="isOwner" class="cn-action" @click="openEditDefault">
-          {{ defaultRow ? 'Edit' : 'Set' }}
-        </button>
-      </div>
-      <div class="caps-grid">
-        <div v-for="axis in USER_AXES" :key="axis.key" class="cap-cell">
-          <span class="cap-label">{{ axis.label }}</span>
-          <span class="cap-value" :class="{ unset: !isSet(defaultRow, axis.key) }">
-            {{ formatAxis(defaultRow, axis.key) }}
-          </span>
-        </div>
-      </div>
-      <p v-if="defaultRow?.notes" class="notes-line">{{ defaultRow.notes }}</p>
-    </div>
-
-    <!-- Per-user overrides. The `#quotas` anchor is what the chat panel's
-         "Manage quotas" link targets, so it has to stay on this block. -->
-    <div v-if="perUser" id="quotas" class="overrides-block">
-      <div class="overrides-head">
-        <h3 class="overrides-title">User overrides</h3>
-        <button type="button" v-if="isOwner" class="cn-action cn-action--primary" @click="openAddUser">Add user</button>
-      </div>
-
-      <div v-if="userRows.length === 0" class="overrides-empty">
-        No user-specific overrides — all users follow the default above.
-      </div>
-
-      <table v-else class="overrides-table">
-        <thead>
-          <tr>
-            <th>User</th>
-            <th v-for="axis in USER_AXES" :key="axis.key">{{ axis.label }}</th>
-            <th>Notes</th>
-            <th v-if="isOwner" class="actions-col">Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="row in userRows" :key="row.userId">
-            <td>{{ getUserName(row.userId) }}</td>
-            <td v-for="axis in USER_AXES" :key="axis.key" :class="{ unset: !isSet(row, axis.key) }">
-              {{ formatAxis(row, axis.key) }}
-            </td>
-            <td class="notes-cell">{{ row.notes || '' }}</td>
-            <td v-if="isOwner" class="actions-col">
-              <button class="row-action" @click="openEditUser(row)">Edit</button>
-              <button class="row-action danger" @click="confirmDelete(row)">Remove</button>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-
-    <p v-if="loadError" class="error-line">Couldn't load LLM budget: {{ loadError.message }}</p>
+    <p v-if="loadError" class="error-line">Couldn't load the AI budget: {{ loadError.message }}</p>
 
     <QuotaEditModal
       v-model:visible="modalOpen"
@@ -149,6 +79,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import QuotaEditModal from './QuotaEditModal.vue'
 import { useChatQuotaAdminStore, DEFAULT_USER_SENTINEL } from '@/stores/chatQuotaAdminStore'
 import { useNodeLlmBudgetStore } from '@/stores/nodeLlmBudgetStore'
+import { limitSummary } from './computeNodeHelpers'
 
 const props = defineProps({
   nodeId: { type: String, required: true },
@@ -158,11 +89,6 @@ const props = defineProps({
   perUser: { type: Boolean, default: true },
 })
 
-const USER_AXES = [
-  { key: 'dailyCostUsd', label: 'Daily' },
-  { key: 'monthlyCostUsd', label: 'Monthly' },
-  { key: 'perWorkflowUsd', label: 'Per workflow' },
-]
 
 const vuexStore = useStore()
 const adminStore = useChatQuotaAdminStore()
@@ -253,20 +179,14 @@ function getUserName(userId) {
   return String(userId).includes(':') ? String(userId).split(':').pop() : String(userId)
 }
 
-const isSet = (row, key) => row?.[key] !== null && row?.[key] !== undefined
 
 function formatUsd(v) {
   if (v === null || v === undefined) return '—'
   return `$${Number(v).toFixed(2)}`
 }
 
-const formatAxis = (row, key) => formatUsd(row?.[key])
-
-function periodLabel(p) {
-  if (p === 'daily') return 'Daily'
-  if (p === 'monthly') return 'Monthly'
-  return p || '—'
-}
+// "a day", "a month": after the amount.
+const periodPhrase = (p) => (p === 'monthly' ? 'a month' : 'a day')
 
 function load() {
   if (!props.nodeId) return
@@ -279,191 +199,45 @@ watch(() => props.nodeId, load)
 </script>
 
 <style scoped lang="scss">
-@use '../../../styles/_theme.scss';
+@use '../../../styles/theme';
 @use './computeNodePage';
 
-.llm-budget-admin {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
+// One short line, then a list: a row per limit (the node's, each user's,
+// a user's own), its limits in one line and its actions at the right.
+.budget-row {
+  .budget-who {
+    font-weight: 500;
+    color: theme.$gray_6;
+  }
+  .budget-limits {
+    margin-left: auto;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: theme.$gray_6;
 
-.section-blurb {
-  margin: 0;
-  font-size: 13px;
-  color: theme.$gray_5;
-  line-height: 1.5;
-
-  em { font-style: italic; }
-}
-
-.propagation-note {
-  display: block;
-  margin-top: 6px;
-  font-size: 12px;
-  color: theme.$gray_4;
-}
-
-/* Square, as the page's other cards (cn-card). */
-.policy-card {
-  border: 1px solid theme.$gray_2;
-  padding: 16px;
-  background: theme.$gray_1;
-}
-
-.policy-card-head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 12px;
-}
-
-.policy-title {
-  margin: 0 0 4px 0;
-  font-size: 14px;
-  font-weight: 600;
-  color: theme.$gray_6;
-}
-
-.policy-subtitle {
-  margin: 0;
-  font-size: 13px;
-  color: theme.$gray_5;
-
-  em { font-style: italic; }
-}
-
-.caps-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-  gap: 12px;
-}
-
-.cap-cell {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.cap-label {
-  font-size: 12px;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: theme.$gray_5;
-}
-
-.cap-value {
-  font-size: 16px;
-  font-weight: 600;
-  color: theme.$purple_3;
-
-  &.unset {
-    color: theme.$gray_4;
-    font-weight: 400;
+    &.unset {
+      color: theme.$gray_4;
+    }
+  }
+  .budget-actions {
+    display: flex;
+    flex-shrink: 0;
+    align-items: center;
+    gap: 8px;
   }
 }
-
-.empty-warning {
-  margin: 12px 0 0 0;
-  font-size: 12px;
-  color: theme.$orange_1;
-  line-height: 1.5;
+.budget-add {
+  justify-content: flex-start !important;
 }
-
-.notes-line {
-  margin: 12px 0 0 0;
-  font-size: 12px;
-  color: theme.$gray_5;
-  font-style: italic;
-}
-
-.overrides-block {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.overrides-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.overrides-title {
-  margin: 0;
-  font-size: 14px;
-  font-weight: 600;
-  color: theme.$gray_6;
-}
-
-.overrides-empty {
+.budget-warning {
+  margin: 0 0 12px;
   font-size: 13px;
-  color: theme.$gray_5;
-  padding: 12px;
-  background: theme.$gray_1;
-  border: 1px dashed theme.$gray_2;
-}
-
-.overrides-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 13px;
-}
-
-.overrides-table th,
-.overrides-table td {
-  text-align: left;
-  padding: 8px 10px;
-  border-bottom: 1px solid theme.$gray_2;
-}
-
-.overrides-table th {
-  font-size: 12px;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: theme.$gray_5;
-  font-weight: 500;
-}
-
-.overrides-table td.unset {
-  color: theme.$gray_4;
-}
-
-.actions-col {
-  width: 1%;
-  white-space: nowrap;
-}
-
-.notes-cell {
-  color: theme.$gray_5;
-  max-width: 220px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.row-action {
-  background: transparent;
-  border: none;
-  color: theme.$purple_2;
-  font-size: 13px;
-  padding: 2px 6px;
-  cursor: pointer;
-
-  &:hover { color: theme.$purple_3; }
-}
-
-.row-action.danger {
   color: theme.$red_2;
-
-  &:hover { color: theme.$red_1; }
 }
-
 .error-line {
-  margin: 8px 0 0 0;
-  font-size: 12px;
+  margin: 8px 0 0;
+  font-size: 13px;
   color: theme.$red_2;
 }
-
 </style>

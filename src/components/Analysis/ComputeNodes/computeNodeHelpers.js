@@ -145,3 +145,21 @@ export function relativeTime(dateString, now = Date.now()) {
   if (d < 30) return `${d} d ago`;
   return new Date(then).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
 }
+
+// A budget row's limits in one line ("$5.00 a day · 3 runs at once"), from
+// the axes it sets; "" when it sets none.
+const LIMIT_PHRASES = {
+  dailyCostUsd: (v) => `${usd(v)} a day`,
+  monthlyCostUsd: (v) => `${usd(v)} a month`,
+  perRunCostUsd: (v) => `${usd(v)} per run`,
+  perWorkflowUsd: (v) => `${usd(v)} per workflow`,
+  maxConcurrentRuns: (v) => `${v} ${Number(v) === 1 ? "run" : "runs"} at once`,
+};
+const usd = (v) => `$${Number(v).toFixed(2)}`;
+export function limitSummary(row, keys = Object.keys(LIMIT_PHRASES)) {
+  if (!row) return "";
+  return keys
+    .filter((k) => row[k] !== null && row[k] !== undefined && LIMIT_PHRASES[k])
+    .map((k) => LIMIT_PHRASES[k](row[k]))
+    .join(" · ");
+}

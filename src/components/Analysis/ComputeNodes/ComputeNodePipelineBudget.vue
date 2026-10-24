@@ -1,19 +1,11 @@
 <template>
   <div class="pipeline-budget-admin" v-loading="isLoading">
-    <p class="section-blurb">
-      Caps what analysis pipelines may spend on this node. Enforced at run
-      creation: a submission that would breach a cap is rejected before any
-      compute starts.
-      <span class="propagation-note">
-        Unlike LLM quotas, pipeline axes are <strong>unlimited</strong> unless
-        set here — pipeline compute runs in this node's own AWS account.
-      </span>
+    <p class="cn-blurb">
+      What workflow runs may spend on this node. Runs over a limit don't start;
+      with no limits set, there are none.
     </p>
 
-    <!-- Live consumption against the caller's own resolved limits. Rendered
-         above the policy cards so an owner checking "is anything actually
-         hitting these?" sees the answer first. Hides itself entirely on an
-         unconfigured node. -->
+    <!-- Spend so far against the limits; hides itself when there are none. -->
     <PipelineBudgetMeter
       :budget="meterBudget"
       :spend-axes="meterSpendAxes"
@@ -24,115 +16,39 @@
       :error="meterError"
     />
 
-    <!-- Node-wide pot: all users combined. Listed first because it outranks
-         the per-user axes — if this is exhausted, raising one user's cap
-         achieves nothing. -->
-    <div class="policy-card">
-      <div class="policy-card-head">
-        <div>
-          <h3 class="policy-title">Node-wide budget</h3>
-          <p class="policy-subtitle">
-            Total across all users of this node. No per-run ceiling here — a
-            per-run cap is a property of a single run, so set it below.
-          </p>
-        </div>
-        <button type="button" v-if="isOwner" class="cn-action" @click="openEditNode">
-          {{ nodeRow ? 'Edit' : 'Set' }}
-        </button>
-      </div>
-      <div class="caps-grid">
-        <div v-for="axis in nodeAxes" :key="axis.key" class="cap-cell">
-          <span class="cap-label">{{ axis.label }}</span>
-          <span class="cap-value" :class="{ unset: !isSet(nodeRow, axis.key) }">
-            {{ formatAxis(nodeRow, axis) }}
+    <ul class="cn-list">
+      <li class="budget-row" :title="nodeRow?.notes || undefined">
+        <span class="budget-who">Whole node</span>
+        <span class="budget-limits" :class="{ unset: !nodeLimits }">{{ nodeLimits || 'No limit' }}</span>
+        <span v-if="isOwner" class="budget-actions">
+          <button type="button" class="cn-action" @click="openEditNode">{{ nodeRow ? 'Edit' : 'Set' }}</button>
+          <button v-if="nodeRow" type="button" class="cn-icon-button" title="Remove" @click="confirmClear('node', 'the node-wide budget')">&times;</button>
+        </span>
+      </li>
+      <li v-if="perUser" class="budget-row" :title="defaultRow?.notes || undefined">
+        <span class="budget-who">Each user</span>
+        <span class="budget-limits" :class="{ unset: !defaultLimits }">{{ defaultLimits || 'No limit' }}</span>
+        <span v-if="isOwner" class="budget-actions">
+          <button type="button" class="cn-action" @click="openEditDefault">{{ defaultRow ? 'Edit' : 'Set' }}</button>
+          <button v-if="defaultRow" type="button" class="cn-icon-button" title="Remove" @click="confirmClear('default', 'the per-user default')">&times;</button>
+        </span>
+      </li>
+      <template v-if="perUser">
+        <li v-for="row in userRows" :key="row.userId" class="budget-row" :title="row.notes || undefined">
+          <span class="budget-who">{{ getUserName(row.userId) }}</span>
+          <span class="budget-limits" :class="{ unset: !limitSummary(row) }">{{ limitSummary(row) || 'No limit' }}</span>
+          <span v-if="isOwner" class="budget-actions">
+            <button type="button" class="cn-action" @click="openEditUser(row)">Edit</button>
+            <button type="button" class="cn-icon-button" title="Remove" @click="confirmClear(row.userId, `the limit for ${getUserName(row.userId)}`)">&times;</button>
           </span>
-        </div>
-      </div>
-      <p v-if="nodeRow?.notes" class="notes-line">{{ nodeRow.notes }}</p>
-      <!-- No rows at all is the normal state, and it means unlimited, unlike
-           the AI budget, where none blocks everything. -->
-      <p v-if="!isConfigured && !isLoading" class="empty-note">
-        No limits set: pipelines on this node can spend without a cap.
-      </p>
-      <div v-if="isOwner && nodeRow" class="card-actions">
-        <button class="row-action danger" @click="confirmClear('node', 'the node-wide budget')">
-          Remove
-        </button>
-      </div>
-    </div>
+        </li>
+        <li v-if="isOwner" class="budget-add">
+          <button type="button" class="cn-link-button" @click="openAddUser">+ A limit for one user</button>
+        </li>
+      </template>
+    </ul>
 
-    <!-- Per-user default. -->
-    <div v-if="perUser" class="policy-card">
-      <div class="policy-card-head">
-        <div>
-          <h3 class="policy-title">Default per user</h3>
-          <p class="policy-subtitle">
-            Applies to each user individually, unless they have an override
-            below.
-          </p>
-        </div>
-        <button type="button" v-if="isOwner" class="cn-action" @click="openEditDefault">
-          {{ defaultRow ? 'Edit' : 'Set' }}
-        </button>
-      </div>
-      <div class="caps-grid">
-        <div v-for="axis in userAxes" :key="axis.key" class="cap-cell">
-          <span class="cap-label">{{ axis.label }}</span>
-          <span class="cap-value" :class="{ unset: !isSet(defaultRow, axis.key) }">
-            {{ formatAxis(defaultRow, axis) }}
-          </span>
-        </div>
-      </div>
-      <p v-if="defaultRow?.notes" class="notes-line">{{ defaultRow.notes }}</p>
-      <div v-if="isOwner && defaultRow" class="card-actions">
-        <button class="row-action danger" @click="confirmClear('default', 'the per-user default')">
-          Remove
-        </button>
-      </div>
-    </div>
-
-    <!-- Per-user overrides. -->
-    <div v-if="perUser" class="overrides-block">
-      <div class="overrides-head">
-        <h3 class="overrides-title">User overrides</h3>
-        <button type="button" v-if="isOwner" class="cn-action cn-action--primary" @click="openAddUser">Add user</button>
-      </div>
-
-      <div v-if="userRows.length === 0" class="overrides-empty">
-        No user-specific overrides — all users follow the default above.
-      </div>
-
-      <table v-else class="overrides-table">
-        <thead>
-          <tr>
-            <th>User</th>
-            <th v-for="axis in userAxes" :key="axis.key">{{ axis.label }}</th>
-            <th>Notes</th>
-            <th v-if="isOwner" class="actions-col">Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="row in userRows" :key="row.userId">
-            <td>{{ getUserName(row.userId) }}</td>
-            <td v-for="axis in userAxes" :key="axis.key" :class="{ unset: !isSet(row, axis.key) }">
-              {{ formatAxis(row, axis) }}
-            </td>
-            <td class="notes-cell">{{ row.notes || '' }}</td>
-            <td v-if="isOwner" class="actions-col">
-              <button class="row-action" @click="openEditUser(row)">Edit</button>
-              <button
-                class="row-action danger"
-                @click="confirmClear(row.userId, `the override for ${getUserName(row.userId)}`)"
-              >
-                Remove
-              </button>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-
-    <p v-if="loadError" class="error-line">Couldn't load pipeline budget: {{ loadError.message }}</p>
+    <p v-if="loadError" class="error-line">Couldn't load the pipeline budget: {{ loadError.message }}</p>
 
     <PipelineQuotaEditModal
       v-model:visible="modalOpen"
@@ -152,12 +68,9 @@ import { useStore } from 'vuex'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import PipelineBudgetMeter from './PipelineBudgetMeter.vue'
 import PipelineQuotaEditModal from './PipelineQuotaEditModal.vue'
-import {
-  useNodePipelineQuotaStore,
-  axesForScope,
-  SCOPE_NODE,
-} from '@/stores/nodePipelineQuotaStore'
+import { useNodePipelineQuotaStore } from '@/stores/nodePipelineQuotaStore'
 import { usePipelineBudgetStore } from '@/stores/pipelineBudgetStore'
+import { limitSummary } from './computeNodeHelpers'
 
 const props = defineProps({
   nodeId: { type: String, required: true },
@@ -181,8 +94,8 @@ const isLoading = computed(() => store.isLoading(props.nodeId))
 const isConfigured = computed(() => store.isConfigured(props.nodeId))
 const loadError = computed(() => store.getError(props.nodeId))
 
-const nodeAxes = axesForScope(SCOPE_NODE)
-const userAxes = axesForScope('')
+const nodeLimits = computed(() => limitSummary(nodeRow.value))
+const defaultLimits = computed(() => limitSummary(defaultRow.value))
 
 // Meter wiring — the same props ChatQuotaHeader-style presentational components
 // expect. Reads workflow-service rather than account-service: account-service
@@ -270,16 +183,9 @@ function getUserName(userId) {
   return String(userId).includes(':') ? String(userId).split(':').pop() : String(userId)
 }
 
-const isSet = (row, key) => row?.[key] !== null && row?.[key] !== undefined
 
 // An em-dash means "not set here" — the axis falls through. A literal 0 is a
 // real cap, so it must never render as unset.
-function formatAxis(row, axis) {
-  const v = row?.[axis.key]
-  if (v === null || v === undefined) return '—'
-  if (axis.unit === 'usd') return `$${Number(v).toFixed(2)}`
-  return String(v)
-}
 
 function load() {
   if (!props.nodeId) return
@@ -292,193 +198,45 @@ watch(() => props.nodeId, load)
 </script>
 
 <style scoped lang="scss">
-@use '../../../styles/_theme.scss';
+@use '../../../styles/theme';
 @use './computeNodePage';
 
-.pipeline-budget-admin {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
+// One short line, then a list: a row per limit (the node's, each user's,
+// a user's own), its limits in one line and its actions at the right.
+.budget-row {
+  .budget-who {
+    font-weight: 500;
+    color: theme.$gray_6;
+  }
+  .budget-limits {
+    margin-left: auto;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: theme.$gray_6;
 
-.section-blurb {
-  margin: 0;
-  font-size: 13px;
-  color: theme.$gray_5;
-  line-height: 1.5;
-
-  strong { color: theme.$gray_6; }
-}
-
-.propagation-note {
-  display: block;
-  margin-top: 6px;
-  font-size: 12px;
-  color: theme.$gray_4;
-}
-
-/* Square, as the page's other cards (cn-card). */
-.policy-card {
-  border: 1px solid theme.$gray_2;
-  padding: 16px;
-  background: theme.$gray_1;
-}
-
-.policy-card-head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 12px;
-}
-
-.policy-title {
-  margin: 0 0 4px 0;
-  font-size: 14px;
-  font-weight: 600;
-  color: theme.$gray_6;
-}
-
-.policy-subtitle {
-  margin: 0;
-  font-size: 13px;
-  color: theme.$gray_5;
-}
-
-.caps-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-  gap: 12px;
-}
-
-.cap-cell {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.cap-label {
-  font-size: 12px;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: theme.$gray_5;
-}
-
-.cap-value {
-  font-size: 16px;
-  font-weight: 600;
-  color: theme.$purple_3;
-
-  &.unset {
-    color: theme.$gray_4;
-    font-weight: 400;
+    &.unset {
+      color: theme.$gray_4;
+    }
+  }
+  .budget-actions {
+    display: flex;
+    flex-shrink: 0;
+    align-items: center;
+    gap: 8px;
   }
 }
-
-.empty-note {
-  margin: 12px 0 0 0;
-  font-size: 12px;
-  color: theme.$gray_5;
-  line-height: 1.5;
+.budget-add {
+  justify-content: flex-start !important;
 }
-
-.notes-line {
-  margin: 12px 0 0 0;
-  font-size: 12px;
-  color: theme.$gray_5;
-  font-style: italic;
-}
-
-.card-actions {
-  margin-top: 12px;
-}
-
-.overrides-block {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.overrides-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.overrides-title {
-  margin: 0;
-  font-size: 14px;
-  font-weight: 600;
-  color: theme.$gray_6;
-}
-
-.overrides-empty {
+.budget-warning {
+  margin: 0 0 12px;
   font-size: 13px;
-  color: theme.$gray_5;
-  padding: 12px;
-  background: theme.$gray_1;
-  border: 1px dashed theme.$gray_2;
-}
-
-.overrides-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 13px;
-}
-
-.overrides-table th,
-.overrides-table td {
-  text-align: left;
-  padding: 8px 10px;
-  border-bottom: 1px solid theme.$gray_2;
-}
-
-.overrides-table th {
-  font-size: 12px;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: theme.$gray_5;
-  font-weight: 500;
-}
-
-.overrides-table td.unset {
-  color: theme.$gray_4;
-}
-
-.actions-col {
-  width: 1%;
-  white-space: nowrap;
-}
-
-.notes-cell {
-  color: theme.$gray_5;
-  max-width: 220px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.row-action {
-  background: transparent;
-  border: none;
-  color: theme.$purple_2;
-  font-size: 13px;
-  padding: 2px 6px;
-  cursor: pointer;
-
-  &:hover { color: theme.$purple_3; }
-}
-
-.row-action.danger {
   color: theme.$red_2;
-
-  &:hover { color: theme.$red_1; }
 }
-
 .error-line {
-  margin: 8px 0 0 0;
-  font-size: 12px;
+  margin: 8px 0 0;
+  font-size: 13px;
   color: theme.$red_2;
 }
-
 </style>
