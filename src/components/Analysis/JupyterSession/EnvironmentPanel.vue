@@ -22,7 +22,8 @@ const props = defineProps({
   kernelName: { type: String, default: "" },
 });
 
-const available = ref(false); // the site and the session can switch
+const available = ref(false); // the site has environments-service
+const outdated = ref(false); // the session's node predates environments
 const collapsed = ref(false);
 const loading = ref(false);
 const error = ref(null);
@@ -66,8 +67,8 @@ async function load() {
   loading.value = true;
   error.value = null;
   try {
-    await readState();
     available.value = true;
+    await readState();
     const list = await listEnvironments();
     environments.value = list;
     // An environment whose latest version is building or failed may still
@@ -77,7 +78,7 @@ async function load() {
     versionsById.value = Object.fromEntries(others.map((e, i) => [e.id, read[i]?.versions || []]));
   } catch (e) {
     if (e instanceof SessionEnvironmentsUnavailable) {
-      available.value = false;
+      outdated.value = true;
       return;
     }
     console.warn("[environment]", e?.message || e);
@@ -150,7 +151,7 @@ async function send(request) {
 watch(
   () => props.ready,
   (ready) => {
-    if (ready && !available.value && !loading.value) load();
+    if (ready && !available.value && !outdated.value && !loading.value) load();
   },
   { immediate: true }
 );
@@ -161,11 +162,16 @@ onBeforeUnmount(() => clearTimeout(pollTimer));
   <div v-if="available && isPython" class="env" :class="{ 'env--collapsed': collapsed }">
     <button class="env__head" :aria-expanded="!collapsed" @click="collapsed = !collapsed">
       <span class="env__title">Environment</span>
-      <span v-if="collapsed" class="env__peek">{{ current ? current.name : "Image packages" }}</span>
+      <span v-if="collapsed && !outdated" class="env__peek">{{ current ? current.name : "Image packages" }}</span>
       <el-icon class="env__chevron" :class="{ 'is-open': !collapsed }"><ArrowRight /></el-icon>
     </button>
 
     <div v-if="!collapsed" class="env__body">
+      <p v-if="outdated" class="env__msg">
+        This notebook's compute node needs an update before it can switch environments. Update the node, then start
+        a new notebook.
+      </p>
+      <template v-else>
       <div class="env__current">
         <template v-if="current">
           <div class="env__name">{{ current.name }}</div>
@@ -229,6 +235,7 @@ onBeforeUnmount(() => clearTimeout(pollTimer));
       </template>
       <p v-else-if="!loading" class="env__msg">You have no environments yet.</p>
       <p v-else class="env__msg">Loading your environments…</p>
+      </template>
     </div>
   </div>
 </template>
