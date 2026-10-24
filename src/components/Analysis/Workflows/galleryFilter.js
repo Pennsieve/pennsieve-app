@@ -1,6 +1,8 @@
 // Searching, filtering and sorting the Gallery's workflows: pure, so the
 // rules are easy to test and change.
 import { appNames, ioSummary, outputLabel } from "./workflowSummary";
+import { normalizeUrl } from "../RunMonitor/runHelpers";
+import { versionManifest } from "../WorkflowBuilder/appManifestInfo";
 
 // Whether a workflow matches a search: its name, description, the apps it
 // runs, or what goes in and comes out ("spike" finds the one running
@@ -48,17 +50,36 @@ const created = (wf) => Date.parse(wf?.createdAt || "") || 0;
 const runs = (wf) => wf?.metrics?.totalRuns ?? 0;
 
 export const SORTS = [
+  { value: "recommended", label: "Recommended" },
   { value: "recent", label: "Recently used" },
   { value: "runs", label: "Most run" },
   { value: "newest", label: "Newest" },
   { value: "name", label: "Name" },
 ];
 
+// Whether every app step's app has an app.yml (a workflow of no apps does).
+function appsDeclared(wf, applications) {
+  const byUrl = new Map((applications || []).map((a) => [normalizeUrl(a.sourceUrl), a]));
+  return (wf?.dag || [])
+    .filter((n) => n.sourceUrl)
+    .every((n) => versionManifest(byUrl.get(normalizeUrl(n.sourceUrl))));
+}
+
+// Recommended, in tiers that can be explained: official first, then active
+// ones, then those whose apps all have an app.yml, then the most run, then
+// the most recently run.
+export function recommendedTier(wf, applications = []) {
+  return [wf?.official ? 0 : 1, wf?.isActive === false ? 1 : 0, appsDeclared(wf, applications) ? 0 : 1];
+}
+
 // Sorted copies; ties go to the newest, then by name.
-export function sortWorkflows(list, sort = "recent") {
+export function sortWorkflows(list, sort = "recent", { applications = [] } = {}) {
   const byName = (a, b) => (a.name || "").localeCompare(b.name || "");
   const tie = (a, b) => created(b) - created(a) || byName(a, b);
+  const tiers = sort === "recommended" ? new Map(list.map((wf) => [wf, recommendedTier(wf, applications)])) : null;
+  const byTier = (a, b) => tiers.get(a).reduce((d, t, i) => d || t - tiers.get(b)[i], 0);
   const cmp = {
+    recommended: (a, b) => byTier(a, b) || runs(b) - runs(a) || lastRun(b) - lastRun(a) || tie(a, b),
     recent: (a, b) => lastRun(b) - lastRun(a) || tie(a, b),
     runs: (a, b) => runs(b) - runs(a) || tie(a, b),
     newest: tie,

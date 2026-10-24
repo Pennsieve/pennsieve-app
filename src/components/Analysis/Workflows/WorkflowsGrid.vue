@@ -35,9 +35,9 @@ const SORT_KEY = "pennsieve.gallery.workflowSort";
 const storedSort = () => {
   try {
     const v = localStorage.getItem(SORT_KEY);
-    return SORTS.some((o) => o.value === v) ? v : "recent";
+    return SORTS.some((o) => o.value === v) ? v : "recommended";
   } catch {
-    return "recent";
+    return "recommended";
   }
 };
 const sortBy = ref(storedSort());
@@ -97,7 +97,8 @@ const filteredWorkflows = computed(() =>
       applications: applications.value,
       targetTypes: targetTypes.value,
     }),
-    sortBy.value
+    sortBy.value,
+    { applications: applications.value }
   )
 );
 

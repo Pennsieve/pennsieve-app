@@ -64,3 +64,27 @@ describe("sortWorkflows", () => {
     expect(sortWorkflows(all, "name").map((w) => w.name)).toEqual(["Alpha", "EEG spikes", "Zip it"]);
   });
 });
+
+describe("recommended order", () => {
+  const app = (url, manifest) => ({ sourceUrl: url, versions: [{ version: "v1", createdAt: "2026-01-01", manifest }] });
+  const applications = [app("https://github.com/a/declared", { tags: [] }), app("https://github.com/a/bare", null)];
+  const wf = (name, extra) => ({ name, createdAt: "2026-01-01", dag: [], ...extra });
+  const step = (url) => ({ id: url, sourceUrl: url });
+
+  it("puts official, then active, then declared apps first, then the most run", () => {
+    const list = [
+      wf("bare", { isActive: true, dag: [step("https://github.com/a/bare")], metrics: { totalRuns: 50 } }),
+      wf("declared", { isActive: true, dag: [step("https://github.com/a/declared/")], metrics: { totalRuns: 1 } }),
+      wf("inactive", { isActive: false, metrics: { totalRuns: 99 } }),
+      wf("official", { official: true, isActive: true }),
+      wf("busy", { isActive: true, dag: [step("https://github.com/a/declared")], metrics: { totalRuns: 5 } }),
+    ];
+    expect(sortWorkflows(list, "recommended", { applications }).map((w) => w.name)).toEqual([
+      "official",
+      "busy",
+      "declared",
+      "bare",
+      "inactive",
+    ]);
+  });
+});

@@ -163,9 +163,9 @@ const SORT_KEY = "pennsieve.gallery.appSort";
 const storedSort = () => {
   try {
     const v = localStorage.getItem(SORT_KEY);
-    return APP_SORTS.some((o) => o.value === v) ? v : "used";
+    return APP_SORTS.some((o) => o.value === v) ? v : "recommended";
   } catch {
-    return "used";
+    return "recommended";
   }
 };
 const sortBy = ref(storedSort());

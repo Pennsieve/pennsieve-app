@@ -60,3 +60,24 @@ describe("app cards", () => {
     expect(sortApps([zip, spike], "name").map(appTitle)).toEqual(["spike-detect", "zipper"]);
   });
 });
+
+describe("recommended order", () => {
+  const v = (status, manifest, createdAt = "2026-01-01") => ({ version: "v1", status, createdAt, manifest });
+  it("puts runnable apps first, then those with an app.yml, then the most used", () => {
+    const list = [
+      { name: "failed", versions: [v("error", { tags: [] })] },
+      { name: "bare", versions: [v("deployed", null)] },
+      { name: "deploying", versions: [v("deploying", { tags: [] })] },
+      { name: "declared", versions: [v("deployed", { tags: [] })] },
+      { name: "declared-used", sourceUrl: "https://github.com/x/declared-used", versions: [v("deployed", { tags: [] })] },
+    ];
+    const workflows = [{ dag: [{ sourceUrl: "https://github.com/x/declared-used" }] }];
+    expect(sortApps(list, "recommended", workflows).map((a) => a.name)).toEqual([
+      "declared-used",
+      "declared",
+      "bare",
+      "deploying",
+      "failed",
+    ]);
+  });
+});

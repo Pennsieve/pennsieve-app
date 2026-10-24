@@ -94,18 +94,28 @@ export function matchesAppSearch(app, query, readme = "") {
 }
 
 export const APP_SORTS = [
+  { value: "recommended", label: "Recommended" },
   { value: "used", label: "Most used" },
   { value: "updated", label: "Recently updated" },
   { value: "newest", label: "Newest" },
   { value: "name", label: "Name" },
 ];
 
+// Recommended, in tiers that can be explained: apps that can run (latest
+// version deployed, then on its way, then failed), then those with an
+// app.yml, then the most used, then the most recently updated.
+const RUNNABLE = { ok: 0, pending: 1, none: 1, failed: 2 };
+export const recommendedTier = (app) => [RUNNABLE[versionState(app)] ?? 1, versionManifest(app) ? 0 : 1];
+
 export function sortApps(list, sort, workflows = []) {
   const created = (a) => Date.parse(a.createdAt || "") || 0;
   const updated = (a) => Date.parse(latestVersion(a)?.createdAt || a.createdAt || "") || 0;
   const byName = (a, b) => appTitle(a).localeCompare(appTitle(b));
   const uses = new Map(list.map((a) => [a, workflowUses(a, workflows)]));
+  const tiers = new Map(list.map((a) => [a, recommendedTier(a)]));
+  const byTier = (a, b) => tiers.get(a)[0] - tiers.get(b)[0] || tiers.get(a)[1] - tiers.get(b)[1];
   const cmp = {
+    recommended: (a, b) => byTier(a, b) || uses.get(b) - uses.get(a) || updated(b) - updated(a) || byName(a, b),
     used: (a, b) => uses.get(b) - uses.get(a) || byName(a, b),
     updated: (a, b) => updated(b) - updated(a) || byName(a, b),
     newest: (a, b) => created(b) - created(a) || byName(a, b),
