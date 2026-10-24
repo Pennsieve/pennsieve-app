@@ -586,37 +586,42 @@ const router = createRouter({
               path: 'applications',
               redirect: { name: 'my-gallery', query: { view: 'apps' } }
             },
+            // Workflow and app pages live under the Gallery, so its tab stays
+            // highlighted there; their old paths redirect.
+            { path: 'applications/manifest-guide', redirect: { name: 'my-application-manifest-guide' } },
+            { path: 'applications/manifest-builder', redirect: { name: 'my-application-manifest-builder' } },
+            { path: 'applications/:uuid', redirect: (to) => ({ name: 'my-application-detail', params: to.params }) },
             {
-              // Static paths before 'applications/:uuid'
+              // Static paths before 'gallery/apps/:uuid'
               name: 'my-application-manifest-guide',
-              path: 'applications/manifest-guide',
+              path: 'gallery/apps/manifest-guide',
               component: AppManifestGuide,
               meta: {
                 hideSecondaryNav: true,
-                backLink: { name: 'my-applications' },
+                backLink: { name: 'my-gallery', query: { view: 'apps' } },
                 title: 'Manifest Guide',
                 description: 'The app.yml manifest specification.'
               }
             },
             {
               name: 'my-application-manifest-builder',
-              path: 'applications/manifest-builder',
+              path: 'gallery/apps/manifest-builder',
               component: AppManifestBuilder,
               meta: {
                 hideSecondaryNav: true,
-                backLink: { name: 'my-applications' },
+                backLink: { name: 'my-gallery', query: { view: 'apps' } },
                 title: 'Manifest Builder',
                 description: 'Generate an app.yml manifest for your application.'
               }
             },
             {
               name: 'my-application-detail',
-              path: 'applications/:uuid',
+              path: 'gallery/apps/:uuid',
               component: ApplicationDetail,
               props: true,
               meta: {
                 hideSecondaryNav: true,
-                backLink: { name: 'my-applications' },
+                backLink: { name: 'my-gallery', query: { view: 'apps' } },
                 title: 'Application',
                 description: 'An application from the Pennsieve App Store.'
               }
@@ -642,9 +647,11 @@ const router = createRouter({
                 description: 'Create a workflow of your own, outside any workspace.'
               }
             },
+            // After 'workflows/new'
+            { path: 'workflows/:uuid', redirect: (to) => ({ name: 'my-workflow-detail', params: to.params }) },
             {
               name: 'my-workflow-detail',
-              path: 'workflows/:uuid',
+              path: 'gallery/workflows/:uuid',
               component: WorkflowBuilder,
               props: true,
               meta: {
@@ -2008,8 +2015,10 @@ const router = createRouter({
           }
         },
         {
+          // Under the Gallery, so its tab stays highlighted; the old path
+          // redirects (after 'workflows/new').
           name: 'workflow-detail',
-          path: 'workflows/:uuid',
+          path: 'gallery/workflows/:uuid',
           components: {
             stage: WorkflowBuilder,
           },
@@ -2085,23 +2094,29 @@ const router = createRouter({
           path: 'applications',
           redirect: (to) => ({ name: 'gallery', params: to.params, query: { view: 'apps' } })
         },
+        // App pages live under the Gallery, so its tab stays highlighted
+        // there; their old paths redirect.
+        { path: 'workflows/:uuid', redirect: (to) => ({ name: 'workflow-detail', params: to.params }) },
+        { path: 'applications/manifest-guide', redirect: (to) => ({ name: 'application-manifest-guide', params: to.params }) },
+        { path: 'applications/manifest-builder', redirect: (to) => ({ name: 'application-manifest-builder', params: to.params }) },
+        { path: 'applications/:uuid', redirect: (to) => ({ name: 'application-detail', params: to.params }) },
         {
           name: 'application-manifest-guide',
-          path: 'applications/manifest-guide',
+          path: 'gallery/apps/manifest-guide',
           components: {
             stage: AppManifestGuide,
           }
         },
         {
           name: 'application-manifest-builder',
-          path: 'applications/manifest-builder',
+          path: 'gallery/apps/manifest-builder',
           components: {
             stage: AppManifestBuilder,
           }
         },
         {
           name: 'application-detail',
-          path: 'applications/:uuid',
+          path: 'gallery/apps/:uuid',
           components: {
             stage: ApplicationDetail,
           },
