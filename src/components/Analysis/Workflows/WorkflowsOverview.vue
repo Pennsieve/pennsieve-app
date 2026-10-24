@@ -1,8 +1,9 @@
 <script setup>
 // The Workflows tab: Live, the workflow runs going on and before (the former
 // Runs page, without standalone notebook sessions, which are on the
-// Notebooks tab), and Builder, the workflows themselves. The view is in the
-// URL (?view=builder), as on the Notebooks tab.
+// Notebooks tab; "Include notebooks" brings them back, e.g. to compare
+// costs), and Builder, the workflows themselves. Both choices are in the URL
+// (?view=builder, ?notebooks=1), as on the Notebooks tab.
 import { computed, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import BfButton from "../../shared/bf-button/BfButton.vue";
@@ -19,6 +20,11 @@ const VIEWS = [
 const view = computed({
   get: () => (route.query.view === "builder" ? "builder" : "live"),
   set: (v) => router.replace({ query: { ...route.query, view: v === "live" ? undefined : v } }),
+});
+
+const includeNotebooks = computed({
+  get: () => route.query.notebooks === "1",
+  set: (on) => router.replace({ query: { ...route.query, notebooks: on ? "1" : undefined } }),
 });
 
 const runsRef = ref(null);
@@ -41,11 +47,14 @@ const gridRef = ref(null);
           {{ v.label }}
         </button>
       </div>
-      <bf-button v-if="view === 'live'" @click="runsRef?.openWizardDialog()">Run Workflow</bf-button>
-      <bf-button v-else @click="gridRef?.goToCreate()">+ New Workflow</bf-button>
+      <div class="wf-actions">
+        <el-checkbox v-if="view === 'live'" v-model="includeNotebooks" size="small">Include notebooks</el-checkbox>
+        <bf-button v-if="view === 'live'" @click="runsRef?.openWizardDialog()">Run Workflow</bf-button>
+        <bf-button v-else @click="gridRef?.goToCreate()">+ New Workflow</bf-button>
+      </div>
     </div>
     <div class="wf-body">
-      <RunsOverview v-if="view === 'live'" ref="runsRef" embedded />
+      <RunsOverview v-if="view === 'live'" ref="runsRef" embedded :exclude-notebooks="!includeNotebooks" />
       <div v-else class="wf-builder">
         <WorkflowsGrid ref="gridRef" embedded />
       </div>
@@ -99,6 +108,11 @@ const gridRef = ref(null);
     color: theme.$purple_3;
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
   }
+}
+.wf-actions {
+  display: flex;
+  align-items: center;
+  gap: 20px;
 }
 .wf-body {
   flex: 1;

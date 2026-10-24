@@ -17,10 +17,11 @@ import { isNotebookWorkflow } from "./notebookHelpers";
 
 const props = defineProps({
   // Inside the Workflows tab (WorkflowsOverview), which has the toolbar and
-  // its Run Workflow button: no header of its own, and no standalone
-  // notebook sessions (those are on the Notebooks tab). A workflow with a
-  // notebook step is a workflow run and stays.
+  // its Run Workflow button: no header of its own.
   embedded: { type: Boolean, default: false },
+  // Leave out standalone notebook sessions (they're on the Notebooks tab); a
+  // workflow with a notebook step is a workflow run and stays.
+  excludeNotebooks: { type: Boolean, default: false },
 });
 import {
   statusDotClass,
@@ -134,7 +135,7 @@ const { counters: orgCounters, isLoading: countersLoading, fetchCounters: fetchO
 const workflowsById = computed(() => new Map(workflows.value.map((w) => [w.uuid, w])));
 const isNotebookRun = (r) => isNotebookWorkflow(workflowsById.value.get(r.workflowUuid) || { name: r.workflowName });
 const shownRuns = computed(() =>
-  props.embedded ? workflowInstances.value.filter((r) => !isNotebookRun(r)) : workflowInstances.value
+  props.excludeNotebooks ? workflowInstances.value.filter((r) => !isNotebookRun(r)) : workflowInstances.value
 );
 const dashboardRuns = computed(() => shownRuns.value);
 
