@@ -4,6 +4,18 @@ import { useStore } from "vuex";
 import { useRouter, useRoute } from "vue-router";
 
 import IconAnalysis from "../../icons/IconAnalysis.vue";
+import {
+  APP_SORTS,
+  appTitle,
+  computeLabel,
+  githubRepo,
+  matchesAppSearch,
+  ownerAvatar,
+  runsOn,
+  sortApps,
+  versionState,
+  workflowUses,
+} from "./appCards";
 
 defineProps({
   // Inside the Gallery, whose toolbar links the manifest builder and guide.
@@ -75,11 +87,6 @@ const latestVersion = (app) => {
   })[0];
 };
 
-const totalDeployments = (app) =>
-  (app.versions || []).reduce(
-    (sum, v) => sum + (v.deployments || []).length,
-    0
-  );
 
 /*
   README previews (fetched lazily per app from GitHub)
@@ -140,6 +147,52 @@ const visibilityLabel = (app) => {
 /*
   Filtered & sorted applications (newest first, matching workflows)
 */
+// Where an app runs (from its runtime config), and the choices the list has.
+const computeFilter = ref("any");
+const computeChoices = computed(() => [
+  ...new Set(applications.value.flatMap((a) => a.runtimeConfig?.computeTypes || [])),
+]);
+
+// The sort is the viewer's, kept in this browser.
+const SORT_KEY = "pennsieve.gallery.appSort";
+const storedSort = () => {
+  try {
+    const v = localStorage.getItem(SORT_KEY);
+    return APP_SORTS.some((o) => o.value === v) ? v : "used";
+  } catch {
+    return "used";
+  }
+};
+const sortBy = ref(storedSort());
+watch(sortBy, (v) => {
+  try {
+    localStorage.setItem(SORT_KEY, v);
+  } catch {
+    // not remembered; it still applies now
+  }
+});
+
+// "Used in 3 workflows" counts the workflows loaded for the Gallery.
+const workflows = computed(() => store.state.analysisModule.workflows || []);
+const usageText = (app) => {
+  const n = workflowUses(app, workflows.value);
+  return n ? `Used in ${n} workflow${n === 1 ? "" : "s"}` : "Not in a workflow yet";
+};
+const githubUrl = (app) => {
+  const r = githubRepo(app.sourceUrl);
+  return r ? `https://github.com/${r.owner}/${r.repo}` : "";
+};
+const brokenAvatars = ref({});
+
+const filtersSet = computed(
+  () => !!searchQuery.value.trim() || visibilityFilter.value !== "all" || computeFilter.value !== "any"
+);
+function clearFilters() {
+  searchQuery.value = "";
+  visibilityFilter.value = "all";
+  computeFilter.value = "any";
+}
+
 const filteredApplications = computed(() => {
   let list = applications.value;
 
@@ -150,20 +203,9 @@ const filteredApplications = computed(() => {
     list = list.filter((app) => app.status === "archived");
   }
 
-  const q = searchQuery.value.trim().toLowerCase();
-  if (q) {
-    list = list.filter((app) => {
-      const url = (app.sourceUrl || "").toLowerCase();
-      const name = repoName(app).toLowerCase();
-      const visibility = (visibilityLabel(app) || "").toLowerCase();
-      const latest = (latestVersion(app)?.version || "").toLowerCase();
-      return (
-        url.includes(q) ||
-        name.includes(q) ||
-        visibility.includes(q) ||
-        latest.includes(q)
-      );
-    });
+  list = list.filter((app) => matchesAppSearch(app, searchQuery.value, readmePreviews.value[app.uuid]));
+  if (computeFilter.value !== "any") {
+    list = list.filter((app) => (app.runtimeConfig?.computeTypes || []).includes(computeFilter.value));
   }
 
   if (visibilityFilter.value !== "all") {
@@ -172,9 +214,7 @@ const filteredApplications = computed(() => {
     );
   }
 
-  return [...list].sort(
-    (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
-  );
+  return sortApps(list, sortBy.value, workflows.value);
 });
 
 const paginatedApplications = computed(() => {
@@ -192,6 +232,10 @@ onMounted(() => {
   store
     .dispatch("analysisModule/fetchApplications", { includeArchived: statusFilter.value !== "active" })
     .catch(() => {});
+  // The workflows "Used in" counts, when the Gallery opened on Apps.
+  if (!workflows.value.length) {
+    store.dispatch("analysisModule/fetchWorkflows", { limit: 100 }).catch(() => {});
+  }
 });
 
 // Archived applications are excluded from the default list response, so any
@@ -208,15 +252,6 @@ watch(statusFilter, (val) => {
 /*
   Status helpers
 */
-const statusBadgeClass = (status) => {
-  if (!status) return "badge-gray";
-  const s = status.toLowerCase();
-  if (["deployed", "active", "running"].includes(s)) return "badge-green";
-  if (["registering", "deploying", "re-deploying", "pending"].includes(s))
-    return "badge-blue";
-  if (s.startsWith("error") || s === "stopped") return "badge-red";
-  return "badge-gray";
-};
 
 const statusLabel = (status) => {
   if (!status) return "Unknown";
@@ -286,132 +321,94 @@ const goToManifestBuilder = () => {
     <!-- Applications Section -->
     <div class="applications-section">
       <div class="applications-section-header">
-        <h3>Applications</h3>
-        <div class="applications-section-actions">
-          <el-input
-            v-if="applications.length > 0"
-            v-model="searchQuery"
-            placeholder="Search applications..."
-            size="default"
-            clearable
-            class="applications-search-input"
-          />
-          <!-- <el-button type="primary" @click="goToManifestBuilder">
-            Create app.yml
-          </el-button> -->
-        </div>
+        <el-input
+          v-model="searchQuery"
+          placeholder="Search by name, description or repository…"
+          size="default"
+          clearable
+          class="applications-search-input"
+        />
+        <label class="sort-control">
+          Sort
+          <el-select v-model="sortBy" size="default" class="sort-select">
+            <el-option v-for="o in APP_SORTS" :key="o.value" :label="o.label" :value="o.value" />
+          </el-select>
+        </label>
       </div>
 
-      <div class="filter-bar">
-        <label class="filter-field">
-          <span class="filter-field-label">Visibility</span>
-          <el-select
-            v-model="visibilityFilter"
-            size="default"
-            class="filter-select"
+      <!-- One row: visibility chips | where it runs | status at the end. -->
+      <div class="filter-row">
+        <div class="scope-buttons">
+          <button
+            v-for="option in visibilityOptions"
+            :key="option.value"
+            class="filter-btn"
+            :class="{ active: visibilityFilter === option.value }"
+            @click="visibilityFilter = option.value"
           >
-            <el-option
-              v-for="option in visibilityOptions"
-              :key="option.value"
-              :label="option.label"
-              :value="option.value"
-            />
-          </el-select>
-        </label>
-
-        <label class="filter-field">
-          <span class="filter-field-label">Status</span>
-          <el-select
-            v-model="statusFilter"
-            size="default"
-            class="filter-select"
-          >
-            <el-option
-              v-for="option in statusOptions"
-              :key="option.value"
-              :label="option.label"
-              :value="option.value"
-            />
-          </el-select>
-        </label>
+            {{ option.label }}
+          </button>
+        </div>
+        <el-select v-model="computeFilter" size="small" class="io-select" aria-label="Runs on">
+          <el-option label="Runs anywhere" value="any" />
+          <el-option v-for="t in computeChoices" :key="t" :label="`Runs on ${computeLabel(t)}`" :value="t" />
+        </el-select>
+        <el-select v-model="statusFilter" size="small" class="status-select" aria-label="Status">
+          <el-option v-for="option in statusOptions" :key="option.value" :label="option.label" :value="option.value" />
+        </el-select>
       </div>
 
       <div v-if="filteredApplications.length > 0" class="applications-grid">
+        <!-- A card: the repository owner's picture on the left; what the app
+             is, where it runs and how much it's used on the right. -->
         <div
           v-for="app in paginatedApplications"
           :key="app.uuid"
           class="app-card"
+          :class="{ 'is-archived': app.status === 'archived' }"
+          role="link"
+          tabindex="0"
           @click="goToDetail(app)"
+          @keydown.enter="goToDetail(app)"
         >
-          <div class="app-header">
-            <div class="app-info">
-              <h3>
-                <button
-                  type="button"
-                  class="app-name-link"
-                  @click.stop="goToDetail(app)"
-                >
-                  {{ repoName(app) }}
-                </button>
-              </h3>
-              <div class="app-subtitle">Application</div>
-              <div v-if="readmePreviews[app.uuid]" class="app-description">
-                {{ readmePreviews[app.uuid] }}
-              </div>
-              <div class="app-tags">
-                <span
-                  class="status-badge"
-                  :class="statusBadgeClass(latestVersion(app)?.status)"
-                >
-                  {{ statusLabel(latestVersion(app)?.status) }}
-                </span>
-                <span
-                  v-if="visibilityLabel(app)"
-                  class="tag visibility"
-                  :class="visibilityLabel(app).toLowerCase()"
-                >
-                  {{ visibilityLabel(app) }}
-                </span>
-                <span class="tag created">
-                  {{ new Date(app.createdAt).toLocaleDateString() }}
-                </span>
-                <span v-if="app.status === 'archived'" class="tag archived">
-                  Archived
-                </span>
-              </div>
-            </div>
+          <div class="app-thumb">
+            <img
+              v-if="ownerAvatar(app) && !brokenAvatars[app.uuid]"
+              :src="ownerAvatar(app)"
+              alt=""
+              loading="lazy"
+              @error="brokenAvatars[app.uuid] = true"
+            />
+            <span v-else class="app-initials">{{ appTitle(app).slice(0, 2).toUpperCase() }}</span>
           </div>
-
-          <div class="app-card-actions">
-            <div class="app-metrics">
-              <span class="metric-item">
-                <span class="metric-value">
-                  {{ (app.versions || []).length }}
-                </span>
-                <span class="metric-label">versions</span>
+          <div class="app-body">
+            <div class="app-title">
+              <span class="app-name">{{ appTitle(app) }}</span>
+              <span v-if="latestVersion(app)?.version" class="app-version">v{{ latestVersion(app).version }}</span>
+              <span v-if="app.status === 'archived'" class="app-badge">Archived</span>
+              <span v-else-if="visibilityLabel(app)" class="app-badge">{{ visibilityLabel(app) }}</span>
+            </div>
+            <p class="app-description">
+              {{ app.description || readmePreviews[app.uuid] || "No description." }}
+            </p>
+            <div v-if="runsOn(app)" class="app-runs">{{ runsOn(app) }}</div>
+            <div class="app-repo">{{ repoName(app) }}</div>
+            <div class="app-foot">
+              <span class="app-usage">
+                <span class="app-dot" :class="versionState(app)" :title="statusLabel(latestVersion(app)?.status)" />
+                {{ usageText(app) }}
               </span>
-              <span class="metric-divider" />
-              <span class="metric-item">
-                <span class="metric-value">{{ totalDeployments(app) }}</span>
-                <span class="metric-label">deployments</span>
-              </span>
-              <span class="metric-divider" />
-              <span class="metric-item">
-                <span class="metric-value">
-                  {{ latestVersion(app)?.version || '--' }}
-                </span>
-                <span class="metric-label">latest</span>
+              <span class="app-actions" @click.stop>
+                <a
+                  v-if="githubUrl(app)"
+                  :href="githubUrl(app)"
+                  target="_blank"
+                  rel="noopener"
+                  class="app-action"
+                >GitHub</a>
+                <button type="button" class="app-action app-action--open" @click="goToDetail(app)">Open</button>
               </span>
             </div>
-
-            <button
-              type="button"
-              class="card-action-link"
-              @click.stop="goToDetail(app)"
-            >
-              <span>View details</span>
-              <span class="arrow">&rarr;</span>
-            </button>
           </div>
         </div>
       </div>
@@ -419,7 +416,10 @@ const goToManifestBuilder = () => {
       <div v-if="filteredApplications.length === 0" class="empty-state">
         <IconAnalysis :width="48" :height="48" color="#9ca3af" />
         <span v-if="applications.length === 0">No applications yet</span>
-        <span v-else>No applications match your filters</span>
+        <span v-else>No applications match your search and filters</span>
+        <button v-if="filtersSet" type="button" class="clear-filters" @click="clearFilters">
+          Clear search and filters
+        </button>
       </div>
 
       <el-pagination
@@ -440,10 +440,11 @@ const goToManifestBuilder = () => {
 @use "../../../styles/theme";
 @use "../../../styles/element/input";
 
+/* Lined up with the Gallery's toolbar and the Analysis tabs (32px). */
 .applications-container {
   max-width: 1000px;
   margin: 0;
-  padding: 16px 24px;
+  padding: 20px 32px;
 }
 
 .info-section {
@@ -523,226 +524,257 @@ const goToManifestBuilder = () => {
 }
 
 .applications-search-input {
-  max-width: 320px;
+  flex: 1;
+  max-width: 420px;
 }
 
-.filter-bar {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 20px;
-  margin-bottom: 16px;
-}
-
-.filter-field {
+.sort-control {
   display: flex;
   align-items: center;
   gap: 8px;
-}
-
-.filter-field-label {
   font-size: 12px;
-  font-weight: 600;
   color: theme.$gray_5;
 }
-
-.filter-select {
-  width: 150px;
+.sort-select {
+  width: 170px;
 }
 
-.applications-grid {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.app-card {
-  background: white;
-  border: 1px solid theme.$gray_2;
-  padding: 20px;
-  transition: border-color 0.2s ease;
-  cursor: pointer;
-
-  &:hover {
-    border-color: theme.$gray_3;
-  }
-}
-
-.app-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 16px;
-}
-
-.app-info {
-  flex: 1;
-  min-width: 0;
-
-  h3 {
-    font-size: 16px;
-    font-weight: 500;
-    color: theme.$gray_6;
-    margin: 0 0 8px 0;
-  }
-}
-
-.app-name-link {
-  background: none;
-  border: none;
-  padding: 0;
-  font: inherit;
-  color: theme.$gray_6;
-  cursor: pointer;
-  text-align: left;
-  text-decoration: none;
-  transition: color 0.2s ease;
-
-  &:hover {
-    color: theme.$purple_2;
-    text-decoration: underline;
-  }
-}
-
-.app-subtitle {
-  font-size: 13px;
-  color: theme.$gray_5;
-  margin-bottom: 6px;
-  font-weight: 400;
-}
-
-.app-description {
-  font-size: 13px;
-  color: theme.$gray_5;
-  margin: 4px 0 8px 0;
-  line-height: 1.4;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
-.app-tags {
-  display: flex;
-  gap: 6px;
-  margin-top: 8px;
-  flex-wrap: wrap;
-
-  .tag {
-    display: inline-block;
-    padding: 2px 8px;
-    border-radius: 3px;
-    font-size: 11px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-
-    &.visibility {
-      &.private {
-        background: rgba(#EF4444, 0.1);
-        color: #DC2626;
-      }
-      &.public {
-        background: rgba(#10B981, 0.1);
-        color: #059669;
-      }
-      &.unknown {
-        background: theme.$gray_2;
-        color: theme.$gray_5;
-      }
-    }
-
-    &.created {
-      background: theme.$gray_1;
-      color: theme.$gray_5;
-    }
-
-    &.archived {
-      background: theme.$gray_2;
-      color: theme.$gray_5;
-    }
-  }
-}
-
-.status-badge {
-  font-size: 10px;
-  font-weight: 600;
-  padding: 2px 8px;
-  border-radius: 4px;
-  white-space: nowrap;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-
-  &.badge-gray { background: theme.$gray_2; color: theme.$gray_5; }
-  &.badge-blue { background: #dbeafe; color: #1d4ed8; }
-  &.badge-green { background: rgba(23, 187, 98, 0.12); color: #17BB62; }
-  &.badge-red { background: #fee2e2; color: #b91c1c; }
-}
-
-.app-card-actions {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 18px;
-  margin-top: 14px;
-  padding-top: 14px;
-  border-top: 1px solid theme.$gray_2;
-  flex-wrap: wrap;
-}
-
-.app-metrics {
+/* One row, all 24px tall, as on the Gallery's workflows. */
+.filter-row {
   display: flex;
   align-items: center;
   gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
 }
-
-.metric-item {
+.scope-buttons {
   display: flex;
-  align-items: baseline;
-  gap: 3px;
-}
-
-.metric-value {
-  font-size: 14px;
-  font-weight: 700;
-  color: theme.$black;
-}
-
-.metric-label {
-  font-size: 10px;
-  color: theme.$gray_4;
-}
-
-.metric-divider {
-  width: 1px;
-  height: 14px;
-  background: theme.$gray_3;
-}
-
-.card-action-link {
-  display: inline-flex;
   align-items: center;
   gap: 6px;
-  background: none;
-  border: none;
-  padding: 0;
-  font: inherit;
-  font-size: 13px;
+  padding-right: 12px;
+  border-right: 1px solid theme.$gray_2;
+}
+.filter-btn {
+  height: 24px;
+  padding: 0 12px;
+  border: 1px solid theme.$gray_2;
+  border-radius: 4px;
+  background: white;
+  color: theme.$gray_5;
+  font-size: 12px;
   font-weight: 500;
-  color: theme.$purple_3;
+  line-height: 22px;
+  cursor: pointer;
+  transition: all 0.2s;
+
+  &:hover {
+    border-color: theme.$purple_1;
+    color: theme.$purple_1;
+  }
+  &.active {
+    background: theme.$purple_1;
+    border-color: theme.$purple_1;
+    color: white;
+  }
+}
+.io-select {
+  width: 170px;
+}
+.status-select {
+  width: 110px;
+  margin-left: auto;
+}
+
+/* Wide cards, two to a row where they fit, as the workflows'. */
+.applications-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+  gap: 16px;
+}
+.app-card {
+  display: flex;
+  min-width: 0;
+  border: 1px solid theme.$gray_2;
+  background: theme.$white;
+  overflow: hidden;
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+
+  &:hover,
+  &:focus-visible {
+    border-color: theme.$purple_1;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+    outline: none;
+  }
+  &:hover .app-actions,
+  &:focus-within .app-actions {
+    opacity: 1;
+  }
+  &.is-archived {
+    opacity: 0.7;
+  }
+}
+/* The repository owner's picture, where the workflows show their graph. */
+.app-thumb {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 150px;
+  border-right: 1px solid theme.$gray_2;
+  background: theme.$gray_1;
+
+  img {
+    width: 88px;
+    height: 88px;
+    border-radius: 8px;
+    object-fit: cover;
+  }
+}
+.app-initials {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 88px;
+  height: 88px;
+  border-radius: 8px;
+  background: rgba(224, 145, 42, 0.15);
+  color: #9a5c0f;
+  font-size: 28px;
+  font-weight: 600;
+}
+.app-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+  padding: 14px 16px 12px;
+}
+.app-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.app-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 15px;
+  font-weight: 600;
+  color: theme.$gray_6;
+}
+.app-version {
+  flex-shrink: 0;
+  font-size: 12px;
+  color: theme.$gray_4;
+}
+.app-badge {
+  flex-shrink: 0;
+  padding: 0 6px;
+  border-radius: 3px;
+  background: theme.$gray_0;
+  color: theme.$gray_5;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+.app-description {
+  display: -webkit-box;
+  margin: 0;
+  overflow: hidden;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  font-size: 13px;
+  line-height: 1.4;
+  color: theme.$gray_5;
+}
+.app-runs {
+  font-size: 12px;
+  color: theme.$gray_6;
+}
+.app-repo {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  color: theme.$gray_4;
+}
+.app-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: auto;
+  padding-top: 6px;
+}
+.app-usage {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: theme.$gray_4;
+}
+/* The latest version's state. */
+.app-dot {
+  width: 8px;
+  height: 8px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: theme.$gray_4;
+
+  &.ok { background: theme.$status_green; }
+  &.pending { background: #f59e0b; }
+  &.failed { background: theme.$status_red; }
+}
+.app-actions {
+  display: flex;
+  gap: 6px;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+.app-action {
+  padding: 3px 10px;
+  border: 1px solid theme.$gray_3;
+  border-radius: 4px;
+  background: theme.$white;
+  font: inherit;
+  font-size: 12px;
+  color: theme.$gray_6;
   text-decoration: none;
   cursor: pointer;
 
   &:hover {
-    text-decoration: underline;
+    border-color: theme.$purple_1;
+    color: theme.$purple_3;
   }
+}
+.app-action--open {
+  border-color: theme.$purple_3;
+  background: theme.$purple_3;
+  color: theme.$white;
 
-  .arrow {
-    transition: transform 0.15s ease;
+  &:hover {
+    background: theme.$purple_2;
+    color: theme.$white;
   }
+}
+@media (hover: none) {
+  .app-actions {
+    opacity: 1;
+  }
+}
+.clear-filters {
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  font-size: 13px;
+  color: theme.$link-color;
+  cursor: pointer;
 
-  &:hover .arrow {
-    transform: translateX(2px);
+  &:hover {
+    color: theme.$link-color-hover;
   }
 }
 
