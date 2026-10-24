@@ -257,7 +257,31 @@ export const mutations = {
   },
 };
 
-export const actions = {
+export // A workflow-service request (api2/compute/workflows/...) with the user's
+// token; rejects with an Error carrying the response status.
+async function workflowRequest(rootState, path, { method = "GET", body } = {}) {
+  const token = await useGetToken();
+  const resp = await fetch(`${rootState.config.api2Url}/compute/workflows/${path}`, {
+    method,
+    headers: { Authorization: `Bearer ${token}`, ...(body !== undefined && { "Content-Type": "application/json" }) },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  const text = await resp.text();
+  let data = {};
+  try {
+    data = text ? JSON.parse(text) : {};
+  } catch {
+    data = { message: text };
+  }
+  if (!resp.ok) {
+    const err = new Error(data.message || `workflow-service responded ${resp.status}`);
+    err.status = resp.status;
+    throw err;
+  }
+  return data;
+}
+
+const actions = {
   fetchComputeNodes: async ({ state, commit, rootState }, { force } = {}) => {
     if (!force && state.computeNodesLoaded) return;
     return useGetToken()
@@ -555,6 +579,25 @@ export const actions = {
       throw err;
     }
   },
+  // Workflow versions (workflow-service): each save is a version.
+  // saveWorkflowVersion: { uuid, payload: { name, description, processors, note } }
+  // -> the workflow at its new version. Errors carry the response status.
+  saveWorkflowVersion: async ({ rootState }, { uuid, payload }) =>
+    workflowRequest(rootState, `definitions/${uuid}/versions`, { method: "POST", body: payload }),
+  fetchWorkflowVersions: async ({ rootState }, uuid) =>
+    (await workflowRequest(rootState, `definitions/${uuid}/versions`)).versions || [],
+  fetchWorkflowVersion: async ({ rootState }, { uuid, version }) =>
+    workflowRequest(rootState, `definitions/${uuid}/versions/${version}`),
+  // duplicateWorkflow: { uuid, version?, name? } -> the new workflow, in the
+  // active workspace (or the user's own outside one).
+  duplicateWorkflow: async ({ rootState }, { uuid, version, name }) => {
+    const organizationId = rootState.activeOrganization?.organization?.id;
+    return workflowRequest(rootState, `definitions/${uuid}/duplicate`, {
+      method: "POST",
+      body: { ...(version && { version }), ...(name && { name }), ...(organizationId && { organizationId }) },
+    });
+  },
+
   updateWorkflow: async ({ commit, rootState }, { uuid, payload }) => {
     const url = `${rootState.config.api2Url}/compute/workflows/definitions/${uuid}`;
     const userToken = await useGetToken();

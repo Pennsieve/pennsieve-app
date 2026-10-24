@@ -41,7 +41,7 @@ import ParamField from "./ParamField.vue";
 import { ioLine, versionManifest } from "./appManifestInfo";
 import { builderReadiness } from "./builderReadiness";
 import StepPicker from "./StepPicker.vue";
-import { useGraphHistory } from "./graphHistory";
+import { useGraphHistory, snapshot } from "./graphHistory";
 import { canConnect, neighbourInDirection } from "./graphEditing";
 import { requiredUnset } from "./builderReadiness";
 import { fitsAfter } from "./appManifestInfo";
@@ -82,7 +82,7 @@ const draggedApp = ref(null);
 const draggedType = ref(null); // 'application', 'data-source', or 'data-target'
 
 // Mode & workflow list state
-const mode = ref("browse"); // 'browse' | 'create'
+const mode = ref("browse"); // 'browse' (a saved workflow, read-only) | 'edit' (its owner editing it) | 'create'
 const selectedWorkflow = ref(null);
 const accordionActiveNames = ref(["workflows"]);
 
@@ -744,11 +744,8 @@ const isWorkflowCreator = computed(() => {
   );
 });
 
-// Application version + default params are editable while building a new
-// workflow (create mode) or by the creator viewing an existing definition.
-const canEditConfig = computed(
-  () => mode.value === "create" || isWorkflowCreator.value,
-);
+// Steps' settings are editable while building (create) or editing (edit).
+const canEditConfig = computed(() => mode.value !== "browse");
 
 const isPublicWorkflow = computed(
   () => selectedWorkflow.value?.visibility === "public",
@@ -812,6 +809,8 @@ const togglePublish = async () => {
 
 const selectWorkflow = (workflow) => {
   mode.value = "browse";
+  viewingVersion.value = null;
+  if (workflow?.uuid && workflow.uuid !== selectedWorkflow.value?.uuid) loadVersions(workflow.uuid);
   selectedWorkflow.value = workflow;
   selectedNode.value = null;
   isEditingDetails.value = false;
@@ -1351,6 +1350,7 @@ const startOver = async () => {
     }
   }
   clearWorkflow();
+  clearDraft();
   selectedNode.value = null;
   seedCanvas();
 };
@@ -1465,7 +1465,57 @@ const saveWorkflow = async () => {
     return;
   }
 
-  const processors = nodes.value.map((node) => {
+  const processors = serializeProcessors();
+
+  const workflowData = {
+    name: workflowName.value,
+    description: workflowDescription.value,
+    processors: processors,
+  };
+
+  saving.value = true;
+  try {
+    const created = await store.dispatch("analysisModule/createWorkflow", workflowData);
+    EventBus.$emit("toast", {
+      detail: { type: "success", msg: `Saved ${workflowData.name}.`, duration: 5000 },
+    });
+    clearDraft();
+    clearWorkflow();
+    // The workflow is created; a failed refresh of the list isn't a failed create
+    store.dispatch("analysisModule/fetchWorkflows").catch((err) =>
+      console.error("Failed to refresh workflows:", err)
+    );
+    // Open what was saved, where it can be run.
+    if (created?.uuid) {
+      router.push(workflowPage(created.uuid));
+    } else {
+      mode.value = "browse";
+    }
+  } catch (error) {
+    console.error(error);
+    EventBus.$emit("toast", {
+      detail: {
+        type: "error",
+        msg: "There was a problem submitting your request.",
+        duration: 6000,
+      },
+    });
+  } finally {
+    saving.value = false;
+  }
+};
+
+// The workflow page of a workflow (in the Gallery).
+const workflowPage = (uuid, query) => ({
+  name: route.params.orgId ? "workflow-detail" : "my-workflow-detail",
+  params: { ...(route.params.orgId && { orgId: route.params.orgId }), uuid },
+  ...(query && { query }),
+});
+
+// The canvas as workflow-service takes it: one processor per node, with
+// what it depends on from the incoming edges.
+const serializeProcessors = () => {
+  return nodes.value.map((node) => {
     // Build dependsOn from incoming edges (edges whose target is this node)
     const dependsOn = edges.value
       .filter((e) => e.target === node.id)
@@ -1514,45 +1564,231 @@ const saveWorkflow = async () => {
     }
     return proc;
   });
+};
 
-  const workflowData = {
-    name: workflowName.value,
-    description: workflowDescription.value,
-    processors: processors,
-  };
+/*
+  A saved workflow: read-only, with Edit for its owner and Duplicate to edit
+  for everyone else. Saving an edit is a new version of it (workflow-service
+  versions); its history lists every version, and an older one can be
+  viewed (read-only) or duplicated.
+*/
+const versions = ref([]); // [{ version, name, note, steps, createdAt, createdBy, official }]
+const viewingVersion = ref(null); // an older version shown, or null for the latest
+const latestVersionNumber = computed(() => selectedWorkflow.value?.latestVersion || 1);
 
+const loadVersions = async (uuid) => {
+  try {
+    versions.value = await store.dispatch("analysisModule/fetchWorkflowVersions", uuid);
+  } catch {
+    versions.value = []; // versions aren't served here (yet)
+  }
+};
+
+const showVersion = async (n) => {
+  const uuid = selectedWorkflow.value?.uuid;
+  if (!uuid || mode.value !== "browse") return;
+  try {
+    if (n === latestVersionNumber.value) {
+      const latest = await store.dispatch("analysisModule/fetchWorkflowDefinition", uuid);
+      selectWorkflow(latest);
+      viewingVersion.value = null;
+    } else {
+      const v = await store.dispatch("analysisModule/fetchWorkflowVersion", { uuid, version: n });
+      selectWorkflow({ ...v, latestVersion: latestVersionNumber.value });
+      viewingVersion.value = n;
+    }
+  } catch (err) {
+    EventBus.$emit("toast", { detail: { type: "error", msg: err?.message || "Could not load that version." } });
+  }
+};
+
+const startEdit = () => {
+  if (!isWorkflowCreator.value || viewingVersion.value) return;
+  mode.value = "edit";
+  selectedNode.value = null;
+  workflowName.value = selectedWorkflow.value?.name || "";
+  workflowDescription.value = selectedWorkflow.value?.description || "";
+  history.reset();
+};
+
+const cancelEdit = async () => {
+  if (history.canUndo()) {
+    try {
+      await ElMessageBox.confirm("Your changes to this workflow will be lost.", "Discard changes?", {
+        confirmButtonText: "Discard",
+        cancelButtonText: "Keep editing",
+        type: "warning",
+      });
+    } catch {
+      return;
+    }
+  }
+  selectWorkflow(selectedWorkflow.value);
+};
+
+// Whether the canvas has the saved workflow's steps and connections (only
+// settings changed): what can still be saved where versions aren't served.
+const sameShape = () => {
+  const dag = selectedWorkflow.value?.dag || [];
+  const ids = (list) => list.map((x) => x).sort().join(",");
+  const savedEdges = dag.flatMap((p) => (p.dependsOn || []).map((d) => `${d}>${p.id}`));
+  return (
+    ids(dag.map((p) => p.id)) === ids(nodes.value.map((n) => n.id)) &&
+    ids(savedEdges) === ids(edges.value.map((e) => `${e.source}>${e.target}`))
+  );
+};
+
+const saveEdit = async () => {
+  const wf = selectedWorkflow.value;
+  if (!wf?.uuid) return;
+  let note = "";
+  try {
+    const { value } = await ElMessageBox.prompt("What changed? (optional)", `Save version ${latestVersionNumber.value + 1}`, {
+      confirmButtonText: "Save",
+      cancelButtonText: "Cancel",
+      inputPlaceholder: "e.g. Raised the threshold; added a plot step",
+    });
+    note = (value || "").trim();
+  } catch {
+    return;
+  }
   saving.value = true;
   try {
-    const created = await store.dispatch("analysisModule/createWorkflow", workflowData);
-    EventBus.$emit("toast", {
-      detail: { type: "success", msg: `Saved ${workflowData.name}.`, duration: 5000 },
-    });
-    clearWorkflow();
-    // The workflow is created; a failed refresh of the list isn't a failed create
-    store.dispatch("analysisModule/fetchWorkflows").catch((err) =>
-      console.error("Failed to refresh workflows:", err)
-    );
-    // Open what was saved, where it can be run.
-    if (created?.uuid) {
-      router.push({
-        name: route.params.orgId ? "workflow-detail" : "my-workflow-detail",
-        params: { ...(route.params.orgId && { orgId: route.params.orgId }), uuid: created.uuid },
-      });
-    } else {
-      mode.value = "browse";
-    }
-  } catch (error) {
-    console.error(error);
-    EventBus.$emit("toast", {
-      detail: {
-        type: "error",
-        msg: "There was a problem submitting your request.",
-        duration: 6000,
+    const saved = await store.dispatch("analysisModule/saveWorkflowVersion", {
+      uuid: wf.uuid,
+      payload: {
+        name: workflowName.value,
+        description: workflowDescription.value,
+        processors: serializeProcessors(),
+        ...(note && { note }),
       },
     });
+    EventBus.$emit("toast", { detail: { type: "success", msg: `Saved version ${saved?.latestVersion || ""}.` } });
+  } catch (err) {
+    if (![404, 501].includes(err?.status)) {
+      EventBus.$emit("toast", {
+        detail: { type: "error", msg: err?.status === 409 ? "The workflow was saved meanwhile. Cancel, and edit it again." : err?.message || "Could not save." },
+      });
+      saving.value = false;
+      return;
+    }
+    // Versions aren't served here yet: settings can still be saved in
+    // place; changes to the steps can't.
+    if (!sameShape()) {
+      EventBus.$emit("toast", {
+        detail: { type: "error", msg: "Adding, removing or connecting steps of a saved workflow isn't available here yet. Duplicate it instead." },
+      });
+      saving.value = false;
+      return;
+    }
+    if (workflowName.value !== wf.name || workflowDescription.value !== wf.description) {
+      await store.dispatch("analysisModule/updateWorkflow", {
+        uuid: wf.uuid,
+        payload: { name: workflowName.value, description: workflowDescription.value },
+      });
+    }
+    await saveWorkflowChanges();
   } finally {
     saving.value = false;
   }
+  const updated = await store.dispatch("analysisModule/fetchWorkflowDefinition", wf.uuid);
+  selectWorkflow(updated);
+};
+
+const duplicating = ref(false);
+const duplicate = async () => {
+  const wf = selectedWorkflow.value;
+  if (!wf?.uuid) return;
+  duplicating.value = true;
+  try {
+    const copy = await store.dispatch("analysisModule/duplicateWorkflow", {
+      uuid: wf.uuid,
+      version: viewingVersion.value || undefined,
+    });
+    router.push(workflowPage(copy.uuid, { edit: "1" }));
+  } catch (err) {
+    EventBus.$emit("toast", {
+      detail: {
+        type: "error",
+        msg: [404, 501].includes(err?.status) ? "Duplicating isn't available here yet." : err?.message || "Could not duplicate.",
+      },
+    });
+  } finally {
+    duplicating.value = false;
+  }
+};
+
+const runThis = () =>
+  router.push({ name: route.params.orgId ? "workflows" : "my-workflows", query: { run: selectedWorkflow.value?.uuid } });
+
+/*
+  Drafts: a new workflow not yet saved is kept in this browser and offered
+  back when the builder opens again.
+*/
+const DRAFT_KEY = computed(() => `pennsieve.builder.draft.${route.params.orgId || "mine"}`);
+let draftTimer = null;
+const clearDraft = () => {
+  try {
+    localStorage.removeItem(DRAFT_KEY.value);
+  } catch {
+    // nothing kept
+  }
+};
+watch(
+  [nodes, edges, workflowName, workflowDescription],
+  () => {
+    if (mode.value !== "create") return;
+    clearTimeout(draftTimer);
+    draftTimer = setTimeout(() => {
+      if (nodes.value.length <= 1 && !workflowName.value.trim()) return;
+      const s = snapshot(nodes.value, edges.value);
+      s.nodes.forEach((n) => {
+        if (n.data.application) n.data.application = { uuid: n.data.application.uuid };
+        delete n.data.manifestPorts;
+      });
+      try {
+        localStorage.setItem(
+          DRAFT_KEY.value,
+          JSON.stringify({ name: workflowName.value, description: workflowDescription.value, ...s, savedAt: Date.now() }),
+        );
+      } catch {
+        // not kept
+      }
+    }, 800);
+  },
+  { deep: true },
+);
+
+const offerDraft = async () => {
+  let draft = null;
+  try {
+    draft = JSON.parse(localStorage.getItem(DRAFT_KEY.value) || "null");
+  } catch {
+    draft = null;
+  }
+  if (!draft?.nodes?.length) return;
+  try {
+    await ElMessageBox.confirm(
+      `You have an unsaved workflow${draft.name ? `, "${draft.name}"` : ""}. Resume it?`,
+      "Resume your draft?",
+      { confirmButtonText: "Resume", cancelButtonText: "Start new", type: "info" },
+    );
+  } catch {
+    clearDraft();
+    return;
+  }
+  const byUuid = (uuid) => availableApplications.value.find((a) => a.uuid === uuid) || { uuid };
+  draft.nodes.forEach((n) => {
+    if (n.data.application) n.data.application = byUuid(n.data.application.uuid);
+  });
+  nodes.value = draft.nodes;
+  edges.value = draft.edges;
+  workflowName.value = draft.name || "";
+  workflowDescription.value = draft.description || "";
+  hydrateManifestPorts();
+  revalidateEdges();
+  history.reset();
+  nextTick(() => setTimeout(() => fitView({ padding: 0.2, maxZoom: 1 }), 50));
 };
 
 /*
@@ -1574,9 +1810,12 @@ onMounted(async () => {
       );
       if (wf) {
         selectWorkflow(wf);
+        // A duplicate opens ready to edit.
+        if (route.query.edit === "1" && isWorkflowCreator.value) startEdit();
       }
     } else {
       enterCreateMode();
+      await offerDraft();
     }
   } catch (err) {
     console.error(err);
@@ -1650,8 +1889,21 @@ const openNodeSettings = (id) => {
       </div>
     </Teleport>
 
-    <!-- Header (browse mode) -->
-    <div class="builder-header" v-if="isReadOnly">
+    <!-- A saved workflow: read-only, or its owner editing it -->
+    <div v-if="mode === 'edit'" class="builder-header">
+      <BuilderBar
+        v-model:name="workflowName"
+        v-model:description="workflowDescription"
+        :readiness="readiness"
+        :saving="saving"
+        :save-label="`Save version ${latestVersionNumber + 1}`"
+        editing
+        @save="saveEdit"
+        @cancel="cancelEdit"
+        @select="onReadinessSelect"
+      />
+    </div>
+    <div v-else-if="isReadOnly" class="builder-header">
       <span class="header-title">
         <router-link :to="workflowsRoute" class="header-back-link">
           &larr; Gallery
@@ -1660,14 +1912,48 @@ const openNodeSettings = (id) => {
         <span class="header-detail-name">{{
           selectedWorkflow?.name || "Workflow"
         }}</span>
+        <el-dropdown v-if="versions.length > 1" trigger="click" @command="showVersion">
+          <button type="button" class="version-pill">
+            Version {{ viewingVersion || latestVersionNumber }}<template v-if="!viewingVersion"> (latest)</template> ▾
+          </button>
+          <template #dropdown>
+            <el-dropdown-menu>
+              <el-dropdown-item v-for="v in versions" :key="v.version" :command="v.version">
+                <div class="version-item">
+                  <span>
+                    Version {{ v.version }}
+                    <template v-if="v.version === latestVersionNumber"> · latest</template>
+                    <template v-if="v.official"> · verified</template>
+                  </span>
+                  <span class="version-item-meta">
+                    {{ v.createdAt ? new Date(v.createdAt).toLocaleDateString() : "" }}<template v-if="v.note"> · {{ v.note }}</template>
+                  </span>
+                </div>
+              </el-dropdown-item>
+            </el-dropdown-menu>
+          </template>
+        </el-dropdown>
+        <span v-else-if="selectedWorkflow?.latestVersion" class="version-pill version-pill--static">
+          Version {{ latestVersionNumber }}
+        </span>
       </span>
       <div class="header-actions">
-        <bf-button
+        <bf-button v-if="!viewingVersion && selectedWorkflow?.isActive !== false" class="secondary" @click="runThis">
+          ▶ Run
+        </bf-button>
+        <el-tooltip
           v-if="isWorkflowCreator"
-          :disabled="!hasAnyChanges"
-          @click="saveWorkflowChanges"
+          :disabled="!viewingVersion"
+          content="Edit works on the latest version; duplicate this one to change it."
+          placement="bottom"
         >
-          Save Changes
+          <span>
+            <bf-button :disabled="!!viewingVersion" @click="startEdit">Edit</bf-button>
+          </span>
+        </el-tooltip>
+        <bf-button v-else :processing="duplicating" @click="duplicate">Duplicate to edit</bf-button>
+        <bf-button v-if="isWorkflowCreator && viewingVersion" class="secondary" :processing="duplicating" @click="duplicate">
+          Duplicate this version
         </bf-button>
       </div>
     </div>
@@ -1743,6 +2029,9 @@ const openNodeSettings = (id) => {
               <!-- The first step: a hint while only the input is there. -->
               <div v-if="!isReadOnly && nodes.length === 1 && nodes[0].type === 'data-source'" class="first-step-hint">
                 Add the first step with the <strong>+</strong> under Input data, or click an app in the list.
+                Or start from a workflow in the
+                <router-link :to="workflowsRoute" class="first-step-link">Gallery</router-link>
+                and duplicate it.
               </div>
 
               <template #node-default="{ data, id }">
@@ -2826,6 +3115,43 @@ const openNodeSettings = (id) => {
   overflow: hidden;
 }
 
+.version-pill {
+  margin-left: 10px;
+  padding: 2px 8px;
+  border: 1px solid theme.$gray_2;
+  border-radius: 10px;
+  background: theme.$white;
+  font: inherit;
+  font-size: 12px;
+  color: theme.$gray_5;
+  cursor: pointer;
+
+  &:hover {
+    border-color: theme.$purple_1;
+  }
+}
+.version-pill--static {
+  cursor: default;
+
+  &:hover {
+    border-color: theme.$gray_2;
+  }
+}
+.version-item {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.3;
+  padding: 2px 0;
+}
+.version-item-meta {
+  max-width: 320px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+  color: theme.$gray_4;
+}
+
 /* The bar's host when it's teleported into the Workflows toolbar. */
 .builder-bar-host {
   display: flex;
@@ -3317,7 +3643,14 @@ const openNodeSettings = (id) => {
   background: theme.$white;
   font-size: 13px;
   color: theme.$gray_5;
-  pointer-events: none;
+}
+.first-step-link {
+  color: theme.$link-color;
+  text-decoration: none;
+
+  &:hover {
+    color: theme.$link-color-hover;
+  }
 }
 
 .about {

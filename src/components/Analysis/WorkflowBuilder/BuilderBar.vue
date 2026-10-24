@@ -15,9 +15,11 @@ const props = defineProps({
   readiness: { type: Object, required: true },
   saving: { type: Boolean, default: false },
   saveLabel: { type: String, default: "Save" },
+  // Editing a saved workflow: a Cancel button, and no Start over.
+  editing: { type: Boolean, default: false },
 });
-// select(item): show what an item is about (its node); start-over
-const emit = defineEmits(["update:name", "update:description", "save", "start-over", "select"]);
+// select(item): show what an item is about (its node); start-over; cancel
+const emit = defineEmits(["update:name", "update:description", "save", "start-over", "select", "cancel"]);
 
 const nameRef = ref(null);
 const showList = ref(false);
@@ -89,7 +91,8 @@ defineExpose({ focusName: () => nameRef.value?.focus() });
       </span>
     </el-tooltip>
 
-    <el-dropdown trigger="click" @command="(c) => c === 'start-over' && emit('start-over')">
+    <button v-if="editing" type="button" class="bb-cancel" @click="emit('cancel')">Cancel</button>
+    <el-dropdown v-else trigger="click" @command="(c) => c === 'start-over' && emit('start-over')">
       <button type="button" class="bb-more" aria-label="More">
         <el-icon><MoreFilled /></el-icon>
       </button>
@@ -220,6 +223,19 @@ defineExpose({ focusName: () => nameRef.value?.focus() });
   margin: 0;
   font-size: 13px;
   color: theme.$gray_5;
+}
+.bb-cancel {
+  padding: 6px 10px;
+  border: none;
+  background: none;
+  font: inherit;
+  font-size: 13px;
+  color: theme.$gray_5;
+  cursor: pointer;
+
+  &:hover {
+    color: theme.$purple_3;
+  }
 }
 .bb-more {
   display: flex;
