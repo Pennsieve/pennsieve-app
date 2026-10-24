@@ -43,8 +43,10 @@ import { builderReadiness } from "./builderReadiness";
 import StepPicker from "./StepPicker.vue";
 import { useGraphHistory } from "./graphHistory";
 import { canConnect, neighbourInDirection } from "./graphEditing";
+import { requiredUnset } from "./builderReadiness";
+import { fitsAfter } from "./appManifestInfo";
 
-const { onNodeClick, onPaneClick, onConnect, screenToFlowCoordinate, fitView } =
+const { onNodeClick, onPaneClick, onConnect, onConnectStart, onConnectEnd, screenToFlowCoordinate, fitView } =
   useVueFlow();
 
 const props = defineProps({
@@ -983,6 +985,36 @@ const addStep = (type, app, afterId = selectedNode.value?.id) => {
   return node;
 };
 
+/*
+  Connecting: while a connection is dragged from a step, steps whose inputs
+  accept its outputs (as their app.yml files declare) are highlighted, ones
+  that don't are dimmed, and ones that can't take it at all (an input, the
+  step itself) are faded. Unknown (no declared types) stays as is.
+*/
+const connectingFrom = ref(null);
+onConnectStart(({ nodeId, handleType }) => {
+  if (handleType === "source") connectingFrom.value = nodeId;
+});
+onConnectEnd(() => {
+  connectingFrom.value = null;
+});
+const connectClass = (id) => {
+  const fromId = connectingFrom.value;
+  if (!fromId || fromId === id) return "";
+  const src = nodes.value.find((n) => n.id === fromId);
+  const tgt = nodes.value.find((n) => n.id === id);
+  if (!canConnect(src, tgt, edges.value)) return "connect-no";
+  if (src.type !== "default" || tgt.type !== "default") return "";
+  const verdict = fitsAfter(src.data?.manifestPorts, tgt.data?.manifestPorts);
+  return verdict === "fits" ? "connect-fits" : verdict === "no" ? "connect-mismatch" : "";
+};
+const stepWarning = (id) => {
+  const node = nodes.value.find((n) => n.id === id);
+  const unset = node?.type === "default" ? requiredUnset(node) : [];
+  return unset.length ? `No value for ${unset.map((p) => `"${p}"`).join(", ")} (can be given when running)` : "";
+};
+const portTypes = (port) => (port.mediaTypes || []).map((t) => String(t).split("/").pop().toUpperCase()).join(", ");
+
 // The + under a step: pick what comes next.
 const pickerFor = ref(null); // the step the picker adds after
 const openStepPicker = (nodeId) => {
@@ -1090,19 +1122,6 @@ const portMediaTypes = (ports) => {
 };
 
 /*
-  What matched, in media-type terms: the type that carried the match and the
-  description app.yml gives the port it fed. Naming the two applications again
-  is noise — the user just drew that edge and can see both ends of it.
-*/
-const matchedPortSummary = (port) => {
-  const head = portMediaTypes([port]).join(", ") || "any";
-  // The sentence supplies its own full stop; manifest descriptions usually
-  // carry one of their own.
-  const description = (port?.description || "").trim().replace(/\.$/, "");
-  return description ? `${head} \u2014 ${description}` : head;
-};
-
-/*
   Re-derive every edge's appearance from the current nodes. Cheap (a handful of
   edges, ports already in memory) and idempotent, so it can be called from
   anywhere the graph changes rather than trying to patch single edges.
@@ -1198,26 +1217,8 @@ const reportConnectionCheck = (srcNode, tgtNode) => {
   // dashed and counted as unchecked on the canvas.
   if (!checked) return;
 
-  if (compatible) {
-    if (!metInputs?.length) return;
-    // One line per media type, not per port: several inputs accepting the same
-    // type is one fact about the edge, not three.
-    const matched = [];
-    const seenTypes = [];
-    metInputs.forEach((port) => {
-      const type = portMediaTypes([port]).join(", ") || "any";
-      if (seenTypes.includes(type)) return;
-      seenTypes.push(type);
-      matched.push(matchedPortSummary(port));
-    });
-    ElMessage({
-      type: "success",
-      duration: 4000,
-      showClose: true,
-      message: `Media types match: ${matched.join("; ")}.`,
-    });
-    return;
-  }
+  // A match shows on the edge itself; only a mismatch is worth a toast.
+  if (compatible) return;
 
   const mediaTypes = portMediaTypes(unmetInputs).join(", ");
   const detail =
@@ -1702,56 +1703,6 @@ const openNodeSettings = (id) => {
             </template>
           </div>
 
-          <!--
-            Persistent verdict for the whole canvas. The per-connection toast
-            is gone in six seconds; this stays, and survives reopening the
-            workflow, so "did it validate?" has a visible answer.
-          -->
-          <div
-            v-if="edgeIssues.length || validEdgeCount || uncheckedEdgeCount"
-            class="compat-panel"
-            :class="{
-              'compat-panel--invalid': edgeIssues.length > 0,
-              'compat-panel--valid':
-                edgeIssues.length === 0 && validEdgeCount > 0,
-            }"
-          >
-            <div class="compat-panel-title">
-              <template v-if="edgeIssues.length">
-                {{ edgeIssues.length }} incompatible
-                {{ edgeIssues.length === 1 ? "connection" : "connections" }}
-              </template>
-              <template v-else-if="validEdgeCount">
-                &#10003; {{ validEdgeCount }}
-                {{ validEdgeCount === 1 ? "connection" : "connections" }}
-                checked &mdash; media types match
-              </template>
-              <template v-else>Connections not checked</template>
-            </div>
-            <div
-              v-if="edgeIssues.length && validEdgeCount"
-              class="compat-panel-ok"
-            >
-              &#10003; {{ validEdgeCount }} other
-              {{ validEdgeCount === 1 ? "connection" : "connections" }} match
-            </div>
-            <ul v-if="edgeIssues.length" class="compat-panel-list">
-              <li v-for="issue in edgeIssues" :key="issue.id">
-                {{ issue.source }} &rarr; {{ issue.target }}
-                <span v-if="issue.mediaTypes.length" class="compat-panel-detail">
-                  {{ issue.reason === "no-overlap" ? "no media type match for" : "needs" }}
-                  {{ issue.mediaTypes.join(", ") }}
-                </span>
-              </li>
-            </ul>
-            <div v-if="uncheckedEdgeCount" class="compat-panel-note">
-              {{ uncheckedEdgeCount }}
-              {{ uncheckedEdgeCount === 1 ? "connection" : "connections" }} not
-              checked &mdash; one side declares no app.yml, or no media types on
-              its ports.
-            </div>
-          </div>
-
           <div class="workflow-builder-flow">
             <VueFlow
               v-model:nodes="nodes"
@@ -1801,7 +1752,9 @@ const openNodeSettings = (id) => {
                   kind="processor"
                   :label="data.label"
                   :runtime="data.computeType"
+                  :class="connectClass(id)"
                 >
+                    <span v-if="stepWarning(id)" class="step-warn" :title="stepWarning(id)" />
                     <button
                       v-if="!isReadOnly"
                       class="settings-btn"
@@ -1818,10 +1771,16 @@ const openNodeSettings = (id) => {
                       &times;
                     </button>
                 </CompactFlowNode>
-                <div v-else class="custom-node">
+                <div v-else class="custom-node" :class="connectClass(id)">
+                  <div v-if="data.manifestPorts?.inputs?.length" class="node-ports node-ports--in">
+                    <span v-for="p in data.manifestPorts.inputs" :key="p.name" class="node-port" :title="p.description">
+                      {{ p.name }}<template v-if="portTypes(p)"> · {{ portTypes(p) }}</template>
+                    </span>
+                  </div>
                   <div class="node-header">
                     <span class="node-type-badge processor-badge">Processor</span>
                     <span class="node-title">{{ data.label }}</span>
+                    <span v-if="stepWarning(id)" class="step-warn" :title="stepWarning(id)" />
                     <button
                       v-if="!isReadOnly"
                       class="settings-btn"
@@ -1868,6 +1827,12 @@ const openNodeSettings = (id) => {
                       data.computeType
                     }}</span>
                   </div>
+                  <div v-if="data.manifestPorts?.outputs?.length" class="node-ports node-ports--out">
+                    <span v-for="p in data.manifestPorts.outputs" :key="p.name" class="node-port" :title="p.description">
+                      {{ p.name }}<template v-if="portTypes(p)"> · {{ portTypes(p) }}</template>
+                    </span>
+                  </div>
+                  <div v-else-if="!data.hasManifest" class="node-ports node-ports--none">No manifest</div>
                 </div>
                 <Handle id="source" type="source" :position="Position.Bottom" />
                 <button
@@ -1999,6 +1964,7 @@ const openNodeSettings = (id) => {
                 <CompactFlowNode
                   v-if="!detailed"
                   kind="source"
+                  :class="connectClass(id)"
                   :label="data.label"
                 >
                     <button
@@ -2009,7 +1975,7 @@ const openNodeSettings = (id) => {
                       &times;
                     </button>
                 </CompactFlowNode>
-                <div v-else class="custom-node data-source-node">
+                <div v-else class="custom-node data-source-node" :class="connectClass(id)">
                   <div class="node-header">
                     <span class="node-type-badge source-badge">Source</span>
                     <span class="node-title">{{ data.label }}</span>
@@ -2039,6 +2005,7 @@ const openNodeSettings = (id) => {
                 <CompactFlowNode
                   v-if="!detailed"
                   kind="target"
+                  :class="connectClass(id)"
                   :label="getTargetTypeLabel(data.targetType)"
                   :runtime="data.computeType"
                 >
@@ -2058,7 +2025,7 @@ const openNodeSettings = (id) => {
                       &times;
                     </button>
                 </CompactFlowNode>
-                <div v-else class="custom-node data-target-node">
+                <div v-else class="custom-node data-target-node" :class="connectClass(id)">
                   <div class="node-header">
                     <span class="node-type-badge target-badge">Target</span>
                     <span class="node-title">{{
@@ -3260,6 +3227,53 @@ const openNodeSettings = (id) => {
   }
 }
 
+/* While connecting: what accepts the connection, what doesn't. */
+.connect-fits {
+  outline: 2px solid #17bb62;
+  outline-offset: 2px;
+}
+.connect-mismatch {
+  opacity: 0.6;
+  outline: 2px dashed #e94b4b;
+  outline-offset: 2px;
+}
+.connect-no {
+  opacity: 0.35;
+}
+/* A step with a required parameter without a value. */
+.step-warn {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: #f59e0b;
+}
+/* A step's declared inputs (top) and outputs (bottom). */
+.node-ports {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  font-size: 10px;
+}
+.node-ports--in {
+  margin-bottom: 6px;
+}
+.node-ports--out {
+  margin-top: 6px;
+}
+.node-ports--none {
+  margin-top: 6px;
+  font-style: italic;
+  color: theme.$gray_4;
+}
+.node-port {
+  padding: 0 5px;
+  border-radius: 3px;
+  background: theme.$gray_0;
+  color: theme.$gray_5;
+}
+
 /* The + under a step: what comes next. Shown on hover and selection. */
 .add-next {
   position: absolute;
@@ -3387,59 +3401,6 @@ const openNodeSettings = (id) => {
 
 /* Sits under the toolbar (node size switch and Auto Layout), which owns the
    top-right corner. */
-.compat-panel {
-  position: absolute;
-  top: 52px;
-  right: 10px;
-  z-index: 10;
-  max-width: 300px;
-  padding: 8px 10px;
-  border: 1px solid theme.$gray_3;
-  border-left: 3px solid theme.$gray_4;
-  border-radius: 4px;
-  background: theme.$white;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
-  font-size: 11px;
-  color: theme.$gray_5;
-}
-
-.compat-panel--invalid {
-  border-left-color: #e94b4b;
-}
-
-.compat-panel--valid {
-  border-left-color: #17bb62;
-}
-
-.compat-panel-ok {
-  margin-top: 6px;
-  color: #0f7a3f;
-}
-
-.compat-panel-title {
-  font-size: 12px;
-  font-weight: 600;
-  color: theme.$black;
-}
-
-.compat-panel-list {
-  margin: 6px 0 0;
-  padding-left: 14px;
-
-  li {
-    margin-bottom: 2px;
-  }
-}
-
-.compat-panel-detail {
-  color: #b45309;
-}
-
-.compat-panel-note {
-  margin-top: 6px;
-  color: theme.$gray_4;
-}
-
 .auto-layout-btn {
   padding: 6px 12px;
   border: 1px solid theme.$gray_3;
