@@ -177,7 +177,7 @@ async function removeTeamAccess(teamId) {
       <section class="cn-section">
         <div class="cn-section-head">
           <h3 class="cn-section-title">Users</h3>
-          <bf-button v-if="canManage" class="small secondary" @click="openAddUserDialog">+ Add user</bf-button>
+          <button type="button" v-if="canManage" class="cn-action" @click="openAddUserDialog">+ Add user</button>
         </div>
         <ul v-if="sharedUsers.length" class="cn-list">
           <li v-for="userId in sharedUsers" :key="userId">
@@ -200,7 +200,7 @@ async function removeTeamAccess(teamId) {
       <section class="cn-section">
         <div class="cn-section-head">
           <h3 class="cn-section-title">Teams</h3>
-          <bf-button v-if="canManage" class="small secondary" @click="openAddTeamDialog">+ Add team</bf-button>
+          <button type="button" v-if="canManage" class="cn-action" @click="openAddTeamDialog">+ Add team</button>
         </div>
         <ul v-if="sharedTeams.length" class="cn-list">
           <li v-for="teamId in sharedTeams" :key="teamId">

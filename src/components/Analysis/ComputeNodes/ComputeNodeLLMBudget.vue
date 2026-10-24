@@ -21,7 +21,7 @@
         <span class="info-value">{{ periodLabel(config.budgetPeriod) }}</span>
       </div>
       <div v-if="isOwner" class="actions-row">
-        <bf-button class="small primary" @click="startEditing">Update Budget</bf-button>
+        <button type="button" class="cn-action cn-action--primary" @click="startEditing">Update Budget</button>
       </div>
     </div>
 
@@ -29,7 +29,7 @@
       No budget configured. The governor will reject all LLM calls until a cap
       is set.
       <div v-if="isOwner" class="actions-row">
-        <bf-button class="small primary" @click="startEditing">Set Budget</bf-button>
+        <button type="button" class="cn-action cn-action--primary" @click="startEditing">Set Budget</button>
       </div>
     </div>
 
@@ -58,8 +58,8 @@
         </span>
       </div>
       <div class="actions-row">
-        <bf-button class="small secondary" :disabled="isSaving" @click="cancelEditing">Cancel</bf-button>
-        <bf-button class="small" :processing="isSaving" :disabled="isSaving" @click="onSave">Save</bf-button>
+        <button type="button" class="cn-action" :disabled="isSaving" @click="cancelEditing">Cancel</button>
+        <button type="button" class="cn-action cn-action--primary" :disabled="isSaving" @click="onSave">Save</button>
       </div>
     </div>
 
@@ -70,7 +70,6 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { ElInputNumber, ElMessage, ElOption, ElSelect } from 'element-plus'
-import BfButton from '@/components/shared/bf-button/BfButton.vue'
 import { useNodeLlmBudgetStore } from '@/stores/nodeLlmBudgetStore'
 
 const props = defineProps({
@@ -134,6 +133,7 @@ onMounted(() => {
 
 <style scoped lang="scss">
 @use '../../../styles/_theme.scss';
+@use './computeNodePage';
 
 .llm-budget-content {
   display: flex;

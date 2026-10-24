@@ -120,15 +120,14 @@ async function confirmDestroy() {
               <span>{{ currentVersion || 'Unknown version' }}</span>
               <span v-if="updateAvailable" class="cn-pill is-warn">Update available: {{ latestVersion }}</span>
               <span v-else-if="latestVersion" class="cn-pill is-on">Up to date</span>
-              <bf-button
+              <button type="button"
                 v-if="canManage && updateAvailable"
-                class="small"
-                :processing="isUpdating"
+                class="cn-action cn-action--primary"
                 :disabled="isUpdating"
                 @click="updateNodeSoftware"
               >
                 Update node
-              </bf-button>
+              </button>
             </dd>
           </div>
           <div v-if="canManage && updateAvailable">

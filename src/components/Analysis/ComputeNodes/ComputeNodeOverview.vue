@@ -6,7 +6,6 @@ import { useRoute } from 'vue-router'
 import { useStore } from 'vuex'
 import { ElMessage } from 'element-plus'
 import { useComputeResourcesStore } from '@/stores/computeResourcesStore'
-import BfButton from '@/components/shared/bf-button/BfButton.vue'
 import { getUserName, runDisplayName, statusLabel, statusDotClass } from '../RunMonitor/runHelpers'
 import { nodeCapabilities, recentNodeRuns, relativeTime } from './computeNodeHelpers'
 
@@ -28,9 +27,9 @@ const isMyWorkspace = computed(() => !route.params.orgId)
 const SCOPE_LABELS = { private: 'only the owner', workspace: 'everyone in the workspace', shared: 'shared users and teams' }
 const ownerLine = computed(() => {
   const owner = getUserName(props.node.ownerId || props.node.userId, profile.value, orgMembers.value)
-  if (!props.node.organizationId) return `Owned by ${owner}; only they can use it.`
+  if (!props.node.organizationId) return `Owned by ${owner}, for their use only`
   const scope = computeResourcesStore.getNodePermissions(props.node.uuid)?.accessScope
-  return scope ? `Owned by ${owner}; used by ${SCOPE_LABELS[scope] || scope}.` : `Owned by ${owner}.`
+  return scope ? `Owned by ${owner}, used by ${SCOPE_LABELS[scope] || scope}` : `Owned by ${owner}`
 })
 const createdLine = computed(() => {
   const created = props.node.createdAt && new Date(props.node.createdAt)
@@ -123,18 +122,18 @@ onMounted(async () => {
     <section class="cn-section">
       <div class="cn-section-head">
         <h3 class="cn-section-title">About</h3>
-        <bf-button v-if="canManage && !isEditingInfo" class="small secondary" @click="startEditingInfo">Edit</bf-button>
+        <button type="button" v-if="canManage && !isEditingInfo" class="cn-action" @click="startEditingInfo">Edit</button>
         <div v-else-if="isEditingInfo" class="edit-actions">
-          <bf-button class="small secondary" @click="isEditingInfo = false">Cancel</bf-button>
-          <bf-button class="small" :processing="isSavingInfo" :disabled="isSavingInfo" @click="saveInfo">Save</bf-button>
+          <button type="button" class="cn-action" @click="isEditingInfo = false">Cancel</button>
+          <button type="button" class="cn-action cn-action--primary" :disabled="isSavingInfo" @click="saveInfo">Save</button>
         </div>
       </div>
-      <div class="cn-card">
-        <template v-if="!isEditingInfo">
-          <p class="about-description">{{ node.description || 'No description.' }}</p>
-          <p class="cn-muted">{{ ownerLine }}<template v-if="createdLine"> {{ createdLine }}.</template></p>
-        </template>
-        <div v-else class="info-form">
+      <template v-if="!isEditingInfo">
+        <p class="about-description">{{ node.description || 'No description.' }}</p>
+        <p class="cn-muted">{{ [ownerLine, createdLine].filter(Boolean).join(' · ') }}</p>
+      </template>
+      <div v-else class="cn-card">
+        <div class="info-form">
           <label>
             <span>Name</span>
             <el-input v-model="infoForm.name" placeholder="Node name" />
@@ -150,10 +149,10 @@ onMounted(async () => {
     <section class="cn-section">
       <div class="cn-section-head">
         <h3 class="cn-section-title">What it can do</h3>
-        <bf-button v-if="canManage && !isEditingConfig" class="small secondary" @click="startEditingConfig">Change</bf-button>
+        <button type="button" v-if="canManage && !isEditingConfig" class="cn-action" @click="startEditingConfig">Change</button>
         <div v-else-if="isEditingConfig" class="edit-actions">
-          <bf-button class="small secondary" @click="isEditingConfig = false">Cancel</bf-button>
-          <bf-button class="small" :processing="isSavingConfig" :disabled="isSavingConfig" @click="saveConfig">Save</bf-button>
+          <button type="button" class="cn-action" @click="isEditingConfig = false">Cancel</button>
+          <button type="button" class="cn-action cn-action--primary" :disabled="isSavingConfig" @click="saveConfig">Save</button>
         </div>
       </div>
 
@@ -257,7 +256,7 @@ onMounted(async () => {
 }
 .capabilities {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 12px;
 }
 .capability {

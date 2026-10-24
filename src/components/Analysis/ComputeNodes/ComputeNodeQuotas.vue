@@ -12,9 +12,9 @@
             fields fall back to the platform safety cap.
           </p>
         </div>
-        <bf-button v-if="isOwner" class="small secondary" @click="openEditDefault">
+        <button type="button" v-if="isOwner" class="cn-action" @click="openEditDefault">
           {{ defaultRow ? 'Edit' : 'Set' }}
-        </bf-button>
+        </button>
       </div>
       <div class="caps-grid">
         <div class="cap-cell">
@@ -39,9 +39,9 @@
     <div class="overrides-block">
       <div class="overrides-head">
         <h3 class="overrides-title">User overrides</h3>
-        <bf-button v-if="isOwner" class="small primary" @click="openAddUser">
+        <button type="button" v-if="isOwner" class="cn-action cn-action--primary" @click="openAddUser">
           Add User
-        </bf-button>
+        </button>
       </div>
 
       <div v-if="userRows.length === 0" class="overrides-empty">
@@ -94,7 +94,6 @@ import { computed, onMounted, ref } from 'vue'
 import { useStore } from 'vuex'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useChatQuotaAdminStore, DEFAULT_USER_SENTINEL } from '@/stores/chatQuotaAdminStore'
-import BfButton from '@/components/shared/bf-button/BfButton.vue'
 import QuotaEditModal from './QuotaEditModal.vue'
 
 const props = defineProps({
@@ -194,6 +193,7 @@ onMounted(() => {
 
 <style scoped lang="scss">
 @use '../../../styles/_theme.scss';
+@use './computeNodePage';
 
 .quotas-content {
   display: flex;

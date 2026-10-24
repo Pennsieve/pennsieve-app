@@ -6,7 +6,6 @@ import { ref, computed } from 'vue'
 import { useStore } from 'vuex'
 import { ElMessage } from 'element-plus'
 import { useComputeResourcesStore } from '@/stores/computeResourcesStore'
-import BfButton from '@/components/shared/bf-button/BfButton.vue'
 import IconRemove from '@/components/icons/IconRemove.vue'
 
 const props = defineProps({
@@ -79,10 +78,10 @@ async function save() {
         Allowed apps
         <span v-if="!isEditing" class="cn-pill" :class="{ 'is-warn': !isOpen }">{{ isOpen ? 'Any app' : 'Restricted' }}</span>
       </h3>
-      <bf-button v-if="!isEditing" class="small secondary" @click="startEditing">Configure</bf-button>
+      <button type="button" v-if="!isEditing" class="cn-action" @click="startEditing">Configure</button>
       <div v-else class="edit-actions">
-        <bf-button class="small secondary" @click="cancelEditing">Cancel</bf-button>
-        <bf-button class="small" :processing="isSaving" :disabled="isSaving" @click="save">Save</bf-button>
+        <button type="button" class="cn-action" @click="cancelEditing">Cancel</button>
+        <button type="button" class="cn-action cn-action--primary" :disabled="isSaving" @click="save">Save</button>
       </div>
     </div>
 
@@ -124,7 +123,7 @@ async function save() {
       </div>
       <div class="add-row">
         <el-input v-model="newUrl" placeholder="git://github.com/org/repo" @keyup.enter="addManual" />
-        <bf-button class="small secondary" :disabled="!newUrl.trim()" @click="addManual">Add</bf-button>
+        <button type="button" class="cn-action" :disabled="!newUrl.trim()" @click="addManual">Add</button>
       </div>
       <ul v-if="editingList.length" class="cn-list">
         <li v-for="(url, index) in editingList" :key="url">
