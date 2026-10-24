@@ -667,8 +667,11 @@ $card-height: 172px;
   font-size: 12px;
   color: theme.$gray_4;
 }
+/* What the card is (public, archived…), in its top-right corner: the
+   badges line up down the grid. */
 .app-badge {
   flex-shrink: 0;
+  margin-left: auto;
   padding: 0 6px;
   border-radius: 3px;
   background: theme.$gray_0;

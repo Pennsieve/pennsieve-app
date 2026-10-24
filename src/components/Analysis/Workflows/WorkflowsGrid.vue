@@ -603,8 +603,11 @@ $card-height: 172px;
   font-weight: 600;
   color: theme.$gray_6;
 }
+/* What the card is (public, archived…), in its top-right corner: the
+   badges line up down the grid. */
 .wf-badge {
   flex-shrink: 0;
+  margin-left: auto;
   padding: 0 6px;
   border-radius: 3px;
   background: theme.$gray_0;
