@@ -24,21 +24,37 @@ const store = useStore();
 const apiUrl = computed(() => store.state.config?.apiUrl);
 
 const other = ref(!!props.modelValue && props.modelValue !== props.runDatasetId);
-const options = ref([]);
+const results = ref([]);
 const loading = ref(false);
 let timer = null;
 
-const runDatasetLabel = computed(() => datasetName(props.runDatasetId, [...props.datasets, ...options.value]));
+// The chosen dataset's record, kept so its name shows after the search
+// results move on; the select resolves a label only from its options.
+const chosen = ref(null);
+const options = computed(() => {
+  const c = chosen.value;
+  if (c && !results.value.some((d) => d?.content?.id === c.content?.id)) return [c, ...results.value];
+  return results.value;
+});
+const choose = (id) => {
+  chosen.value = results.value.find((d) => d?.content?.id === id) || chosen.value;
+  emit("update:modelValue", id);
+};
+
+const runDatasetLabel = computed(() => datasetName(props.runDatasetId, [...props.datasets, ...results.value]));
 
 // The list stays while a search runs, so it doesn't blink; the select
 // shows its loading text only when there is nothing to show yet.
 const search = async (query = "") => {
   loading.value = options.value.length === 0;
   try {
-    options.value = await searchDatasets(apiUrl.value, query, { getToken: useGetToken, sendXhr: useSendXhr, toQueryParams });
+    results.value = await searchDatasets(apiUrl.value, query, { getToken: useGetToken, sendXhr: useSendXhr, toQueryParams });
+    if (props.modelValue && !chosen.value) {
+      chosen.value = results.value.find((d) => d?.content?.id === props.modelValue) || null;
+    }
   } catch (err) {
     console.error("Failed to search datasets:", err);
-    options.value = [];
+    results.value = [];
   } finally {
     loading.value = false;
   }
@@ -49,7 +65,7 @@ let lastQuery = "";
 const onSearch = (query) => {
   clearTimeout(timer);
   if (query === lastQuery) return;
-  if (!query && options.value.length) {
+  if (!query && results.value.length) {
     lastQuery = "";
     return;
   }
@@ -65,12 +81,16 @@ const chooseRun = () => {
 };
 const chooseOther = () => {
   other.value = true;
-  if (options.value.length === 0) search();
+  if (results.value.length === 0) search();
 };
 
 watch(() => props.modelValue, (v) => {
   if (v && v !== props.runDatasetId) other.value = true;
 });
+if (other.value) {
+  chosen.value = props.datasets.find((d) => d?.content?.id === props.modelValue) || null;
+  if (!chosen.value) search();
+}
 </script>
 
 <template>
@@ -93,7 +113,7 @@ watch(() => props.modelValue, (v) => {
       placeholder="Search datasets you can edit…"
       size="small"
       class="tdf-select"
-      @update:model-value="(v) => emit('update:modelValue', v)"
+      @update:model-value="choose"
     >
       <el-option
         v-for="ds in options"

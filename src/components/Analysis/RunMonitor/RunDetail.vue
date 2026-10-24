@@ -2041,6 +2041,9 @@ onUnmounted(() => {
             <!-- CONFIGURE MODE: Selected data-target node -->
             <template v-else-if="mode === 'configure' && selectedNode && selectedNode.type === 'data-target' && nodeConfigs[selectedNode.id]">
               <h4 class="sidebar-section-title">Data Target Configuration</h4>
+              <div v-if="!getTargetTypeDefinition(selectedNode.data?.targetType)" class="target-type-missing">
+                Target type "{{ selectedNode.data?.targetType }}" is no longer available, so it has no parameters or runtimes here. Edit the workflow and choose a current target type.
+              </div>
               <div class="info-card">
                 <div class="info-row">
                   <span class="info-label">Target Type</span>
@@ -3718,6 +3721,16 @@ onUnmounted(() => {
     line-height: 1;
     flex-shrink: 0;
   }
+}
+
+.target-type-missing {
+  margin: 0 0 12px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: #fef3c7;
+  color: #92400e;
+  font-size: 12px;
+  line-height: 1.4;
 }
 
 .target-param {
