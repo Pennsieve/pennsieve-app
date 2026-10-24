@@ -259,27 +259,25 @@ function fmtSize(bytes) {
       <p v-else-if="error" class="inp__msg inp__msg--error">{{ error }}</p>
 
       <div v-for="{ source, crumbs: path, rows, inSession } in panes" :key="source.nodeId" class="inp__source">
-        <div class="inp__dataset">
-          <div class="inp__name" :title="source.name">{{ source.name }}</div>
-          <div class="inp__sub">
-            <span v-if="source.sourceVersion">Version {{ source.sourceVersion }} · </span>
-            {{ inSession }} of {{ source.entries.length }} files in session
-          </div>
-        </div>
-
         <div class="inp__nav">
           <button
+            v-if="source.folder"
             class="inp__up"
-            :disabled="!source.folder"
             title="Up one folder"
             aria-label="Up one folder"
             @click="up(source)"
           >
             <IconArrowUp :width="12" :height="12" />
           </button>
-          <nav class="inp__crumbs" :title="source.folder || 'Dataset root'">
-            <button class="inp__crumb" :class="{ 'is-current': !source.folder }" @click="open(source, '')">
-              Dataset
+          <!-- The dataset is the path's root, so its name needs no row of its own. -->
+          <nav class="inp__crumbs">
+            <button
+              class="inp__crumb inp__crumb--root"
+              :class="{ 'is-current': !source.folder }"
+              :title="source.sourceVersion ? `${source.name}, version ${source.sourceVersion}` : source.name"
+              @click="open(source, '')"
+            >
+              {{ source.name }}
             </button>
             <template v-for="(c, i) in path" :key="c.folder">
               <span class="inp__sep">/</span>
@@ -293,6 +291,9 @@ function fmtSize(bytes) {
               </button>
             </template>
           </nav>
+          <span class="inp__count" :title="`${inSession} of ${source.entries.length} files in the session`">
+            {{ inSession }}/{{ source.entries.length }}
+          </span>
         </div>
 
         <label v-if="selectable(rows).length" class="inp__all">
@@ -374,7 +375,7 @@ function fmtSize(bytes) {
           Add {{ pending.length }} file{{ pending.length === 1 ? "" : "s" }} to session ({{ fmtSize(pendingSize) }})
         </el-button>
         <p v-else class="inp__hint">
-          Select folders or files to add. They're copied into the notebook's input folder.
+          Select folders or files to copy into the notebook's input folder.
         </p>
       </div>
     </template>
@@ -406,7 +407,7 @@ function fmtSize(bytes) {
   padding: 10px 10px;
   border: none;
   border-bottom: 1px solid theme.$gray_2;
-  background: none;
+  background: theme.$gray_0;
   cursor: pointer;
   font: inherit;
   text-align: left;
@@ -429,29 +430,11 @@ function fmtSize(bytes) {
   min-height: 0;
   flex: 1;
 }
-.inp__dataset {
-  padding: 8px 10px 6px;
-}
-.inp__name {
-  font-weight: 500;
-  color: theme.$gray_6;
-  line-height: 1.3;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-.inp__sub {
-  margin-top: 2px;
-  font-size: 11px;
-  color: theme.$gray_4;
-}
 .inp__nav {
   display: flex;
   align-items: center;
   gap: 6px;
   padding: 4px 10px;
-  border-top: 1px solid theme.$gray_2;
   border-bottom: 1px solid theme.$gray_2;
   background: theme.$white;
 }
@@ -467,10 +450,6 @@ function fmtSize(bytes) {
   background: theme.$white;
   color: theme.$gray_5;
   cursor: pointer;
-}
-.inp__up:disabled {
-  color: theme.$gray_3;
-  cursor: default;
 }
 .inp__crumbs {
   display: flex;
@@ -490,12 +469,29 @@ function fmtSize(bytes) {
   text-overflow: ellipsis;
   max-width: 90px;
 }
+/* The dataset's name takes what room the folders leave, and gives it up first. */
+.inp__crumb--root {
+  max-width: none;
+  min-width: 48px;
+  flex-shrink: 1;
+}
+.inp__crumb:not(.inp__crumb--root) {
+  flex-shrink: 0;
+}
+.inp__count {
+  flex-shrink: 0;
+  margin-left: auto;
+  padding-left: 6px;
+  font-size: 11px;
+  color: theme.$gray_4;
+}
 .inp__crumb:not(.is-current):hover {
   color: theme.$link-color-hover;
 }
+/* Where you are is plain text; the folders above it are links. */
 .inp__crumb.is-current {
-  color: theme.$purple_3;
-  font-weight: 600;
+  color: theme.$gray_6;
+  font-weight: 500;
   cursor: default;
 }
 .inp__sep {

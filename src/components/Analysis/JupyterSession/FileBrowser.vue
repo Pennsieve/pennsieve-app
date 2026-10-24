@@ -208,6 +208,7 @@ function copyPath(node) {
   padding: 10px 10px;
   cursor: pointer;
   border-bottom: 1px solid theme.$gray_2;
+  background: theme.$gray_0;
 }
 .fb__title {
   font-weight: 600;

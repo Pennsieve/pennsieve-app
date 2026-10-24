@@ -168,8 +168,7 @@ onBeforeUnmount(() => clearTimeout(pollTimer));
 
     <div v-if="!collapsed" class="env__body">
       <p v-if="outdated" class="env__msg">
-        This notebook's compute node needs an update before it can switch environments. Update the node, then start
-        a new notebook.
+        Update this notebook's compute node to switch environments, then start a new notebook.
       </p>
       <template v-else>
       <div class="env__current">
@@ -261,7 +260,7 @@ onBeforeUnmount(() => clearTimeout(pollTimer));
   padding: 10px 10px;
   border: none;
   border-bottom: 1px solid theme.$gray_2;
-  background: none;
+  background: theme.$gray_0;
   cursor: pointer;
   font: inherit;
   text-align: left;
