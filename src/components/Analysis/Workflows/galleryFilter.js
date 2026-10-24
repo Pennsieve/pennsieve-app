@@ -1,7 +1,6 @@
 // Searching, filtering and sorting the Gallery's workflows: pure, so the
 // rules are easy to test and change.
-import { appNames, ioSummary } from "./workflowSummary";
-import { getTargetTypeLabel } from "../RunMonitor/runHelpers";
+import { appNames, ioSummary, outputLabel } from "./workflowSummary";
 
 // Whether a workflow matches a search: its name, description, the apps it
 // runs, or what goes in and comes out ("spike" finds the one running
@@ -29,7 +28,7 @@ export const outputTypes = (wf) => [
 export function outputOptions(list, targetTypes = []) {
   const types = [...new Set(list.flatMap(outputTypes))];
   return types
-    .map((t) => ({ value: t, label: getTargetTypeLabel(t, targetTypes) || t }))
+    .map((t) => ({ value: t, label: outputLabel(t, targetTypes) || t }))
     .sort((a, b) => a.label.localeCompare(b.label));
 }
 

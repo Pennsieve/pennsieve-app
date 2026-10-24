@@ -296,17 +296,9 @@ onMounted(async () => {
           <el-option v-for="o in outputChoices" :key="o.value" :label="o.label" :value="o.value" />
         </el-select>
 
-        <div class="status-buttons status-buttons--end">
-          <button
-            v-for="option in filterOptions"
-            :key="option.value"
-            class="filter-btn"
-            :class="{ active: statusFilter === option.value }"
-            @click="statusFilter = option.value"
-          >
-            {{ option.label }}
-          </button>
-        </div>
+        <el-select v-model="statusFilter" size="small" class="status-select" aria-label="Status">
+          <el-option v-for="option in filterOptions" :key="option.value" :label="option.label" :value="option.value" />
+        </el-select>
       </div>
 
       <p v-if="scopeFilter === 'pennsieve'" class="scope-hint">
@@ -402,10 +394,11 @@ onMounted(async () => {
 @use "../../../styles/theme";
 @use "../../../styles/element/input";
 
+/* Lined up with the toolbar above and the Analysis tabs (32px). */
 .workflows-container {
   max-width: 1000px;
   margin: 0;
-  padding: 16px 24px;
+  padding: 20px 32px;
 }
 
 .info-section {
@@ -470,9 +463,10 @@ onMounted(async () => {
   width: 160px;
 }
 .io-select {
-  width: 160px;
+  width: 150px;
 }
-.status-buttons--end {
+.status-select {
+  width: 110px;
   margin-left: auto;
 }
 .clear-filters {
@@ -489,22 +483,24 @@ onMounted(async () => {
   }
 }
 
+/* One row: scope chips | input, output | status at the end, all 24px tall
+   and centred on one line. */
 .filter-row {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 12px;
   flex-wrap: wrap;
+  margin-bottom: 16px;
 }
 
 .status-buttons {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-bottom: 16px;
+  gap: 6px;
 }
 
 .scope-buttons {
-  padding-right: 16px;
+  padding-right: 12px;
   border-right: 1px solid theme.$gray_2;
 }
 
@@ -515,8 +511,10 @@ onMounted(async () => {
   line-height: 1.4;
 }
 
+/* As tall as the small selects beside them (24px). */
 .filter-btn {
-  padding: 4px 16px;
+  height: 24px;
+  padding: 0 12px;
   border: 1px solid theme.$gray_2;
   border-radius: 4px;
   background: white;
@@ -525,7 +523,7 @@ onMounted(async () => {
   font-weight: 500;
   cursor: pointer;
   transition: all 0.2s;
-  line-height: 1.4;
+  line-height: 22px;
 
   &:hover {
     border-color: theme.$purple_1;
@@ -542,7 +540,7 @@ onMounted(async () => {
 /* Wide cards, two to a row where they fit: graphs need width and height. */
 .workflows-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(420px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
   gap: 16px;
 }
 

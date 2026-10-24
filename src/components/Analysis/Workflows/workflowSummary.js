@@ -1,6 +1,13 @@
 // What a workflow card says about a workflow, from its definition.
 import { extractRepoName, findAppByUrl, getTargetTypeLabel } from "../RunMonitor/runHelpers";
 
+// A target type's label, or its name capitalised where it has none
+// ("pennsieve" -> "Pennsieve").
+export function outputLabel(targetType, targetTypes = []) {
+  const label = getTargetTypeLabel(targetType, targetTypes);
+  return label ? label.charAt(0).toUpperCase() + label.slice(1) : "";
+}
+
 const plural = (n, one, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 
 // "Dataset files → 3 steps → Pennsieve Dataset": what goes in, how many
@@ -10,7 +17,7 @@ export function ioSummary(wf, targetTypes = []) {
   const sources = dag.filter((n) => n.type === "data-source").length;
   const steps = dag.filter((n) => n.type !== "data-source" && n.type !== "data-target").length;
   const targets = [
-    ...new Set(dag.filter((n) => n.type === "data-target").map((n) => getTargetTypeLabel(n.targetType, targetTypes))),
+    ...new Set(dag.filter((n) => n.type === "data-target").map((n) => outputLabel(n.targetType, targetTypes))),
   ].filter(Boolean);
   const input = sources === 0 ? "No input" : sources === 1 ? "Dataset files" : `${sources} inputs`;
   const output = targets.length ? targets.join(", ") : "Results";
