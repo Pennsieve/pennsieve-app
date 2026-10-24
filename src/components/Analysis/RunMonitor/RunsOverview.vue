@@ -57,10 +57,14 @@ const computeNodes = computed(
 // workflows are the user's own outside any workspace, and a run can't use a
 // dataset yet.
 const isMyWorkspace = computed(() => !route.params.orgId);
-const runRoute = (name, runId) =>
-  isMyWorkspace.value
+// A run's page from here says it came from Workflows, so that tab stays
+// highlighted there even for a notebook's run (with notebooks included).
+const runRoute = (name, runId) => ({
+  ...(isMyWorkspace.value
     ? { name: `my-${name}`, params: runId ? { runId } : {} }
-    : { name, params: runId ? { runId } : {} };
+    : { name, params: runId ? { runId } : {} }),
+  ...(runId && props.embedded && { query: { from: "workflows" } }),
+});
 
 // My Workspace offers the user's own workflows (the store's list there) and
 // public ones, as its Workflow Library does.
@@ -630,6 +634,7 @@ onBeforeUnmount(() => {
         <!-- Earlier runs: the same list as the Notebooks tab's, with the
              filters above it -->
         <run-history
+          :from="embedded ? 'workflows' : ''"
           :title="activeRuns.length ? 'Earlier runs' : 'Runs'"
           :runs="earlierRuns"
           :loading="isLoading"
