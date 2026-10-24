@@ -25,8 +25,10 @@
           <button v-if="nodeRow" type="button" class="cn-icon-button" title="Remove" @click="confirmClear('node', 'the node-wide budget')">&times;</button>
         </span>
       </li>
-      <li v-if="perUser" class="budget-row" :title="defaultRow?.notes || undefined">
-        <span class="budget-who">Each user</span>
+      <!-- The per-user row holds the per-run cap too, so a personal node
+           (one user) keeps it, as "Your runs". -->
+      <li class="budget-row" :title="defaultRow?.notes || undefined">
+        <span class="budget-who">{{ perUser ? 'Each user' : 'Your runs' }}</span>
         <span class="budget-limits" :class="{ unset: !defaultLimits }">{{ defaultLimits || 'No limit' }}</span>
         <span v-if="isOwner" class="budget-actions">
           <button type="button" class="cn-action" @click="openEditDefault">{{ defaultRow ? 'Edit' : 'Set' }}</button>
