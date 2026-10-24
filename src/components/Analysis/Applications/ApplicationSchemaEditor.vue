@@ -57,6 +57,28 @@
           </el-checkbox>
         </div>
       </div>
+
+      <!-- runtime.interactive / sessionType: a live session the user works
+           in (a notebook kernel), where the workflow waits for them. -->
+      <div class="field-row">
+        <label class="field-label">Live session</label>
+        <div class="field-control inline-checks">
+          <el-switch v-model="schema.runtime.interactive" @change="onInteractiveChange" />
+          <el-select
+            v-if="schema.runtime.interactive"
+            v-model="schema.runtime.sessionType"
+            size="small"
+            class="session-type"
+            aria-label="Session type"
+          >
+            <el-option v-for="t in SESSION_TYPES" :key="t.value" :label="t.label" :value="t.value" />
+          </el-select>
+        </div>
+      </div>
+      <p class="schema-section-hint">
+        Turn on for an app people work in live, such as a notebook kernel: in a workflow it runs as an
+        interactive step, and the workflow waits until the session ends.
+      </p>
     </section>
 
     <!-- ───────────── Parameters ───────────── -->
@@ -326,6 +348,7 @@ import { CircleClose, Plus } from "@element-plus/icons-vue";
 import {
   PARAM_TYPES,
   PARAM_TYPE_OPTIONS,
+  SESSION_TYPES,
   createParameter,
   createPort,
   portDataTypeOptions,
@@ -347,6 +370,11 @@ defineProps({
 });
 
 const store = useStore();
+
+// A live session needs a session type; Jupyter unless chosen otherwise.
+function onInteractiveChange(on) {
+  schema.value.runtime.sessionType = on ? schema.value.runtime.sessionType || "jupyter" : "";
+}
 
 // A typed tag lands on the suggestion it spells ("EEG" -> "eeg"), so the
 // same thing gets one tag across apps.
@@ -497,6 +525,10 @@ const removePort = (key, i) => schema.value[key].splice(i, 1);
   flex: 0 0 110px;
   font-size: 13px;
   color: theme.$gray_6;
+}
+
+.session-type {
+  width: 180px;
 }
 
 .field-control {

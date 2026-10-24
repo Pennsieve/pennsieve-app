@@ -193,9 +193,24 @@ export const createPort = (overrides = {}) => ({
  * A blank, fully-formed schema for a brand-new application.
  * @returns {ApplicationSchema}
  */
+// What a live (human-in-the-loop) app runs as: app.yml's runtime.sessionType.
+export const SESSION_TYPES = Object.freeze([
+  { value: "jupyter", label: "Jupyter (Python)" },
+  { value: "r", label: "R" },
+]);
+
+// runtime.interactive / runtime.sessionType as the editor holds them: a
+// sessionType alone also means interactive, and an interactive app without
+// one is a Jupyter session, as the platform reads it.
+const parseSession = (runtime) => {
+  const interactive = Boolean(runtime?.interactive || runtime?.sessionType);
+  const type = runtime?.sessionType === "python" ? "jupyter" : runtime?.sessionType;
+  return { interactive, sessionType: interactive ? type || "jupyter" : "" };
+};
+
 export const createApplicationSchema = (overrides = {}) => ({
   resources: { cpu: null, memory: null },
-  runtime: { computeTypes: [...DEFAULT_COMPUTE_TYPES] },
+  runtime: { computeTypes: [...DEFAULT_COMPUTE_TYPES], interactive: false, sessionType: "" },
   parameters: [],
   inputs: [],
   outputs: [],
@@ -313,7 +328,7 @@ export const parseApplication = (app) => {
 
   return createApplicationSchema({
     resources: { cpu: rc.cpu ?? null, memory: rc.memory ?? null },
-    runtime: { computeTypes: parseComputeTypes(rc) },
+    runtime: { computeTypes: parseComputeTypes(rc), ...parseSession(rc) },
     parameters: parseParameters(app),
     inputs: asArray(app?.inputs).map(parsePort),
     outputs: asArray(app?.outputs).map(parsePort),
@@ -550,6 +565,12 @@ export const buildManifest = (schema, meta = {}) => {
   if (meta.timeoutSeconds != null && meta.timeoutSeconds !== "") {
     runtime.timeoutSeconds = Number(meta.timeoutSeconds);
   }
+  // A live session (a notebook kernel), not a batch step: the one place an
+  // app declares it.
+  if (s.runtime?.interactive) {
+    runtime.interactive = true;
+    runtime.sessionType = s.runtime.sessionType || "jupyter";
+  }
   manifest.runtime = runtime;
 
   const mParams = asArray(s.parameters).filter((p) => (p.name || "").trim());
@@ -694,7 +715,7 @@ export const parseManifest = (source) => {
       cpu: resources.cpu ?? null,
       memory: resources.memory ?? null,
     },
-    runtime: { computeTypes: parseComputeTypes(runtime) },
+    runtime: { computeTypes: parseComputeTypes(runtime), ...parseSession(runtime) },
     // Both manifest shapes go through parseParameter, which reads the
     // canonical `defaultValue`/`validValues` and the legacy `default`/
     // `allowedValues` alike.

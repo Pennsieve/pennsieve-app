@@ -22,6 +22,7 @@ import {
   MANIFEST_SHAPES,
   detectManifestShape,
 } from './applicationSchema'
+import { dump as dumpYaml } from 'js-yaml'
 
 describe('applicationSchema', () => {
   describe('parseParameters', () => {
@@ -947,5 +948,27 @@ describe('applicationSchema', () => {
       // No default reaches the builder as "required at run".
       expect(byName.channel).toMatchObject({ required: true, defaultValue: undefined })
     })
+  })
+})
+
+describe('live sessions (runtime.interactive / sessionType)', () => {
+  it('writes them only for a live session, with a session type', () => {
+    const batch = buildManifest(createApplicationSchema(), { name: 'a' })
+    expect(batch.runtime).not.toHaveProperty('interactive')
+    expect(batch.runtime).not.toHaveProperty('sessionType')
+
+    const live = createApplicationSchema()
+    live.runtime.interactive = true
+    expect(buildManifest(live, { name: 'a' }).runtime).toMatchObject({ interactive: true, sessionType: 'jupyter' })
+    live.runtime.sessionType = 'r'
+    expect(buildManifest(live, { name: 'a' }).runtime).toMatchObject({ interactive: true, sessionType: 'r' })
+  })
+
+  it('reads them back, a sessionType alone meaning interactive', () => {
+    const read = (runtime) => parseManifest(dumpYaml({ application: { name: 'a' }, runtime })).schema.runtime
+    expect(read({ interactive: true })).toMatchObject({ interactive: true, sessionType: 'jupyter' })
+    expect(read({ sessionType: 'r' })).toMatchObject({ interactive: true, sessionType: 'r' })
+    expect(read({ sessionType: 'python' })).toMatchObject({ interactive: true, sessionType: 'jupyter' })
+    expect(read({ computeTypes: ['standard'] })).toMatchObject({ interactive: false, sessionType: '' })
   })
 })
