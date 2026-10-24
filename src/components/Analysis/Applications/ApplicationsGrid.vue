@@ -12,6 +12,8 @@ import {
   computeLabel,
   githubRepo,
   matchesAppSearch,
+  appDescription,
+  versionLabel,
   runsOn,
   sortApps,
   versionState,
@@ -383,12 +385,12 @@ const goToManifestBuilder = () => {
           <div class="app-body">
             <div class="app-title">
               <span class="app-name">{{ appTitle(app) }}</span>
-              <span v-if="latestVersion(app)?.version" class="app-version">v{{ latestVersion(app).version }}</span>
+              <span v-if="latestVersion(app)?.version" class="app-version">{{ versionLabel(latestVersion(app).version) }}</span>
               <span v-if="app.status === 'archived'" class="app-badge">Archived</span>
               <span v-else-if="visibilityLabel(app)" class="app-badge">{{ visibilityLabel(app) }}</span>
             </div>
             <p class="app-description">
-              {{ app.description || readmePreviews[app.uuid] || "No description." }}
+              {{ appDescription(app) || readmePreviews[app.uuid] || "No description." }}
             </p>
             <div v-if="appTags(app).length" class="app-tags">
               <span v-for="t in appTags(app)" :key="t" class="app-tag">{{ t }}</span>

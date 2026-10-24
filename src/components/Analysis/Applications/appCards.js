@@ -33,9 +33,22 @@ export function latestVersion(app) {
 const COMPUTE_LABEL = { standard: "Standard", lambda: "Lambda", gpu: "GPU" };
 export const computeLabel = (t) => COMPUTE_LABEL[t] || (t ? t.charAt(0).toUpperCase() + t.slice(1) : "");
 
-// "Standard, Lambda · 2 vCPU · 4 GB": where it runs and what it asks for.
+// "v1.2.0", from a tag written with or without its "v".
+export const versionLabel = (tag) => (tag ? (/^v/i.test(tag) ? tag : `v${tag}`) : "");
+
+// What the app is: its app.yml's description, else its record's.
+export const appDescription = (app) => versionManifest(app)?.description || app?.description || "";
+
+// "Standard, Lambda · 2 vCPU · 4 GB": where it runs and what it asks for,
+// as its app.yml declares it, else as its record has it.
 export function runsOn(app) {
-  const rc = app?.runtimeConfig || {};
+  const declared = versionManifest(app)?.runtime || {};
+  const record = app?.runtimeConfig || {};
+  const rc = {
+    computeTypes: declared.computeTypes?.length ? declared.computeTypes : record.computeTypes,
+    cpu: declared.cpu || record.cpu,
+    memory: declared.memory || record.memory,
+  };
   const parts = [];
   const types = (rc.computeTypes || []).map(computeLabel).filter(Boolean);
   if (types.length) parts.push(types.join(", "));

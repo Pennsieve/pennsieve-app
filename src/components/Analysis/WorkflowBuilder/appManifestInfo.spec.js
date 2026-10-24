@@ -31,6 +31,7 @@ describe("media types", () => {
     expect(shortMediaType("*/*")).toBe("Any");
     expect(shortMediaType("application/vnd.apache.parquet")).toBe("PARQUET");
     expect(shortMediaType("application/x-rds")).toBe("RDS");
+    expect(shortMediaType("application/octet-stream")).toBe("File");
     expect(ioLine(edfToJson)).toBe("EDF → JSON");
     expect(ioLine({ inputs: [], outputs: [] })).toBe("");
     expect(ioLine(null)).toBe("");

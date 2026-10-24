@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { appTitle, appInitials, appColor, runsOn, workflowUses, versionState, matchesAppSearch, sortApps } from "./appCards";
+import { appTitle, appInitials, appColor, appDescription, versionLabel, runsOn, workflowUses, versionState, matchesAppSearch, sortApps } from "./appCards";
 
 const spike = {
   name: "spike-detect",
@@ -31,6 +31,12 @@ describe("app cards", () => {
   it("says where it runs and how much it asks for", () => {
     expect(runsOn(spike)).toBe("Standard, Lambda · 2 vCPU · 4 GB");
     expect(runsOn({})).toBe("");
+    const declared = { ...spike, versions: [{ version: "v2", createdAt: "2026-07-01", manifest: { description: "From app.yml", runtime: { computeTypes: ["standard"], cpu: 4096 } } }] };
+    expect(runsOn(declared)).toBe("Standard · 4 vCPU · 4 GB");
+    expect(appDescription(declared)).toBe("From app.yml");
+    expect(appDescription(spike)).toBe("Finds spikes");
+    expect(versionLabel("v1.1.4")).toBe("v1.1.4");
+    expect(versionLabel("1.1.4")).toBe("v1.1.4");
   });
 
   it("counts the workflows that use it, and its latest version's state", () => {

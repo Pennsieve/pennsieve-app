@@ -32,10 +32,12 @@ export function versionManifest(app, tag) {
 export const manifestsServed = (apps) => (apps || []).some((a) => (a.versions || []).some((v) => v.manifest));
 
 // "application/edf" -> "EDF", "image/png" -> "PNG", "*/*" -> "Any";
-// a vendor type by its last part ("application/vnd.apache.parquet" ->
+// "application/octet-stream" -> "File"; a vendor type by its last part ("application/vnd.apache.parquet" ->
 // "PARQUET").
 export function shortMediaType(t) {
   if (!t || t === "*/*") return "Any";
+  // Bytes of any kind: a file, not a format.
+  if (t === "application/octet-stream") return "File";
   let sub = String(t).split("/").pop().replace(/^x-/, "").split("+")[0];
   if (sub.startsWith("vnd.")) sub = sub.split(".").pop();
   return sub.split(/[.-]/)[0].toUpperCase();
