@@ -44,11 +44,12 @@ export function isNotebookWorkflow(wf) {
   return !!notebookKernel(wf);
 }
 
-// Whether a run page (run-detail) shows a notebook's run, so it belongs under
-// the Notebooks tab rather than Workflows: opened from the Notebooks tab
-// (?from=notebooks), or a notebook's run among those loaded.
+// Whether a run page (run-detail) belongs under the Notebooks tab rather than
+// Workflows: the tab it was opened from (?from=notebooks|workflows), else
+// whether it's a notebook's run among those loaded (a link from elsewhere).
 export function runPageIsNotebook(route, runs = []) {
   if (route?.query?.from === "notebooks") return true;
+  if (route?.query?.from === "workflows") return false;
   const runId = route?.params?.runId;
   const run = runId && (runs || []).find((r) => r.uuid === runId);
   return !!run && isNotebookWorkflow({ name: run.workflowName });
