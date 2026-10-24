@@ -1,4 +1,4 @@
-// What an app is for, from the tags its app.yml declares: a short list of
+// What an app is for, from the categories and tags its app.yml declares: a short list of
 // domains, each with a hue and an icon, that the Gallery's app banners are
 // coloured by. Tags are free text, so each domain lists the spellings people
 // use ("EEG", "iEEG", "electrophysiology"); a tag matches regardless of case
@@ -29,7 +29,7 @@ export const DOMAINS = [
     label: "Imaging",
     tag: "imaging",
     hue: 190,
-    aliases: ["image", "images", "microscopy", "mri", "fmri", "ct", "pet", "dicom", "nifti", "histology", "segmentation", "calcium-imaging", "image-processing"],
+    aliases: ["image", "images", "microscopy", "mri", "fmri", "ct", "pet", "dicom", "nifti", "histology", "segmentation", "registration", "calcium-imaging", "image-processing"],
     icon: "M4 5h16v14H4zM4 16l5-5 4 4 2-2 5 5M15.5 9.5h.01",
   },
   {
@@ -37,7 +37,7 @@ export const DOMAINS = [
     label: "Genomics",
     tag: "genomics",
     hue: 140,
-    aliases: ["sequencing", "rna-seq", "rnaseq", "scrna-seq", "dna", "rna", "omics", "transcriptomics", "proteomics", "genetics", "bioinformatics"],
+    aliases: ["sequencing", "rna-seq", "rnaseq", "scrna-seq", "dna", "rna", "omics", "transcriptomics", "proteomics", "genetics", "bioinformatics", "single-cell", "scrna", "seurat"],
     icon: "M7 3c0 6 10 6 10 12s-10 6-10 6M17 3c0 6-10 6-10 12M9 7h6M9 17h6",
   },
   {
@@ -98,10 +98,10 @@ for (const d of DOMAINS) for (const t of [d.tag, d.key, d.label, ...d.aliases]) 
 
 export const domainOfTag = (tag) => BY_TAG.get(normalize(tag)) || null;
 
-// The app's domain: its first tag that names one, else Notebook for an app
-// whose app.yml says it's a live session.
+// The app's domain: its first category, else tag, that names one, else
+// Notebook for an app whose app.yml says it's a live session.
 export function domainOf(manifest) {
-  for (const t of manifest?.tags || []) {
+  for (const t of [...(manifest?.categories || []), ...(manifest?.tags || [])]) {
     const d = domainOfTag(t);
     if (d) return d;
   }

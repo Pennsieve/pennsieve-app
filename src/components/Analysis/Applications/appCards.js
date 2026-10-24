@@ -68,7 +68,7 @@ export function matchesAppSearch(app, query, readme = "") {
   if (!q) return true;
   const r = githubRepo(app?.sourceUrl);
   const m = versionManifest(app);
-  const haystack = [appTitle(app), app?.description, m?.description, ...(m?.tags || []), readme, r && `${r.owner}/${r.repo}`, latestVersion(app)?.version]
+  const haystack = [appTitle(app), app?.description, m?.description, ...(m?.categories || []), ...(m?.tags || []), readme, r && `${r.owner}/${r.repo}`, latestVersion(app)?.version]
     .filter(Boolean)
     .join("\n")
     .toLowerCase();
