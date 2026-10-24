@@ -18,7 +18,14 @@ const props = defineProps({
 const computeResourcesStore = useComputeResourcesStore()
 
 const layerData = computed(() => computeResourcesStore.getNodeLayers(props.nodeId))
-const layers = computed(() => layerData.value.layers || [])
+// Data layers only: python-env / r-env layers came from the retired build
+// workflows; environments now come from environments-service.
+const layers = computed(() =>
+  (layerData.value.layers || []).filter((l) => !l.layerType || l.layerType === 'data')
+)
+const totalCost = computed(() =>
+  layers.value.reduce((sum, l) => sum + (l.estimatedMonthlyCostUsd || 0), 0)
+)
 const isLoading = computed(() => computeResourcesStore.isNodeLayersLoading(props.nodeId))
 
 // Create layer form
@@ -43,13 +50,9 @@ function toggleLayer(name) {
   expandedLayer.value = expandedLayer.value === name ? null : name
 }
 
-const LAYER_TYPE_LABELS = {
-  'python-env': 'Python environment',
-  'r-env': 'R environment',
-  data: 'Data layer',
-}
-function layerTypeLabel(layerType) {
-  return LAYER_TYPE_LABELS[layerType] || 'Data layer'
+const STATUS_LABELS = { READY: 'Ready', EMPTY: 'Empty' }
+function statusLabel(status) {
+  return STATUS_LABELS[status] || status
 }
 
 function formatSize(sizeBytes) {
@@ -209,14 +212,14 @@ async function confirmDeleteLayer(layer) {
             <td>
               <div class="layer-name">
                 <span class="expand-caret" :class="{ open: expandedLayer === layer.layerName }">▸</span>
-                <LayerTypeIcon :layer-type="layer.layerType" :size="18" />
+                <LayerTypeIcon :size="18" />
                 <span>{{ layer.layerName }}</span>
               </div>
               <div v-if="layer.description" class="layer-description">{{ layer.description }}</div>
             </td>
             <td>
               <span class="status-badge" :class="layer.status === 'READY' ? 'badge-green' : 'badge-yellow'">
-                {{ layer.status }}
+                {{ statusLabel(layer.status) }}
               </span>
             </td>
             <td>{{ formatSize(layer.sizeBytes) }}</td>
@@ -233,17 +236,6 @@ async function confirmDeleteLayer(layer) {
             <td :colspan="isOwner ? 9 : 8">
               <div class="layer-detail">
                 <div class="detail-grid">
-                  <div class="detail-item">
-                    <span class="detail-label">Type</span>
-                    <span class="detail-value">
-                      <LayerTypeIcon :layer-type="layer.layerType" :size="14" />
-                      {{ layerTypeLabel(layer.layerType) }}
-                    </span>
-                  </div>
-                  <div v-if="layer.pythonVersion" class="detail-item">
-                    <span class="detail-label">Python</span>
-                    <span class="detail-value">{{ layer.pythonVersion }}</span>
-                  </div>
                   <div v-if="layer.snapshotId" class="detail-item">
                     <span class="detail-label">Snapshot</span>
                     <span class="detail-value mono">{{ layer.snapshotId }}</span>
@@ -254,16 +246,7 @@ async function confirmDeleteLayer(layer) {
                   </div>
                 </div>
 
-                <template v-if="layer.packages && layer.packages.length">
-                  <div class="detail-subhead">{{ layer.packages.length }} packages</div>
-                  <div class="package-list">
-                    <code v-for="pkg in layer.packages" :key="pkg" class="package">{{ pkg }}</code>
-                  </div>
-                </template>
-                <div v-else-if="layer.layerType === 'python-env' || layer.layerType === 'r-env'" class="detail-empty">
-                  No package list recorded — built before package capture, or still building.
-                </div>
-                <div v-else class="detail-empty">
+                <div class="detail-empty">
                   Data layer — {{ formatFileCount(layer.fileCount) }} files, {{ formatSize(layer.sizeBytes) }}.
                 </div>
               </div>
@@ -277,7 +260,7 @@ async function confirmDeleteLayer(layer) {
             <td>{{ formatSize(layers.reduce((sum, l) => sum + (l.sizeBytes || 0), 0)) }}</td>
             <td></td>
             <td></td>
-            <td>{{ formatCost(layerData.totalEstimatedMonthlyCostUsd) }}</td>
+            <td>{{ formatCost(totalCost) }}</td>
             <td :colspan="isOwner ? 3 : 2"></td>
           </tr>
         </tfoot>
@@ -531,31 +514,6 @@ async function confirmDeleteLayer(layer) {
   &.mono {
     font-family: 'Courier New', monospace;
   }
-}
-
-.detail-subhead {
-  font-size: 12px;
-  font-weight: 500;
-  color: theme.$gray_6;
-  margin-bottom: 6px;
-}
-
-.package-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  max-height: 220px;
-  overflow-y: auto;
-}
-
-.package {
-  font-family: 'Courier New', monospace;
-  font-size: 12px;
-  color: theme.$gray_6;
-  background: theme.$white;
-  border: 1px solid theme.$gray_2;
-  border-radius: 3px;
-  padding: 2px 6px;
 }
 
 .detail-empty {
