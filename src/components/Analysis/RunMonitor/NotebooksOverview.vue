@@ -395,6 +395,7 @@ onBeforeUnmount(() => {
         </div>
 
         <run-history
+          from="notebooks"
           :title="activeNotebookRuns.length ? 'Earlier notebooks' : 'Notebooks'"
           :runs="historyRuns"
           :loading="isLoading"

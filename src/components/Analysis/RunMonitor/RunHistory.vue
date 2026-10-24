@@ -12,6 +12,8 @@ import { costOf, costParts, fetchRun } from "./runDetails";
 
 const props = defineProps({
   title: { type: String, required: true },
+  // The tab the list is on ("notebooks"), passed to the run pages it links.
+  from: { type: String, default: "" },
   // The runs to list, newest first.
   runs: { type: Array, default: () => [] },
   loading: { type: Boolean, default: false },
@@ -49,10 +51,14 @@ async function toggle(run) {
   if (full) details.value = { ...details.value, [run.uuid]: full };
 }
 
-const runPage = (run) =>
-  route.params.orgId
+// The run's page, saying which tab it was opened from (props.from) so that
+// tab stays highlighted there.
+const runPage = (run) => ({
+  ...(route.params.orgId
     ? { name: "run-detail", params: { orgId: route.params.orgId, runId: run.uuid } }
-    : { name: "my-run-detail", params: { runId: run.uuid } };
+    : { name: "my-run-detail", params: { runId: run.uuid } }),
+  ...(props.from && { query: { from: props.from } }),
+});
 const ended = (run) => run.completedAt && !["NOT_STARTED", "STARTED", "FINALIZING"].includes(run.status);
 const errorOf = (run) => run.errorMessage || details.value[run.uuid]?.errorMessage || "";
 </script>

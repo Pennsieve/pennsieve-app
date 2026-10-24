@@ -22,7 +22,7 @@ import OrgBreadcrumb from "../../components/shared/OrgBreadcrumb/OrgBreadcrumb.v
 import { useComputeResourcesStore } from "@/stores/computeResourcesStore";
 import { useGetToken } from "@/composables/useGetToken";
 import EventBus from "@/utils/event-bus";
-import { isNotebookWorkflow } from "@/components/Analysis/RunMonitor/notebookHelpers";
+import { runPageIsNotebook } from "@/components/Analysis/RunMonitor/notebookHelpers";
 
 export default {
   name: "IntegrationView",
@@ -57,11 +57,24 @@ export default {
     // Whether the run on a run page is a notebook's (Notebooks tab) rather than
     // a workflow's, from the runs already loaded.
     runIsNotebook() {
-      const runId = this.$route.params.runId;
-      if (!runId) return false;
-      const runs = this.$store.getters["analysisModule/workflowInstances"] || [];
-      const run = runs.find((r) => r.uuid === runId);
-      return !!run && isNotebookWorkflow({ name: run.workflowName });
+      return runPageIsNotebook(this.$route, this.$store.getters["analysisModule/workflowInstances"]);
+    },
+    // A run's page sits under no tab's path: it lights up Notebooks for a
+    // notebook's run, else Workflows (as do configuring a run and a new
+    // workflow).
+    tabs() {
+      const runPage = (route) => route.name === "run-detail";
+      return [
+        { name: "Notebooks", to: "notebooks", activeWhen: (route) => runPage(route) && this.runIsNotebook },
+        {
+          name: "Workflows",
+          to: "workflows",
+          activeWhen: (route) =>
+            (runPage(route) && !this.runIsNotebook) || ["run-configure", "workflow-create"].includes(route.name),
+        },
+        { name: "Gallery", to: "gallery" },
+        { name: "Compute Nodes", to: "compute-nodes" },
+      ];
     },
     breadcrumbCrumbs() {
       const routeName = this.$route.name;
@@ -152,24 +165,6 @@ export default {
 
   data() {
     return {
-      tabs: [
-        {
-          name: "Notebooks",
-          to: "notebooks",
-        },
-        {
-          name: "Workflows",
-          to: "workflows",
-        },
-        {
-          name: "Gallery",
-          to: "gallery",
-        },
-        {
-          name: "Compute Nodes",
-          to: "compute-nodes",
-        },
-      ],
     };
   },
 };

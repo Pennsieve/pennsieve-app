@@ -44,6 +44,16 @@ export function isNotebookWorkflow(wf) {
   return !!notebookKernel(wf);
 }
 
+// Whether a run page (run-detail) shows a notebook's run, so it belongs under
+// the Notebooks tab rather than Workflows: opened from the Notebooks tab
+// (?from=notebooks), or a notebook's run among those loaded.
+export function runPageIsNotebook(route, runs = []) {
+  if (route?.query?.from === "notebooks") return true;
+  const runId = route?.params?.runId;
+  const run = runId && (runs || []).find((r) => r.uuid === runId);
+  return !!run && isNotebookWorkflow({ name: run.workflowName });
+}
+
 // A compute node can host notebooks/environments only if it has interactive
 // sessions enabled. Non-interactive nodes can't run a notebook and have no use
 // for env layers, so they're excluded from the Notebooks-page node pickers.
