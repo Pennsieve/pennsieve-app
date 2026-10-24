@@ -22,9 +22,7 @@ export function notebookKernel(wf) {
   // Name fallback (separators normalized so "r-notebook", "R Session", and
   // "Pennsieve R Session" all match).
   const name = (wf?.name || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
-  // Environment builders (e.g. "Pennsieve - Build Python Environment") carry a
-  // language in their name but are NOT notebooks — exclude them explicitly.
-  if (name.includes("build") || name.includes("environment")) return null;
+  if (isRetiredEnvironmentBuilder(wf)) return null;
   if (name.includes("jupyter")) return "jupyter";
   // Standardized notebook names are "Pennsieve - <Language> Notebook - <version>";
   // require the notebook/session qualifier so a workflow that merely mentions a
@@ -38,6 +36,14 @@ export function notebookKernel(wf) {
   // An interactive node with no explicit sessionType defaults to Python/Jupyter.
   if (node) return "jupyter";
   return null;
+}
+
+// The old "Pennsieve - Build Python/R Environment" workflows, retired now that
+// environments come from environments-service. They may still be published,
+// and their names mention a language, so they must not pass for notebooks.
+export function isRetiredEnvironmentBuilder(wf) {
+  const name = (wf?.name || "").toLowerCase();
+  return name.includes("build") || name.includes("environment");
 }
 
 export function isNotebookWorkflow(wf) {
@@ -55,9 +61,9 @@ export function runPageIsNotebook(route, runs = []) {
   return !!run && isNotebookWorkflow({ name: run.workflowName });
 }
 
-// A compute node can host notebooks/environments only if it has interactive
-// sessions enabled. Non-interactive nodes can't run a notebook and have no use
-// for env layers, so they're excluded from the Notebooks-page node pickers.
+// A compute node can host notebooks only if it has interactive sessions
+// enabled, so non-interactive nodes are left out of the Notebooks-page node
+// pickers.
 export function interactiveCapable(cn) {
   return (
     (cn?.maxInteractiveSessions || 0) > 0 ||

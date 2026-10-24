@@ -130,8 +130,8 @@ async function fetchNotebookWorkflows() {
     }
     const all = [...byId.values()];
     // Require the Official flag (set by Pennsieve, not user-settable) so a workflow
-    // a user merely *names* "Pennsieve - …" can't masquerade as an official kernel
-    // or environment builder. Name still selects which official workflow it is.
+    // a user merely *names* "Pennsieve - …" can't masquerade as an official
+    // kernel. Name still selects which official workflow it is.
     const official = all.filter((w) => w?.official);
     notebookWorkflows.value = official.filter(isNotebookWorkflow);
     if (notebookWorkflows.value.length === 0) {

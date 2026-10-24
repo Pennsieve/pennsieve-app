@@ -9,7 +9,7 @@ import { ref, computed, watch, onBeforeUnmount } from "vue";
 import { useStore } from "vuex";
 import { ElMessage, ElMessageBox } from "element-plus";
 import { MoreFilled, Loading } from "@element-plus/icons-vue";
-import LayerTypeIcon from "../ComputeNodes/LayerTypeIcon.vue";
+import EnvironmentIcon from "./EnvironmentIcon.vue";
 import {
   buildLog,
   deleteEnvironment,
@@ -238,7 +238,7 @@ const STATUS_LABEL = { ready: "Ready", building: "Building", failed: "Failed", u
         @keydown.enter="openDetail(card)"
       >
         <div class="env-card-top">
-          <LayerTypeIcon layer-type="python-env" :size="20" />
+          <EnvironmentIcon :language="card.env.language" :size="20" />
           <span class="env-name" :title="card.env.name">{{ card.env.name }}</span>
           <span v-if="card.env.official" class="env-tag">Pennsieve</span>
           <span class="env-more-wrap" @click.stop>

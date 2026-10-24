@@ -110,10 +110,9 @@ const isExecuting = ref(false);
 const errorBanner = ref("");
 const errorBannerNodeId = ref("");
 const rerunSource = ref(null);
-// Environment layers (python-env / r-env / data) attached to the run being
-// configured. Carried over from the source run on a rerun so the rebuilt
-// payload re-attaches them — otherwise "Rerun with configuration" silently
-// drops the layer.
+// The node's data layers the source run mounted (set through the API; the
+// app doesn't attach any itself). Carried over on a rerun so "Rerun with
+// configuration" doesn't silently drop them.
 const configLayers = ref([]);
 
 // File picker dialog state
@@ -762,7 +761,7 @@ const initiateWorkflowFromConfig = async (pendingConfig) => {
   const { workflowId, computeNodeId, datasetId, rerunSource: source } = pendingConfig;
   initiateForm.value = { workflowId, computeNodeId, datasetId, name: "" };
   runNameError.value = "";
-  // Preserve any environment layers from the source run so the rerun re-attaches them.
+  // Preserve any data layers from the source run so the rerun re-attaches them.
   configLayers.value = Array.isArray(source?.layers) ? [...source.layers] : [];
 
   try {
@@ -2251,7 +2250,7 @@ onUnmounted(() => {
                   </span>
                 </div>
                 <div v-if="configLayers.length" class="info-row">
-                  <span class="info-label">Environment</span>
+                  <span class="info-label">Data layers</span>
                   <span class="info-value">{{ configLayers.join(', ') }}</span>
                 </div>
               </div>
