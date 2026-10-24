@@ -79,6 +79,7 @@ const takenEnvNames = computed(() => environmentsRef.value?.ownNames || []);
 // "Use in a notebook": a new notebook, where the environment is picked from
 // the session's sidebar once it runs.
 function onEnvUse() {
+  view.value = "live";
   dialogVisible.value = true;
 }
 function onEnvCreated() {
@@ -86,11 +87,16 @@ function onEnvCreated() {
 }
 const isLoading = ref(false);
 const dialogVisible = ref(false);
-// Recent notebooks are history (all of it is under Runs): folded at first.
-const recentOpen = ref(false);
-const runsRoute = computed(() =>
-  isMyWorkspace.value ? { name: "my-runs" } : { name: "runs", params: { orgId: route.params.orgId } }
-);
+// The sub-tab, kept in the URL so it can be linked to and survives reloads.
+// Environments only where the site has environments-service.
+const VIEWS = [
+  { key: "live", label: "Live" },
+  ...(hasEnvironments ? [{ key: "environments", label: "Environments" }] : []),
+];
+const view = computed({
+  get: () => (hasEnvironments && route.query.view === "environments" ? "environments" : "live"),
+  set: (v) => router.replace({ query: { ...route.query, view: v === "live" ? undefined : v } }),
+});
 
 const notebookWorkflowIds = computed(
   () => new Set(notebookWorkflows.value.map((w) => w.uuid))
@@ -155,7 +161,9 @@ const activeNotebookRuns = computed(() =>
     )
     .sort((a, b) => new Date(b.startedAt) - new Date(a.startedAt))
 );
-const recentNotebookRuns = computed(() =>
+// Every finished notebook loaded so far, newest first; more load on request
+// (the runs list pages through all runs, notebooks among them).
+const historyRuns = computed(() =>
   notebookRuns.value
     .filter((r) => isTerminalStatus(r.status))
     .sort(
@@ -163,8 +171,25 @@ const recentNotebookRuns = computed(() =>
         new Date(b.completedAt || b.startedAt) -
         new Date(a.completedAt || a.startedAt)
     )
-    .slice(0, 5)
 );
+const historyQuery = ref("");
+const shownHistory = computed(() => {
+  const q = historyQuery.value.trim().toLowerCase();
+  if (!q) return historyRuns.value;
+  return historyRuns.value.filter((r) => (runDisplayName(r) || "").toLowerCase().includes(q));
+});
+const hasMoreRuns = computed(() => !!store.getters["analysisModule/workflowInstancesCursor"]);
+const loadingMore = ref(false);
+async function loadMoreRuns() {
+  loadingMore.value = true;
+  try {
+    await store.dispatch("analysisModule/fetchMoreWorkflowInstances");
+  } catch (err) {
+    console.error("Failed to load more notebooks:", err);
+  } finally {
+    loadingMore.value = false;
+  }
+}
 
 // After a notebook is created, open its notebook page straight away — it shows
 // the "waiting for the kernel" empty state while the session task launches.
@@ -291,29 +316,31 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="notebooks-container">
-      <div class="info-section">
-        <div class="info-card">
-          <div class="info-card-text">
-            <p>
-              Interactive Python and R notebooks on your data, with the packages you need from your environments.
-              For multi-step analyses, add a notebook step to a workflow under
-              <router-link v-if="!isMyWorkspace" :to="{ name: 'workflows' }" class="info-card-link">Workflows</router-link
-              ><template v-else>a workspace's Workflows</template>.
-            </p>
-          </div>
-          <div class="info-card-actions">
-            <bf-button :disabled="notebookWorkflows.length === 0" @click="dialogVisible = true">
-              + New Notebook
-            </bf-button>
-            <bf-button v-if="hasEnvironments" class="ghost" @click="openCreateEnvironment()">
-              + New Environment
-            </bf-button>
-          </div>
+      <!-- Live: the notebooks running and the ones before; Environments: what
+           they run with. The view is in the URL (?view=environments). -->
+      <div class="nb-toolbar">
+        <div class="nb-views" role="tablist">
+          <button
+            v-for="v in VIEWS"
+            :key="v.key"
+            role="tab"
+            class="nb-view"
+            :class="{ active: view === v.key }"
+            :aria-selected="view === v.key"
+            @click="view = v.key"
+          >
+            {{ v.label }}
+          </button>
         </div>
+        <bf-button v-if="view === 'live'" :disabled="notebookWorkflows.length === 0" @click="dialogVisible = true">
+          + New Notebook
+        </bf-button>
+        <bf-button v-else @click="openCreateEnvironment()">+ New Environment</bf-button>
       </div>
 
+      <template v-if="view === 'live'">
       <div v-if="!isLoading && notebookWorkflows.length === 0" class="empty-canvas">
-        <h3>No notebook environments available</h3>
+        <h3>No notebook kernels available</h3>
         <p>
           A published notebook workflow (e.g. "Jupyter Notebook") must exist
           before you can start a notebook here.
@@ -370,25 +397,30 @@ onBeforeUnmount(() => {
           </div>
         </div>
 
-        <environments-section
-          ref="environmentsRef"
-          @create="openCreateEnvironment()"
-          @edit="openCreateEnvironment"
-          @retry="openCreateEnvironment"
-          @use="onEnvUse"
-        />
-
-        <div v-if="recentNotebookRuns.length > 0" class="dashboard-section">
-          <div class="recent-head">
-            <button class="recent-toggle" :aria-expanded="recentOpen" @click="recentOpen = !recentOpen">
-              <span class="recent-caret" :class="{ open: recentOpen }">▸</span>
-              Recent notebooks ({{ recentNotebookRuns.length }})
-            </button>
-            <router-link :to="runsRoute" class="info-card-link recent-all">View all in Runs →</router-link>
+        <div class="dashboard-section">
+          <div class="history-head">
+            <h3 class="dashboard-section-title">
+              {{ activeNotebookRuns.length ? "Earlier notebooks" : "Notebooks" }}
+            </h3>
+            <el-input
+              v-if="historyRuns.length > 5"
+              v-model="historyQuery"
+              size="small"
+              clearable
+              placeholder="Search notebooks…"
+              class="history-search"
+            />
           </div>
-          <div v-if="recentOpen" class="recent-runs-list">
+          <p v-if="isLoading && !historyRuns.length" class="history-empty">Loading…</p>
+          <p v-else-if="!historyRuns.length && !activeNotebookRuns.length" class="history-empty">
+            No notebooks yet. Start one to work with your data interactively; it uses the packages of an environment
+            you switch to from its sidebar.
+          </p>
+          <p v-else-if="!historyRuns.length" class="history-empty">No earlier notebooks.</p>
+          <p v-else-if="!shownHistory.length" class="history-empty">No notebook matches.</p>
+          <div v-else class="recent-runs-list">
             <div
-              v-for="run in recentNotebookRuns"
+              v-for="run in shownHistory"
               :key="run.uuid"
               class="recent-run-row"
               @click="selectRun(run)"
@@ -403,20 +435,26 @@ onBeforeUnmount(() => {
               }}</span>
             </div>
           </div>
+          <button v-if="hasMoreRuns" class="history-more" :disabled="loadingMore" @click="loadMoreRuns">
+            {{ loadingMore ? "Loading…" : "Load earlier notebooks" }}
+          </button>
         </div>
+      </template>
+      </template>
 
-        <div
-          v-if="
-            !isLoading &&
-            activeNotebookRuns.length === 0 &&
-            recentNotebookRuns.length === 0
-          "
-          class="empty-canvas"
-        >
-          <h3>No notebooks yet</h3>
-          <p>Start a notebook to work with your data interactively.</p>
-        </div>
-
+      <template v-else>
+        <p class="nb-view-desc">
+          Python package environments for your notebooks. Build one from a requirements list, then switch to it from a
+          notebook's sidebar while it runs.
+        </p>
+        <environments-section
+          ref="environmentsRef"
+          :show-title="false"
+          @create="openCreateEnvironment()"
+          @edit="openCreateEnvironment"
+          @retry="openCreateEnvironment"
+          @use="onEnvUse"
+        />
       </template>
 
     <new-notebook-dialog
@@ -480,38 +518,75 @@ onBeforeUnmount(() => {
   justify-content: flex-end;
   gap: 8px;
 }
-.info-section {
-  margin-bottom: 24px;
-}
-/* The tab names the page: a line on the left, the two actions on the right. */
-.info-card {
+/* The sub-tabs on the left, the view's action on the right. */
+.nb-toolbar {
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
-  gap: 12px 24px;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
+  border-bottom: 1px solid theme.$gray_2;
 }
-.info-card-text {
-  flex: 1 1 360px;
-  min-width: 0;
-}
-.info-card-actions {
+.nb-views {
   display: flex;
-  gap: 12px;
-  flex-shrink: 0;
+  gap: 20px;
 }
-.info-card p {
-  font-size: 13px;
+.nb-view {
+  padding: 8px 0 10px;
+  margin-bottom: -1px;
+  border: none;
+  border-bottom: 2px solid transparent;
+  background: none;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 500;
   color: theme.$gray_5;
-  line-height: 1.5;
-  margin: 0;
+  cursor: pointer;
+
+  &:hover {
+    color: theme.$purple_3;
+  }
+  &.active {
+    color: theme.$purple_3;
+    border-bottom-color: theme.$purple_3;
+  }
 }
-.info-card-link {
-  color: theme.$purple_1;
-  font-weight: 600;
-  text-decoration: none;
+.nb-toolbar :deep(.bf-button) {
+  margin-bottom: 8px;
 }
-.info-card-link:hover {
-  text-decoration: underline;
+.nb-view-desc {
+  margin: 0 0 12px;
+  font-size: 13px;
+  color: theme.$gray_4;
+}
+.history-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.history-search {
+  width: 240px;
+}
+.history-empty {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: theme.$gray_4;
+}
+.history-more {
+  margin-top: 8px;
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  font-size: 12px;
+  color: theme.$link-color;
+  cursor: pointer;
+
+  &:disabled {
+    color: theme.$gray_4;
+    cursor: default;
+  }
 }
 .dashboard-section {
   margin-bottom: 24px;
@@ -627,38 +702,6 @@ onBeforeUnmount(() => {
   height: 8px;
   border-radius: 50%;
   background: theme.$gray_3;
-}
-.recent-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 8px;
-}
-.recent-toggle {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 0;
-  border: none;
-  background: none;
-  font: inherit;
-  font-size: 14px;
-  font-weight: 600;
-  color: theme.$gray_6;
-  cursor: pointer;
-}
-.recent-caret {
-  font-size: 10px;
-  color: theme.$gray_4;
-  transition: transform 0.12s ease;
-
-  &.open {
-    transform: rotate(90deg);
-  }
-}
-.recent-all {
-  font-size: 12px;
-  font-weight: 500;
 }
 .recent-runs-list {
   display: flex;

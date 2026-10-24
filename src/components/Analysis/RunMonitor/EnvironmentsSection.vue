@@ -20,6 +20,11 @@ import {
 import { cardStatus, formatBytes, shownVersion, since, sortEnvironments } from "./environmentCards";
 import { matchesQuery, packageSummary } from "../JupyterSession/environmentHelpers";
 
+const props = defineProps({
+  // Off where the page names the section (the Notebooks page's Environments
+  // tab), which also has the New button.
+  showTitle: { type: Boolean, default: true },
+});
 // create(), edit({ name, requirements }), retry({ name, requirements, retry }),
 // use(): the page opens the dialogs.
 const emit = defineEmits(["create", "edit", "retry", "use"]);
@@ -199,8 +204,8 @@ const STATUS_LABEL = { ready: "Ready", building: "Building", failed: "Failed", u
 
 <template>
   <div v-if="available" class="dashboard-section">
-    <div class="env-header">
-      <h3 class="dashboard-section-title">Environments</h3>
+    <div class="env-header" :class="{ 'env-header--untitled': !showTitle }">
+      <h3 v-if="showTitle" class="dashboard-section-title">Environments</h3>
       <div class="env-header-actions">
         <el-input
           v-if="cards.length > 3"
@@ -210,7 +215,7 @@ const STATUS_LABEL = { ready: "Ready", building: "Building", failed: "Failed", u
           placeholder="Search by name or package…"
           class="env-search"
         />
-        <button class="env-link env-new" type="button" @click="emit('create')">+ New</button>
+        <button v-if="showTitle" class="env-link env-new" type="button" @click="emit('create')">+ New</button>
       </div>
     </div>
 
@@ -417,6 +422,9 @@ const STATUS_LABEL = { ready: "Ready", building: "Building", failed: "Failed", u
 .env-empty .env-link {
   font-size: 13px;
   margin-left: 4px;
+}
+.env-header--untitled {
+  justify-content: flex-end;
 }
 .env-header-actions {
   display: flex;
