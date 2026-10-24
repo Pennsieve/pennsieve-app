@@ -298,7 +298,7 @@
       <div class="field-row">
         <label class="field-label">Tags</label>
         <el-select
-          v-model="schema.tags"
+          :model-value="schema.tags"
           class="field-control"
           multiple
           filterable
@@ -306,8 +306,15 @@
           default-first-option
           :reserve-keyword="false"
           placeholder="Type a tag and press Enter"
-        />
+          @update:model-value="setTags"
+        >
+          <el-option v-for="t in SUGGESTED_TAGS" :key="t" :label="t" :value="t" />
+        </el-select>
       </div>
+      <p class="schema-section-hint">
+        Tags say what the app is for, and colour its card in the Gallery: pick from the list where one fits
+        (eeg, imaging, spike-sorting…), or type your own.
+      </p>
     </section>
   </div>
 </template>
@@ -325,6 +332,7 @@ import {
   STANDARD_CPU_OPTIONS,
   getStandardMemoryOptions,
 } from "./applicationSchema";
+import { SUGGESTED_TAGS, canonicalTag } from "./appDomains";
 
 /**
  * v-model is an ApplicationSchema (see applicationSchema.js). The component
@@ -339,6 +347,12 @@ defineProps({
 });
 
 const store = useStore();
+
+// A typed tag lands on the suggestion it spells ("EEG" -> "eeg"), so the
+// same thing gets one tag across apps.
+function setTags(tags) {
+  schema.value.tags = [...new Set((tags || []).map(canonicalTag).filter(Boolean))];
+}
 
 /*
   A port's media type is a platform package format, not a vocabulary this form

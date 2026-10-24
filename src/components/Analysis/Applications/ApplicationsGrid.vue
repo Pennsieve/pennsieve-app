@@ -4,14 +4,14 @@ import { useStore } from "vuex";
 import { useRouter, useRoute } from "vue-router";
 
 import IconAnalysis from "../../icons/IconAnalysis.vue";
+import AppBanner from "./AppBanner.vue";
+import { versionManifest } from "../WorkflowBuilder/appManifestInfo";
 import {
   APP_SORTS,
   appTitle,
   computeLabel,
   githubRepo,
   matchesAppSearch,
-  appColor,
-  appInitials,
   runsOn,
   sortApps,
   versionState,
@@ -76,6 +76,8 @@ const parseGitHubDisplay = (sourceUrl) => {
   return info ? `${info.owner}/${info.repo}` : null;
 };
 
+// The app.yml's tags, a few: the rest are found by search.
+const appTags = (app) => (versionManifest(app)?.tags || []).slice(0, 4);
 const repoName = (app) => parseGitHubDisplay(app.sourceUrl) || "Unknown repo";
 
 const latestVersion = (app) => {
@@ -359,8 +361,9 @@ const goToManifestBuilder = () => {
       </div>
 
       <div v-if="filteredApplications.length > 0" class="applications-grid">
-        <!-- A card: the app's tile on the left; what the app is, where it
-             runs and how much it's used on the right. -->
+        <!-- A card: the app's banner on the left (what goes in and comes
+             out, on its domain's colour); what the app is, where it runs
+             and how much it's used on the right. -->
         <div
           v-for="app in paginatedApplications"
           :key="app.uuid"
@@ -372,7 +375,7 @@ const goToManifestBuilder = () => {
           @keydown.enter="goToDetail(app)"
         >
           <div class="app-thumb">
-            <span class="app-initials" :style="appColor(app)" aria-hidden="true">{{ appInitials(app) }}</span>
+            <AppBanner :app="app" />
           </div>
           <div class="app-body">
             <div class="app-title">
@@ -384,6 +387,9 @@ const goToManifestBuilder = () => {
             <p class="app-description">
               {{ app.description || readmePreviews[app.uuid] || "No description." }}
             </p>
+            <div v-if="appTags(app).length" class="app-tags">
+              <span v-for="t in appTags(app)" :key="t" class="app-tag">{{ t }}</span>
+            </div>
             <div v-if="runsOn(app)" class="app-runs">{{ runsOn(app) }}</div>
             <div class="app-repo">{{ repoName(app) }}</div>
             <div class="app-foot">
@@ -607,24 +613,23 @@ const goToManifestBuilder = () => {
     opacity: 0.7;
   }
 }
-/* The app's tile, where the workflows show their graph. */
+/* The app's banner, where the workflows show their graph. */
 .app-thumb {
   display: flex;
-  align-items: center;
-  justify-content: center;
   flex: 0 0 150px;
   border-right: 1px solid theme.$gray_2;
-  background: theme.$gray_1;
 }
-.app-initials {
+.app-tags {
   display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 88px;
-  height: 88px;
-  font-size: 30px;
-  font-weight: 600;
-  letter-spacing: 0.02em;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.app-tag {
+  padding: 0 6px;
+  border-radius: 3px;
+  background: theme.$gray_0;
+  font-size: 11px;
+  color: theme.$gray_5;
 }
 .app-body {
   display: flex;

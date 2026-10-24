@@ -1,6 +1,7 @@
 // What the Gallery's app cards show, and how they're searched, filtered
 // and sorted: pure, from the application records.
 import { normalizeUrl } from "../RunMonitor/runHelpers";
+import { versionManifest } from "../WorkflowBuilder/appManifestInfo";
 
 export function githubRepo(sourceUrl) {
   const m = (sourceUrl || "").match(/github\.com\/([^/]+)\/([^/\s.]+)/);
@@ -66,7 +67,8 @@ export function matchesAppSearch(app, query, readme = "") {
   const q = (query || "").trim().toLowerCase();
   if (!q) return true;
   const r = githubRepo(app?.sourceUrl);
-  const haystack = [appTitle(app), app?.description, readme, r && `${r.owner}/${r.repo}`, latestVersion(app)?.version]
+  const m = versionManifest(app);
+  const haystack = [appTitle(app), app?.description, m?.description, ...(m?.tags || []), readme, r && `${r.owner}/${r.repo}`, latestVersion(app)?.version]
     .filter(Boolean)
     .join("\n")
     .toLowerCase();
