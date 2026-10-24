@@ -469,7 +469,6 @@ onMounted(async () => {
   display: flex;
   min-width: 0;
   border: 1px solid theme.$gray_2;
-  border-radius: 6px;
   background: theme.$white;
   overflow: hidden;
   cursor: pointer;
