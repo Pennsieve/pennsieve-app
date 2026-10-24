@@ -23,6 +23,8 @@ describe("app domains", () => {
     expect(domainOfTag("spike_sorting").key).toBe("spikes");
     expect(domainOfTag("Machine-Learning").key).toBe("ml");
     expect(domainOfTag("my-lab")).toBeNull();
+    expect(domainOfTag("Pre-processing").key).toBe("preprocessing");
+    expect(domainOfTag("Reporting").key).toBe("report");
   });
 
   it("takes the first subject named, else the first task, else a live session's", () => {

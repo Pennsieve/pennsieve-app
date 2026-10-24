@@ -655,8 +655,8 @@ describe('applicationSchema', () => {
       expect(schema.resources).toEqual({ cpu: 4096, memory: 16384 })
       // The legacy gpu block folds into the compute types.
       expect(schema.runtime.computeTypes).toEqual(['standard', 'gpu'])
-      // An old app.yml's categories are read as tags.
-      expect(schema.tags).toEqual(['Preprocessing'])
+      // An old app.yml's categories are read as tags, in the known spelling.
+      expect(schema.tags).toEqual(['preprocessing'])
       expect(schema).not.toHaveProperty('categories')
       // Manifest `default` maps back onto the editable `defaultValue`.
       expect(schema.parameters[0]).toMatchObject({

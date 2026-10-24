@@ -87,6 +87,22 @@ export const DOMAINS = [
     icon: "M12 3l8 3v6c0 5-4 8-8 9-4-1-8-4-8-9V6zM8.5 12l2.5 2.5 4.5-5",
   },
   {
+    key: "preprocessing",
+    label: "Preprocessing",
+    tag: "preprocessing",
+    hue: 165,
+    aliases: ["preprocess", "pre-processing", "filtering", "filter", "denoising", "artifact-removal", "normalization", "resampling", "re-referencing"],
+    icon: "M3 5h18l-7 8v6l-4 2v-8z",
+  },
+  {
+    key: "report",
+    label: "Report",
+    tag: "report",
+    hue: 315,
+    aliases: ["reports", "reporting", "summary", "summarize", "pdf-report"],
+    icon: "M6 3h9l4 4v14H6zM14 3v5h5M9 13h7M9 17h5",
+  },
+  {
     key: "notebook",
     label: "Notebook",
     tag: "notebook",
