@@ -3,6 +3,20 @@
 // list's versions). Apps without an app.yml have none, and are shown and
 // used as before, marked "No manifest".
 import { validateAppConnection } from "../Applications/applicationSchema";
+import { notebookKernel } from "../RunMonitor/notebookHelpers";
+
+// The session type of an interactive (human-in-the-loop) app, e.g. a
+// notebook kernel: "jupyter" or "r"; null for a batch app. As its app.yml
+// declares it (runtime.interactive, runtime.sessionType), else read from
+// the name as the Notebooks page does (notebookKernel):
+// "pennsieve-jupyter-session", "pennsieve-r-session".
+export function sessionTypeOf(app) {
+  const runtime = versionManifest(app)?.runtime;
+  if (runtime?.sessionType) return runtime.sessionType === "python" ? "jupyter" : runtime.sessionType;
+  if (runtime?.interactive) return "jupyter";
+  const repo = (app?.sourceUrl || "").replace(/\.git$/, "").split("/").pop() || "";
+  return notebookKernel({ name: [versionManifest(app)?.name, app?.name, repo].filter(Boolean).join(" ") });
+}
 
 const newestFirst = (versions) =>
   [...(versions || [])].sort((a, b) => (Date.parse(b.createdAt) || 0) - (Date.parse(a.createdAt) || 0));
@@ -59,10 +73,22 @@ export function paletteGroups(apps, { stepPorts = null, me = "", name = (a) => a
   const rest = apps.filter((a) => !fits.includes(a));
   const groups = [];
   if (stepPorts) groups.push({ key: "fits", label: "Fits after the selected step", apps: [...fits].sort(byName) });
-  const yours = rest.filter((a) => me && a.ownerId === me);
-  const others = rest.filter((a) => !yours.includes(a));
+  // Interactive apps (notebook kernels) are their own group, last: a step
+  // where the workflow waits for someone to work in a session.
+  const interactive = rest.filter((a) => sessionTypeOf(a));
+  const batch = rest.filter((a) => !interactive.includes(a));
+  const yours = batch.filter((a) => me && a.ownerId === me);
+  const others = batch.filter((a) => !yours.includes(a));
   if (yours.length) groups.push({ key: "yours", label: "Yours", apps: yours.sort(byName) });
   groups.push({ key: "all", label: yours.length || stepPorts ? "Other apps" : "Apps", apps: others.sort(byName) });
+  if (interactive.length) {
+    groups.push({
+      key: "interactive",
+      label: "Interactive",
+      note: "The workflow pauses here while someone works in a notebook.",
+      apps: interactive.sort(byName),
+    });
+  }
   return groups.filter((g) => g.apps.length || g.key === "fits");
 }
 

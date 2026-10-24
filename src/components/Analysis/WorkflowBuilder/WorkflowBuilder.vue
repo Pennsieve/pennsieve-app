@@ -39,7 +39,7 @@ import { useAppManifest } from "@/composables/useAppManifest";
 import BuilderBar from "./BuilderBar.vue";
 import BuilderPalette from "./BuilderPalette.vue";
 import ParamField from "./ParamField.vue";
-import { ioLine, versionManifest } from "./appManifestInfo";
+import { ioLine, sessionTypeOf, versionManifest } from "./appManifestInfo";
 import { diffLines, manifestDiff, versionWarnings } from "./manifestDiff";
 import { builderReadiness } from "./builderReadiness";
 import StepPicker from "./StepPicker.vue";
@@ -716,6 +716,7 @@ const definitionToNodesAndEdges = (workflow, applications) => {
           (p.memory ? String(p.memory) : "") ||
           (matchedApplication?.runtimeConfig?.memory ? String(matchedApplication.runtimeConfig.memory) : ""),
         application: matchedApplication,
+        ...(p.runtimeConfig?.interactive && { interactive: true, sessionType: p.runtimeConfig.sessionType || "" }),
         defaultParams: p.defaultParams || {},
         paramSchema: p.paramSchema || [],
         resolvedParams: p.resolvedParams || {},
@@ -1004,6 +1005,8 @@ const makeNode = (type, app, position) => {
     data: {
       label: appDisplayName(app),
       application: app,
+      // A notebook kernel: a human-in-the-loop step, run as a live session.
+      ...(sessionTypeOf(app) && { interactive: true, sessionType: sessionTypeOf(app) }),
       computeType: "standard",
       cpu: "",
       memory: "",
@@ -1638,6 +1641,10 @@ const serializeProcessors = () => {
     };
     if (node.data.cpu) proc.cpu = node.data.cpu;
     if (node.data.memory) proc.memory = node.data.memory;
+    if (node.data.interactive) {
+      proc.interactive = true;
+      if (node.data.sessionType) proc.sessionType = node.data.sessionType;
+    }
     if (
       node.data.defaultParams &&
       Object.keys(node.data.defaultParams).length > 0
@@ -2149,7 +2156,7 @@ const openNodeSettings = (id) => {
                   v-if="!detailed"
                   kind="processor"
                   :label="data.label"
-                  :runtime="data.computeType"
+                  :runtime="data.interactive ? 'interactive' : data.computeType"
                   :class="connectClass(id)"
                 >
                     <span v-if="stepWarning(id)" class="step-warn" :title="stepWarning(id)" />
@@ -2176,7 +2183,7 @@ const openNodeSettings = (id) => {
                     </span>
                   </div>
                   <div class="node-header">
-                    <span class="node-type-badge processor-badge">Processor</span>
+                    <span class="node-type-badge processor-badge">{{ data.interactive ? "Interactive" : "Processor" }}</span>
                     <span class="node-title">{{ data.label }}</span>
                     <span v-if="stepWarning(id)" class="step-warn" :title="stepWarning(id)" />
                     <button

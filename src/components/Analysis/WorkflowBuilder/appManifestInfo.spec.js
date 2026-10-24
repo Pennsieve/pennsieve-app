@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { versionManifest, manifestsServed, shortMediaType, ioLine, fitsAfter, paletteGroups, matchesApp } from "./appManifestInfo";
+import { versionManifest, manifestsServed, shortMediaType, ioLine, fitsAfter, paletteGroups, matchesApp, sessionTypeOf } from "./appManifestInfo";
 
 const edfToJson = { name: "spike", description: "Finds spikes", tags: ["eeg"], inputs: [{ name: "rec", mediaTypes: ["application/edf"] }], outputs: [{ name: "ev", mediaTypes: ["application/json"] }] };
 const jsonToPng = { name: "plot", inputs: [{ name: "in", mediaTypes: ["application/json"] }], outputs: [{ name: "out", mediaTypes: ["image/png"] }] };
@@ -47,6 +47,21 @@ describe("fitsAfter and paletteGroups", () => {
       ["all", ["bare"]],
     ]);
   });
+  it("puts interactive apps (notebook kernels) in their own group, last", () => {
+    const jupyter = { uuid: "4", sourceUrl: "https://github.com/Pennsieve/pennsieve-jupyter-session", versions: [] };
+    const rSession = { uuid: "5", sourceUrl: "https://github.com/Pennsieve/pennsieve-r-session.git", versions: [] };
+    expect(sessionTypeOf(jupyter)).toBe("jupyter");
+    expect(sessionTypeOf(rSession)).toBe("r");
+    expect(sessionTypeOf(plot)).toBeNull();
+    const declared = { uuid: "6", sourceUrl: "https://github.com/o/my-viewer", versions: [{ version: "v1", createdAt: "x", manifest: { runtime: { sessionType: "r" } } }] };
+    expect(sessionTypeOf(declared)).toBe("r");
+    const flagged = { ...declared, versions: [{ version: "v1", createdAt: "x", manifest: { runtime: { interactive: true } } }] };
+    expect(sessionTypeOf(flagged)).toBe("jupyter");
+    const groups = paletteGroups([plot, jupyter, rSession], { name });
+    expect(groups.map((g) => [g.key, g.apps.length])).toEqual([["all", 1], ["interactive", 2]]);
+    expect(groups[1].note).toMatch("pauses");
+  });
+
   it("is one list with nothing selected and nothing of the user's", () => {
     expect(paletteGroups([plot, bare], { name }).map((g) => [g.key, g.label])).toEqual([["all", "Apps"]]);
   });

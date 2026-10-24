@@ -92,6 +92,7 @@ const tileOf = (app) => {
         <div class="pal-heading">
           {{ g.key === "fits" && stepLabel ? `Fits after ${stepLabel}` : g.label }}
         </div>
+        <p v-if="g.note" class="pal-note">{{ g.note }}</p>
         <p v-if="!g.apps.length" class="pal-empty">
           No app declares that it takes this step's output.
         </p>
@@ -258,6 +259,12 @@ const tileOf = (app) => {
   &:hover {
     color: theme.$link-color-hover;
   }
+}
+.pal-note {
+  margin: 0 4px 4px;
+  font-size: 11px;
+  line-height: 1.35;
+  color: theme.$gray_4;
 }
 .pal-empty {
   margin: 2px 4px 6px;
