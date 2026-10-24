@@ -152,11 +152,12 @@ export default {
         if (routeName === 'my-workflows') {
           return [{ name: 'Workflows' }];
         }
-        if (routeName === 'my-workflow-create' || routeName === 'my-workflow-detail') {
-          return [
-            { name: 'Workflows', route: { name: 'my-workflows' } },
-            { name: routeName === 'my-workflow-create' ? 'New Workflow' : 'Workflow' }
-          ];
+        if (routeName === 'my-workflow-create') {
+          return [{ name: 'Workflows', route: { name: 'my-workflows' } }, { name: 'New Workflow' }];
+        }
+        // A workflow's page lives under the Gallery
+        if (routeName === 'my-workflow-detail') {
+          return [{ name: 'Gallery', route: { name: 'my-gallery' } }, { name: 'Workflow' }];
         }
         if (routeName === 'my-compute-nodes') {
           return [{ name: 'Compute Nodes' }];

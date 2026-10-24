@@ -13,6 +13,10 @@ const isNotebook = (route) => runPageIsNotebook(route, store.getters['analysisMo
 // Analysis outside any workspace, laid out like a workspace's Analysis page.
 const tabs = [
   {
+    name: 'Gallery',
+    to: 'my-gallery',
+  },
+  {
     name: 'Notebooks',
     to: 'my-notebooks',
     activeWhen: (route) => runPage(route) && isNotebook(route),
@@ -22,10 +26,6 @@ const tabs = [
     to: 'my-workflows',
     activeWhen: (route) =>
       (runPage(route) && !isNotebook(route)) || ['my-run-configure', 'my-workflow-create'].includes(route.name),
-  },
-  {
-    name: 'Gallery',
-    to: 'my-gallery',
   },
   {
     name: 'Compute Nodes',
