@@ -2076,6 +2076,14 @@ const openNodeSettings = (id) => {
                   Auto Layout
                 </button>
                 <template v-if="!isReadOnly">
+                  <button
+                    v-if="edges.some((e) => e.selected)"
+                    class="auto-layout-btn"
+                    title="Remove the selected connection (Delete)"
+                    @click="deleteSelection()"
+                  >
+                    Remove connection
+                  </button>
                   <button class="auto-layout-btn" title="Undo (⌘Z)" aria-label="Undo" @click="history.undo()">↶</button>
                   <button class="auto-layout-btn" title="Redo (⇧⌘Z)" aria-label="Redo" @click="history.redo()">↷</button>
                 </template>
