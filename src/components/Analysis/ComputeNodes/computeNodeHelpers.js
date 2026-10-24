@@ -92,14 +92,6 @@ const MODES = {
 export const deploymentMode = (node) =>
   MODES[(node?.deploymentMode || "basic").toLowerCase()] || MODES.basic;
 
-// The header's one line: "Your AWS account · Secure", or whose it is.
-export function nodeSubtitle(node, { isOwner = false } = {}) {
-  if (!node) return "";
-  const cloud = cloudLabel(node.account?.accountType);
-  const where = isOwner ? `Your ${cloud} account` : `${cloud} account`;
-  return [where, deploymentMode(node).label].join(" · ");
-}
-
 // What the node can do, one entry each, on or off.
 export function nodeCapabilities(node, gpuTiers = []) {
   if (!node) return [];
