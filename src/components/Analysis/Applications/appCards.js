@@ -12,10 +12,17 @@ export function appTitle(app) {
   return app?.name || githubRepo(app?.sourceUrl)?.repo || "Unnamed app";
 }
 
-// The repository owner's GitHub avatar, the card's picture; "" without one.
-export function ownerAvatar(app, size = 160) {
-  const r = githubRepo(app?.sourceUrl);
-  return r ? `https://github.com/${encodeURIComponent(r.owner)}.png?size=${size}` : "";
+// The card's tile: the app's initials on a colour of its own, derived from
+// its name, so it's stable and needs nothing from outside the platform.
+export function appInitials(app) {
+  const words = appTitle(app).split(/[^A-Za-z0-9]+/).filter(Boolean);
+  const letters = words.length > 1 ? words[0][0] + words[1][0] : (words[0] || "?").slice(0, 2);
+  return letters.toUpperCase();
+}
+export function appColor(app) {
+  let h = 0;
+  for (const c of appTitle(app)) h = (h * 31 + c.charCodeAt(0)) % 360;
+  return { background: `hsl(${h}, 55%, 92%)`, color: `hsl(${h}, 45%, 32%)` };
 }
 
 export function latestVersion(app) {

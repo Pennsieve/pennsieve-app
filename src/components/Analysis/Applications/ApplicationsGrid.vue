@@ -10,7 +10,8 @@ import {
   computeLabel,
   githubRepo,
   matchesAppSearch,
-  ownerAvatar,
+  appColor,
+  appInitials,
   runsOn,
   sortApps,
   versionState,
@@ -182,7 +183,6 @@ const githubUrl = (app) => {
   const r = githubRepo(app.sourceUrl);
   return r ? `https://github.com/${r.owner}/${r.repo}` : "";
 };
-const brokenAvatars = ref({});
 
 const filtersSet = computed(
   () => !!searchQuery.value.trim() || visibilityFilter.value !== "all" || computeFilter.value !== "any"
@@ -359,8 +359,8 @@ const goToManifestBuilder = () => {
       </div>
 
       <div v-if="filteredApplications.length > 0" class="applications-grid">
-        <!-- A card: the repository owner's picture on the left; what the app
-             is, where it runs and how much it's used on the right. -->
+        <!-- A card: the app's tile on the left; what the app is, where it
+             runs and how much it's used on the right. -->
         <div
           v-for="app in paginatedApplications"
           :key="app.uuid"
@@ -372,14 +372,7 @@ const goToManifestBuilder = () => {
           @keydown.enter="goToDetail(app)"
         >
           <div class="app-thumb">
-            <img
-              v-if="ownerAvatar(app) && !brokenAvatars[app.uuid]"
-              :src="ownerAvatar(app)"
-              alt=""
-              loading="lazy"
-              @error="brokenAvatars[app.uuid] = true"
-            />
-            <span v-else class="app-initials">{{ appTitle(app).slice(0, 2).toUpperCase() }}</span>
+            <span class="app-initials" :style="appColor(app)" aria-hidden="true">{{ appInitials(app) }}</span>
           </div>
           <div class="app-body">
             <div class="app-title">
@@ -614,7 +607,7 @@ const goToManifestBuilder = () => {
     opacity: 0.7;
   }
 }
-/* The repository owner's picture, where the workflows show their graph. */
+/* The app's tile, where the workflows show their graph. */
 .app-thumb {
   display: flex;
   align-items: center;
@@ -622,13 +615,6 @@ const goToManifestBuilder = () => {
   flex: 0 0 150px;
   border-right: 1px solid theme.$gray_2;
   background: theme.$gray_1;
-
-  img {
-    width: 88px;
-    height: 88px;
-    border-radius: 8px;
-    object-fit: cover;
-  }
 }
 .app-initials {
   display: flex;
@@ -636,11 +622,9 @@ const goToManifestBuilder = () => {
   justify-content: center;
   width: 88px;
   height: 88px;
-  border-radius: 8px;
-  background: rgba(224, 145, 42, 0.15);
-  color: #9a5c0f;
-  font-size: 28px;
+  font-size: 30px;
   font-weight: 600;
+  letter-spacing: 0.02em;
 }
 .app-body {
   display: flex;

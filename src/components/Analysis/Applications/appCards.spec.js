@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { appTitle, ownerAvatar, runsOn, workflowUses, versionState, matchesAppSearch, sortApps } from "./appCards";
+import { appTitle, appInitials, appColor, runsOn, workflowUses, versionState, matchesAppSearch, sortApps } from "./appCards";
 
 const spike = {
   name: "spike-detect",
@@ -22,8 +22,10 @@ describe("app cards", () => {
   it("names and pictures an app", () => {
     expect(appTitle(spike)).toBe("spike-detect");
     expect(appTitle(zip)).toBe("zipper");
-    expect(ownerAvatar(spike)).toBe("https://github.com/penn-lab.png?size=160");
-    expect(ownerAvatar({})).toBe("");
+    expect(appInitials(spike)).toBe("SD");
+    expect(appInitials(zip)).toBe("ZI");
+    expect(appColor(spike)).toEqual(appColor({ name: "spike-detect" }));
+    expect(appColor(spike).background).toMatch(/^hsl\(\d+, 55%, 92%\)$/);
   });
 
   it("says where it runs and how much it asks for", () => {
