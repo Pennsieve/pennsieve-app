@@ -506,10 +506,11 @@ onBeforeUnmount(() => {
 <style scoped lang="scss">
 @use "../../../styles/theme";
 
+/* Lined up with the Analysis tabs above (32px). */
 .notebooks-container {
   max-width: 1000px;
   margin: 0;
-  padding: 16px 24px;
+  padding: 20px 32px;
 }
 /* End-session dialog footer: right-aligned buttons with an even 8px gap (the
    mr-8 utility doesn't reliably land on the bf-button root). */
@@ -518,27 +519,29 @@ onBeforeUnmount(() => {
   justify-content: flex-end;
   gap: 8px;
 }
-/* The sub-tabs on the left, the view's action on the right. */
+/* The view switch on the left, the view's action on the right. A small
+   two-way toggle, so it doesn't read as a second row of page tabs. */
 .nb-toolbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
   margin-bottom: 20px;
-  border-bottom: 1px solid theme.$gray_2;
 }
 .nb-views {
-  display: flex;
-  gap: 20px;
+  display: inline-flex;
+  padding: 2px;
+  border: 1px solid theme.$gray_2;
+  border-radius: 6px;
+  background: theme.$gray_1;
 }
 .nb-view {
-  padding: 8px 0 10px;
-  margin-bottom: -1px;
+  padding: 5px 14px;
   border: none;
-  border-bottom: 2px solid transparent;
+  border-radius: 4px;
   background: none;
   font: inherit;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 500;
   color: theme.$gray_5;
   cursor: pointer;
@@ -547,12 +550,10 @@ onBeforeUnmount(() => {
     color: theme.$purple_3;
   }
   &.active {
+    background: theme.$white;
     color: theme.$purple_3;
-    border-bottom-color: theme.$purple_3;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
   }
-}
-.nb-toolbar :deep(.bf-button) {
-  margin-bottom: 8px;
 }
 .nb-view-desc {
   margin: 0 0 12px;
