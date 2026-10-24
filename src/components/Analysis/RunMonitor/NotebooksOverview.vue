@@ -86,6 +86,11 @@ function onEnvCreated() {
 }
 const isLoading = ref(false);
 const dialogVisible = ref(false);
+// Recent notebooks are history (all of it is under Runs): folded at first.
+const recentOpen = ref(false);
+const runsRoute = computed(() =>
+  isMyWorkspace.value ? { name: "my-runs" } : { name: "runs", params: { orgId: route.params.orgId } }
+);
 
 const notebookWorkflowIds = computed(
   () => new Set(notebookWorkflows.value.map((w) => w.uuid))
@@ -158,7 +163,7 @@ const recentNotebookRuns = computed(() =>
         new Date(b.completedAt || b.startedAt) -
         new Date(a.completedAt || a.startedAt)
     )
-    .slice(0, 10)
+    .slice(0, 5)
 );
 
 // After a notebook is created, open its notebook page straight away — it shows
@@ -288,30 +293,19 @@ onBeforeUnmount(() => {
   <div class="notebooks-container">
       <div class="info-section">
         <div class="info-card">
-          <h3>Notebooks &amp; Environments</h3>
-          <p>
-            Launch an interactive Jupyter or R notebook on your data in a few
-            clicks — pick a kernel, compute node, and input files, and start
-            exploring. Create a reusable <strong>environment</strong> from a
-            <code>requirements.txt</code> with the Python packages you need,
-            then switch to it from the notebook's sidebar. For multi-step
-            analyses, add a notebook step to a custom workflow under
-            <router-link v-if="!isMyWorkspace" :to="{ name: 'workflows' }" class="info-card-link">
-              Workflows</router-link
-            ><template v-else>a workspace's Workflows</template>.
-          </p>
+          <div class="info-card-text">
+            <p>
+              Interactive Python and R notebooks on your data, with the packages you need from your environments.
+              For multi-step analyses, add a notebook step to a workflow under
+              <router-link v-if="!isMyWorkspace" :to="{ name: 'workflows' }" class="info-card-link">Workflows</router-link
+              ><template v-else>a workspace's Workflows</template>.
+            </p>
+          </div>
           <div class="info-card-actions">
-            <bf-button
-              :disabled="notebookWorkflows.length === 0"
-              @click="dialogVisible = true"
-            >
+            <bf-button :disabled="notebookWorkflows.length === 0" @click="dialogVisible = true">
               + New Notebook
             </bf-button>
-            <bf-button
-              v-if="hasEnvironments"
-              class="ghost"
-              @click="openCreateEnvironment()"
-            >
+            <bf-button v-if="hasEnvironments" class="ghost" @click="openCreateEnvironment()">
               + New Environment
             </bf-button>
           </div>
@@ -376,9 +370,23 @@ onBeforeUnmount(() => {
           </div>
         </div>
 
+        <environments-section
+          ref="environmentsRef"
+          @create="openCreateEnvironment()"
+          @edit="openCreateEnvironment"
+          @retry="openCreateEnvironment"
+          @use="onEnvUse"
+        />
+
         <div v-if="recentNotebookRuns.length > 0" class="dashboard-section">
-          <h3 class="dashboard-section-title">Recent Notebooks</h3>
-          <div class="recent-runs-list">
+          <div class="recent-head">
+            <button class="recent-toggle" :aria-expanded="recentOpen" @click="recentOpen = !recentOpen">
+              <span class="recent-caret" :class="{ open: recentOpen }">▸</span>
+              Recent notebooks ({{ recentNotebookRuns.length }})
+            </button>
+            <router-link :to="runsRoute" class="info-card-link recent-all">View all in Runs →</router-link>
+          </div>
+          <div v-if="recentOpen" class="recent-runs-list">
             <div
               v-for="run in recentNotebookRuns"
               :key="run.uuid"
@@ -409,13 +417,6 @@ onBeforeUnmount(() => {
           <p>Start a notebook to work with your data interactively.</p>
         </div>
 
-        <environments-section
-          ref="environmentsRef"
-          @create="openCreateEnvironment()"
-          @edit="openCreateEnvironment"
-          @retry="openCreateEnvironment"
-          @use="onEnvUse"
-        />
       </template>
 
     <new-notebook-dialog
@@ -480,26 +481,26 @@ onBeforeUnmount(() => {
   gap: 8px;
 }
 .info-section {
-  margin-bottom: 32px;
+  margin-bottom: 24px;
+}
+/* The tab names the page: a line on the left, the two actions on the right. */
+.info-card {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px 24px;
+}
+.info-card-text {
+  flex: 1 1 360px;
+  min-width: 0;
 }
 .info-card-actions {
-  margin-top: 16px;
   display: flex;
   gap: 12px;
-}
-.info-card {
-  background: theme.$gray_1;
-  border: 1px solid theme.$gray_2;
-  padding: 24px;
-}
-.info-card h3 {
-  font-size: 18px;
-  font-weight: 500;
-  color: theme.$gray_6;
-  margin: 0 0 12px 0;
+  flex-shrink: 0;
 }
 .info-card p {
-  font-size: 14px;
+  font-size: 13px;
   color: theme.$gray_5;
   line-height: 1.5;
   margin: 0;
@@ -626,6 +627,38 @@ onBeforeUnmount(() => {
   height: 8px;
   border-radius: 50%;
   background: theme.$gray_3;
+}
+.recent-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+.recent-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  color: theme.$gray_6;
+  cursor: pointer;
+}
+.recent-caret {
+  font-size: 10px;
+  color: theme.$gray_4;
+  transition: transform 0.12s ease;
+
+  &.open {
+    transform: rotate(90deg);
+  }
+}
+.recent-all {
+  font-size: 12px;
+  font-weight: 500;
 }
 .recent-runs-list {
   display: flex;

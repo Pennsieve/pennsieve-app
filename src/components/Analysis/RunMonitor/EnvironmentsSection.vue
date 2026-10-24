@@ -1,9 +1,10 @@
 <script setup>
 // The user's environments, and Pennsieve's official ones, from environments-
 // service: named, versioned Python package sets, built once and usable by
-// any of the user's notebooks, which switch to one from their sidebar. Each
-// card shows the newest ready version and the latest build's status; the
-// section polls while a build runs.
+// any of the user's notebooks, which switch to one from their sidebar. A grid
+// of cards, searchable by name or package; each shows the newest ready
+// version and the latest build's status, and opens its details. Polls while
+// a build runs.
 import { ref, computed, watch, onBeforeUnmount } from "vue";
 import { useStore } from "vuex";
 import { ElMessage, ElMessageBox } from "element-plus";
@@ -17,6 +18,7 @@ import {
   listEnvironments,
 } from "@/utils/environmentsService";
 import { cardStatus, formatBytes, shownVersion, since, sortEnvironments } from "./environmentCards";
+import { matchesQuery, packageSummary } from "../JupyterSession/environmentHelpers";
 
 // create(), edit({ name, requirements }), retry({ name, requirements, retry }),
 // use(): the page opens the dialogs.
@@ -31,8 +33,9 @@ const versionsById = ref({}); // id -> versions, newest first, once read
 const loading = ref(false);
 const loaded = ref(false);
 const error = ref("");
-const expanded = ref(null);
+const detailId = ref(null); // the card whose details are open
 const packageQuery = ref("");
+const query = ref("");
 
 async function readVersions(id) {
   try {
@@ -55,7 +58,7 @@ async function load() {
         .filter((e) => e.latest?.status !== "ready" && e.latestVersion > 1)
         .map((e) => readVersions(e.id))
     );
-    if (expanded.value) await readVersions(expanded.value);
+    if (detailId.value) await readVersions(detailId.value);
   } catch (e) {
     error.value = e?.message || String(e);
   } finally {
@@ -80,6 +83,10 @@ const cards = computed(() =>
       })
   )
 );
+const shownCards = computed(() =>
+  cards.value.filter((c) => matchesQuery({ name: c.env.name, packages: c.shown?.packages || [] }, query.value))
+);
+const detail = computed(() => cards.value.find((c) => c.env.id === detailId.value) || null);
 const ownNames = computed(() => environments.value.filter((e) => !e.official).map((e) => e.name));
 
 /* -------------------------------------------------------------- polling --- */
@@ -110,11 +117,10 @@ async function refresh() {
 defineExpose({ refresh, ownNames });
 
 /* -------------------------------------------------------------- details --- */
-function toggle(card) {
-  const id = card.env.id;
-  expanded.value = expanded.value === id ? null : id;
+function openDetail(card) {
+  detailId.value = card.env.id;
   packageQuery.value = "";
-  if (expanded.value && !versionsById.value[id]) readVersions(id);
+  readVersions(card.env.id);
 }
 
 const filteredPackages = (version) => {
@@ -162,6 +168,11 @@ async function onCommand(command, card) {
   if (command === "delete") await remove(env);
 }
 
+async function removeFromDetail(card) {
+  if (await remove(card.env)) detailId.value = null;
+}
+
+// Deletes after a confirmation; true once deleted.
 async function remove(env) {
   try {
     await ElMessageBox.confirm(
@@ -170,14 +181,16 @@ async function remove(env) {
       { confirmButtonText: "Delete", cancelButtonText: "Cancel", type: "warning" }
     );
   } catch {
-    return; // cancelled
+    return false; // cancelled
   }
   try {
     await deleteEnvironment(env.id);
     environments.value = environments.value.filter((e) => e.id !== env.id);
     ElMessage.success(`Deleted ${env.name}.`);
+    return true;
   } catch (e) {
     ElMessage.error(e?.message || "Could not delete the environment.");
+    return false;
   }
 }
 
@@ -188,48 +201,42 @@ const STATUS_LABEL = { ready: "Ready", building: "Building", failed: "Failed", u
   <div v-if="available" class="dashboard-section">
     <div class="env-header">
       <h3 class="dashboard-section-title">Environments</h3>
+      <div class="env-header-actions">
+        <el-input
+          v-if="cards.length > 3"
+          v-model="query"
+          size="small"
+          clearable
+          placeholder="Search by name or package…"
+          class="env-search"
+        />
+        <button class="env-link env-new" type="button" @click="emit('create')">+ New</button>
+      </div>
     </div>
-    <p class="env-desc">
-      Python package environments for your notebooks. Build one from a requirements list, then switch to it from a
-      notebook's sidebar while it runs.
-    </p>
 
     <div v-if="!loaded" class="env-empty">Loading…</div>
     <div v-else-if="error && !cards.length" class="env-empty env-error">Couldn't load environments: {{ error }}</div>
     <div v-else-if="!cards.length" class="env-empty">
-      No environments yet.
+      No environments yet. Build one from a requirements list, then switch to it from a notebook's sidebar.
       <button class="env-link" type="button" @click="emit('create')">Create one</button>
     </div>
-    <div v-else class="env-list">
-      <div v-for="card in cards" :key="card.env.id" class="env-card" :class="`is-${card.status}`">
-        <div class="env-row" @click="toggle(card)">
-          <span class="env-caret" :class="{ open: expanded === card.env.id }">▸</span>
-          <LayerTypeIcon layer-type="python-env" :size="22" />
-          <div class="env-main">
-            <div class="env-name">
-              {{ card.env.name }}
-              <span v-if="card.env.official" class="env-tag">Pennsieve</span>
-            </div>
-            <div class="env-meta">
-              <template v-if="card.shown?.status === 'ready'">
-                Version {{ card.shown.version }} · Python {{ card.shown.runtime?.version }} ·
-                {{ (card.shown.packages || []).length }} packages<template v-if="formatBytes(card.shown.archive?.unpackedBytes)">
-                  · {{ formatBytes(card.shown.archive.unpackedBytes) }}</template
-                >
-              </template>
-              <template v-else-if="card.status === 'building'">
-                Version {{ card.env.latest.version }} · started {{ since(card.env.latest.createdAt) }}
-              </template>
-              <template v-else-if="card.env.latest">Version {{ card.env.latest.version }}</template>
-            </div>
-          </div>
-
-          <span v-if="STATUS_LABEL[card.status]" class="env-status" :class="`is-${card.status}`">
-            <el-icon v-if="card.status === 'building'" class="env-spin"><Loading /></el-icon>
-            {{ STATUS_LABEL[card.status] }}
-          </span>
-
-          <span @click.stop>
+    <div v-else-if="!shownCards.length" class="env-empty">No environment has that name or package.</div>
+    <div v-else class="env-grid">
+      <div
+        v-for="card in shownCards"
+        :key="card.env.id"
+        class="env-card"
+        :class="`is-${card.status}`"
+        role="button"
+        tabindex="0"
+        @click="openDetail(card)"
+        @keydown.enter="openDetail(card)"
+      >
+        <div class="env-card-top">
+          <LayerTypeIcon layer-type="python-env" :size="20" />
+          <span class="env-name" :title="card.env.name">{{ card.env.name }}</span>
+          <span v-if="card.env.official" class="env-tag">Pennsieve</span>
+          <span class="env-more-wrap" @click.stop>
             <el-dropdown trigger="click" @command="(c) => onCommand(c, card)">
               <button class="env-more" type="button" aria-label="Environment actions">
                 <el-icon><MoreFilled /></el-icon>
@@ -249,54 +256,116 @@ const STATUS_LABEL = { ready: "Ready", building: "Building", failed: "Failed", u
           </span>
         </div>
 
-        <div v-if="card.status === 'failed'" class="env-failure">
-          <span>
-            Version {{ card.env.latest.version }} didn't build<template v-if="card.shown?.status === 'ready'">;
-              notebooks can still use version {{ card.shown.version }}</template
-            >.
-          </span>
-          <button v-if="card.own" class="env-link" type="button" @click="openLog(card)">View build log</button>
-          <button v-if="card.own" class="env-link" type="button" @click="onCommand('retry', card)">Edit and retry</button>
+        <div class="env-meta">
+          <template v-if="card.shown?.status === 'ready'">
+            v{{ card.shown.version }} · {{ (card.shown.packages || []).length }} packages<template
+              v-if="formatBytes(card.shown.archive?.unpackedBytes)"
+            >
+              · {{ formatBytes(card.shown.archive.unpackedBytes) }}</template
+            >
+          </template>
+          <template v-else-if="card.env.latest">v{{ card.env.latest.version }}</template>
         </div>
-        <div v-else-if="card.status === 'building'" class="env-building">
-          Installing packages. This usually takes a minute or two.
-          <button v-if="card.own" class="env-link" type="button" @click="openLog(card)">View build log</button>
+        <div class="env-packages-line" :title="(card.shown?.packages || []).join(', ')">
+          {{ packageSummary(card.shown?.packages, 4) || "\u00a0" }}
         </div>
 
-        <div v-if="expanded === card.env.id" class="env-details">
-          <template v-if="(card.shown?.packages || []).length">
-            <el-input
-              v-if="card.shown.packages.length > 12"
-              v-model="packageQuery"
-              size="small"
-              placeholder="Search packages…"
-              clearable
-              class="env-pkg-search"
-            />
-            <div class="env-packages">
-              <code v-for="p in filteredPackages(card.shown)" :key="p" class="pkg">{{ p }}</code>
-              <span v-if="!filteredPackages(card.shown).length" class="env-muted">No package matches.</span>
-            </div>
-          </template>
-          <p v-else class="env-muted">No packages recorded yet.</p>
-          <template v-if="card.shown?.requirements">
-            <div class="env-sub">Requirements it was built from</div>
-            <pre class="env-reqs">{{ card.shown.requirements }}</pre>
-          </template>
-          <template v-if="(versionsById[card.env.id] || []).length > 1">
-            <div class="env-sub">Versions</div>
-            <ul class="env-versions">
-              <li v-for="v in versionsById[card.env.id]" :key="v.version">
-                <span class="env-version-n">Version {{ v.version }}</span>
-                <span class="env-status" :class="`is-${v.status}`">{{ STATUS_LABEL[v.status] }}</span>
-                <span class="env-muted">{{ since(v.readyAt || v.createdAt) }}</span>
-                <button v-if="card.own" class="env-link" type="button" @click="openLog(card, v)">Log</button>
-              </li>
-            </ul>
-          </template>
+        <div class="env-card-foot">
+          <span v-if="STATUS_LABEL[card.status]" class="env-status" :class="`is-${card.status}`">
+            <el-icon v-if="card.status === 'building'" class="env-spin"><Loading /></el-icon>
+            {{ card.status === "failed" && card.shown?.status === "ready" ? `v${card.env.latest.version} failed` : STATUS_LABEL[card.status] }}
+          </span>
+          <span v-if="card.status === 'building'" class="env-muted">started {{ since(card.env.latest.createdAt) }}</span>
+          <button
+            v-if="card.own && (card.status === 'failed' || card.status === 'building')"
+            class="env-link env-foot-link"
+            type="button"
+            @click.stop="openLog(card)"
+          >
+            View log
+          </button>
         </div>
       </div>
     </div>
+
+    <!-- An environment's details: packages, requirements, versions. -->
+    <el-dialog
+      :model-value="!!detail"
+      :title="detail ? detail.env.name : ''"
+      width="640px"
+      append-to-body
+      @update:model-value="(v) => v || (detailId = null)"
+    >
+      <template v-if="detail">
+        <p class="env-detail-sub">
+          <template v-if="detail.shown?.status === 'ready'">
+            Version {{ detail.shown.version }} · Python {{ detail.shown.runtime?.version }} ·
+            {{ (detail.shown.packages || []).length }} packages<template v-if="formatBytes(detail.shown.archive?.unpackedBytes)">
+              · {{ formatBytes(detail.shown.archive.unpackedBytes) }}</template
+            >
+          </template>
+          <template v-else-if="detail.status === 'building'">Version {{ detail.env.latest.version }} is building.</template>
+          <template v-else-if="detail.status === 'failed'">Version {{ detail.env.latest.version }} didn't build.</template>
+          <span v-if="detail.env.official"> · Provided by Pennsieve</span>
+        </p>
+
+        <template v-if="(detail.shown?.packages || []).length">
+          <el-input
+            v-if="detail.shown.packages.length > 12"
+            v-model="packageQuery"
+            size="small"
+            placeholder="Search packages…"
+            clearable
+            class="env-pkg-search"
+          />
+          <div class="env-packages">
+            <code v-for="p in filteredPackages(detail.shown)" :key="p" class="pkg">{{ p }}</code>
+            <span v-if="!filteredPackages(detail.shown).length" class="env-muted">No package matches.</span>
+          </div>
+        </template>
+
+        <template v-if="detail.shown?.requirements">
+          <div class="env-sub">Requirements it was built from</div>
+          <pre class="env-reqs">{{ detail.shown.requirements }}</pre>
+        </template>
+
+        <template v-if="(versionsById[detail.env.id] || []).length">
+          <div class="env-sub">Versions</div>
+          <ul class="env-versions">
+            <li v-for="v in versionsById[detail.env.id]" :key="v.version">
+              <span class="env-version-n">Version {{ v.version }}</span>
+              <span class="env-status" :class="`is-${v.status}`">{{ STATUS_LABEL[v.status] }}</span>
+              <span class="env-muted">{{ since(v.readyAt || v.createdAt) }}</span>
+              <button v-if="detail.own" class="env-link" type="button" @click="openLog(detail, v)">Log</button>
+            </li>
+          </ul>
+        </template>
+      </template>
+      <template #footer>
+        <div v-if="detail" class="env-detail-actions">
+          <el-button v-if="detail.own" text type="danger" @click="removeFromDetail(detail)">
+            Delete
+          </el-button>
+          <span class="env-spacer" />
+          <el-button
+            v-if="detail.own && detail.status === 'failed'"
+            @click="detailId = null; onCommand('retry', detail)"
+          >
+            Edit and retry
+          </el-button>
+          <el-button
+            v-else-if="detail.own"
+            :disabled="detail.status === 'building'"
+            @click="detailId = null; onCommand('edit', detail)"
+          >
+            Edit packages
+          </el-button>
+          <el-button v-if="detail.shown?.status === 'ready'" type="primary" @click="detailId = null; emit('use')">
+            Use in a notebook
+          </el-button>
+        </div>
+      </template>
+    </el-dialog>
 
     <el-dialog
       :model-value="!!log"
@@ -322,11 +391,6 @@ const STATUS_LABEL = { ready: "Ready", building: "Building", failed: "Failed", u
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-}
-.env-desc {
-  font-size: 13px;
-  color: theme.$gray_4;
-  margin: 4px 0 12px;
 }
 .env-empty {
   font-size: 13px;
@@ -354,54 +418,62 @@ const STATUS_LABEL = { ready: "Ready", building: "Building", failed: "Failed", u
   font-size: 13px;
   margin-left: 4px;
 }
-.env-list {
+.env-header-actions {
   display: flex;
-  flex-direction: column;
-  gap: 8px;
+  align-items: center;
+  gap: 16px;
+}
+.env-search {
+  width: 240px;
+}
+.env-new {
+  font-size: 13px;
+  font-weight: 500;
+}
+/* Cards side by side, as many as fit. */
+.env-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 12px;
+  margin-top: 8px;
 }
 .env-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  padding: 12px 12px 10px;
   border: 1px solid theme.$gray_2;
   border-radius: 4px;
-  overflow: hidden;
   background: theme.$white;
+  cursor: pointer;
 
+  &:hover,
+  &:focus-visible {
+    border-color: theme.$purple_1;
+    outline: none;
+  }
   &.is-failed {
     border-color: rgba(theme.$red_2, 0.4);
   }
 }
-.env-row {
+.env-card-top {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 10px 12px;
-  cursor: pointer;
-
-  &:hover {
-    background: theme.$gray_1;
-  }
-}
-.env-caret {
-  color: theme.$gray_4;
-  font-size: 10px;
-  width: 10px;
-  transition: transform 0.12s ease;
-
-  &.open {
-    transform: rotate(90deg);
-  }
-}
-.env-main {
-  flex: 1;
+  gap: 8px;
   min-width: 0;
 }
 .env-name {
-  display: flex;
-  align-items: center;
-  gap: 6px;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-weight: 500;
   color: theme.$gray_6;
 }
 .env-tag {
+  flex-shrink: 0;
   padding: 0 5px;
   border-radius: 3px;
   background: theme.$purple_tint;
@@ -409,9 +481,30 @@ const STATUS_LABEL = { ready: "Ready", building: "Building", failed: "Failed", u
   font-size: 10px;
   font-weight: 600;
 }
+.env-more-wrap {
+  flex-shrink: 0;
+  margin-right: -4px;
+}
 .env-meta {
   font-size: 12px;
   color: theme.$gray_4;
+}
+.env-packages-line {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  color: theme.$gray_5;
+}
+.env-card-foot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+  min-height: 20px;
+}
+.env-foot-link {
+  margin-left: auto;
 }
 .env-status {
   display: inline-flex;
@@ -459,23 +552,18 @@ const STATUS_LABEL = { ready: "Ready", building: "Building", failed: "Failed", u
     color: theme.$purple_3;
   }
 }
-.env-failure,
-.env-building {
+.env-detail-sub {
+  margin: -8px 0 12px;
+  font-size: 13px;
+  color: theme.$gray_4;
+}
+.env-detail-actions {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
-  gap: 4px 12px;
-  padding: 0 12px 10px 42px;
-  font-size: 12px;
+  gap: 8px;
 }
-.env-failure {
-  color: theme.$red_2;
-}
-.env-building {
-  color: theme.$gray_5;
-}
-.env-details {
-  padding: 0 12px 12px 42px;
+.env-spacer {
+  flex: 1;
 }
 .env-pkg-search {
   max-width: 260px;
