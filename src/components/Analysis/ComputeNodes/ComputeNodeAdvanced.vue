@@ -22,7 +22,6 @@ const computeResourcesStore = useComputeResourcesStore()
 
 const mode = computed(() => deploymentMode(props.node))
 const showModeDetails = ref(false)
-const showTechnical = ref(false)
 
 // Node software update (always to the newest released tag, never a floating
 // tag). latestVersion/updateAvailable are annotated on the GET compute-nodes
@@ -141,11 +140,8 @@ async function confirmDestroy() {
     </section>
 
     <section class="cn-section">
-      <button type="button" class="technical-toggle" :aria-expanded="showTechnical" @click="showTechnical = !showTechnical">
-        <span class="caret" :class="{ open: showTechnical }">▸</span>
-        Technical details
-      </button>
-      <div v-if="showTechnical" class="cn-card technical">
+      <h3 class="cn-section-title">Technical details</h3>
+      <div class="cn-card technical">
         <dl class="cn-facts">
           <div v-for="t in technical" :key="t.label">
             <dt>{{ t.label }}</dt>
@@ -191,33 +187,6 @@ async function confirmDestroy() {
   font-size: 13px;
   line-height: 1.5;
   color: theme.$gray_5;
-}
-.technical-toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  margin: 0 0 12px;
-  padding: 0;
-  border: none;
-  background: none;
-  font: inherit;
-  font-size: 14px;
-  font-weight: 600;
-  color: theme.$gray_6;
-  cursor: pointer;
-
-  &:hover {
-    color: theme.$purple_3;
-  }
-}
-.caret {
-  display: inline-block;
-  font-size: 11px;
-  transition: transform 0.15s ease;
-
-  &.open {
-    transform: rotate(90deg);
-  }
 }
 .danger {
   display: flex;
