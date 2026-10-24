@@ -298,8 +298,8 @@ onBeforeUnmount(() => clearTimeout(pollTimer));
   padding: 8px 10px 10px;
 }
 .env__name {
-  font-weight: 600;
-  color: theme.$black;
+  font-weight: 500;
+  color: theme.$gray_6;
   line-height: 1.3;
   overflow: hidden;
   text-overflow: ellipsis;
