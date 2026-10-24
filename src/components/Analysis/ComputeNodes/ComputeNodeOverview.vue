@@ -265,7 +265,6 @@ onMounted(async () => {
   gap: 4px;
   padding: 14px 16px;
   border: 1px solid theme.$gray_2;
-  border-radius: 6px;
   background: theme.$gray_1;
 }
 .capability-label {
