@@ -12,6 +12,7 @@ import { endInteractiveSession } from "@/composables/useJupyterSession";
 import { useGetToken } from "@/composables/useGetToken";
 import { useSendXhr } from "@/mixins/request/request_composable";
 import { useMetricsCounters } from "@/composables/useMetricsCounters";
+import { useWorkflowSearch } from "@/composables/useWorkflowSearch";
 import toQueryParams from "@/utils/toQueryParams";
 import { isNotebookWorkflow } from "./notebookHelpers";
 import RunHistory from "./RunHistory.vue";
@@ -312,7 +313,6 @@ const wizardVisible = ref(false);
 const wizardStep = ref(0);
 const wizardForm = ref({ workflowId: "", computeNodeId: "", datasetId: "" });
 const rerunSource = ref(null);
-const workflowSearch = ref("");
 const computeNodeSearch = ref("");
 const datasetOptions = ref([]);
 const datasetSearchLoading = ref(false);
@@ -325,15 +325,37 @@ const wizardVisibleSteps = computed(() =>
   wizardStepTitles.map((title, i) => ({ title, i })).filter(({ i }) => !wizardSkipsStep(i))
 );
 
+// The wizard's own list, searched and paged on the server (#825), so a
+// workflow past the first page can be found: the workspace's workflows, or in
+// My Workspace the user's own and the public ones. The store's list, which
+// feeds the run filters, is left alone.
+const {
+  workflowOptions: wizardWorkflowOptions,
+  nextCursor: wizardWorkflowsCursor,
+  isLoading: wizardWorkflowsLoading,
+  isLoadingMore: wizardWorkflowsLoadingMore,
+  searchQuery: workflowSearch,
+  onSearchInput: onWorkflowSearch,
+  loadMore: loadMoreWizardWorkflows,
+  reset: resetWorkflowSearch,
+  fetchWorkflow: fetchWizardWorkflow,
+} = useWorkflowSearch(() =>
+  isMyWorkspace.value
+    ? [{}, { visibility: "public" }]
+    : [{ organization_id: store.state.activeOrganization?.organization?.id || "" }]
+);
 // Notebooks start on the Notebooks tab, so the run wizard leaves them out.
-const filteredWizardWorkflows = computed(() => {
-  const q = workflowSearch.value.toLowerCase().trim();
-  const runnable = workflows.value.filter((w) => !isNotebookWorkflow(w));
-  if (!q) return runnable;
-  return runnable.filter(w =>
-    w.name?.toLowerCase().includes(q) || w.description?.toLowerCase().includes(q)
-  );
-});
+const filteredWizardWorkflows = computed(() =>
+  wizardWorkflowOptions.value.filter((w) => !isNotebookWorkflow(w))
+);
+// A preselected workflow (a Gallery card's Run, a rerun) that isn't among the
+// pages loaded, fetched on its own.
+const pickedWorkflow = ref(null);
+const pickWorkflow = async (workflowId) => {
+  wizardForm.value.workflowId = workflowId;
+  const known = [...wizardWorkflowOptions.value, ...workflows.value].some((w) => w.uuid === workflowId);
+  pickedWorkflow.value = known ? null : await fetchWizardWorkflow(workflowId);
+};
 
 const filteredWizardComputeNodes = computed(() => {
   const q = computeNodeSearch.value.toLowerCase().trim();
@@ -343,9 +365,15 @@ const filteredWizardComputeNodes = computed(() => {
   );
 });
 
-const wizardSelectedWorkflow = computed(() =>
-  workflows.value.find(w => w.uuid === wizardForm.value.workflowId) || null
-);
+const wizardSelectedWorkflow = computed(() => {
+  const id = wizardForm.value.workflowId;
+  if (!id) return null;
+  return (
+    wizardWorkflowOptions.value.find((w) => w.uuid === id) ||
+    workflows.value.find((w) => w.uuid === id) ||
+    (pickedWorkflow.value?.uuid === id ? pickedWorkflow.value : null)
+  );
+});
 const wizardSelectedComputeNode = computed(() =>
   computeNodes.value.find(cn => cn.uuid === wizardForm.value.computeNodeId) || null
 );
@@ -390,7 +418,7 @@ defineExpose({
   openWizardDialog: (workflowId) => {
     openWizardDialog();
     if (workflowId) {
-      wizardForm.value.workflowId = workflowId;
+      pickWorkflow(workflowId);
       wizardStep.value = 1;
     }
   },
@@ -403,12 +431,13 @@ const onDatasetSearch = (query) => {
 
 const openWizardDialog = () => {
   wizardForm.value = { workflowId: "", computeNodeId: "", datasetId: "" };
-  workflowSearch.value = "";
+  pickedWorkflow.value = null;
   computeNodeSearch.value = "";
   datasetSearchQuery.value = "";
   wizardStep.value = 0;
   rerunSource.value = null;
   wizardVisible.value = true;
+  resetWorkflowSearch();
   if (!isMyWorkspace.value) fetchDatasetOptions();
 };
 
@@ -426,10 +455,11 @@ const rerunFromRun = async (run) => {
     computeNodeId: run.computeNodeUuid || "",
     datasetId: run.datasetId || "",
   };
-  workflowSearch.value = "";
   computeNodeSearch.value = "";
   wizardStep.value = 3;
   wizardVisible.value = true;
+  resetWorkflowSearch();
+  if (run.workflowUuid) pickWorkflow(run.workflowUuid);
   if (!isMyWorkspace.value) fetchDatasetOptions();
 };
 
@@ -733,17 +763,20 @@ onBeforeUnmount(() => {
           <template v-else>
             <el-input
               v-model="workflowSearch"
-              placeholder="Filter workflows..."
+              placeholder="Search workflows..."
               clearable
               class="wizard-search"
+              @input="onWorkflowSearch"
+              @clear="onWorkflowSearch"
             />
             <div class="wizard-cards">
+              <div v-if="wizardWorkflowsLoading" class="wizard-cards-loading">Searching...</div>
               <div
                 v-for="wf in filteredWizardWorkflows"
                 :key="wf.uuid"
                 class="wizard-card"
                 :class="{ disabled: !wizardWorkflowSelectable(wf) }"
-                @click="wizardWorkflowSelectable(wf) && (wizardForm.workflowId = wf.uuid, workflowSearch = '')"
+                @click="wizardWorkflowSelectable(wf) && (wizardForm.workflowId = wf.uuid)"
               >
                 <div class="wizard-card-name">{{ wf.name }}</div>
                 <div v-if="wf.description" class="wizard-card-desc">{{ wf.description }}</div>
@@ -757,7 +790,16 @@ onBeforeUnmount(() => {
                   >Needs a dataset</span>
                 </div>
               </div>
-              <div v-if="filteredWizardWorkflows.length === 0" class="wizard-cards-loading">No workflows found</div>
+              <div v-if="!wizardWorkflowsLoading && filteredWizardWorkflows.length === 0" class="wizard-cards-loading">No workflows found</div>
+              <button
+                v-if="wizardWorkflowsCursor"
+                type="button"
+                class="wizard-load-more"
+                :disabled="wizardWorkflowsLoadingMore"
+                @click="loadMoreWizardWorkflows"
+              >
+                {{ wizardWorkflowsLoadingMore ? 'Loading...' : 'Load more workflows' }}
+              </button>
             </div>
           </template>
         </div>
@@ -1337,6 +1379,26 @@ onBeforeUnmount(() => {
   overflow-y: auto;
 }
 
+.wizard-load-more {
+  align-self: center;
+  padding: 6px 14px;
+  border: 1px solid theme.$gray_3;
+  border-radius: 4px;
+  background: theme.$white;
+  font: inherit;
+  font-size: 13px;
+  color: theme.$gray_6;
+  cursor: pointer;
+
+  &:hover:not(:disabled) {
+    border-color: theme.$purple_1;
+    color: theme.$purple_3;
+  }
+  &:disabled {
+    opacity: 0.5;
+    cursor: default;
+  }
+}
 .wizard-cards-loading {
   padding: 20px;
   text-align: center;
