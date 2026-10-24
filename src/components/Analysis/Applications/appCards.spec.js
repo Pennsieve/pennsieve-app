@@ -35,6 +35,7 @@ describe("app cards", () => {
     expect(runsOn(declared)).toBe("Standard · 4 vCPU · 4 GB");
     expect(appDescription(declared)).toBe("From app.yml");
     expect(appDescription(spike)).toBe("Finds spikes");
+    expect(appDescription({ name: "zipper", description: "Zipper " })).toBe("");
     expect(versionLabel("v1.1.4")).toBe("v1.1.4");
     expect(versionLabel("1.1.4")).toBe("v1.1.4");
   });

@@ -95,6 +95,7 @@ const label = computed(() => {
   font-size: 10px;
   font-weight: 600;
   letter-spacing: 0.02em;
+  text-transform: uppercase;
   color: var(--ab-ink);
 }
 .ab-type--more,
@@ -127,8 +128,8 @@ const label = computed(() => {
 }
 .ab-icon {
   position: absolute;
+  top: -7px;
   right: -7px;
-  bottom: -7px;
   width: 22px;
   height: 22px;
   padding: 3px;

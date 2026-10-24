@@ -36,8 +36,13 @@ export const computeLabel = (t) => COMPUTE_LABEL[t] || (t ? t.charAt(0).toUpperC
 // "v1.2.0", from a tag written with or without its "v".
 export const versionLabel = (tag) => (tag ? (/^v/i.test(tag) ? tag : `v${tag}`) : "");
 
-// What the app is: its app.yml's description, else its record's.
-export const appDescription = (app) => versionManifest(app)?.description || app?.description || "";
+// What the app is: its app.yml's description, else its record's; one that
+// only repeats the app's name says nothing.
+export function appDescription(app) {
+  const m = versionManifest(app);
+  const same = (a, b) => String(a || "").trim().toLowerCase() === String(b || "").trim().toLowerCase();
+  return [m?.description, app?.description].find((d) => d && !same(d, appTitle(app)) && !same(d, m?.name)) || "";
+}
 
 // "Standard, Lambda · 2 vCPU · 4 GB": where it runs and what it asks for,
 // as its app.yml declares it, else as its record has it.
