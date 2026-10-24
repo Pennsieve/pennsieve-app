@@ -29,6 +29,8 @@ describe("media types", () => {
     expect(shortMediaType("application/edf")).toBe("EDF");
     expect(shortMediaType("application/vnd.nifti+gzip")).toBe("NIFTI");
     expect(shortMediaType("*/*")).toBe("Any");
+    expect(shortMediaType("application/vnd.apache.parquet")).toBe("PARQUET");
+    expect(shortMediaType("application/x-rds")).toBe("RDS");
     expect(ioLine(edfToJson)).toBe("EDF → JSON");
     expect(ioLine({ inputs: [], outputs: [] })).toBe("");
     expect(ioLine(null)).toBe("");

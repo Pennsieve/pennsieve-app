@@ -31,11 +31,14 @@ export function versionManifest(app, tag) {
 // said to lack one.
 export const manifestsServed = (apps) => (apps || []).some((a) => (a.versions || []).some((v) => v.manifest));
 
-// "application/edf" -> "EDF", "image/png" -> "PNG", "*/*" -> "Any".
+// "application/edf" -> "EDF", "image/png" -> "PNG", "*/*" -> "Any";
+// a vendor type by its last part ("application/vnd.apache.parquet" ->
+// "PARQUET").
 export function shortMediaType(t) {
   if (!t || t === "*/*") return "Any";
-  const sub = String(t).split("/").pop().replace(/^x-/, "").replace(/^vnd\./, "");
-  return sub.split(/[.+-]/)[0].toUpperCase();
+  let sub = String(t).split("/").pop().replace(/^x-/, "").split("+")[0];
+  if (sub.startsWith("vnd.")) sub = sub.split(".").pop();
+  return sub.split(/[.-]/)[0].toUpperCase();
 }
 
 const portsLabel = (ports) => {
