@@ -525,7 +525,8 @@ const router = createRouter({
         {
           name: 'my-analysis',
           path: 'analysis',
-          redirect: { name: 'my-notebooks' },
+          // The Gallery first: what there is to run, before what's running
+          redirect: { name: 'my-gallery' },
           components: {
             stage: MyAnalysis,
             navigation: UserNavigation,
@@ -2018,8 +2019,9 @@ const router = createRouter({
         page: Analysis,
         navigation: BfNavigation
       },
+      // The Gallery first: what there is to run, before what's running
       redirect: {
-        name: 'notebooks'
+        name: 'gallery'
       },
       props: true,
       children: [

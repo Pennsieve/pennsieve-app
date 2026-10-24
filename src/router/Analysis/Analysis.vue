@@ -2,7 +2,7 @@
   <bf-page>
     <bf-rafter slot="heading" class="primary" :org-id="orgId">
       <template #breadcrumb>
-        <org-breadcrumb page-name="Analysis" :crumbs="breadcrumbCrumbs" :page-route="{ name: 'notebooks' }" />
+        <org-breadcrumb page-name="Analysis" :crumbs="breadcrumbCrumbs" :page-route="{ name: 'gallery' }" />
       </template>
     </bf-rafter>
     <div class="content-tabs">
@@ -65,6 +65,7 @@ export default {
     tabs() {
       const runPage = (route) => route.name === "run-detail";
       return [
+        { name: "Gallery", to: "gallery" },
         { name: "Notebooks", to: "notebooks", activeWhen: (route) => runPage(route) && this.runIsNotebook },
         {
           name: "Workflows",
@@ -72,7 +73,6 @@ export default {
           activeWhen: (route) =>
             (runPage(route) && !this.runIsNotebook) || ["run-configure", "workflow-create"].includes(route.name),
         },
-        { name: "Gallery", to: "gallery" },
         { name: "Compute Nodes", to: "compute-nodes" },
       ];
     },
