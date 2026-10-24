@@ -54,10 +54,6 @@ const current = computed(() => {
     packages: packages ? packageSummary(packages) : "",
   };
 });
-const pickedChoice = computed(() => choices.value.find((c) => c.id === picked.value) || null);
-const pickedIsActive = computed(
-  () => !!pickedChoice.value && active.value?.environmentId === pickedChoice.value.id && active.value?.version === pickedChoice.value.version
-);
 
 const POLL_MS = 1500;
 let pollTimer = null;
@@ -124,12 +120,21 @@ async function confirmRestart(title, message, confirmButtonText) {
 
 const RESTART_NOTE = "The kernel restarts: your notebook stays, but its variables are cleared.";
 
-async function use() {
-  const c = pickedChoice.value;
+// Picking an environment is the switch: confirmed, since the kernel
+// restarts. Picking the active one, or cancelling, changes nothing.
+async function use(id) {
+  const c = choices.value.find((x) => x.id === id);
+  picked.value = "";
+  changing.value = false;
   if (!c || c.disabled || busy.value) return;
+  if (active.value?.environmentId === c.id && active.value?.version === c.version) return;
   if (!(await confirmRestart(`Use ${c.name}?`, RESTART_NOTE, "Use and restart"))) return;
   await send(() => props.switchEnvironment(c.id, c.version));
 }
+
+// With an environment in use, the list shows only on "Change".
+const changing = ref(false);
+const showPicker = computed(() => !current.value || changing.value);
 
 async function stopUsing() {
   if (busy.value) return;
@@ -180,7 +185,7 @@ onBeforeUnmount(() => clearTimeout(pollTimer));
         </template>
         <template v-else>
           <div class="env__name env__name--none">Image packages only</div>
-          <div class="env__sub">Pick an environment to add your packages.</div>
+          <div class="env__sub">Pick an environment to add your packages; the kernel restarts.</div>
         </template>
       </div>
 
@@ -193,8 +198,13 @@ onBeforeUnmount(() => clearTimeout(pollTimer));
       <p v-else-if="error" class="env__msg env__msg--error">{{ error }}</p>
 
       <template v-if="choices.length">
+        <div v-if="current && !showPicker && !busy" class="env__actions">
+          <button class="env__link" @click="changing = true">Change</button>
+          <button class="env__link env__link--quiet" @click="stopUsing">Stop using</button>
+        </div>
         <el-select
-          v-model="picked"
+          v-if="showPicker"
+          :model-value="picked"
           class="env__select"
           size="small"
           filterable
@@ -202,6 +212,8 @@ onBeforeUnmount(() => clearTimeout(pollTimer));
           placeholder="Choose an environment…"
           no-match-text="No environment has that name or package"
           :disabled="busy"
+          :automatic-dropdown="changing"
+          @change="use"
           @visible-change="(open) => open || (query = '')"
         >
           <el-option
@@ -220,17 +232,7 @@ onBeforeUnmount(() => clearTimeout(pollTimer));
             <div v-if="c.packages.length" class="env__option-packages">{{ packageSummary(c.packages) }}</div>
           </el-option>
         </el-select>
-        <div class="env__actions">
-          <el-button
-            type="primary"
-            size="small"
-            :disabled="!pickedChoice || !!pickedChoice.disabled || pickedIsActive || busy"
-            @click="use"
-          >
-            {{ pickedIsActive ? "In use" : "Use and restart kernel" }}
-          </el-button>
-          <button v-if="current && !busy" class="env__link" @click="stopUsing">Stop using</button>
-        </div>
+        <button v-if="changing && !busy" class="env__link env__link--quiet" @click="changing = false">Cancel</button>
       </template>
       <p v-else-if="!loading" class="env__msg">You have no environments yet.</p>
       <p v-else class="env__msg">Loading your environments…</p>
@@ -332,6 +334,9 @@ onBeforeUnmount(() => clearTimeout(pollTimer));
 }
 .env__link:hover {
   text-decoration: underline;
+}
+.env__link--quiet {
+  color: theme.$gray_5;
 }
 .env__msg {
   display: flex;
