@@ -58,12 +58,8 @@
         </span>
       </div>
       <div class="actions-row">
-        <button class="processor-edit-button" :disabled="isSaving" @click="onSave">
-          {{ isSaving ? 'Saving…' : 'Save' }}
-        </button>
-        <button class="processor-cancel-button" :disabled="isSaving" @click="cancelEditing">
-          Cancel
-        </button>
+        <bf-button class="small secondary" :disabled="isSaving" @click="cancelEditing">Cancel</bf-button>
+        <bf-button class="small" :processing="isSaving" :disabled="isSaving" @click="onSave">Save</bf-button>
       </div>
     </div>
 
@@ -213,36 +209,4 @@ onMounted(() => {
   color: theme.$red_2;
 }
 
-.processor-edit-button {
-  background: theme.$purple_1;
-  color: theme.$white;
-  border: none;
-  border-radius: 4px;
-  padding: 6px 12px;
-  font-size: 12px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s ease;
-
-  &:hover { background: theme.$purple_2; }
-  &:disabled { opacity: 0.5; cursor: not-allowed; }
-}
-
-.processor-cancel-button {
-  background: theme.$white;
-  color: theme.$gray_5;
-  border: 1px solid theme.$gray_3;
-  border-radius: 4px;
-  padding: 6px 12px;
-  font-size: 12px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s ease;
-
-  &:hover {
-    border-color: theme.$gray_4;
-    color: theme.$gray_6;
-  }
-  &:disabled { opacity: 0.5; cursor: not-allowed; }
-}
 </style>

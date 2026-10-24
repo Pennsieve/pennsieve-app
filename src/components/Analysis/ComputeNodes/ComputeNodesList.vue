@@ -5,9 +5,7 @@ import { ElMessage } from 'element-plus'
 import { useGetToken } from '@/composables/useGetToken'
 import * as siteConfig from '@/site-config/site.json'
 import BfButton from '@/components/shared/bf-button/BfButton.vue'
-import BfStage from '@/components/layout/BfStage/BfStage.vue'
 import BfEmptyPageState from '@/components/shared/bf-empty-page-state/BfEmptyPageState.vue'
-import IconArrowRight from '@/components/icons/IconArrowRight.vue'
 import CreateComputeNodeDialog from './CreateComputeNodeDialog.vue'
 import ComputeNodeCard from './ComputeNodeCard.vue'
 import { useComputeResourcesStore } from '@/stores/computeResourcesStore'
@@ -307,73 +305,37 @@ async function confirmDeleteNode() {
 </script>
 
 <template>
-  <bf-stage element-loading-background="transparent">
-    <template #actions>
-      <bf-button
-        :disabled="!canCreate"
-        @click="openCreateDialog"
-      >
-        Create Compute Node
-      </bf-button>
-    </template>
-    
-    <div class="compute-nodes-container">
+  <div class="compute-nodes-page">
+  <div class="compute-nodes-container">
+    <div class="nodes-toolbar">
+      <p class="nodes-intro">
+        <template v-if="isMyWorkspace">
+          Your personal compute nodes, on AWS accounts you registered. They're private to you.
+        </template>
+        <template v-else>
+          Compute nodes run this workspace's workflows and notebooks, on cloud accounts members registered.
+        </template>
+        <router-link v-if="isMyWorkspace" :to="{ name: 'user-compute-resource' }" class="doc-link">Your compute resources</router-link>
+        <a v-else href="https://docs.pennsieve.io/docs/compute-nodes" target="_blank" rel="noopener" class="doc-link">Documentation</a>
+      </p>
+      <bf-button :disabled="!canCreate" @click="openCreateDialog">+ New Compute Node</bf-button>
+    </div>
+
       <div class="nodes-content">
-        <!-- Setup Information Section -->
-        <div class="info-section">
-          <div v-if="isMyWorkspace" class="info-card">
-            <h3>Your Compute Nodes</h3>
-            <p>
-              These are your personal compute nodes, outside any workspace. Each runs on an AWS account you registered
-              as a Compute Resource with the Pennsieve agent (<code>pennsieve account register</code>), and is private to you:
-              it can't be shared with other users or workspaces.
-            </p>
-            <div class="setup-steps" v-if="hasNoResources">
-              <h4>Quick Setup Guide:</h4>
-              <ol>
-                <li>Register your AWS account with <code>pennsieve account register</code></li>
-                <li>Click "Create Compute Node" and choose that account</li>
-                <li>Configure the node with a name and description</li>
-              </ol>
-            </div>
-            <div class="documentation-link">
-              <router-link :to="{ name: 'user-compute-resource' }" class="doc-link">
-                Your Compute Resources
-                <IconArrowRight :width="14" :height="14" style="margin-left: 4px;" />
-              </router-link>
-            </div>
-          </div>
-          <div v-else class="info-card">
-            <h3>Managing Compute Nodes</h3>
-            <p>
-              Compute nodes are computational resources deployed on individual user's cloud accounts that process and analyze Pennsieve data.
-              Each compute node is created from a Compute Resource (AWS account) owned by a specific user, but can be shared with other users in workspaces to enable collaborative data analysis.
-            </p>
-            <p class="info-note">
-              <strong>Note:</strong> Compute Resources are associated with individual users who own the cloud accounts. 
-              Compute nodes created from these resources can be shared across workspace members with different permission levels (private, workspace, or shared access).
-            </p>
-            <div class="setup-steps" v-if="hasNoResources">
-              <h4>Quick Setup Guide:</h4>
-              <ol>
-                <li>Ensure your AWS account is registered as a Compute Resource</li>
-                <li>Click "Create Compute Node" to set up a new node</li>
-                <li>Configure the node with a name and description</li>
-                <li>Manage node status (enabled/paused) as needed</li>
-              </ol>
-            </div>
-            <div class="documentation-link">
-              <a href="https://docs.pennsieve.io/docs/compute-nodes" target="_blank" class="doc-link">
-                View Full Documentation
-                <IconArrowRight :width="14" :height="14" style="margin-left: 4px;" />
-              </a>
-            </div>
+        <div v-if="hasNoResources && !isLoading" class="info-section">
+          <div class="info-card">
+            <h3>Getting started</h3>
+            <ol class="setup-steps">
+              <li>Register your AWS account with the Pennsieve agent: <code>pennsieve account register</code></li>
+              <li>Click <strong>+ New Compute Node</strong> and choose that account</li>
+              <li v-if="!isMyWorkspace">Choose who in the workspace can use it</li>
+            </ol>
           </div>
         </div>
 
         <!-- Nodes List -->
         <div class="nodes-section" v-loading="isLoading">
-          <h3>Available Compute Nodes</h3>
+          <h3 class="nodes-title">Compute nodes</h3>
           
           <div v-if="showEmptyState" class="empty-state">
             <bf-empty-page-state class="empty">
@@ -386,7 +348,7 @@ async function confirmDeleteNode() {
               <div v-if="isMyWorkspace" class="copy">
                 <h2>You don't have any personal compute nodes yet.</h2>
                 <p>
-                  Click "Create Compute Node" above to create one on an AWS account you registered.
+                  Click <strong>+ New Compute Node</strong> to create one on an AWS account you registered.
                 </p>
               </div>
               <div v-else-if="hasAdminRights" class="copy">
@@ -394,7 +356,7 @@ async function confirmDeleteNode() {
                 <p>
                   Compute Nodes are created from user-owned Compute Resources (cloud accounts) and can be shared
                   with workspace members to enable collaborative data analysis. Workspace administrators can create nodes
-                  from available compute resources and manage access permissions. Click "Create Compute Node" above to get started.
+                  from available compute resources and manage access permissions. Click <strong>+ New Compute Node</strong> to get started.
                 </p>
               </div>
               <div v-else class="copy">
@@ -475,15 +437,15 @@ async function confirmDeleteNode() {
         </div>
       </template>
     </el-dialog>
-  </bf-stage>
+  </div>
 </template>
 
 <style scoped lang="scss">
 @use '../../../styles/_theme.scss';
 
 .compute-nodes-container {
-  max-width: 1000px;
   margin: 0;
+  padding: 20px 32px;
 }
 
 h2 {
@@ -493,82 +455,55 @@ h2 {
   margin-bottom: 8px;
 }
 
+// Intro line and the page's main action, where "+ New Notebook" sits on the
+// Notebooks tab.
+.nodes-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+.nodes-intro {
+  margin: 0;
+  font-size: 13px;
+  color: theme.$gray_5;
+
+  .doc-link {
+    margin-left: 6px;
+    color: theme.$purple_3;
+  }
+}
+
 .nodes-content {
   padding: 0;
 }
 
 .info-section {
-  margin-bottom: 32px;
+  margin-bottom: 24px;
 }
 
 .info-card {
   background: theme.$gray_1;
   border: 1px solid theme.$gray_2;
-  padding: 24px;
+  border-radius: 6px;
+  padding: 16px 20px;
 
   h3 {
-    font-size: 18px;
-    font-weight: 500;
-    color: theme.$gray_6;
-    margin: 0 0 12px 0;
-  }
-
-  p {
     font-size: 14px;
-    color: theme.$gray_5;
-    line-height: 1.5;
-    margin: 0 0 12px 0;
-  }
-
-  .info-note {
-    background: rgba(theme.$purple_1, 0.1);
-    border-left: 3px solid theme.$purple_1;
-    padding: 12px;
-    margin: 16px 0;
-    border-radius: 4px;
+    font-weight: 600;
+    color: theme.$gray_6;
+    margin: 0 0 8px 0;
   }
 
   .setup-steps {
-    margin: 20px 0;
+    margin: 0;
+    padding-left: 20px;
 
-    h4 {
-      font-size: 15px;
-      font-weight: 500;
-      color: theme.$gray_6;
-      margin: 0 0 12px 0;
-    }
-
-    ol {
-      margin: 0;
-      padding-left: 24px;
-
-      li {
-        font-size: 14px;
-        color: theme.$gray_5;
-        line-height: 1.6;
-        margin-bottom: 8px;
-      }
-    }
-  }
-
-  .documentation-link {
-    margin-top: 16px;
-
-    .doc-link {
-      display: inline-flex;
-      align-items: center;
-      padding: 8px 16px;
-      background: theme.$purple_3;
-      color: white;
-      text-decoration: none;
-      border-radius: 4px;
-      font-size: 14px;
-      font-weight: 500;
-      transition: background 0.2s ease;
-
-      &:hover {
-        background: theme.$purple_2;
-      }
+    li {
+      font-size: 13px;
+      color: theme.$gray_5;
+      line-height: 1.6;
     }
   }
 }
@@ -576,11 +511,11 @@ h2 {
 .nodes-section {
   margin-bottom: 48px;
 
-  h3 {
-    font-size: 20px;
-    font-weight: 500;
+  .nodes-title {
+    font-size: 14px;
+    font-weight: 600;
     color: theme.$gray_6;
-    margin-bottom: 16px;
+    margin: 0 0 12px;
   }
 }
 
@@ -735,41 +670,41 @@ h2 {
     // Status-specific colors
     &.enabled {
       :deep(.el-select__wrapper) {
-        background: rgba(#10B981, 0.08);
-        border-color: rgba(#10B981, 0.2);
+        background: rgba(theme.$green_1, 0.08);
+        border-color: rgba(theme.$green_1, 0.2);
         
         &:hover {
-          background: rgba(#10B981, 0.12);
-          border-color: rgba(#10B981, 0.3);
+          background: rgba(theme.$green_1, 0.12);
+          border-color: rgba(theme.$green_1, 0.3);
         }
       }
       
       :deep(.el-input__inner) {
-        color: #059669;
+        color: theme.$green_2;
       }
       
       :deep(.el-select__caret) {
-        color: #059669;
+        color: theme.$green_2;
       }
     }
     
     &.paused {
       :deep(.el-select__wrapper) {
-        background: rgba(#F59E0B, 0.08);
-        border-color: rgba(#F59E0B, 0.2);
+        background: rgba(theme.$orange_1, 0.08);
+        border-color: rgba(theme.$orange_1, 0.2);
         
         &:hover {
-          background: rgba(#F59E0B, 0.12);
-          border-color: rgba(#F59E0B, 0.3);
+          background: rgba(theme.$orange_1, 0.12);
+          border-color: rgba(theme.$orange_1, 0.3);
         }
       }
       
       :deep(.el-input__inner) {
-        color: #D97706;
+        color: theme.$orange_2;
       }
       
       :deep(.el-select__caret) {
-        color: #D97706;
+        color: theme.$orange_2;
       }
     }
   }
@@ -911,8 +846,8 @@ h2 {
           color: theme.$green_1;
 
           &.paused {
-            background: rgba(#F59E0B, 0.1);
-            color: #F59E0B;
+            background: rgba(theme.$orange_1, 0.1);
+            color: theme.$orange_1;
           }
         }
         
@@ -1002,8 +937,8 @@ h2 {
     gap: 16px;
     margin-bottom: 24px;
     padding: 20px;
-    background: rgba(#F59E0B, 0.05);
-    border: 1px solid rgba(#F59E0B, 0.15);
+    background: rgba(theme.$orange_1, 0.05);
+    border: 1px solid rgba(theme.$orange_1, 0.15);
     border-radius: 8px;
 
     .warning-icon {
@@ -1036,7 +971,7 @@ h2 {
 
       .impact-message {
         font-size: 13px;
-        color: #D97706;
+        color: theme.$orange_2;
         margin: 0;
         font-weight: 500;
         line-height: 1.4;

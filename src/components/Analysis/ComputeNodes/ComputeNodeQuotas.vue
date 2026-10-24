@@ -12,9 +12,9 @@
             fields fall back to the platform safety cap.
           </p>
         </div>
-        <button v-if="isOwner" class="processor-edit-button" @click="openEditDefault">
+        <bf-button v-if="isOwner" class="small secondary" @click="openEditDefault">
           {{ defaultRow ? 'Edit' : 'Set' }}
-        </button>
+        </bf-button>
       </div>
       <div class="caps-grid">
         <div class="cap-cell">
@@ -346,18 +346,4 @@ onMounted(() => {
   color: theme.$red_2;
 }
 
-.processor-edit-button {
-  background: theme.$purple_1;
-  color: theme.$white;
-  border: none;
-  border-radius: 4px;
-  padding: 6px 12px;
-  font-size: 12px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s ease;
-
-  &:hover { background: theme.$purple_2; }
-  &:disabled { opacity: 0.5; cursor: not-allowed; }
-}
 </style>
