@@ -2,9 +2,9 @@
 // domains, each with a hue and an icon, that the Gallery's app banners are
 // coloured by. Tags are free text, so each domain lists the spellings people
 // use ("EEG", "iEEG", "electrophysiology"); a tag matches regardless of case
-// and punctuation. Tags that match none leave the app coloured by its name.
+// and punctuation. An app whose tags match none is grey: a colour always
+// means a domain.
 import { versionManifest, shortMediaType, sessionTypeOf } from "../WorkflowBuilder/appManifestInfo";
-import { appTitle } from "./appCards";
 
 // A domain is a subject (what the app is about: EEG, imaging, genomics…) or
 // a task (what it does with it: visualization, conversion, statistics…).
@@ -15,7 +15,7 @@ export const DOMAINS = [
     subject: true,
     label: "Electrophysiology",
     tag: "electrophysiology",
-    hue: 255,
+    hue: 245,
     aliases: ["eeg", "ieeg", "seeg", "ecog", "ephys", "lfp", "emg", "ecg", "ekg", "meg", "neurophysiology", "edf", "signal-processing", "time-series", "timeseries"],
     icon: "M2 12h4l2-6 4 12 3-9 2 3h5",
   },
@@ -33,7 +33,7 @@ export const DOMAINS = [
     subject: true,
     label: "Imaging",
     tag: "imaging",
-    hue: 190,
+    hue: 185,
     aliases: ["image", "images", "microscopy", "mri", "fmri", "ct", "pet", "dicom", "nifti", "histology", "segmentation", "registration", "calcium-imaging", "image-processing"],
     icon: "M4 5h16v14H4zM4 16l5-5 4 4 2-2 5 5M15.5 9.5h.01",
   },
@@ -42,7 +42,7 @@ export const DOMAINS = [
     subject: true,
     label: "Genomics",
     tag: "genomics",
-    hue: 140,
+    hue: 135,
     aliases: ["sequencing", "rna-seq", "rnaseq", "scrna-seq", "dna", "rna", "omics", "transcriptomics", "proteomics", "genetics", "bioinformatics", "single-cell", "scrna", "seurat"],
     icon: "M7 3c0 6 10 6 10 12s-10 6-10 6M17 3c0 6-10 6-10 12M9 7h6M9 17h6",
   },
@@ -50,7 +50,7 @@ export const DOMAINS = [
     key: "ml",
     label: "Machine learning",
     tag: "machine-learning",
-    hue: 290,
+    hue: 280,
     aliases: ["ml", "ai", "deep-learning", "neural-network", "llm", "classification", "prediction", "inference"],
     icon: "M5 6h.01M5 18h.01M12 12h.01M19 6h.01M19 18h.01M5 6l7 6 7-6M5 18l7-6 7 6",
   },
@@ -58,7 +58,7 @@ export const DOMAINS = [
     key: "stats",
     label: "Statistics",
     tag: "statistics",
-    hue: 28,
+    hue: 20,
     aliases: ["stats", "analytics", "regression", "quantification"],
     icon: "M4 20V10M10 20V4M16 20v-7M22 20H2",
   },
@@ -66,7 +66,7 @@ export const DOMAINS = [
     key: "viz",
     label: "Visualization",
     tag: "visualization",
-    hue: 48,
+    hue: 45,
     aliases: ["viz", "visualisation", "plotting", "plots", "figures", "dashboard"],
     icon: "M3 3v18h18M7 15l4-5 3 3 5-7",
   },
@@ -82,7 +82,7 @@ export const DOMAINS = [
     key: "qc",
     label: "Quality control",
     tag: "quality-control",
-    hue: 100,
+    hue: 85,
     aliases: ["qc", "qa", "validation", "validate", "curation", "cleaning"],
     icon: "M12 3l8 3v6c0 5-4 8-8 9-4-1-8-4-8-9V6zM8.5 12l2.5 2.5 4.5-5",
   },
@@ -90,7 +90,7 @@ export const DOMAINS = [
     key: "notebook",
     label: "Notebook",
     tag: "notebook",
-    hue: 230,
+    hue: 225,
     aliases: ["notebooks", "interactive", "jupyter", "rstudio", "human-in-the-loop"],
     icon: "M4 4h16v16H4zM8 10l3 2-3 2M13 15h4",
   },
@@ -128,24 +128,57 @@ export function canonicalTag(tag) {
   return SUGGESTED_TAGS.find((s) => normalize(s) === n) || t;
 }
 
-const nameHue = (app) => {
-  let h = 0;
-  for (const c of appTitle(app)) h = (h * 31 + c.charCodeAt(0)) % 360;
-  return h;
-};
+// Each domain's colours, from its hue: a subject's strong, a task's quieter,
+// so what an app is about reads first. bg: the banner; tile: the app's tile;
+// ink: text and icons on them; line: chip borders and edges; accent: the
+// domain's mark elsewhere (a canvas step's strip, a filter chip's dot).
+export function domainColors(domain) {
+  if (!domain) return NEUTRAL_COLORS;
+  const h = domain.hue;
+  return domain.subject
+    ? { bg: `hsl(${h}, 65%, 96%)`, tile: `hsl(${h}, 60%, 88%)`, ink: `hsl(${h}, 55%, 30%)`, line: `hsl(${h}, 40%, 72%)`, accent: `hsl(${h}, 60%, 45%)` }
+    : { bg: `hsl(${h}, 30%, 96%)`, tile: `hsl(${h}, 28%, 88%)`, ink: `hsl(${h}, 30%, 32%)`, line: `hsl(${h}, 20%, 74%)`, accent: `hsl(${h}, 35%, 50%)` };
+}
+
+// An app with no domain is grey: a colour always means a domain. Its accent
+// is none, so a canvas step keeps the processor's own colour.
+export const NEUTRAL_COLORS = Object.freeze({
+  bg: "hsl(220, 12%, 96%)",
+  tile: "hsl(220, 10%, 89%)",
+  ink: "hsl(220, 9%, 35%)",
+  line: "hsl(220, 8%, 78%)",
+  accent: null,
+});
+
+// The domain of an app (of a version, by tag), from its app.yml.
+export const appDomain = (app, tag) => domainOf(versionManifest(app, tag));
+export const appColors = (app, tag) => domainColors(appDomain(app, tag));
+
+// The domains of a list of apps, most common first, with how many apps each:
+// the Gallery's filter chips.
+export function domainCounts(apps) {
+  const counts = new Map();
+  for (const app of apps || []) {
+    const d = appDomain(app);
+    if (d) counts.set(d, (counts.get(d) || 0) + 1);
+  }
+  return [...counts]
+    .map(([domain, count]) => ({ domain, count }))
+    .sort((a, b) => Number(!!b.domain.subject) - Number(!!a.domain.subject) || b.count - a.count || a.domain.label.localeCompare(b.domain.label));
+}
 
 const typesOf = (ports) => [...new Set((ports || []).flatMap((p) => (p.mediaTypes || []).map(shortMediaType)))];
 
-// What an app's banner shows: { manifest, domain, hue, inputs, outputs }.
-// Its hue is its domain's, else its name's (as the initials tiles); inputs
-// and outputs are the media types its app.yml declares, short ("EDF").
+// What an app's banner shows: { manifest, domain, colors, interactive,
+// inputs, outputs }. Its colours are its domain's, else grey; inputs and
+// outputs are the media types its app.yml declares, short ("EDF").
 export function appBanner(app) {
   const manifest = versionManifest(app);
   const domain = domainOf(manifest);
   return {
     manifest: !!manifest,
     domain,
-    hue: domain ? domain.hue : nameHue(app),
+    colors: domainColors(domain),
     interactive: !!sessionTypeOf(app),
     inputs: typesOf(manifest?.inputs),
     outputs: typesOf(manifest?.outputs),

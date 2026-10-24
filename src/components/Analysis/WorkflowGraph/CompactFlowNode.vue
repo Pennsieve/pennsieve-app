@@ -24,6 +24,9 @@ const props = defineProps({
   // Editing actions (configure, remove) show on hover; ones the user is
   // waiting on (open a waiting notebook) stay visible.
   actionsOnHover: { type: Boolean, default: true },
+  // A colour for the strip instead of the kind's: an app step's domain
+  // (appDomains.js), so a graph shows the domains it touches.
+  accent: { type: String, default: "" },
 });
 
 // Source and target: the detailed cards' colours. Processor: the theme's
@@ -32,7 +35,7 @@ const props = defineProps({
 const KIND_COLOR = { source: "#6366f1", processor: "#E0912A", target: "#64748b" };
 const KIND_LABEL = { source: "Source", processor: "Processor", target: "Target" };
 
-const stripColor = computed(() => KIND_COLOR[props.kind] || KIND_COLOR.processor);
+const stripColor = computed(() => props.accent || KIND_COLOR[props.kind] || KIND_COLOR.processor);
 const showRuntime = computed(() => props.runtime && props.runtime !== "standard");
 const tooltip = computed(() =>
   [

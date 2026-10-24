@@ -5,6 +5,7 @@ import { useRouter, useRoute } from "vue-router";
 
 import IconAnalysis from "../../icons/IconAnalysis.vue";
 import AppBanner from "./AppBanner.vue";
+import { appDomain, domainColors, domainCounts } from "./appDomains";
 import { versionManifest } from "../WorkflowBuilder/appManifestInfo";
 import {
   APP_SORTS,
@@ -154,6 +155,8 @@ const visibilityLabel = (app) => {
 */
 // Where an app runs (from its runtime config), and the choices the list has.
 const computeFilter = ref("any");
+// A domain's key, or null for every app: the colour legend above the cards.
+const domainFilter = ref(null);
 const computeChoices = computed(() => [
   ...new Set(applications.value.flatMap((a) => a.runtimeConfig?.computeTypes || [])),
 ]);
@@ -189,13 +192,29 @@ const githubUrl = (app) => {
 };
 
 const filtersSet = computed(
-  () => !!searchQuery.value.trim() || visibilityFilter.value !== "all" || computeFilter.value !== "any"
+  () =>
+    !!searchQuery.value.trim() || visibilityFilter.value !== "all" || computeFilter.value !== "any" || !!domainFilter.value
 );
 function clearFilters() {
   searchQuery.value = "";
   visibilityFilter.value = "all";
   computeFilter.value = "any";
+  domainFilter.value = null;
 }
+
+// The domains among the apps in this status (active, archived…), as chips
+// in their colours: what the banners' colours mean, and a filter.
+const statusApps = computed(() =>
+  statusFilter.value === "all"
+    ? applications.value
+    : applications.value.filter((app) => (statusFilter.value === "archived") === (app.status === "archived"))
+);
+const domainChips = computed(() => domainCounts(statusApps.value));
+const chipStyle = (domain) => {
+  const c = domainColors(domain);
+  return { "--chip-bg": c.bg, "--chip-ink": c.ink, "--chip-line": c.line, "--chip-dot": c.accent };
+};
+const toggleDomain = (key) => (domainFilter.value = domainFilter.value === key ? null : key);
 
 const filteredApplications = computed(() => {
   let list = applications.value;
@@ -216,6 +235,9 @@ const filteredApplications = computed(() => {
     list = list.filter(
       (app) => (visibilityLabel(app) || "").toLowerCase() === visibilityFilter.value
     );
+  }
+  if (domainFilter.value) {
+    list = list.filter((app) => appDomain(app)?.key === domainFilter.value);
   }
 
   return sortApps(list, sortBy.value, workflows.value);
@@ -360,6 +382,24 @@ const goToManifestBuilder = () => {
         <el-select v-model="statusFilter" size="small" class="status-select" aria-label="Status">
           <el-option v-for="option in statusOptions" :key="option.value" :label="option.label" :value="option.value" />
         </el-select>
+      </div>
+
+      <div v-if="domainChips.length" class="domain-row" role="group" aria-label="What apps are for">
+        <button
+          v-for="{ domain, count } in domainChips"
+          :key="domain.key"
+          type="button"
+          class="domain-chip"
+          :class="{ active: domainFilter === domain.key }"
+          :style="chipStyle(domain)"
+          :aria-pressed="domainFilter === domain.key"
+          :title="domain.subject ? `About ${domain.label.toLowerCase()}` : `For ${domain.label.toLowerCase()}`"
+          @click="toggleDomain(domain.key)"
+        >
+          <span class="domain-dot" />
+          {{ domain.label }}
+          <span class="domain-count">{{ count }}</span>
+        </button>
       </div>
 
       <div v-if="filteredApplications.length > 0" class="applications-grid">
@@ -542,6 +582,45 @@ const goToManifestBuilder = () => {
 }
 
 /* One row, all 24px tall, as on the Gallery's workflows. */
+/* The domains, in their banners' colours: a legend, and a filter. */
+.domain-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: -4px 0 16px;
+}
+.domain-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border: 1px solid var(--chip-line);
+  border-radius: 12px;
+  background: theme.$white;
+  font: inherit;
+  font-size: 12px;
+  color: var(--chip-ink);
+  cursor: pointer;
+
+  &:hover {
+    background: var(--chip-bg);
+  }
+  &.active {
+    border-color: var(--chip-ink);
+    background: var(--chip-bg);
+    font-weight: 600;
+  }
+}
+.domain-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--chip-dot);
+}
+.domain-count {
+  color: theme.$gray_4;
+  font-weight: 400;
+}
 .filter-row {
   display: flex;
   align-items: center;

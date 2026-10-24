@@ -9,7 +9,8 @@ import { computed, ref } from "vue";
 import { ArrowLeft } from "@element-plus/icons-vue";
 import { useRoute } from "vue-router";
 import { useStore } from "vuex";
-import { appColor, appInitials, githubRepo } from "../Applications/appCards";
+import { appInitials, githubRepo } from "../Applications/appCards";
+import { appColors } from "../Applications/appDomains";
 import { ioLine, manifestsServed, matchesApp, paletteGroups, versionManifest } from "./appManifestInfo";
 
 const props = defineProps({
@@ -40,9 +41,13 @@ const lacksManifest = (app) => served.value && !manifestOf(app);
 const manifestBuilder = computed(() => ({
   name: route.params.orgId ? "application-manifest-builder" : "my-application-manifest-builder",
 }));
-// The tile's colours and letters, as in the Gallery, from the app's name
-// without its owner's ("pennsieve-ai-analyze" -> "AA"), so an
-// organization's apps don't all read the same.
+// The tile's letters, from the app's name without its owner's
+// ("pennsieve-ai-analyze" -> "AA"), so an organization's apps don't all read
+// the same; its colours, its domain's, as in the Gallery.
+const tileColors = (app) => {
+  const c = appColors(app);
+  return { background: c.tile, color: c.ink };
+};
 const tileOf = (app) => {
   const owner = (githubRepo(app.sourceUrl)?.owner || "").toLowerCase();
   const name = props.appName(app);
@@ -112,7 +117,7 @@ const tileOf = (app) => {
           @click="emit('add', 'default', app)"
           @dragstart="emit('dragstart', app, $event, 'application')"
         >
-          <span class="pal-tile" :style="appColor(tileOf(app))" aria-hidden="true">{{ appInitials(tileOf(app)) }}</span>
+          <span class="pal-tile" :style="tileColors(app)" aria-hidden="true">{{ appInitials(tileOf(app)) }}</span>
           <span class="pal-text">
             <span class="pal-name">{{ appName(app) }}</span>
             <span v-if="ioLine(manifestOf(app))" class="pal-io">{{ ioLine(manifestOf(app)) }}</span>

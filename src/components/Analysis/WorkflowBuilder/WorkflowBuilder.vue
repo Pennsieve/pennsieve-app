@@ -40,6 +40,7 @@ import BuilderBar from "./BuilderBar.vue";
 import BuilderPalette from "./BuilderPalette.vue";
 import ParamField from "./ParamField.vue";
 import { ioLine, sessionTypeOf, versionManifest } from "./appManifestInfo";
+import { appColors } from "../Applications/appDomains";
 import { diffLines, manifestDiff, versionWarnings } from "./manifestDiff";
 import { builderReadiness } from "./builderReadiness";
 import StepPicker from "./StepPicker.vue";
@@ -981,6 +982,11 @@ const onDrop = (event) => {
   item or a step's + places it below a step, connects it and tidies the
   layout (addStep).
 */
+// An app step's domain colour (its pinned version's app.yml tags), for its
+// strip on the canvas; none for an app without a domain, which keeps the
+// processor's own.
+const stepAccent = (data) => (data?.application ? appColors(data.application, data.tag)?.accent || "" : "");
+
 const makeNode = (type, app, position) => {
   const id = generateNodeId();
   if (type === "data-source") {
@@ -2154,6 +2160,7 @@ const openNodeSettings = (id) => {
                   kind="processor"
                   :label="data.label"
                   :runtime="data.interactive ? 'interactive' : data.computeType"
+                  :accent="stepAccent(data)"
                   :class="connectClass(id)"
                 >
                     <span v-if="stepWarning(id)" class="step-warn" :title="stepWarning(id)" />
@@ -2173,7 +2180,12 @@ const openNodeSettings = (id) => {
                       &times;
                     </button>
                 </CompactFlowNode>
-                <div v-else class="custom-node" :class="connectClass(id)">
+                <div
+                  v-else
+                  class="custom-node"
+                  :class="connectClass(id)"
+                  :style="stepAccent(data) ? { boxShadow: `inset 4px 0 0 ${stepAccent(data)}` } : undefined"
+                >
                   <div v-if="data.manifestPorts?.inputs?.length" class="node-ports node-ports--in">
                     <span v-for="p in data.manifestPorts.inputs" :key="p.name" class="node-port" :title="p.description">
                       {{ p.name }}<template v-if="portTypes(p)"> · {{ portTypes(p) }}</template>

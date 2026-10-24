@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { appBanner, canonicalTag, domainOf, domainOfTag, fitTypes, SUGGESTED_TAGS } from "./appDomains";
+import { appBanner, canonicalTag, domainColors, domainCounts, domainOf, domainOfTag, DOMAINS, fitTypes, NEUTRAL_COLORS, SUGGESTED_TAGS } from "./appDomains";
 
 const withManifest = (manifest, name = "spike-detect") => ({
   name,
@@ -60,14 +60,33 @@ describe("app domains", () => {
         outputs: [{ name: "spikes", mediaTypes: ["text/csv"] }, { name: "plot", mediaTypes: ["image/png", "text/csv"] }],
       })
     );
-    expect(b).toMatchObject({ manifest: true, hue: 255, inputs: ["EDF", "NWB"], outputs: ["CSV", "PNG"] });
+    expect(b).toMatchObject({ manifest: true, inputs: ["EDF", "NWB"], outputs: ["CSV", "PNG"] });
+    expect(b.colors).toEqual(domainColors(b.domain));
     expect(b.domain.key).toBe("ephys");
   });
 
-  it("colours an app without a domain by its name, as the tiles do", () => {
+  it("greys an app without a domain: a colour always means one", () => {
     const a = appBanner(withManifest({ tags: ["penn"] }));
     expect(a.domain).toBeNull();
-    expect(a.hue).toBe(appBanner(withManifest({}, "spike-detect")).hue);
-    expect(appBanner({ name: "spike-detect", versions: [] })).toMatchObject({ manifest: false, inputs: [], outputs: [] });
+    expect(a.colors).toBe(NEUTRAL_COLORS);
+    expect(appBanner({ name: "spike-detect", versions: [] })).toMatchObject({ manifest: false, colors: NEUTRAL_COLORS, inputs: [], outputs: [] });
+  });
+
+  it("colours subjects strongly and tasks quietly, each its own", () => {
+    const sat = (c) => Number(/hsl\(\d+, (\d+)%/.exec(c.accent)[1]);
+    expect(sat(domainColors(domainOfTag("eeg")))).toBeGreaterThan(sat(domainColors(domainOfTag("visualization"))));
+    const accents = DOMAINS.map((d) => domainColors(d).accent);
+    expect(new Set(accents).size).toBe(DOMAINS.length);
+    expect(NEUTRAL_COLORS.accent).toBeNull();
+  });
+
+  it("counts the domains among apps, subjects first", () => {
+    const chips = domainCounts([
+      withManifest({ tags: ["visualization"] }, "a"),
+      withManifest({ tags: ["visualization"] }, "b"),
+      withManifest({ tags: ["eeg"] }, "c"),
+      withManifest({ tags: ["penn"] }, "d"),
+    ]);
+    expect(chips.map((c) => [c.domain.key, c.count])).toEqual([["ephys", 1], ["viz", 2]]);
   });
 });

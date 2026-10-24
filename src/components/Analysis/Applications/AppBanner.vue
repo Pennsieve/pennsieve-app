@@ -1,8 +1,7 @@
 <script setup>
 // An app card's banner, where the workflows show their graph: what goes in,
 // the app, what comes out, top to bottom as the graphs run, on its domain's
-// colour (appDomains.js). An app without an app.yml keeps its initials
-// tile on grey.
+// colours (appDomains.js), else grey: a colour always means a domain.
 import { computed } from "vue";
 import { appBanner, fitTypes } from "./appDomains";
 import { appInitials } from "./appCards";
@@ -17,10 +16,8 @@ const ins = computed(() => fitTypes(b.value.inputs));
 const outs = computed(() => fitTypes(b.value.outputs));
 const hasIo = computed(() => b.value.inputs.length || b.value.outputs.length);
 const style = computed(() => {
-  const h = b.value.hue;
-  return b.value.manifest
-    ? { "--ab-bg": `hsl(${h}, 60%, 96%)`, "--ab-tile": `hsl(${h}, 55%, 88%)`, "--ab-ink": `hsl(${h}, 45%, 30%)`, "--ab-line": `hsl(${h}, 30%, 75%)` }
-    : { "--ab-tile": `hsl(${h}, 55%, 92%)`, "--ab-ink": `hsl(${h}, 45%, 32%)` };
+  const c = b.value.colors;
+  return { "--ab-bg": c.bg, "--ab-tile": c.tile, "--ab-ink": c.ink, "--ab-line": c.line };
 });
 const label = computed(() => {
   const io = hasIo.value ? `takes ${b.value.inputs.join(", ") || "any files"}, gives ${b.value.outputs.join(", ") || "any files"}` : "";
@@ -29,7 +26,7 @@ const label = computed(() => {
 </script>
 
 <template>
-  <div class="ab" :class="{ 'ab--plain': !b.manifest }" :style="style" role="img" :aria-label="label || undefined">
+  <div class="ab" :style="style" role="img" :aria-label="label || undefined">
     <template v-if="b.manifest && hasIo">
       <div class="ab-types" :title="b.inputs.length ? `In: ${b.inputs.join(', ')}` : undefined">
         <span v-for="t in ins.types" :key="t" class="ab-type">{{ t }}</span>
@@ -73,10 +70,6 @@ const label = computed(() => {
   padding: 12px 8px 22px;
   box-sizing: border-box;
   background: var(--ab-bg);
-}
-.ab--plain {
-  padding-bottom: 12px;
-  background: theme.$gray_1;
 }
 .ab-types {
   display: flex;
