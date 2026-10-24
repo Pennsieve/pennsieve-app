@@ -358,7 +358,7 @@ onMounted(async () => {
             <div class="wf-foot">
               <span class="wf-usage">
                 <span class="last-run-dot" :class="lastRunInfo(wf).statusKey" />
-                {{ usageLine(wf, formatRelativeTime) }}
+                <span class="wf-usage-text">{{ usageLine(wf, formatRelativeTime) }}</span>
               </span>
               <span class="wf-actions" @click.stop>
                 <button type="button" class="wf-action" @click="goToDetail(wf)">Open</button>
@@ -669,20 +669,29 @@ $card-height: 172px;
   margin-top: auto;
   padding-top: 6px;
 }
+/* One line each: the usage gives way (…) to the buttons, which never wrap. */
 .wf-usage {
   display: flex;
   align-items: center;
   gap: 6px;
+  min-width: 0;
   font-size: 12px;
   color: theme.$gray_4;
 }
+.wf-usage-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .wf-actions {
   display: flex;
+  flex-shrink: 0;
   gap: 6px;
   opacity: 0;
   transition: opacity 0.15s ease;
 }
 .wf-action {
+  white-space: nowrap;
   padding: 3px 10px;
   border: 1px solid theme.$gray_3;
   border-radius: 4px;
