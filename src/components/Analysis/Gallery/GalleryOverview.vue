@@ -59,8 +59,10 @@ const newWorkflow = () => router.push({ name: scoped("workflows"), query: { view
 @use "../../../styles/theme";
 
 /* The view switch on the left, the view's action on the right, lined up with
-   the Analysis tabs (32px); as on the Notebooks and Workflows tabs. */
+   the Analysis tabs (32px) and as wide as the cards below (1000px), so the
+   action sits over their right edge; as on the Notebooks and Workflows tabs. */
 .gallery-toolbar {
+  max-width: 1000px;
   display: flex;
   align-items: center;
   justify-content: space-between;

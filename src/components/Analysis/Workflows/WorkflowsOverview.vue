@@ -97,8 +97,12 @@ watch(() => route.query.run, openRunFromQuery);
   padding: 16px 32px;
   background: theme.$white;
 }
-/* No rule under the bar on Live, as on the Notebooks tab; the builder keeps
-   one, where the canvas starts right below it. */
+/* On Live the bar is as wide as the runs below it (1000px), with no rule
+   under it, as on the Notebooks tab; the builder's spans its canvas, with a
+   rule where the canvas starts. */
+.wf-toolbar:not(.wf-toolbar--builder) {
+  max-width: 1000px;
+}
 .wf-toolbar--builder {
   border-bottom: 1px solid theme.$gray_2;
 }
