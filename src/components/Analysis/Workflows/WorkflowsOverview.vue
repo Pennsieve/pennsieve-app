@@ -61,16 +61,18 @@ watch(() => route.query.run, openRunFromQuery);
           {{ v.label }}
         </button>
       </div>
-      <div class="wf-actions">
-        <el-checkbox v-if="view === 'live'" v-model="includeNotebooks" size="small">Include notebooks</el-checkbox>
-        <bf-button v-if="view === 'live'" @click="runsRef?.openWizardDialog()">Run Workflow</bf-button>
-
+      <div v-if="view === 'live'" class="wf-actions">
+        <el-checkbox v-model="includeNotebooks" size="small">Include notebooks</el-checkbox>
+        <bf-button @click="runsRef?.openWizardDialog()">Run Workflow</bf-button>
       </div>
+      <!-- The builder's bar (name, readiness, Save) goes here, so the canvas
+           starts right below one bar. -->
+      <div v-else id="wf-toolbar-builder" class="wf-builder-bar" />
     </div>
     <div class="wf-body">
       <RunsOverview v-if="view === 'live'" ref="runsRef" embedded :exclude-notebooks="!includeNotebooks" />
       <div v-else class="wf-builder">
-        <WorkflowBuilder />
+        <WorkflowBuilder toolbar-target="#wf-toolbar-builder" />
       </div>
     </div>
   </div>
@@ -122,6 +124,11 @@ watch(() => route.query.run, openRunFromQuery);
     color: theme.$purple_3;
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
   }
+}
+.wf-builder-bar {
+  display: flex;
+  flex: 1;
+  min-width: 0;
 }
 .wf-actions {
   display: flex;

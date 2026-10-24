@@ -8,6 +8,7 @@ import { useRouter, useRoute } from "vue-router";
 import { useVueFlow, VueFlow, Handle, Position } from "@vue-flow/core";
 import { Background } from "@vue-flow/background";
 import { Controls } from "@vue-flow/controls";
+import { MiniMap } from "@vue-flow/minimap";
 import dagre from "@dagrejs/dagre";
 import { ElMessage, ElMessageBox } from "element-plus";
 import EventBus from "../../../utils/event-bus";
@@ -34,12 +35,20 @@ import {
   validateAppConnection,
 } from "../Applications/applicationSchema";
 import { useAppManifest } from "@/composables/useAppManifest";
+import BuilderBar from "./BuilderBar.vue";
+import { builderReadiness } from "./builderReadiness";
 
 const { onNodeClick, onPaneClick, onConnect, screenToFlowCoordinate, fitView } =
   useVueFlow();
 
 const props = defineProps({
   uuid: {
+    type: String,
+    default: "",
+  },
+  // Where the builder's bar goes (a selector), e.g. the Workflows tab's
+  // toolbar; empty: above the canvas.
+  toolbarTarget: {
     type: String,
     default: "",
   },
@@ -1033,6 +1042,7 @@ const revalidateEdges = () => {
       const mediaTypes = portMediaTypes(result.unmetInputs);
       issues.push({
         id: edge.id,
+        targetId: edge.target,
         source: result.src.data.label,
         target: result.tgt.data.label,
         reason: result.reason,
@@ -1218,6 +1228,42 @@ const autoLayout = () => {
   setTimeout(() => fitView({ padding: 0.2, maxZoom: 1 }), 50);
 };
 
+/*
+Readiness: what blocks saving, and what to check (builderReadiness.js).
+*/
+const readiness = computed(() =>
+  builderReadiness({
+    name: workflowName.value,
+    nodes: nodes.value,
+    edges: edges.value,
+    edgeIssues: edgeIssues.value,
+  }),
+);
+const saving = ref(false);
+
+// A readiness item was clicked: show its step.
+const onReadinessSelect = (item) => {
+  if (!item.nodeId) return;
+  openNodeSettings(item.nodeId);
+  setTimeout(() => fitView({ nodes: [item.nodeId], padding: 0.6, maxZoom: 1.2, duration: 300 }), 50);
+};
+
+const startOver = async () => {
+  if (nodes.value.length || workflowName.value) {
+    try {
+      await ElMessageBox.confirm(
+        "This clears the canvas, the name and the description.",
+        "Start over?",
+        { confirmButtonText: "Start over", cancelButtonText: "Cancel", type: "warning" },
+      );
+    } catch {
+      return;
+    }
+  }
+  clearWorkflow();
+  selectedNode.value = null;
+};
+
 const saveWorkflow = async () => {
   if (!workflowName.value.trim()) {
     EventBus.$emit("toast", {
@@ -1313,21 +1359,26 @@ const saveWorkflow = async () => {
     processors: processors,
   };
 
+  saving.value = true;
   try {
-    await store.dispatch("analysisModule/createWorkflow", workflowData);
+    const created = await store.dispatch("analysisModule/createWorkflow", workflowData);
     EventBus.$emit("toast", {
-      detail: {
-        type: "success",
-        msg: "Your request to create a Workflow has been initiated.",
-        duration: 8000,
-      },
+      detail: { type: "success", msg: `Saved ${workflowData.name}.`, duration: 5000 },
     });
     clearWorkflow();
-    mode.value = "browse";
     // The workflow is created; a failed refresh of the list isn't a failed create
     store.dispatch("analysisModule/fetchWorkflows").catch((err) =>
       console.error("Failed to refresh workflows:", err)
     );
+    // Open what was saved, where it can be run.
+    if (created?.uuid) {
+      router.push({
+        name: route.params.orgId ? "workflow-detail" : "my-workflow-detail",
+        params: { ...(route.params.orgId && { orgId: route.params.orgId }), uuid: created.uuid },
+      });
+    } else {
+      mode.value = "browse";
+    }
   } catch (error) {
     console.error(error);
     EventBus.$emit("toast", {
@@ -1337,6 +1388,8 @@ const saveWorkflow = async () => {
         duration: 6000,
       },
     });
+  } finally {
+    saving.value = false;
   }
 };
 
@@ -1419,23 +1472,21 @@ const openNodeSettings = (id) => {
 
 <template>
   <div class="workflow-builder">
-    <!-- Header (create mode) -->
-    <div class="builder-header" v-if="mode === 'create'">
-      <el-input
-        v-model="workflowName"
-        placeholder="Workflow name"
-        class="header-name-input"
-      />
-      <el-input
-        v-model="workflowDescription"
-        placeholder="Description (optional)"
-        class="header-desc-input"
-      />
-      <div class="header-actions">
-        <bf-button class="secondary" @click="clearWorkflow">Clear</bf-button>
-        <bf-button @click="saveWorkflow">Save</bf-button>
+    <!-- The bar (create mode): in the Workflows tab's toolbar when given
+         one (toolbarTarget), else above the canvas. -->
+    <Teleport v-if="mode === 'create'" defer :to="toolbarTarget || 'body'" :disabled="!toolbarTarget">
+      <div :class="toolbarTarget ? 'builder-bar-host' : 'builder-header'">
+        <BuilderBar
+          v-model:name="workflowName"
+          v-model:description="workflowDescription"
+          :readiness="readiness"
+          :saving="saving"
+          @save="saveWorkflow"
+          @start-over="startOver"
+          @select="onReadinessSelect"
+        />
       </div>
-    </div>
+    </Teleport>
 
     <!-- Header (browse mode) -->
     <div class="builder-header" v-if="isReadOnly">
@@ -1542,7 +1593,8 @@ const openNodeSettings = (id) => {
               :zoom-on-scroll="true"
             >
               <Background pattern-color="#aaa" :gap="16" />
-              <Controls position="top-left" />
+              <Controls position="bottom-right" />
+              <MiniMap v-if="nodes.length > 6" position="bottom-left" pannable zoomable />
 
               <div class="canvas-toolbar">
                 <GraphDensityToggle
@@ -2652,17 +2704,6 @@ const openNodeSettings = (id) => {
       </div>
     </div>
 
-    <!-- Workflow Summary -->
-    <div v-if="nodes.length > 0 && mode === 'create'" class="workflow-summary">
-      <h4>Workflow Summary</h4>
-      <div class="summary-content">
-        <span><strong>Steps:</strong> {{ nodes.length }}</span>
-        <span><strong>Name:</strong> {{ workflowName || "Unnamed" }}</span>
-        <span v-if="workflowDescription"
-          ><strong>Description:</strong> {{ workflowDescription }}</span
-        >
-      </div>
-    </div>
   </div>
 </template>
 
@@ -2670,6 +2711,7 @@ const openNodeSettings = (id) => {
 /* these are necessary styles for vue flow */
 @import "@vue-flow/core/dist/style.css";
 @import "@vue-flow/core/dist/theme-default.css";
+@import "@vue-flow/minimap/dist/style.css";
 
 /* Handle styles — must be unscoped so VueFlow can render them */
 .workflow-builder-flow {
@@ -2752,6 +2794,13 @@ const openNodeSettings = (id) => {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+}
+
+/* The bar's host when it's teleported into the Workflows toolbar. */
+.builder-bar-host {
+  display: flex;
+  flex: 1;
+  min-width: 0;
 }
 
 .builder-header {
@@ -3512,24 +3561,6 @@ const openNodeSettings = (id) => {
       background: #64748b;
       color: white;
     }
-  }
-}
-
-.workflow-summary {
-  padding: 15px 20px;
-  background-color: theme.$white;
-  border-top: 1px solid theme.$gray_3;
-
-  h4 {
-    margin: 0 0 10px 0;
-    font-size: 14px;
-  }
-
-  .summary-content {
-    display: flex;
-    gap: 20px;
-    font-size: 13px;
-    flex-wrap: wrap;
   }
 }
 
