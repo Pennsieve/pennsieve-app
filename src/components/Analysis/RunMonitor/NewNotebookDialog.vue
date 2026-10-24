@@ -28,6 +28,9 @@ const props = defineProps({
   // The published notebook workflows (one per kernel). Provided by the parent,
   // which already fetched them to gate the "New Notebook" button.
   notebookWorkflows: { type: Array, default: () => [] },
+  // The kernel to open on (a Gallery card's "Start notebook"); else the only
+  // one, if there's just one.
+  initialWorkflowId: { type: String, default: "" },
   // Launched from My Workspace, on the user's own compute node. There the
   // input is a public (Discover) dataset version, where the site has
   // views-service, or none. Its files aren't picked here: the notebook starts
@@ -519,8 +522,11 @@ function reset() {
   Object.keys(dataSourceFiles).forEach((k) => delete dataSourceFiles[k]);
   Object.keys(dataTargetConfigs).forEach((k) => delete dataTargetConfigs[k]);
   store.commit("analysisModule/CLEAR_SELECTED_FILES");
-  // Preselect the only kernel if there's just one — but keep the step visible.
-  if (props.notebookWorkflows.length === 1) {
+  // Preselect the kernel asked for, or the only one if there's just one — but
+  // keep the step visible.
+  if (props.initialWorkflowId && props.notebookWorkflows.some((w) => w.uuid === props.initialWorkflowId)) {
+    form.value.workflowId = props.initialWorkflowId;
+  } else if (props.notebookWorkflows.length === 1) {
     form.value.workflowId = props.notebookWorkflows[0].uuid;
   }
   // Seed the suggested name ({kernel}-{user}-{date}) now that the kernel (if any)

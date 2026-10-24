@@ -484,8 +484,6 @@ const goToManifestBuilder = () => {
 
 /* Lined up with the Gallery's toolbar and the Analysis tabs (32px). */
 .applications-container {
-  max-width: 1000px;
-  margin: 0;
   padding: 20px 32px;
 }
 

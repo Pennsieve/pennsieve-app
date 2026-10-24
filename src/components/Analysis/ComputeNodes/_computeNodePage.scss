@@ -1,0 +1,162 @@
+// The compute node page's shared pieces, matching the other Analysis pages:
+// section titles like the dashboards', grey info cards, and quiet lists.
+@use '../../../styles/theme';
+
+.cn-section {
+  margin-bottom: 24px;
+}
+.cn-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+
+  .cn-section-title {
+    margin: 0;
+  }
+}
+.cn-section-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 12px;
+  font-size: 14px;
+  font-weight: 600;
+  color: theme.$gray_6;
+}
+.cn-card {
+  padding: 16px 20px;
+  border: 1px solid theme.$gray_2;
+  border-radius: 6px;
+  background: theme.$gray_1;
+}
+.cn-blurb {
+  margin: -4px 0 12px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: theme.$gray_5;
+}
+.cn-muted {
+  font-size: 13px;
+  color: theme.$gray_4;
+}
+.cn-facts {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+
+  > div {
+    display: grid;
+    grid-template-columns: 140px 1fr;
+    align-items: baseline;
+    gap: 12px;
+  }
+  dt {
+    font-size: 13px;
+    font-weight: 500;
+    color: theme.$gray_5;
+  }
+  dd {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    margin: 0;
+    min-width: 0;
+    font-size: 14px;
+    color: theme.$gray_6;
+  }
+}
+.cn-mono {
+  font-family: 'Courier New', monospace;
+  font-size: 13px;
+  word-break: break-all;
+}
+.cn-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 8px;
+  border: 1px solid theme.$gray_2;
+  border-radius: 10px;
+  background: theme.$white;
+  font-size: 12px;
+  font-weight: 500;
+  color: theme.$gray_5;
+
+  &.is-on {
+    border-color: theme.$green_1;
+    background: theme.$green_tint;
+    color: theme.$green_2;
+  }
+  &.is-warn {
+    border-color: theme.$orange_1;
+    background: theme.$orange_tint;
+    color: theme.$orange_2;
+  }
+  &.is-bad {
+    border-color: theme.$red_1;
+    background: theme.$red_tint;
+    color: theme.$red_2;
+  }
+}
+.cn-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border: 1px solid theme.$gray_2;
+  border-radius: 6px;
+  background: theme.$white;
+
+  > li {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 16px;
+    font-size: 14px;
+    color: theme.$gray_6;
+
+    & + li {
+      border-top: 1px solid theme.$gray_2;
+    }
+  }
+}
+.cn-icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  border: none;
+  border-radius: 4px;
+  background: none;
+  color: theme.$gray_4;
+  cursor: pointer;
+
+  &:hover:not(:disabled) {
+    background: theme.$gray_1;
+    color: theme.$red_1;
+  }
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+}
+.cn-link-button {
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  font-size: 13px;
+  color: theme.$purple_3;
+  cursor: pointer;
+
+  &:hover {
+    text-decoration: underline;
+  }
+}
+.dialog-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}

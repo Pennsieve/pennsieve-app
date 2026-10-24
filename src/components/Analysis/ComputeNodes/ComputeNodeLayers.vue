@@ -2,6 +2,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useComputeResourcesStore } from '@/stores/computeResourcesStore'
+import BfButton from '@/components/shared/bf-button/BfButton.vue'
 import LayerTypeIcon from './LayerTypeIcon.vue'
 
 const props = defineProps({
@@ -153,7 +154,7 @@ async function confirmDeleteLayer(layer) {
         </p>
       </div>
       <div class="layers-actions" v-if="isOwner && !isCreating">
-        <button @click="startCreating" class="create-button">New reference</button>
+        <bf-button class="small" @click="startCreating">+ New reference</bf-button>
       </div>
     </div>
 
@@ -180,10 +181,8 @@ async function confirmDeleteLayer(layer) {
         </div>
       </div>
       <div class="create-form-actions">
-        <button @click="createLayer" :disabled="isSaving || !isValidName" class="save-button">
-          {{ isSaving ? 'Creating...' : 'Create' }}
-        </button>
-        <button @click="cancelCreating" class="cancel-button">Cancel</button>
+        <bf-button class="small secondary" @click="cancelCreating">Cancel</bf-button>
+        <bf-button class="small" :processing="isSaving" :disabled="isSaving || !isValidName" @click="createLayer">Create</bf-button>
       </div>
     </div>
 
@@ -300,37 +299,6 @@ async function confirmDeleteLayer(layer) {
 .layers-actions {
   flex-shrink: 0;
   margin-left: 16px;
-}
-
-.create-button,
-.save-button,
-.cancel-button {
-  background: theme.$purple_1;
-  color: white;
-  border: none;
-  border-radius: 4px;
-  padding: 6px 12px;
-  font-size: 12px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s ease;
-
-  &:hover {
-    background: theme.$purple_2;
-  }
-
-  &:disabled {
-    background: theme.$gray_4;
-    cursor: not-allowed;
-  }
-}
-
-.cancel-button {
-  background: theme.$gray_4;
-
-  &:hover {
-    background: theme.$gray_5;
-  }
 }
 
 // Create form
@@ -536,13 +504,13 @@ async function confirmDeleteLayer(layer) {
   letter-spacing: 0.5px;
 
   &.badge-green {
-    background: rgba(23, 187, 98, 0.12);
-    color: #17BB62;
+    background: theme.$green_tint;
+    color: theme.$green_1;
   }
 
   &.badge-yellow {
-    background: #fef3cd;
-    color: #856404;
+    background: theme.$yellow_tint;
+    color: theme.$orange_2;
   }
 }
 

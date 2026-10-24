@@ -8,6 +8,7 @@ import {
   onMounted,
   onBeforeUnmount,
   getCurrentInstance,
+  watch,
 } from "vue";
 import { runScopeChannel } from "@/realtime/channels";
 import { useStore } from "vuex";
@@ -16,6 +17,7 @@ import BfButton from "../../shared/bf-button/BfButton.vue";
 import IconControllerPlay from "../../icons/IconControllerPlay.vue";
 import IconXCircle from "../../icons/IconXCircle.vue";
 import NewNotebookDialog from "./NewNotebookDialog.vue";
+import AnalysisViewBar from "../AnalysisViewBar.vue";
 import EnvironmentsSection from "./EnvironmentsSection.vue";
 import CreateEnvironmentDialog from "./CreateEnvironmentDialog.vue";
 import { environmentsServiceUrl } from "@/utils/environmentsService";
@@ -81,14 +83,30 @@ const takenEnvNames = computed(() => environmentsRef.value?.ownNames || []);
 // "Use in a notebook": a new notebook, where the environment is picked from
 // the session's sidebar once it runs.
 function onEnvUse() {
-  view.value = "live";
-  dialogVisible.value = true;
+  openNewNotebook();
 }
 function onEnvCreated() {
   environmentsRef.value?.refresh?.();
 }
 const isLoading = ref(false);
 const dialogVisible = ref(false);
+// The kernel the New notebook dialog opens on: a Gallery card's "Start
+// notebook" lands here with ?start=<workflow>. The query goes once it's
+// open, so a reload doesn't open it again.
+const startWorkflowId = ref("");
+function openNewNotebook(workflowId = "") {
+  view.value = "live";
+  startWorkflowId.value = workflowId;
+  dialogVisible.value = true;
+}
+function openFromQuery() {
+  const id = route.query.start;
+  if (!id || !notebookWorkflowIds.value.has(String(id))) return;
+  const { start, ...rest } = route.query;
+  router.replace({ query: rest });
+  openNewNotebook(String(id));
+}
+watch(() => route.query.start, openFromQuery);
 // The sub-tab, kept in the URL so it can be linked to and survives reloads.
 // Environments only where the site has environments-service.
 const VIEWS = [
@@ -293,6 +311,7 @@ onMounted(async () => {
   } finally {
     isLoading.value = false;
   }
+  openFromQuery();
   // Live updates for every run in the workspace (or the user's own runs)
   if (realtime) {
     analyticsChannel = realtime.subscribe(
@@ -313,28 +332,16 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="notebooks-container">
-      <!-- Live: the notebooks running and the ones before; Environments: what
-           they run with. The view is in the URL (?view=environments). -->
-      <div class="nb-toolbar">
-        <div class="nb-views" role="tablist">
-          <button
-            v-for="v in VIEWS"
-            :key="v.key"
-            role="tab"
-            class="nb-view"
-            :class="{ active: view === v.key }"
-            :aria-selected="view === v.key"
-            @click="view = v.key"
-          >
-            {{ v.label }}
-          </button>
-        </div>
-        <bf-button v-if="view === 'live'" :disabled="notebookWorkflows.length === 0" @click="dialogVisible = true">
+  <div class="notebooks-page">
+    <!-- Live: the notebooks running and the ones before; Environments: what
+         they run with. The view is in the URL (?view=environments). -->
+    <AnalysisViewBar v-model="view" :views="VIEWS">
+        <bf-button v-if="view === 'live'" :disabled="notebookWorkflows.length === 0" @click="openNewNotebook()">
           + New Notebook
         </bf-button>
         <bf-button v-else @click="openCreateEnvironment()">+ New Environment</bf-button>
-      </div>
+    </AnalysisViewBar>
+    <div class="notebooks-container">
 
       <template v-if="view === 'live'">
       <div v-if="!isLoading && notebookWorkflows.length === 0" class="empty-canvas">
@@ -436,6 +443,7 @@ onBeforeUnmount(() => {
     <new-notebook-dialog
       v-model="dialogVisible"
       :notebook-workflows="notebookWorkflows"
+      :initial-workflow-id="startWorkflowId"
       :personal="isMyWorkspace"
       @created="onNotebookCreated"
     />
@@ -476,6 +484,7 @@ onBeforeUnmount(() => {
         </div>
       </template>
     </el-dialog>
+    </div>
   </div>
 </template>
 
@@ -484,8 +493,6 @@ onBeforeUnmount(() => {
 
 /* Lined up with the Analysis tabs above (32px). */
 .notebooks-container {
-  max-width: 1000px;
-  margin: 0;
   padding: 20px 32px;
 }
 /* End-session dialog footer: right-aligned buttons with an even 8px gap (the
@@ -494,42 +501,6 @@ onBeforeUnmount(() => {
   display: flex;
   justify-content: flex-end;
   gap: 8px;
-}
-/* The view switch on the left, the view's action on the right. A small
-   two-way toggle, so it doesn't read as a second row of page tabs. */
-.nb-toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 20px;
-}
-.nb-views {
-  display: inline-flex;
-  padding: 2px;
-  border: 1px solid theme.$gray_2;
-  border-radius: 6px;
-  background: theme.$gray_1;
-}
-.nb-view {
-  padding: 5px 14px;
-  border: none;
-  border-radius: 4px;
-  background: none;
-  font: inherit;
-  font-size: 13px;
-  font-weight: 500;
-  color: theme.$gray_5;
-  cursor: pointer;
-
-  &:hover {
-    color: theme.$purple_3;
-  }
-  &.active {
-    background: theme.$white;
-    color: theme.$purple_3;
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
-  }
 }
 .nb-view-desc {
   margin: 0 0 12px;

@@ -8,6 +8,7 @@ import { useRoute, useRouter } from "vue-router";
 import BfButton from "../../shared/bf-button/BfButton.vue";
 import WorkflowsGrid from "../Workflows/WorkflowsGrid.vue";
 import ApplicationsGrid from "../Applications/ApplicationsGrid.vue";
+import AnalysisViewBar from "../AnalysisViewBar.vue";
 
 const route = useRoute();
 const router = useRouter();
@@ -28,20 +29,7 @@ const newWorkflow = () => router.push({ name: scoped("workflows"), query: { view
 
 <template>
   <div class="gallery">
-    <div class="gallery-toolbar">
-      <div class="gallery-views" role="tablist">
-        <button
-          v-for="v in VIEWS"
-          :key="v.key"
-          role="tab"
-          class="gallery-view"
-          :class="{ active: view === v.key }"
-          :aria-selected="view === v.key"
-          @click="view = v.key"
-        >
-          {{ v.label }}
-        </button>
-      </div>
+    <AnalysisViewBar v-model="view" :views="VIEWS">
       <bf-button v-if="view === 'workflows'" @click="newWorkflow">+ New Workflow</bf-button>
       <div v-else class="gallery-links">
         Publishing an app?
@@ -49,7 +37,7 @@ const newWorkflow = () => router.push({ name: scoped("workflows"), query: { view
         ·
         <router-link :to="{ name: scoped('application-manifest-guide') }">Guide</router-link>
       </div>
-    </div>
+    </AnalysisViewBar>
     <WorkflowsGrid v-if="view === 'workflows'" embedded />
     <ApplicationsGrid v-else embedded />
   </div>
@@ -58,44 +46,6 @@ const newWorkflow = () => router.push({ name: scoped("workflows"), query: { view
 <style scoped lang="scss">
 @use "../../../styles/theme";
 
-/* The view switch on the left, the view's action on the right, lined up with
-   the Analysis tabs (32px); as on the Notebooks and Workflows tabs. */
-.gallery-toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 16px 32px;
-  border-bottom: 1px solid theme.$gray_2;
-  background: theme.$white;
-}
-.gallery-views {
-  display: inline-flex;
-  padding: 2px;
-  border: 1px solid theme.$gray_2;
-  border-radius: 6px;
-  background: theme.$gray_1;
-}
-.gallery-view {
-  padding: 5px 14px;
-  border: none;
-  border-radius: 4px;
-  background: none;
-  font: inherit;
-  font-size: 13px;
-  font-weight: 500;
-  color: theme.$gray_5;
-  cursor: pointer;
-
-  &:hover {
-    color: theme.$purple_3;
-  }
-  &.active {
-    background: theme.$white;
-    color: theme.$purple_3;
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
-  }
-}
 .gallery-links {
   font-size: 13px;
   color: theme.$gray_4;

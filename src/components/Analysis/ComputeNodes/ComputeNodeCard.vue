@@ -11,19 +11,13 @@
           </router-link>
         </h3>
         <div class="node-subtitle">
-          {{ getAccountTypeLabel(node.account?.accountType) }} Account
+          {{ getAccountTypeLabel(node.account?.accountType) }} account
         </div>
         <div class="node-description" v-if="node.description">
           {{ node.description }}
         </div>
-        <div class="node-account">
-          <strong>Account ID:</strong> {{ formatAccountId(node.account?.accountId) }}
-        </div>
-        <div class="node-identifier">
-          <strong>Node UUID:</strong> {{ node.uuid }}
-        </div>
         <div v-if="ownerName" class="node-owner">
-          <strong>Node Owner:</strong> {{ ownerName }}
+          Owned by {{ ownerName }}
         </div>
         <div class="node-tags">
           <el-tooltip
@@ -37,15 +31,15 @@
             </span>
           </el-tooltip>
           <span v-if="node.defaultComputeType" class="tag compute-type">{{ node.defaultComputeType }}</span>
-          <span v-if="node.enableLLMAccess === true || node.enableLLMAccess === 'true'" class="tag llm">LLM</span>
+          <span v-if="node.enableLLMAccess === true || node.enableLLMAccess === 'true'" class="tag llm">AI</span>
           <span v-if="node.maxGpuInstances > 0" class="tag gpu">GPU</span>
           <el-tooltip
             v-if="node.maxInteractiveSessions > 0"
-            content="Supports interactive Jupyter notebook sessions"
+            content="Runs notebook sessions"
             placement="top"
             :show-after="300"
           >
-            <span class="tag interactive">Interactive</span>
+            <span class="tag interactive">Notebooks</span>
           </el-tooltip>
           <el-tooltip
             v-if="hasProvisionerUpdate && !canUpdateNode"
@@ -181,14 +175,6 @@ const deploymentModeTooltip = computed(() => {
   }
 })
 
-function formatAccountId(accountId) {
-  if (!accountId) return ''
-  if (accountId.length === 12) {
-    return `${accountId.slice(0, 4)}-${accountId.slice(4, 8)}-${accountId.slice(8)}`
-  }
-  return accountId
-}
-
 function getAccountTypeLabel(type) {
   switch (type) {
     case 'AWS': return 'Amazon Web Services'
@@ -309,44 +295,42 @@ async function updateNode() {
     letter-spacing: 0.5px;
 
     &.basic {
-      background: rgba(#6B7280, 0.1);
-      color: #6B7280;
+      background: rgba(theme.$gray_4, 0.1);
+      color: theme.$gray_4;
     }
 
     &.secure {
-      background: rgba(#3B82F6, 0.1);
-      color: #2563EB;
+      background: rgba(theme.$teal_1, 0.1);
+      color: theme.$teal_2;
     }
 
     &.compliant {
-      background: rgba(#8B5CF6, 0.1);
-      color: #7C3AED;
+      background: rgba(theme.$purple_1, 0.1);
+      color: theme.$purple_2;
     }
 
     &.llm {
-      background: rgba(#10B981, 0.1);
-      color: #059669;
+      background: rgba(theme.$green_1, 0.1);
+      color: theme.$green_2;
     }
 
     &.gpu {
-      background: rgba(#F59E0B, 0.1);
-      color: #D97706;
+      background: rgba(theme.$orange_1, 0.1);
+      color: theme.$orange_2;
     }
 
     &.interactive {
-      background: rgba(#011F5B, 0.1);
-      color: #011F5B; /* brand navy */
+      background: rgba(theme.$purple_3, 0.1);
+      color: theme.$purple_3; /* brand navy */
     }
 
     &.update {
-      background: rgba(#F59E0B, 0.12);
-      color: #B45309;
+      background: rgba(theme.$orange_1, 0.12);
+      color: theme.$orange_2;
     }
   }
 }
 
-.node-account,
-.node-identifier,
 .node-owner {
   font-size: 13px;
   color: theme.$gray_5;
@@ -374,33 +358,33 @@ async function updateNode() {
   letter-spacing: 0.5px;
 
   &.pending {
-    background: rgba(#6B7280, 0.1);
-    color: #6B7280;
-    border: 1px solid rgba(#6B7280, 0.2);
+    background: rgba(theme.$gray_4, 0.1);
+    color: theme.$gray_4;
+    border: 1px solid rgba(theme.$gray_4, 0.2);
   }
 
   &.enabled {
-    background: rgba(#10B981, 0.1);
-    color: #059669;
-    border: 1px solid rgba(#10B981, 0.2);
+    background: rgba(theme.$green_1, 0.1);
+    color: theme.$green_2;
+    border: 1px solid rgba(theme.$green_1, 0.2);
   }
 
   &.paused {
-    background: rgba(#F59E0B, 0.1);
-    color: #D97706;
-    border: 1px solid rgba(#F59E0B, 0.2);
+    background: rgba(theme.$orange_1, 0.1);
+    color: theme.$orange_2;
+    border: 1px solid rgba(theme.$orange_1, 0.2);
   }
 
   &.destroying {
-    background: rgba(#F59E0B, 0.1);
-    color: #D97706;
-    border: 1px solid rgba(#F59E0B, 0.2);
+    background: rgba(theme.$orange_1, 0.1);
+    color: theme.$orange_2;
+    border: 1px solid rgba(theme.$orange_1, 0.2);
   }
 
   &.failed {
-    background: rgba(#EF4444, 0.1);
-    color: #DC2626;
-    border: 1px solid rgba(#EF4444, 0.2);
+    background: rgba(theme.$red_1, 0.1);
+    color: theme.$red_2;
+    border: 1px solid rgba(theme.$red_1, 0.2);
   }
 }
 
@@ -443,41 +427,41 @@ async function updateNode() {
 
   &.enabled {
     :deep(.el-select__wrapper) {
-      background: rgba(#10B981, 0.08);
-      border-color: rgba(#10B981, 0.2);
+      background: rgba(theme.$green_1, 0.08);
+      border-color: rgba(theme.$green_1, 0.2);
 
       &:hover {
-        background: rgba(#10B981, 0.12);
-        border-color: rgba(#10B981, 0.3);
+        background: rgba(theme.$green_1, 0.12);
+        border-color: rgba(theme.$green_1, 0.3);
       }
     }
 
     :deep(.el-input__inner) {
-      color: #059669;
+      color: theme.$green_2;
     }
 
     :deep(.el-select__caret) {
-      color: #059669;
+      color: theme.$green_2;
     }
   }
 
   &.paused {
     :deep(.el-select__wrapper) {
-      background: rgba(#F59E0B, 0.08);
-      border-color: rgba(#F59E0B, 0.2);
+      background: rgba(theme.$orange_1, 0.08);
+      border-color: rgba(theme.$orange_1, 0.2);
 
       &:hover {
-        background: rgba(#F59E0B, 0.12);
-        border-color: rgba(#F59E0B, 0.3);
+        background: rgba(theme.$orange_1, 0.12);
+        border-color: rgba(theme.$orange_1, 0.3);
       }
     }
 
     :deep(.el-input__inner) {
-      color: #D97706;
+      color: theme.$orange_2;
     }
 
     :deep(.el-select__caret) {
-      color: #D97706;
+      color: theme.$orange_2;
     }
   }
 }
@@ -504,12 +488,12 @@ async function updateNode() {
   cursor: pointer;
 
   &.update {
-    background: rgba(#F59E0B, 0.12);
-    border: 1px solid rgba(#F59E0B, 0.4);
-    color: #B45309;
+    background: rgba(theme.$orange_1, 0.12);
+    border: 1px solid rgba(theme.$orange_1, 0.4);
+    color: theme.$orange_2;
 
     &:hover:not(:disabled) {
-      background: rgba(#F59E0B, 0.2);
+      background: rgba(theme.$orange_1, 0.2);
     }
   }
 
