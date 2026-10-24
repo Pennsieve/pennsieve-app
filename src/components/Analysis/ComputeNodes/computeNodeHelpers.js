@@ -15,6 +15,7 @@ export const NODE_TABS = [
 const HASH_TABS = {
   "#llm-budget": "settings",
   "#quotas": "settings",
+  "#pipeline-budget": "settings",
   "#reference-data": "reference-data",
 };
 

@@ -18,8 +18,8 @@ import ComputeNodeAllowedApps from './ComputeNodeAllowedApps.vue'
 import ComputeNodeAdvanced from './ComputeNodeAdvanced.vue'
 import ComputeNodeSecrets from './ComputeNodeSecrets.vue'
 import ComputeNodeLayers from './ComputeNodeLayers.vue'
-import ComputeNodeQuotas from './ComputeNodeQuotas.vue'
 import ComputeNodeLLMBudget from './ComputeNodeLLMBudget.vue'
+import ComputeNodePipelineBudget from './ComputeNodePipelineBudget.vue'
 import AnalysisViewBar from '../AnalysisViewBar.vue'
 import { NODE_TABS, nodeTab, nodeStatus, canToggleStatus } from './computeNodeHelpers'
 
@@ -186,24 +186,23 @@ const STATUS_TEXT = { Enabled: 'Running', Paused: 'Paused', Pending: 'Setting up
         <ComputeNodeAllowedApps v-if="isNodeOwner" :node-id="nodeUuid" />
 
         <template v-if="canManage">
-          <!-- The node-wide AI budget is the cap the governor enforces on
-               every call, chat and apps alike; per-user quotas only gate
-               chat, on top of it. Anchors #llm-budget and #quotas are what
-               older links (the chat panel's "Manage quotas") target. -->
+          <!-- Pipeline spend limits, enforced when a run is created
+               (workflow-service), on every node. No limits means unlimited:
+               pipelines run in the node's own cloud account. -->
+          <section id="pipeline-budget" class="cn-section">
+            <h3 class="cn-section-title">Pipeline budget</h3>
+            <ComputeNodePipelineBudget :node-id="nodeUuid" :is-owner="canManage" :per-user="!isPersonalNode" />
+          </section>
+          <!-- AI spend limits: the node-wide cap the governor enforces on every
+               call, chat and apps alike, then per-user caps on chat. No budget
+               means no AI calls at all. #llm-budget is this section; #quotas,
+               the chat panel's "Manage quotas" link, is its overrides. -->
           <section v-if="computeNode.enableLLMAccess" id="llm-budget" class="cn-section">
             <h3 class="cn-section-title">AI budget</h3>
-            <ComputeNodeLLMBudget :node-id="nodeUuid" :is-owner="isNodeOwner" />
+            <ComputeNodeLLMBudget :node-id="nodeUuid" :is-owner="canManage" :per-user="!isPersonalNode" />
           </section>
-          <section v-if="computeNode.enableLLMAccess && !isPersonalNode" id="quotas" class="cn-section">
-            <h3 class="cn-section-title">Per-user AI quotas</h3>
-            <p class="cn-blurb">
-              Optional caps per user, on top of the node's AI budget. They only gate chat; apps are
-              governed by the node budget alone.
-            </p>
-            <ComputeNodeQuotas :node-id="nodeUuid" :is-owner="isNodeOwner" />
-          </section>
-          <p v-if="!computeNode.enableLLMAccess" class="cn-muted">
-            The AI budget and quotas appear here once AI models are turned on, on the Overview tab.
+          <p v-else class="cn-muted">
+            The AI budget appears here once AI models are turned on, on the Overview tab.
           </p>
         </template>
       </div>
