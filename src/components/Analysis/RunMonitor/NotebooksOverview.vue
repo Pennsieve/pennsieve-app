@@ -17,6 +17,7 @@ import BfButton from "../../shared/bf-button/BfButton.vue";
 import IconControllerPlay from "../../icons/IconControllerPlay.vue";
 import IconXCircle from "../../icons/IconXCircle.vue";
 import NewNotebookDialog from "./NewNotebookDialog.vue";
+import AnalysisViewBar from "../AnalysisViewBar.vue";
 import EnvironmentsSection from "./EnvironmentsSection.vue";
 import CreateEnvironmentDialog from "./CreateEnvironmentDialog.vue";
 import { environmentsServiceUrl } from "@/utils/environmentsService";
@@ -331,28 +332,16 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="notebooks-container">
-      <!-- Live: the notebooks running and the ones before; Environments: what
-           they run with. The view is in the URL (?view=environments). -->
-      <div class="nb-toolbar">
-        <div class="nb-views" role="tablist">
-          <button
-            v-for="v in VIEWS"
-            :key="v.key"
-            role="tab"
-            class="nb-view"
-            :class="{ active: view === v.key }"
-            :aria-selected="view === v.key"
-            @click="view = v.key"
-          >
-            {{ v.label }}
-          </button>
-        </div>
+  <div class="notebooks-page">
+    <!-- Live: the notebooks running and the ones before; Environments: what
+         they run with. The view is in the URL (?view=environments). -->
+    <AnalysisViewBar v-model="view" :views="VIEWS">
         <bf-button v-if="view === 'live'" :disabled="notebookWorkflows.length === 0" @click="openNewNotebook()">
           + New Notebook
         </bf-button>
         <bf-button v-else @click="openCreateEnvironment()">+ New Environment</bf-button>
-      </div>
+    </AnalysisViewBar>
+    <div class="notebooks-container">
 
       <template v-if="view === 'live'">
       <div v-if="!isLoading && notebookWorkflows.length === 0" class="empty-canvas">
@@ -495,6 +484,7 @@ onBeforeUnmount(() => {
         </div>
       </template>
     </el-dialog>
+    </div>
   </div>
 </template>
 
@@ -511,42 +501,6 @@ onBeforeUnmount(() => {
   display: flex;
   justify-content: flex-end;
   gap: 8px;
-}
-/* The view switch on the left, the view's action on the right. A small
-   two-way toggle, so it doesn't read as a second row of page tabs. */
-.nb-toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 20px;
-}
-.nb-views {
-  display: inline-flex;
-  padding: 2px;
-  border: 1px solid theme.$gray_2;
-  border-radius: 6px;
-  background: theme.$gray_1;
-}
-.nb-view {
-  padding: 5px 14px;
-  border: none;
-  border-radius: 4px;
-  background: none;
-  font: inherit;
-  font-size: 13px;
-  font-weight: 500;
-  color: theme.$gray_5;
-  cursor: pointer;
-
-  &:hover {
-    color: theme.$purple_3;
-  }
-  &.active {
-    background: theme.$white;
-    color: theme.$purple_3;
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
-  }
 }
 .nb-view-desc {
   margin: 0 0 12px;
