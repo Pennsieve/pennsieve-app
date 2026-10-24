@@ -70,7 +70,6 @@ const label = computed(() => {
   justify-content: center;
   width: 100%;
   height: 100%;
-  min-height: 150px;
   padding: 12px 8px 22px;
   box-sizing: border-box;
   background: var(--ab-bg);

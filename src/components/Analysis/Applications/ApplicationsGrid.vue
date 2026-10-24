@@ -395,8 +395,9 @@ const goToManifestBuilder = () => {
             <div v-if="appTags(app).length" class="app-tags">
               <span v-for="t in appTags(app)" :key="t" class="app-tag">{{ t }}</span>
             </div>
-            <div v-if="runsOn(app)" class="app-runs">{{ runsOn(app) }}</div>
-            <div class="app-repo">{{ repoName(app) }}</div>
+            <div class="app-meta">
+              <span v-if="runsOn(app)" class="app-runs">{{ runsOn(app) }} · </span>{{ repoName(app) }}
+            </div>
             <div class="app-foot">
               <span class="app-usage">
                 <span class="app-dot" :class="versionState(app)" :title="statusLabel(latestVersion(app)?.status)" />
@@ -590,16 +591,18 @@ const goToManifestBuilder = () => {
 }
 
 /* Wide cards, two to a row where they fit, as the workflows'. */
-/* Every card as tall as the tallest, whether or not it has tags or a
-   second line of description, so the rows line up. */
+$card-height: 172px;
+
+/* Cards of one height, with a square banner: the rows line up whether or
+   not a card has tags or a second line of description. */
 .applications-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
-  grid-auto-rows: 1fr;
+  grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
   gap: 16px;
 }
 .app-card {
   display: flex;
+  height: $card-height;
   min-width: 0;
   border: 1px solid theme.$gray_2;
   background: theme.$white;
@@ -624,15 +627,16 @@ const goToManifestBuilder = () => {
 /* The app's banner, where the workflows show their graph. */
 .app-thumb {
   display: flex;
-  flex: 0 0 150px;
+  flex: 0 0 $card-height;
   border-right: 1px solid theme.$gray_2;
 }
 .app-tags {
   display: flex;
-  flex-wrap: wrap;
   gap: 4px;
+  overflow: hidden;
 }
 .app-tag {
+  flex-shrink: 0;
   padding: 0 6px;
   border-radius: 3px;
   background: theme.$gray_0;
@@ -686,16 +690,16 @@ const goToManifestBuilder = () => {
   line-height: 1.4;
   color: theme.$gray_5;
 }
-.app-runs {
-  font-size: 12px;
-  color: theme.$gray_6;
-}
-.app-repo {
+/* Where it runs, then its repository, on one line. */
+.app-meta {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   font-size: 12px;
   color: theme.$gray_4;
+}
+.app-runs {
+  color: theme.$gray_6;
 }
 .app-foot {
   display: flex;
