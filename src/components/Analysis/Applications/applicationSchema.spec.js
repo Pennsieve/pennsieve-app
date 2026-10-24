@@ -112,6 +112,7 @@ describe('applicationSchema', () => {
         tags: ['mri'],
         categories: ['Segmentation'],
       })
+      // Categories aren't part of the schema: tags say what an app is for.
       expect(schema.resources).toEqual({ cpu: 1024, memory: 2048 })
       // "ecs" is mapped to "standard", and a legacy gpu block becomes the
       // "gpu" compute type rather than a capability of its own.
@@ -120,7 +121,7 @@ describe('applicationSchema', () => {
       expect(schema.inputs[0]).toMatchObject({ name: 'in', dataType: 'file', required: true })
       expect(schema.outputs[0]).toMatchObject({ name: 'out', dataType: 'package' })
       expect(schema.tags).toEqual(['mri'])
-      expect(schema.categories).toEqual(['Segmentation'])
+      expect(schema).not.toHaveProperty('categories')
     })
 
     it('defaults gracefully for a bare application', () => {
@@ -170,7 +171,7 @@ describe('applicationSchema', () => {
       expect(payload.runtimeConfig).not.toHaveProperty('gpu')
     })
 
-    it('drops empty inputs/outputs/tags/categories', () => {
+    it('drops empty inputs/outputs/tags', () => {
       const payload = buildSchemaPayload(createApplicationSchema())
       expect(payload.inputs).toBeUndefined()
       expect(payload.tags).toBeUndefined()
@@ -653,7 +654,9 @@ describe('applicationSchema', () => {
       expect(schema.resources).toEqual({ cpu: 4096, memory: 16384 })
       // The legacy gpu block folds into the compute types.
       expect(schema.runtime.computeTypes).toEqual(['standard', 'gpu'])
-      expect(schema.categories).toEqual(['Preprocessing'])
+      // An old app.yml's categories are read as tags.
+      expect(schema.tags).toEqual(['Preprocessing'])
+      expect(schema).not.toHaveProperty('categories')
       // Manifest `default` maps back onto the editable `defaultValue`.
       expect(schema.parameters[0]).toMatchObject({
         name: 'threshold',
@@ -685,7 +688,6 @@ describe('applicationSchema', () => {
         inputs: [createPort({ name: 'recording', dataType: 'timeseries', required: true })],
         outputs: [createPort({ name: 'units', dataType: 'package' })],
         tags: ['ephys'],
-        categories: ['Preprocessing'],
       })
       const meta = { name: 'Spike Sorter', description: 'Sorts spikes.', applicationType: 'processor' }
 

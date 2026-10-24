@@ -28,15 +28,21 @@ describe("app domains", () => {
   it("takes the first subject named, else the first task, else a live session's", () => {
     expect(domainOf({ tags: ["penn", "MRI", "eeg"] }).key).toBe("imaging");
     expect(domainOf({ tags: ["penn"] })).toBeNull();
-    expect(domainOf({ categories: ["Single Cell"], tags: ["eeg"] }).key).toBe("genomics");
-    expect(domainOf({ categories: ["Utility", "Visualization"] }).key).toBe("viz");
+    expect(domainOf({ tags: ["Single Cell", "eeg"] }).key).toBe("genomics");
+    expect(domainOf({ tags: ["utility", "visualization"] }).key).toBe("viz");
     // A subject wins over a task, wherever it's named.
-    expect(domainOf({ categories: ["Visualization", "Single Cell"] }).key).toBe("genomics");
-    expect(domainOf({ categories: ["Statistics"], tags: ["eeg"] }).key).toBe("ephys");
-    expect(domainOf({ categories: ["Statistics", "Visualization"] }).key).toBe("stats");
-    expect(domainOf({ categories: ["Format Conversion"] }).key).toBe("convert");
+    expect(domainOf({ tags: ["visualization", "single-cell"] }).key).toBe("genomics");
+    expect(domainOf({ tags: ["statistics", "eeg"] }).key).toBe("ephys");
+    expect(domainOf({ tags: ["statistics", "visualization"] }).key).toBe("stats");
+    expect(domainOf({ tags: ["Format Conversion"] }).key).toBe("convert");
     expect(domainOf({ tags: [], runtime: { interactive: true } }).key).toBe("notebook");
     expect(domainOf(null)).toBeNull();
+  });
+
+  it("reads an old app.yml's categories as tags, in the known spelling", async () => {
+    const { parseManifest } = await import("./applicationSchema");
+    const { schema } = parseManifest("application:\n  name: x\n  tags: [seurat]\n  categories: [Visualization, Single Cell]\n");
+    expect(schema.tags).toEqual(["seurat", "visualization", "single-cell"]);
   });
 
   it("lands typed tags on the suggestion they spell", () => {

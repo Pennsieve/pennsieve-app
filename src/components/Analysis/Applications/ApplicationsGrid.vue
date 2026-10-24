@@ -78,11 +78,8 @@ const parseGitHubDisplay = (sourceUrl) => {
   return info ? `${info.owner}/${info.repo}` : null;
 };
 
-// The app.yml's categories and tags, a few: the rest are found by search.
-const appTags = (app) => {
-  const m = versionManifest(app);
-  return [...new Set([...(m?.categories || []), ...(m?.tags || [])])].slice(0, 4);
-};
+// The app.yml's tags, a few: the rest are found by search.
+const appTags = (app) => (versionManifest(app)?.tags || []).slice(0, 4);
 const repoName = (app) => parseGitHubDisplay(app.sourceUrl) || "Unknown repo";
 
 const latestVersion = (app) => {

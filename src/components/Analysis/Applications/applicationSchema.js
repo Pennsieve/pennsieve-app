@@ -16,8 +16,9 @@
  *   - parameters : typed, defaultable, optionally-required run parameters
  *   - inputs     : ports the application consumes  (workflow validation)
  *   - outputs    : ports the application produces  (workflow validation)
- *   - tags       : free-form labels
- *   - categories : controlled-vocabulary classification
+ *   - tags       : what the application is for (appDomains.js suggests
+ *                  the known ones); an old app.yml's `categories` are read
+ *                  as tags
  *
  * ── Two shapes, one source of truth ──────────────────────────────────────
  *   1. The *editable* shape (`ApplicationSchema`) is nested and UI-friendly;
@@ -33,6 +34,7 @@
  */
 
 import { dump as dumpYaml, load as loadYaml } from "js-yaml";
+import { canonicalTag } from "./appDomains";
 
 import {
   STANDARD_CPU_OPTIONS,
@@ -118,24 +120,6 @@ export const portDataTypeOptions = (packageFormats, declared = []) => {
   return options;
 };
 
-/**
- * Controlled vocabulary for application categories. Free-form values are
- * still permitted (the form allows custom entries), but offering a curated
- * list keeps classification consistent and filterable.
- */
-export const APPLICATION_CATEGORIES = Object.freeze([
-  "Preprocessing",
-  "Segmentation",
-  "Registration",
-  "Quantification",
-  "Visualization",
-  "Machine Learning",
-  "Statistics",
-  "Format Conversion",
-  "Quality Control",
-  "Utility",
-]);
-
 /* ──────────────────────────────────────────────────────────────────────────
  * Typedefs (JSDoc — this is a plain-JS codebase)
  * ────────────────────────────────────────────────────────────────────────── */
@@ -171,7 +155,6 @@ export const APPLICATION_CATEGORIES = Object.freeze([
  * @property {PortSchema[]} inputs
  * @property {PortSchema[]} outputs
  * @property {string[]} tags
- * @property {string[]} categories
  */
 
 /* ──────────────────────────────────────────────────────────────────────────
@@ -217,7 +200,6 @@ export const createApplicationSchema = (overrides = {}) => ({
   inputs: [],
   outputs: [],
   tags: [],
-  categories: [],
   ...overrides,
 });
 
@@ -336,7 +318,6 @@ export const parseApplication = (app) => {
     inputs: asArray(app?.inputs).map(parsePort),
     outputs: asArray(app?.outputs).map(parsePort),
     tags: asArray(app?.tags),
-    categories: asArray(app?.categories),
   });
 };
 
@@ -418,7 +399,7 @@ const serializePort = (port) => {
  *
  * @param {ApplicationSchema} schema
  * @returns {Object} payload slice with runtimeConfig, params, paramSchema,
- *                   inputs, outputs, tags, categories.
+ *                   inputs, outputs, tags.
  */
 export const buildSchemaPayload = (schema) => {
   const s = schema || createApplicationSchema();
@@ -446,11 +427,7 @@ export const buildSchemaPayload = (schema) => {
   if (outputs.length) payload.outputs = outputs.map(serializePort);
 
   const tags = asArray(s.tags).map((t) => String(t).trim()).filter(Boolean);
-  const categories = asArray(s.categories)
-    .map((c) => String(c).trim())
-    .filter(Boolean);
   if (tags.length) payload.tags = tags;
-  if (categories.length) payload.categories = categories;
 
   return payload;
 };
@@ -557,9 +534,7 @@ export const buildManifest = (schema, meta = {}) => {
     .map((m) => (str(m.email) ? { name: str(m.name), email: str(m.email) } : { name: str(m.name) }));
   if (mMaintainers.length) application.maintainers = mMaintainers;
 
-  const mCategories = asArray(s.categories).map(str).filter(Boolean);
   const mTags = asArray(s.tags).map(str).filter(Boolean);
-  if (mCategories.length) application.categories = mCategories;
   if (mTags.length) application.tags = mTags;
 
   if (Object.keys(application).length) manifest.application = application;
@@ -726,8 +701,15 @@ export const parseManifest = (source) => {
     parameters: asArray(manifest.parameters).map(parseParameter),
     inputs: asArray(manifest.inputs).map(parsePort),
     outputs: asArray(manifest.outputs).map(parsePort),
-    tags: asArray(nested ? app.tags : manifest.tags),
-    categories: asArray(nested ? app.categories : manifest.categories),
+    // An old app.yml's categories become tags, as the known spelling
+    // ("Format Conversion" -> "conversion"), so saving it again moves them.
+    tags: [
+      ...new Set(
+        [...asArray(nested ? app.tags : manifest.tags), ...asArray(nested ? app.categories : manifest.categories)]
+          .map((t) => canonicalTag(t))
+          .filter(Boolean)
+      ),
+    ],
   });
 
   return { meta, schema };

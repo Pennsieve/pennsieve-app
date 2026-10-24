@@ -1,4 +1,4 @@
-// What an app is for, from the categories and tags its app.yml declares: a short list of
+// What an app is for, from the tags its app.yml declares: a short list of
 // domains, each with a hue and an icon, that the Gallery's app banners are
 // coloured by. Tags are free text, so each domain lists the spellings people
 // use ("EEG", "iEEG", "electrophysiology"); a tag matches regardless of case
@@ -104,12 +104,12 @@ for (const d of DOMAINS) for (const t of [d.tag, d.key, d.label, ...d.aliases]) 
 
 export const domainOfTag = (tag) => BY_TAG.get(normalize(tag)) || null;
 
-// The app's domain: the first subject its categories, then tags, name,
-// since what an app is about says more than what it does ("Visualization,
-// Single Cell" is Genomics); else the first task; else Notebook for an app
+// The app's domain: the first subject its tags name, since what an app is
+// about says more than what it does ("visualization, single-cell" is
+// Genomics); else the first task; else Notebook for an app
 // whose app.yml says it's a live session.
 export function domainOf(manifest) {
-  const named = [...(manifest?.categories || []), ...(manifest?.tags || [])].map(domainOfTag).filter(Boolean);
+  const named = (manifest?.tags || []).map(domainOfTag).filter(Boolean);
   const d = named.find((x) => x.subject) || named[0];
   if (d) return d;
   if (manifest?.runtime?.interactive || manifest?.runtime?.sessionType) return DOMAINS.find((d) => d.key === "notebook");
