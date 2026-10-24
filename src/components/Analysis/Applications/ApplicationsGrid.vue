@@ -590,9 +590,12 @@ const goToManifestBuilder = () => {
 }
 
 /* Wide cards, two to a row where they fit, as the workflows'. */
+/* Every card as tall as the tallest, whether or not it has tags or a
+   second line of description, so the rows line up. */
 .applications-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+  grid-auto-rows: 1fr;
   gap: 16px;
 }
 .app-card {
