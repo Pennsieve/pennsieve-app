@@ -151,19 +151,17 @@ const statsOf = (total, succeeded, failed, canceled) => ({
   successRate: succeeded + failed > 0 ? Math.round((succeeded / (succeeded + failed)) * 100) : 0,
 });
 
-// The metrics service's counters; where it has none (they update every
-// ~15 minutes, and My Workspace's runs may not be counted), the runs listed
-// below, which are already in the range, so the overview never says "no
-// runs" above a list of them.
+// The counters of the workspace (or, in My Workspace, of your own runs),
+// counted as each run finishes. With notebooks hidden, their share
+// (counters.interactive) is taken out, so the overview matches the list.
 const dashboardStats = computed(() => {
-  const bucket = orgCounters.value && (orgCounters.value.allTime || orgCounters.value);
-  if (bucket?.totalRuns) {
-    return statsOf(bucket.totalRuns, bucket.succeeded || 0, bucket.failed || 0, bucket.canceled || 0);
-  }
-  const runs = shownRuns.value;
-  if (!runs.length) return null;
-  const count = (s) => runs.filter((r) => r.status === s).length;
-  return { ...statsOf(runs.length, count("SUCCEEDED"), count("FAILED"), count("CANCELED")), fromList: true };
+  const all = orgCounters.value?.allTime;
+  if (!all?.totalRuns) return null;
+  const nb = props.excludeNotebooks ? orgCounters.value.interactive?.allTime || {} : {};
+  const less = (k) => Math.max(0, (all[k] || 0) - (nb[k] || 0));
+  const total = less("totalRuns");
+  if (!total) return null;
+  return statsOf(total, less("succeeded"), less("failed"), less("canceled"));
 });
 
 // Nothing has run at all (not just nothing in a range or filter): one
@@ -173,7 +171,7 @@ const filtersDefault = computed(
   () => statusFilter.value === "all" && workflowFilter.value === "all" && dashboardRange.value === "allTime"
 );
 const nothingRun = computed(
-  () => !isLoading.value && filtersDefault.value && !shownRuns.value.length && !orgCounters.value?.allTime?.totalRuns
+  () => !isLoading.value && filtersDefault.value && !shownRuns.value.length && !dashboardStats.value
 );
 const onlyNotebooks = computed(() => props.excludeNotebooks && workflowInstances.value.length > 0);
 const toBuilder = () => router.replace({ query: { ...route.query, view: "builder" } });
@@ -587,7 +585,7 @@ onBeforeUnmount(() => {
           <div class="dashboard-section-header">
             <h3 class="dashboard-section-title">
               Overview
-              <el-tooltip content="Metrics update approximately every 15 minutes" placement="top">
+              <el-tooltip content="Counted as each run finishes" placement="top">
                 <IconInfoSmall :width="24" :height="24" color="#9ca3af" class="dashboard-info-icon" />
               </el-tooltip>
             </h3>
@@ -624,10 +622,7 @@ onBeforeUnmount(() => {
               <span class="dash-stat-label">Success Rate</span>
             </div>
           </div>
-          <p v-if="dashboardStats?.fromList" class="dashboard-note">
-            From the runs listed below{{ hasMoreRuns ? ", so far" : "" }}.
-          </p>
-          <div v-else-if="!dashboardStats" class="dashboard-empty-range">
+          <div v-else class="dashboard-empty-range">
             No runs in this time range
           </div>
         </div>
@@ -1003,11 +998,6 @@ onBeforeUnmount(() => {
   50% { opacity: 0.8; box-shadow: 0 0 0 6px rgba(6, 182, 212, 0); }
 }
 
-.dashboard-note {
-  margin: 8px 0 0;
-  font-size: 12px;
-  color: theme.$gray_4;
-}
 .runs-welcome {
   display: flex;
   flex-direction: column;

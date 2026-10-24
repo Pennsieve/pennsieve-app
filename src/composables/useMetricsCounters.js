@@ -32,8 +32,10 @@ export function useMetricsCounters({ scope, id, range: timeRange } = {}) {
     const idVal = toValue(id)
     // For scoped calls, require an id
     if (scopeVal && !idVal) return
-    // Counters are kept per organization; outside one (My Workspace) there are none yet
-    if (!store.state.activeOrganization?.organization?.id) {
+    const orgId = store.state.activeOrganization?.organization?.id
+    // Outside a workspace (My Workspace) only the caller's own counters
+    // exist: the user scope, which needs no organization.
+    if (!orgId && scopeVal) {
       counters.value = null
       return
     }
@@ -44,9 +46,7 @@ export function useMetricsCounters({ scope, id, range: timeRange } = {}) {
     try {
       const token = await useGetToken()
       const api2Url = store.state.config.api2Url
-      const orgId = store.state.activeOrganization?.organization?.id
-
-      const params = new URLSearchParams({ organization_id: orgId })
+      const params = new URLSearchParams(orgId ? { organization_id: orgId } : { scope: 'user' })
       if (scopeVal) {
         params.set('scope', scopeVal)
         params.set('id', idVal)
