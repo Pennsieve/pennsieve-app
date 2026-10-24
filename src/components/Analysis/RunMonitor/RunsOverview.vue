@@ -14,6 +14,7 @@ import { useSendXhr } from "@/mixins/request/request_composable";
 import { useMetricsCounters } from "@/composables/useMetricsCounters";
 import toQueryParams from "@/utils/toQueryParams";
 import { isNotebookWorkflow } from "./notebookHelpers";
+import RunHistory from "./RunHistory.vue";
 
 const props = defineProps({
   // Inside the Workflows tab (WorkflowsOverview), which has the toolbar and
@@ -110,7 +111,6 @@ const workflowFilter = ref("all");
 const computeNodeFilter = ref("all");
 const isLoading = ref(false);
 const isLoadingMore = ref(false);
-const accordionActiveNames = ref(["runs"]);
 let analyticsChannel = null;
 
 /*
@@ -137,18 +137,11 @@ const isNotebookRun = (r) => isNotebookWorkflow(workflowsById.value.get(r.workfl
 const shownRuns = computed(() =>
   props.excludeNotebooks ? workflowInstances.value.filter((r) => !isNotebookRun(r)) : workflowInstances.value
 );
-const dashboardRuns = computed(() => shownRuns.value);
 
 const activeRuns = computed(() =>
   shownRuns.value.filter((r) => r.status === "NOT_STARTED" || r.status === "STARTED" || r.status === "FINALIZING")
 );
 
-const recentCompletedRuns = computed(() =>
-  dashboardRuns.value
-    .filter((r) => isTerminalStatus(r.status))
-    .sort((a, b) => new Date(b.completedAt || b.startedAt) - new Date(a.completedAt || a.startedAt))
-    .slice(0, 5)
-);
 
 const dashboardStats = computed(() => {
   const data = orgCounters.value;
@@ -171,6 +164,14 @@ const dashboardStats = computed(() => {
 /*
   Filtered Runs
 */
+// The runs below the active ones: all that match the filters, less the
+// active ones above (unless the status filter asks for those).
+const earlierRuns = computed(() =>
+  statusFilter.value === "all"
+    ? filteredRuns.value.filter((r) => !["NOT_STARTED", "STARTED", "FINALIZING"].includes(r.status))
+    : filteredRuns.value
+);
+
 const filteredRuns = computed(() => {
   let runs = shownRuns.value;
   if (computeNodeFilter.value !== "all") {
@@ -580,23 +581,40 @@ onBeforeUnmount(() => {
           </div>
         </div>
 
-        <!-- Recent Completions -->
-        <div v-if="recentCompletedRuns.length > 0" class="dashboard-section">
-          <h3 class="dashboard-section-title">Recent Completions</h3>
-          <div class="recent-runs-list">
-            <div
-              v-for="run in recentCompletedRuns"
-              :key="run.uuid"
-              class="recent-run-row"
-              @click="selectRun(run)"
-            >
-              <span class="run-status-dot" :class="statusDotClass(run.status)" />
-              <span class="recent-run-name">{{ runDisplayName(run) || 'Unnamed' }}</span>
-              <span class="recent-run-status">{{ statusLabel(run.status) }}</span>
-              <span class="recent-run-time">{{ formatTime(run.completedAt || run.startedAt) }}</span>
-            </div>
-          </div>
-        </div>
+        <!-- Earlier runs: the same list as the Notebooks tab's, with the
+             filters above it -->
+        <run-history
+          :title="activeRuns.length ? 'Earlier runs' : 'Runs'"
+          :runs="earlierRuns"
+          :loading="isLoading"
+          :has-more="hasMoreRuns"
+          :loading-more="isLoadingMore"
+          empty-text="No runs match these filters."
+          search-placeholder="Search runs…"
+          show-workflow
+          :node-name="computeNodeName"
+          :user-name="getUserName"
+          @load-more="loadMoreRuns"
+        >
+          <template #filters>
+            <el-select v-model="statusFilter" size="small" class="run-filter-select">
+              <el-option v-for="opt in runStatusOptions" :key="opt.value" :label="opt.label" :value="opt.value" />
+            </el-select>
+            <el-select v-model="workflowFilter" size="small" class="run-filter-select" filterable>
+              <el-option label="All workflows" value="all" />
+              <el-option v-for="wf in workflows" :key="wf.uuid" :label="wf.name" :value="wf.uuid" />
+            </el-select>
+            <el-select v-if="computeNodes.length > 1" v-model="computeNodeFilter" size="small" class="run-filter-select">
+              <el-option label="All compute nodes" value="all" />
+              <el-option v-for="cn in computeNodes" :key="cn.uuid" :label="cn.name" :value="cn.uuid" />
+            </el-select>
+          </template>
+          <template #actions="{ run }">
+            <button class="rerun-btn" title="Rerun with this configuration" @click="rerunFromRun(run)">
+              <IconRotateRight :width="16" :height="16" />
+            </button>
+          </template>
+        </run-history>
 
         <!-- Empty fallback -->
         <div
@@ -608,93 +626,6 @@ onBeforeUnmount(() => {
         </div>
       </div>
 
-      <!-- Sidebar: Runs list -->
-      <div class="applications-sidebar">
-        <el-collapse v-model="accordionActiveNames" class="sidebar-accordion">
-          <el-collapse-item title="Runs" name="runs">
-            <div class="filter-bar">
-              <el-select
-                v-model="statusFilter"
-                placeholder="Filter by status"
-                size="small"
-                class="run-filter-select"
-              >
-                <el-option
-                  v-for="opt in runStatusOptions"
-                  :key="opt.value"
-                  :label="opt.label"
-                  :value="opt.value"
-                />
-              </el-select>
-              <el-select
-                v-model="workflowFilter"
-                placeholder="Filter by workflow"
-                size="small"
-                class="run-filter-select"
-              >
-                <el-option label="All Workflows" value="all" />
-                <el-option
-                  v-for="wf in workflows"
-                  :key="wf.uuid"
-                  :label="wf.name"
-                  :value="wf.uuid"
-                />
-              </el-select>
-              <el-select
-                v-model="computeNodeFilter"
-                placeholder="Filter by compute node"
-                size="small"
-                class="run-filter-select"
-              >
-                <el-option label="All Compute Nodes" value="all" />
-                <el-option
-                  v-for="cn in computeNodes"
-                  :key="cn.uuid"
-                  :label="cn.name"
-                  :value="cn.uuid"
-                />
-              </el-select>
-            </div>
-
-            <div v-if="isLoading" class="loading">Loading runs...</div>
-            <div v-else class="workflow-list">
-              <div
-                v-for="run in filteredRuns"
-                :key="run.uuid"
-                class="workflow-list-item"
-                @click="selectRun(run)"
-              >
-                <span class="run-status-dot" :class="statusDotClass(run.status)"></span>
-                <div class="wf-item-info">
-                  <div class="wf-item-name">{{ runDisplayName(run) || formatTime(run.startedAt) }}</div>
-                  <div v-if="run.name" class="wf-item-meta">{{ run.workflowName || 'Unnamed workflow' }}</div>
-                  <div class="wf-item-meta">{{ formatTime(run.startedAt) }}</div>
-                  <div class="wf-item-meta">{{ computeNodeName(run.computeNodeUuid) }}</div>
-                  <div class="wf-item-meta">{{ getUserName(run.createdBy) }}</div>
-                </div>
-                <button
-                  class="rerun-btn"
-                  title="Rerun with this configuration"
-                  @click.stop="rerunFromRun(run)"
-                >
-                  <IconRotateRight :width="16" :height="16" />
-                </button>
-              </div>
-              <div v-if="filteredRuns.length === 0" class="workflow-list-empty">
-                No runs found
-              </div>
-              <button
-                v-if="hasMoreRuns"
-                class="load-more-btn"
-                :disabled="isLoadingMore"
-                @click="loadMoreRuns"
-              >
-                {{ isLoadingMore ? 'Loading...' : 'Load more runs' }}
-              </button>
-            </div>
-          </el-collapse-item>
-        </el-collapse>
-      </div>
     </div>
 
     <!-- End-session confirmation (Pennsieve dialog, not the browser prompt) -->
@@ -949,11 +880,16 @@ onBeforeUnmount(() => {
   overflow: hidden;
 }
 
+/* White, with its sections as wide as the Notebooks tab's. */
 .runs-main {
   flex: 1;
   overflow-y: auto;
-  padding: 24px 32px;
-  background: theme.$gray_1;
+  padding: 20px 32px;
+  background: theme.$white;
+}
+.runs-main > .dashboard-section,
+.runs-main > .empty-canvas {
+  max-width: 1000px;
 }
 
 .empty-canvas {
@@ -1164,48 +1100,10 @@ onBeforeUnmount(() => {
   margin-top: 4px;
 }
 
-.recent-runs-list {
-  background: theme.$white;
-  border: 1px solid theme.$gray_3;
-  border-radius: 4px;
-  overflow: hidden;
-}
 
-.recent-run-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 16px;
-  cursor: pointer;
-  font-size: 13px;
-  border-bottom: 1px solid theme.$gray_2;
-  transition: background 0.15s;
 
-  &:last-child { border-bottom: none; }
-  &:hover { background: theme.$gray_1; }
-}
 
-.recent-run-name {
-  font-weight: 500;
-  color: theme.$black;
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
 
-.recent-run-status {
-  font-size: 12px;
-  color: theme.$gray_4;
-  white-space: nowrap;
-}
-
-.recent-run-time {
-  font-size: 12px;
-  color: theme.$gray_4;
-  white-space: nowrap;
-}
 
 /* Status dots */
 .run-status-dot {
@@ -1222,131 +1120,29 @@ onBeforeUnmount(() => {
   &.dot-red { background-color: theme.$status_red; }
 }
 
-/* Sidebar */
-.applications-sidebar {
-  width: 350px;
-  background-color: theme.$white;
-  border-left: 1px solid theme.$gray_2;
-  overflow-y: auto;
-  padding: 16px;
+/* Rerun, at the end of a row of the earlier runs. */
+.rerun-btn {
   display: flex;
-  flex-direction: column;
-  gap: 12px;
-
-  .loading {
-    text-align: center;
-    padding: 20px;
-    color: theme.$gray_4;
-  }
-}
-
-.sidebar-accordion { border-top: none; }
-
-.filter-bar {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  margin-bottom: 10px;
-}
-.run-filter-select { width: 100%; }
-
-.workflow-list {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  overflow-y: auto;
-}
-
-.workflow-list-item {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  padding: 10px 12px;
-  background-color: theme.$gray_1;
-  border: 1px solid theme.$gray_2;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  border: none;
+  border-radius: 4px;
+  background: none;
+  color: theme.$gray_4;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: color 0.15s, background 0.15s;
 
   &:hover {
-    border-color: theme.$purple_1;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  }
-
-  .wf-item-info {
-    flex: 1;
-    min-width: 0;
-  }
-
-  .rerun-btn {
-    background: none;
-    border: none;
-    color: theme.$gray_4;
-    cursor: pointer;
-    padding: 4px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 4px;
-    opacity: 0;
-    transition: opacity 0.15s, color 0.15s, background 0.15s;
-    flex-shrink: 0;
-    align-self: center;
-
-    &:hover {
-      color: theme.$purple_1;
-      background: rgba(0, 0, 0, 0.05);
-    }
-  }
-
-  &:hover .rerun-btn {
-    opacity: 1;
-  }
-
-  .wf-item-name {
-    font-weight: 600;
-    font-size: 13px;
-    color: theme.$black;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-
-  .wf-item-meta {
-    font-size: 11px;
-    color: theme.$gray_4;
-    margin-top: 2px;
+    color: theme.$purple_1;
+    background: rgba(0, 0, 0, 0.05);
   }
 }
 
-.workflow-list-empty {
-  padding: 16px;
-  text-align: center;
-  font-size: 13px;
-  color: theme.$gray_4;
+.run-filter-select {
+  width: 160px;
 }
 
-.load-more-btn {
-  display: block;
-  width: 100%;
-  padding: 10px;
-  border: none;
-  background: none;
-  color: theme.$purple_1;
-  font-size: 13px;
-  cursor: pointer;
-  border-top: 1px solid theme.$gray_2;
-
-  &:hover:not(:disabled) {
-    background: theme.$gray_1;
-  }
-
-  &:disabled {
-    color: theme.$gray_4;
-    cursor: default;
-  }
-}
-
-/* Dialogs */
 .run-dialog-footer {
   display: flex;
   justify-content: space-between;

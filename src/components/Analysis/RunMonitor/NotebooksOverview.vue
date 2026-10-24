@@ -26,13 +26,11 @@ import {
   statusLabel,
   isTerminalStatus,
   formatTime,
-  formatDuration,
-  formatCost,
   runDisplayName,
   getUserName as getUserNameFn,
 } from "./runHelpers";
 import { isNotebookWorkflow } from "./notebookHelpers";
-import { costOf, costParts, fetchRun } from "./runDetails";
+import RunHistory from "./RunHistory.vue";
 
 const store = useStore();
 const router = useRouter();
@@ -175,35 +173,8 @@ const historyRuns = computed(() =>
         new Date(a.completedAt || a.startedAt)
     )
 );
-const historyQuery = ref("");
-const shownHistory = computed(() => {
-  const q = historyQuery.value.trim().toLowerCase();
-  if (!q) return historyRuns.value;
-  return historyRuns.value.filter((r) => (runDisplayName(r) || "").toLowerCase().includes(q));
-});
-// Costs of the notebooks opened below, read from their runs.
-const historyCosts = ref({});
-// An earlier notebook's session is gone, so its row opens in place: when it
-// ran, where, what it cost (from its run), and a link to its run page for
-// logs and outputs.
-const expandedRunId = ref(null);
-const runDetails = ref({}); // run id -> the run, with metrics
-async function toggleHistory(run) {
-  expandedRunId.value = expandedRunId.value === run.uuid ? null : run.uuid;
-  if (!expandedRunId.value || runDetails.value[run.uuid]) return;
-  const full = await fetchRun(config.value.api2Url, run.uuid);
-  if (full) {
-    runDetails.value = { ...runDetails.value, [run.uuid]: full };
-    const cost = costOf(full);
-    if (cost != null) historyCosts.value = { ...historyCosts.value, [run.uuid]: cost };
-  }
-}
 const nodeName = (id) =>
   (store.getters["analysisModule/computeNodes"] || []).find((n) => n.uuid === id)?.name || "";
-const runPageRoute = (run) =>
-  isMyWorkspace.value
-    ? { name: "my-run-detail", params: { runId: run.uuid } }
-    : { name: "run-detail", params: { orgId: route.params.orgId, runId: run.uuid } };
 const hasMoreRuns = computed(() => !!store.getters["analysisModule/workflowInstancesCursor"]);
 const loadingMore = ref(false);
 async function loadMoreRuns() {
@@ -423,86 +394,22 @@ onBeforeUnmount(() => {
           </div>
         </div>
 
-        <div class="dashboard-section">
-          <div class="history-head">
-            <h3 class="dashboard-section-title">
-              {{ activeNotebookRuns.length ? "Earlier notebooks" : "Notebooks" }}
-            </h3>
-            <el-input
-              v-if="historyRuns.length > 5"
-              v-model="historyQuery"
-              size="small"
-              clearable
-              placeholder="Search notebooks…"
-              class="history-search"
-            />
-          </div>
-          <p v-if="isLoading && !historyRuns.length" class="history-empty">Loading…</p>
-          <p v-else-if="!historyRuns.length && !activeNotebookRuns.length" class="history-empty">
-            No notebooks yet. Start one to work with your data interactively; it uses the packages of an environment
-            you switch to from its sidebar.
-          </p>
-          <p v-else-if="!historyRuns.length" class="history-empty">No earlier notebooks.</p>
-          <p v-else-if="!shownHistory.length" class="history-empty">No notebook matches.</p>
-          <div v-else class="recent-runs-list">
-            <template v-for="run in shownHistory" :key="run.uuid">
-            <div
-              class="recent-run-row"
-              :class="{ 'is-open': expandedRunId === run.uuid }"
-              role="button"
-              tabindex="0"
-              :aria-expanded="expandedRunId === run.uuid"
-              @click="toggleHistory(run)"
-              @keydown.enter="toggleHistory(run)"
-            >
-              <span class="recent-caret" :class="{ open: expandedRunId === run.uuid }">▸</span>
-              <span class="run-status-dot" :class="statusDotClass(run.status)" />
-              <span class="recent-run-name">{{
-                runDisplayName(run) || "Unnamed"
-              }}</span>
-              <span class="recent-run-status">{{ statusLabel(run.status) }}</span>
-              <span class="recent-run-time">{{
-                formatTime(run.completedAt || run.startedAt)
-              }}</span>
-              <span class="recent-run-num" title="How long the session ran">{{
-                run.completedAt ? formatDuration(run.startedAt, run.completedAt) : ""
-              }}</span>
-            </div>
-            <div v-if="expandedRunId === run.uuid" class="recent-run-details">
-              <dl class="run-facts">
-                <dt>Started</dt>
-                <dd>{{ formatTime(run.startedAt) }}</dd>
-                <dt>Ended</dt>
-                <dd>{{ run.completedAt ? formatTime(run.completedAt) : "—" }}</dd>
-                <dt>Ran for</dt>
-                <dd>{{ run.completedAt ? formatDuration(run.startedAt, run.completedAt) : "—" }}</dd>
-                <template v-if="nodeName(run.computeNodeUuid)">
-                  <dt>Compute node</dt>
-                  <dd>{{ nodeName(run.computeNodeUuid) }}</dd>
-                </template>
-                <dt>Estimated cost</dt>
-                <dd>
-                  <template v-if="run.uuid in historyCosts">
-                    {{ formatCost(historyCosts[run.uuid]) }}
-                    <span v-if="costParts(runDetails[run.uuid]).length" class="run-cost-parts">
-                      ({{ costParts(runDetails[run.uuid]).map((p) => `${p.label} ${formatCost(p.cost)}`).join(" · ") }})
-                    </span>
-                  </template>
-                  <template v-else-if="runDetails[run.uuid]">Not calculated yet</template>
-                  <template v-else>Loading…</template>
-                </dd>
-              </dl>
-              <p v-if="run.errorMessage || runDetails[run.uuid]?.errorMessage" class="run-error">
-                {{ run.errorMessage || runDetails[run.uuid].errorMessage }}
-              </p>
-              <router-link :to="runPageRoute(run)" class="run-page-link">Logs, outputs and full details →</router-link>
-            </div>
-            </template>
-          </div>
-          <button v-if="hasMoreRuns" class="history-more" :disabled="loadingMore" @click="loadMoreRuns">
-            {{ loadingMore ? "Loading…" : "Load earlier notebooks" }}
-          </button>
-        </div>
+        <run-history
+          :title="activeNotebookRuns.length ? 'Earlier notebooks' : 'Notebooks'"
+          :runs="historyRuns"
+          :loading="isLoading"
+          :has-more="hasMoreRuns"
+          :loading-more="loadingMore"
+          :empty-text="
+            activeNotebookRuns.length
+              ? 'No earlier notebooks.'
+              : 'No notebooks yet. Start one to work with your data interactively; it uses the packages of an environment you switch to from its sidebar.'
+          "
+          search-placeholder="Search notebooks…"
+          :node-name="nodeName"
+          :user-name="getUserName"
+          @load-more="loadMoreRuns"
+        />
       </template>
       </template>
 
@@ -624,35 +531,6 @@ onBeforeUnmount(() => {
   font-size: 13px;
   color: theme.$gray_4;
 }
-.history-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-.history-search {
-  width: 240px;
-}
-.history-empty {
-  margin: 4px 0 0;
-  font-size: 13px;
-  color: theme.$gray_4;
-}
-.history-more {
-  margin-top: 8px;
-  padding: 0;
-  border: none;
-  background: none;
-  font: inherit;
-  font-size: 12px;
-  color: theme.$link-color;
-  cursor: pointer;
-
-  &:disabled {
-    color: theme.$gray_4;
-    cursor: default;
-  }
-}
 .dashboard-section {
   margin-bottom: 24px;
 }
@@ -767,100 +645,6 @@ onBeforeUnmount(() => {
   height: 8px;
   border-radius: 50%;
   background: theme.$gray_3;
-}
-.recent-runs-list {
-  display: flex;
-  flex-direction: column;
-  background: theme.$white;
-  border: 1px solid theme.$gray_3;
-  border-radius: 4px;
-  overflow: hidden;
-}
-.recent-run-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 14px;
-  border-bottom: 1px solid theme.$gray_1;
-  cursor: pointer;
-  font-size: 13px;
-}
-.recent-run-row:last-child {
-  border-bottom: none;
-}
-.recent-run-row:hover {
-  background: theme.$gray_1;
-}
-.recent-run-name {
-  font-weight: 500;
-  color: theme.$gray_6;
-}
-.recent-run-status {
-  color: theme.$gray_5;
-}
-.recent-run-time {
-  margin-left: auto;
-  color: theme.$gray_4;
-}
-.recent-caret {
-  width: 10px;
-  flex-shrink: 0;
-  font-size: 10px;
-  color: theme.$gray_4;
-  transition: transform 0.12s ease;
-
-  &.open {
-    transform: rotate(90deg);
-  }
-}
-.recent-run-row.is-open {
-  background: theme.$gray_1;
-}
-.recent-run-details {
-  padding: 4px 14px 14px 38px;
-  border-bottom: 1px solid theme.$gray_1;
-  background: theme.$gray_1;
-  font-size: 13px;
-}
-.run-facts {
-  display: grid;
-  grid-template-columns: max-content 1fr;
-  gap: 4px 16px;
-  margin: 0 0 8px;
-
-  dt {
-    color: theme.$gray_4;
-  }
-  dd {
-    margin: 0;
-    color: theme.$gray_6;
-  }
-}
-.run-cost-parts {
-  margin-left: 4px;
-  color: theme.$gray_4;
-}
-.run-error {
-  margin: 0 0 8px;
-  color: theme.$red_2;
-  white-space: pre-wrap;
-}
-.run-page-link {
-  font-size: 12px;
-  color: theme.$link-color;
-  text-decoration: none;
-
-  &:hover {
-    color: theme.$link-color-hover;
-  }
-}
-/* Duration: a fixed column, right-aligned, so the rows line up. */
-.recent-run-num {
-  width: 64px;
-  flex-shrink: 0;
-  text-align: right;
-  color: theme.$gray_5;
-  font-variant-numeric: tabular-nums;
 }
 .empty-canvas {
   text-align: center;
