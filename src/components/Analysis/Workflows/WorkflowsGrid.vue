@@ -27,7 +27,7 @@ const isMyWorkspace = computed(() => !route.params.orgId);
 
 const searchQuery = ref("");
 const statusFilter = ref("active");
-const scopeFilter = ref("workspace"); // "workspace" | "public" | "pennsieve" (public, official only)
+const scopeFilter = ref("workspace"); // "workspace" | "public" | "pennsieve" (public, official only) | "notebooks" (Pennsieve's notebooks)
 const inputFilter = ref("any"); // "any" | "dataset" | "none"
 const outputFilter = ref("any"); // "any" | a target type
 
@@ -73,6 +73,7 @@ const scopeOptions = computed(() => [
   { label: isMyWorkspace.value ? "My workflows" : "This workspace", value: "workspace" },
   { label: "Public", value: "public" },
   { label: "Pennsieve", value: "pennsieve" },
+  { label: "Notebooks", value: "notebooks" },
 ]);
 
 // Pennsieve's are the public ones it has reviewed (official).
@@ -95,6 +96,7 @@ const filteredWorkflows = computed(() =>
       input: inputFilter.value,
       output: outputFilter.value,
       officialOnly: scopeFilter.value === "pennsieve",
+      notebooksOnly: scopeFilter.value === "notebooks",
       applications: applications.value,
       targetTypes: targetTypes.value,
     }),
@@ -308,7 +310,11 @@ onMounted(async () => {
         </el-select>
       </div>
 
-      <p v-if="scopeFilter === 'pennsieve'" class="scope-hint">
+      <p v-if="scopeFilter === 'notebooks'" class="scope-hint">
+        Pennsieve's notebooks: Start notebook opens one on the Notebooks tab,
+        where your notebooks and environments are.
+      </p>
+      <p v-else-if="scopeFilter === 'pennsieve'" class="scope-hint">
         Workflows Pennsieve has reviewed and validated. They can be run from any workspace.
       </p>
       <p v-else-if="isPublicScope" class="scope-hint">

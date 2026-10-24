@@ -47,6 +47,12 @@ describe("applyFilters", () => {
     expect(applyFilters(all, { officialOnly: true })).toEqual([spikes]);
   });
 
+  it("keeps Pennsieve's notebooks", () => {
+    const jupyter = { name: "Pennsieve - Python Notebook - 3.12", official: true, dag: [{ id: "p", type: "processor", runtimeConfig: { interactive: true, sessionType: "python" } }] };
+    const lookalike = { ...jupyter, official: false };
+    expect(applyFilters([spikes, jupyter, lookalike], { notebooksOnly: true })).toEqual([jupyter]);
+  });
+
   it("offers the outputs the list has", () => {
     expect(outputOptions(all, targetTypes)).toEqual([
       { value: "download", label: "Download" },
