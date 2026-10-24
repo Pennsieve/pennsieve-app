@@ -5,6 +5,11 @@ import {
   getEnvironment,
   newestReady,
   fitsKernel,
+  createEnvironment,
+  deleteEnvironment,
+  buildLog,
+  requirementsProblem,
+  ENVIRONMENT_NAME,
   EnvironmentsServiceError,
 } from './environmentsService'
 import dev from '../site-config/dev.json'
@@ -71,5 +76,41 @@ describe('fitsKernel', () => {
     expect(fitsKernel(py312, 'R 4.4.1')).toBe(false)
     expect(fitsKernel(py312, '')).toBe(true)
     expect(fitsKernel({}, 'Python 3.12.3')).toBe(false)
+  })
+})
+
+describe('createEnvironment', () => {
+  it('posts the name and requirements', async () => {
+    const fetchFn = respond(202, { environment: { id: 'e1' }, version: { version: 1, status: 'building' } })
+    const out = await createEnvironment({ name: 'np', requirements: 'numpy\n' }, { config, getToken, fetchFn })
+    expect(out.version.status).toBe('building')
+    const [url, init] = fetchFn.mock.calls[0]
+    expect(url).toBe('https://api2.pennsieve.net/environments/me')
+    expect(init.method).toBe('POST')
+    expect(JSON.parse(init.body)).toEqual({ name: 'np', language: 'python', requirements: 'numpy\n' })
+  })
+})
+
+describe('deleteEnvironment and buildLog', () => {
+  it('call the environment and version routes', async () => {
+    const del = respond(204, {})
+    await deleteEnvironment('e1', { config, getToken, fetchFn: del })
+    expect(del.mock.calls[0][0]).toBe('https://api2.pennsieve.net/environments/e1')
+    expect(del.mock.calls[0][1].method).toBe('DELETE')
+    const log = respond(200, { status: 'failed', lines: ['ERROR: x'] })
+    expect((await buildLog('e1', 2, { config, getToken, fetchFn: log })).lines).toEqual(['ERROR: x'])
+    expect(log.mock.calls[0][0]).toBe('https://api2.pennsieve.net/environments/e1/versions/2/log')
+  })
+})
+
+describe('names and requirements', () => {
+  it('checks what environments-service checks', () => {
+    expect(ENVIRONMENT_NAME.test('numpy-pandas')).toBe(true)
+    expect(ENVIRONMENT_NAME.test('NumPy')).toBe(false)
+    expect(ENVIRONMENT_NAME.test('-x')).toBe(false)
+    expect(requirementsProblem('numpy\n# a comment\npandas==3.1')).toBe('')
+    expect(requirementsProblem('  \n')).toBe('List at least one package.')
+    expect(requirementsProblem('--index-url https://x\nnumpy')).toMatch('"--index-url"')
+    expect(requirementsProblem(Array.from({ length: 501 }, (_, i) => `p${i}`).join('\n'))).toBe('At most 500 packages.')
   })
 })

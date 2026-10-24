@@ -18,8 +18,7 @@ import IconXCircle from "../../icons/IconXCircle.vue";
 import NewNotebookDialog from "./NewNotebookDialog.vue";
 import EnvironmentsSection from "./EnvironmentsSection.vue";
 import CreateEnvironmentDialog from "./CreateEnvironmentDialog.vue";
-import { nextName } from "./environmentStatus";
-import { useComputeResourcesStore } from "@/stores/computeResourcesStore";
+import { environmentsServiceUrl } from "@/utils/environmentsService";
 import { endInteractiveSession } from "@/composables/useJupyterSession";
 import { useGetToken } from "@/composables/useGetToken";
 import {
@@ -30,10 +29,9 @@ import {
   runDisplayName,
   getUserName as getUserNameFn,
 } from "./runHelpers";
-import { isNotebookWorkflow, interactiveCapable } from "./notebookHelpers";
+import { isNotebookWorkflow } from "./notebookHelpers";
 
 const store = useStore();
-const computeResources = useComputeResourcesStore();
 const router = useRouter();
 const route = useRoute();
 const realtime = getCurrentInstance()?.appContext.config.globalProperties.$realtime;
@@ -65,20 +63,8 @@ const getUserName = (userId) =>
 
 /* --------------------------------------------------- notebook workflows ----- */
 const notebookWorkflows = ref([]);
-// Public "Pennsieve - Build {Python,R} Environment" workflows, resolved from the
-// definitions list and handed to the create-environment dialog (one per language).
-const buildPythonEnvWorkflow = ref(null);
-const buildREnvWorkflow = ref(null);
-const buildEnvWorkflows = computed(() => ({
-  python: buildPythonEnvWorkflow.value,
-  r: buildREnvWorkflow.value,
-}));
-const hasEnvBuilder = computed(
-  () => !!buildPythonEnvWorkflow.value || !!buildREnvWorkflow.value
-);
-const computeNodesList = computed(() =>
-  (store.getters["analysisModule/computeNodes"] || []).filter(interactiveCapable)
-);
+// Environments come from environments-service, where the site has it.
+const hasEnvironments = !!environmentsServiceUrl();
 const createEnvVisible = ref(false);
 // Where the New environment dialog starts: empty, or an edit or retry of an
 // environment (see EnvironmentsSection).
@@ -88,18 +74,15 @@ function openCreateEnvironment(initial = null) {
   envInitial.value = initial;
   createEnvVisible.value = true;
 }
-function onEnvEdit(start) {
-  const taken = (computeResources.getNodeLayers(start.nodeId)?.layers || []).map((l) => l.layerName);
-  openCreateEnvironment({ ...start, name: nextName(start.name, taken) });
-}
+// Names the New environment dialog mustn't reuse.
+const takenEnvNames = computed(() => environmentsRef.value?.ownNames || []);
 // "Use in a notebook": a new notebook, where the environment is picked from
 // the session's sidebar once it runs.
 function onEnvUse() {
   dialogVisible.value = true;
 }
-function onEnvCreated({ nodeId }) {
+function onEnvCreated() {
   environmentsRef.value?.refresh?.();
-  if (nodeId) computeResources.fetchNodeLayers(nodeId, true);
 }
 const isLoading = ref(false);
 const dialogVisible = ref(false);
@@ -138,11 +121,6 @@ async function fetchNotebookWorkflows() {
     // or environment builder. Name still selects which official workflow it is.
     const official = all.filter((w) => w?.official);
     notebookWorkflows.value = official.filter(isNotebookWorkflow);
-    buildPythonEnvWorkflow.value =
-      official.find((w) => (w?.name || "").startsWith("Pennsieve - Build Python Environment")) ||
-      null;
-    buildREnvWorkflow.value =
-      official.find((w) => (w?.name || "").startsWith("Pennsieve - Build R Environment")) || null;
     if (notebookWorkflows.value.length === 0) {
       console.warn(
         "[Notebooks] no notebook workflows matched among",
@@ -315,8 +293,8 @@ onBeforeUnmount(() => {
             Launch an interactive Jupyter or R notebook on your data in a few
             clicks — pick a kernel, compute node, and input files, and start
             exploring. Create a reusable <strong>environment</strong> from a
-            <code>requirements.txt</code> to preinstall the Python or R packages
-            you need, then attach it when you launch a notebook. For multi-step
+            <code>requirements.txt</code> with the Python packages you need,
+            then switch to it from the notebook's sidebar. For multi-step
             analyses, add a notebook step to a custom workflow under
             <router-link v-if="!isMyWorkspace" :to="{ name: 'workflows' }" class="info-card-link">
               Workflows</router-link
@@ -330,9 +308,8 @@ onBeforeUnmount(() => {
               + New Notebook
             </bf-button>
             <bf-button
+              v-if="hasEnvironments"
               class="ghost"
-              :disabled="!hasEnvBuilder"
-              :title="hasEnvBuilder ? '' : 'Environment builder not available yet'"
               @click="openCreateEnvironment()"
             >
               + New Environment
@@ -434,9 +411,8 @@ onBeforeUnmount(() => {
 
         <environments-section
           ref="environmentsRef"
-          :build-workflows="buildEnvWorkflows"
           @create="openCreateEnvironment()"
-          @edit="onEnvEdit"
+          @edit="openCreateEnvironment"
           @retry="openCreateEnvironment"
           @use="onEnvUse"
         />
@@ -451,9 +427,8 @@ onBeforeUnmount(() => {
 
     <create-environment-dialog
       v-model="createEnvVisible"
-      :build-workflows="buildEnvWorkflows"
-      :compute-nodes="computeNodesList"
       :initial="envInitial"
+      :taken-names="takenEnvNames"
       @created="onEnvCreated"
     />
 

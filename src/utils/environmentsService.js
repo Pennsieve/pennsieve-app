@@ -60,6 +60,40 @@ export async function getEnvironment(id, options = {}) {
   return { environment: data.environment, versions }
 }
 
+// Builds requirements into an environment: a new one with a new name, or a
+// new version of the caller's environment of that name. With the same
+// requirements as a ready version, that version comes back (reused) and
+// nothing is built. { environment, version, reused }.
+export function createEnvironment({ name, requirements, language = 'python' }, options = {}) {
+  return environmentsRequest('/me', { ...options, method: 'POST', body: { name, language, requirements } })
+}
+
+// Deletes an environment, its versions and archives. The owner's only.
+export async function deleteEnvironment(id, options = {}) {
+  await environmentsRequest(`/${encodeURIComponent(id)}`, { ...options, method: 'DELETE' })
+}
+
+// A version's build status and the last lines of its build log:
+// { status, lines }.
+export function buildLog(id, version, options = {}) {
+  return environmentsRequest(`/${encodeURIComponent(id)}/versions/${version}/log`, options)
+}
+
+// Environment names: lowercase letters, digits and dashes, at most 63.
+export const ENVIRONMENT_NAME = /^[a-z0-9][a-z0-9-]{0,62}$/
+
+// Why requirements can't be built, or '': one pip spec per line, no pip
+// options, at most 500 lines and 32 KB (as environments-service checks).
+export function requirementsProblem(text) {
+  const lines = String(text || '').split('\n').map((l) => l.trim()).filter((l) => l && !l.startsWith('#'))
+  if (!lines.length) return 'List at least one package.'
+  const option = lines.find((l) => l.startsWith('-'))
+  if (option) return `Pip options like "${option.split(/\s/)[0]}" aren't allowed; list one package per line.`
+  if (lines.length > 500) return 'At most 500 packages.'
+  if (new Blob([text]).size > 32 * 1024) return 'The list must be under 32 KB.'
+  return ''
+}
+
 // The newest ready version among versions, or null.
 export function newestReady(versions) {
   return [...(versions || [])]
