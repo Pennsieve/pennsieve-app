@@ -31,6 +31,7 @@ import {
 } from "./runHelpers";
 import { isNotebookWorkflow } from "./notebookHelpers";
 import RunHistory from "./RunHistory.vue";
+import NotebookUsage from "./NotebookUsage.vue";
 
 const store = useStore();
 const router = useRouter();
@@ -393,6 +394,9 @@ onBeforeUnmount(() => {
             </div>
           </div>
         </div>
+
+        <!-- Usage: sessions, time and cost, as the Workflows tab's overview -->
+        <NotebookUsage />
 
         <run-history
           from="notebooks"
