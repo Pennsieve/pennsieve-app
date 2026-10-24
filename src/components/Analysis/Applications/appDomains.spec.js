@@ -1,9 +1,19 @@
 import { describe, it, expect } from "vitest";
-import { appBanner, canonicalTag, domainOf, domainOfTag, SUGGESTED_TAGS } from "./appDomains";
+import { appBanner, canonicalTag, domainOf, domainOfTag, fitTypes, SUGGESTED_TAGS } from "./appDomains";
 
 const withManifest = (manifest, name = "spike-detect") => ({
   name,
   versions: [{ version: "1.0.0", createdAt: "2026-01-01", manifest }],
+});
+
+describe("banner types", () => {
+  it("shows what fits on one row, then how many more", () => {
+    expect(fitTypes(["EDF", "NWB"])).toEqual({ types: ["EDF", "NWB"], more: 0 });
+    expect(fitTypes(["PARQUET", "PARQUET2", "PARQUET3"])).toEqual({ types: ["PARQUET"], more: 2 });
+    expect(fitTypes(["EDF", "NWB", "CSV", "PNG", "JSON"])).toEqual({ types: ["EDF", "NWB"], more: 3 });
+    expect(fitTypes(["NEURODATAWITHOUTBORDERS"])).toEqual({ types: ["NEURODATAWITHOUTBORDERS"], more: 0 });
+    expect(fitTypes([])).toEqual({ types: [], more: 0 });
+  });
 });
 
 describe("app domains", () => {

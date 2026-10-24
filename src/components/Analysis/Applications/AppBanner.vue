@@ -4,18 +4,17 @@
 // colour (appDomains.js). An app without an app.yml keeps its initials
 // tile on grey.
 import { computed } from "vue";
-import { appBanner } from "./appDomains";
+import { appBanner, fitTypes } from "./appDomains";
 import { appInitials } from "./appCards";
 
 const props = defineProps({
   app: { type: Object, required: true },
 });
 
-const MAX_TYPES = 3;
 const b = computed(() => appBanner(props.app));
-const shown = (types) => ({ types: types.slice(0, MAX_TYPES), more: Math.max(0, types.length - MAX_TYPES) });
-const ins = computed(() => shown(b.value.inputs));
-const outs = computed(() => shown(b.value.outputs));
+// One row each: what fits, then "+n"; the whole list on hover.
+const ins = computed(() => fitTypes(b.value.inputs));
+const outs = computed(() => fitTypes(b.value.outputs));
 const hasIo = computed(() => b.value.inputs.length || b.value.outputs.length);
 const style = computed(() => {
   const h = b.value.hue;
@@ -32,7 +31,7 @@ const label = computed(() => {
 <template>
   <div class="ab" :class="{ 'ab--plain': !b.manifest }" :style="style" role="img" :aria-label="label || undefined">
     <template v-if="b.manifest && hasIo">
-      <div class="ab-types">
+      <div class="ab-types" :title="b.inputs.length ? `In: ${b.inputs.join(', ')}` : undefined">
         <span v-for="t in ins.types" :key="t" class="ab-type">{{ t }}</span>
         <span v-if="ins.more" class="ab-type ab-type--more">+{{ ins.more }}</span>
         <span v-if="!ins.types.length" class="ab-type ab-type--any">Any</span>
@@ -49,7 +48,7 @@ const label = computed(() => {
 
     <template v-if="b.manifest && hasIo">
       <span class="ab-edge" />
-      <div class="ab-types">
+      <div class="ab-types" :title="b.outputs.length ? `Out: ${b.outputs.join(', ')}` : undefined">
         <span v-for="t in outs.types" :key="t" class="ab-type">{{ t }}</span>
         <span v-if="outs.more" class="ab-type ab-type--more">+{{ outs.more }}</span>
         <span v-if="!outs.types.length" class="ab-type ab-type--any">Any</span>
@@ -82,12 +81,17 @@ const label = computed(() => {
 }
 .ab-types {
   display: flex;
-  flex-wrap: wrap;
   justify-content: center;
   gap: 3px;
   max-width: 100%;
+  min-width: 0;
 }
 .ab-type {
+  flex-shrink: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   padding: 1px 6px;
   border: 1px solid var(--ab-line);
   border-radius: 3px;
@@ -100,6 +104,7 @@ const label = computed(() => {
 }
 .ab-type--more,
 .ab-type--any {
+  flex-shrink: 0;
   font-weight: 500;
   color: theme.$gray_4;
 }

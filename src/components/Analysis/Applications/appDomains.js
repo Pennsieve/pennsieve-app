@@ -144,3 +144,21 @@ export function appBanner(app) {
     outputs: typesOf(manifest?.outputs),
   };
 }
+
+// The types that fit on one row of a banner, and how many more there are:
+// as many as fit in `width` px (a chip is ~7px a letter plus 15px of padding
+// and gap), keeping room for "+n" while any are left out; always the first,
+// which the chip shortens with an ellipsis when it alone is too long.
+export function fitTypes(types, width = 130) {
+  const chip = (t) => String(t).length * 7 + 15;
+  const MORE = 30;
+  const shown = [];
+  let used = 0;
+  for (let i = 0; i < types.length; i++) {
+    const need = used + chip(types[i]) + (i < types.length - 1 ? MORE : 0);
+    if (shown.length && need > width) break;
+    shown.push(types[i]);
+    used += chip(types[i]);
+  }
+  return { types: shown, more: types.length - shown.length };
+}
