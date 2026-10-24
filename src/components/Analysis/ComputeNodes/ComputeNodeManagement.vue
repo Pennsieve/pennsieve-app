@@ -12,7 +12,6 @@ import { ElMessage } from 'element-plus'
 import { useComputeResourcesStore } from '@/stores/computeResourcesStore'
 import { useGetToken } from '@/composables/useGetToken'
 import * as siteConfig from '@/site-config/site.json'
-import BfButton from '@/components/shared/bf-button/BfButton.vue'
 import ComputeNodeOverview from './ComputeNodeOverview.vue'
 import ComputeNodeAccess from './ComputeNodeAccess.vue'
 import ComputeNodeAllowedApps from './ComputeNodeAllowedApps.vue'
@@ -166,15 +165,14 @@ const STATUS_TEXT = { Enabled: 'Running', Paused: 'Paused', Pending: 'Setting up
           </div>
           <p class="node-subtitle">{{ subtitle }}</p>
         </div>
-        <bf-button
+        <button type="button"
           v-if="canManage && canToggleStatus(computeNode)"
-          class="secondary small"
-          :processing="isUpdatingStatus"
+          class="cn-action"
           :disabled="isUpdatingStatus"
           @click="toggleStatus"
         >
           {{ status === 'Enabled' ? 'Pause node' : 'Resume node' }}
-        </bf-button>
+        </button>
       </header>
 
       <div class="node-toolbar">

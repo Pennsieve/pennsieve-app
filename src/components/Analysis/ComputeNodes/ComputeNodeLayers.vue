@@ -2,7 +2,6 @@
 import { ref, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useComputeResourcesStore } from '@/stores/computeResourcesStore'
-import BfButton from '@/components/shared/bf-button/BfButton.vue'
 import LayerTypeIcon from './LayerTypeIcon.vue'
 
 const props = defineProps({
@@ -154,7 +153,7 @@ async function confirmDeleteLayer(layer) {
         </p>
       </div>
       <div class="layers-actions" v-if="isOwner && !isCreating">
-        <bf-button class="small" @click="startCreating">+ New reference</bf-button>
+        <button type="button" class="cn-action cn-action--primary" @click="startCreating">+ New reference</button>
       </div>
     </div>
 
@@ -181,8 +180,8 @@ async function confirmDeleteLayer(layer) {
         </div>
       </div>
       <div class="create-form-actions">
-        <bf-button class="small secondary" @click="cancelCreating">Cancel</bf-button>
-        <bf-button class="small" :processing="isSaving" :disabled="isSaving || !isValidName" @click="createLayer">Create</bf-button>
+        <button type="button" class="cn-action" @click="cancelCreating">Cancel</button>
+        <button type="button" class="cn-action cn-action--primary" :disabled="isSaving || !isValidName" @click="createLayer">Create</button>
       </div>
     </div>
 
@@ -275,6 +274,7 @@ async function confirmDeleteLayer(layer) {
 
 <style scoped lang="scss">
 @use '../../../styles/_theme.scss';
+@use './computeNodePage';
 
 .layers-container {
   display: flex;

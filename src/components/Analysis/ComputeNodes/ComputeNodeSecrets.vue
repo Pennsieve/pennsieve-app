@@ -2,7 +2,6 @@
 import { ref, computed, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useComputeResourcesStore } from '@/stores/computeResourcesStore'
-import BfButton from '@/components/shared/bf-button/BfButton.vue'
 
 const props = defineProps({
   nodeId: {
@@ -216,13 +215,13 @@ async function saveSharedSecrets() {
           </p>
         </div>
         <div class="secrets-actions" v-if="!isEditingUser">
-          <bf-button class="small secondary" @click="startEditingUser">
+          <button type="button" class="cn-action" @click="startEditingUser">
             {{ userSecretKeys.length > 0 ? 'Edit' : '+ Add secrets' }}
-          </bf-button>
+          </button>
         </div>
         <div class="secrets-actions" v-else>
-          <bf-button class="small secondary" @click="cancelEditingUser">Cancel</bf-button>
-          <bf-button class="small" :processing="isSavingUser" :disabled="isSavingUser" @click="saveUserSecrets">Save</bf-button>
+          <button type="button" class="cn-action" @click="cancelEditingUser">Cancel</button>
+          <button type="button" class="cn-action cn-action--primary" :disabled="isSavingUser" @click="saveUserSecrets">Save</button>
         </div>
       </div>
 
@@ -278,13 +277,13 @@ async function saveSharedSecrets() {
           </p>
         </div>
         <div class="secrets-actions" v-if="isOwner && !isEditingShared">
-          <bf-button class="small secondary" @click="startEditingShared">
+          <button type="button" class="cn-action" @click="startEditingShared">
             {{ sharedSecretKeys.length > 0 ? 'Edit' : '+ Add secrets' }}
-          </bf-button>
+          </button>
         </div>
         <div class="secrets-actions" v-else-if="isOwner && isEditingShared">
-          <bf-button class="small secondary" @click="cancelEditingShared">Cancel</bf-button>
-          <bf-button class="small" :processing="isSavingShared" :disabled="isSavingShared" @click="saveSharedSecrets">Save</bf-button>
+          <button type="button" class="cn-action" @click="cancelEditingShared">Cancel</button>
+          <button type="button" class="cn-action cn-action--primary" :disabled="isSavingShared" @click="saveSharedSecrets">Save</button>
         </div>
       </div>
 
@@ -333,6 +332,7 @@ async function saveSharedSecrets() {
 
 <style scoped lang="scss">
 @use '../../../styles/_theme.scss';
+@use './computeNodePage';
 
 .secrets-container {
   display: flex;
