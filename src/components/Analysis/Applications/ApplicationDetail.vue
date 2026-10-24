@@ -43,6 +43,8 @@ const route = useRoute();
 // organization in the route and route names carry a "my-" prefix.
 const isMyWorkspace = computed(() => !route.params.orgId);
 const scopedRoute = (name, params = {}) => ({ name: isMyWorkspace.value ? `my-${name}` : name, params });
+// Apps are in the Gallery's Apps view, which their page leads back to.
+const galleryApps = computed(() => ({ ...scopedRoute("gallery"), query: { view: "apps" } }));
 
 const profile = computed(() => store.state.profile);
 const orgMembers = computed(() => store.state.orgMembers || []);
@@ -427,7 +429,7 @@ watch(
     <!-- Header -->
     <div class="builder-header">
       <span class="header-title">
-        <router-link :to="scopedRoute('applications')" class="header-back-link">Applications</router-link>
+        <router-link :to="galleryApps" class="header-back-link">Gallery</router-link>
         <template v-if="detail">
           <span class="header-breadcrumb-sep">/</span>
           <span class="header-detail-name">{{ repoName }}</span>
@@ -443,8 +445,8 @@ watch(
     <!-- Error / Not Found -->
     <div v-else-if="detailError || !detail" class="app-not-found">
       <p>{{ detailError || "Application not found." }}</p>
-      <router-link :to="scopedRoute('applications')" class="back-link">
-        &larr; Back to Applications
+      <router-link :to="galleryApps" class="back-link">
+        &larr; Back to the Gallery
       </router-link>
     </div>
 

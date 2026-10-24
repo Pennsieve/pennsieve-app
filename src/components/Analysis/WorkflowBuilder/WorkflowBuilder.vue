@@ -47,9 +47,10 @@ const props = defineProps({
 
 const router = useRouter();
 const route = useRoute();
-// My Workspace's workflow pages live under My Analysis, with no orgId
+// A workflow's page is in the Gallery, which it leads back to (My
+// Workspace's pages live under My Analysis, with no orgId).
 const workflowsRoute = computed(() =>
-  route.params.orgId ? { name: "workflows" } : { name: "my-workflows" }
+  route.params.orgId ? { name: "gallery" } : { name: "my-gallery" }
 );
 
 /*
@@ -1440,7 +1441,7 @@ const openNodeSettings = (id) => {
     <div class="builder-header" v-if="isReadOnly">
       <span class="header-title">
         <router-link :to="workflowsRoute" class="header-back-link">
-          &larr; Workflows
+          &larr; Gallery
         </router-link>
         <span class="header-breadcrumb-sep">/</span>
         <span class="header-detail-name">{{
