@@ -1625,7 +1625,7 @@ const serializeProcessors = () => {
     }
 
     if (node.type === "data-target") {
-      return {
+      const target = {
         id: node.id,
         type: "data-target",
         targetType: node.data.targetType,
@@ -1633,6 +1633,13 @@ const serializeProcessors = () => {
         dependsOn: dependsOn,
         position,
       };
+      if (
+        node.data.defaultParams &&
+        Object.keys(node.data.defaultParams).length > 0
+      ) {
+        target.defaultParams = node.data.defaultParams;
+      }
+      return target;
     }
 
     // Default: processor
@@ -2645,6 +2652,9 @@ const openNodeSettings = (id) => {
                 "
               >
                 <h4 class="sidebar-section-title">Parameters</h4>
+                <!-- A target's params can be fixed in the workflow (its
+                     defaultParams), e.g. PATH_PREFIX to route part of a
+                     step's output; a run can still override them. -->
                 <div class="info-card">
                   <template
                     v-if="
@@ -2652,31 +2662,16 @@ const openNodeSettings = (id) => {
                       0
                     "
                   >
-                    <div
+                    <ParamField
                       v-for="param in getTargetTypeParams(
                         selectedNode.data.targetType,
                       )"
                       :key="param.name"
-                      class="info-row"
-                    >
-                      <span class="info-label">
-                        {{ param.name }}
-                        <span
-                          v-if="!param.defaultValue"
-                          class="param-required-badge"
-                          >required at run</span
-                        >
-                      </span>
-                      <span
-                        v-if="isReadOnly"
-                        class="info-value param-value-truncate"
-                      >
-                        {{ param.defaultValue || "—" }}
-                      </span>
-                      <span v-else class="info-value">
-                        {{ param.defaultValue || "—" }}
-                      </span>
-                    </div>
+                      :param="param"
+                      :editable="canEditConfig"
+                      :model-value="selectedNode.data.defaultParams?.[param.name]"
+                      @update:model-value="(v) => setDefaultParam(param.name, v)"
+                    />
                   </template>
                   <div v-else class="info-row">
                     <span class="info-value">No parameters</span>

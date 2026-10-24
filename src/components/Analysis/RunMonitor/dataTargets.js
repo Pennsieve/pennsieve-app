@@ -1,0 +1,85 @@
+/*
+  A run's data targets: which dataset each writes to and which part of its
+  input it takes. A target writes to its own dataset (dataTargets[nodeId].
+  datasetId) or, when it names none, to the run's; the built-in download and
+  persistent-layer targets write no dataset. Every target can take only the
+  files below a path prefix (PATH_PREFIX on a container target, pathPrefix on
+  a built-in one), without it. See compute-node-aws-provisioner-v2's api
+  contract §3.2.
+*/
+
+export const BUILTIN_TARGET_TYPES = ["download", "persistent-layer"];
+
+// Whether a target of this type writes to a dataset (and so may name one).
+export const targetWritesToDataset = (targetType) =>
+  !!targetType && !BUILTIN_TARGET_TYPES.includes(targetType);
+
+// The name of the target type's path-prefix param.
+export const prefixParamName = (targetType) =>
+  BUILTIN_TARGET_TYPES.includes(targetType) ? "pathPrefix" : "PATH_PREFIX";
+
+/*
+  A target's params for the run-configure form, from the registry's param
+  definitions. Values come from, in order, the run being rerun, the workflow
+  definition's defaultParams on the node, and the registry default, which is
+  the order workflow-service applies them.
+*/
+export const targetParamFields = (paramDefs, { sourceParams = {}, definitionDefaults = {} } = {}) =>
+  (paramDefs || []).map((pd) => {
+    const fromSource = sourceParams[pd.name];
+    const fromDefinition = definitionDefaults[pd.name];
+    const value =
+      fromSource != null ? String(fromSource)
+      : fromDefinition != null && fromDefinition !== "" ? String(fromDefinition)
+      : pd.defaultValue != null ? String(pd.defaultValue)
+      : "";
+    return {
+      name: pd.name,
+      type: pd.type || "string",
+      description: pd.description || "",
+      required: pd.defaultValue == null || pd.defaultValue === undefined,
+      value,
+    };
+  });
+
+/*
+  The run request's dataTargets, from the configure form: each target's
+  non-empty params, and its dataset when it names one other than the run's
+  (the run's is the default, so it isn't sent). A target with neither is
+  left out.
+*/
+export const buildDataTargets = (dag, nodeConfigs, runDatasetId = "") => {
+  const dataTargets = {};
+  for (const d of dag || []) {
+    if (d.type !== "data-target") continue;
+    const cfg = nodeConfigs?.[d.id];
+    if (!cfg) continue;
+    const params = {};
+    for (const p of cfg.params || []) {
+      if (p.name && p.value) params[p.name] = p.value;
+    }
+    const entry = {};
+    const datasetId = targetWritesToDataset(d.targetType) ? cfg.datasetId || "" : "";
+    if (datasetId && datasetId !== runDatasetId) entry.datasetId = datasetId;
+    if (Object.keys(params).length > 0) entry.params = params;
+    if (Object.keys(entry).length > 0) dataTargets[d.id] = entry;
+  }
+  return dataTargets;
+};
+
+// What a run's target wrote to, for display: its own dataset or the run's.
+export const targetDatasetId = (target, runDatasetId = "") => target?.datasetId || runDatasetId || "";
+
+// A dataset's name from a list of dataset records, else its id.
+export const datasetName = (datasetId, datasets = []) =>
+  datasets.find((d) => d?.content?.id === datasetId)?.content?.name || datasetId;
+
+// Search the workspace's datasets by name (the run wizard's search).
+export const searchDatasets = async (apiUrl, query, { getToken, sendXhr, toQueryParams, limit = 25 }) => {
+  const token = await getToken();
+  const params = toQueryParams({
+    limit, offset: 0, query, orderBy: "IntId", orderDirection: "Desc", type: "research", api_key: token,
+  });
+  const response = await sendXhr(`${apiUrl}/datasets/paginated?${params}`);
+  return response?.datasets || response || [];
+};

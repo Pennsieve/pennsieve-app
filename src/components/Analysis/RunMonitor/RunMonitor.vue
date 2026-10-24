@@ -19,6 +19,8 @@ import { useSendXhr } from "@/mixins/request/request_composable";
 import { useMetricsCounters } from "@/composables/useMetricsCounters";
 import toQueryParams from "@/utils/toQueryParams";
 import LayerNameSelector from "./LayerNameSelector.vue";
+import TargetDatasetField from "./TargetDatasetField.vue";
+import { targetWritesToDataset, targetParamFields, buildDataTargets, targetDatasetId, datasetName } from "./dataTargets";
 import { validateRunName, runDisplayName, RUN_NAME_MAX_LENGTH } from "./runHelpers";
 
 const { onNodeClick, onPaneClick, fitView, updateNodeData } = useVueFlow();
@@ -547,6 +549,7 @@ const runToNodesAndEdges = (run) => {
       extra.computeType = cfg?.executionTarget || d.computeType || null;
       const targetParams = runDataTargets[d.id]?.params || {};
       extra.params = Object.entries(targetParams).map(([key, value]) => ({ key, value: String(value) }));
+      extra.datasetId = targetWritesToDataset(d.targetType) ? targetDatasetId(runDataTargets[d.id], run.datasetId) : "";
     } else {
       const cfg = runProcessorConfigs.find((c) => c.nodeId === d.id);
       extra.executionTarget = cfg?.executionTarget || null;
@@ -985,18 +988,18 @@ const initiateWorkflow = async () => {
         const ttDef = getTargetTypeDefinition(d.targetType);
         const paramDefs = ttDef?.params || [];
 
-        // Build params from the target type definition, pre-filling from rerun source or defaults
-        const targetParams = paramDefs.map((pd) => ({
-          name: pd.name,
-          type: pd.type || "string",
-          description: pd.description || "",
-          required: pd.defaultValue == null || pd.defaultValue === undefined,
-          value: srcTargetParams[pd.name] != null ? String(srcTargetParams[pd.name]) : (pd.defaultValue != null ? String(pd.defaultValue) : ""),
-        }));
+        // Values: the run being rerun, then the definition's defaults on the
+        // node, then the registry's (workflow-service applies them in that order).
+        const targetParams = targetParamFields(paramDefs, {
+          sourceParams: srcTargetParams,
+          definitionDefaults: d.defaultParams || {},
+        });
 
         nodeConfigs[d.id] = {
           computeType: srcCfg?.executionTarget || d.computeType || fallback,
           targetType: d.targetType || null,
+          // The target's own dataset; "" means the run's.
+          datasetId: source?.dataTargets?.[d.id]?.datasetId || "",
           params: targetParams,
         };
       } else if (d.type !== "data-source") {
@@ -1182,17 +1185,7 @@ const executeWorkflow = async () => {
     });
 
     // Build dataTargets: keyed by data-target node ID
-    const dataTargets = {};
-    Object.entries(nodeConfigs).forEach(([nodeId, cfg]) => {
-      const dagNode = dag.find((n) => n.id === nodeId);
-      if (dagNode?.type === "data-target" && cfg.params && cfg.params.length > 0) {
-        const obj = {};
-        cfg.params.forEach((p) => { if (p.name && p.value) obj[p.name] = p.value; });
-        if (Object.keys(obj).length > 0) {
-          dataTargets[nodeId] = { params: obj };
-        }
-      }
-    });
+    const dataTargets = buildDataTargets(dag, nodeConfigs, initiateForm.value.datasetId);
 
     const trimmedName = nameResult.value;
     const payload = {
@@ -2170,6 +2163,18 @@ onUnmounted(() => {
                   </el-select>
                 </div>
 
+                <!-- Which dataset the target writes to (the run's, by default) -->
+                <div
+                  v-if="targetWritesToDataset(selectedNode.data?.targetType) && initiateForm.datasetId"
+                  class="config-field"
+                >
+                  <TargetDatasetField
+                    v-model="nodeConfigs[selectedNode.id].datasetId"
+                    :run-dataset-id="initiateForm.datasetId"
+                    :datasets="datasetOptions"
+                  />
+                </div>
+
                 <!-- Target type params -->
                 <div v-if="nodeConfigs[selectedNode.id].params.length > 0" class="config-field">
                   <label>Parameters</label>
@@ -2323,6 +2328,10 @@ onUnmounted(() => {
                 <div v-if="selectedNode.data?.processorType" class="info-row">
                   <span class="info-label">Type</span>
                   <span class="info-value">{{ selectedNode.data.processorType }}</span>
+                </div>
+                <div v-if="selectedNode.data?.datasetId" class="info-row">
+                  <span class="info-label">Writes to</span>
+                  <span class="info-value">{{ datasetName(selectedNode.data.datasetId, datasetOptions) }}</span>
                 </div>
               </div>
 
