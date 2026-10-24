@@ -143,23 +143,41 @@ const activeRuns = computed(() =>
 );
 
 
-const dashboardStats = computed(() => {
-  const data = orgCounters.value;
-  if (!data) return null;
-
-  const bucket = data.allTime || data;
-  if (!bucket || !bucket.totalRuns) return null;
-
-  const total = bucket.totalRuns;
-  const succeeded = bucket.succeeded || 0;
-  const failed = bucket.failed || 0;
-  const canceled = bucket.canceled || 0;
-  const successRate = (succeeded + failed) > 0
-    ? Math.round((succeeded / (succeeded + failed)) * 100)
-    : 0;
-
-  return { total, succeeded, failed, canceled, successRate };
+const statsOf = (total, succeeded, failed, canceled) => ({
+  total,
+  succeeded,
+  failed,
+  canceled,
+  successRate: succeeded + failed > 0 ? Math.round((succeeded / (succeeded + failed)) * 100) : 0,
 });
+
+// The metrics service's counters; where it has none (they update every
+// ~15 minutes, and My Workspace's runs may not be counted), the runs listed
+// below, which are already in the range, so the overview never says "no
+// runs" above a list of them.
+const dashboardStats = computed(() => {
+  const bucket = orgCounters.value && (orgCounters.value.allTime || orgCounters.value);
+  if (bucket?.totalRuns) {
+    return statsOf(bucket.totalRuns, bucket.succeeded || 0, bucket.failed || 0, bucket.canceled || 0);
+  }
+  const runs = shownRuns.value;
+  if (!runs.length) return null;
+  const count = (s) => runs.filter((r) => r.status === s).length;
+  return { ...statsOf(runs.length, count("SUCCEEDED"), count("FAILED"), count("CANCELED")), fromList: true };
+});
+
+// Nothing has run at all (not just nothing in a range or filter): one
+// welcome in place of an empty overview and list. Notebook sessions may
+// have run while they're hidden.
+const filtersDefault = computed(
+  () => statusFilter.value === "all" && workflowFilter.value === "all" && dashboardRange.value === "allTime"
+);
+const nothingRun = computed(
+  () => !isLoading.value && filtersDefault.value && !shownRuns.value.length && !orgCounters.value?.allTime?.totalRuns
+);
+const onlyNotebooks = computed(() => props.excludeNotebooks && workflowInstances.value.length > 0);
+const toBuilder = () => router.replace({ query: { ...route.query, view: "builder" } });
+const galleryRoute = computed(() => ({ name: isMyWorkspace.value ? "my-gallery" : "gallery" }));
 
 /*
   Filtered Runs
@@ -544,6 +562,26 @@ onBeforeUnmount(() => {
           </div>
         </div>
 
+        <!-- Nothing has run yet: a welcome, with where to start -->
+        <div v-if="nothingRun && !activeRuns.length" class="runs-welcome">
+          <IconControllerPlay :width="40" :height="40" color="currentColor" class="runs-welcome-icon" />
+          <h3>No workflow runs yet</h3>
+          <p v-if="onlyNotebooks">
+            Only notebook sessions so far. Tick <strong>Include notebooks</strong> to see them here.
+          </p>
+          <p v-else>
+            When you run a workflow, it shows here: live while it runs, then with its status, logs and cost.
+          </p>
+          <div class="runs-welcome-actions">
+            <template v-if="embedded">
+              <bf-button @click="toBuilder">Build a workflow</bf-button>
+              <router-link :to="galleryRoute" class="runs-welcome-link">Browse the Gallery</router-link>
+            </template>
+            <bf-button v-else @click="openWizardDialog">Initiate Workflow</bf-button>
+          </div>
+        </div>
+
+        <template v-else>
         <!-- Aggregate Stats -->
         <div class="dashboard-section">
           <div class="dashboard-section-header">
@@ -586,7 +624,10 @@ onBeforeUnmount(() => {
               <span class="dash-stat-label">Success Rate</span>
             </div>
           </div>
-          <div v-else class="dashboard-empty-range">
+          <p v-if="dashboardStats?.fromList" class="dashboard-note">
+            From the runs listed below{{ hasMoreRuns ? ", so far" : "" }}.
+          </p>
+          <div v-else-if="!dashboardStats" class="dashboard-empty-range">
             No runs in this time range
           </div>
         </div>
@@ -625,15 +666,7 @@ onBeforeUnmount(() => {
             </button>
           </template>
         </run-history>
-
-        <!-- Empty fallback -->
-        <div
-          v-if="!dashboardStats && activeRuns.length === 0 && (!isMyWorkspace || workflowInstances.length === 0)"
-          class="empty-canvas"
-        >
-          <h3>No runs yet</h3>
-          <p>Initiate a workflow to see run activity here</p>
-        </div>
+        </template>
       </div>
 
     </div>
@@ -898,18 +931,6 @@ onBeforeUnmount(() => {
   background: theme.$white;
 }
 .runs-main > .dashboard-section,
-.runs-main > .empty-canvas {
-  max-width: 1000px;
-}
-
-.empty-canvas {
-  text-align: center;
-  color: theme.$gray_4;
-  padding: 60px 20px;
-
-  h3 { margin: 0 0 10px 0; }
-  p { margin: 0; font-size: 14px; }
-}
 
 /* Dashboard */
 .dashboard-section {
@@ -982,6 +1003,53 @@ onBeforeUnmount(() => {
   50% { opacity: 0.8; box-shadow: 0 0 0 6px rgba(6, 182, 212, 0); }
 }
 
+.dashboard-note {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: theme.$gray_4;
+}
+.runs-welcome {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  max-width: 1000px;
+  padding: 72px 20px;
+  border: 1px dashed theme.$gray_3;
+  text-align: center;
+
+  h3 {
+    margin: 4px 0 0;
+    font-size: 16px;
+    font-weight: 600;
+    color: theme.$gray_6;
+  }
+  p {
+    max-width: 420px;
+    margin: 0;
+    font-size: 14px;
+    line-height: 1.5;
+    color: theme.$gray_5;
+  }
+}
+.runs-welcome-icon {
+  color: theme.$purple_1;
+}
+.runs-welcome-actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-top: 12px;
+}
+.runs-welcome-link {
+  font-size: 14px;
+  color: theme.$link-color;
+  text-decoration: none;
+
+  &:hover {
+    color: theme.$link-color-hover;
+  }
+}
 .dashboard-empty-range {
   font-size: 13px;
   color: theme.$gray_4;
