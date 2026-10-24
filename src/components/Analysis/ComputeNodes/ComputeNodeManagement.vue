@@ -970,10 +970,10 @@ async function saveConfig() {
         <ComputeNodeSecrets :node-id="nodeUuid" :is-owner="isNodeOwner" />
       </div>
 
-      <!-- Persistent Layers Section -->
-      <div id="persistent-layers" class="management-section">
+      <!-- Reference data section -->
+      <div id="reference-data" class="management-section">
         <div class="section-header">
-          <h2>Persistent Layers</h2>
+          <h2>Reference data</h2>
         </div>
         <ComputeNodeLayers :node-id="nodeUuid" :is-owner="isNodeOwner" />
       </div>

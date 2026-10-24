@@ -92,11 +92,20 @@ export const findAppByUrl = (sourceUrl, applications) => {
   );
 };
 
-export const getTargetTypeLabel = (targetType, targetTypes = []) => {
-  if (!targetType) return "Data Target";
+// What the app calls a target type where the registry's label is out of date:
+// node layers are shown as reference data, never as "layers".
+const TARGET_TYPE_NAMES = { "persistent-layer": "Reference data" };
+
+// A target type's name for people: ours, else the registry's label, else the
+// type itself.
+export const targetTypeName = (targetType, targetTypes = []) => {
+  if (TARGET_TYPE_NAMES[targetType]) return TARGET_TYPE_NAMES[targetType];
   const tt = targetTypes.find((t) => t.targetType === targetType);
   return tt?.label || targetType;
 };
+
+export const getTargetTypeLabel = (targetType, targetTypes = []) =>
+  targetType ? targetTypeName(targetType, targetTypes) : "Data Target";
 
 export const labelForDagNode = (d, applications, targetTypes = []) => {
   if (d.type === "data-source") return "Data Source";
