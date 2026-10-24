@@ -30,8 +30,10 @@ let timer = null;
 
 const runDatasetLabel = computed(() => datasetName(props.runDatasetId, [...props.datasets, ...options.value]));
 
+// The list stays while a search runs, so it doesn't blink; the select
+// shows its loading text only when there is nothing to show yet.
 const search = async (query = "") => {
-  loading.value = true;
+  loading.value = options.value.length === 0;
   try {
     options.value = await searchDatasets(apiUrl.value, query, { getToken: useGetToken, sendXhr: useSendXhr, toQueryParams });
   } catch (err) {
@@ -41,9 +43,20 @@ const search = async (query = "") => {
     loading.value = false;
   }
 };
+// The select asks with an empty query every time it opens; the list is
+// already there then. Typing searches, after a pause.
+let lastQuery = "";
 const onSearch = (query) => {
   clearTimeout(timer);
-  timer = setTimeout(() => search(query), 300);
+  if (query === lastQuery) return;
+  if (!query && options.value.length) {
+    lastQuery = "";
+    return;
+  }
+  timer = setTimeout(() => {
+    lastQuery = query;
+    search(query);
+  }, 300);
 };
 
 const chooseRun = () => {
