@@ -92,10 +92,9 @@ function onEnvEdit(start) {
   const taken = (computeResources.getNodeLayers(start.nodeId)?.layers || []).map((l) => l.layerName);
   openCreateEnvironment({ ...start, name: nextName(start.name, taken) });
 }
-// "Use in a notebook": the New Notebook dialog, on that node with that environment.
-const notebookStart = ref(null);
-function onEnvUse(env) {
-  notebookStart.value = env;
+// "Use in a notebook": a new notebook, where the environment is picked from
+// the session's sidebar once it runs.
+function onEnvUse() {
   dialogVisible.value = true;
 }
 function onEnvCreated({ nodeId }) {
@@ -326,7 +325,7 @@ onBeforeUnmount(() => {
           <div class="info-card-actions">
             <bf-button
               :disabled="notebookWorkflows.length === 0"
-              @click="notebookStart = null; dialogVisible = true"
+              @click="dialogVisible = true"
             >
               + New Notebook
             </bf-button>
@@ -447,8 +446,6 @@ onBeforeUnmount(() => {
       v-model="dialogVisible"
       :notebook-workflows="notebookWorkflows"
       :personal="isMyWorkspace"
-      :start="notebookStart"
-      :build-workflows="buildEnvWorkflows"
       @created="onNotebookCreated"
     />
 

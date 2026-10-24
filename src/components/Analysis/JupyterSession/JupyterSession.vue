@@ -10,6 +10,7 @@ import { useJupyterSession } from "@/composables/useJupyterSession";
 import NotebookCell from "./NotebookCell.vue";
 import FileBrowser from "./FileBrowser.vue";
 import InputsPanel from "./InputsPanel.vue";
+import EnvironmentPanel from "./EnvironmentPanel.vue";
 import {
   VideoPlay,
   DArrowRight,
@@ -57,6 +58,9 @@ const {
   listDir,
   fetchInputs,
   inputsStatus,
+  environmentState,
+  switchEnvironment,
+  clearEnvironment,
   setSource,
   addCell,
   addCellAbove,
@@ -732,6 +736,13 @@ const kernelPill = computed(() => {
         :style="{ width: `${sidebarWidth}px`, flexBasis: `${sidebarWidth}px` }"
       >
         <div class="nb-files__content">
+        <EnvironmentPanel
+          :environment-state="environmentState"
+          :switch-environment="switchEnvironment"
+          :clear-environment="clearEnvironment"
+          :ready="status === 'ready'"
+          :kernel-name="kernelName"
+        />
         <InputsPanel
           :run-id="runId"
           :fetch-inputs="fetchInputs"

@@ -129,6 +129,41 @@ export async function getInputsFetch(kernelBaseUrl, token, { fetchFn = globalThi
   return inputsResponse(resp);
 }
 
+// The session's environment, switched while it runs. The sidecar fetches the
+// version from environments-service with the run's own credential, unpacks
+// it and restarts the kernel; the browser only names it:
+//   POST   {session}/pennsieve/environments {environmentId, version} -> 202
+//   DELETE {session}/pennsieve/environments  (back to the image's packages) -> 202
+//   GET    {session}/pennsieve/environments -> 200
+// All answer { active: { environmentId, version, ... } | null,
+//   switch: { environmentId, version, state: resolving|downloading|restarting|done|failed,
+//             sizeBytes, bytes, error } | null }.
+// A session on a node from before environments answers 404.
+const ENVIRONMENTS_PATH = "/pennsieve/environments";
+
+export class SessionEnvironmentsUnavailable extends Error {}
+
+async function environmentsResponse(resp) {
+  if (resp.status === 404) throw new SessionEnvironmentsUnavailable("This session can't switch environments.");
+  if (!resp.ok) {
+    const text = await resp.text().catch(() => "");
+    throw new Error(text.trim() || `The session couldn't switch environments (${resp.status}).`);
+  }
+  return resp.json();
+}
+
+export async function sessionEnvironmentRequest(kernelBaseUrl, token, method = "GET", body, { fetchFn = globalThis.fetch } = {}) {
+  const headers = { Authorization: `Bearer ${token}` };
+  if (body !== undefined) headers["Content-Type"] = "application/json";
+  const resp = await fetchFn(`${kernelBaseUrl}${ENVIRONMENTS_PATH}`, {
+    method,
+    credentials: "include",
+    headers,
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  return environmentsResponse(resp);
+}
+
 // Default path for a brand-new notebook: under output/ (a symlink to OUTPUT_DIR,
 // relative to the workspace root_dir) so it's persisted as a run output and
 // passed to the next workflow step — not left in the ephemeral workspace root.
@@ -902,6 +937,22 @@ export function useJupyterSession() {
     return getInputsFetch(kernelBaseUrl, sessionToken);
   }
 
+  // The session's environment (see sessionEnvironmentRequest).
+  function environmentState() {
+    if (!kernelBaseUrl) throw new Error("The session isn't connected.");
+    return sessionEnvironmentRequest(kernelBaseUrl, sessionToken);
+  }
+
+  function switchEnvironment(environmentId, version) {
+    if (!kernelBaseUrl) throw new Error("The session isn't connected.");
+    return sessionEnvironmentRequest(kernelBaseUrl, sessionToken, "POST", { environmentId, version });
+  }
+
+  function clearEnvironment() {
+    if (!kernelBaseUrl) throw new Error("The session isn't connected.");
+    return sessionEnvironmentRequest(kernelBaseUrl, sessionToken, "DELETE");
+  }
+
   async function close({ discardOutput = false } = {}) {
     if (discardOutput) {
       // Stop autosave and mark clean so nothing re-creates output/notebook.ipynb
@@ -959,6 +1010,10 @@ export function useJupyterSession() {
     listDir,
     fetchInputs,
     inputsStatus,
+    // environment
+    environmentState,
+    switchEnvironment,
+    clearEnvironment,
     // cells
     setSource,
     addCell,

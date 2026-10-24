@@ -13,9 +13,6 @@ import { useStore } from "vuex";
 import BfButton from "../../shared/bf-button/BfButton.vue";
 import AnalysisFilesTable from "../../FilesTable/AnalysisFilesTable.vue";
 import BreadcrumbNavigation from "../../datasets/files/BreadcrumbNavigation/BreadcrumbNavigation.vue";
-import EnvironmentLayerSelector from "./EnvironmentLayerSelector.vue";
-import CreateEnvironmentDialog from "./CreateEnvironmentDialog.vue";
-import { useComputeResourcesStore } from "@/stores/computeResourcesStore";
 import IconCompass from "@/components/icons/IconCompass.vue";
 import { useGetToken } from "@/composables/useGetToken";
 import { useSendXhr } from "@/mixins/request/request_composable";
@@ -37,11 +34,6 @@ const props = defineProps({
   // with the dataset's file list, and the user downloads files from the
   // notebook's Inputs panel.
   personal: { type: Boolean, default: false },
-  // Start from an environment ("Use in a notebook"): { nodeId, layerName,
-  // layerType }. Its kernel, node and environment are preselected.
-  start: { type: Object, default: null },
-  // The environment build workflows, { python, r }, for "Create one…".
-  buildWorkflows: { type: Object, default: () => ({ python: null, r: null }) },
 });
 const emit = defineEmits(["update:modelValue", "created"]);
 
@@ -63,7 +55,7 @@ const config = computed(() => store.state.config);
 
 /* ----------------------------------------------------------- wizard state --- */
 const step = ref(0);
-const form = ref({ workflowId: "", computeNodeId: "", datasetId: "", environmentLayer: "" });
+const form = ref({ workflowId: "", computeNodeId: "", datasetId: "" });
 const runName = ref("");
 const computeNodeSearch = ref("");
 const datasetOptions = ref([]);
@@ -76,7 +68,6 @@ const stepTitles = [
   "Select Kernel",
   "Select Compute Node",
   "Compute Resources",
-  "Environment",
   "Select Dataset",
   "Select Input Files",
   "Output Destination",
@@ -226,12 +217,10 @@ const canNext = computed(() => {
     case 2:
       return true; // resources always have a valid default (1 vCPU)
     case 3:
-      return true; // environment layer is optional
-    case 4:
       return props.personal || !!form.value.datasetId;
-    case 5:
+    case 4:
       return props.personal || dataSourcesComplete.value;
-    case 6:
+    case 5:
       return dataTargetsComplete.value;
     default:
       return true;
@@ -517,7 +506,7 @@ function onFileSelect(selectedFiles, parentId) {
 
 /* ----------------------------------------------------------- wizard nav ----- */
 function reset() {
-  form.value = { workflowId: "", computeNodeId: "", datasetId: "", environmentLayer: "" };
+  form.value = { workflowId: "", computeNodeId: "", datasetId: "" };
   nameTouched.value = false;
   computeNodeSearch.value = "";
   datasetSearchQuery.value = "";
@@ -543,7 +532,6 @@ function reset() {
 watch(visible, (open) => {
   if (open) {
     reset();
-    applyStart();
     if (!props.personal) fetchDatasetOptions();
     else if (publicInputs) searchPublicDatasets();
   }
@@ -551,57 +539,11 @@ watch(visible, (open) => {
 
 // Outside a workspace there are no input files to pick: the user downloads a
 // public dataset's files from the notebook itself.
-const INPUT_FILES_STEP = 5;
+const INPUT_FILES_STEP = 4;
 const skipsStep = (i) => props.personal && i === INPUT_FILES_STEP;
 
-function applyStart() {
-  const st = props.start;
-  if (!st) return;
-  const kernel = st.layerType === "r-env" ? "r" : "jupyter";
-  const wf = props.notebookWorkflows.find((w) => (notebookKernel(w) || "jupyter") === kernel);
-  if (wf) form.value.workflowId = wf.uuid;
-  form.value.computeNodeId = st.nodeId;
-  form.value.environmentLayer = st.layerName;
-}
-
-/* ---------------------------------------------- creating an environment --- */
-// "Create one…" in the Environment step: builds one on the chosen node, and
-// selects it once it's ready (the dialog keeps looking while it's open).
-const computeResources = useComputeResourcesStore();
-const createEnvVisible = ref(false);
-const pendingEnv = ref(""); // name being built for this notebook
-let pendingTimer = null;
-const kernelLang = computed(() => (notebookKernel(selectedWorkflow.value) === "r" ? "r" : "python"));
-const canCreateEnv = computed(() => !!props.buildWorkflows?.[kernelLang.value]);
-const envInitial = computed(() => ({ lang: kernelLang.value, nodeId: form.value.computeNodeId }));
-
-function onEnvCreated({ nodeId, layerName }) {
-  pendingEnv.value = layerName;
-  watchPending(nodeId);
-}
-function watchPending(nodeId) {
-  clearTimeout(pendingTimer);
-  pendingTimer = setTimeout(async () => {
-    if (!visible.value || !pendingEnv.value) return;
-    const data = await computeResources.fetchNodeLayers(nodeId, true).catch(() => null);
-    const layer = (data?.layers || []).find((l) => l.layerName === pendingEnv.value);
-    if (layer?.status === "READY") {
-      if (form.value.computeNodeId === nodeId) form.value.environmentLayer = layer.layerName;
-      pendingEnv.value = "";
-      return;
-    }
-    watchPending(nodeId);
-  }, 15000);
-}
-watch(visible, (open) => {
-  if (!open) {
-    clearTimeout(pendingTimer);
-    pendingEnv.value = "";
-  }
-});
-
 const next = async () => {
-  if (step.value === 4) await loadDefinition(); // leaving Dataset → load inputs
+  if (step.value === 3) await loadDefinition(); // leaving Dataset → load inputs
   let n = step.value + 1;
   while (skipsStep(n)) n++;
   if (n < stepTitles.length) step.value = n;
@@ -672,9 +614,6 @@ async function execute() {
       dataSources: props.personal ? personalSources : dataSources,
       ...(name && { name }),
       ...(Object.keys(dataTargets).length > 0 && { dataTargets }),
-      // Mount the selected environment layer (python-env / r-env). `layers` is a
-      // run-request root field (workflow-service createRunRequestBody.Layers).
-      ...(form.value.environmentLayer && { layers: [form.value.environmentLayer] }),
     };
 
     console.log("[Notebook] createRun payload:", JSON.stringify(payload, null, 2));
@@ -704,7 +643,7 @@ async function execute() {
   <el-dialog
     v-model="visible"
     :title="stepTitles[step]"
-    :width="step === 5 && !personal ? '840px' : '560px'"
+    :width="step === 4 && !personal ? '840px' : '560px'"
     :close-on-click-modal="false"
   >
     <div class="wizard-body">
@@ -816,26 +755,8 @@ async function execute() {
         </p>
       </div>
 
-      <!-- Step 3: Environment -->
-      <div v-if="step === 3" class="wizard-step">
-        <p class="wizard-step-desc">
-          Optionally mount a prebuilt environment layer so its packages are
-          importable in the notebook. Only layers matching this kernel
-          ({{ notebookKernel(selectedWorkflow) === "r" ? "r-env" : "python-env" }})
-          are shown.
-        </p>
-        <EnvironmentLayerSelector
-          v-model="form.environmentLayer"
-          :compute-node-id="form.computeNodeId"
-          :session-type="notebookKernel(selectedWorkflow) || 'jupyter'"
-          :can-create="canCreateEnv"
-          :pending-name="pendingEnv"
-          @create="createEnvVisible = true"
-        />
-      </div>
-
-      <!-- Step 4: Dataset -->
-      <div v-if="step === 4 && personal && publicInputs" class="wizard-step">
+      <!-- Step 3: Dataset -->
+      <div v-if="step === 3 && personal && publicInputs" class="wizard-step">
         <p class="wizard-step-desc">
           Optionally choose a public dataset to work with. You pick which of
           its files to download from the notebook. Skip this step to start
@@ -925,7 +846,7 @@ async function execute() {
           </div>
         </template>
       </div>
-      <div v-else-if="step === 4 && personal" class="wizard-step wizard-step--disabled">
+      <div v-else-if="step === 3 && personal" class="wizard-step wizard-step--disabled">
         <p class="wizard-step-desc">
           Selecting a dataset isn't available outside a workspace yet. Public
           datasets, and datasets from your workspaces, will be selectable here.
@@ -933,7 +854,7 @@ async function execute() {
         </p>
         <el-input placeholder="Search datasets..." disabled class="wizard-search" />
       </div>
-      <div v-else-if="step === 4" class="wizard-step">
+      <div v-else-if="step === 3" class="wizard-step">
         <p class="wizard-step-desc">Select the dataset to work with.</p>
         <div v-if="selectedDataset" class="wizard-selection">
           <div class="wizard-selection-header">
@@ -979,8 +900,8 @@ async function execute() {
         </template>
       </div>
 
-      <!-- Step 5: Input files -->
-      <div v-if="step === 5 && !personal" class="wizard-step">
+      <!-- Step 4: Input files -->
+      <div v-if="step === 4 && !personal" class="wizard-step">
         <div v-if="definitionLoading" class="wizard-cards-loading">
           Loading notebook inputs...
         </div>
@@ -1031,8 +952,8 @@ async function execute() {
         </template>
       </div>
 
-      <!-- Step 6: Output destination -->
-      <div v-if="step === 6" class="wizard-step">
+      <!-- Step 5: Output destination -->
+      <div v-if="step === 5" class="wizard-step">
         <p class="wizard-step-desc">
           Configure where the notebook's results are saved.
         </p>
@@ -1069,8 +990,8 @@ async function execute() {
         </template>
       </div>
 
-      <!-- Step 7: Review -->
-      <div v-if="step === 7" class="wizard-step">
+      <!-- Step 6: Review -->
+      <div v-if="step === 6" class="wizard-step">
         <p class="wizard-step-desc">Review and start the notebook session.</p>
         <div class="wizard-summary">
           <div class="wizard-summary-row">
@@ -1089,10 +1010,6 @@ async function execute() {
               {{ cpuLabel(resourceCpu) }} ·
               {{ isAutoMemory ? `${memoryLabel(autoMemoryForCpu(resourceCpu))} (auto)` : memoryLabel(resourceMemory) }}
             </span>
-          </div>
-          <div class="wizard-summary-row">
-            <span class="wizard-summary-label">Environment</span>
-            <span class="wizard-summary-value">{{ form.environmentLayer || "None" }}</span>
           </div>
           <div v-if="personal" class="wizard-summary-row">
             <span class="wizard-summary-label">Public dataset</span>
@@ -1150,14 +1067,6 @@ async function execute() {
         </div>
       </div>
     </template>
-    <create-environment-dialog
-      v-model="createEnvVisible"
-      append-to-body
-      :build-workflows="buildWorkflows"
-      :compute-nodes="computeNodes.filter(interactiveCapable)"
-      :initial="envInitial"
-      @created="onEnvCreated"
-    />
   </el-dialog>
 </template>
 
