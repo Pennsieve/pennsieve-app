@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref, reactive, onMounted, onBeforeUnmount, nextTick, watch } from "vue";
+import { computed, h, ref, reactive, onMounted, onBeforeUnmount, nextTick, watch } from "vue";
 
 import { useStore } from "vuex";
 import { useRouter, useRoute } from "vue-router";
@@ -39,6 +39,7 @@ import BuilderBar from "./BuilderBar.vue";
 import BuilderPalette from "./BuilderPalette.vue";
 import ParamField from "./ParamField.vue";
 import { ioLine, versionManifest } from "./appManifestInfo";
+import { diffLines, manifestDiff, versionWarnings } from "./manifestDiff";
 import { builderReadiness } from "./builderReadiness";
 import StepPicker from "./StepPicker.vue";
 import { useGraphHistory, snapshot } from "./graphHistory";
@@ -227,6 +228,60 @@ const manifestsKnown = computed(() =>
 );
 const ioTypes = (port) => ioLine({ inputs: [port], outputs: [] }).replace(/ → .*$/, "");
 const showAdvanced = ref(false);
+
+/*
+  A step's app version: pinned (data.tag). Switching shows what changes,
+  from the two versions' app.yml (manifestDiff), and warns about what the
+  workflow would lose; a newer version is offered as an update.
+*/
+const newerVersion = computed(() => {
+  const node = selectedNode.value;
+  if (node?.type !== "default") return null;
+  const latest = latestVersion(node.data?.application);
+  return latest && node.data.tag && latest.version !== node.data.tag ? latest.version : null;
+});
+const updateLines = computed(() => {
+  const node = selectedNode.value;
+  if (!newerVersion.value) return [];
+  return diffLines(
+    manifestDiff(versionManifest(node.data.application, node.data.tag), versionManifest(node.data.application, newerVersion.value)),
+  );
+});
+
+const applyVersion = (node, tag) => {
+  node.data.tag = tag;
+  const m = versionManifest(node.data.application, tag);
+  if (m) {
+    node.data.paramSchema = toParamSchema(m.parameters || []);
+    node.data.manifestPorts = { inputs: m.inputs || [], outputs: m.outputs || [] };
+    node.data.hasManifest = true;
+  }
+  revalidateEdges();
+};
+
+const requestVersion = async (tag) => {
+  const node = selectedNode.value;
+  if (!node || !tag || tag === node.data.tag) return;
+  const app = node.data.application;
+  const d = manifestDiff(versionManifest(app, node.data.tag), versionManifest(app, tag));
+  const lines = diffLines(d);
+  const warnings = versionWarnings(d, node.data.defaultParams || {});
+  if (lines.length || warnings.length) {
+    try {
+      await ElMessageBox.confirm(
+        h("div", { class: "version-change" }, [
+          lines.length ? h("ul", lines.map((l) => h("li", l))) : null,
+          ...warnings.map((w) => h("p", { class: "version-warning" }, `⚠ ${w}`)),
+        ]),
+        `Use version ${tag}?`,
+        { confirmButtonText: `Use ${tag}`, cancelButtonText: "Keep current", type: warnings.length ? "warning" : "info" },
+      );
+    } catch {
+      return;
+    }
+  }
+  applyVersion(node, tag);
+};
 
 // app.yml as written, in a dialog.
 const appYml = ref(null); // { title, text }
@@ -2542,60 +2597,44 @@ const openNodeSettings = (id) => {
                 </div>
               </template>
 
-              <!-- Processor version -->
+              <!-- The step's app version (pinned), and what an update changes -->
               <template
                 v-if="
                   selectedNode.type === 'default' &&
                   selectedNode.data.application?.versions?.length
                 "
               >
-                <h4 class="sidebar-section-title">Application Version</h4>
+                <h4 class="sidebar-section-title">Version</h4>
                 <div class="info-card">
                   <div class="info-row">
                     <span class="info-label">Version</span>
                     <el-select
                       v-if="canEditConfig"
-                      v-model="selectedNode.data.tag"
+                      :model-value="selectedNode.data.tag"
                       size="small"
                       class="info-inline-select"
+                      @update:model-value="requestVersion"
                     >
                       <el-option
-                        v-for="v in sortedVersions(
-                          selectedNode.data.application,
-                        )"
+                        v-for="v in sortedVersions(selectedNode.data.application)"
                         :key="v.version"
                         :label="versionOptionLabel(selectedNode.data.application, v)"
                         :value="v.version"
                       />
                     </el-select>
-                    <span v-else class="info-value">
-                      {{ selectedNode.data.tag || "—" }}
-                      <span
-                        v-if="
-                          selectedNode.data.tag &&
-                          latestVersion(selectedNode.data.application) &&
-                          selectedNode.data.tag !==
-                            latestVersion(selectedNode.data.application).version
-                        "
-                        class="version-outdated-badge"
-                      >
-                        older — latest
-                        {{
-                          latestVersion(selectedNode.data.application).version
-                        }}
-                      </span>
-                      <span
-                        v-else-if="
-                          selectedNode.data.tag &&
-                          latestVersion(selectedNode.data.application) &&
-                          selectedNode.data.tag ===
-                            latestVersion(selectedNode.data.application).version
-                        "
-                        class="version-latest-badge"
-                      >
-                        latest
-                      </span>
-                    </span>
+                    <span v-else class="info-value">{{ selectedNode.data.tag || "—" }}</span>
+                  </div>
+                  <div v-if="newerVersion" class="update-note">
+                    <div class="update-head">
+                      <span>Update available: <strong>{{ newerVersion }}</strong></span>
+                      <button v-if="canEditConfig" type="button" class="text-link-btn" @click="requestVersion(newerVersion)">
+                        Update
+                      </button>
+                    </div>
+                    <ul v-if="updateLines.length" class="update-lines">
+                      <li v-for="l in updateLines" :key="l">{{ l }}</li>
+                    </ul>
+                    <p v-else class="update-lines-none">No changes declared in app.yml.</p>
                   </div>
                 </div>
               </template>
@@ -3032,6 +3071,18 @@ const openNodeSettings = (id) => {
 @import "@vue-flow/core/dist/theme-default.css";
 @import "@vue-flow/minimap/dist/style.css";
 
+/* The "Use version …?" confirmation (rendered outside the builder). */
+.version-change {
+  ul {
+    margin: 0 0 8px;
+    padding-left: 18px;
+  }
+  .version-warning {
+    margin: 4px 0 0;
+    color: #92400e;
+  }
+}
+
 /* Handle styles — must be unscoped so VueFlow can render them */
 .workflow-builder-flow {
   .vue-flow__node {
@@ -3113,6 +3164,31 @@ const openNodeSettings = (id) => {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+}
+
+.update-note {
+  margin-top: 8px;
+  padding: 8px 10px;
+  border: 1px solid #fcd9a6;
+  border-radius: 4px;
+  background: #fff8ec;
+  font-size: 12px;
+  color: theme.$gray_6;
+}
+.update-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.update-lines {
+  margin: 6px 0 0;
+  padding-left: 16px;
+  color: theme.$gray_5;
+}
+.update-lines-none {
+  margin: 4px 0 0;
+  color: theme.$gray_4;
 }
 
 .version-pill {
