@@ -503,8 +503,6 @@ onBeforeUnmount(() => {
 
 /* Lined up with the Analysis tabs above (32px). */
 .notebooks-container {
-  max-width: 1000px;
-  margin: 0;
   padding: 20px 32px;
 }
 /* End-session dialog footer: right-aligned buttons with an even 8px gap (the

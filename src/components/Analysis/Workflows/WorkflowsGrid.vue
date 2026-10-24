@@ -403,8 +403,6 @@ onMounted(async () => {
 
 /* Lined up with the toolbar above and the Analysis tabs (32px). */
 .workflows-container {
-  max-width: 1000px;
-  margin: 0;
   padding: 20px 32px;
 }
 

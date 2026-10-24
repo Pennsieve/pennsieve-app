@@ -1010,7 +1010,6 @@ onBeforeUnmount(() => {
   flex-direction: column;
   align-items: center;
   gap: 8px;
-  max-width: 1000px;
   padding: 72px 20px;
   border: 1px dashed theme.$gray_3;
   text-align: center;
