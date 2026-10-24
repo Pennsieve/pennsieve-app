@@ -3,19 +3,15 @@
 // list's versions). Apps without an app.yml have none, and are shown and
 // used as before, marked "No manifest".
 import { validateAppConnection } from "../Applications/applicationSchema";
-import { notebookKernel } from "../RunMonitor/notebookHelpers";
-
 // The session type of an interactive (human-in-the-loop) app, e.g. a
-// notebook kernel: "jupyter" or "r"; null for a batch app. As its app.yml
-// declares it (runtime.interactive, runtime.sessionType), else read from
-// the name as the Notebooks page does (notebookKernel):
-// "pennsieve-jupyter-session", "pennsieve-r-session".
+// notebook kernel: "jupyter" or "r"; null for a batch app. Only as its
+// app.yml declares it (runtime.interactive, runtime.sessionType): the one
+// place an app says it's interactive.
 export function sessionTypeOf(app) {
   const runtime = versionManifest(app)?.runtime;
   if (runtime?.sessionType) return runtime.sessionType === "python" ? "jupyter" : runtime.sessionType;
   if (runtime?.interactive) return "jupyter";
-  const repo = (app?.sourceUrl || "").replace(/\.git$/, "").split("/").pop() || "";
-  return notebookKernel({ name: [versionManifest(app)?.name, app?.name, repo].filter(Boolean).join(" ") });
+  return null;
 }
 
 const newestFirst = (versions) =>
