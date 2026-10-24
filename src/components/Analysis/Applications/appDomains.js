@@ -6,10 +6,13 @@
 import { versionManifest, shortMediaType, sessionTypeOf } from "../WorkflowBuilder/appManifestInfo";
 import { appTitle } from "./appCards";
 
+// A domain is a subject (what the app is about: EEG, imaging, genomics…) or
+// a task (what it does with it: visualization, conversion, statistics…).
 // The icon is an SVG path on a 24×24 grid, drawn as a stroke.
 export const DOMAINS = [
   {
     key: "ephys",
+    subject: true,
     label: "Electrophysiology",
     tag: "electrophysiology",
     hue: 255,
@@ -18,6 +21,7 @@ export const DOMAINS = [
   },
   {
     key: "spikes",
+    subject: true,
     label: "Spike sorting",
     tag: "spike-sorting",
     hue: 340,
@@ -26,6 +30,7 @@ export const DOMAINS = [
   },
   {
     key: "imaging",
+    subject: true,
     label: "Imaging",
     tag: "imaging",
     hue: 190,
@@ -34,6 +39,7 @@ export const DOMAINS = [
   },
   {
     key: "genomics",
+    subject: true,
     label: "Genomics",
     tag: "genomics",
     hue: 140,
@@ -98,13 +104,14 @@ for (const d of DOMAINS) for (const t of [d.tag, d.key, d.label, ...d.aliases]) 
 
 export const domainOfTag = (tag) => BY_TAG.get(normalize(tag)) || null;
 
-// The app's domain: its first category, else tag, that names one, else
-// Notebook for an app whose app.yml says it's a live session.
+// The app's domain: the first subject its categories, then tags, name,
+// since what an app is about says more than what it does ("Visualization,
+// Single Cell" is Genomics); else the first task; else Notebook for an app
+// whose app.yml says it's a live session.
 export function domainOf(manifest) {
-  for (const t of [...(manifest?.categories || []), ...(manifest?.tags || [])]) {
-    const d = domainOfTag(t);
-    if (d) return d;
-  }
+  const named = [...(manifest?.categories || []), ...(manifest?.tags || [])].map(domainOfTag).filter(Boolean);
+  const d = named.find((x) => x.subject) || named[0];
+  if (d) return d;
   if (manifest?.runtime?.interactive || manifest?.runtime?.sessionType) return DOMAINS.find((d) => d.key === "notebook");
   return null;
 }

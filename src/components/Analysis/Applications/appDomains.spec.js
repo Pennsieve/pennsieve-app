@@ -25,11 +25,15 @@ describe("app domains", () => {
     expect(domainOfTag("my-lab")).toBeNull();
   });
 
-  it("takes the first tag that names a domain, else a live session's", () => {
+  it("takes the first subject named, else the first task, else a live session's", () => {
     expect(domainOf({ tags: ["penn", "MRI", "eeg"] }).key).toBe("imaging");
     expect(domainOf({ tags: ["penn"] })).toBeNull();
     expect(domainOf({ categories: ["Single Cell"], tags: ["eeg"] }).key).toBe("genomics");
     expect(domainOf({ categories: ["Utility", "Visualization"] }).key).toBe("viz");
+    // A subject wins over a task, wherever it's named.
+    expect(domainOf({ categories: ["Visualization", "Single Cell"] }).key).toBe("genomics");
+    expect(domainOf({ categories: ["Statistics"], tags: ["eeg"] }).key).toBe("ephys");
+    expect(domainOf({ categories: ["Statistics", "Visualization"] }).key).toBe("stats");
     expect(domainOf({ categories: ["Format Conversion"] }).key).toBe("convert");
     expect(domainOf({ tags: [], runtime: { interactive: true } }).key).toBe("notebook");
     expect(domainOf(null)).toBeNull();
