@@ -66,7 +66,6 @@ const newWorkflow = () => router.push({ name: scoped("workflows"), query: { view
   justify-content: space-between;
   gap: 16px;
   padding: 16px 32px;
-  border-bottom: 1px solid theme.$gray_2;
   background: theme.$white;
 }
 .gallery-views {

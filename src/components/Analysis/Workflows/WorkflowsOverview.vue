@@ -47,7 +47,7 @@ watch(() => route.query.run, openRunFromQuery);
 
 <template>
   <div class="wf-page">
-    <div class="wf-toolbar">
+    <div class="wf-toolbar" :class="{ 'wf-toolbar--builder': view === 'builder' }">
       <div class="wf-views" role="tablist">
         <button
           v-for="v in VIEWS"
@@ -95,8 +95,12 @@ watch(() => route.query.run, openRunFromQuery);
   justify-content: space-between;
   gap: 16px;
   padding: 16px 32px;
-  border-bottom: 1px solid theme.$gray_2;
   background: theme.$white;
+}
+/* No rule under the bar on Live, as on the Notebooks tab; the builder keeps
+   one, where the canvas starts right below it. */
+.wf-toolbar--builder {
+  border-bottom: 1px solid theme.$gray_2;
 }
 .wf-views {
   display: inline-flex;
