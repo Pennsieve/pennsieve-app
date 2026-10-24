@@ -537,15 +537,19 @@ onMounted(async () => {
   }
 }
 
-/* Wide cards, two to a row where they fit: graphs need width and height. */
+$card-height: 172px;
+
+/* Wide cards, two to a row where they fit, of one height with a square
+   graph, as the apps' (ApplicationsGrid): the rows line up. */
 .workflows-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
   gap: 16px;
 }
 
 .wf-card {
   display: flex;
+  height: $card-height;
   min-width: 0;
   border: 1px solid theme.$gray_2;
   background: theme.$white;
@@ -569,7 +573,8 @@ onMounted(async () => {
 }
 /* The graph, on the builder's dotted canvas. */
 .wf-thumb {
-  flex: 0 0 150px;
+  flex: 0 0 $card-height;
+  box-sizing: border-box;
   padding: 8px;
   border-right: 1px solid theme.$gray_2;
   background-color: theme.$gray_1;
@@ -619,15 +624,20 @@ onMounted(async () => {
   color: theme.$gray_5;
 }
 .wf-io {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-size: 12px;
   color: theme.$gray_6;
 }
+/* One line: the first apps, then +n. */
 .wf-apps {
   display: flex;
-  flex-wrap: wrap;
   gap: 4px;
+  overflow: hidden;
 }
 .wf-app {
+  flex-shrink: 0;
   max-width: 160px;
   overflow: hidden;
   text-overflow: ellipsis;
