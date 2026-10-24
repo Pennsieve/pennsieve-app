@@ -5,7 +5,7 @@
 // costs), and Builder, the canvas for a new workflow. The list of workflows
 // is in the Gallery. Both choices are in the URL (?view=builder,
 // ?notebooks=1), as on the Notebooks tab.
-import { computed, ref } from "vue";
+import { computed, nextTick, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import BfButton from "../../shared/bf-button/BfButton.vue";
 import RunsOverview from "../RunMonitor/RunsOverview.vue";
@@ -29,6 +29,20 @@ const includeNotebooks = computed({
 });
 
 const runsRef = ref(null);
+
+// A Gallery card's Run lands here with ?run=<workflow>: the wizard opens on
+// it, and the query goes, so a reload doesn't open it again.
+async function openRunFromQuery() {
+  const id = route.query.run;
+  if (!id) return;
+  if (view.value !== "live") view.value = "live";
+  await nextTick();
+  runsRef.value?.openWizardDialog(String(id));
+  const { run, ...rest } = route.query;
+  router.replace({ query: rest });
+}
+onMounted(openRunFromQuery);
+watch(() => route.query.run, openRunFromQuery);
 </script>
 
 <template>

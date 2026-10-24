@@ -362,7 +362,17 @@ const fetchDatasetOptions = async (query = "") => {
   }
 };
 
-defineExpose({ openWizardDialog: () => openWizardDialog() });
+// The Workflows tab opens the wizard, on a workflow when a Gallery card's Run
+// sent the user here: it starts at choosing the compute node.
+defineExpose({
+  openWizardDialog: (workflowId) => {
+    openWizardDialog();
+    if (workflowId) {
+      wizardForm.value.workflowId = workflowId;
+      wizardStep.value = 1;
+    }
+  },
+});
 
 const onDatasetSearch = (query) => {
   clearTimeout(datasetSearchTimer);

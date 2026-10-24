@@ -6,6 +6,8 @@ import { useRouter, useRoute } from "vue-router";
 import BfButton from "../../shared/bf-button/BfButton.vue";
 import IconAnalysis from "../../icons/IconAnalysis.vue";
 import IconPennsieveMark from "../../icons/IconPennsieveMark.vue";
+import WorkflowThumbnail from "../WorkflowGraph/WorkflowThumbnail.vue";
+import { ioSummary, appNames, usageLine } from "./workflowSummary";
 
 defineProps({
   // Inside the Gallery, whose toolbar has the New Workflow button.
@@ -76,26 +78,8 @@ watch(filteredWorkflows, () => {
   currentPage.value = 1;
 });
 
-const getWorkflowMetrics = (wf) => {
-  const m = wf.metrics;
-  if (!m || !m.totalRuns) return null;
-  return m;
-};
 
-const formatDuration = (v) => {
-  if (v == null) return "--";
-  if (v < 1) return `${(v * 1000).toFixed(0)}ms`;
-  if (v < 60) return `${v.toFixed(1)}s`;
-  if (v < 3600) return `${(v / 60).toFixed(1)}m`;
-  return `${(v / 3600).toFixed(1)}h`;
-};
 
-const formatCost = (v) => {
-  if (v == null) return "--";
-  if (v < 0.01) return `$${v.toFixed(4)}`;
-  if (v < 1) return `$${v.toFixed(3)}`;
-  return `$${v.toFixed(2)}`;
-};
 
 const formatRelativeTime = (dateString) => {
   if (!dateString) return null;
@@ -198,6 +182,16 @@ const fetchAllWorkflows = async () => {
   }
 };
 
+// What the cards name: target types (outputs) and applications (steps).
+const targetTypes = computed(() => store.getters["analysisModule/targetTypes"] || []);
+const applications = computed(() => store.getters["analysisModule/applications"] || []);
+
+// Run from a card: the Workflows tab's Live view, with the run wizard open on
+// this workflow.
+const runWorkflow = (wf) => {
+  router.push({ name: isMyWorkspace.value ? "my-workflows" : "workflows", query: { run: wf.uuid } });
+};
+
 // Re-fetch all when the status or scope filter changes
 watch([statusFilter, scopeFilter], () => {
   currentPage.value = 1;
@@ -205,6 +199,8 @@ watch([statusFilter, scopeFilter], () => {
 });
 
 onMounted(async () => {
+  store.dispatch("analysisModule/fetchTargetTypes").catch(() => {});
+  store.dispatch("analysisModule/fetchApplications").catch(() => {});
   await fetchAllWorkflows();
 });
 </script>
@@ -272,97 +268,56 @@ onMounted(async () => {
       </p>
 
       <div v-if="filteredWorkflows.length > 0" class="workflows-grid">
+        <!-- A card: the graph on the left; what it is, does and runs on the
+             right; Open and Run. -->
         <div
           v-for="wf in paginatedWorkflows"
           :key="wf.uuid"
           class="wf-card"
+          :class="{ 'is-inactive': !wf.isActive }"
+          role="link"
+          tabindex="0"
           @click="goToDetail(wf)"
+          @keydown.enter="goToDetail(wf)"
         >
-          <div class="wf-header">
-            <div class="wf-info">
-              <h3>
-                <button
-                  type="button"
-                  class="wf-name-link"
-                  @click.stop="goToDetail(wf)"
-                >
-                  {{ wf.name }}
-                </button>
-              </h3>
-              <div class="wf-subtitle">Workflow</div>
-              <div v-if="wf.description" class="wf-description">
-                {{ wf.description }}
-              </div>
-              <div class="wf-tags">
-                <span
-                  class="tag"
-                  :class="wf.isActive ? 'active' : 'inactive'"
-                >
-                  {{ wf.isActive ? 'Active' : 'Inactive' }}
-                </span>
-                <span class="tag nodes">
-                  {{ (wf.dag || []).length }} nodes
-                </span>
-                <span class="tag created">
-                  {{ new Date(wf.createdAt).toLocaleDateString() }}
-                </span>
-                <span v-if="wf.visibility === 'public'" class="tag public">
-                  Public
-                </span>
-                <el-tooltip
-                  v-if="wf.official"
-                  content="This workflow has been reviewed and validated by Pennsieve."
-                  placement="top"
-                >
-                  <span class="official-mark" @click.stop>
-                    <IconPennsieveMark :width="14" :height="14" color="currentColor" />
-                  </span>
-                </el-tooltip>
-              </div>
-            </div>
-
-            <div
-              class="last-run-pill"
-              :class="lastRunInfo(wf).statusKey"
-            >
-              <span class="last-run-dot" />
-              {{ lastRunInfo(wf).label }}
-            </div>
+          <div class="wf-thumb">
+            <WorkflowThumbnail :dag="wf.dag || []" :aspect="1" />
           </div>
-
-          <div class="wf-card-actions">
-            <div v-if="getWorkflowMetrics(wf)" class="wf-metrics">
-              <span class="metric-item">
-                <span class="metric-value">
-                  {{ getWorkflowMetrics(wf).totalRuns }}
+          <div class="wf-body">
+            <div class="wf-title">
+              <span class="wf-name">{{ wf.name }}</span>
+              <el-tooltip
+                v-if="wf.official"
+                content="Reviewed and validated by Pennsieve."
+                placement="top"
+              >
+                <span class="official-mark" @click.stop>
+                  <IconPennsieveMark :width="14" :height="14" color="currentColor" />
                 </span>
-                <span class="metric-label">runs</span>
-              </span>
-              <span class="metric-divider" />
-              <span class="metric-item">
-                <span class="metric-value">
-                  {{ Math.round(getWorkflowMetrics(wf).successRate) }}%
-                </span>
-                <span class="metric-label">success</span>
-              </span>
-              <span class="metric-divider" />
-              <span class="metric-item">
-                <span class="metric-value">
-                  {{ formatDuration(getWorkflowMetrics(wf).avgDurationSec) }}
-                </span>
-                <span class="metric-label">avg duration</span>
+              </el-tooltip>
+              <span v-if="!wf.isActive" class="wf-badge">Inactive</span>
+              <span v-else-if="wf.visibility === 'public' && !wf.official" class="wf-badge">Public</span>
+            </div>
+            <p class="wf-description">{{ wf.description || "No description." }}</p>
+            <div class="wf-io">{{ ioSummary(wf, targetTypes) }}</div>
+            <div v-if="appNames(wf, applications).length" class="wf-apps">
+              <span v-for="name in appNames(wf, applications).slice(0, 3)" :key="name" class="wf-app">{{ name }}</span>
+              <span v-if="appNames(wf, applications).length > 3" class="wf-app wf-app--more">
+                +{{ appNames(wf, applications).length - 3 }}
               </span>
             </div>
-            <span v-else class="empty-footer-text">No runs to report</span>
-
-            <button
-              type="button"
-              class="card-action-link"
-              @click.stop="goToDetail(wf)"
-            >
-              <span>View details</span>
-              <span class="arrow">&rarr;</span>
-            </button>
+            <div class="wf-foot">
+              <span class="wf-usage">
+                <span class="last-run-dot" :class="lastRunInfo(wf).statusKey" />
+                {{ usageLine(wf, formatRelativeTime) }}
+              </span>
+              <span class="wf-actions" @click.stop>
+                <button type="button" class="wf-action" @click="goToDetail(wf)">Open</button>
+                <button v-if="wf.isActive" type="button" class="wf-action wf-action--run" @click="runWorkflow(wf)">
+                  ▶ Run
+                </button>
+              </span>
+            </div>
           </div>
         </div>
       </div>
@@ -503,65 +458,163 @@ onMounted(async () => {
   }
 }
 
+/* Wide cards, two to a row where they fit: graphs need width and height. */
 .workflows-grid {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(420px, 1fr));
   gap: 16px;
 }
 
 .wf-card {
-  background: white;
+  display: flex;
+  min-width: 0;
   border: 1px solid theme.$gray_2;
-  padding: 20px;
-  transition: border-color 0.2s ease;
+  border-radius: 6px;
+  background: theme.$white;
+  overflow: hidden;
   cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 
-  &:hover {
-    border-color: theme.$gray_3;
+  &:hover,
+  &:focus-visible {
+    border-color: theme.$purple_1;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+    outline: none;
+  }
+  &:hover .wf-actions,
+  &:focus-within .wf-actions {
+    opacity: 1;
+  }
+  &.is-inactive {
+    opacity: 0.7;
   }
 }
-
-.wf-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 16px;
+/* The graph, on the builder's dotted canvas. */
+.wf-thumb {
+  flex: 0 0 150px;
+  padding: 8px;
+  border-right: 1px solid theme.$gray_2;
+  background-color: theme.$gray_1;
+  background-image: radial-gradient(theme.$gray_3 1px, transparent 1px);
+  background-size: 12px 12px;
 }
-
-.wf-info {
+.wf-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
   flex: 1;
   min-width: 0;
-
-  h3 {
-    font-size: 16px;
-    font-weight: 500;
-    color: theme.$gray_6;
-    margin: 0 0 8px 0;
-  }
+  padding: 14px 16px 12px;
 }
-
-.wf-name-link {
-  background: none;
-  border: none;
-  padding: 0;
+.wf-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.wf-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 15px;
+  font-weight: 600;
+  color: theme.$gray_6;
+}
+.wf-badge {
+  flex-shrink: 0;
+  padding: 0 6px;
+  border-radius: 3px;
+  background: theme.$gray_0;
+  color: theme.$gray_5;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+.wf-description {
+  display: -webkit-box;
+  margin: 0;
+  overflow: hidden;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  font-size: 13px;
+  line-height: 1.4;
+  color: theme.$gray_5;
+}
+.wf-io {
+  font-size: 12px;
+  color: theme.$gray_6;
+}
+.wf-apps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.wf-app {
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 1px 7px;
+  border-radius: 3px;
+  background: rgba(224, 145, 42, 0.12);
+  color: #9a5c0f;
+  font-size: 11px;
+  font-weight: 500;
+}
+.wf-app--more {
+  background: theme.$gray_0;
+  color: theme.$gray_5;
+}
+.wf-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: auto;
+  padding-top: 6px;
+}
+.wf-usage {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: theme.$gray_4;
+}
+.wf-actions {
+  display: flex;
+  gap: 6px;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+.wf-action {
+  padding: 3px 10px;
+  border: 1px solid theme.$gray_3;
+  border-radius: 4px;
+  background: theme.$white;
   font: inherit;
+  font-size: 12px;
   color: theme.$gray_6;
   cursor: pointer;
-  text-align: left;
-  text-decoration: none;
-  transition: color 0.2s ease;
 
   &:hover {
-    color: theme.$purple_2;
-    text-decoration: underline;
+    border-color: theme.$purple_1;
+    color: theme.$purple_3;
   }
 }
+.wf-action--run {
+  border-color: theme.$purple_3;
+  background: theme.$purple_3;
+  color: theme.$white;
 
-.wf-subtitle {
-  font-size: 13px;
-  color: theme.$gray_5;
-  margin-bottom: 6px;
-  font-weight: 400;
+  &:hover {
+    background: theme.$purple_2;
+    color: theme.$white;
+  }
+}
+@media (hover: none) {
+  .wf-actions {
+    opacity: 1;
+  }
 }
 
 .wf-description {
@@ -572,164 +625,22 @@ onMounted(async () => {
   word-break: break-word;
 }
 
-.last-run-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
+/* A card's last run, as a dot by its usage line. */
+.last-run-dot {
+  width: 8px;
+  height: 8px;
   flex-shrink: 0;
-  padding: 4px 12px;
-  border-radius: 999px;
-  font-size: 12px;
-  font-weight: 500;
-  white-space: nowrap;
+  border-radius: 50%;
+  background: theme.$gray_4;
 
-  .last-run-dot {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    flex-shrink: 0;
-  }
-
-  &.gray {
-    background: theme.$gray_2;
-    color: theme.$gray_5;
-    .last-run-dot { background: theme.$gray_4; }
-  }
-
-  &.enabled {
-    background: rgba(theme.$status_green, 0.12);
-    color: theme.$status_green;
-    .last-run-dot { background: theme.$status_green; }
-  }
-
-  &.pending {
-    background: rgba(#F59E0B, 0.12);
-    color: #B45309;
-    .last-run-dot { background: #F59E0B; }
-  }
-
-  &.failed {
-    background: rgba(#EF4444, 0.12);
-    color: #DC2626;
-    .last-run-dot { background: #DC2626; }
-  }
+  &.enabled { background: theme.$status_green; }
+  &.pending { background: #f59e0b; }
+  &.failed { background: theme.$status_red; }
 }
-
-.wf-tags {
-  display: flex;
-  gap: 6px;
-  margin-top: 8px;
-  flex-wrap: wrap;
-
-  .tag {
-    display: inline-block;
-    padding: 2px 8px;
-    border-radius: 3px;
-    font-size: 11px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-
-    &.active {
-      background: rgba(theme.$status_green, 0.12);
-      color: theme.$status_green;
-    }
-
-    &.inactive {
-      background: theme.$gray_2;
-      color: theme.$gray_5;
-    }
-
-    &.nodes,
-    &.created {
-      background: theme.$gray_1;
-      color: theme.$gray_5;
-    }
-
-    &.public {
-      background: theme.$green_tint;
-      color: theme.$status_green;
-    }
-  }
-}
-
 .official-mark {
   display: inline-flex;
   align-items: center;
   color: theme.$purple_3;
-}
-
-.wf-card-actions {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 18px;
-  margin-top: 14px;
-  padding-top: 14px;
-  border-top: 1px solid theme.$gray_2;
-  flex-wrap: wrap;
-}
-
-.wf-metrics {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.metric-item {
-  display: flex;
-  align-items: baseline;
-  gap: 3px;
-}
-
-.metric-value {
-  font-size: 14px;
-  font-weight: 700;
-  color: theme.$black;
-}
-
-.metric-label {
-  font-size: 10px;
-  color: theme.$gray_4;
-}
-
-.metric-divider {
-  width: 1px;
-  height: 14px;
-  background: theme.$gray_3;
-}
-
-.empty-footer-text {
-  font-size: 12px;
-  color: theme.$gray_4;
-  font-style: italic;
-}
-
-.card-action-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  background: none;
-  border: none;
-  padding: 0;
-  font: inherit;
-  font-size: 13px;
-  font-weight: 500;
-  color: theme.$purple_3;
-  text-decoration: none;
-  cursor: pointer;
-
-  &:hover {
-    text-decoration: underline;
-  }
-
-  .arrow {
-    transition: transform 0.15s ease;
-  }
-
-  &:hover .arrow {
-    transform: translateX(2px);
-  }
 }
 
 .workflows-pagination {
