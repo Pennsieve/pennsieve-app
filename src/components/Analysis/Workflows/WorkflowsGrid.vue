@@ -7,6 +7,12 @@ import BfButton from "../../shared/bf-button/BfButton.vue";
 import IconAnalysis from "../../icons/IconAnalysis.vue";
 import IconPennsieveMark from "../../icons/IconPennsieveMark.vue";
 
+defineProps({
+  // Inside the Workflows tab's Builder view, whose toolbar has the New
+  // Workflow button.
+  embedded: { type: Boolean, default: false },
+});
+
 const store = useStore();
 const router = useRouter();
 const route = useRoute();
@@ -148,6 +154,7 @@ const lastRunStatusKey = (status, successRate) => {
 const goToCreate = () => {
   router.push({ name: isMyWorkspace.value ? "my-workflow-create" : "workflow-create" });
 };
+defineExpose({ goToCreate });
 
 const goToDetail = (wf) => {
   router.push({
@@ -204,8 +211,8 @@ onMounted(async () => {
 
 <template>
   <div class="workflows-container">
-    <!-- Info Section -->
-    <div class="info-section">
+    <!-- Info Section (the Workflows tab has its own toolbar) -->
+    <div v-if="!embedded" class="info-section">
       <div class="info-card">
         <h3>Compute Workflows</h3>
         <p>

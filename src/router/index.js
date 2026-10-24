@@ -154,12 +154,11 @@ const AppManifestGuide = () => import ('../components/Analysis/Applications/AppM
 const AppManifestBuilder = () => import ('../components/Analysis/Applications/AppManifestBuilder.vue')
 const ActivityMonitor = () => import ('../components/Analysis/Activity/ActivityMonitor.vue')
 const RunMonitor = () => import ('../components/Analysis/RunMonitor/RunMonitor.vue')
-const RunsOverview = () => import ('../components/Analysis/RunMonitor/RunsOverview.vue')
 const RunDetail = () => import ('../components/Analysis/RunMonitor/RunDetail.vue')
 const NotebooksOverview = () => import ('../components/Analysis/RunMonitor/NotebooksOverview.vue')
 const NotebookSession = () => import ('../components/Analysis/JupyterSession/NotebookSession.vue')
 const WorkflowBuilder = () => import ('../components/Analysis/WorkflowBuilder/WorkflowBuilder.vue')
-const WorkflowsGrid = () => import ('../components/Analysis/Workflows/WorkflowsGrid.vue')
+const WorkflowsOverview = () => import ('../components/Analysis/Workflows/WorkflowsOverview.vue')
 
 /**
  * Metadata Components
@@ -540,14 +539,11 @@ const router = createRouter({
               }
             },
             {
+              // Runs are on the Workflows tab's Live view (and notebooks on
+              // the Notebooks tab); old links land there.
               name: 'my-runs',
               path: 'runs',
-              component: RunsOverview,
-              meta: {
-                hideSecondaryNav: true,
-                title: 'Runs',
-                description: 'Your runs outside any workspace.'
-              }
+              redirect: { name: 'my-workflows' }
             },
             {
               // Before 'runs/:runId', which would otherwise match 'configure'
@@ -621,7 +617,7 @@ const router = createRouter({
             {
               name: 'my-workflows',
               path: 'workflows',
-              component: WorkflowsGrid,
+              component: WorkflowsOverview,
               meta: {
                 hideSecondaryNav: true,
                 title: 'Workflows',
@@ -1985,15 +1981,16 @@ const router = createRouter({
         navigation: BfNavigation
       },
       redirect: {
-        name: 'runs'
+        name: 'notebooks'
       },
       props: true,
       children: [
         {
+          // Live (the workflow runs) and Builder (the workflows)
           name: 'workflows',
           path: 'workflows',
           components: {
-            stage: WorkflowsGrid,
+            stage: WorkflowsOverview,
           }
         },
         {
@@ -2014,11 +2011,11 @@ const router = createRouter({
           }
         },
         {
+          // Runs are on the Workflows tab's Live view (and notebooks on the
+          // Notebooks tab); old links land there.
           name: 'runs',
           path: 'runs',
-          components: {
-            stage: RunsOverview,
-          }
+          redirect: (to) => ({ name: 'workflows', params: to.params })
         },
         {
           name: 'notebooks',

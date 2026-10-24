@@ -8,10 +8,6 @@ const tabs = [
     to: 'my-notebooks',
   },
   {
-    name: 'Runs',
-    to: 'my-runs',
-  },
-  {
     name: 'Workflows',
     to: 'my-workflows',
   },

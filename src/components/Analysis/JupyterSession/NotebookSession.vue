@@ -99,7 +99,7 @@ const crumbs = computed(() => [
           v-if="resolvedOrgId"
           page-name="Analysis"
           :crumbs="crumbs"
-          :page-route="{ name: 'runs', params: { orgId: resolvedOrgId } }"
+          :page-route="{ name: 'notebooks', params: { orgId: resolvedOrgId } }"
           :workspace-route="workspaceRoute"
         />
       </template>

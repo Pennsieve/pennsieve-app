@@ -2,7 +2,7 @@
   <bf-page>
     <bf-rafter slot="heading" class="primary" :org-id="orgId">
       <template #breadcrumb>
-        <org-breadcrumb page-name="Analysis" :crumbs="breadcrumbCrumbs" :page-route="{ name: 'runs' }" />
+        <org-breadcrumb page-name="Analysis" :crumbs="breadcrumbCrumbs" :page-route="{ name: 'notebooks' }" />
       </template>
     </bf-rafter>
     <div class="content-tabs">
@@ -22,6 +22,7 @@ import OrgBreadcrumb from "../../components/shared/OrgBreadcrumb/OrgBreadcrumb.v
 import { useComputeResourcesStore } from "@/stores/computeResourcesStore";
 import { useGetToken } from "@/composables/useGetToken";
 import EventBus from "@/utils/event-bus";
+import { isNotebookWorkflow } from "@/components/Analysis/RunMonitor/notebookHelpers";
 
 export default {
   name: "IntegrationView",
@@ -53,12 +54,20 @@ export default {
       const node = nodes.find(n => n.uuid === nodeId);
       return node?.name || '';
     },
+    // Whether the run on a run page is a notebook's (Notebooks tab) rather than
+    // a workflow's, from the runs already loaded.
+    runIsNotebook() {
+      const runId = this.$route.params.runId;
+      if (!runId) return false;
+      const runs = this.$store.getters["analysisModule/workflowInstances"] || [];
+      const run = runs.find((r) => r.uuid === runId);
+      return !!run && isNotebookWorkflow({ name: run.workflowName });
+    },
     breadcrumbCrumbs() {
       const routeName = this.$route.name;
 
       // Top-level tabs: just one crumb (the tab name, as current)
       const topLevelTabs = {
-        'runs': 'Runs',
         'notebooks': 'Notebooks',
         'workflows': 'Workflows',
         'applications': 'Applications',
@@ -70,10 +79,13 @@ export default {
 
       // Sub-pages: parent tab as link + detail name as current
       const subPages = {
-        'run-detail': { parent: 'Runs', parentRoute: { name: 'runs' } },
-        'run-configure': { parent: 'Runs', parentRoute: { name: 'runs' } },
-        'workflow-detail': { parent: 'Workflows', parentRoute: { name: 'workflows' } },
-        'workflow-create': { parent: 'Workflows', parentRoute: { name: 'workflows' } },
+        // A notebook's run belongs to Notebooks, any other to Workflows' Live.
+        'run-detail': this.runIsNotebook
+          ? { parent: 'Notebooks', parentRoute: { name: 'notebooks' } }
+          : { parent: 'Workflows', parentRoute: { name: 'workflows' } },
+        'run-configure': { parent: 'Workflows', parentRoute: { name: 'workflows' } },
+        'workflow-detail': { parent: 'Workflows', parentRoute: { name: 'workflows', query: { view: 'builder' } } },
+        'workflow-create': { parent: 'Workflows', parentRoute: { name: 'workflows', query: { view: 'builder' } } },
         'application-detail': { parent: 'Applications', parentRoute: { name: 'applications' } },
         'application-manifest-guide': { parent: 'Applications', parentRoute: { name: 'applications' } },
         'application-manifest-builder': { parent: 'Applications', parentRoute: { name: 'applications' } },
@@ -141,10 +153,6 @@ export default {
   data() {
     return {
       tabs: [
-        {
-          name: "Runs",
-          to: "runs",
-        },
         {
           name: "Notebooks",
           to: "notebooks",

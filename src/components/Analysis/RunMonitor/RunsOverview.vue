@@ -13,6 +13,15 @@ import { useGetToken } from "@/composables/useGetToken";
 import { useSendXhr } from "@/mixins/request/request_composable";
 import { useMetricsCounters } from "@/composables/useMetricsCounters";
 import toQueryParams from "@/utils/toQueryParams";
+import { isNotebookWorkflow } from "./notebookHelpers";
+
+const props = defineProps({
+  // Inside the Workflows tab (WorkflowsOverview), which has the toolbar and
+  // its Run Workflow button: no header of its own, and no standalone
+  // notebook sessions (those are on the Notebooks tab). A workflow with a
+  // notebook step is a workflow run and stays.
+  embedded: { type: Boolean, default: false },
+});
 import {
   statusDotClass,
   statusLabel,
@@ -120,10 +129,17 @@ const { counters: orgCounters, isLoading: countersLoading, fetchCounters: fetchO
 /*
   Dashboard computed
 */
-const dashboardRuns = computed(() => workflowInstances.value);
+// A run of a notebook workflow itself (Jupyter, R), by its definition or,
+// for a public one not in the list, its name.
+const workflowsById = computed(() => new Map(workflows.value.map((w) => [w.uuid, w])));
+const isNotebookRun = (r) => isNotebookWorkflow(workflowsById.value.get(r.workflowUuid) || { name: r.workflowName });
+const shownRuns = computed(() =>
+  props.embedded ? workflowInstances.value.filter((r) => !isNotebookRun(r)) : workflowInstances.value
+);
+const dashboardRuns = computed(() => shownRuns.value);
 
 const activeRuns = computed(() =>
-  workflowInstances.value.filter((r) => r.status === "NOT_STARTED" || r.status === "STARTED" || r.status === "FINALIZING")
+  shownRuns.value.filter((r) => r.status === "NOT_STARTED" || r.status === "STARTED" || r.status === "FINALIZING")
 );
 
 const recentCompletedRuns = computed(() =>
@@ -155,7 +171,7 @@ const dashboardStats = computed(() => {
   Filtered Runs
 */
 const filteredRuns = computed(() => {
-  let runs = workflowInstances.value;
+  let runs = shownRuns.value;
   if (computeNodeFilter.value !== "all") {
     runs = runs.filter((r) => r.computeNodeUuid === computeNodeFilter.value);
   }
@@ -344,6 +360,8 @@ const fetchDatasetOptions = async (query = "") => {
   }
 };
 
+defineExpose({ openWizardDialog: () => openWizardDialog() });
+
 const onDatasetSearch = (query) => {
   clearTimeout(datasetSearchTimer);
   datasetSearchTimer = setTimeout(() => fetchDatasetOptions(query), 300);
@@ -458,9 +476,9 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="runs-overview">
+  <div class="runs-overview" :class="{ 'is-embedded': embedded }">
     <!-- Header -->
-    <div class="builder-header">
+    <div v-if="!embedded" class="builder-header">
       <div class="header-actions">
         <bf-button @click="openWizardDialog">Initiate Workflow</bf-button>
       </div>
@@ -885,6 +903,10 @@ onBeforeUnmount(() => {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+}
+/* In the Workflows tab, which sizes it below its toolbar. */
+.runs-overview.is-embedded {
+  height: 100%;
 }
 
 .builder-header {
