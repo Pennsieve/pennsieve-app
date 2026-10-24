@@ -356,7 +356,7 @@ const goToManifestBuilder = () => {
         />
         <label class="sort-control">
           Sort
-          <el-select v-model="sortBy" size="default" class="sort-select">
+          <el-select v-model="sortBy" size="small" class="sort-select">
             <el-option v-for="o in APP_SORTS" :key="o.value" :label="o.label" :value="o.value" />
           </el-select>
         </label>

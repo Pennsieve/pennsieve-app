@@ -16,6 +16,7 @@ describe("compute node page", () => {
     expect(nodeTab({ tab: "nonsense" })).toBe("overview");
     expect(nodeTab({}, "#quotas")).toBe("settings");
     expect(nodeTab({}, "#llm-budget")).toBe("settings");
+    expect(nodeTab({}, "#pipeline-budget")).toBe("settings");
     expect(nodeTab({}, "#reference-data")).toBe("reference-data");
     expect(nodeTab({ tab: "advanced" }, "#quotas")).toBe("advanced");
     expect(nodeTab()).toBe("overview");
