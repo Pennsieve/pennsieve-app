@@ -153,36 +153,41 @@
     text-decoration: underline;
   }
 }
-// A section's actions (Edit, Change, Save): small outline buttons, as on the
-// Gallery's cards; bf-button is for a page's main action and dialogs.
+// A section's actions (Edit, Change, Save): Pennsieve's buttons, as bf-button
+// draws them (secondary, and the default for --primary), but compact: no
+// 160px minimum width.
 .cn-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   flex-shrink: 0;
-  padding: 4px 12px;
-  border: 1px solid theme.$gray_3;
-  border-radius: 4px;
-  background: theme.$white;
+  box-sizing: border-box;
+  min-height: 32px;
+  padding: 8px 16px;
+  border: 1px solid #d3d5da;
+  border-radius: 3px;
+  background: theme.$gray_1;
   font: inherit;
-  font-size: 13px;
+  font-size: 14px;
+  line-height: 1;
   white-space: nowrap;
-  color: theme.$gray_6;
+  color: theme.$text-color;
   cursor: pointer;
 
   &:hover:not(:disabled) {
-    border-color: theme.$purple_1;
-    color: theme.$purple_3;
+    background: theme.$gray_2;
   }
   &:disabled {
-    opacity: 0.5;
+    opacity: 0.3;
     cursor: default;
   }
   &--primary {
-    border-color: theme.$purple_3;
-    background: theme.$purple_3;
+    border-color: transparent;
+    background: theme.$app-primary-color;
     color: theme.$white;
 
     &:hover:not(:disabled) {
-      background: theme.$purple_2;
-      color: theme.$white;
+      background: theme.$purple_3;
     }
   }
 }

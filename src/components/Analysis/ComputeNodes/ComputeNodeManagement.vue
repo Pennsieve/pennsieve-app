@@ -21,6 +21,7 @@ import ComputeNodeLayers from './ComputeNodeLayers.vue'
 import ComputeNodeLLMBudget from './ComputeNodeLLMBudget.vue'
 import ComputeNodePipelineBudget from './ComputeNodePipelineBudget.vue'
 import AnalysisViewBar from '../AnalysisViewBar.vue'
+import BfButton from '@/components/shared/bf-button/BfButton.vue'
 import { NODE_TABS, nodeTab, nodeStatus, canToggleStatus } from './computeNodeHelpers'
 
 const route = useRoute()
@@ -150,14 +151,17 @@ const STATUS_TEXT = { Enabled: 'Running', Paused: 'Paused', Pending: 'Setting up
         <span class="cn-pill" :class="STATUS_PILL[status]">{{ STATUS_TEXT[status] }}</span>
       </Teleport>
       <AnalysisViewBar v-model="tab" :views="NODE_TABS">
-        <button type="button"
+        <!-- Pausing in Pennsieve's warning style (red outline), resuming in
+             green. -->
+        <bf-button
           v-if="canManage && canToggleStatus(computeNode)"
-          class="cn-action"
+          :class="status === 'Enabled' ? 'red ghost compact flex' : 'green compact flex'"
+          :processing="isUpdatingStatus"
           :disabled="isUpdatingStatus"
           @click="toggleStatus"
         >
           {{ status === 'Enabled' ? 'Pause node' : 'Resume node' }}
-        </button>
+        </bf-button>
       </AnalysisViewBar>
 
       <div class="node-body">
