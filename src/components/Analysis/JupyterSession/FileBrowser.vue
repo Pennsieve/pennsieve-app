@@ -9,10 +9,14 @@ import { ref, watch } from "vue";
 import FileNode from "./FileNode.vue";
 import { ArrowRight } from "@element-plus/icons-vue";
 import { fileIconForPath } from "@/utils/fileIconForPath";
+import { sessionPathCode } from "./pathCode";
 
 const props = defineProps({
   listDir: { type: Function, required: true },
   ready: { type: Boolean, default: false },
+  // The kernel's language and version ("Python 3.12.3"): copied paths are
+  // code for it (pathCode.js).
+  kernelName: { type: String, default: "" },
 });
 
 const emit = defineEmits(["insert-path", "open-notebook"]);
@@ -147,7 +151,7 @@ function icon(node) {
 }
 
 function copyPath(node) {
-  navigator.clipboard?.writeText(node.path).catch(() => {});
+  navigator.clipboard?.writeText(sessionPathCode(node.path, props.kernelName)).catch(() => {});
 }
 
 </script>

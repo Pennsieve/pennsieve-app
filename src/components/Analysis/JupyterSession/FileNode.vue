@@ -63,8 +63,8 @@ const isNotebook = (node) =>
         >
           ↪
         </button>
-        <button class="fn__act" title="Insert path into a cell" @click="emit('insert', node.path)">↩</button>
-        <button class="fn__act" title="Copy path" @click="emit('copy', node)">⧉</button>
+        <button class="fn__act" title="Insert the path into a cell, as code (INPUT_DIR / …)" @click="emit('insert', node.path)">↩</button>
+        <button class="fn__act" title="Copy the path, as code (INPUT_DIR / …)" @click="emit('copy', node)">⧉</button>
       </span>
     </div>
 

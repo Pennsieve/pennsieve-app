@@ -11,6 +11,7 @@ import NotebookCell from "./NotebookCell.vue";
 import FileBrowser from "./FileBrowser.vue";
 import InputsPanel from "./InputsPanel.vue";
 import EnvironmentPanel from "./EnvironmentPanel.vue";
+import { sessionPathCode } from "./pathCode";
 import {
   VideoPlay,
   DArrowRight,
@@ -390,7 +391,7 @@ async function focusCell(id) {
 // Insert a filesystem path (from the file browser) into the selected code cell
 // as a quoted string; if no code cell is selected, create one.
 function insertPath(path) {
-  const literal = `"${path}"`;
+  const literal = sessionPathCode(path, kernelName.value);
   let cell = selectedCell();
   if (!cell || cell.cell_type !== "code") {
     const id = addCell(cell ? cell.id : null, "code");
@@ -756,6 +757,7 @@ const kernelPill = computed(() => {
             ref="fileBrowserRef"
             :list-dir="listDir"
             :ready="status === 'ready'"
+            :kernel-name="kernelName"
             @insert-path="insertPath"
             @open-notebook="requestOpen"
           />
