@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref, reactive, onMounted, nextTick } from "vue";
+import { computed, ref, reactive, onMounted, onBeforeUnmount, nextTick, watch } from "vue";
 
 import { useStore } from "vuex";
 import { useRouter, useRoute } from "vue-router";
@@ -37,6 +37,9 @@ import {
 import { useAppManifest } from "@/composables/useAppManifest";
 import BuilderBar from "./BuilderBar.vue";
 import { builderReadiness } from "./builderReadiness";
+import StepPicker from "./StepPicker.vue";
+import { useGraphHistory } from "./graphHistory";
+import { canConnect, neighbourInDirection } from "./graphEditing";
 
 const { onNodeClick, onPaneClick, onConnect, screenToFlowCoordinate, fitView } =
   useVueFlow();
@@ -418,6 +421,8 @@ const enterCreateMode = () => {
   selectedNode.value = null;
   isEditingDetails.value = false;
   clearWorkflow();
+  seedCanvas();
+  history.reset();
   accordionActiveNames.value = ["data-and-apps"];
   store.commit("analysisModule/SET_SELECTED_WORKFLOW", {});
 };
@@ -787,6 +792,7 @@ const selectWorkflow = (workflow) => {
   } else {
     setTimeout(() => fitView({ padding: 0.2, maxZoom: 1 }), 50);
   }
+  history.reset();
 };
 
 /*
@@ -835,65 +841,128 @@ const onDrop = (event) => {
     y: flowPos.y - dragOffset.value.y,
   };
 
-  const nodeId = generateNodeId();
-  let newNode;
-
-  if (draggedType.value === "data-source") {
-    newNode = {
-      id: nodeId,
-      type: "data-source",
-      data: {
-        label: "Data Source",
-      },
-      position,
-    };
-  } else if (draggedType.value === "data-target") {
-    newNode = {
-      id: nodeId,
-      type: "data-target",
-      data: {
-        label: "Data Target",
-        targetType:
-          targetTypes.value.length === 1
-            ? targetTypes.value[0].targetType
-            : null,
-        computeType:
-          targetTypes.value.length === 1 &&
-          targetTypes.value[0].runtimeConfig?.computeTypes?.length
-            ? targetTypes.value[0].runtimeConfig.computeTypes[0]
-            : null,
-      },
-      position,
-    };
-  } else if (draggedApp.value) {
-    newNode = {
-      id: nodeId,
-      type: "default",
-      data: {
-        label: repoName(draggedApp.value),
-        application: draggedApp.value,
-        computeType: "standard",
-        cpu: "",
-        memory: "",
-        defaultParams: {},
-        paramSchema: [],
-        hasManifest: false,
-        tag: latestVersion(draggedApp.value)?.version || "",
-      },
-      position,
-    };
-  }
-
-  const droppedApp = draggedApp.value;
-
-  if (newNode) {
-    nodes.value.push(newNode);
-    // Fire-and-forget: patches the node in place once app.yml is read.
-    if (droppedApp) applyManifestDefaults(newNode.id, droppedApp);
-  }
+  const type = draggedType.value === "application" ? "default" : draggedType.value;
+  if (type !== "default" || draggedApp.value) addNode(type, draggedApp.value, position);
 
   draggedApp.value = null;
   draggedType.value = null;
+};
+
+/*
+  Adding steps
+  ------------
+  A node of a type ("data-source", "data-target", or "default" for an app),
+  at a position. Dragging places it where it's dropped; clicking a palette
+  item or a step's + places it below a step, connects it and tidies the
+  layout (addStep).
+*/
+const makeNode = (type, app, position) => {
+  const id = generateNodeId();
+  if (type === "data-source") {
+    return { id, type, data: { label: "Input data" }, position };
+  }
+  if (type === "data-target") {
+    const only = targetTypes.value.length === 1 ? targetTypes.value[0] : null;
+    return {
+      id,
+      type,
+      data: {
+        label: "Output",
+        targetType: only ? only.targetType : null,
+        computeType: only?.runtimeConfig?.computeTypes?.[0] || null,
+      },
+      position,
+    };
+  }
+  return {
+    id,
+    type: "default",
+    data: {
+      label: repoName(app),
+      application: app,
+      computeType: "standard",
+      cpu: "",
+      memory: "",
+      defaultParams: {},
+      paramSchema: [],
+      hasManifest: false,
+      tag: latestVersion(app)?.version || "",
+    },
+    position,
+  };
+};
+
+const addNode = (type, app, position) => {
+  const node = makeNode(type, app, position);
+  nodes.value.push(node);
+  // Fire-and-forget: patches the node in place once app.yml is read.
+  if (app) applyManifestDefaults(node.id, app);
+  return node;
+};
+
+// Connects two steps, with the same checks and feedback as dragging a
+// connection between them.
+const connectNodes = (sourceId, targetId) => {
+  const src = nodes.value.find((n) => n.id === sourceId);
+  const tgt = nodes.value.find((n) => n.id === targetId);
+  if (!canConnect(src, tgt, edges.value)) return false;
+  edges.value.push({
+    id: `e${sourceId}-${targetId}`,
+    source: sourceId,
+    target: targetId,
+    animated: false,
+    style: { stroke: nodeTypeColor(src.type) },
+  });
+  reportConnectionCheck(src, tgt);
+  revalidateEdges();
+  return true;
+};
+
+const selectOnly = (id) => {
+  nodes.value.forEach((n) => (n.selected = n.id === id));
+  edges.value.forEach((e) => (e.selected = false));
+  selectedNode.value = nodes.value.find((n) => n.id === id) || null;
+};
+
+// Adds a step after another (the selected one when not given), or below the
+// whole graph, connects it when the types allow, selects it and lays the
+// graph out.
+const addStep = (type, app, afterId = selectedNode.value?.id) => {
+  if (isReadOnly.value) return null;
+  const after = nodes.value.find((n) => n.id === afterId) ||
+    [...nodes.value].filter((n) => n.type !== "data-target").sort((a, b) => b.position.y - a.position.y)[0];
+  const gap = layoutBox(detailed.value, DETAILED_BOX);
+  const position = after
+    ? { x: after.position.x, y: after.position.y + gap.height + gap.ranksep }
+    : { x: 0, y: 0 };
+  const node = addNode(type, app, position);
+  if (after) connectNodes(after.id, node.id);
+  selectOnly(node.id);
+  nextTick(() => autoLayout());
+  return node;
+};
+
+// The + under a step: pick what comes next.
+const pickerFor = ref(null); // the step the picker adds after
+const openStepPicker = (nodeId) => {
+  if (isReadOnly.value) return;
+  pickerFor.value = nodeId;
+};
+const onStepPicked = ({ type, app }) => {
+  const after = pickerFor.value;
+  pickerFor.value = null;
+  addStep(type, app, after);
+};
+const pickerTitle = computed(() => {
+  const n = nodes.value.find((x) => x.id === pickerFor.value);
+  return n ? `Add a step after ${n.data?.label || "this step"}` : "Add a step";
+});
+
+// A new workflow starts with its input, and a + below it.
+const seedCanvas = () => {
+  if (nodes.value.length) return;
+  addNode("data-source", null, { x: 0, y: 0 });
+  nextTick(() => setTimeout(() => fitView({ padding: 0.8, maxZoom: 1 }), 50));
 };
 
 const onDragOver = (event) => {
@@ -905,30 +974,9 @@ const onDragOver = (event) => {
 onConnect((params) => {
   if (isReadOnly.value) return;
 
-  // Guard against self-loops
-  if (params.source === params.target) return;
-
-  // Guard against duplicate edges
-  const duplicate = edges.value.some(
-    (e) => e.source === params.source && e.target === params.target,
-  );
-  if (duplicate) return;
-
-  const srcNode = nodes.value.find((n) => n.id === params.source);
-  const tgtNode = nodes.value.find((n) => n.id === params.target);
-
-  edges.value.push({
-    id: `e${params.source}-${params.target}`,
-    source: params.source,
-    target: params.target,
-    animated: false,
-    style: { stroke: nodeTypeColor(srcNode?.type) },
-  });
-
-  // Immediate feedback: a toast for this connection, plus the persistent
-  // marks (red edge / canvas summary) that outlive it.
-  reportConnectionCheck(srcNode, tgtNode);
-  revalidateEdges();
+  // Self-loops, duplicates, into an input or out of an output are refused;
+  // the rest get a toast and the persistent marks (connectNodes).
+  connectNodes(params.source, params.target);
 });
 
 /*
@@ -1262,7 +1310,79 @@ const startOver = async () => {
   }
   clearWorkflow();
   selectedNode.value = null;
+  seedCanvas();
 };
+
+/*
+  Undo and redo (graphHistory.js): snapshots of the graph as it settles, so
+  every edit, adding, removing, connecting, moving or changing a step's
+  settings, can be undone.
+*/
+const history = useGraphHistory({
+  nodes,
+  edges,
+  enabled: () => !isReadOnly.value,
+  onRestore: () => {
+    selectedNode.value = null;
+    revalidateEdges();
+  },
+});
+
+/*
+  Keyboard: Delete/Backspace removes the selection, Cmd/Ctrl-Z undoes and
+  Shift-Cmd/Ctrl-Z (or Ctrl-Y) redoes, arrows move between steps, Esc
+  deselects. Not while typing.
+*/
+const deleteSelection = () => {
+  const selectedEdges = edges.value.filter((e) => e.selected).map((e) => e.id);
+  const selectedNodes = nodes.value.filter((n) => n.selected).map((n) => n.id);
+  if (selectedEdges.length) {
+    edges.value = edges.value.filter((e) => !selectedEdges.includes(e.id));
+    revalidateEdges();
+  }
+  selectedNodes.forEach((id) => removeNode(id));
+  if (selectedNodes.length) selectedNode.value = null;
+};
+
+const onKeydown = (event) => {
+  if (isReadOnly.value) return;
+  const t = event.target;
+  if (t?.closest?.("input, textarea, select, [contenteditable='true'], .el-select, .el-dialog, .el-popper")) return;
+  const mod = event.metaKey || event.ctrlKey;
+  const key = event.key.toLowerCase();
+  if (mod && key === "z") {
+    event.preventDefault();
+    if (event.shiftKey) history.redo();
+    else history.undo();
+    return;
+  }
+  if (mod && key === "y") {
+    event.preventDefault();
+    history.redo();
+    return;
+  }
+  if (mod) return;
+  if (event.key === "Delete" || event.key === "Backspace") {
+    event.preventDefault();
+    deleteSelection();
+  } else if (event.key === "Escape") {
+    nodes.value.forEach((n) => (n.selected = false));
+    edges.value.forEach((e) => (e.selected = false));
+    selectedNode.value = null;
+    pickerFor.value = null;
+  } else if (event.key.startsWith("Arrow")) {
+    const from = selectedNode.value?.id;
+    const next = from
+      ? neighbourInDirection(nodes.value, edges.value, from, event.key.slice(5).toLowerCase())
+      : nodes.value[0]?.id;
+    if (next) {
+      event.preventDefault();
+      selectOnly(next);
+    }
+  }
+};
+onMounted(() => window.addEventListener("keydown", onKeydown));
+onBeforeUnmount(() => window.removeEventListener("keydown", onKeydown));
 
 const saveWorkflow = async () => {
   if (!workflowName.value.trim()) {
@@ -1591,6 +1711,7 @@ const openNodeSettings = (id) => {
               :elements-selectable="true"
               :pan-on-drag="true"
               :zoom-on-scroll="true"
+              :delete-key-code="null"
             >
               <Background pattern-color="#aaa" :gap="16" />
               <Controls position="bottom-right" />
@@ -1609,6 +1730,15 @@ const openNodeSettings = (id) => {
                 >
                   Auto Layout
                 </button>
+                <template v-if="!isReadOnly">
+                  <button class="auto-layout-btn" title="Undo (⌘Z)" aria-label="Undo" @click="history.undo()">↶</button>
+                  <button class="auto-layout-btn" title="Redo (⇧⌘Z)" aria-label="Redo" @click="history.redo()">↷</button>
+                </template>
+              </div>
+
+              <!-- The first step: a hint while only the input is there. -->
+              <div v-if="!isReadOnly && nodes.length === 1 && nodes[0].type === 'data-source'" class="first-step-hint">
+                Add the first step with the <strong>+</strong> under Input data, or click an app in the list.
               </div>
 
               <template #node-default="{ data, id }">
@@ -1687,6 +1817,14 @@ const openNodeSettings = (id) => {
                   </div>
                 </div>
                 <Handle id="source" type="source" :position="Position.Bottom" />
+                <button
+                  v-if="!isReadOnly"
+                  type="button"
+                  class="add-next nodrag"
+                  title="Add a step after this"
+                  aria-label="Add a step after this"
+                  @click.stop="openStepPicker(id)"
+                >+</button>
               </template>
 
               <template #node-input="{ data, id }">
@@ -1832,6 +1970,14 @@ const openNodeSettings = (id) => {
                   </div>
                 </div>
                 <Handle id="source" type="source" :position="Position.Bottom" />
+                <button
+                  v-if="!isReadOnly"
+                  type="button"
+                  class="add-next nodrag"
+                  title="Add a step after this"
+                  aria-label="Add a step after this"
+                  @click.stop="openStepPicker(id)"
+                >+</button>
               </template>
 
               <!-- Data Target Node: input only (receives from processors) -->
@@ -2570,6 +2716,7 @@ const openNodeSettings = (id) => {
                 :class="{ disabled: isReadOnly }"
                 :draggable="!isReadOnly"
                 @dragstart="onDragStart(null, $event, 'data-source')"
+                @click="addStep('data-source', null, null)"
               >
                 <IconFile class="data-item-icon" :width="20" :height="20" />
                 <div class="data-item-info">
@@ -2582,6 +2729,7 @@ const openNodeSettings = (id) => {
                 :class="{ disabled: isReadOnly }"
                 :draggable="!isReadOnly"
                 @dragstart="onDragStart(null, $event, 'data-target')"
+                @click="addStep('data-target', null)"
               >
                 <IconCollection
                   class="data-item-icon"
@@ -2623,6 +2771,7 @@ const openNodeSettings = (id) => {
                   :class="{ disabled: isReadOnly }"
                   :draggable="!isReadOnly"
                   @dragstart="onDragStart(app, $event, 'application')"
+                  @click="addStep('default', app)"
                 >
                   <IconAnalysis class="app-icon" :width="20" :height="20" />
                   <div class="app-info">
@@ -2704,6 +2853,15 @@ const openNodeSettings = (id) => {
       </div>
     </div>
 
+    <StepPicker
+      :open="!!pickerFor"
+      :title="pickerTitle"
+      :applications="filteredApplications"
+      :app-name="repoName"
+      :app-line="(app) => app.description || ''"
+      @pick="onStepPicked"
+      @close="pickerFor = null"
+    />
   </div>
 </template>
 
@@ -3195,6 +3353,52 @@ const openNodeSettings = (id) => {
     margin: 0;
     font-size: 14px;
   }
+}
+
+/* The + under a step: what comes next. Shown on hover and selection. */
+.add-next {
+  position: absolute;
+  left: 50%;
+  bottom: -34px;
+  z-index: 5;
+  width: 22px;
+  height: 22px;
+  margin-left: -11px;
+  padding: 0;
+  border: 1px solid theme.$purple_1;
+  border-radius: 50%;
+  background: theme.$white;
+  color: theme.$purple_2;
+  font-size: 15px;
+  line-height: 19px;
+  cursor: pointer;
+  opacity: 0.55;
+  transition: opacity 0.15s, background 0.15s;
+
+  &:hover,
+  &:focus-visible {
+    opacity: 1;
+    background: theme.$purple_tint;
+    outline: none;
+  }
+}
+.vue-flow__node:hover .add-next,
+.vue-flow__node.selected .add-next {
+  opacity: 1;
+}
+.first-step-hint {
+  position: absolute;
+  left: 50%;
+  bottom: 24px;
+  z-index: 5;
+  transform: translateX(-50%);
+  padding: 8px 14px;
+  border: 1px solid theme.$gray_2;
+  border-radius: 4px;
+  background: theme.$white;
+  font-size: 13px;
+  color: theme.$gray_5;
+  pointer-events: none;
 }
 
 .canvas-toolbar {
