@@ -6,6 +6,7 @@
 // the selected step; drag places. Apps without an app.yml are listed as
 // usual, marked; their owner gets a link to the manifest builder.
 import { computed, ref } from "vue";
+import { ArrowLeft } from "@element-plus/icons-vue";
 import { useRoute } from "vue-router";
 import { useStore } from "vuex";
 import { appColor, appInitials, githubRepo } from "../Applications/appCards";
@@ -20,8 +21,8 @@ const props = defineProps({
   stepLabel: { type: String, default: "" },
   loading: { type: Boolean, default: false },
 });
-// add(type, app), dragstart(app, event, type)
-const emit = defineEmits(["add", "dragstart"]);
+// add(type, app), dragstart(app, event, type), fold
+const emit = defineEmits(["add", "dragstart", "fold"]);
 
 const store = useStore();
 const route = useRoute();
@@ -52,7 +53,12 @@ const tileOf = (app) => {
 
 <template>
   <aside class="pal" aria-label="Steps to add">
-    <el-input v-model="query" size="small" clearable placeholder="Search apps, tags, file types…" class="pal-search" />
+    <div class="pal-top">
+      <el-input v-model="query" size="small" clearable placeholder="Search apps, tags, file types…" class="pal-search" />
+      <button type="button" class="pal-fold" title="Fold the list" aria-label="Fold the list" @click="emit('fold')">
+        <el-icon><ArrowLeft /></el-icon>
+      </button>
+    </div>
 
     <div class="pal-section">
       <div class="pal-heading">Data</div>
@@ -142,8 +148,33 @@ const tileOf = (app) => {
   border-right: 1px solid theme.$gray_2;
   background: theme.$white;
 }
-.pal-search {
+.pal-top {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   margin-bottom: 6px;
+}
+.pal-search {
+  flex: 1;
+}
+.pal-fold {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  border-radius: 3px;
+  background: none;
+  color: theme.$gray_5;
+  cursor: pointer;
+
+  &:hover {
+    background: theme.$gray_0;
+    color: theme.$purple_3;
+  }
 }
 .pal-section {
   display: flex;

@@ -2060,11 +2060,8 @@ const openNodeSettings = (id) => {
         <el-icon><ArrowRight /></el-icon>
         <span class="panel-rail-label">Add steps</span>
       </button>
-      <div v-if="!isReadOnly && panels.palette" class="panel-wrap">
-        <button type="button" class="panel-fold panel-fold--left" title="Fold" aria-label="Fold the list" @click="togglePanel('palette')">
-          <el-icon><ArrowLeft /></el-icon>
-        </button>
       <BuilderPalette
+        v-if="!isReadOnly && panels.palette"
         :applications="availableApplications"
         :app-name="appDisplayName"
         :step-ports="selectedNode?.type === 'default' ? selectedNode.data?.manifestPorts || null : null"
@@ -2072,8 +2069,8 @@ const openNodeSettings = (id) => {
         :loading="isLoading"
         @add="(type, app) => addStep(type, app)"
         @dragstart="(app, event, type) => onDragStart(app, event, type)"
+        @fold="togglePanel('palette')"
       />
-      </div>
 
       <!-- Middle: the canvas -->
       <div class="main-panel">
@@ -2477,9 +2474,12 @@ const openNodeSettings = (id) => {
         <span class="panel-rail-label">Details</span>
       </button>
       <div v-else ref="sidebarRef" class="applications-sidebar">
-        <button type="button" class="panel-fold panel-fold--right" title="Fold" aria-label="Fold the details" @click="togglePanel('inspector')">
-          <el-icon><ArrowRight /></el-icon>
-        </button>
+        <div class="insp-top">
+          <span>Details</span>
+          <button type="button" class="insp-fold" title="Fold the details" aria-label="Fold the details" @click="togglePanel('inspector')">
+            <el-icon><ArrowRight /></el-icon>
+          </button>
+        </div>
         <el-collapse v-model="accordionActiveNames" class="sidebar-accordion">
           <!-- Information Section -->
           <el-collapse-item :title="selectedNode ? 'Step' : 'Workflow'" name="information">
@@ -3402,10 +3402,6 @@ const openNodeSettings = (id) => {
 }
 
 /* Folding the side panels: a rail to open one, a button to fold it. */
-.panel-wrap {
-  position: relative;
-  display: flex;
-}
 .panel-rail {
   display: flex;
   flex-direction: column;
@@ -3435,32 +3431,34 @@ const openNodeSettings = (id) => {
   font-size: 12px;
   font-weight: 500;
 }
-.panel-fold {
-  position: absolute;
-  top: 8px;
-  z-index: 3;
+.insp-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: -4px 0 4px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: theme.$gray_4;
+}
+.insp-fold {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 22px;
-  height: 22px;
+  width: 24px;
+  height: 24px;
   padding: 0;
-  border: 1px solid theme.$gray_2;
-  border-radius: 50%;
-  background: theme.$white;
+  border: none;
+  border-radius: 3px;
+  background: none;
   color: theme.$gray_5;
   cursor: pointer;
 
   &:hover {
-    border-color: theme.$purple_1;
+    background: theme.$gray_0;
     color: theme.$purple_3;
   }
-}
-.panel-fold--left {
-  right: -11px;
-}
-.panel-fold--right {
-  left: 4px;
 }
 .icon-btn {
   display: flex;
