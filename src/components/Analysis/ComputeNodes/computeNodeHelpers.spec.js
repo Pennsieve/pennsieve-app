@@ -3,7 +3,6 @@ import {
   nodeTab,
   nodeStatus,
   canToggleStatus,
-  nodeSubtitle,
   nodeCapabilities,
   recentNodeRuns,
   relativeTime,
@@ -31,11 +30,7 @@ describe("compute node page", () => {
     expect(canToggleStatus({ status: "Pending" })).toBe(false);
   });
 
-  it("describes where it runs in one line", () => {
-    const node = { account: { accountType: "AWS" }, deploymentMode: "secure" };
-    expect(nodeSubtitle(node, { isOwner: true })).toBe("Your AWS account · Secure");
-    expect(nodeSubtitle(node)).toBe("AWS account · Secure");
-    expect(nodeSubtitle({})).toBe("Cloud account · Basic");
+  it("names the deployment mode", () => {
     expect(deploymentMode({ deploymentMode: "COMPLIANT" }).label).toBe("Compliant");
   });
 

@@ -22,6 +22,7 @@
 import BfRafter from "@/components/shared/bf-rafter/BfRafter.vue";
 import RouterTabs from "@/components/shared/routerTabs/routerTabs.vue";
 import OrgBreadcrumb from "@/components/shared/OrgBreadcrumb/OrgBreadcrumb.vue";
+import { useComputeResourcesStore } from "@/stores/computeResourcesStore";
 
 export default {
   name: 'MyWorkSpacePage',
@@ -45,6 +46,18 @@ export default {
   },
 
   computed: {
+    // A compute node page's title: the node's name, from the nodes the page
+    // loads (the user's own).
+    computeNodeName() {
+      const nodeId = this.$route.params.nodeId;
+      if (!nodeId) return "";
+      const store = useComputeResourcesStore();
+      const nodes = [
+        ...(store.getScopedComputeNodes("user-owned") || []),
+        ...(store.getScopedComputeNodes("account-owner") || []),
+      ];
+      return nodes.find((n) => n.uuid === nodeId)?.name || "";
+    },
     routeName() {
       return this.$route.name;
     },
@@ -165,7 +178,7 @@ export default {
         if (routeName === 'my-compute-node-management') {
           return [
             { name: 'Compute Nodes', route: { name: 'my-compute-nodes' } },
-            { name: 'Compute Node' }
+            { name: this.computeNodeName || 'Compute Node' }
           ];
         }
         return [];

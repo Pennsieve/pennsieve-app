@@ -20,7 +20,8 @@ import ComputeNodeSecrets from './ComputeNodeSecrets.vue'
 import ComputeNodeLayers from './ComputeNodeLayers.vue'
 import ComputeNodeQuotas from './ComputeNodeQuotas.vue'
 import ComputeNodeLLMBudget from './ComputeNodeLLMBudget.vue'
-import { NODE_TABS, nodeTab, nodeStatus, canToggleStatus, nodeSubtitle } from './computeNodeHelpers'
+import AnalysisViewBar from '../AnalysisViewBar.vue'
+import { NODE_TABS, nodeTab, nodeStatus, canToggleStatus } from './computeNodeHelpers'
 
 const route = useRoute()
 const router = useRouter()
@@ -51,7 +52,6 @@ const canManage = computed(() => isNodeOwner.value)
 const isPersonalNode = computed(() => !!computeNode.value && !computeNode.value.organizationId)
 
 const status = computed(() => nodeStatus(computeNode.value))
-const subtitle = computed(() => nodeSubtitle(computeNode.value, { isOwner: isNodeOwner.value }))
 
 const tab = computed({
   get: () => nodeTab(route.query, route.hash),
@@ -125,13 +125,13 @@ const STATUS_TEXT = { Enabled: 'Running', Paused: 'Paused', Pending: 'Setting up
 
 <template>
   <div class="compute-node-page">
-    <div v-if="isLoading" class="state-placeholder">
+    <div v-if="isLoading" class="node-body state-placeholder">
       <div class="skeleton skeleton--title" />
       <div class="skeleton skeleton--line" />
       <div class="skeleton skeleton--block" />
     </div>
 
-    <div v-else-if="!computeNode" class="state-empty">
+    <div v-else-if="!computeNode" class="node-body state-empty">
       <h3>{{ loadError === 'not-found' ? 'Compute node not found' : "This compute node couldn't be loaded" }}</h3>
       <p>
         {{ loadError === 'not-found'
@@ -142,14 +142,14 @@ const STATUS_TEXT = { Enabled: 'Running', Paused: 'Paused', Pending: 'Setting up
     </div>
 
     <template v-else>
-      <header class="node-header">
-        <div class="node-heading">
-          <div class="node-title-row">
-            <h2 class="node-title">{{ computeNode.name }}</h2>
-            <span class="cn-pill" :class="STATUS_PILL[status]">{{ STATUS_TEXT[status] }}</span>
-          </div>
-          <p class="node-subtitle">{{ subtitle }}</p>
-        </div>
+      <!-- The tabs, in the bar the other Analysis tabs have; Pause on its
+           right. -->
+      <!-- The node's name is the page title (the breadcrumb's); its status
+           goes next to it. -->
+      <Teleport defer to="#page-title-extra">
+        <span class="cn-pill" :class="STATUS_PILL[status]">{{ STATUS_TEXT[status] }}</span>
+      </Teleport>
+      <AnalysisViewBar v-model="tab" :views="NODE_TABS">
         <button type="button"
           v-if="canManage && canToggleStatus(computeNode)"
           class="cn-action"
@@ -158,23 +158,9 @@ const STATUS_TEXT = { Enabled: 'Running', Paused: 'Paused', Pending: 'Setting up
         >
           {{ status === 'Enabled' ? 'Pause node' : 'Resume node' }}
         </button>
-      </header>
+      </AnalysisViewBar>
 
-      <div class="node-toolbar">
-        <div class="node-views" role="tablist">
-          <button
-            v-for="t in NODE_TABS"
-            :key="t.key"
-            role="tab"
-            class="node-view"
-            :class="{ active: tab === t.key }"
-            :aria-selected="tab === t.key"
-            @click="tab = t.key"
-          >
-            {{ t.label }}
-          </button>
-        </div>
-      </div>
+      <div class="node-body">
 
       <ComputeNodeOverview
         v-if="tab === 'overview'"
@@ -232,6 +218,7 @@ const STATUS_TEXT = { Enabled: 'Running', Paused: 'Paused', Pending: 'Setting up
         :can-manage="canManage"
         @updated="fetchComputeNode"
       />
+      </div>
     </template>
   </div>
 </template>
@@ -240,75 +227,10 @@ const STATUS_TEXT = { Enabled: 'Running', Paused: 'Paused', Pending: 'Setting up
 @use '../../../styles/theme';
 @use './computeNodePage';
 
-.compute-node-page {
-  margin: 0;
+.node-body {
   padding: 20px 32px;
 }
-.node-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 16px;
-}
-.node-heading {
-  min-width: 0;
-}
-.node-title-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-.node-title {
-  margin: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 18px;
-  font-weight: 500;
-  color: theme.$gray_6;
-}
-.node-subtitle {
-  margin: 4px 0 0;
-  font-size: 13px;
-  color: theme.$gray_5;
-}
-// The tabs, as the Notebooks and Workflows tabs' Live/Builder switch.
-.node-toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 20px;
-}
-.node-views {
-  display: inline-flex;
-  flex-wrap: wrap;
-  padding: 2px;
-  border: 1px solid theme.$gray_2;
-  border-radius: 6px;
-  background: theme.$gray_1;
-}
-.node-view {
-  padding: 5px 14px;
-  border: none;
-  border-radius: 4px;
-  background: none;
-  font: inherit;
-  font-size: 13px;
-  font-weight: 500;
-  color: theme.$gray_5;
-  cursor: pointer;
 
-  &:hover {
-    color: theme.$purple_3;
-  }
-  &.active {
-    background: theme.$white;
-    color: theme.$purple_3;
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
-  }
-}
 .state-empty {
   padding: 48px 24px;
   text-align: center;
