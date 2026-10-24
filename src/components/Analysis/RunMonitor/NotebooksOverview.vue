@@ -18,6 +18,7 @@ import IconXCircle from "../../icons/IconXCircle.vue";
 import NewNotebookDialog from "./NewNotebookDialog.vue";
 import EnvironmentsSection from "./EnvironmentsSection.vue";
 import CreateEnvironmentDialog from "./CreateEnvironmentDialog.vue";
+import { nextName } from "./environmentStatus";
 import { useComputeResourcesStore } from "@/stores/computeResourcesStore";
 import { endInteractiveSession } from "@/composables/useJupyterSession";
 import { useGetToken } from "@/composables/useGetToken";
@@ -79,7 +80,26 @@ const computeNodesList = computed(() =>
   (store.getters["analysisModule/computeNodes"] || []).filter(interactiveCapable)
 );
 const createEnvVisible = ref(false);
+// Where the New environment dialog starts: empty, or an edit or retry of an
+// environment (see EnvironmentsSection).
+const envInitial = ref(null);
+const environmentsRef = ref(null);
+function openCreateEnvironment(initial = null) {
+  envInitial.value = initial;
+  createEnvVisible.value = true;
+}
+function onEnvEdit(start) {
+  const taken = (computeResources.getNodeLayers(start.nodeId)?.layers || []).map((l) => l.layerName);
+  openCreateEnvironment({ ...start, name: nextName(start.name, taken) });
+}
+// "Use in a notebook": the New Notebook dialog, on that node with that environment.
+const notebookStart = ref(null);
+function onEnvUse(env) {
+  notebookStart.value = env;
+  dialogVisible.value = true;
+}
 function onEnvCreated({ nodeId }) {
+  environmentsRef.value?.refresh?.();
   if (nodeId) computeResources.fetchNodeLayers(nodeId, true);
 }
 const isLoading = ref(false);
@@ -306,7 +326,7 @@ onBeforeUnmount(() => {
           <div class="info-card-actions">
             <bf-button
               :disabled="notebookWorkflows.length === 0"
-              @click="dialogVisible = true"
+              @click="notebookStart = null; dialogVisible = true"
             >
               + New Notebook
             </bf-button>
@@ -314,7 +334,7 @@ onBeforeUnmount(() => {
               class="ghost"
               :disabled="!hasEnvBuilder"
               :title="hasEnvBuilder ? '' : 'Environment builder not available yet'"
-              @click="createEnvVisible = true"
+              @click="openCreateEnvironment()"
             >
               + New Environment
             </bf-button>
@@ -413,13 +433,22 @@ onBeforeUnmount(() => {
           <p>Start a notebook to work with your data interactively.</p>
         </div>
 
-        <environments-section />
+        <environments-section
+          ref="environmentsRef"
+          :build-workflows="buildEnvWorkflows"
+          @create="openCreateEnvironment()"
+          @edit="onEnvEdit"
+          @retry="openCreateEnvironment"
+          @use="onEnvUse"
+        />
       </template>
 
     <new-notebook-dialog
       v-model="dialogVisible"
       :notebook-workflows="notebookWorkflows"
       :personal="isMyWorkspace"
+      :start="notebookStart"
+      :build-workflows="buildEnvWorkflows"
       @created="onNotebookCreated"
     />
 
@@ -427,6 +456,7 @@ onBeforeUnmount(() => {
       v-model="createEnvVisible"
       :build-workflows="buildEnvWorkflows"
       :compute-nodes="computeNodesList"
+      :initial="envInitial"
       @created="onEnvCreated"
     />
 

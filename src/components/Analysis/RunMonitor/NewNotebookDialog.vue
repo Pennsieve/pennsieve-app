@@ -14,6 +14,8 @@ import BfButton from "../../shared/bf-button/BfButton.vue";
 import AnalysisFilesTable from "../../FilesTable/AnalysisFilesTable.vue";
 import BreadcrumbNavigation from "../../datasets/files/BreadcrumbNavigation/BreadcrumbNavigation.vue";
 import EnvironmentLayerSelector from "./EnvironmentLayerSelector.vue";
+import CreateEnvironmentDialog from "./CreateEnvironmentDialog.vue";
+import { useComputeResourcesStore } from "@/stores/computeResourcesStore";
 import IconCompass from "@/components/icons/IconCompass.vue";
 import { useGetToken } from "@/composables/useGetToken";
 import { useSendXhr } from "@/mixins/request/request_composable";
@@ -35,6 +37,11 @@ const props = defineProps({
   // with the dataset's file list, and the user downloads files from the
   // notebook's Inputs panel.
   personal: { type: Boolean, default: false },
+  // Start from an environment ("Use in a notebook"): { nodeId, layerName,
+  // layerType }. Its kernel, node and environment are preselected.
+  start: { type: Object, default: null },
+  // The environment build workflows, { python, r }, for "Create one…".
+  buildWorkflows: { type: Object, default: () => ({ python: null, r: null }) },
 });
 const emit = defineEmits(["update:modelValue", "created"]);
 
@@ -536,6 +543,7 @@ function reset() {
 watch(visible, (open) => {
   if (open) {
     reset();
+    applyStart();
     if (!props.personal) fetchDatasetOptions();
     else if (publicInputs) searchPublicDatasets();
   }
@@ -545,6 +553,52 @@ watch(visible, (open) => {
 // public dataset's files from the notebook itself.
 const INPUT_FILES_STEP = 5;
 const skipsStep = (i) => props.personal && i === INPUT_FILES_STEP;
+
+function applyStart() {
+  const st = props.start;
+  if (!st) return;
+  const kernel = st.layerType === "r-env" ? "r" : "jupyter";
+  const wf = props.notebookWorkflows.find((w) => (notebookKernel(w) || "jupyter") === kernel);
+  if (wf) form.value.workflowId = wf.uuid;
+  form.value.computeNodeId = st.nodeId;
+  form.value.environmentLayer = st.layerName;
+}
+
+/* ---------------------------------------------- creating an environment --- */
+// "Create one…" in the Environment step: builds one on the chosen node, and
+// selects it once it's ready (the dialog keeps looking while it's open).
+const computeResources = useComputeResourcesStore();
+const createEnvVisible = ref(false);
+const pendingEnv = ref(""); // name being built for this notebook
+let pendingTimer = null;
+const kernelLang = computed(() => (notebookKernel(selectedWorkflow.value) === "r" ? "r" : "python"));
+const canCreateEnv = computed(() => !!props.buildWorkflows?.[kernelLang.value]);
+const envInitial = computed(() => ({ lang: kernelLang.value, nodeId: form.value.computeNodeId }));
+
+function onEnvCreated({ nodeId, layerName }) {
+  pendingEnv.value = layerName;
+  watchPending(nodeId);
+}
+function watchPending(nodeId) {
+  clearTimeout(pendingTimer);
+  pendingTimer = setTimeout(async () => {
+    if (!visible.value || !pendingEnv.value) return;
+    const data = await computeResources.fetchNodeLayers(nodeId, true).catch(() => null);
+    const layer = (data?.layers || []).find((l) => l.layerName === pendingEnv.value);
+    if (layer?.status === "READY") {
+      if (form.value.computeNodeId === nodeId) form.value.environmentLayer = layer.layerName;
+      pendingEnv.value = "";
+      return;
+    }
+    watchPending(nodeId);
+  }, 15000);
+}
+watch(visible, (open) => {
+  if (!open) {
+    clearTimeout(pendingTimer);
+    pendingEnv.value = "";
+  }
+});
 
 const next = async () => {
   if (step.value === 4) await loadDefinition(); // leaving Dataset → load inputs
@@ -774,6 +828,9 @@ async function execute() {
           v-model="form.environmentLayer"
           :compute-node-id="form.computeNodeId"
           :session-type="notebookKernel(selectedWorkflow) || 'jupyter'"
+          :can-create="canCreateEnv"
+          :pending-name="pendingEnv"
+          @create="createEnvVisible = true"
         />
       </div>
 
@@ -1093,6 +1150,14 @@ async function execute() {
         </div>
       </div>
     </template>
+    <create-environment-dialog
+      v-model="createEnvVisible"
+      append-to-body
+      :build-workflows="buildWorkflows"
+      :compute-nodes="computeNodes.filter(interactiveCapable)"
+      :initial="envInitial"
+      @created="onEnvCreated"
+    />
   </el-dialog>
 </template>
 

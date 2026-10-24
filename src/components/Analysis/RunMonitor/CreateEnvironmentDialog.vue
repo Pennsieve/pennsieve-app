@@ -12,6 +12,10 @@ const props = defineProps({
   buildWorkflows: { type: Object, default: () => ({ python: null, r: null }) },
   computeNodes: { type: Array, default: () => [] },
   defaultNodeId: { type: String, default: "" },
+  // Where an edit or a retry starts: { lang, nodeId, name, requirements,
+  // replace }. replace (retrying a failed build) rebuilds under the same
+  // name; otherwise the name must be new.
+  initial: { type: Object, default: null },
 });
 const emit = defineEmits(["update:modelValue", "created"]);
 
@@ -61,23 +65,38 @@ const langCfg = computed(() => LANGS[form.value.language] || LANGS.python);
 const selectedWorkflow = computed(() => props.buildWorkflows[form.value.language] || null);
 
 function resetForm() {
-  const lang = availableLangs.value[0] || "python";
+  const init = props.initial || {};
+  const lang = init.lang && props.buildWorkflows[init.lang] ? init.lang : availableLangs.value[0] || "python";
   form.value = {
     language: lang,
-    name: "",
-    nodeId: props.defaultNodeId || props.computeNodes[0]?.uuid || "",
-    requirements: "",
+    name: init.name || "",
+    nodeId: init.nodeId || props.defaultNodeId || props.computeNodes[0]?.uuid || "",
+    requirements: init.requirements || "",
   };
 }
+const replacing = computed(() => !!props.initial?.replace && form.value.name === props.initial?.name);
 watch(visible, (open) => {
   if (open) resetForm();
 });
 
 const nameValid = computed(() => NAME_RE.test(form.value.name));
+// A name already used on the node (unless this replaces that environment).
+const nameTaken = computed(
+  () =>
+    !replacing.value &&
+    (cr.getNodeLayers(form.value.nodeId)?.layers || []).some((l) => l.layerName === form.value.name)
+);
+watch(
+  () => form.value.nodeId,
+  (id) => {
+    if (id) cr.fetchNodeLayers(id).catch(() => {});
+  }
+);
 const canSubmit = computed(
   () =>
     !!selectedWorkflow.value &&
     nameValid.value &&
+    !nameTaken.value &&
     !!form.value.nodeId &&
     !!form.value.requirements.trim() &&
     !submitting.value
@@ -123,12 +142,17 @@ async function submit() {
       throw new Error("The environment builder workflow must be data-source-free.");
     }
 
+    // Retrying a failed build: its empty layer goes, and a new one of the
+    // same name is built.
+    if (replacing.value) {
+      await cr.deleteNodeLayer(form.value.nodeId, form.value.name);
+    }
     await cr.createNodeLayer(form.value.nodeId, {
       layerName: form.value.name,
       layerType: cfg.layerType,
     });
 
-    await store.dispatch("analysisModule/createRun", {
+    const run = await store.dispatch("analysisModule/createRun", {
       workflowInstanceConfiguration: {
         workflowId: selectedWorkflow.value.uuid,
         computeNodeId: form.value.nodeId,
@@ -143,9 +167,9 @@ async function submit() {
       name: `build-${form.value.name}`,
     });
 
-    ElMessage.success(`Building environment "${form.value.name}" — this can take a few minutes.`);
+    ElMessage.success(`Building "${form.value.name}". Follow it under Environments.`);
     visible.value = false;
-    emit("created", { nodeId: form.value.nodeId });
+    emit("created", { nodeId: form.value.nodeId, layerName: form.value.name, runId: run?.uuid });
   } catch (err) {
     ElMessage.error((err && err.message) || "Failed to start environment build");
   } finally {
@@ -155,7 +179,7 @@ async function submit() {
 </script>
 
 <template>
-  <el-dialog v-model="visible" title="New environment" width="560px">
+  <el-dialog v-model="visible" :title="replacing ? 'Rebuild environment' : 'New environment'" width="560px">
     <div v-if="availableLangs.length === 0" class="env-warn">
       The environment builder isn’t available yet. (It needs a public
       “Pennsieve - Build Python Environment” / “… Build R Environment” workflow.)
@@ -179,8 +203,14 @@ async function submit() {
 
       <label class="env-label">Name</label>
       <el-input v-model="form.name" placeholder="e.g. my-analysis-stack" size="default" />
-      <span class="env-hint" :class="{ err: form.name && !nameValid }">
-        Lowercase letters, numbers and dashes.
+      <span v-if="nameTaken" class="env-hint err">
+        There's already an environment called "{{ form.name }}" on this node. Choose another name.
+      </span>
+      <span v-else-if="replacing" class="env-hint">
+        This rebuilds "{{ form.name }}", replacing the failed build.
+      </span>
+      <span v-else class="env-hint" :class="{ err: form.name && !nameValid }">
+        Lowercase letters, numbers and dashes, starting with a letter or number.
       </span>
 
       <div class="env-grid">
@@ -218,7 +248,7 @@ async function submit() {
       <div class="env-footer">
         <bf-button class="secondary" @click="visible = false">Cancel</bf-button>
         <bf-button :disabled="!canSubmit" :processing="submitting" @click="submit">
-          Create environment
+          {{ replacing ? "Rebuild environment" : "Create environment" }}
         </bf-button>
       </div>
     </template>

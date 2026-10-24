@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, watch } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import { useComputeResourcesStore } from "@/stores/computeResourcesStore";
 
 const props = defineProps({
@@ -7,9 +7,14 @@ const props = defineProps({
   computeNodeId: { type: String, default: "" },
   // The notebook kernel: "jupyter" -> python-env layers, "r" -> r-env layers.
   sessionType: { type: String, default: "jupyter" },
+  // Offer "Create one…" (the page has a builder for this language).
+  canCreate: { type: Boolean, default: false },
+  // An environment being built for this picker: named in the hint until it's ready.
+  pendingName: { type: String, default: "" },
 });
 
-const emit = defineEmits(["update:modelValue"]);
+// create: the user asked for a new environment on this node.
+const emit = defineEmits(["update:modelValue", "create"]);
 
 const computeResourcesStore = useComputeResourcesStore();
 
@@ -64,6 +69,26 @@ function layerMeta(layer) {
 function onChange(val) {
   emit("update:modelValue", val || "");
 }
+
+// Search by name or by a package in it ("mne" finds the environment with mne).
+const query = ref("");
+const shownLayers = computed(() => {
+  const q = query.value.trim().toLowerCase();
+  if (!q) return envLayers.value;
+  return envLayers.value.filter(
+    (l) =>
+      l.layerName.toLowerCase().includes(q) ||
+      (l.packages || []).some((p) => p.toLowerCase().includes(q))
+  );
+});
+// The packages a search matched, else the first few: shown under each option.
+function packagePreview(layer) {
+  const pkgs = layer.packages || [];
+  const q = query.value.trim().toLowerCase();
+  const picked = q ? pkgs.filter((p) => p.toLowerCase().includes(q)) : pkgs;
+  const shown = picked.slice(0, 4).join(", ");
+  return picked.length > 4 ? `${shown}, +${picked.length - 4} more` : shown;
+}
 </script>
 
 <template>
@@ -79,17 +104,31 @@ function onChange(val) {
           : 'No environment (base Python image)'
       "
       :loading="isLoading"
+      filterable
+      :filter-method="(q) => (query = q || '')"
+      popper-class="env-layer-popper"
       @change="onChange"
+      @visible-change="(open) => open || (query = '')"
     >
       <el-option
-        v-for="layer in envLayers"
+        v-for="layer in shownLayers"
         :key="layer.layerName"
         :label="layer.layerName"
         :value="layer.layerName"
+        class="env-layer-option"
       >
-        <span>{{ layer.layerName }}</span>
-        <span v-if="layerMeta(layer)" class="env-layer-meta"> — {{ layerMeta(layer) }}</span>
+        <div class="env-layer-line">
+          <span>{{ layer.layerName }}</span>
+          <span v-if="layerMeta(layer)" class="env-layer-meta"> — {{ layerMeta(layer) }}</span>
+        </div>
+        <div v-if="packagePreview(layer)" class="env-layer-pkgs">{{ packagePreview(layer) }}</div>
       </el-option>
+      <el-option
+        v-if="query && envLayers.length && !shownLayers.length"
+        disabled
+        :label="`No environment has “${query}”`"
+        value="__nomatch__"
+      />
       <el-option
         v-if="!computeNodeId"
         disabled
@@ -107,9 +146,15 @@ function onChange(val) {
         value="__none__"
       />
     </el-select>
-    <span class="env-layer-hint">
-      Optional. Mounts a prebuilt {{ envType === 'r-env' ? 'R' : 'Python' }}
-      environment layer so its packages are importable in the notebook.
+    <span v-if="pendingName" class="env-layer-hint">
+      Building “{{ pendingName }}”. It's selected here as soon as it's ready;
+      you can also start without it.
+    </span>
+    <span v-else class="env-layer-hint">
+      Optional. Its packages are importable in the notebook. Search by name or by a package.
+      <button v-if="canCreate && computeNodeId" type="button" class="env-layer-create" @click="emit('create')">
+        Create one…
+      </button>
     </span>
   </div>
 </template>
@@ -126,10 +171,43 @@ function onChange(val) {
   color: theme.$gray_4;
 }
 
+.env-layer-create {
+  border: none;
+  background: none;
+  padding: 0;
+  font: inherit;
+  color: theme.$link-color;
+  cursor: pointer;
+
+  &:hover {
+    color: theme.$link-color-hover;
+  }
+}
+
 .env-layer-hint {
   font-size: 11px;
   color: theme.$gray_4;
   margin-top: 4px;
   display: block;
+}
+</style>
+
+<style lang="scss">
+@use "../../../styles/_theme.scss";
+
+// Options are two lines (name, then packages); the dropdown is teleported, so
+// this isn't scoped.
+.env-layer-popper .env-layer-option {
+  height: auto;
+  line-height: 1.4;
+  padding-top: 6px;
+  padding-bottom: 6px;
+}
+.env-layer-popper .env-layer-pkgs {
+  font-size: 11px;
+  color: theme.$gray_4;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 </style>
