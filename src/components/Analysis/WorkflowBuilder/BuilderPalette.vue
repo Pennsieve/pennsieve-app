@@ -8,7 +8,7 @@
 import { computed, ref } from "vue";
 import { useRoute } from "vue-router";
 import { useStore } from "vuex";
-import { appColor, appInitials } from "../Applications/appCards";
+import { appColor, appInitials, githubRepo } from "../Applications/appCards";
 import { ioLine, manifestsServed, matchesApp, paletteGroups, versionManifest } from "./appManifestInfo";
 
 const props = defineProps({
@@ -39,8 +39,15 @@ const lacksManifest = (app) => served.value && !manifestOf(app);
 const manifestBuilder = computed(() => ({
   name: route.params.orgId ? "application-manifest-builder" : "my-application-manifest-builder",
 }));
-// The tile's colours and letters, as in the Gallery, from the app's name.
-const tileOf = (app) => ({ name: props.appName(app) });
+// The tile's colours and letters, as in the Gallery, from the app's name
+// without its owner's ("pennsieve-ai-analyze" -> "AA"), so an
+// organization's apps don't all read the same.
+const tileOf = (app) => {
+  const owner = (githubRepo(app.sourceUrl)?.owner || "").toLowerCase();
+  const name = props.appName(app);
+  const words = name.split(/[^A-Za-z0-9]+/).filter((w) => w && w.toLowerCase() !== owner);
+  return { name: words.join("-") || name };
+};
 </script>
 
 <template>

@@ -11,6 +11,7 @@ import { Controls } from "@vue-flow/controls";
 import { MiniMap } from "@vue-flow/minimap";
 import dagre from "@dagrejs/dagre";
 import { ElMessage, ElMessageBox } from "element-plus";
+import { ArrowLeft, ArrowRight, RefreshLeft, RefreshRight } from "@element-plus/icons-vue";
 import EventBus from "../../../utils/event-bus";
 import IconFile from "../../icons/IconFile.vue";
 import IconCollection from "../../icons/IconCollection.vue";
@@ -214,8 +215,34 @@ const saveWorkflowChanges = async () => {
   }
 };
 
-// An app's name: its app.yml's, else its repository's.
-const appDisplayName = (app) => versionManifest(app)?.name || repoName(app);
+// An app's name: its app.yml's, else its repository's (without its owner).
+const appDisplayName = (app) => versionManifest(app)?.name || extractRepoName(app?.sourceUrl) || repoName(app);
+
+/*
+  The side panels (palette, inspector) can be folded to a rail; the choice
+  is kept in this browser.
+*/
+const PANELS_KEY = "pennsieve.builder.panels";
+const storedPanels = () => {
+  try {
+    return { palette: true, inspector: true, ...JSON.parse(localStorage.getItem(PANELS_KEY) || "{}") };
+  } catch {
+    return { palette: true, inspector: true };
+  }
+};
+const panels = ref(storedPanels());
+const togglePanel = (which) => {
+  panels.value = { ...panels.value, [which]: !panels.value[which] };
+  try {
+    localStorage.setItem(PANELS_KEY, JSON.stringify(panels.value));
+  } catch {
+    // not kept
+  }
+};
+// Selecting a step opens the inspector, if folded.
+watch(selectedNode, (n) => {
+  if (n && !panels.value.inspector) panels.value = { ...panels.value, inspector: true };
+});
 
 // The selected app step's manifest: its pinned version's.
 const stepManifest = computed(() => {
@@ -521,7 +548,7 @@ const enterCreateMode = () => {
   clearWorkflow();
   seedCanvas();
   history.reset();
-  accordionActiveNames.value = ["data-and-apps"];
+  accordionActiveNames.value = ["information"];
   store.commit("analysisModule/SET_SELECTED_WORKFLOW", {});
 };
 
@@ -2015,8 +2042,22 @@ const openNodeSettings = (id) => {
 
     <div class="builder-content">
       <!-- Left: what can be added (create and edit) -->
+      <button
+        v-if="!isReadOnly && !panels.palette"
+        type="button"
+        class="panel-rail"
+        title="Show the steps you can add"
+        aria-label="Show the steps you can add"
+        @click="togglePanel('palette')"
+      >
+        <el-icon><ArrowRight /></el-icon>
+        <span class="panel-rail-label">Add steps</span>
+      </button>
+      <div v-if="!isReadOnly && panels.palette" class="panel-wrap">
+        <button type="button" class="panel-fold panel-fold--left" title="Fold" aria-label="Fold the list" @click="togglePanel('palette')">
+          <el-icon><ArrowLeft /></el-icon>
+        </button>
       <BuilderPalette
-        v-if="!isReadOnly"
         :applications="availableApplications"
         :app-name="appDisplayName"
         :step-ports="selectedNode?.type === 'default' ? selectedNode.data?.manifestPorts || null : null"
@@ -2025,6 +2066,7 @@ const openNodeSettings = (id) => {
         @add="(type, app) => addStep(type, app)"
         @dragstart="(app, event, type) => onDragStart(app, event, type)"
       />
+      </div>
 
       <!-- Middle: the canvas -->
       <div class="main-panel">
@@ -2084,8 +2126,12 @@ const openNodeSettings = (id) => {
                   >
                     Remove connection
                   </button>
-                  <button class="auto-layout-btn" title="Undo (⌘Z)" aria-label="Undo" @click="history.undo()">↶</button>
-                  <button class="auto-layout-btn" title="Redo (⇧⌘Z)" aria-label="Redo" @click="history.redo()">↷</button>
+                  <button class="auto-layout-btn icon-btn" title="Undo (⌘Z)" aria-label="Undo" @click="history.undo()">
+                    <el-icon><RefreshLeft /></el-icon>
+                  </button>
+                  <button class="auto-layout-btn icon-btn" title="Redo (⇧⌘Z)" aria-label="Redo" @click="history.redo()">
+                    <el-icon><RefreshRight /></el-icon>
+                  </button>
                 </template>
               </div>
 
@@ -2412,7 +2458,21 @@ const openNodeSettings = (id) => {
       </div>
 
       <!-- Sidebar (Right) -->
-      <div ref="sidebarRef" class="applications-sidebar">
+      <button
+        v-if="!panels.inspector"
+        type="button"
+        class="panel-rail panel-rail--right"
+        title="Show details"
+        aria-label="Show details"
+        @click="togglePanel('inspector')"
+      >
+        <el-icon><ArrowLeft /></el-icon>
+        <span class="panel-rail-label">Details</span>
+      </button>
+      <div v-else ref="sidebarRef" class="applications-sidebar">
+        <button type="button" class="panel-fold panel-fold--right" title="Fold" aria-label="Fold the details" @click="togglePanel('inspector')">
+          <el-icon><ArrowRight /></el-icon>
+        </button>
         <el-collapse v-model="accordionActiveNames" class="sidebar-accordion">
           <!-- Information Section -->
           <el-collapse-item :title="selectedNode ? 'Step' : 'Workflow'" name="information">
@@ -2855,6 +2915,26 @@ const openNodeSettings = (id) => {
               <button class="text-link-btn" @click="selectedNode = null">
                 Clear selection
               </button>
+            </template>
+
+            <!-- Building, nothing selected: what's left, and how -->
+            <template v-if="!selectedNode && mode !== 'browse'">
+              <h4 class="sidebar-section-title">Checklist</h4>
+              <ul class="checklist">
+                <li v-if="!readiness.items.length" class="checklist-done">Ready to save.</li>
+                <li v-for="item in readiness.items" :key="item.id">
+                  <button type="button" class="checklist-item" :class="`is-${item.level}`" @click="onReadinessSelect(item)">
+                    <span class="checklist-dot" />
+                    {{ item.text }}
+                  </button>
+                </li>
+              </ul>
+              <h4 class="sidebar-section-title">Tips</h4>
+              <ul class="tips">
+                <li>Click a step to see and change its settings.</li>
+                <li><strong>+</strong> under a step adds the next one; drag between steps to connect them.</li>
+                <li><kbd>Delete</kbd> removes the selection; <kbd>⌘Z</kbd> / <kbd>⇧⌘Z</kbd> undo and redo; arrows move between steps.</li>
+              </ul>
             </template>
 
             <!-- Workflow Details -->
@@ -3314,7 +3394,125 @@ const openNodeSettings = (id) => {
   overflow: hidden;
 }
 
+/* Folding the side panels: a rail to open one, a button to fold it. */
+.panel-wrap {
+  position: relative;
+  display: flex;
+}
+.panel-rail {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  width: 30px;
+  flex-shrink: 0;
+  padding: 12px 0;
+  border: none;
+  border-right: 1px solid theme.$gray_2;
+  background: theme.$white;
+  color: theme.$gray_5;
+  cursor: pointer;
+
+  &:hover {
+    background: theme.$gray_1;
+    color: theme.$purple_3;
+  }
+}
+.panel-rail--right {
+  border-right: none;
+  border-left: 1px solid theme.$gray_2;
+}
+.panel-rail-label {
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  font-size: 12px;
+  font-weight: 500;
+}
+.panel-fold {
+  position: absolute;
+  top: 8px;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 1px solid theme.$gray_2;
+  border-radius: 50%;
+  background: theme.$white;
+  color: theme.$gray_5;
+  cursor: pointer;
+
+  &:hover {
+    border-color: theme.$purple_1;
+    color: theme.$purple_3;
+  }
+}
+.panel-fold--left {
+  right: -11px;
+}
+.panel-fold--right {
+  left: 4px;
+}
+.icon-btn {
+  display: flex;
+  align-items: center;
+  padding: 6px 8px;
+}
+.checklist,
+.tips {
+  margin: 0 0 12px;
+  padding: 0;
+  list-style: none;
+  font-size: 12px;
+}
+.checklist-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  width: 100%;
+  padding: 4px 2px;
+  border: none;
+  background: none;
+  font: inherit;
+  color: theme.$gray_6;
+  text-align: left;
+  cursor: pointer;
+
+  &:hover {
+    background: theme.$gray_1;
+  }
+}
+.checklist-dot {
+  width: 8px;
+  height: 8px;
+  flex-shrink: 0;
+  margin-top: 4px;
+  border-radius: 50%;
+  background: #f59e0b;
+}
+.checklist-item.is-block .checklist-dot {
+  background: theme.$status_red;
+}
+.checklist-done {
+  color: theme.$status_green;
+}
+.tips li {
+  margin-bottom: 6px;
+  line-height: 1.4;
+  color: theme.$gray_5;
+}
+kbd {
+  padding: 0 4px;
+  border: 1px solid theme.$gray_3;
+  border-radius: 3px;
+  background: theme.$gray_1;
+  font-size: 11px;
+}
+
 .applications-sidebar {
+  position: relative;
   width: 350px;
   background-color: theme.$white;
   border-left: 1px solid theme.$gray_3;
