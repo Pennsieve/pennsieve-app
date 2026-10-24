@@ -8,8 +8,7 @@ import IconAnalysis from "../../icons/IconAnalysis.vue";
 import IconPennsieveMark from "../../icons/IconPennsieveMark.vue";
 
 defineProps({
-  // Inside the Workflows tab's Builder view, whose toolbar has the New
-  // Workflow button.
+  // Inside the Gallery, whose toolbar has the New Workflow button.
   embedded: { type: Boolean, default: false },
 });
 
@@ -152,7 +151,8 @@ const lastRunStatusKey = (status, successRate) => {
 };
 
 const goToCreate = () => {
-  router.push({ name: isMyWorkspace.value ? "my-workflow-create" : "workflow-create" });
+  // The Workflows tab's Builder view.
+  router.push({ name: isMyWorkspace.value ? "my-workflows" : "workflows", query: { view: "builder" } });
 };
 defineExpose({ goToCreate });
 

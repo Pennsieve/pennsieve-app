@@ -2,13 +2,14 @@
 // The Workflows tab: Live, the workflow runs going on and before (the former
 // Runs page, without standalone notebook sessions, which are on the
 // Notebooks tab; "Include notebooks" brings them back, e.g. to compare
-// costs), and Builder, the workflows themselves. Both choices are in the URL
-// (?view=builder, ?notebooks=1), as on the Notebooks tab.
+// costs), and Builder, the canvas for a new workflow. The list of workflows
+// is in the Gallery. Both choices are in the URL (?view=builder,
+// ?notebooks=1), as on the Notebooks tab.
 import { computed, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import BfButton from "../../shared/bf-button/BfButton.vue";
 import RunsOverview from "../RunMonitor/RunsOverview.vue";
-import WorkflowsGrid from "./WorkflowsGrid.vue";
+import WorkflowBuilder from "../WorkflowBuilder/WorkflowBuilder.vue";
 
 const route = useRoute();
 const router = useRouter();
@@ -28,7 +29,6 @@ const includeNotebooks = computed({
 });
 
 const runsRef = ref(null);
-const gridRef = ref(null);
 </script>
 
 <template>
@@ -50,13 +50,13 @@ const gridRef = ref(null);
       <div class="wf-actions">
         <el-checkbox v-if="view === 'live'" v-model="includeNotebooks" size="small">Include notebooks</el-checkbox>
         <bf-button v-if="view === 'live'" @click="runsRef?.openWizardDialog()">Run Workflow</bf-button>
-        <bf-button v-else @click="gridRef?.goToCreate()">+ New Workflow</bf-button>
+
       </div>
     </div>
     <div class="wf-body">
       <RunsOverview v-if="view === 'live'" ref="runsRef" embedded :exclude-notebooks="!includeNotebooks" />
       <div v-else class="wf-builder">
-        <WorkflowsGrid ref="gridRef" embedded />
+        <WorkflowBuilder />
       </div>
     </div>
   </div>
@@ -120,6 +120,8 @@ const gridRef = ref(null);
 }
 .wf-builder {
   height: 100%;
-  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 </style>

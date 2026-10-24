@@ -148,7 +148,6 @@ const WebhooksList = () => import ('../components/Integrations/WebhooksList/Webh
 const IntegrationsList = () => import ('../components/Integrations/IntegrationsList/IntegrationsList.vue')
 const ComputeNodesList = () => import ('../components/Analysis/ComputeNodes/ComputeNodesList.vue')
 const ComputeNodeManagement = () => import ('../components/Analysis/ComputeNodes/ComputeNodeManagement.vue')
-const ApplicationsGrid = () => import ('../components/Analysis/Applications/ApplicationsGrid.vue')
 const ApplicationDetail = () => import ('../components/Analysis/Applications/ApplicationDetail.vue')
 const AppManifestGuide = () => import ('../components/Analysis/Applications/AppManifestGuide.vue')
 const AppManifestBuilder = () => import ('../components/Analysis/Applications/AppManifestBuilder.vue')
@@ -159,6 +158,7 @@ const NotebooksOverview = () => import ('../components/Analysis/RunMonitor/Noteb
 const NotebookSession = () => import ('../components/Analysis/JupyterSession/NotebookSession.vue')
 const WorkflowBuilder = () => import ('../components/Analysis/WorkflowBuilder/WorkflowBuilder.vue')
 const WorkflowsOverview = () => import ('../components/Analysis/Workflows/WorkflowsOverview.vue')
+const GalleryOverview = () => import ('../components/Analysis/Gallery/GalleryOverview.vue')
 
 /**
  * Metadata Components
@@ -570,14 +570,21 @@ const router = createRouter({
               }
             },
             {
-              name: 'my-applications',
-              path: 'applications',
-              component: ApplicationsGrid,
+              // Workflows and apps to use
+              name: 'my-gallery',
+              path: 'gallery',
+              component: GalleryOverview,
               meta: {
                 hideSecondaryNav: true,
-                title: 'Applications',
-                description: 'Public applications, your own, and applications shared with you.'
+                title: 'Gallery',
+                description: 'Workflows and applications: your own, public ones, and ones shared with you.'
               }
+            },
+            {
+              // Applications are in the Gallery's Apps view; old links land there.
+              name: 'my-applications',
+              path: 'applications',
+              redirect: { name: 'my-gallery', query: { view: 'apps' } }
             },
             {
               // Static paths before 'applications/:uuid'
@@ -621,7 +628,7 @@ const router = createRouter({
               meta: {
                 hideSecondaryNav: true,
                 title: 'Workflows',
-                description: 'Your own workflows, and public ones.'
+                description: 'Your workflow runs, and the builder for new workflows.'
               }
             },
             {
@@ -642,7 +649,7 @@ const router = createRouter({
               props: true,
               meta: {
                 hideSecondaryNav: true,
-                backLink: { name: 'my-workflows' },
+                backLink: { name: 'my-gallery' },
                 title: 'Workflow',
                 description: 'A workflow of your own, or a public one.'
               }
@@ -2065,11 +2072,18 @@ const router = createRouter({
           props: true
         },
         {
+          // Workflows and apps to use
+          name: 'gallery',
+          path: 'gallery',
+          components: {
+            stage: GalleryOverview,
+          }
+        },
+        {
+          // Applications are in the Gallery's Apps view; old links land there.
           name: 'applications',
           path: 'applications',
-          components: {
-            stage: ApplicationsGrid,
-          }
+          redirect: (to) => ({ name: 'gallery', params: to.params, query: { view: 'apps' } })
         },
         {
           name: 'application-manifest-guide',

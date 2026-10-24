@@ -5,6 +5,11 @@ import { useRouter, useRoute } from "vue-router";
 
 import IconAnalysis from "../../icons/IconAnalysis.vue";
 
+defineProps({
+  // Inside the Gallery, whose toolbar links the manifest builder and guide.
+  embedded: { type: Boolean, default: false },
+});
+
 
 /*
   Local State
@@ -232,8 +237,8 @@ const goToManifestBuilder = () => {
 
 <template>
   <div class="applications-container">
-    <!-- Info Section -->
-    <div class="info-section">
+    <!-- Info Section (the Gallery has its own toolbar) -->
+    <div v-if="!embedded" class="info-section">
       <div class="info-card">
         <h3>Applications</h3>
         <p>

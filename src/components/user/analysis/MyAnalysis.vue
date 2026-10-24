@@ -12,8 +12,8 @@ const tabs = [
     to: 'my-workflows',
   },
   {
-    name: 'Applications',
-    to: 'my-applications',
+    name: 'Gallery',
+    to: 'my-gallery',
   },
   {
     name: 'Compute Nodes',

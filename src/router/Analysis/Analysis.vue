@@ -70,7 +70,7 @@ export default {
       const topLevelTabs = {
         'notebooks': 'Notebooks',
         'workflows': 'Workflows',
-        'applications': 'Applications',
+        'gallery': 'Gallery',
         'compute-nodes': 'Compute Nodes',
       };
       if (topLevelTabs[routeName]) {
@@ -84,11 +84,11 @@ export default {
           ? { parent: 'Notebooks', parentRoute: { name: 'notebooks' } }
           : { parent: 'Workflows', parentRoute: { name: 'workflows' } },
         'run-configure': { parent: 'Workflows', parentRoute: { name: 'workflows' } },
-        'workflow-detail': { parent: 'Workflows', parentRoute: { name: 'workflows', query: { view: 'builder' } } },
+        'workflow-detail': { parent: 'Gallery', parentRoute: { name: 'gallery' } },
         'workflow-create': { parent: 'Workflows', parentRoute: { name: 'workflows', query: { view: 'builder' } } },
-        'application-detail': { parent: 'Applications', parentRoute: { name: 'applications' } },
-        'application-manifest-guide': { parent: 'Applications', parentRoute: { name: 'applications' } },
-        'application-manifest-builder': { parent: 'Applications', parentRoute: { name: 'applications' } },
+        'application-detail': { parent: 'Gallery', parentRoute: { name: 'gallery', query: { view: 'apps' } } },
+        'application-manifest-guide': { parent: 'Gallery', parentRoute: { name: 'gallery', query: { view: 'apps' } } },
+        'application-manifest-builder': { parent: 'Gallery', parentRoute: { name: 'gallery', query: { view: 'apps' } } },
         'compute-node-management': { parent: 'Compute Nodes', parentRoute: { name: 'compute-nodes' } },
       };
       const sub = subPages[routeName];
@@ -162,8 +162,8 @@ export default {
           to: "workflows",
         },
         {
-          name: "Applications",
-          to: "applications",
+          name: "Gallery",
+          to: "gallery",
         },
         {
           name: "Compute Nodes",
