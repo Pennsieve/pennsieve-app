@@ -8,6 +8,7 @@ import IconAnalysis from "../../icons/IconAnalysis.vue";
 import IconPennsieveMark from "../../icons/IconPennsieveMark.vue";
 import WorkflowThumbnail from "../WorkflowGraph/WorkflowThumbnail.vue";
 import { ioSummary, appNames, usageLine } from "./workflowSummary";
+import { applyFilters, outputOptions, sortWorkflows, SORTS } from "./galleryFilter";
 
 defineProps({
   // Inside the Gallery, whose toolbar has the New Workflow button.
@@ -25,7 +26,28 @@ const isMyWorkspace = computed(() => !route.params.orgId);
 
 const searchQuery = ref("");
 const statusFilter = ref("active");
-const scopeFilter = ref("workspace"); // "workspace" | "public"
+const scopeFilter = ref("workspace"); // "workspace" | "public" | "pennsieve" (public, official only)
+const inputFilter = ref("any"); // "any" | "dataset" | "none"
+const outputFilter = ref("any"); // "any" | a target type
+
+// The sort is the viewer's, kept in this browser.
+const SORT_KEY = "pennsieve.gallery.workflowSort";
+const storedSort = () => {
+  try {
+    const v = localStorage.getItem(SORT_KEY);
+    return SORTS.some((o) => o.value === v) ? v : "recent";
+  } catch {
+    return "recent";
+  }
+};
+const sortBy = ref(storedSort());
+watch(sortBy, (v) => {
+  try {
+    localStorage.setItem(SORT_KEY, v);
+  } catch {
+    // not remembered; it still applies now
+  }
+});
 const pageSize = ref(10);
 const currentPage = ref(1);
 const isLoadingAll = ref(false);
@@ -33,6 +55,9 @@ const isLoadingAll = ref(false);
 const workflows = computed(
   () => store.state.analysisModule.workflows || []
 );
+// What the cards name: target types (outputs) and applications (steps).
+const targetTypes = computed(() => store.getters["analysisModule/targetTypes"] || []);
+const applications = computed(() => store.getters["analysisModule/applications"] || []);
 const nextCursor = computed(
   () => store.state.analysisModule.workflowsNextCursor || ""
 );
@@ -46,24 +71,35 @@ const filterOptions = [
 const scopeOptions = computed(() => [
   { label: isMyWorkspace.value ? "My workflows" : "This workspace", value: "workspace" },
   { label: "Public", value: "public" },
+  { label: "Pennsieve", value: "pennsieve" },
 ]);
 
-const isPublicScope = computed(() => scopeFilter.value === "public");
+// Pennsieve's are the public ones it has reviewed (official).
+const isPublicScope = computed(() => scopeFilter.value !== "workspace");
 
-const filteredWorkflows = computed(() => {
-  let list = [...workflows.value];
-  const q = searchQuery.value.trim().toLowerCase();
-  if (q) {
-    list = list.filter((wf) => {
-      const name = (wf.name || "").toLowerCase();
-      const desc = (wf.description || "").toLowerCase();
-      return name.includes(q) || desc.includes(q);
-    });
-  }
-  return list.sort(
-    (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
-  );
-});
+const outputChoices = computed(() => outputOptions(workflows.value, targetTypes.value));
+const filtersSet = computed(
+  () => !!searchQuery.value.trim() || inputFilter.value !== "any" || outputFilter.value !== "any"
+);
+function clearFilters() {
+  searchQuery.value = "";
+  inputFilter.value = "any";
+  outputFilter.value = "any";
+}
+
+const filteredWorkflows = computed(() =>
+  sortWorkflows(
+    applyFilters(workflows.value, {
+      query: searchQuery.value,
+      input: inputFilter.value,
+      output: outputFilter.value,
+      officialOnly: scopeFilter.value === "pennsieve",
+      applications: applications.value,
+      targetTypes: targetTypes.value,
+    }),
+    sortBy.value
+  )
+);
 
 const paginatedWorkflows = computed(() => {
   const start = (currentPage.value - 1) * pageSize.value;
@@ -182,9 +218,6 @@ const fetchAllWorkflows = async () => {
   }
 };
 
-// What the cards name: target types (outputs) and applications (steps).
-const targetTypes = computed(() => store.getters["analysisModule/targetTypes"] || []);
-const applications = computed(() => store.getters["analysisModule/applications"] || []);
 
 // Run from a card: the Workflows tab's Live view, with the run wizard open on
 // this workflow.
@@ -193,7 +226,7 @@ const runWorkflow = (wf) => {
 };
 
 // Re-fetch all when the status or scope filter changes
-watch([statusFilter, scopeFilter], () => {
+watch([statusFilter, isPublicScope], () => {
   currentPage.value = 1;
   fetchAllWorkflows();
 });
@@ -225,15 +258,19 @@ onMounted(async () => {
     <!-- Workflows Section -->
     <div class="workflows-section">
       <div class="workflows-section-header">
-        <h3>Workflows</h3>
         <el-input
-          v-if="workflows.length > 0"
           v-model="searchQuery"
-          placeholder="Search workflows..."
+          placeholder="Search by name, app, input or output…"
           size="default"
           clearable
           class="workflows-search-input"
         />
+        <label class="sort-control">
+          Sort
+          <el-select v-model="sortBy" size="default" class="sort-select">
+            <el-option v-for="o in SORTS" :key="o.value" :label="o.label" :value="o.value" />
+          </el-select>
+        </label>
       </div>
 
       <div class="filter-row">
@@ -249,7 +286,17 @@ onMounted(async () => {
           </button>
         </div>
 
-        <div class="status-buttons">
+        <el-select v-model="inputFilter" size="small" class="io-select" aria-label="Input">
+          <el-option label="Any input" value="any" />
+          <el-option label="Takes a dataset" value="dataset" />
+          <el-option label="No input" value="none" />
+        </el-select>
+        <el-select v-model="outputFilter" size="small" class="io-select" aria-label="Output">
+          <el-option label="Any output" value="any" />
+          <el-option v-for="o in outputChoices" :key="o.value" :label="o.label" :value="o.value" />
+        </el-select>
+
+        <div class="status-buttons status-buttons--end">
           <button
             v-for="option in filterOptions"
             :key="option.value"
@@ -262,7 +309,10 @@ onMounted(async () => {
         </div>
       </div>
 
-      <p v-if="isPublicScope" class="scope-hint">
+      <p v-if="scopeFilter === 'pennsieve'" class="scope-hint">
+        Workflows Pennsieve has reviewed and validated. They can be run from any workspace.
+      </p>
+      <p v-else-if="isPublicScope" class="scope-hint">
         Public workflows published across all workspaces. They can be run from
         any workspace; only the creator can edit or unpublish them.
       </p>
@@ -331,6 +381,7 @@ onMounted(async () => {
           <strong>"{{ searchQuery }}"</strong>
         </span>
         <span v-else>No workflows match your filters</span>
+        <button v-if="filtersSet" type="button" class="clear-filters" @click="clearFilters">Clear search and filters</button>
       </div>
 
       <el-pagination
@@ -405,7 +456,37 @@ onMounted(async () => {
 }
 
 .workflows-search-input {
-  max-width: 320px;
+  flex: 1;
+  max-width: 420px;
+}
+.sort-control {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: theme.$gray_5;
+}
+.sort-select {
+  width: 160px;
+}
+.io-select {
+  width: 160px;
+}
+.status-buttons--end {
+  margin-left: auto;
+}
+.clear-filters {
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  font-size: 13px;
+  color: theme.$link-color;
+  cursor: pointer;
+
+  &:hover {
+    color: theme.$link-color-hover;
+  }
 }
 
 .filter-row {
