@@ -273,13 +273,16 @@ export const useComputeResourcesStore = defineStore('computeResources', () => {
   // Registers the account once its role exists; account-service checks the
   // role works with the external ID (and refuses without it). Then, as the
   // agent does, asks for pull access to the app store's images.
-  const registerComputeAccount = async ({ accountId, roleName, externalId, name }) => {
+  const registerComputeAccount = async ({ accountId, roleName, externalId, name, templateVersion }) => {
     const created = await accountRequest('POST', '/accounts', {
       accountId,
       accountType: 'AWS',
       roleName,
       externalId,
-      ...(name && { name })
+      ...(name && { name }),
+      // The template the stack was made from: it makes this a CloudFormation
+      // connection, not a legacy one.
+      ...(templateVersion && { templateVersion })
     })
     try {
       await accountRequest('POST', '/app-store/access', { accountId, accountType: 'AWS' })
@@ -293,8 +296,12 @@ export const useComputeResourcesStore = defineStore('computeResources', () => {
 
   // Upgrade: points an existing registration (its nodes and sharing kept) at
   // a role made from the template.
-  const switchComputeAccountRole = async (accountUuid, { roleName, externalId }) => {
-    const result = await accountRequest('POST', `/accounts/${accountUuid}/role`, { roleName, externalId })
+  const switchComputeAccountRole = async (accountUuid, { roleName, externalId, templateVersion }) => {
+    const result = await accountRequest('POST', `/accounts/${accountUuid}/role`, {
+      roleName,
+      externalId,
+      ...(templateVersion && { templateVersion }),
+    })
     await fetchComputeAccounts(true)
     return result
   }
