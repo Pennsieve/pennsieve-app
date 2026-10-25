@@ -137,6 +137,40 @@ export function domainOf(manifest) {
 // spellings people use, so a typed "EEG" lands on a known "eeg".
 export const SUGGESTED_TAGS = [...new Set(DOMAINS.flatMap((d) => [d.tag, ...d.aliases]))];
 
+// The builder's tag options: each domain's preferred tag (subjects first, then
+// tasks, in DOMAINS order) and the aliases that colour a card the same way.
+export function preferredTagGroups() {
+  const ordered = [...DOMAINS.filter((d) => d.subject), ...DOMAINS.filter((d) => !d.subject)];
+  return {
+    preferred: ordered.map((domain) => ({ tag: domain.tag, domain })),
+    aliases: ordered.flatMap((domain) => domain.aliases.filter((a) => a !== domain.tag).map((tag) => ({ tag, domain }))),
+  };
+}
+
+// Whether a tag option matches what's typed: the tag, its domain's label and,
+// for a preferred tag, the domain's aliases ("spike" finds spike-sorting).
+export function tagOptionMatches(option, query, { preferred = false } = {}) {
+  const q = normalize(query);
+  if (!q) return true;
+  const words = [option.tag, option.domain?.label, ...(preferred ? option.domain?.aliases || [] : [])];
+  return words.filter(Boolean).some((w) => normalize(w).includes(q));
+}
+
+// The preferred tag to suggest: an alias names a domain whose preferred tag
+// the app doesn't have yet ("eeg" -> electrophysiology). Free-typed tags with
+// no domain suggest nothing.
+export function tagDomainNudge(tags = []) {
+  const have = new Set(tags.map(normalize));
+  for (const t of tags) {
+    const domain = domainOfTag(t);
+    if (domain && !have.has(normalize(domain.tag))) return { tag: domain.tag, domain };
+  }
+  return null;
+}
+
+// Whether any tag names a domain, i.e. the card gets a colour.
+export const hasDomainTag = (tags = []) => tags.some((t) => !!domainOfTag(t));
+
 // A typed tag, as the suggestion it matches when there is one ("EEG" ->
 // "eeg", "Machine Learning" -> "machine-learning"), else as typed.
 export function canonicalTag(tag) {

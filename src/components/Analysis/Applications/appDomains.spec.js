@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { appBanner, canonicalTag, domainColors, domainCounts, domainOf, domainOfTag, DOMAINS, fitTypes, NEUTRAL_COLORS, SUGGESTED_TAGS } from "./appDomains";
+import { appBanner, canonicalTag, domainColors, domainCounts, domainOf, domainOfTag, DOMAINS, fitTypes, NEUTRAL_COLORS, SUGGESTED_TAGS, preferredTagGroups, tagOptionMatches, tagDomainNudge, hasDomainTag } from "./appDomains";
 
 const withManifest = (manifest, name = "spike-detect") => ({
   name,
@@ -95,3 +95,33 @@ describe("app domains", () => {
     expect(chips.map((c) => [c.domain.key, c.count])).toEqual([["ephys", 1], ["viz", 2]]);
   });
 });
+
+describe("preferred tags", () => {
+  it("lists each domain's tag, subjects first, in DOMAINS order", () => {
+    const { preferred, aliases } = preferredTagGroups();
+    expect(preferred).toHaveLength(DOMAINS.length);
+    const subjects = DOMAINS.filter((d) => d.subject).map((d) => d.tag);
+    expect(preferred.slice(0, subjects.length).map((o) => o.tag)).toEqual(subjects);
+    expect(aliases.find((o) => o.tag === "eeg").domain.tag).toBe("electrophysiology");
+    expect(aliases.some((o) => o.tag === o.domain.tag)).toBe(false);
+  });
+  it("matches a preferred tag by its aliases and label", () => {
+    const { preferred } = preferredTagGroups();
+    const spikes = preferred.find((o) => o.tag === "spike-sorting");
+    expect(tagOptionMatches(spikes, "spike", { preferred: true })).toBe(true);
+    expect(tagOptionMatches(spikes, "kilosort", { preferred: true })).toBe(true);
+    expect(tagOptionMatches(spikes, "kilosort")).toBe(false);
+    expect(tagOptionMatches(spikes, "")).toBe(true);
+  });
+  it("suggests the preferred tag for an alias's domain, once", () => {
+    expect(tagDomainNudge(["eeg"])).toMatchObject({ tag: "electrophysiology" });
+    expect(tagDomainNudge(["eeg", "electrophysiology"])).toBeNull();
+    expect(tagDomainNudge(["my-lab-tool"])).toBeNull();
+    expect(tagDomainNudge([])).toBeNull();
+  });
+  it("knows whether any tag gives the card a colour", () => {
+    expect(hasDomainTag(["my-lab-tool"])).toBe(false);
+    expect(hasDomainTag(["qc"])).toBe(true);
+  });
+});
+
