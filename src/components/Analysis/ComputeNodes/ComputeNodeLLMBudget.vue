@@ -1,248 +1,243 @@
 <template>
-  <div class="llm-budget-content" v-loading="isLoading">
-    <p class="section-blurb">
-      Caps total LLM spend across <strong>all callers</strong> on this compute
-      node — chat <em>and</em> workflow applications. When the cap is reached,
-      every new LLM invocation is rejected at the governor until the period
-      rolls over.
-      <span class="propagation-note">
-        Changes take effect within ~60 seconds (governor caches the value).
-      </span>
+  <div class="llm-budget-admin" v-loading="isLoading">
+    <p class="cn-blurb">
+      What AI models may cost on this node, for chat and apps. Changes apply
+      within a minute.
+    </p>
+    <!-- No budget here isn't unlimited: AI calls are refused until one is set. -->
+    <p v-if="!nodeConfig && !isLoading" class="budget-warning">
+      No budget set, so AI calls on this node are refused.
     </p>
 
-    <!-- Read-only view -->
-    <div v-if="!isEditing && config" class="budget-view">
-      <div class="info-row">
-        <span class="info-label">Budget cap:</span>
-        <span class="info-value strong">${{ Number(config.budgetUsd).toFixed(2) }}</span>
-      </div>
-      <div class="info-row">
-        <span class="info-label">Period:</span>
-        <span class="info-value">{{ periodLabel(config.budgetPeriod) }}</span>
-      </div>
-      <div v-if="isOwner" class="actions-row">
-        <bf-button class="small primary" @click="startEditing">Update Budget</bf-button>
-      </div>
-    </div>
-
-    <div v-else-if="!isEditing && !config && !isLoading" class="budget-empty">
-      No budget configured. The governor will reject all LLM calls until a cap
-      is set.
-      <div v-if="isOwner" class="actions-row">
-        <bf-button class="small primary" @click="startEditing">Set Budget</bf-button>
-      </div>
-    </div>
-
-    <!-- Edit view -->
-    <div v-if="isEditing" class="budget-edit">
-      <div class="info-row">
-        <span class="info-label">Budget cap (USD):</span>
-        <span class="info-value">
-          <el-input-number
-            v-model="form.budgetUsd"
-            :min="0"
-            :precision="2"
-            :step="10"
-            :controls="false"
-            style="width: 200px"
-          />
+    <ul class="cn-list">
+      <li class="budget-row">
+        <span class="budget-who">Whole node</span>
+        <span class="budget-limits" :class="{ unset: !nodeConfig }">
+          {{ nodeConfig ? `${formatUsd(nodeConfig.budgetUsd)} ${periodPhrase(nodeConfig.budgetPeriod)}` : 'Not set' }}
         </span>
-      </div>
-      <div class="info-row">
-        <span class="info-label">Period:</span>
-        <span class="info-value">
-          <el-select v-model="form.budgetPeriod" size="default" style="width: 200px">
-            <el-option label="Daily" value="daily" />
-            <el-option label="Monthly" value="monthly" />
-          </el-select>
+        <span v-if="isOwner" class="budget-actions">
+          <button type="button" class="cn-action" @click="openEditNode">{{ nodeConfig ? 'Edit' : 'Set' }}</button>
         </span>
-      </div>
-      <div class="actions-row">
-        <button class="processor-edit-button" :disabled="isSaving" @click="onSave">
-          {{ isSaving ? 'Saving…' : 'Save' }}
-        </button>
-        <button class="processor-cancel-button" :disabled="isSaving" @click="cancelEditing">
-          Cancel
-        </button>
-      </div>
-    </div>
+      </li>
+      <!-- Per user: chat only; apps count against the node's budget alone. -->
+      <li v-if="perUser" class="budget-row" :title="defaultRow?.notes || 'Limits chat only; apps count against the whole node.'">
+        <span class="budget-who">Each user's chat</span>
+        <span class="budget-limits" :class="{ unset: !limitSummary(defaultRow) }">{{ limitSummary(defaultRow) || 'Platform default' }}</span>
+        <span v-if="isOwner" class="budget-actions">
+          <button type="button" class="cn-action" @click="openEditDefault">{{ defaultRow ? 'Edit' : 'Set' }}</button>
+        </span>
+      </li>
+      <!-- #quotas is what the chat panel's "Manage quotas" link opens. -->
+      <template v-if="perUser">
+        <li v-for="(row, i) in userRows" :id="i === 0 ? 'quotas' : undefined" :key="row.userId" class="budget-row" :title="row.notes || undefined">
+          <span class="budget-who">{{ getUserName(row.userId) }}</span>
+          <span class="budget-limits" :class="{ unset: !limitSummary(row) }">{{ limitSummary(row) || 'Platform default' }}</span>
+          <span v-if="isOwner" class="budget-actions">
+            <button type="button" class="cn-action" @click="openEditUser(row)">Edit</button>
+            <button type="button" class="cn-icon-button" title="Remove" @click="confirmDelete(row)">&times;</button>
+          </span>
+        </li>
+        <li v-if="isOwner" :id="userRows.length ? undefined : 'quotas'" class="budget-add">
+          <button type="button" class="cn-link-button" @click="openAddUser">+ A limit for one user</button>
+        </li>
+      </template>
+    </ul>
 
-    <p v-if="loadError" class="error-line">Couldn't load budget: {{ loadError.message }}</p>
+    <p v-if="loadError" class="error-line">Couldn't load the AI budget: {{ loadError.message }}</p>
+
+    <QuotaEditModal
+      v-model:visible="modalOpen"
+      :node-id="nodeId"
+      :mode="modalMode"
+      :row="modalRow"
+      :subject-label="modalSubjectLabel"
+      :available-users="availableUsersForPicker"
+      @saved="onSaved"
+    />
   </div>
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue'
-import { ElInputNumber, ElMessage, ElOption, ElSelect } from 'element-plus'
-import BfButton from '@/components/shared/bf-button/BfButton.vue'
+// One section for everything that caps LLM spend on a node, laid out the same
+// way as ComputeNodePipelineBudget: node-wide pot, per-user default, per-user
+// overrides. The two families are deliberately separate sections — they have
+// different defaults (an LLM node with no budget rejects everything; a pipeline
+// node with no budget is unlimited) — but they read the same.
+//
+// Two backing stores sit behind this one panel, because the platform stores the
+// two tiers differently:
+//
+//   nodeLlmBudgetStore    the node-wide cap, SSM-backed via account-service's
+//                         llm-config endpoint. Enforced by the governor on
+//                         every Bedrock invocation, so it catches non-chat
+//                         callers too.
+//   chatQuotaAdminStore   per-user rows in the chat quota table. Gates chat
+//                         turns only.
+import { computed, onMounted, ref, watch } from 'vue'
+import { useStore } from 'vuex'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import QuotaEditModal from './QuotaEditModal.vue'
+import { useChatQuotaAdminStore, DEFAULT_USER_SENTINEL } from '@/stores/chatQuotaAdminStore'
 import { useNodeLlmBudgetStore } from '@/stores/nodeLlmBudgetStore'
+import { limitSummary } from './computeNodeHelpers'
 
 const props = defineProps({
   nodeId: { type: String, required: true },
   isOwner: { type: Boolean, default: false },
+  // A node with others on it (not a personal node): the per-user default and
+  // overrides only make sense there.
+  perUser: { type: Boolean, default: true },
 })
 
-const store = useNodeLlmBudgetStore()
 
-const config = computed(() => store.getConfig(props.nodeId))
-const isLoading = computed(() => store.isLoading(props.nodeId))
-const loadError = computed(() => store.getError(props.nodeId))
+const vuexStore = useStore()
+const adminStore = useChatQuotaAdminStore()
+const nodeBudgetStore = useNodeLlmBudgetStore()
 
-const isEditing = ref(false)
-const isSaving = ref(false)
-const form = ref({ budgetUsd: 0, budgetPeriod: 'daily' })
+const orgMembers = computed(() => vuexStore.state?.orgMembers || [])
+const profile = computed(() => vuexStore.state?.profile)
 
-function startEditing() {
-  form.value = {
-    budgetUsd: config.value?.budgetUsd ?? 0,
-    budgetPeriod: config.value?.budgetPeriod || 'daily',
-  }
-  isEditing.value = true
+const nodeConfig = computed(() => nodeBudgetStore.getConfig(props.nodeId))
+const defaultRow = computed(() => adminStore.getDefaultRow(props.nodeId))
+const userRows = computed(() => adminStore.getUserRows(props.nodeId))
+
+const isLoading = computed(
+  () => adminStore.isLoading(props.nodeId) || nodeBudgetStore.isLoading(props.nodeId),
+)
+const loadError = computed(
+  () => adminStore.getError(props.nodeId) || nodeBudgetStore.getError(props.nodeId),
+)
+
+const availableUsersForPicker = computed(() => {
+  const taken = new Set(userRows.value.map((r) => r.userId))
+  return orgMembers.value.filter((m) => !taken.has(m.id))
+})
+
+const modalOpen = ref(false)
+const modalMode = ref('edit-node')
+const modalRow = ref(null)
+const modalSubjectLabel = ref('')
+
+function openEditNode() {
+  modalMode.value = 'edit-node'
+  modalRow.value = nodeConfig.value
+  modalSubjectLabel.value = 'This compute node (all callers combined)'
+  modalOpen.value = true
 }
 
-function cancelEditing() {
-  if (isSaving.value) return
-  isEditing.value = false
+function openEditDefault() {
+  modalMode.value = 'edit-default'
+  modalRow.value = defaultRow.value
+  modalSubjectLabel.value = 'All users (default)'
+  modalOpen.value = true
 }
 
-async function onSave() {
-  if (form.value.budgetUsd < 0) {
-    ElMessage.error('Budget must be non-negative')
+function openAddUser() {
+  modalMode.value = 'add-user'
+  modalRow.value = null
+  modalSubjectLabel.value = ''
+  modalOpen.value = true
+}
+
+function openEditUser(row) {
+  modalMode.value = 'edit-user'
+  modalRow.value = row
+  modalSubjectLabel.value = getUserName(row.userId)
+  modalOpen.value = true
+}
+
+async function confirmDelete(row) {
+  try {
+    await ElMessageBox.confirm(
+      `Remove the quota override for ${getUserName(row.userId)}? They will fall back to the default.`,
+      'Remove override',
+      { type: 'warning', confirmButtonText: 'Remove', cancelButtonText: 'Cancel' },
+    )
+  } catch {
     return
   }
-  isSaving.value = true
   try {
-    await store.put(props.nodeId, {
-      budgetUsd: Number(form.value.budgetUsd),
-      budgetPeriod: form.value.budgetPeriod,
-    })
-    ElMessage.success('LLM budget updated')
-    isEditing.value = false
+    await adminStore.deleteRow(props.nodeId, row.userId)
+    ElMessage.success('Override removed')
   } catch (e) {
-    ElMessage.error(`Failed to update budget: ${e?.message || e}`)
-  } finally {
-    isSaving.value = false
+    ElMessage.error(`Failed to remove: ${e?.message || e}`)
   }
 }
 
-function periodLabel(p) {
-  if (p === 'daily') return 'Daily (resets at 00:00 UTC)'
-  if (p === 'monthly') return 'Monthly (resets at the 1st of each month, UTC)'
-  return p
+function onSaved() {
+  ElMessage.success('LLM budget saved')
 }
 
-onMounted(() => {
-  store.fetch(props.nodeId)
-})
+function getUserName(userId) {
+  if (!userId) return 'Unknown'
+  if (userId === DEFAULT_USER_SENTINEL) return 'All users (default)'
+  if (profile.value && (profile.value.id === userId || profile.value.intId === userId)) {
+    return `${profile.value.firstName} ${profile.value.lastName}`.trim() || 'You'
+  }
+  const m = orgMembers.value.find((x) => x.id === userId || x.intId === userId)
+  if (m) return `${m.firstName || ''} ${m.lastName || ''}`.trim() || m.email || userId
+  return String(userId).includes(':') ? String(userId).split(':').pop() : String(userId)
+}
+
+
+function formatUsd(v) {
+  if (v === null || v === undefined) return '—'
+  return `$${Number(v).toFixed(2)}`
+}
+
+// "a day", "a month": after the amount.
+const periodPhrase = (p) => (p === 'monthly' ? 'a month' : 'a day')
+
+function load() {
+  if (!props.nodeId) return
+  adminStore.fetchAll(props.nodeId)
+  nodeBudgetStore.fetch(props.nodeId)
+}
+
+onMounted(load)
+watch(() => props.nodeId, load)
 </script>
 
 <style scoped lang="scss">
-@use '../../../styles/_theme.scss';
+@use '../../../styles/theme';
+@use './computeNodePage';
 
-.llm-budget-content {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-
-.section-blurb {
-  margin: 0;
-  font-size: 13px;
-  color: theme.$gray_5;
-  line-height: 1.5;
-
-  strong { color: theme.$gray_6; }
-  em { font-style: italic; }
-}
-
-.propagation-note {
-  display: block;
-  margin-top: 6px;
-  font-size: 12px;
-  color: theme.$gray_4;
-}
-
-.budget-view,
-.budget-edit,
-.budget-empty {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.budget-empty {
-  font-size: 13px;
-  color: theme.$gray_5;
-  padding: 12px;
-  background: theme.$gray_1;
-  border-radius: 6px;
-  border: 1px dashed theme.$gray_2;
-}
-
-.info-row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.info-label {
-  min-width: 140px;
-  font-size: 13px;
-  color: theme.$gray_5;
-}
-
-.info-value {
-  font-size: 14px;
-  color: theme.$gray_6;
-}
-
-.info-value.strong {
-  font-weight: 600;
-  color: theme.$purple_3;
-}
-
-.actions-row {
-  display: flex;
-  gap: 8px;
-  margin-top: 4px;
-}
-
-.error-line {
-  margin: 8px 0 0 0;
-  font-size: 12px;
-  color: theme.$red_2;
-}
-
-.processor-edit-button {
-  background: theme.$purple_1;
-  color: theme.$white;
-  border: none;
-  border-radius: 4px;
-  padding: 6px 12px;
-  font-size: 12px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s ease;
-
-  &:hover { background: theme.$purple_2; }
-  &:disabled { opacity: 0.5; cursor: not-allowed; }
-}
-
-.processor-cancel-button {
-  background: theme.$white;
-  color: theme.$gray_5;
-  border: 1px solid theme.$gray_3;
-  border-radius: 4px;
-  padding: 6px 12px;
-  font-size: 12px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s ease;
-
-  &:hover {
-    border-color: theme.$gray_4;
+// One short line, then a list: a row per limit (the node's, each user's,
+// a user's own), its limits in one line and its actions at the right.
+.budget-row {
+  .budget-who {
+    font-weight: 500;
     color: theme.$gray_6;
   }
-  &:disabled { opacity: 0.5; cursor: not-allowed; }
+  .budget-limits {
+    margin-left: auto;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: theme.$gray_6;
+
+    &.unset {
+      color: theme.$gray_4;
+    }
+  }
+  .budget-actions {
+    display: flex;
+    flex-shrink: 0;
+    align-items: center;
+    gap: 8px;
+  }
+}
+.budget-add {
+  justify-content: flex-start !important;
+}
+.budget-warning {
+  margin: 0 0 12px;
+  font-size: 13px;
+  color: theme.$red_2;
+}
+.error-line {
+  margin: 8px 0 0;
+  font-size: 13px;
+  color: theme.$red_2;
 }
 </style>

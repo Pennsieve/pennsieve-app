@@ -16,8 +16,9 @@
  *   - parameters : typed, defaultable, optionally-required run parameters
  *   - inputs     : ports the application consumes  (workflow validation)
  *   - outputs    : ports the application produces  (workflow validation)
- *   - tags       : free-form labels
- *   - categories : controlled-vocabulary classification
+ *   - tags       : what the application is for (appDomains.js suggests
+ *                  the known ones); an old app.yml's `categories` are read
+ *                  as tags
  *
  * ── Two shapes, one source of truth ──────────────────────────────────────
  *   1. The *editable* shape (`ApplicationSchema`) is nested and UI-friendly;
@@ -33,6 +34,7 @@
  */
 
 import { dump as dumpYaml, load as loadYaml } from "js-yaml";
+import { canonicalTag } from "./appDomains";
 
 import {
   STANDARD_CPU_OPTIONS,
@@ -48,14 +50,19 @@ import {
 export const PARAM_TYPES = Object.freeze({
   STRING: "string",
   NUMBER: "number",
+  INTEGER: "integer",
   BOOLEAN: "boolean",
   ENUM: "enum",
 });
+
+/** Number and whole number: the types with a numeric default, min and max. */
+export const isNumericType = (type) => type === PARAM_TYPES.NUMBER || type === PARAM_TYPES.INTEGER;
 
 /** Human-facing labels + the Element Plus control each type maps to. */
 export const PARAM_TYPE_OPTIONS = Object.freeze([
   { value: PARAM_TYPES.STRING, label: "Text", control: "input" },
   { value: PARAM_TYPES.NUMBER, label: "Number", control: "number" },
+  { value: PARAM_TYPES.INTEGER, label: "Whole number", control: "number" },
   { value: PARAM_TYPES.BOOLEAN, label: "True / False", control: "switch" },
   { value: PARAM_TYPES.ENUM, label: "Choice", control: "select" },
 ]);
@@ -95,21 +102,48 @@ export const FALLBACK_PORT_DATA_TYPES = Object.freeze([
  * @param {Array<{value: string, label: string}>} [packageFormats] from the store
  * @param {string[]} [declared]  dataTypes already present in the manifest
  */
+/** Whether a media type option matches a search: its formats' names, extensions or the type. */
+export const mediaTypeMatches = (option, query) => {
+  const q = String(query || "").trim().toLowerCase();
+  if (!q) return true;
+  return [option.value, option.label, option.edam, ...(option.formats || []), ...(option.extensions || [])]
+    .filter(Boolean)
+    .some((s) => String(s).toLowerCase().includes(q));
+};
+
 export const portDataTypeOptions = (packageFormats, declared = []) => {
   const options = [...FALLBACK_PORT_DATA_TYPES];
   const seen = new Set(options.map((o) => o.value));
+  // Formats can share a media type (HDF5 and NWB are both
+  // application/x-hdf5): one option per media type, naming every format that
+  // uses it and their extensions, so searching "nwb" finds it.
+  const byValue = new Map();
+  const edamsByValue = new Map();
   for (const t of asArray(packageFormats)) {
     if (!t?.value || seen.has(t.value)) continue;
-    seen.add(t.value);
-    // `name`/`description` come from the package format the media type belongs
-    // to. The port form does not collect them; selecting a media type copies
-    // them onto the port. Omitted when the server does not supply them so the
-    // option stays a bare {value, label}.
-    const option = { value: t.value, label: t.label || t.value };
-    if (t.name) option.name = String(t.name);
-    if (t.description) option.description = String(t.description);
-    options.push(option);
+    let option = byValue.get(t.value);
+    if (!option) {
+      // `name`/`description` come from the (first) package format the media
+      // type belongs to; selecting a media type copies them onto the port.
+      option = { value: t.value, label: t.label || t.value };
+      if (t.name) option.name = String(t.name);
+      if (t.description) option.description = String(t.description);
+      byValue.set(t.value, option);
+      options.push(option);
+    }
+    // Only when the server says so, so a bare {value, label} stays bare.
+    if (t.name && !(option.formats || []).includes(String(t.name))) (option.formats ||= []).push(String(t.name));
+    for (const e of asArray(t.extensions)) {
+      if (!(option.extensions || []).includes(String(e))) (option.extensions ||= []).push(String(e));
+    }
+    (edamsByValue.get(t.value) || edamsByValue.set(t.value, []).get(t.value)).push(t.edam ? String(t.edam) : "");
   }
+  // A media type's EDAM id: only when every format sharing it has the same one
+  // (HDF5 and NWB share application/x-hdf5; NWB has none, so neither gets it).
+  for (const [value, edams] of edamsByValue) {
+    if (edams.length && edams[0] && edams.every((e) => e === edams[0])) byValue.get(value).edam = edams[0];
+  }
+  for (const value of byValue.keys()) seen.add(value);
   for (const value of asArray(declared)) {
     if (!value || seen.has(value)) continue;
     seen.add(value);
@@ -117,24 +151,6 @@ export const portDataTypeOptions = (packageFormats, declared = []) => {
   }
   return options;
 };
-
-/**
- * Controlled vocabulary for application categories. Free-form values are
- * still permitted (the form allows custom entries), but offering a curated
- * list keeps classification consistent and filterable.
- */
-export const APPLICATION_CATEGORIES = Object.freeze([
-  "Preprocessing",
-  "Segmentation",
-  "Registration",
-  "Quantification",
-  "Visualization",
-  "Machine Learning",
-  "Statistics",
-  "Format Conversion",
-  "Quality Control",
-  "Utility",
-]);
 
 /* ──────────────────────────────────────────────────────────────────────────
  * Typedefs (JSDoc — this is a plain-JS codebase)
@@ -145,7 +161,7 @@ export const APPLICATION_CATEGORIES = Object.freeze([
  * @property {string} name                 Machine name (key passed to the app).
  * @property {string} [label]              Human-facing label; defaults to name.
  * @property {string} [description]        Help text shown next to the control.
- * @property {("string"|"number"|"boolean"|"enum")} type
+ * @property {("string"|"number"|"integer"|"boolean"|"enum")} type
  * @property {boolean} required            Must a value exist before a run?
  * @property {(string|number|boolean|null)} defaultValue  App-provided default.
  * @property {Array<string|number>} [validValues]  Permitted choices. Presence
@@ -171,7 +187,6 @@ export const APPLICATION_CATEGORIES = Object.freeze([
  * @property {PortSchema[]} inputs
  * @property {PortSchema[]} outputs
  * @property {string[]} tags
- * @property {string[]} categories
  */
 
 /* ──────────────────────────────────────────────────────────────────────────
@@ -202,6 +217,9 @@ export const createPort = (overrides = {}) => ({
   // type and cardinality rather than by `dataType`; we retain them for display
   // and validation. buildManifest() does not emit them.
   mediaTypes: [],
+  // EDAM format ids (format_3590), for scientific formats without a MIME
+  // type. With neither mediaTypes nor formats, a port takes any file.
+  formats: [],
   cardinality: "",
   ...overrides,
 });
@@ -210,14 +228,34 @@ export const createPort = (overrides = {}) => ({
  * A blank, fully-formed schema for a brand-new application.
  * @returns {ApplicationSchema}
  */
+// What a live (human-in-the-loop) app runs as: app.yml's runtime.sessionType,
+// the kind of session ("jupyter" is a notebook; others may come), and for a
+// Jupyter session its language, runtime.kernel.
+export const SESSION_TYPES = Object.freeze([{ value: "jupyter", label: "Jupyter notebook" }]);
+export const KERNELS = Object.freeze([
+  { value: "python", label: "Python" },
+  { value: "r", label: "R" },
+]);
+
+// runtime.interactive / sessionType / kernel as the editor holds them, read
+// as written: an interactive app without a sessionType is a Jupyter session,
+// as the platform reads it, and a Jupyter session without a kernel starts as
+// Python.
+const parseSession = (runtime) => {
+  const interactive = Boolean(runtime?.interactive || runtime?.sessionType);
+  if (!interactive) return { interactive: false, sessionType: "", kernel: "" };
+  const sessionType = runtime?.sessionType || "jupyter";
+  const kernel = runtime?.kernel || (sessionType === "jupyter" ? "python" : "");
+  return { interactive, sessionType, kernel };
+};
+
 export const createApplicationSchema = (overrides = {}) => ({
   resources: { cpu: null, memory: null },
-  runtime: { computeTypes: [...DEFAULT_COMPUTE_TYPES] },
+  runtime: { computeTypes: [...DEFAULT_COMPUTE_TYPES], interactive: false, sessionType: "", kernel: "" },
   parameters: [],
   inputs: [],
   outputs: [],
   tags: [],
-  categories: [],
   ...overrides,
 });
 
@@ -235,18 +273,19 @@ const asArray = (v) => (Array.isArray(v) ? v : []);
 const parseParameter = (raw) => {
   if (raw == null) return createParameter();
 
-  // `validValues` / `defaultValue` are the keys app.yml and the API both use;
-  // `allowedValues` / `default` are read as legacy aliases only.
-  const validValues = asArray(raw.validValues ?? raw.allowedValues);
-  const defaultValue = raw.defaultValue ?? raw.default ?? null;
+  // `validValues` / `defaultValue`: the keys app.yml and the API both use.
+  const validValues = asArray(raw.validValues);
+  const defaultValue = raw.defaultValue ?? null;
 
   // A manifest has no separate "enum" type — a choice parameter is written as
   // `type: string` with `validValues`, so an explicit string type does not
   // out-vote the choices. A number or boolean keeps its declared type and
   // still offers its choices.
-  const declared = Object.values(PARAM_TYPES).includes(raw.type)
-    ? raw.type
-    : null;
+  // "enum" is the editor's own type for a choice, not one app.yml declares.
+  const declared =
+    raw.type !== PARAM_TYPES.ENUM && Object.values(PARAM_TYPES).includes(raw.type)
+      ? raw.type
+      : null;
   const type =
     validValues.length && (declared === null || declared === PARAM_TYPES.STRING)
       ? PARAM_TYPES.ENUM
@@ -331,12 +370,11 @@ export const parseApplication = (app) => {
 
   return createApplicationSchema({
     resources: { cpu: rc.cpu ?? null, memory: rc.memory ?? null },
-    runtime: { computeTypes: parseComputeTypes(rc) },
+    runtime: { computeTypes: parseComputeTypes(rc), ...parseSession(rc) },
     parameters: parseParameters(app),
     inputs: asArray(app?.inputs).map(parsePort),
     outputs: asArray(app?.outputs).map(parsePort),
     tags: asArray(app?.tags),
-    categories: asArray(app?.categories),
   });
 };
 
@@ -350,8 +388,20 @@ const parsePort = (raw) =>
     // Carried through so port compatibility can compare media types when a
     // manifest describes ports that way.
     mediaTypes: asArray(raw?.mediaTypes).map(String),
+    formats: asArray(raw?.formats).map((f) => normalizeEdamFormat(f)).filter(Boolean),
     cardinality: typeof raw?.cardinality === "string" ? raw.cardinality : "",
   });
+
+/**
+ * An EDAM format id as app.yml writes it: `format_3590`, also from its
+ * http://edamontology.org/format_3590 URI.
+ */
+export const normalizeEdamFormat = (value) =>
+  String(value ?? "").trim().replace(/^https?:\/\/edamontology\.org\//, "");
+
+/** An ORCID iD as app.yml writes it: bare, also from its https://orcid.org/ form. */
+export const normalizeOrcid = (value) =>
+  String(value ?? "").trim().replace(/^https?:\/\/orcid\.org\//, "");
 
 /* ──────────────────────────────────────────────────────────────────────────
  * Serialization — editable ApplicationSchema  ->  API payload
@@ -375,7 +425,7 @@ const serializeParameter = (p) => {
   // the Workflow Builder read back off `paramSchema`.
   const choices = asArray(p.validValues);
   if (choices.length) out.validValues = choices;
-  if (p.type === PARAM_TYPES.NUMBER) {
+  if (isNumericType(p.type)) {
     if (p.min != null && p.min !== "") out.min = Number(p.min);
     if (p.max != null && p.max !== "") out.max = Number(p.max);
   }
@@ -418,7 +468,7 @@ const serializePort = (port) => {
  *
  * @param {ApplicationSchema} schema
  * @returns {Object} payload slice with runtimeConfig, params, paramSchema,
- *                   inputs, outputs, tags, categories.
+ *                   inputs, outputs, tags.
  */
 export const buildSchemaPayload = (schema) => {
   const s = schema || createApplicationSchema();
@@ -446,11 +496,7 @@ export const buildSchemaPayload = (schema) => {
   if (outputs.length) payload.outputs = outputs.map(serializePort);
 
   const tags = asArray(s.tags).map((t) => String(t).trim()).filter(Boolean);
-  const categories = asArray(s.categories)
-    .map((c) => String(c).trim())
-    .filter(Boolean);
   if (tags.length) payload.tags = tags;
-  if (categories.length) payload.categories = categories;
 
   return payload;
 };
@@ -464,6 +510,13 @@ export const MANIFEST_EXAMPLE_URL =
   "https://app.pennsieve.io/static/schemas/app-manifest.v1.yml";
 
 export const MANIFEST_SCHEMA_VERSION = "1.0";
+
+/**
+ * The app.yml JSON Schema, published by app-deploy-service. A copy is bundled
+ * (app-manifest.v1.schema.json) for the specs; generated manifests point
+ * editors at the published one.
+ */
+export const MANIFEST_SCHEMA_URL = "https://schemas.pennsieve.io/app-manifest/v1.json";
 
 /**
  * Roles an application can play within a workflow. Only `processor` is
@@ -505,21 +558,29 @@ const manifestParameter = (p) => {
   const choices = asArray(p.validValues).map(String);
   if (choices.length) out.validValues = choices;
 
-  if (p.type === PARAM_TYPES.NUMBER) {
+  if (isNumericType(p.type)) {
     if (p.min != null && p.min !== "") out.min = Number(p.min);
     if (p.max != null && p.max !== "") out.max = Number(p.max);
   }
   return out;
 };
 
+// A port as app.yml writes it: its media types (the editor's media type
+// select is `dataType`, kept in step with mediaTypes), its EDAM formats, or
+// neither, which takes any file. A non-MIME dataType from an older manifest
+// is kept as the (deprecated) dataType so it isn't lost.
+const isMediaType = (v) => /^[\w.+-]+\/[\w.+-]+$/.test(String(v || ""));
 const manifestPort = (port) => {
-  const out = {
-    name: (port.name || "").trim(),
-    dataType: port.dataType || "any",
-  };
-  if (port.required) out.required = true;
+  const out = { name: (port.name || "").trim() };
   if (port.description && port.description.trim())
     out.description = port.description.trim();
+  const media = asArray(port.mediaTypes).map(String).filter(isMediaType);
+  if (!media.length && isMediaType(port.dataType)) media.push(String(port.dataType));
+  if (media.length) out.mediaTypes = [...new Set(media)];
+  else if (port.dataType && port.dataType !== "any") out.dataType = port.dataType;
+  const formats = asArray(port.formats).map(normalizeEdamFormat).filter(Boolean);
+  if (formats.length) out.formats = [...new Set(formats)];
+  if (port.required) out.required = true;
   return out;
 };
 
@@ -539,6 +600,8 @@ const manifestPort = (port) => {
 export const buildManifest = (schema, meta = {}) => {
   const s = schema || createApplicationSchema();
   const manifest = {
+    // Written as the editor directive on app.yml's first line (manifestToYaml).
+    $schema: MANIFEST_SCHEMA_URL,
     schemaVersion: meta.schemaVersion || MANIFEST_SCHEMA_VERSION,
   };
 
@@ -554,12 +617,15 @@ export const buildManifest = (schema, meta = {}) => {
   const mMaintainers = asArray(meta.maintainers)
     .map((m) => (typeof m === "string" ? { name: m } : m))
     .filter((m) => m && str(m.name))
-    .map((m) => (str(m.email) ? { name: str(m.name), email: str(m.email) } : { name: str(m.name) }));
+    .map((m) => {
+      const person = { name: str(m.name) };
+      if (str(m.email)) person.email = str(m.email);
+      if (normalizeOrcid(m.orcid)) person.orcid = normalizeOrcid(m.orcid);
+      return person;
+    });
   if (mMaintainers.length) application.maintainers = mMaintainers;
 
-  const mCategories = asArray(s.categories).map(str).filter(Boolean);
   const mTags = asArray(s.tags).map(str).filter(Boolean);
-  if (mCategories.length) application.categories = mCategories;
   if (mTags.length) application.tags = mTags;
 
   if (Object.keys(application).length) manifest.application = application;
@@ -574,6 +640,13 @@ export const buildManifest = (schema, meta = {}) => {
     : [...DEFAULT_COMPUTE_TYPES];
   if (meta.timeoutSeconds != null && meta.timeoutSeconds !== "") {
     runtime.timeoutSeconds = Number(meta.timeoutSeconds);
+  }
+  // A live session (a notebook), not a batch step: the one place an app
+  // declares it. A Jupyter session also says its language.
+  if (s.runtime?.interactive) {
+    runtime.interactive = true;
+    runtime.sessionType = s.runtime.sessionType || "jupyter";
+    if (runtime.sessionType === "jupyter") runtime.kernel = s.runtime.kernel || "python";
   }
   manifest.runtime = runtime;
 
@@ -596,8 +669,8 @@ export const buildManifest = (schema, meta = {}) => {
  * Serialize a manifest object to the YAML an author commits as `app.yml`. A
  * `$schema` carried by the manifest is emitted as a `yaml-language-server`
  * directive comment (the YAML convention for editor autocomplete/validation)
- * rather than a data key, so the body stays clean. buildManifest() does not set
- * one, so manifests written here carry no directive.
+ * rather than a data key, so the body stays clean. buildManifest() sets the
+ * published schema (MANIFEST_SCHEMA_URL), so editors validate as authors type.
  *
  * @param {Object} manifest  manifest object (e.g. from buildManifest)
  * @returns {string} app.yml text
@@ -655,6 +728,17 @@ export const detectManifestShape = (manifest) =>
     ? MANIFEST_SHAPES.NESTED
     : MANIFEST_SHAPES.FLAT;
 
+// The earlier flat layout (from the app's first JSON Schema, removed
+// 2026-08-31): no `application` mapping, and its metadata at the top level.
+// A file with neither (only runtime/parameters) isn't that layout, just
+// incomplete.
+const EARLIER_LAYOUT_KEYS = ["name", "description", "applicationType", "categories", "resources", "tags"];
+export const isEarlierLayout = (manifest) =>
+  detectManifestShape(manifest) === MANIFEST_SHAPES.FLAT &&
+  !!manifest &&
+  typeof manifest === "object" &&
+  EARLIER_LAYOUT_KEYS.some((k) => k in manifest);
+
 /**
  * Maintainers are `[{name, email?}]` in the manifest, but tolerate bare
  * strings so a hand-written `maintainers: [alice]` still reads.
@@ -664,8 +748,8 @@ const parseMaintainers = (raw) =>
   asArray(raw)
     .map((m) =>
       typeof m === "string"
-        ? { name: m.trim(), email: "" }
-        : { name: (m?.name ?? "").trim(), email: (m?.email ?? "").trim() },
+        ? { name: m.trim(), email: "", orcid: "" }
+        : { name: (m?.name ?? "").trim(), email: (m?.email ?? "").trim(), orcid: normalizeOrcid(m?.orcid) },
     )
     .filter((m) => m.name || m.email);
 
@@ -687,23 +771,20 @@ export const parseManifest = (source) => {
   const manifest =
     typeof source === "string" ? loadYaml(source) || {} : source || {};
 
-  const nested = detectManifestShape(manifest) === MANIFEST_SHAPES.NESTED;
-  // In the nested shape the application metadata lives under `application`
-  // and cpu/memory sit on `runtime`; in the flat shape both are top-level.
-  const app = nested ? manifest.application || {} : manifest;
-  const runtime = manifest.runtime || {};
-  const resources = nested ? runtime : manifest.resources || {};
-
-  const rawType = nested ? app.type : app.applicationType;
+  // Only the nested layout is read: application metadata under
+  // `application`, cpu/memory on `runtime`. A file in the earlier flat layout
+  // (top-level name, applicationType, categories, resources) is reported as
+  // such (meta.shape FLAT) and read as nothing, as the platform reads it.
+  const earlier = isEarlierLayout(manifest);
+  const app = earlier ? {} : manifest.application || {};
+  const runtime = earlier ? {} : manifest.runtime || {};
 
   const meta = {
     name: typeof app.name === "string" ? app.name : "",
     description: typeof app.description === "string" ? app.description : "",
-    applicationType: APPLICATION_TYPES.some((t) => t.value === rawType)
-      ? rawType
+    applicationType: APPLICATION_TYPES.some((t) => t.value === app.type)
+      ? app.type
       : "processor",
-    // Present in the nested shape only; empty strings/arrays otherwise so
-    // callers never have to branch on shape.
     id: typeof app.id === "string" ? app.id : "",
     version: app.version == null ? "" : String(app.version),
     maintainers: parseMaintainers(app.maintainers),
@@ -711,24 +792,23 @@ export const parseManifest = (source) => {
       manifest.schemaVersion == null ? "" : String(manifest.schemaVersion),
     timeoutSeconds:
       typeof runtime.timeoutSeconds === "number" ? runtime.timeoutSeconds : null,
-    shape: nested ? MANIFEST_SHAPES.NESTED : MANIFEST_SHAPES.FLAT,
+    shape: earlier ? MANIFEST_SHAPES.FLAT : MANIFEST_SHAPES.NESTED,
   };
 
-  const schema = createApplicationSchema({
-    resources: {
-      cpu: resources.cpu ?? null,
-      memory: resources.memory ?? null,
-    },
-    runtime: { computeTypes: parseComputeTypes(runtime) },
-    // Both manifest shapes go through parseParameter, which reads the
-    // canonical `defaultValue`/`validValues` and the legacy `default`/
-    // `allowedValues` alike.
-    parameters: asArray(manifest.parameters).map(parseParameter),
-    inputs: asArray(manifest.inputs).map(parsePort),
-    outputs: asArray(manifest.outputs).map(parsePort),
-    tags: asArray(nested ? app.tags : manifest.tags),
-    categories: asArray(nested ? app.categories : manifest.categories),
-  });
+  const schema = earlier
+    ? createApplicationSchema()
+    : createApplicationSchema({
+        resources: {
+          cpu: runtime.cpu ?? null,
+          memory: runtime.memory ?? null,
+        },
+        runtime: { computeTypes: parseComputeTypes(runtime), ...parseSession(runtime) },
+        parameters: asArray(manifest.parameters).map(parseParameter),
+        inputs: asArray(manifest.inputs).map(parsePort),
+        outputs: asArray(manifest.outputs).map(parsePort),
+        // Tags as their known spelling ("EEG" -> "eeg").
+        tags: [...new Set(asArray(app.tags).map((t) => canonicalTag(t)).filter(Boolean))],
+      });
 
   return { meta, schema };
 };
@@ -786,7 +866,8 @@ export const extractDefaultParams = (parameters, overrides = {}) => {
 export function coerceParameterValue(param, value) {
   if (value == null || value === "") return null;
   switch (param?.type) {
-    case PARAM_TYPES.NUMBER: {
+    case PARAM_TYPES.NUMBER:
+    case PARAM_TYPES.INTEGER: {
       const n = Number(value);
       return Number.isFinite(n) ? n : null;
     }
@@ -817,10 +898,13 @@ export function validateParameterValue(param, value) {
   }
 
   switch (param.type) {
-    case PARAM_TYPES.NUMBER: {
+    case PARAM_TYPES.NUMBER:
+    case PARAM_TYPES.INTEGER: {
       const n = Number(value);
       if (!Number.isFinite(n))
         return { valid: false, error: "Must be a number" };
+      if (param.type === PARAM_TYPES.INTEGER && !Number.isInteger(n))
+        return { valid: false, error: "Must be a whole number" };
       if (param.min != null && n < Number(param.min))
         return { valid: false, error: `Must be ≥ ${param.min}` };
       if (param.max != null && n > Number(param.max))
@@ -857,7 +941,7 @@ export function validateParameters(parameters) {
       errors.push(`${where} is a choice but has no valid values`);
     }
     if (
-      p.type === PARAM_TYPES.NUMBER &&
+      isNumericType(p.type) &&
       p.min != null &&
       p.max != null &&
       p.min !== "" &&

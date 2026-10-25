@@ -18,7 +18,14 @@ const props = defineProps({
 const computeResourcesStore = useComputeResourcesStore()
 
 const layerData = computed(() => computeResourcesStore.getNodeLayers(props.nodeId))
-const layers = computed(() => layerData.value.layers || [])
+// Data layers only: python-env / r-env layers came from the retired build
+// workflows; environments now come from environments-service.
+const layers = computed(() =>
+  (layerData.value.layers || []).filter((l) => !l.layerType || l.layerType === 'data')
+)
+const totalCost = computed(() =>
+  layers.value.reduce((sum, l) => sum + (l.estimatedMonthlyCostUsd || 0), 0)
+)
 const isLoading = computed(() => computeResourcesStore.isNodeLayersLoading(props.nodeId))
 
 // Create layer form
@@ -43,13 +50,9 @@ function toggleLayer(name) {
   expandedLayer.value = expandedLayer.value === name ? null : name
 }
 
-const LAYER_TYPE_LABELS = {
-  'python-env': 'Python environment',
-  'r-env': 'R environment',
-  data: 'Data layer',
-}
-function layerTypeLabel(layerType) {
-  return LAYER_TYPE_LABELS[layerType] || 'Data layer'
+const STATUS_LABELS = { READY: 'Ready', EMPTY: 'Empty' }
+function statusLabel(status) {
+  return STATUS_LABELS[status] || status
 }
 
 function formatSize(sizeBytes) {
@@ -103,7 +106,7 @@ function cancelCreating() {
 
 async function createLayer() {
   if (!isValidName.value) {
-    ElMessage.error('Layer name must be lowercase with dashes (e.g., hg38-reference)')
+    ElMessage.error('Names are lowercase letters, numbers and dashes (e.g., hg38-reference)')
     return
   }
 
@@ -113,12 +116,12 @@ async function createLayer() {
       layerName: newLayerName.value,
       description: newLayerDescription.value || undefined
     })
-    ElMessage.success(`Layer "${newLayerName.value}" created`)
+    ElMessage.success(`Reference "${newLayerName.value}" created`)
     isCreating.value = false
     newLayerName.value = ''
     newLayerDescription.value = ''
   } catch (err) {
-    ElMessage.error(err.message || 'Failed to create layer')
+    ElMessage.error(err.message || 'Failed to create the reference')
   } finally {
     isSaving.value = false
   }
@@ -127,15 +130,15 @@ async function createLayer() {
 async function confirmDeleteLayer(layer) {
   try {
     await ElMessageBox.confirm(
-      `Delete layer "${layer.layerName}"? This will remove the layer metadata. EFS data cleanup is handled separately.`,
-      'Delete Layer',
+      `Delete reference "${layer.layerName}"? Its data is removed from this node.`,
+      'Delete reference',
       { confirmButtonText: 'Delete', cancelButtonText: 'Cancel', type: 'warning' }
     )
     await computeResourcesStore.deleteNodeLayer(props.nodeId, layer.layerName)
-    ElMessage.success(`Layer "${layer.layerName}" deleted`)
+    ElMessage.success(`Reference "${layer.layerName}" deleted`)
   } catch (err) {
     if (err !== 'cancel') {
-      ElMessage.error(err.message || 'Failed to delete layer')
+      ElMessage.error(err.message || 'Failed to delete the reference')
     }
   }
 }
@@ -146,19 +149,19 @@ async function confirmDeleteLayer(layer) {
     <div class="layers-header">
       <div>
         <p class="layers-description">
-          Persistent layers store reusable datasets on EFS that survive between workflow executions.
+          Read-only data that workflows on this node can use, such as genomes and indexes. It stays on the node between runs.
         </p>
       </div>
       <div class="layers-actions" v-if="isOwner && !isCreating">
-        <button @click="startCreating" class="create-button">Create Layer</button>
+        <button type="button" class="cn-action cn-action--primary" @click="startCreating">+ New reference</button>
       </div>
     </div>
 
-    <!-- Create Layer Form -->
+    <!-- New reference form -->
     <div v-if="isCreating" class="create-form">
       <div class="create-form-row">
         <div class="create-form-field">
-          <label>Layer Name <span class="required">*</span></label>
+          <label>Name <span class="required">*</span></label>
           <input
             v-model="newLayerName"
             placeholder="hg38-reference"
@@ -177,10 +180,8 @@ async function confirmDeleteLayer(layer) {
         </div>
       </div>
       <div class="create-form-actions">
-        <button @click="createLayer" :disabled="isSaving || !isValidName" class="save-button">
-          {{ isSaving ? 'Creating...' : 'Create' }}
-        </button>
-        <button @click="cancelCreating" class="cancel-button">Cancel</button>
+        <button type="button" class="cn-action" @click="cancelCreating">Cancel</button>
+        <button type="button" class="cn-action cn-action--primary" :disabled="isSaving || !isValidName" @click="createLayer">Create</button>
       </div>
     </div>
 
@@ -209,14 +210,14 @@ async function confirmDeleteLayer(layer) {
             <td>
               <div class="layer-name">
                 <span class="expand-caret" :class="{ open: expandedLayer === layer.layerName }">▸</span>
-                <LayerTypeIcon :layer-type="layer.layerType" :size="18" />
+                <LayerTypeIcon :size="18" />
                 <span>{{ layer.layerName }}</span>
               </div>
               <div v-if="layer.description" class="layer-description">{{ layer.description }}</div>
             </td>
             <td>
               <span class="status-badge" :class="layer.status === 'READY' ? 'badge-green' : 'badge-yellow'">
-                {{ layer.status }}
+                {{ statusLabel(layer.status) }}
               </span>
             </td>
             <td>{{ formatSize(layer.sizeBytes) }}</td>
@@ -226,24 +227,13 @@ async function confirmDeleteLayer(layer) {
             <td>{{ formatRelativeTime(layer.lastAccessed) }}</td>
             <td>{{ formatRelativeTime(layer.createdAt) }}</td>
             <td v-if="isOwner">
-              <button class="delete-button" @click.stop="confirmDeleteLayer(layer)" title="Delete layer">&times;</button>
+              <button class="delete-button" @click.stop="confirmDeleteLayer(layer)" title="Delete reference">&times;</button>
             </td>
           </tr>
           <tr v-if="expandedLayer === layer.layerName" class="layer-detail-row">
             <td :colspan="isOwner ? 9 : 8">
               <div class="layer-detail">
                 <div class="detail-grid">
-                  <div class="detail-item">
-                    <span class="detail-label">Type</span>
-                    <span class="detail-value">
-                      <LayerTypeIcon :layer-type="layer.layerType" :size="14" />
-                      {{ layerTypeLabel(layer.layerType) }}
-                    </span>
-                  </div>
-                  <div v-if="layer.pythonVersion" class="detail-item">
-                    <span class="detail-label">Python</span>
-                    <span class="detail-value">{{ layer.pythonVersion }}</span>
-                  </div>
                   <div v-if="layer.snapshotId" class="detail-item">
                     <span class="detail-label">Snapshot</span>
                     <span class="detail-value mono">{{ layer.snapshotId }}</span>
@@ -254,17 +244,8 @@ async function confirmDeleteLayer(layer) {
                   </div>
                 </div>
 
-                <template v-if="layer.packages && layer.packages.length">
-                  <div class="detail-subhead">{{ layer.packages.length }} packages</div>
-                  <div class="package-list">
-                    <code v-for="pkg in layer.packages" :key="pkg" class="package">{{ pkg }}</code>
-                  </div>
-                </template>
-                <div v-else-if="layer.layerType === 'python-env' || layer.layerType === 'r-env'" class="detail-empty">
-                  No package list recorded — built before package capture, or still building.
-                </div>
-                <div v-else class="detail-empty">
-                  Data layer — {{ formatFileCount(layer.fileCount) }} files, {{ formatSize(layer.sizeBytes) }}.
+                <div class="detail-empty">
+                  Reference data: {{ formatFileCount(layer.fileCount) }} files, {{ formatSize(layer.sizeBytes) }}.
                 </div>
               </div>
             </td>
@@ -277,7 +258,7 @@ async function confirmDeleteLayer(layer) {
             <td>{{ formatSize(layers.reduce((sum, l) => sum + (l.sizeBytes || 0), 0)) }}</td>
             <td></td>
             <td></td>
-            <td>{{ formatCost(layerData.totalEstimatedMonthlyCostUsd) }}</td>
+            <td>{{ formatCost(totalCost) }}</td>
             <td :colspan="isOwner ? 3 : 2"></td>
           </tr>
         </tfoot>
@@ -286,13 +267,14 @@ async function confirmDeleteLayer(layer) {
 
     <!-- Empty State -->
     <div v-else class="layers-empty">
-      No persistent layers configured. Create a layer and populate it by running a workflow with a <code>persistent-layer</code> data target.
+      No reference data on this node yet. Create a reference, then fill it by running a workflow whose data target is reference data.
     </div>
   </div>
 </template>
 
 <style scoped lang="scss">
 @use '../../../styles/_theme.scss';
+@use './computeNodePage';
 
 .layers-container {
   display: flex;
@@ -317,37 +299,6 @@ async function confirmDeleteLayer(layer) {
 .layers-actions {
   flex-shrink: 0;
   margin-left: 16px;
-}
-
-.create-button,
-.save-button,
-.cancel-button {
-  background: theme.$purple_1;
-  color: white;
-  border: none;
-  border-radius: 4px;
-  padding: 6px 12px;
-  font-size: 12px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s ease;
-
-  &:hover {
-    background: theme.$purple_2;
-  }
-
-  &:disabled {
-    background: theme.$gray_4;
-    cursor: not-allowed;
-  }
-}
-
-.cancel-button {
-  background: theme.$gray_4;
-
-  &:hover {
-    background: theme.$gray_5;
-  }
 }
 
 // Create form
@@ -533,31 +484,6 @@ async function confirmDeleteLayer(layer) {
   }
 }
 
-.detail-subhead {
-  font-size: 12px;
-  font-weight: 500;
-  color: theme.$gray_6;
-  margin-bottom: 6px;
-}
-
-.package-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  max-height: 220px;
-  overflow-y: auto;
-}
-
-.package {
-  font-family: 'Courier New', monospace;
-  font-size: 12px;
-  color: theme.$gray_6;
-  background: theme.$white;
-  border: 1px solid theme.$gray_2;
-  border-radius: 3px;
-  padding: 2px 6px;
-}
-
 .detail-empty {
   font-size: 12px;
   color: theme.$gray_4;
@@ -578,13 +504,13 @@ async function confirmDeleteLayer(layer) {
   letter-spacing: 0.5px;
 
   &.badge-green {
-    background: rgba(23, 187, 98, 0.12);
-    color: #17BB62;
+    background: theme.$green_tint;
+    color: theme.$green_1;
   }
 
   &.badge-yellow {
-    background: #fef3cd;
-    color: #856404;
+    background: theme.$yellow_tint;
+    color: theme.$orange_2;
   }
 }
 

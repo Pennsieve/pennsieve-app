@@ -10,6 +10,10 @@ import {
   getPublicArchive,
   getPublicArchiveUrl,
   deletePublicArchive,
+  listRunArchives,
+  getRunArchive,
+  getRunArchiveUrl,
+  deleteRunArchive,
 } from "@/utils/downloadService";
 import { triggerBrowserDownload } from "@/utils/triggerBrowserDownload";
 
@@ -26,12 +30,28 @@ export const isActive = (d) => ACTIVE_STATUSES.includes(d.status);
 // no workspace's list.
 const isPublic = (d) => d.scope === "public";
 
-const fetchArchive = (d) =>
-  isPublic(d) ? getPublicArchive({ id: d.id }) : getArchive({ id: d.id, datasetId: d.datasetNodeId });
-const fetchArchiveUrl = (d) =>
-  isPublic(d) ? getPublicArchiveUrl({ id: d.id }) : getArchiveUrl({ id: d.id, datasetId: d.datasetNodeId });
-const removeArchive = (d) =>
-  isPublic(d) ? deletePublicArchive({ id: d.id }) : deleteArchive({ id: d.id, datasetId: d.datasetNodeId });
+// A compute run's results, made by the run's download data target: reached
+// through the /runs routes, its creator's whatever workspace the run was in.
+// organizationNodeId is the run's workspace, absent for a personal run.
+export const isRun = (d) => d.scope === "run";
+
+const fetchArchive = (d) => {
+  if (isPublic(d)) return getPublicArchive({ id: d.id });
+  if (isRun(d)) return getRunArchive({ id: d.id });
+  return getArchive({ id: d.id, datasetId: d.datasetNodeId });
+};
+const fetchArchiveUrl = (d) => {
+  if (isPublic(d)) return getPublicArchiveUrl({ id: d.id });
+  if (isRun(d)) return getRunArchiveUrl({ id: d.id });
+  return getArchiveUrl({ id: d.id, datasetId: d.datasetNodeId });
+};
+const removeArchive = (d) => {
+  if (isPublic(d)) return deletePublicArchive({ id: d.id });
+  if (isRun(d)) return deleteRunArchive({ id: d.id });
+  return deleteArchive({ id: d.id, datasetId: d.datasetNodeId });
+};
+
+const newestFirst = (a, b) => (b.createdAt || "").localeCompare(a.createdAt || "");
 
 // Ready archives this browser has downloaded, so the navigation badge only
 // counts new ones. A convenience: without storage the badge counts every
@@ -157,11 +177,27 @@ export const useDownloadsStore = defineStore("downloads", () => {
     const workspace = organizationNodeId
       ? list.filter((d) => !d.organizationNodeId || d.organizationNodeId === organizationNodeId)
       : list;
-    // Public archives aren't listed: keep the ones this tab asked for.
-    downloads.value = [...downloads.value.filter(isPublic), ...workspace];
+    // Public archives aren't listed: keep the ones this tab asked for. Run
+    // archives come from loadRuns.
+    downloads.value = [
+      ...downloads.value.filter((d) => isPublic(d) || isRun(d)),
+      ...workspace,
+    ].sort(newestFirst);
     loaded.value = true;
     schedule();
   }
+
+  // Loads the user's run archives, from every workspace and none. Kept
+  // apart from load, which a workspace switch repeats.
+  async function loadRuns() {
+    const runs = await listRunArchives();
+    downloads.value = [...downloads.value.filter((d) => !isRun(d)), ...runs].sort(newestFirst);
+    schedule();
+  }
+
+  // The archive of a run's results, once its download target has asked for
+  // one (the newest, should there be several).
+  const forRun = (runId) => downloads.value.find((d) => isRun(d) && d.runId === runId) || null;
 
   // Queues an archive of a selection. Rejects with a DownloadServiceError
   // (413 too large, 403 no access, 400 nothing to download, 409 scan_pending
@@ -214,6 +250,8 @@ export const useDownloadsStore = defineStore("downloads", () => {
     panelDownloads,
     attentionCount,
     load,
+    loadRuns,
+    forRun,
     start,
     startPublic,
     download,

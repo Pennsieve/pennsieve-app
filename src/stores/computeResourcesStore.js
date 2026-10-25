@@ -6,7 +6,7 @@ import * as siteConfig from '@/site-config/site.json'
 
 export const useComputeResourcesStore = defineStore('computeResources', () => {
   // Scoped compute nodes cache - tracks different contexts
-  const scopedComputeNodes = ref(new Map()) // Key: scope (e.g., 'account-owner', 'workspace:orgId')
+  const scopedComputeNodes = ref(new Map()) // Key: scope ('account-owner', 'user-owned', 'workspace:orgId')
   const scopedNodesLastFetched = ref(new Map()) // Track fetch times per scope
   const scopedNodesLoading = ref(new Map()) // Track loading states per scope
   
@@ -206,6 +206,13 @@ export const useComputeResourcesStore = defineStore('computeResources', () => {
     return fetchScopedComputeNodes(scope, organizationId, forceRefresh)
   }
 
+  // The caller's own nodes outside any workspace (organization-independent),
+  // as listed in My Workspace. Unlike 'account-owner', which lists every node
+  // on accounts the caller owns, this excludes workspace nodes.
+  const fetchUserOwnedComputeNodes = async (forceRefresh = false) => {
+    return fetchScopedComputeNodes('user-owned', null, forceRefresh)
+  }
+
   const fetchComputeAccounts = async (forceRefresh = false) => {
     // Return cached data if valid and not forcing refresh
     if (!forceRefresh && isComputeAccountsCacheValid.value && computeAccountsLoaded.value) {
@@ -292,6 +299,65 @@ export const useComputeResourcesStore = defineStore('computeResources', () => {
     if (!orgId || !accountUuid) return false
     const account = (workspaceComputeAccounts.value[orgId] || []).find(a => a.uuid === accountUuid)
     return !!account?.enabledWorkspaces?.some(ws => ws.organizationId === orgId && ws.isPublic)
+  }
+
+  // Connecting an AWS account in the browser (ConnectAwsAccountDialog): the
+  // same calls the Pennsieve agent makes (pennsieve-agent
+  // pkg/service/account.go), from the browser. Each resolves to the parsed
+  // body, or rejects with { status, body } for the dialog to explain.
+  const accountRequest = async (method, path, payload) => {
+    const token = await useGetToken()
+    const response = await fetch(`${siteConfig.api2Url}/compute/resources${path}`, {
+      method,
+      headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+      ...(payload && { body: JSON.stringify(payload) })
+    })
+    const text = await response.text()
+    let body = null
+    try { body = text ? JSON.parse(text) : null } catch { body = { message: text } }
+    if (!response.ok) return Promise.reject({ status: response.status, body })
+    return body
+  }
+
+  // A role setup: { roleName, externalId, cloudFormation?: { quickCreateUrl,
+  // cloudShellCommand, templateUrl, templateVersion }, ... }. The external ID
+  // is issued to this user, for this role, for 24 hours.
+  const requestRoleSetup = () => accountRequest('GET', '/role-policy?externalId=true')
+
+  // Registers the account once its role exists; account-service checks the
+  // role works with the external ID (and refuses without it). Then, as the
+  // agent does, asks for pull access to the app store's images.
+  const registerComputeAccount = async ({ accountId, roleName, externalId, name, templateVersion }) => {
+    const created = await accountRequest('POST', '/accounts', {
+      accountId,
+      accountType: 'AWS',
+      roleName,
+      externalId,
+      ...(name && { name }),
+      // The template the stack was made from: it makes this a CloudFormation
+      // connection, not a legacy one.
+      ...(templateVersion && { templateVersion })
+    })
+    try {
+      await accountRequest('POST', '/app-store/access', { accountId, accountType: 'AWS' })
+    } catch (error) {
+      // As the agent: the account is registered; pull access can be asked again
+      console.warn('App store access request failed:', error)
+    }
+    await fetchComputeAccounts(true)
+    return created
+  }
+
+  // Upgrade: points an existing registration (its nodes and sharing kept) at
+  // a role made from the template.
+  const switchComputeAccountRole = async (accountUuid, { roleName, externalId, templateVersion }) => {
+    const result = await accountRequest('POST', `/accounts/${accountUuid}/role`, {
+      roleName,
+      externalId,
+      ...(templateVersion && { templateVersion }),
+    })
+    await fetchComputeAccounts(true)
+    return result
   }
 
   const fetchNodePermissions = async (nodeId, forceRefresh = false) => {
@@ -790,8 +856,9 @@ export const useComputeResourcesStore = defineStore('computeResources', () => {
         
         // Add the new node to relevant scoped caches and sort them
         for (const [scope, scopedNodes] of scopedComputeNodes.value.entries()) {
-          // Add to account-owner scope (always relevant for user's nodes)
-          if (scope === 'account-owner') {
+          // Add to account-owner scope (always relevant for user's nodes),
+          // and to user-owned when the node has no organization
+          if (scope === 'account-owner' || (scope === 'user-owned' && !createdNode.organizationId)) {
             const updatedNodes = [...scopedNodes, createdNode].sort((a, b) => {
               const nameA = (a.name || '').toLowerCase()
               const nameB = (b.name || '').toLowerCase()
@@ -936,6 +1003,8 @@ export const useComputeResourcesStore = defineStore('computeResources', () => {
       // Build URL based on scope
       if (scope === 'account-owner') {
         url += '?account_owner=true'
+      } else if (scope === 'user-owned') {
+        // No query: the API lists the caller's organization-independent nodes
       } else if (scope.startsWith('workspace:') && organizationId) {
         url += `?organization_id=${organizationId}`
       } else {
@@ -1448,7 +1517,9 @@ export const useComputeResourcesStore = defineStore('computeResources', () => {
     if (gpuTiersLoaded.value) return gpuTiers.value
     try {
       const token = await useGetToken()
-      const url = `${siteConfig.api2Url}/compute/resources/gpu-tiers?organization_id=${orgId}`
+      const url = orgId
+        ? `${siteConfig.api2Url}/compute/resources/gpu-tiers?organization_id=${orgId}`
+        : `${siteConfig.api2Url}/compute/resources/gpu-tiers`
       const response = await fetch(url, {
         method: 'GET',
         headers: {
@@ -1562,6 +1633,11 @@ export const useComputeResourcesStore = defineStore('computeResources', () => {
   }
 
   return {
+    // Connecting an AWS account
+    requestRoleSetup,
+    registerComputeAccount,
+    switchComputeAccountRole,
+
     // State - Accounts
     computeAccounts,
     computeAccountsLoaded,
@@ -1594,6 +1670,7 @@ export const useComputeResourcesStore = defineStore('computeResources', () => {
     // Actions - Nodes
     clearCache,
     fetchComputeNodes,
+    fetchUserOwnedComputeNodes,
     fetchScopedComputeNodes,
     fetchWorkspaceComputeAccounts,
     fetchNodePermissions,

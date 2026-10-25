@@ -35,8 +35,10 @@ export function useMetricsExport({ filterColumn, filterValue, viewerId = 'metric
     const token = await useGetToken()
     const api2Url = store.state.config.api2Url
     const orgId = store.state.activeOrganization?.organization?.id
+    // Without an organization (My Workspace) the export covers the user's own runs
+    const query = orgId ? `?organization_id=${encodeURIComponent(orgId)}` : ''
     const resp = await fetch(
-      `${api2Url}/compute/workflows/metrics/export?organization_id=${encodeURIComponent(orgId)}`,
+      `${api2Url}/compute/workflows/metrics/export${query}`,
       {
         method: 'GET',
         headers: { Authorization: `Bearer ${token}` },

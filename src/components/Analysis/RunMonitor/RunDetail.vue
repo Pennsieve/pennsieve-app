@@ -20,11 +20,26 @@ import { endInteractiveSession } from "@/composables/useJupyterSession";
 import AnalysisFilesTable from "../../FilesTable/AnalysisFilesTable.vue";
 import BreadcrumbNavigation from "../../datasets/files/BreadcrumbNavigation/BreadcrumbNavigation.vue";
 import { useGetToken } from "@/composables/useGetToken";
+import { getView } from "@/utils/viewsService";
+import CompactFlowNode from "../WorkflowGraph/CompactFlowNode.vue";
+import GraphDensityToggle from "../WorkflowGraph/GraphDensityToggle.vue";
+import { layoutBox, useGraphDensity } from "../WorkflowGraph/graphDensity";
+import { formatResources, formatRunTime, nodeDurationSec } from "../WorkflowGraph/nodeFacts";
 import { useSendXhr } from "@/mixins/request/request_composable";
 import toQueryParams from "@/utils/toQueryParams";
 import LayerNameSelector from "./LayerNameSelector.vue";
+import TargetDatasetField from "./TargetDatasetField.vue";
+import { targetWritesToDataset, targetParamFields, buildDataTargets, targetDatasetId, datasetName } from "./dataTargets";
+import DownloadItem from "@/components/downloads/DownloadItem.vue";
+import { useDownloadsStore } from "@/stores/downloadsStore";
 
 const ASSET_TYPE_OPTIONS = ["timeseries-zarr","ome-zarr", "thumb"];
+// The download target's notify param (download-service's notify).
+const DOWNLOAD_NOTIFY_OPTIONS = [
+  { value: "auto", label: "Email me unless I'm watching" },
+  { value: "email", label: "Always email me" },
+  { value: "none", label: "Don't email me" },
+];
 const ASSET_TYPE_CUSTOM = "__custom__";
 const customAssetTypeNodes = reactive(new Set());
 
@@ -56,6 +71,12 @@ import {
   runDisplayName,
   RUN_NAME_MAX_LENGTH,
 } from "./runHelpers";
+
+// Shown in a workspace (/:orgId/analysis/runs/...) and in My Workspace
+// (/my-workspace/analysis/runs/...), where there's no organization and a run
+// has no dataset. Route names there carry a "my-" prefix.
+const isMyWorkspace = computed(() => !route.params.orgId);
+const scopedRoute = (name, params = {}) => ({ name: isMyWorkspace.value ? `my-${name}` : name, params });
 
 const props = defineProps({
   runId: { type: String, default: "" },
@@ -89,10 +110,9 @@ const isExecuting = ref(false);
 const errorBanner = ref("");
 const errorBannerNodeId = ref("");
 const rerunSource = ref(null);
-// Environment layers (python-env / r-env / data) attached to the run being
-// configured. Carried over from the source run on a rerun so the rebuilt
-// payload re-attaches them — otherwise "Rerun with configuration" silently
-// drops the layer.
+// The node's data layers the source run mounted (set through the API; the
+// app doesn't attach any itself). Carried over on a rerun so "Rerun with
+// configuration" doesn't silently drop them.
 const configLayers = ref([]);
 
 // File picker dialog state
@@ -278,6 +298,71 @@ const interactiveProcessor = computed(() => {
   return dag.find((d) => d.runtimeConfig?.interactive || d.interactive) || null;
 });
 
+/*
+  Results download: a run whose DAG ends in a download target gets a zip of
+  its results from download-service, its creator's. The downloads store
+  follows the archive (polling it while it's prepared, which also tells the
+  service not to email).
+*/
+const downloads = useDownloadsStore();
+const downloadTarget = computed(() => {
+  const dag = selectedWorkflowActivity.value?.dag || [];
+  return dag.find((d) => d.type === "data-target" && d.targetType === "download") || null;
+});
+const runArchive = computed(() => {
+  const runId = selectedWorkflowActivity.value?.uuid;
+  return runId && downloadTarget.value ? downloads.forRun(runId) : null;
+});
+const resultsHint = computed(() => {
+  const status = selectedWorkflowActivity.value?.status;
+  if (isTerminalStatus(status) && status !== "SUCCEEDED") {
+    return "The run ended before its results were packaged.";
+  }
+  return "A zip of the results appears here when the run's download step finishes.";
+});
+// The archive exists once the download target has asked for it: look again
+// when the run or the target's status changes, until it's found.
+watch(
+  () => [selectedWorkflowActivity.value?.uuid, selectedWorkflowActivity.value?.status, downloadTarget.value?.status],
+  ([runId]) => {
+    if (runId && downloadTarget.value && !runArchive.value) downloads.loadRuns().catch(() => {});
+  },
+  { immediate: true }
+);
+
+// A results zip made just now (the run finished while, or just before, this
+// page was open) is announced: the downloads panel opens on it and a toast
+// says so. Older zips are only listed under Results. Once per zip per tab,
+// remembered in sessionStorage (a convenience: without it, at most once per
+// visit to the page).
+const ANNOUNCE_WITHIN_MS = 5 * 60 * 1000;
+const ANNOUNCED_KEY = "pennsieve.runArchivesAnnounced";
+const wasAnnounced = (id) => {
+  try {
+    return JSON.parse(sessionStorage.getItem(ANNOUNCED_KEY) || "[]").includes(id);
+  } catch {
+    return false;
+  }
+};
+const markAnnounced = (id) => {
+  try {
+    const ids = JSON.parse(sessionStorage.getItem(ANNOUNCED_KEY) || "[]");
+    sessionStorage.setItem(ANNOUNCED_KEY, JSON.stringify([...ids, id].slice(-50)));
+  } catch {
+    // not remembered
+  }
+};
+watch(runArchive, (archive, previous) => {
+  if (!archive || previous?.id === archive.id || wasAnnounced(archive.id)) return;
+  const age = Date.now() - Date.parse(archive.createdAt || 0);
+  if (!(age >= 0 && age < ANNOUNCE_WITHIN_MS)) return;
+  markAnnounced(archive.id);
+  downloads.panelOpen = true;
+  EventBus.$emit("toast", {
+    detail: { type: "success", msg: "The run's results are ready to download." },
+  });
+});
+
 const interactiveSessionAvailable = computed(() => {
   const activity = selectedWorkflowActivity.value;
   if (!activity?.uuid || !interactiveProcessor.value) return false;
@@ -287,10 +372,11 @@ const interactiveSessionAvailable = computed(() => {
 const openNotebook = () => {
   const activity = selectedWorkflowActivity.value;
   if (!activity?.uuid) return;
-  router.push({
-    name: "run-notebook",
-    params: { orgId: route.params.orgId, runId: activity.uuid },
-  });
+  router.push(
+    isMyWorkspace.value
+      ? { name: "my-run-notebook", params: { runId: activity.uuid } }
+      : { name: "run-notebook", params: { orgId: route.params.orgId, runId: activity.uuid } }
+  );
 };
 
 // Terminate the interactive session without opening the notebook: ends it
@@ -335,19 +421,36 @@ const allDataSourcesHaveFiles = computed(() => {
 /*
   DAG Layout
 */
+// Compact (one line) or detailed nodes: the viewer's choice, shared with
+// the workflow builder. Laid out with the box of the current choice.
+const { detailed, setDetailed } = useGraphDensity();
+const DETAILED_BOX = { width: NODE_WIDTH, height: NODE_HEIGHT, nodesep: 120, ranksep: 150 };
+
 const autoLayout = () => {
   if (nodes.value.length === 0) return;
+  const box = layoutBox(detailed.value, DETAILED_BOX);
   const g = new dagre.graphlib.Graph();
   g.setDefaultEdgeLabel(() => ({}));
-  g.setGraph({ rankdir: "TB", nodesep: 120, ranksep: 150 });
-  for (const node of nodes.value) g.setNode(node.id, { width: NODE_WIDTH, height: NODE_HEIGHT });
+  g.setGraph({ rankdir: "TB", nodesep: box.nodesep, ranksep: box.ranksep });
+  for (const node of nodes.value) g.setNode(node.id, { width: box.width, height: box.height });
   for (const edge of edges.value) g.setEdge(edge.source, edge.target);
   dagre.layout(g);
   nodes.value = nodes.value.map((node) => {
     const pos = g.node(node.id);
-    return { ...node, position: { x: pos.x - NODE_WIDTH / 2, y: pos.y - NODE_HEIGHT / 2 } };
+    return { ...node, position: { x: pos.x - box.width / 2, y: pos.y - box.height / 2 } };
   });
   setTimeout(() => fitView({ padding: 0.2, maxZoom: 1 }), 50);
+};
+
+// This page saves no positions, so a graph is laid out for its node size:
+// compact always gets a tight layout of its own; detailed keeps the
+// definition's saved positions, where it has them.
+const needsLayout = (result) => result.needsAutoLayout || !detailed.value;
+
+const changeDensity = (value) => {
+  if (value === detailed.value) return;
+  setDetailed(value);
+  autoLayout();
 };
 
 /*
@@ -408,17 +511,25 @@ const runToNodesAndEdges = (run) => {
     const extra = {};
     if (d.type === "data-source") {
       const src = runDataSources[d.id];
-      extra.packageIds = src?.packageIds || [];
-      extra.packageCount = extra.packageIds.length;
+      if (src?.kind === "viewVersion") {
+        // A public dataset, taken in as a dataset view (viewsService).
+        extra.view = { viewId: src.viewId, viewVersion: src.viewVersion };
+      } else {
+        extra.packageIds = src?.packageIds || [];
+        extra.packageCount = extra.packageIds.length;
+      }
     } else if (d.type === "data-target") {
       extra.targetType = d.targetType || null;
       const cfg = runProcessorConfigs.find((c) => c.nodeId === d.id);
       extra.computeType = cfg?.executionTarget || d.computeType || null;
       const targetParams = runDataTargets[d.id]?.params || {};
       extra.params = Object.entries(targetParams).map(([key, value]) => ({ key, value: String(value) }));
+      extra.datasetId = targetWritesToDataset(d.targetType) ? targetDatasetId(runDataTargets[d.id], run.datasetId) : "";
     } else {
       const cfg = runProcessorConfigs.find((c) => c.nodeId === d.id);
       extra.executionTarget = cfg?.executionTarget || null;
+      extra.cpu = cfg?.cpu || null;
+      extra.memory = cfg?.memory || null;
       const nodeParams = runProcessorParams[d.id] || {};
       extra.params = Object.entries(nodeParams).map(([key, value]) => ({ key, value: String(value) }));
     }
@@ -467,6 +578,45 @@ const parseEventData = (data) => {
   return data;
 };
 
+// Re-reads the shown run (its status and its steps') and redraws the graph,
+// keeping where the user placed the nodes.
+const refreshSelectedRun = async () => {
+  await store.dispatch("analysisModule/setSelectedWorkflowActivity", selectedWorkflowActivity.value);
+  const activity = selectedWorkflowActivity.value;
+  if (activity?.dag?.length > 0) {
+    const result = runToNodesAndEdges(activity);
+    const posMap = new Map();
+    nodes.value.forEach((n) => posMap.set(n.id, n.position));
+    nodes.value = result.nodes.map((n) => ({
+      ...n,
+      position: posMap.get(n.id) || n.position,
+    }));
+    if (result.edges.length > 0) edges.value = result.edges;
+  }
+};
+
+// A fallback for live updates: while the shown run isn't finished, check it
+// now and then. An update sent before the page subscribed, or lost on a
+// reconnect, would otherwise leave it looking stuck until a reload.
+const RUN_POLL_MS = 20000;
+let runPollTimer = null;
+const scheduleRunPoll = () => {
+  clearTimeout(runPollTimer);
+  runPollTimer = null;
+  const activity = selectedWorkflowActivity.value;
+  if (mode.value !== "browse" || !activity?.uuid || isTerminalStatus(activity.status)) return;
+  runPollTimer = setTimeout(async () => {
+    if (document.visibilityState === "visible") {
+      try {
+        await refreshSelectedRun();
+      } catch (err) {
+        console.warn("Run refresh failed:", err?.message || err);
+      }
+    }
+    scheduleRunPoll();
+  }, RUN_POLL_MS);
+};
+
 const onRunStatusUpdate = async (raw) => {
   const data = parseEventData(raw);
   store.commit("analysisModule/UPDATE_RUN_STATUS", { runId: data.runId, status: data.status });
@@ -478,18 +628,7 @@ const onRunStatusUpdate = async (raw) => {
         ...selectedWorkflowActivity.value,
         status: data.status,
       });
-      await store.dispatch("analysisModule/setSelectedWorkflowActivity", selectedWorkflowActivity.value);
-      const activity = selectedWorkflowActivity.value;
-      if (activity?.dag?.length > 0) {
-        const result = runToNodesAndEdges(activity);
-        const posMap = new Map();
-        nodes.value.forEach((n) => posMap.set(n.id, n.position));
-        nodes.value = result.nodes.map((n) => ({
-          ...n,
-          position: posMap.get(n.id) || n.position,
-        }));
-        if (result.edges.length > 0) edges.value = result.edges;
-      }
+      await refreshSelectedRun();
     } else {
       store.commit("analysisModule/SET_SELECTED_WORKFLOW_ACTIVITY", {
         ...selectedWorkflowActivity.value,
@@ -550,7 +689,7 @@ const loadRun = async (runId) => {
       const result = runToNodesAndEdges(activity);
       nodes.value = result.nodes;
       edges.value = result.edges;
-      if (result.needsAutoLayout) autoLayout();
+      if (needsLayout(result)) autoLayout();
       else setTimeout(() => fitView({ padding: 0.2, maxZoom: 1 }), 50);
     }
     if (activity?.datasetId) {
@@ -577,7 +716,7 @@ const copyRunId = async () => {
 
 const goBack = () => {
   store.dispatch("analysisModule/setSelectedWorkflowActivity", null);
-  router.push({ name: "runs" });
+  router.push(scopedRoute("runs"));
 };
 
 /*
@@ -622,7 +761,7 @@ const initiateWorkflowFromConfig = async (pendingConfig) => {
   const { workflowId, computeNodeId, datasetId, rerunSource: source } = pendingConfig;
   initiateForm.value = { workflowId, computeNodeId, datasetId, name: "" };
   runNameError.value = "";
-  // Preserve any environment layers from the source run so the rerun re-attaches them.
+  // Preserve any data layers from the source run so the rerun re-attaches them.
   configLayers.value = Array.isArray(source?.layers) ? [...source.layers] : [];
 
   try {
@@ -645,16 +784,17 @@ const initiateWorkflowFromConfig = async (pendingConfig) => {
         const srcTargetParams = source?.dataTargets?.[d.id]?.params || {};
         const ttDef = getTargetTypeDefinition(d.targetType);
         const paramDefs = ttDef?.params || [];
-        const targetParams = paramDefs.map((pd) => ({
-          name: pd.name,
-          type: pd.type || "string",
-          description: pd.description || "",
-          required: pd.defaultValue == null || pd.defaultValue === undefined,
-          value: srcTargetParams[pd.name] != null ? String(srcTargetParams[pd.name]) : (pd.defaultValue != null ? String(pd.defaultValue) : ""),
-        }));
+        // Values: the run being rerun, then the definition's defaults on the
+        // node, then the registry's (workflow-service applies them in that order).
+        const targetParams = targetParamFields(paramDefs, {
+          sourceParams: srcTargetParams,
+          definitionDefaults: d.defaultParams || {},
+        });
         nodeConfigs[d.id] = {
           computeType: computeTypeForMode(srcCfg?.executionTarget || d.computeType || fallback),
           targetType: d.targetType || null,
+          // The target's own dataset; "" means the run's.
+          datasetId: source?.dataTargets?.[d.id]?.datasetId || "",
           params: targetParams,
         };
       } else if (d.type !== "data-source") {
@@ -708,7 +848,7 @@ const initiateWorkflowFromConfig = async (pendingConfig) => {
     const result = definitionToNodesAndEdges(definition);
     nodes.value = result.nodes;
     edges.value = result.edges;
-    if (result.needsAutoLayout) autoLayout();
+    if (needsLayout(result)) autoLayout();
     else setTimeout(() => fitView({ padding: 0.2, maxZoom: 1 }), 50);
 
     mode.value = "configure";
@@ -717,7 +857,7 @@ const initiateWorkflowFromConfig = async (pendingConfig) => {
   } catch (err) {
     console.error("Failed to load workflow definition:", err);
     EventBus.$emit("toast", { detail: { type: "error", msg: "Failed to load workflow definition." } });
-    router.push({ name: "runs" });
+    router.push(scopedRoute("runs"));
   }
 };
 
@@ -730,7 +870,7 @@ const cancelConfigure = () => {
   nodes.value = [];
   edges.value = [];
   selectedNode.value = null;
-  router.push({ name: "runs" });
+  router.push(scopedRoute("runs"));
 };
 
 /*
@@ -834,15 +974,7 @@ const executeWorkflow = async () => {
       if (Object.keys(obj).length > 0) processorParams[nodeId] = obj;
     });
 
-    const dataTargets = {};
-    Object.entries(nodeConfigs).forEach(([nodeId, cfg]) => {
-      const dagNode = dag.find((n) => n.id === nodeId);
-      if (dagNode?.type === "data-target" && cfg.params && cfg.params.length > 0) {
-        const obj = {};
-        cfg.params.forEach((p) => { if (p.name && p.value) obj[p.name] = p.value; });
-        if (Object.keys(obj).length > 0) dataTargets[nodeId] = { params: obj };
-      }
-    });
+    const dataTargets = buildDataTargets(dag, nodeConfigs, initiateForm.value.datasetId);
 
     const trimmedName = nameResult.value;
     const payload = {
@@ -862,7 +994,7 @@ const executeWorkflow = async () => {
     await store.dispatch("analysisModule/createRun", payload);
     EventBus.$emit("toast", { detail: { type: "success", msg: "Workflow executed successfully." } });
 
-    router.push({ name: "runs" });
+    router.push(scopedRoute("runs"));
   } catch (err) {
     console.error("Failed to execute workflow:", err);
     const msg = err?.message || "Failed to execute workflow.";
@@ -1042,8 +1174,49 @@ watch(
     if (node?.type === "data-source" && mode.value === "browse" && node.data?.packageIds?.length > 0) {
       fetchPackageNames(node.data.packageIds);
     }
+    if (node?.type === "data-source" && mode.value === "browse" && node.data?.view) {
+      fetchViewInfo(node.data.view);
+    }
   }
 );
+
+// Browse mode: a view source's dataset, by view id. The view summary names
+// its source dataset version: { name, version, doi, entryCount, totalSize }.
+const browseViewInfo = ref({});
+
+const fetchViewInfo = async ({ viewId }) => {
+  if (browseViewInfo.value[viewId]) return;
+  try {
+    const view = await getView(viewId);
+    const src = view.sources?.[0] || {};
+    browseViewInfo.value[viewId] = {
+      datasetId: src.datasetId,
+      name: src.name || view.name,
+      version: src.version,
+      doi: src.doi,
+      entryCount: view.entryCount,
+      totalSize: view.totalSize,
+    };
+  } catch (err) {
+    browseViewInfo.value[viewId] = { error: err?.message || "Could not read the dataset." };
+  }
+};
+
+// Public dataset sources name their dataset on the card.
+watch(
+  () => nodes.value.filter((n) => n.data?.view).map((n) => n.data.view.viewId).join(","),
+  () => {
+    for (const n of nodes.value) if (n.data?.view) fetchViewInfo(n.data.view);
+  },
+  { immediate: true }
+);
+
+const formatViewSize = (bytes) => {
+  if (!bytes) return "0 B";
+  const units = ["B", "KB", "MB", "GB", "TB"];
+  const i = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
+  return `${(bytes / 1024 ** i).toFixed(i ? 1 : 0)} ${units[i]}`;
+};
 
 /*
   Node params helpers (configure mode)
@@ -1175,6 +1348,32 @@ const nodeMetricLabel = (nodeId) => {
   return d ? labelForDagNode(d, availableApplications.value, targetTypes.value) : nodeId;
 };
 
+// Detailed cards: how long a step ran (ticking while it runs), its resources
+// and, once the run's metrics are in, its cost.
+const nowTick = ref(Date.now());
+let nowTimer = null;
+onMounted(() => {
+  nowTimer = setInterval(() => (nowTick.value = Date.now()), 15000);
+});
+onBeforeUnmount(() => clearInterval(nowTimer));
+
+const nodeCostLabel = (nodeId) => {
+  const nm = runMetrics.value?.nodeMetrics?.find((m) => m.nodeId === nodeId);
+  const cost = Number(nm?.estimatedCost);
+  return nm && cost > 0 ? formatCost(cost) : "";
+};
+const nodeRunTime = (data) => formatRunTime(nodeDurationSec(data, nowTick.value));
+const processorFacts = (id, data) =>
+  [data.version, formatResources(data.cpu, data.memory), nodeRunTime(data), nodeCostLabel(id)].filter(Boolean);
+const targetFacts = (data) => [nodeRunTime(data)].filter(Boolean);
+const viewSourceLabel = (view) => {
+  const info = view && browseViewInfo.value[view.viewId];
+  if (!info || info.error) return "Public dataset";
+  return [info.name, info.version && `v${info.version}`, info.entryCount != null && `${info.entryCount} files`]
+    .filter(Boolean)
+    .join(" · ");
+};
+
 const selectedNodeMetrics = computed(() => {
   if (!selectedNode.value || !runMetrics.value?.nodeMetrics) return null;
   return (
@@ -1197,7 +1396,7 @@ const rerunFromRun = async () => {
     datasetId: activity.datasetId || "",
     rerunSource: activity,
   });
-  router.push({ name: "run-configure" });
+  router.push(scopedRoute("run-configure"));
 };
 
 /*
@@ -1226,6 +1425,20 @@ const fetchDatasetOptions = async (query = "") => {
   Lifecycle
 */
 onMounted(async () => {
+  // Live updates for every run in the workspace (or the user's own runs).
+  // Subscribed before anything loads, so an update sent while the page is
+  // loading isn't missed.
+  if (realtime) {
+    analyticsChannel = realtime.subscribe(
+      // The route's workspace, not activeOrganization: that stays set in My
+      // Workspace, where a personal run's events go to the user's channel.
+      runScopeChannel(route.params.orgId, store.state.profile?.id)
+    );
+    store.commit("analysisModule/SET_ANALYTICS_CHANNEL", analyticsChannel);
+    analyticsChannel.bind("workflow-run-status", onRunStatusUpdate);
+    analyticsChannel.bind("workflow-processor-status", onProcessorStatusUpdate);
+  }
+
   await Promise.all([
     store.dispatch("analysisModule/fetchComputeNodes"),
     store.dispatch("analysisModule/fetchTargetTypes"),
@@ -1236,39 +1449,31 @@ onMounted(async () => {
   const pendingConfig = store.state.analysisModule.pendingRunConfig;
   if (pendingConfig) {
     store.commit("analysisModule/CLEAR_PENDING_RUN_CONFIG");
-    fetchDatasetOptions();
+    if (!isMyWorkspace.value) fetchDatasetOptions();
     await initiateWorkflowFromConfig(pendingConfig);
   } else if (props.runId) {
     if (!store.getters["analysisModule/workflowInstances"]?.length) {
       await store.dispatch("analysisModule/fetchWorkflowInstances");
     }
     await loadRun(props.runId);
+    scheduleRunPoll();
   } else {
     // No pending config and no runId — nothing to show, redirect to runs
-    router.replace({ name: "runs" });
+    router.replace(scopedRoute("runs"));
     return;
   }
 
-  // Live updates for every run in the workspace (or the user's own runs)
-  if (realtime) {
-    analyticsChannel = realtime.subscribe(
-      runScopeChannel(store.state.activeOrganization?.organization?.id, store.state.profile?.id)
-    );
-    store.commit("analysisModule/SET_ANALYTICS_CHANNEL", analyticsChannel);
-    analyticsChannel.bind("workflow-run-status", onRunStatusUpdate);
-    analyticsChannel.bind("workflow-processor-status", onProcessorStatusUpdate);
-  }
 });
 
 // Handle same-component navigation (e.g. run-detail → run-configure)
 watch(
   () => route.name,
   async (newName) => {
-    if (newName === "run-configure") {
+    if (newName === "run-configure" || newName === "my-run-configure") {
       const pendingConfig = store.state.analysisModule.pendingRunConfig;
       if (pendingConfig) {
         store.commit("analysisModule/CLEAR_PENDING_RUN_CONFIG");
-        fetchDatasetOptions();
+        if (!isMyWorkspace.value) fetchDatasetOptions();
         await initiateWorkflowFromConfig(pendingConfig);
       }
     }
@@ -1276,6 +1481,7 @@ watch(
 );
 
 onBeforeUnmount(() => {
+  clearTimeout(runPollTimer);
   if (analyticsChannel) {
     analyticsChannel.unbind("workflow-run-status", onRunStatusUpdate);
     analyticsChannel.unbind(
@@ -1356,7 +1562,7 @@ onUnmounted(() => {
         {{ errorBanner }}
         <router-link
           v-if="errorBannerNodeId"
-          :to="{ name: 'compute-node-management', params: { nodeId: errorBannerNodeId } }"
+          :to="scopedRoute('compute-node-management', { nodeId: errorBannerNodeId })"
           class="error-banner-link"
         >View allowed processors</router-link>
       </span>
@@ -1393,6 +1599,7 @@ onUnmounted(() => {
               <span v-if="mode === 'browse'" class="header-status-badge" :class="statusDotClass(selectedWorkflowActivity?.status)">
                 {{ statusLabel(selectedWorkflowActivity?.status) }}
               </span>
+              <GraphDensityToggle :detailed="detailed" @update:detailed="changeDensity" />
               <button class="auto-layout-btn" @click="autoLayout">
                 Auto Layout
               </button>
@@ -1402,7 +1609,35 @@ onUnmounted(() => {
             <template #node-default="{ data, id }">
               <div :style="{ '--node-border-color': mode === 'browse' ? statusBorderColor(data.status) : '#cccccc', '--handle-target-color': incomingEdgeColor(id) }">
                 <Handle type="target" :position="Position.Top" />
-                <div class="custom-node" :class="mode === 'browse' ? statusClass(data.status) : ''">
+                <CompactFlowNode
+                  v-if="!detailed"
+                  kind="processor"
+                  :label="data.label"
+                  :status="mode === 'browse' ? data.status : ''"
+                  :runtime="mode === 'browse' ? data.executionTarget : nodeConfigs[id]?.executionTarget"
+                  :unmet="nodeUnmetCount(id, 'processor')"
+                  :actions-on-hover="false"
+                >
+                  <template v-if="mode === 'browse' && interactiveSessionAvailable && id === interactiveProcessor?.id">
+                    <button
+                      class="node-action node-action--end"
+                      title="End session — resumes the workflow"
+                      :disabled="endingSession"
+                      @click="endSession"
+                    >
+                      <IconXCircle :width="14" :height="14" color="#c14d49" />
+                    </button>
+                    <button
+                      class="node-action node-action--play"
+                      :class="{ 'node-action--waiting': data.status === 'STARTED' }"
+                      title="Interactive notebook is waiting for you — open it"
+                      @click="openNotebook"
+                    >
+                      <IconControllerPlay :width="18" :height="11" color="#011f5b" />
+                    </button>
+                  </template>
+                </CompactFlowNode>
+                <div v-else class="custom-node" :class="mode === 'browse' ? statusClass(data.status) : ''">
                   <span v-if="nodeUnmetCount(id, 'processor') > 0" class="node-unmet-badge">{{ nodeUnmetCount(id, 'processor') }}</span>
                   <div
                     v-if="mode === 'browse' && interactiveSessionAvailable && id === interactiveProcessor?.id"
@@ -1430,9 +1665,13 @@ onUnmounted(() => {
                     <span class="node-title">{{ data.label }}</span>
                   </div>
                   <div class="node-tags">
+                    <span class="node-type-badge processor-badge">Processor</span>
                     <span v-if="mode === 'browse' && data.executionTarget" class="node-type-badge exec-badge">{{ data.executionTarget }}</span>
                     <span v-if="mode === 'configure' && nodeConfigs[id]?.executionTarget" class="node-type-badge exec-badge">{{ nodeConfigs[id].executionTarget }}</span>
                     <span v-if="mode === 'browse'" class="node-status-badge" :class="statusDotClass(data.status)">{{ statusLabel(data.status) }}</span>
+                  </div>
+                  <div v-if="mode === 'browse' && processorFacts(id, data).length" class="node-facts">
+                    {{ processorFacts(id, data).join(" · ") }}
                   </div>
                   <div v-if="(mode === 'browse' && data.params?.length > 0) || (mode === 'configure' && nodeConfigs[id])" class="node-config-summary">
                     <div v-if="mode === 'browse' && data.params?.length > 0" class="param-preview">
@@ -1461,14 +1700,30 @@ onUnmounted(() => {
             <!-- Data-source node template -->
             <template #node-data-source="{ data, id }">
               <div :style="{ '--node-border-color': mode === 'configure' && fileCountForNode(id) > 0 ? '#17BB62' : '#6366f1' }">
-                <div class="custom-node data-source-node" :class="{ 'has-files': mode === 'configure' && fileCountForNode(id) > 0 }">
+                <CompactFlowNode
+                  v-if="!detailed"
+                  kind="source"
+                  :label="data.label"
+                  :unmet="nodeUnmetCount(id, 'data-source')"
+                  :detail="mode === 'configure'
+                    ? `${fileCountForNode(id)} file${fileCountForNode(id) !== 1 ? 's' : ''} selected`
+                    : data.view
+                    ? 'Public dataset'
+                    : data.packageCount != null
+                    ? `${data.packageCount} file${data.packageCount !== 1 ? 's' : ''}`
+                    : ''"
+                />
+                <div v-else class="custom-node data-source-node" :class="{ 'has-files': mode === 'configure' && fileCountForNode(id) > 0 }">
                   <span v-if="nodeUnmetCount(id, 'data-source') > 0" class="node-unmet-badge">{{ nodeUnmetCount(id, 'data-source') }}</span>
                   <div class="node-header">
                     <span class="node-title">{{ data.label }}</span>
                   </div>
                   <div class="node-tags">
                     <span class="node-type-badge source-badge">Source</span>
-                    <span v-if="mode === 'browse' && data.packageCount != null" class="node-tag-info">
+                    <span v-if="mode === 'browse' && data.view" class="node-tag-info" :title="viewSourceLabel(data.view)">
+                      {{ viewSourceLabel(data.view) }}
+                    </span>
+                    <span v-else-if="mode === 'browse' && data.packageCount != null" class="node-tag-info">
                       {{ data.packageCount }} file{{ data.packageCount !== 1 ? 's' : '' }}
                     </span>
                     <template v-if="mode === 'configure'">
@@ -1487,7 +1742,15 @@ onUnmounted(() => {
             <template #node-data-target="{ data, id }">
               <div :style="{ '--node-border-color': mode === 'browse' ? (data.status && data.status !== 'NOT_STARTED' ? statusBorderColor(data.status) : '#64748b') : '#64748b', '--handle-target-color': incomingEdgeColor(id) }">
                 <Handle type="target" :position="Position.Top" />
-                <div class="custom-node data-target-node" :class="mode === 'browse' ? statusClass(data.status) : ''">
+                <CompactFlowNode
+                  v-if="!detailed"
+                  kind="target"
+                  :label="data.targetType || data.label"
+                  :status="mode === 'browse' ? data.status : ''"
+                  :runtime="nodeConfigs[id]?.computeType || data.computeType"
+                  :unmet="nodeUnmetCount(id, 'data-target')"
+                />
+                <div v-else class="custom-node data-target-node" :class="mode === 'browse' ? statusClass(data.status) : ''">
                   <span v-if="nodeUnmetCount(id, 'data-target') > 0" class="node-unmet-badge">{{ nodeUnmetCount(id, 'data-target') }}</span>
                   <div class="node-header">
                     <span class="node-title">{{ data.targetType || data.label }}</span>
@@ -1498,6 +1761,9 @@ onUnmounted(() => {
                       {{ nodeConfigs[id]?.computeType || data.computeType }}
                     </span>
                     <span v-if="mode === 'browse'" class="node-status-badge" :class="statusDotClass(data.status)">{{ statusLabel(data.status) }}</span>
+                  </div>
+                  <div v-if="mode === 'browse' && targetFacts(data).length" class="node-facts">
+                    {{ targetFacts(data).join(" · ") }}
                   </div>
                   <div class="node-body">
                     <div v-if="mode === 'browse' && data.params?.length > 0" class="param-preview">
@@ -1774,6 +2040,9 @@ onUnmounted(() => {
             <!-- CONFIGURE MODE: Selected data-target node -->
             <template v-else-if="mode === 'configure' && selectedNode && selectedNode.type === 'data-target' && nodeConfigs[selectedNode.id]">
               <h4 class="sidebar-section-title">Data Target Configuration</h4>
+              <div v-if="!getTargetTypeDefinition(selectedNode.data?.targetType)" class="target-type-missing">
+                Target type "{{ selectedNode.data?.targetType }}" is no longer available, so it has no parameters or runtimes here. Edit the workflow and choose a current target type.
+              </div>
               <div class="info-card">
                 <div class="info-row">
                   <span class="info-label">Target Type</span>
@@ -1813,6 +2082,18 @@ onUnmounted(() => {
                   </el-select>
                 </div>
 
+                <!-- Which dataset the target writes to (the run's, by default) -->
+                <div
+                  v-if="targetWritesToDataset(selectedNode.data?.targetType)"
+                  class="config-field"
+                >
+                  <TargetDatasetField
+                    v-model="nodeConfigs[selectedNode.id].datasetId"
+                    :run-dataset-id="initiateForm.datasetId"
+                    :datasets="datasetOptions"
+                  />
+                </div>
+
                 <!-- Target type params -->
                 <div v-if="nodeConfigs[selectedNode.id].params.length > 0" class="config-field">
                   <label>Parameters</label>
@@ -1831,6 +2112,19 @@ onUnmounted(() => {
                       v-model="param.value"
                       :compute-node-id="initiateForm.computeNodeId"
                     />
+                    <el-select
+                      v-else-if="nodeConfigs[selectedNode.id].targetType === 'download' && param.name === 'notify'"
+                      v-model="param.value"
+                      size="small"
+                      style="width: 100%"
+                    >
+                      <el-option
+                        v-for="o in DOWNLOAD_NOTIFY_OPTIONS"
+                        :key="o.value"
+                        :label="o.label"
+                        :value="o.value"
+                      />
+                    </el-select>
                     <template v-else-if="param.name === 'ASSET_TYPE'">
                       <el-select
                         :model-value="
@@ -1949,14 +2243,14 @@ onUnmounted(() => {
                   <span class="info-label">Compute Node</span>
                   <span class="info-value">{{ computeNodeName(initiateForm.computeNodeId) }}</span>
                 </div>
-                <div class="info-row">
+                <div v-if="!isMyWorkspace" class="info-row">
                   <span class="info-label">Dataset</span>
                   <span class="info-value">
                     {{ datasetOptions.find(d => d.content?.id === initiateForm.datasetId)?.content?.name || initiateForm.datasetId }}
                   </span>
                 </div>
                 <div v-if="configLayers.length" class="info-row">
-                  <span class="info-label">Environment</span>
+                  <span class="info-label">Reference data</span>
                   <span class="info-value">{{ configLayers.join(', ') }}</span>
                 </div>
               </div>
@@ -1970,6 +2264,52 @@ onUnmounted(() => {
             <!-- BROWSE MODE: Selected Data Source Node -->
             <template v-else-if="mode === 'browse' && selectedNode && selectedNode.type === 'data-source'">
               <h4 class="sidebar-section-title">Data Source</h4>
+              <template v-if="selectedNode.data?.view">
+                <div class="info-card">
+                  <div class="info-row">
+                    <span class="info-label">Name</span>
+                    <span class="info-value">{{ selectedNode.data?.label || 'Unnamed' }}</span>
+                  </div>
+                  <template v-for="info in [browseViewInfo[selectedNode.data.view.viewId]]" :key="selectedNode.data.view.viewId">
+                    <div v-if="!info" class="info-row">
+                      <span class="info-value">Loading…</span>
+                    </div>
+                    <div v-else-if="info.error" class="info-row">
+                      <span class="info-value">{{ info.error }}</span>
+                    </div>
+                    <template v-else>
+                      <div class="info-row">
+                        <span class="info-label">Public dataset</span>
+                        <span class="info-value">
+                          <router-link
+                            v-if="info.datasetId"
+                            :to="{ name: 'public-dataset', params: { datasetId: info.datasetId } }"
+                          >{{ info.name }}</router-link>
+                          <template v-else>{{ info.name }}</template>
+                        </span>
+                      </div>
+                      <div class="info-row">
+                        <span class="info-label">Version</span>
+                        <span class="info-value">{{ info.version }}</span>
+                      </div>
+                      <div v-if="info.doi" class="info-row">
+                        <span class="info-label">DOI</span>
+                        <span class="info-value">
+                          <a :href="`https://doi.org/${info.doi}`" target="_blank" rel="noopener">{{ info.doi }}</a>
+                        </span>
+                      </div>
+                      <div class="info-row">
+                        <span class="info-label">Files</span>
+                        <span class="info-value">{{ info.entryCount }} · {{ formatViewSize(info.totalSize) }}</span>
+                      </div>
+                    </template>
+                  </template>
+                </div>
+                <p class="configure-hint">
+                  The notebook downloads the files it needs from this dataset.
+                </p>
+              </template>
+              <template v-else>
               <div class="info-card">
                 <div class="info-row">
                   <span class="info-label">Name</span>
@@ -1992,6 +2332,7 @@ onUnmounted(() => {
                   <span class="selected-file-name">{{ browseFileInfo[pkgId]?.name || pkgId }}</span>
                 </div>
               </div>
+              </template>
               <div class="info-actions">
                 <button class="text-link-btn" @click="selectedNode = null">
                   Clear selection
@@ -2017,6 +2358,10 @@ onUnmounted(() => {
                 <div v-if="selectedNode.data?.version" class="info-row">
                   <span class="info-label">Version</span>
                   <span class="info-value">{{ selectedNode.data.version }}</span>
+                </div>
+                <div v-if="selectedNode.data?.datasetId" class="info-row">
+                  <span class="info-label">Writes to</span>
+                  <span class="info-value">{{ datasetName(selectedNode.data.datasetId, datasetOptions) }}</span>
                 </div>
               </div>
 
@@ -2071,7 +2416,7 @@ onUnmounted(() => {
                   <span class="info-value truncate-value">
                     <router-link
                       v-if="selectedWorkflowActivity.workflowUuid"
-                      :to="{ name: 'workflow-detail', params: { uuid: selectedWorkflowActivity.workflowUuid } }"
+                      :to="scopedRoute('workflow-detail', { uuid: selectedWorkflowActivity.workflowUuid })"
                       :title="runWorkflowName"
                       class="truncate-text"
                     >
@@ -2110,7 +2455,7 @@ onUnmounted(() => {
                   <span class="info-label">Compute Node</span>
                   <span class="info-value truncate-value">
                     <router-link
-                      :to="{ name: 'compute-node-management', params: { nodeId: selectedWorkflowActivity.computeNodeUuid } }"
+                      :to="scopedRoute('compute-node-management', { nodeId: selectedWorkflowActivity.computeNodeUuid })"
                       :title="computeNodeName(selectedWorkflowActivity.computeNodeUuid)"
                       class="truncate-text"
                     >
@@ -2135,6 +2480,13 @@ onUnmounted(() => {
                   <span class="info-value">{{ formatDuration(selectedWorkflowActivity.startedAt, selectedWorkflowActivity.completedAt) }}</span>
                 </div>
               </div>
+              <template v-if="downloadTarget">
+                <h4 class="sidebar-section-title">Results</h4>
+                <div class="info-card results-card">
+                  <DownloadItem v-if="runArchive" :download="runArchive" />
+                  <p v-else class="results-hint">{{ resultsHint }}</p>
+                </div>
+              </template>
               <!-- Metrics summary -->
               <template v-if="runMetrics">
                 <h4 class="sidebar-section-title">Metrics</h4>
@@ -2918,6 +3270,19 @@ onUnmounted(() => {
     font-size: 10px;
     color: theme.$gray_4;
     white-space: nowrap;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  // Run time, resources and cost under a detailed card's badges.
+  .node-facts {
+    margin-top: 6px;
+    font-size: 11px;
+    color: theme.$gray_4;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .node-meta {
@@ -3058,6 +3423,7 @@ onUnmounted(() => {
     flex-shrink: 0;
 
     &.source-badge { background: #6366f1; color: white; }
+    &.processor-badge { background: theme.$orange_2; color: white; }
     &.target-badge { background: #64748b; color: white; }
     &.exec-badge { background: rgba(5, 150, 105, 0.12); color: #047857; }
   }
@@ -3098,6 +3464,14 @@ onUnmounted(() => {
 
 .new-workflow-btn { width: 100%; }
 .sidebar-accordion { border-top: none; }
+
+.results-card {
+  .results-hint {
+    margin: 0;
+    font-size: 13px;
+    color: theme.$gray_4;
+  }
+}
 
 .sidebar-section-title {
   margin: 10px 0 6px 0;
@@ -3346,6 +3720,16 @@ onUnmounted(() => {
     line-height: 1;
     flex-shrink: 0;
   }
+}
+
+.target-type-missing {
+  margin: 0 0 12px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: #fef3c7;
+  color: #92400e;
+  font-size: 12px;
+  line-height: 1.4;
 }
 
 .target-param {
@@ -3597,7 +3981,7 @@ onUnmounted(() => {
   text-transform: uppercase;
   letter-spacing: 0.5px;
   padding: 2px 8px;
-  border-radius: 10px;
+  border-radius: 3px;
   white-space: nowrap;
 
   &.lambda {

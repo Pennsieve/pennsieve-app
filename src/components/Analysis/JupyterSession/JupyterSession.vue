@@ -5,15 +5,18 @@
 // surface (code + markdown cells, per-cell run, run-all, restart, command-mode
 // keyboard shortcuts).
 import { onMounted, onBeforeUnmount, nextTick, ref, computed, watch } from "vue";
-import { useRoute, onBeforeRouteLeave } from "vue-router";
+import { useRoute, useRouter, onBeforeRouteLeave } from "vue-router";
 import { useJupyterSession } from "@/composables/useJupyterSession";
 import NotebookCell from "./NotebookCell.vue";
 import FileBrowser from "./FileBrowser.vue";
+import InputsPanel from "./InputsPanel.vue";
+import EnvironmentPanel from "./EnvironmentPanel.vue";
+import { sessionPathCode } from "./pathCode";
 import {
   VideoPlay,
   DArrowRight,
-  RefreshRight,
   FolderOpened,
+  RefreshRight,
   Document,
   Plus,
   ArrowDown,
@@ -25,13 +28,16 @@ const props = defineProps({
   runId: { type: String, required: true },
 });
 
-// Route to the Analysis tab (orgId from the current route) — offered as a way
-// back once the session has ended and the notebook surface is gone.
+// The run's page: where ending the session leads, since the run carries on
+// (its next steps, e.g. a download target's zip, show there). In its
+// workspace, or in My Analysis for a personal run (no orgId).
 const route = useRoute();
-const analysisRoute = computed(() => ({
-  name: "analysis",
-  params: { orgId: route.params.orgId },
-}));
+const router = useRouter();
+const runRoute = computed(() =>
+  route.params.orgId
+    ? { name: "run-detail", params: { orgId: route.params.orgId, runId: props.runId } }
+    : { name: "my-run-detail", params: { runId: props.runId } }
+);
 
 const {
   status,
@@ -51,7 +57,11 @@ const {
   openNotebookFrom,
   findInputNotebooks,
   listDir,
-  downloadFile,
+  fetchInputs,
+  inputsStatus,
+  environmentState,
+  switchEnvironment,
+  clearEnvironment,
   setSource,
   addCell,
   addCellAbove,
@@ -140,7 +150,92 @@ const selectedId = ref(null);
 const cellRefs = new Map();
 const ending = ref(false);
 const confirmEnd = ref(false);
-const showFiles = ref(true);
+// The sidebar shows or hides from the folder button at the start of the
+// notebook toolbar, and stays as the user left it in this browser.
+const SIDEBAR_OPEN_KEY = "pennsieve.notebook.sidebarOpen";
+function storedOpen() {
+  try {
+    return localStorage.getItem(SIDEBAR_OPEN_KEY) !== "false";
+  } catch {
+    return true;
+  }
+}
+const showFiles = ref(storedOpen());
+
+// Below this toolbar width the buttons keep only their icons (each has a
+// tooltip), so the toolbar stays on one line beside the sidebar.
+const COMPACT_TOOLBAR_PX = 900;
+const toolbarRef = ref(null);
+const compactToolbar = ref(false);
+let toolbarObserver = null;
+watch(toolbarRef, (el) => {
+  toolbarObserver?.disconnect();
+  toolbarObserver = null;
+  if (!el || typeof ResizeObserver === "undefined") return;
+  toolbarObserver = new ResizeObserver(([entry]) => {
+    compactToolbar.value = entry.contentRect.width < COMPACT_TOOLBAR_PX;
+  });
+  toolbarObserver.observe(el);
+});
+function toggleSidebar() {
+  showFiles.value = !showFiles.value;
+  try {
+    localStorage.setItem(SIDEBAR_OPEN_KEY, String(showFiles.value));
+  } catch {
+    // not remembered
+  }
+}
+
+// The sidebar's width, dragged from its right edge and remembered in this
+// browser (a convenience only: it may not persist).
+const SIDEBAR_KEY = "pennsieve.notebook.sidebarWidth";
+const SIDEBAR_MIN = 220;
+const SIDEBAR_MAX = 520;
+const SIDEBAR_DEFAULT = 300;
+const clampWidth = (w) => Math.min(SIDEBAR_MAX, Math.max(SIDEBAR_MIN, Math.round(w)));
+function storedWidth() {
+  try {
+    const w = parseInt(localStorage.getItem(SIDEBAR_KEY), 10);
+    return Number.isFinite(w) ? clampWidth(w) : SIDEBAR_DEFAULT;
+  } catch {
+    return SIDEBAR_DEFAULT;
+  }
+}
+const sidebarWidth = ref(storedWidth());
+const resizingSidebar = ref(false);
+let resizeStart = null;
+
+function onSidebarMove(e) {
+  if (!resizeStart) return;
+  sidebarWidth.value = clampWidth(resizeStart.width + e.clientX - resizeStart.x);
+}
+function endSidebarResize() {
+  if (!resizeStart) return;
+  resizeStart = null;
+  resizingSidebar.value = false;
+  window.removeEventListener("pointermove", onSidebarMove);
+  window.removeEventListener("pointerup", endSidebarResize);
+  try {
+    localStorage.setItem(SIDEBAR_KEY, String(sidebarWidth.value));
+  } catch {
+    // not remembered; the width still applies to this page
+  }
+}
+function startSidebarResize(e) {
+  resizeStart = { x: e.clientX, width: sidebarWidth.value };
+  resizingSidebar.value = true;
+  window.addEventListener("pointermove", onSidebarMove);
+  window.addEventListener("pointerup", endSidebarResize);
+}
+// Arrow keys on the focused handle resize it too.
+function nudgeSidebar(delta) {
+  sidebarWidth.value = clampWidth(sidebarWidth.value + delta);
+  try {
+    localStorage.setItem(SIDEBAR_KEY, String(sidebarWidth.value));
+  } catch {
+    // not remembered
+  }
+}
 const fileBrowserRef = ref(null);
 let lastD = 0;
 
@@ -238,6 +333,8 @@ onMounted(async () => {
 });
 
 onBeforeUnmount(() => {
+  toolbarObserver?.disconnect();
+  endSidebarResize();
   window.removeEventListener("keydown", onKeydown, true);
   window.removeEventListener("beforeunload", onBeforeUnload);
   stopProgress();
@@ -294,7 +391,7 @@ async function focusCell(id) {
 // Insert a filesystem path (from the file browser) into the selected code cell
 // as a quoted string; if no code cell is selected, create one.
 function insertPath(path) {
-  const literal = `"${path}"`;
+  const literal = sessionPathCode(path, kernelName.value);
   let cell = selectedCell();
   if (!cell || cell.cell_type !== "code") {
     const id = addCell(cell ? cell.id : null, "code");
@@ -376,6 +473,7 @@ async function endSession(saveFirst) {
     ending.value = false;
     if (status.value === "closed") confirmEnd.value = false;
   }
+  if (status.value === "closed") router.replace(runRoute.value);
 }
 
 // Command-mode keyboard shortcuts (ignored while a CodeMirror editor has focus).
@@ -479,87 +577,6 @@ const kernelPill = computed(() => {
 
 <template>
   <div class="nb">
-    <!-- toolbar -->
-    <div class="nb-toolbar" v-if="status === 'ready'">
-      <el-tooltip content="Toggle file browser" :show-after="400">
-        <el-button
-          size="small"
-          :type="showFiles ? 'primary' : 'default'"
-          :icon="FolderOpened"
-          @click="showFiles = !showFiles"
-        >
-          Files
-        </el-button>
-      </el-tooltip>
-
-      <span class="nb-div" />
-
-      <el-tooltip content="Save (⌘/Ctrl+S)" :show-after="400">
-        <el-button size="small" :icon="Document" :loading="saving" @click="saveAndRefresh">
-          Save<span v-if="dirty" class="nb-dirty">•</span>
-        </el-button>
-      </el-tooltip>
-
-      <el-dropdown trigger="click" @command="addCellFromMenu">
-        <el-button size="small" :icon="Plus">
-          Add<el-icon class="nb-caret"><ArrowDown /></el-icon>
-        </el-button>
-        <template #dropdown>
-          <el-dropdown-menu>
-            <el-dropdown-item command="code">Code cell</el-dropdown-item>
-            <el-dropdown-item command="markdown">Markdown cell</el-dropdown-item>
-          </el-dropdown-menu>
-        </template>
-      </el-dropdown>
-
-      <span class="nb-div" />
-
-      <el-tooltip content="Run selected (Shift+Enter)" :show-after="400">
-        <el-button size="small" type="primary" :icon="VideoPlay" @click="runSelected">Run</el-button>
-      </el-tooltip>
-      <el-tooltip content="Run all cells" :show-after="400">
-        <el-button size="small" :icon="DArrowRight" @click="runAll">Run all</el-button>
-      </el-tooltip>
-
-      <el-dropdown trigger="click" @command="onKernelCommand">
-        <el-button size="small" :icon="RefreshRight">
-          Kernel<el-icon class="nb-caret"><ArrowDown /></el-icon>
-        </el-button>
-        <template #dropdown>
-          <el-dropdown-menu>
-            <el-dropdown-item command="interrupt">Interrupt</el-dropdown-item>
-            <el-dropdown-item command="restart">Restart</el-dropdown-item>
-            <el-dropdown-item command="restartRunAll">Restart &amp; run all</el-dropdown-item>
-            <el-dropdown-item command="clear" divided>Clear all outputs</el-dropdown-item>
-          </el-dropdown-menu>
-        </template>
-      </el-dropdown>
-
-      <span v-if="notebookSourceLabel" class="nb-source" :title="notebookSource">
-        <el-icon class="nb-source__icon"><Document /></el-icon>
-        editing: {{ notebookSourceLabel }}
-      </span>
-
-      <span class="nb-spacer" />
-
-      <span class="nb-kernel" :class="`nb-kernel--${kernelPill.cls}`">
-        <el-icon v-if="kernelPill.cls === 'busy'" class="nb-kernel__spin"><Loading /></el-icon>
-        <span class="nb-kernel__dot" />
-        {{ kernelName || "Kernel" }} · {{ kernelPill.label }}
-      </span>
-
-      <el-button
-        size="small"
-        type="danger"
-        plain
-        :icon="SwitchButton"
-        :loading="ending"
-        @click="confirmEnd = true"
-      >
-        End session
-      </el-button>
-    </div>
-
     <!-- End-session confirmation (Pennsieve dialog, not the browser prompt) -->
     <el-dialog
       v-model="confirmEnd"
@@ -707,88 +724,223 @@ const kernelPill = computed(() => {
       />
       <h2 class="nb-empty__title">Session ended</h2>
       <p class="nb-empty__msg">Your kernel has been shut down and the workflow will continue at the next step.</p>
-      <router-link :to="analysisRoute" class="nb-empty__link">Return to Analysis →</router-link>
-    </div>
-
-    <!-- Offer to open an existing notebook staged in input/ -->
-    <div v-if="status === 'ready' && showInputBanner" class="nb-open-banner">
-      <span class="nb-open-banner__text">
-        <template v-if="inputNotebooks.length === 1">
-          Found a notebook in your input files:
-          <strong>{{ inputNotebooks[0].name }}</strong>
-        </template>
-        <template v-else>
-          Found {{ inputNotebooks.length }} notebooks in your input files —
-          choose one to open.
-        </template>
-      </span>
-      <el-select
-        v-if="inputNotebooks.length > 1"
-        v-model="inputChoice"
-        size="small"
-        placeholder="Choose a notebook"
-        class="nb-open-banner__select"
-      >
-        <el-option
-          v-for="nb in inputNotebooks"
-          :key="nb.path"
-          :label="nb.name"
-          :value="nb.path"
-        />
-      </el-select>
-      <el-button
-        size="small"
-        type="primary"
-        :loading="opening"
-        :disabled="!inputChoice"
-        @click="openFromBanner"
-      >
-        Open
-      </el-button>
-      <el-button size="small" text @click="showInputBanner = false">
-        Dismiss
-      </el-button>
+      <router-link :to="runRoute" class="nb-empty__link">View the run →</router-link>
     </div>
 
     <!-- file browser + notebook -->
     <div v-if="status === 'ready'" class="nb-main">
-      <aside v-show="showFiles" class="nb-files">
-        <FileBrowser
-          ref="fileBrowserRef"
-          :list-dir="listDir"
-          :download-file="downloadFile"
+      <aside
+        v-show="showFiles"
+        id="nb-sidebar"
+        class="nb-files"
+        :class="{ 'is-resizing': resizingSidebar }"
+        :style="{ width: `${sidebarWidth}px`, flexBasis: `${sidebarWidth}px` }"
+      >
+        <div class="nb-files__content">
+        <EnvironmentPanel
+          :environment-state="environmentState"
+          :switch-environment="switchEnvironment"
+          :clear-environment="clearEnvironment"
           :ready="status === 'ready'"
-          @insert-path="insertPath"
-          @open-notebook="requestOpen"
+          :kernel-name="kernelName"
+        />
+        <InputsPanel
+          :run-id="runId"
+          :fetch-inputs="fetchInputs"
+          :inputs-status="inputsStatus"
+          :ready="status === 'ready'"
+          :width="sidebarWidth"
+          @downloaded="fileBrowserRef?.refresh?.()"
+        />
+        <div class="nb-files__browser">
+          <FileBrowser
+            ref="fileBrowserRef"
+            :list-dir="listDir"
+            :ready="status === 'ready'"
+            :kernel-name="kernelName"
+            @insert-path="insertPath"
+            @open-notebook="requestOpen"
+          />
+        </div>
+        </div>
+        <div
+          class="nb-files__resize"
+          role="separator"
+          aria-orientation="vertical"
+          aria-label="Resize the sidebar"
+          :aria-valuenow="sidebarWidth"
+          :aria-valuemin="SIDEBAR_MIN"
+          :aria-valuemax="SIDEBAR_MAX"
+          tabindex="0"
+          @pointerdown.prevent="startSidebarResize"
+          @dblclick="nudgeSidebar(SIDEBAR_DEFAULT - sidebarWidth)"
+          @keydown.left.prevent="nudgeSidebar(-20)"
+          @keydown.right.prevent="nudgeSidebar(20)"
         />
       </aside>
 
-      <div class="nb-doc">
-        <NotebookCell
-          v-for="(cell, i) in cells"
-          :key="cell.id"
-          :ref="(el) => setCellRef(cell.id, el)"
-          :cell="cell"
-          :selected="cell.id === selectedId"
-          :is-first="i === 0"
-          :is-last="i === cells.length - 1"
-          @select="select(cell.id)"
-          @update:source="setSource(cell.id, $event)"
-          @run="onRun(cell, $event)"
-          @edit="cell._editing = true"
-          @add-below="select(addCell(cell.id, 'code'))"
-          @delete="deleteCell(cell.id)"
-          @move-up="moveCell(cell.id, -1)"
-          @move-down="moveCell(cell.id, 1)"
-          @change-type="onChangeType(cell, $event)"
-          @focus-prev="selectRel(-1)"
-          @focus-next="selectRel(1)"
-        />
-        <div class="nb-add-row">
-          <el-button size="small" :icon="Plus" @click="focusCell(addCell(null, 'code'))">
-            Add cell
+      <!-- The notebook pane: its toolbar and banner sit over the notebook only,
+           so the sidebar runs the full height beside them. -->
+      <div class="nb-pane">
+        <!-- toolbar -->
+        <div ref="toolbarRef" class="nb-toolbar" :class="{ 'is-compact': compactToolbar }" v-if="status === 'ready'">
+          <el-tooltip :content="showFiles ? 'Hide inputs and session files' : 'Show inputs and session files'" :show-after="400">
+            <el-button
+              size="small"
+              class="nb-sidebar-toggle"
+              :class="{ 'is-on': showFiles }"
+              :icon="FolderOpened"
+              :aria-label="showFiles ? 'Hide the sidebar' : 'Show the sidebar'"
+              aria-controls="nb-sidebar"
+              :aria-expanded="showFiles"
+              @click="toggleSidebar"
+            />
+          </el-tooltip>
+          <span class="nb-div" />
+          <el-tooltip content="Save (⌘/Ctrl+S)" :show-after="400">
+            <el-button size="small" :icon="Document" :loading="saving" aria-label="Save" @click="saveAndRefresh">
+              <span v-if="!compactToolbar">Save</span><span v-if="dirty" class="nb-dirty">•</span>
+            </el-button>
+          </el-tooltip>
+
+          <el-dropdown trigger="click" @command="addCellFromMenu">
+            <el-button size="small" :icon="Plus" aria-label="Add a cell" :title="compactToolbar ? 'Add a cell' : undefined">
+              <span v-if="!compactToolbar">Add</span><el-icon class="nb-caret"><ArrowDown /></el-icon>
+            </el-button>
+            <template #dropdown>
+              <el-dropdown-menu>
+                <el-dropdown-item command="code">Code cell</el-dropdown-item>
+                <el-dropdown-item command="markdown">Markdown cell</el-dropdown-item>
+              </el-dropdown-menu>
+            </template>
+          </el-dropdown>
+
+          <span class="nb-div" />
+
+          <el-tooltip content="Run selected (Shift+Enter)" :show-after="400">
+            <el-button size="small" type="primary" :icon="VideoPlay" aria-label="Run" @click="runSelected">
+              <span v-if="!compactToolbar">Run</span>
+            </el-button>
+          </el-tooltip>
+          <el-tooltip content="Run all cells" :show-after="400">
+            <el-button size="small" :icon="DArrowRight" aria-label="Run all" @click="runAll">
+              <span v-if="!compactToolbar">Run all</span>
+            </el-button>
+          </el-tooltip>
+
+          <el-dropdown trigger="click" @command="onKernelCommand">
+            <el-button size="small" :icon="RefreshRight" aria-label="Kernel" :title="compactToolbar ? 'Kernel' : undefined">
+              <span v-if="!compactToolbar">Kernel</span><el-icon class="nb-caret"><ArrowDown /></el-icon>
+            </el-button>
+            <template #dropdown>
+              <el-dropdown-menu>
+                <el-dropdown-item command="interrupt">Interrupt</el-dropdown-item>
+                <el-dropdown-item command="restart">Restart</el-dropdown-item>
+                <el-dropdown-item command="restartRunAll">Restart &amp; run all</el-dropdown-item>
+                <el-dropdown-item command="clear" divided>Clear all outputs</el-dropdown-item>
+              </el-dropdown-menu>
+            </template>
+          </el-dropdown>
+
+          <span v-if="notebookSourceLabel" class="nb-source" :title="`Editing ${notebookSource}`">
+            <el-icon class="nb-source__icon"><Document /></el-icon>
+            <template v-if="!compactToolbar">editing: {{ notebookSourceLabel }}</template>
+          </span>
+
+          <span class="nb-spacer" />
+
+          <span
+            class="nb-kernel"
+            :class="`nb-kernel--${kernelPill.cls}`"
+            :title="`${kernelName || 'Kernel'} · ${kernelPill.label}`"
+          >
+            <el-icon v-if="kernelPill.cls === 'busy'" class="nb-kernel__spin"><Loading /></el-icon>
+            <span class="nb-kernel__dot" />
+            <template v-if="!compactToolbar">{{ kernelName || "Kernel" }} · </template>{{ kernelPill.label }}
+          </span>
+
+          <el-tooltip content="End session" :show-after="400" :disabled="!compactToolbar">
+            <el-button
+              size="small"
+              type="danger"
+              plain
+              :icon="SwitchButton"
+              :loading="ending"
+              aria-label="End session"
+              @click="confirmEnd = true"
+            >
+              <span v-if="!compactToolbar">End session</span>
+            </el-button>
+          </el-tooltip>
+        </div>
+
+        <!-- Offer to open an existing notebook staged in input/ -->
+        <div v-if="status === 'ready' && showInputBanner" class="nb-open-banner">
+          <span class="nb-open-banner__text">
+            <template v-if="inputNotebooks.length === 1">
+              Found a notebook in your input files:
+              <strong>{{ inputNotebooks[0].name }}</strong>
+            </template>
+            <template v-else>
+              Found {{ inputNotebooks.length }} notebooks in your input files —
+              choose one to open.
+            </template>
+          </span>
+          <el-select
+            v-if="inputNotebooks.length > 1"
+            v-model="inputChoice"
+            size="small"
+            placeholder="Choose a notebook"
+            class="nb-open-banner__select"
+          >
+            <el-option
+              v-for="nb in inputNotebooks"
+              :key="nb.path"
+              :label="nb.name"
+              :value="nb.path"
+            />
+          </el-select>
+          <el-button
+            size="small"
+            type="primary"
+            :loading="opening"
+            :disabled="!inputChoice"
+            @click="openFromBanner"
+          >
+            Open
           </el-button>
-          <span v-if="error" class="nb-inline-err">{{ error }}</span>
+          <el-button size="small" text @click="showInputBanner = false">
+            Dismiss
+          </el-button>
+        </div>
+
+        <div class="nb-doc">
+          <NotebookCell
+            v-for="(cell, i) in cells"
+            :key="cell.id"
+            :ref="(el) => setCellRef(cell.id, el)"
+            :cell="cell"
+            :selected="cell.id === selectedId"
+            :is-first="i === 0"
+            :is-last="i === cells.length - 1"
+            @select="select(cell.id)"
+            @update:source="setSource(cell.id, $event)"
+            @run="onRun(cell, $event)"
+            @edit="cell._editing = true"
+            @add-below="select(addCell(cell.id, 'code'))"
+            @delete="deleteCell(cell.id)"
+            @move-up="moveCell(cell.id, -1)"
+            @move-down="moveCell(cell.id, 1)"
+            @change-type="onChangeType(cell, $event)"
+            @focus-prev="selectRel(-1)"
+            @focus-next="selectRel(1)"
+          />
+          <div class="nb-add-row">
+            <el-button size="small" :icon="Plus" @click="focusCell(addCell(null, 'code'))">
+              Add cell
+            </el-button>
+            <span v-if="error" class="nb-inline-err">{{ error }}</span>
+          </div>
         </div>
       </div>
     </div>
@@ -838,6 +990,22 @@ const kernelPill = computed(() => {
   margin-left: 4px;
   vertical-align: middle;
 }
+/* The sidebar toggle: a plain button, tinted while the sidebar is open (the
+   app's primary style would paint the icon the same navy as its fill). */
+.nb-sidebar-toggle.is-on {
+  background: #e6e9ef; /* purple_tint */
+  border-color: #808fad; /* purple_1 */
+  color: #011f5b; /* purple_3 */
+}
+.nb-toolbar.is-compact {
+  flex-wrap: nowrap;
+  gap: 6px;
+}
+/* An icon-only button still renders its (now empty) label wrapper, whose left
+   margin would push the icon off centre. */
+.nb-toolbar.is-compact :deep(.el-button > span:empty) {
+  display: none;
+}
 .nb-div { width: 1px; align-self: stretch; margin: 2px 4px; background: #e5e5e5; }
 .nb-spacer { flex: 1; }
 .nb-dirty { color: #f9a23a; font-weight: 700; margin-left: 2px; } /* orange_1 */
@@ -882,10 +1050,49 @@ const kernelPill = computed(() => {
   overflow: hidden;
 }
 .nb-files {
-  flex: 0 0 250px;
-  width: 250px;
+  position: relative;
+  flex: 0 0 300px;
+  width: 300px;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.nb-files__content {
+  flex: 1;
   min-height: 0;
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.nb-files.is-resizing {
+  user-select: none;
+}
+/* A thin grab strip on the sidebar's right edge; double-click resets it. */
+.nb-files__resize {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 6px;
+  cursor: col-resize;
+  z-index: 2;
+}
+.nb-files__resize:hover,
+.nb-files__resize:focus-visible,
+.nb-files.is-resizing .nb-files__resize {
+  background: #808fad; /* purple_1 */
+  outline: none;
+}
+.nb-files__browser {
+  flex: 1;
+  min-height: 0;
+}
+.nb-pane {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 .nb-doc {
   flex: 1;
