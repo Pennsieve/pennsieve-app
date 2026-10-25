@@ -27,9 +27,12 @@ describe("parseAwsAccountInput", () => {
   });
 
   it("says what's wrong otherwise", () => {
+    expect(
+      parseAwsAccountInput("arn:aws:cloudformation:us-east-1:932986170183:stack/Pennsieve-Compute-dev-88a1d309/1650ad80-d016-11f1-819c-0effe360d03f")
+    ).toEqual({ accountId: "932986170183", roleName: null });
     expect(parseAwsAccountInput("").error).toMatch(/Enter/);
     expect(parseAwsAccountInput("12345").error).toMatch(/12 digits/);
-    expect(parseAwsAccountInput("arn:aws:s3:::bucket").error).toMatch(/role's ARN/);
+    expect(parseAwsAccountInput("arn:aws:s3:::bucket").error).toMatch(/doesn't name an AWS account/);
   });
 });
 
