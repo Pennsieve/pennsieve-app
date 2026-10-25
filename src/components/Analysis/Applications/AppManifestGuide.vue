@@ -194,6 +194,13 @@ const inputOutputFields = [
         release's tag, and the license is read from the repository's LICENSE file, so
         app.yml declares neither.
       </p>
+      <p class="guide-note">
+        Already have an app.yml?
+        <router-link :to="{ name: 'application-manifest-builder', query: { check: 1 } }">
+          Check it against the schema
+        </router-link>
+        in the manifest builder: paste it or drop the file, and see what to fix.
+      </p>
     </section>
 
     <section class="guide-section">

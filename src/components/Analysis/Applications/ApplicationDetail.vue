@@ -120,6 +120,16 @@ const sortedVersions = computed(() => {
 // repository's LICENSE file at that release (an SPDX id), not from app.yml.
 const latestLicense = computed(() => sortedVersions.value.find((v) => v.license)?.license || "");
 
+// How the newest version's app.yml doesn't follow the schema, as
+// app-deploy-service found at registration (in warn mode it registers anyway):
+// "path: reason" strings, shown as field and reason.
+const manifestProblems = computed(() =>
+  (sortedVersions.value[0]?.manifestProblems || []).map((line) => {
+    const i = String(line).indexOf(": ");
+    return i > 0 ? { path: line.slice(0, i), message: line.slice(i + 2) } : { path: "Root", message: String(line) };
+  })
+);
+
 const versionsPageCount = computed(() =>
   Math.max(1, Math.ceil(sortedVersions.value.length / versionsPageSize))
 );
@@ -549,6 +559,26 @@ watch(
               <p class="manifest-error-detail">{{ manifestParsed.error }}</p>
             </div>
             <div v-else class="manifest-detail">
+              <!-- The newest version's schema problems, if registration found any -->
+              <section v-if="manifestProblems.length" class="manifest-block manifest-problems">
+                <h4 class="manifest-block-title">
+                  This version's app.yml has {{ manifestProblems.length }}
+                  {{ manifestProblems.length === 1 ? "problem" : "problems" }}
+                </h4>
+                <div class="validation-list">
+                  <div v-for="(p, i) in manifestProblems" :key="i" class="validation-item">
+                    <div class="field-name">{{ p.path }}</div>
+                    <div class="error-message">{{ p.message }}</div>
+                  </div>
+                </div>
+                <router-link
+                  :to="{ ...scopedRoute('application-manifest-builder'), query: { check: 1 } }"
+                  class="manifest-cta-secondary"
+                >
+                  Check an app.yml in the manifest builder
+                </router-link>
+              </section>
+
               <!-- Overview -->
               <section class="manifest-block">
                 <h4 class="manifest-block-title">Overview</h4>
@@ -1852,6 +1882,36 @@ watch(
   --el-pagination-hover-color: #{theme.$purple_3};
 }
 
+/* A version's app.yml problems, as the metadata record generator lists them. */
+.manifest-problems {
+  padding: 12px 14px;
+  border: 1px solid theme.$gray_2;
+  background: theme.$gray_1;
+}
+.validation-list {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 8px;
+}
+.validation-item {
+  padding: 8px 0;
+  border-bottom: 1px solid theme.$gray_2;
+
+  &:last-child {
+    border-bottom: none;
+  }
+  .field-name {
+    margin-bottom: 2px;
+    font-size: 13px;
+    font-weight: 500;
+    color: theme.$gray_6;
+  }
+  .error-message {
+    font-size: 12px;
+    line-height: 1.4;
+    color: theme.$gray_5;
+  }
+}
 .manifest-license-note {
   margin-left: 8px;
   font-size: 12px;
