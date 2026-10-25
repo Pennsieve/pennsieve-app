@@ -8,7 +8,7 @@ import { load as loadYaml } from "js-yaml";
 
 import IconInfoSmall from "../../icons/IconInfoSmall.vue";
 import MetricsDashboard from "../Metrics/MetricsDashboard.vue";
-import { parseManifest, MANIFEST_SHAPES } from "./applicationSchema";
+import { parseManifest, MANIFEST_SHAPES, PARAM_TYPE_OPTIONS } from "./applicationSchema";
 import BfButton from "../../shared/bf-button/BfButton.vue";
 import { fetchRepository, canUpdateManifest } from "./githubRepository";
 import AppPermissions from "../../user/code/AppPermissions.vue";
@@ -173,8 +173,13 @@ const getUserName = (userId) => {
   if (member) {
     return `${member.firstName} ${member.lastName}`.trim() || "Unknown User";
   }
-  return String(userId).includes(":") ? String(userId).split(":").pop() : String(userId);
+  // Not someone this page knows (another workspace, or outside one): say so
+  // rather than show an id.
+  return "Another Pennsieve user";
 };
+// A parameter's type as the builder names it: Text, Number, Whole number,
+// True / False, or Choice (a value from a list).
+const paramTypeLabel = (type) => PARAM_TYPE_OPTIONS.find((o) => o.value === type)?.label || type;
 
 const formatDate = (dateString) => {
   if (!dateString) return "N/A";
@@ -763,7 +768,7 @@ watch(
                     <tbody>
                       <tr v-for="param in manifestSchema.parameters" :key="param.name">
                         <td class="manifest-mono">{{ param.name }}</td>
-                        <td>{{ param.type }}</td>
+                        <td>{{ paramTypeLabel(param.type) }}</td>
                         <td class="manifest-mono">
                           {{ formatDefaultValue(param.defaultValue) }}
                         </td>
@@ -884,7 +889,7 @@ watch(
               </div>
               <div v-if="detail.ownerId" class="info-row">
                 <span class="info-label">Owner</span>
-                <span class="info-value">{{ getUserName(detail.ownerId) }}</span>
+                <span class="info-value info-value--name" :title="detail.ownerId">{{ getUserName(detail.ownerId) }}</span>
               </div>
               <div v-if="detail.sourceUrl" class="info-row">
                 <span class="info-label">URL</span>
@@ -946,6 +951,7 @@ watch(
                     </span>
                   </div>
                 </div>
+                <router-link :to="builderForApp" class="manifest-builder-link">Update in builder ›</router-link>
               </template>
 
               <!-- In the earlier layout: not read -->
@@ -955,6 +961,7 @@ watch(
                   <span class="manifest-filename">app.yml</span>
                   <span class="manifest-status-text">Earlier layout, not read</span>
                 </div>
+                <router-link :to="builderForApp" class="manifest-builder-link">Update in builder ›</router-link>
               </template>
 
               <!-- Present but malformed -->
@@ -978,6 +985,7 @@ watch(
                   <code>app.yml</code> to declare its runtime, resources,
                   parameters, and inputs/outputs.
                 </p>
+                <router-link :to="builderForApp" class="manifest-builder-link">Create in builder ›</router-link>
                 <router-link
                   :to="scopedRoute('application-manifest-guide')"
                   class="manifest-cta-secondary"
@@ -1779,6 +1787,22 @@ watch(
   font-size: 11px;
   color: theme.$gray_5;
   flex-shrink: 0;
+}
+
+/* Names aren't capitalised word by word (info-value's text-transform). */
+.info-value--name {
+  text-transform: none;
+}
+.manifest-builder-link {
+  display: inline-block;
+  margin-top: 12px;
+  font-size: 12px;
+  color: theme.$purple_3;
+  text-decoration: none;
+
+  &:hover {
+    text-decoration: underline;
+  }
 }
 
 .manifest-summary-value {
