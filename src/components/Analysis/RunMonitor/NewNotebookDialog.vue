@@ -19,7 +19,7 @@ import { useGetToken } from "@/composables/useGetToken";
 import { useSendXhr } from "@/mixins/request/request_composable";
 import toQueryParams from "@/utils/toQueryParams";
 import EventBus from "@/utils/event-bus";
-import { notebookKernel, kernelLabel, interactiveCapable } from "./notebookHelpers";
+import { notebookKernel, kernelLabel, interactiveCapable, launchableKernels, kernelOutput } from "./notebookHelpers";
 import { STANDARD_CPU_OPTIONS, getStandardMemoryOptions } from "./runHelpers";
 import * as siteConfig from "@/site-config/site.json";
 import { viewsServiceUrl, viewForDataset, viewDataSource } from "@/utils/viewsService";
@@ -40,6 +40,10 @@ const props = defineProps({
   personal: { type: Boolean, default: false },
 });
 const emit = defineEmits(["update:modelValue", "created"]);
+
+// The kernels that can start here: in My Workspace, not those whose results
+// go to a dataset (there's none to write to).
+const kernelChoices = computed(() => launchableKernels(props.notebookWorkflows, { personal: props.personal }));
 
 const store = useStore();
 
@@ -160,7 +164,7 @@ const filteredComputeNodes = computed(() => {
 /* ----------------------------------------------------------- selections ----- */
 const selectedWorkflow = computed(
   () =>
-    props.notebookWorkflows.find((w) => w.uuid === form.value.workflowId) || null
+    kernelChoices.value.find((w) => w.uuid === form.value.workflowId) || null
 );
 const selectedComputeNode = computed(
   () => computeNodes.value.find((cn) => cn.uuid === form.value.computeNodeId) || null
@@ -541,10 +545,10 @@ function reset() {
   store.commit("analysisModule/CLEAR_SELECTED_FILES");
   // Preselect the kernel asked for, or the only one if there's just one — but
   // keep the step visible.
-  if (props.initialWorkflowId && props.notebookWorkflows.some((w) => w.uuid === props.initialWorkflowId)) {
+  if (props.initialWorkflowId && kernelChoices.value.some((w) => w.uuid === props.initialWorkflowId)) {
     form.value.workflowId = props.initialWorkflowId;
-  } else if (props.notebookWorkflows.length === 1) {
-    form.value.workflowId = props.notebookWorkflows[0].uuid;
+  } else if (kernelChoices.value.length === 1) {
+    form.value.workflowId = kernelChoices.value[0].uuid;
   }
   // Seed the suggested name ({kernel}-{user}-{date}) now that the kernel (if any)
   // is selected; the watcher keeps it current until the user edits it.
@@ -683,16 +687,19 @@ async function execute() {
       <!-- Step 0: Kernel -->
       <div v-if="step === 0" class="wizard-step">
         <p class="wizard-step-desc">Choose the kernel for this notebook.</p>
+        <p v-if="!kernelChoices.length" class="wizard-step-desc">
+          None of the notebook kernels can start outside a workspace yet: their results are saved to a dataset.
+        </p>
         <div class="kernel-grid">
           <button
-            v-for="wf in notebookWorkflows"
+            v-for="wf in kernelChoices"
             :key="wf.uuid"
             class="kernel-card"
             :class="{ selected: form.workflowId === wf.uuid }"
             @click="form.workflowId = wf.uuid"
           >
             <span class="kernel-name">{{ kernelLabel(notebookKernel(wf)) }}</span>
-            <span class="kernel-sub">{{ wf.name }}</span>
+            <span class="kernel-sub">{{ kernelOutput(wf) || wf.name }}</span>
           </button>
         </div>
       </div>
