@@ -81,6 +81,12 @@ describe('folder formats and structures in app.yml', () => {
     expect(text).toMatch(/conformsTo/)
   })
 
+  it('treats a structure as a folder: container: file is refused, directory is allowed', () => {
+    const doc = (container) => loadYaml(`application:\n  name: a\ninputs:\n  - name: x\n    conformsTo: bids\n    container: ${container}\n`)
+    expect(JSON.stringify(validateManifestDoc(doc('file')).problems)).toMatch(/container/)
+    expect(validateManifestDoc(doc('directory'))).toEqual({ valid: true, problems: [] })
+  })
+
   it('matches structures by id, whatever the version', () => {
     const bids = createPort({ conformsTo: 'bids' })
     expect(arePortsCompatible(createPort({ conformsTo: 'bids@1.9' }), bids)).toBe(true)

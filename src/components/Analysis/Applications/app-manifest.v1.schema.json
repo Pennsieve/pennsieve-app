@@ -204,6 +204,8 @@
       "description": "An input or output. Without mediaTypes, formats or conformsTo it accepts any file.",
       "additionalProperties": false,
       "required": ["name"],
+      "if": { "required": ["conformsTo"] },
+      "then": { "properties": { "container": { "const": "directory" } } },
       "properties": {
         "name": { "type": "string", "minLength": 1, "description": "Its name." },
         "description": { "type": "string", "description": "What it is." },
@@ -221,12 +223,12 @@
           "type": "string",
           "enum": ["file", "directory"],
           "default": "file",
-          "description": "How the app gets it, or writes it. file (the default): the package as stored; for a folder format such as OME-Zarr that's its zip (.ozx, .ts.zarr.zip). directory: the platform unpacks the folder before the step, and packs the folder the app writes after it."
+          "description": "How the app gets it, or writes it. file (the default): the package as stored; for a folder format such as OME-Zarr that's its zip (.ozx, .ts.zarr.zip). directory: the platform unpacks each package into its own folder (<name>.ome.zarr/) before the step, and packs each folder the app writes after it. An input can take several packages, so expect one or more folders."
         },
         "conformsTo": {
           "type": "string",
           "pattern": "^[a-z0-9][a-z0-9-]*(@[0-9A-Za-z.+-]+)?$",
-          "description": "A folder structure from the Pennsieve format registry that the whole input follows, or that the app writes, with an optional version: e.g. bids or bids@1.9. The input is given as a folder tree with its paths kept."
+          "description": "A folder structure from the Pennsieve format registry that the whole input follows, or that the app writes, with an optional version: e.g. bids or bids@1.9. The input is given as a folder tree with its paths kept, so it is always a folder: container is implied (only directory is allowed, and it can be left out)."
         },
         "required": { "type": "boolean", "description": "Whether a run must give it something." },
         "dataType": {
