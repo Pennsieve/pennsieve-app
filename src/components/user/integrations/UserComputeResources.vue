@@ -1,10 +1,13 @@
 <script setup>
-import { computed, onMounted } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useStore } from 'vuex'
 import { useRouter } from 'vue-router'
 import IconArrowRight from '@/components/icons/IconArrowRight.vue'
 import IconApi from '@/components/icons/IconApi.vue'
 import { useComputeResourcesStore } from '@/stores/computeResourcesStore'
+import BfButton from '@/components/shared/bf-button/BfButton.vue'
+import ConnectAwsAccountDialog from './ConnectAwsAccountDialog.vue'
+import { connectionState, stackConsoleUrl } from './awsConnect'
 
 const store = useStore()
 const router = useRouter()
@@ -12,7 +15,6 @@ const computeResourcesStore = useComputeResourcesStore()
 
 const computeResources = computed(() => computeResourcesStore.computeAccounts)
 const isLoading = computed(() => computeResourcesStore.isLoadingComputeAccounts)
-const hasNoResources = computed(() => computeResources.value.length === 0)
 
 onMounted(async () => {
   await computeResourcesStore.fetchComputeAccounts()
@@ -39,6 +41,24 @@ function getStatusLabel(resource) {
   return resource.status ? resource.status.charAt(0).toUpperCase() + resource.status.slice(1).toLowerCase() : 'Enabled'
 }
 
+// Connect a new account, or upgrade one an older agent registered.
+const connectVisible = ref(false)
+const upgrading = ref(null)
+// Hidden for the session once this Pennsieve says it can't switch roles yet.
+const upgradeAvailable = ref(true)
+function openConnect() {
+  upgrading.value = null
+  connectVisible.value = true
+}
+function openUpgrade(resource) {
+  upgrading.value = resource
+  connectVisible.value = true
+}
+// The account's own role details are the owner's (blanked for others), so an
+// account without a role name isn't one this user can upgrade.
+const canUpgrade = (resource) =>
+  upgradeAvailable.value && !!resource.roleName && connectionState(resource)?.kind === 'legacy'
+
 function navigateToDetail(resource) {
   router.push({ name: 'user-compute-resource-detail', params: { accountId: resource.uuid } })
 }
@@ -52,18 +72,12 @@ function navigateToDetail(resource) {
         <div class="info-card">
           <h3>Setting Up Compute Resources</h3>
           <p>
-            Compute resources are your personal cloud accounts (AWS) that you register with Pennsieve through the Pennsieve Agent.
-            As the owner of these accounts, you control which workspaces have access to create compute nodes and which storage nodes are attached.
+            Compute resources are your own cloud accounts (AWS) that Pennsieve runs compute nodes in.
+            As their owner, you choose which workspaces can create compute nodes on them.
           </p>
-          <div class="setup-steps" v-if="hasNoResources">
-            <h4>Quick Setup Guide:</h4>
-            <ol>
-              <li>Configure your AWS account using the AWS CLI</li>
-              <li>Download and configure the Pennsieve Agent</li>
-              <li>Use the Pennsieve Agent to register your AWS account</li>
-              <li>Share your compute resource with workspaces where you want to enable collaborative analysis</li>
-              <li>Workspace members can then create compute nodes on your resources through the Analysis > Compute Nodes section</li>
-            </ol>
+          <div class="connect-row">
+            <bf-button @click="openConnect">Connect AWS account</bf-button>
+            <span class="cli-hint">Prefer the command line? <code>pennsieve account register</code></span>
           </div>
           <div class="documentation-link">
             <a href="https://docs.pennsieve.io/docs/registering-a-compute-resource" target="_blank" class="doc-link">
@@ -84,9 +98,9 @@ function navigateToDetail(resource) {
           </div>
           <h3>No Compute Resources Found</h3>
           <p>
-            You don't have any compute resources configured yet.
-            Please refer to the setup guide above or contact your administrator to get started.
+            You haven't connected a cloud account yet. Connect your AWS account to run compute nodes in it.
           </p>
+          <bf-button class="empty-connect" @click="openConnect">Connect AWS account</bf-button>
         </div>
 
         <div v-else class="resources-grid">
@@ -112,6 +126,21 @@ function navigateToDetail(resource) {
               </div>
             </div>
             <div class="resource-card-right">
+              <template v-if="connectionState(resource)?.kind === 'legacy' && resource.roleName">
+                <span class="connection-badge">Older connection</span>
+                <bf-button v-if="canUpgrade(resource)" class="secondary compact flex" @click.stop="openUpgrade(resource)">
+                  Upgrade
+                </bf-button>
+              </template>
+              <a
+                v-else-if="connectionState(resource)?.kind === 'outdated'"
+                class="connection-badge connection-badge--update"
+                :href="stackConsoleUrl(resource.roleName)"
+                target="_blank"
+                rel="noopener"
+                title="A newer version of Pennsieve's role template is out: update the stack in your AWS console"
+                @click.stop
+              >Update available</a>
               <span :class="['status-badge', getStatusLabel(resource).toLowerCase()]">
                 {{ getStatusLabel(resource) }}
               </span>
@@ -121,6 +150,12 @@ function navigateToDetail(resource) {
         </div>
       </div>
     </div>
+
+    <ConnectAwsAccountDialog
+      v-model="connectVisible"
+      :account="upgrading"
+      @upgrade-unavailable="upgradeAvailable = false"
+    />
   </div>
 </template>
 
@@ -163,6 +198,36 @@ h2 {
   }
 }
 
+.connect-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px;
+  margin: 16px 0 4px;
+}
+.cli-hint {
+  font-size: 12px;
+  color: theme.$gray_4;
+}
+.connection-badge {
+  display: inline-block;
+  padding: 4px 8px;
+  border: 1px solid theme.$gray_2;
+  border-radius: 3px;
+  background: theme.$white;
+  font-size: 11px;
+  font-weight: 500;
+  color: theme.$gray_5;
+  text-decoration: none;
+
+  &--update {
+    border-color: theme.$orange_1;
+    color: theme.$orange_2;
+  }
+}
+.empty-connect {
+  margin-top: 16px;
+}
 .setup-steps {
   margin: 16px 0;
 
