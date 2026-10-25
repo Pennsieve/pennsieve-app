@@ -44,10 +44,10 @@ describe("app domains", () => {
     expect(domainOf(null)).toBeNull();
   });
 
-  it("reads an old app.yml's categories as tags, in the known spelling", async () => {
+  it("reads tags only, not the deprecated categories", async () => {
     const { parseManifest } = await import("./applicationSchema");
-    const { schema } = parseManifest("application:\n  name: x\n  tags: [seurat]\n  categories: [Visualization, Single Cell]\n");
-    expect(schema.tags).toEqual(["seurat", "visualization", "single-cell"]);
+    const { schema } = parseManifest("application:\n  name: x\n  tags: [seurat, EEG]\n  categories: [Visualization]\n");
+    expect(schema.tags).toEqual(["seurat", "eeg"]);
   });
 
   it("lands typed tags on the suggestion they spell", () => {

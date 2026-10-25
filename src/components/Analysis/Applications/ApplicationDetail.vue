@@ -1,14 +1,16 @@
 <script setup>
 import { computed, ref, watch } from "vue";
 import { useStore } from "vuex";
-import { useRoute } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 import { marked } from "marked";
 import DOMPurify from "dompurify";
 import { load as loadYaml } from "js-yaml";
 
 import IconInfoSmall from "../../icons/IconInfoSmall.vue";
 import MetricsDashboard from "../Metrics/MetricsDashboard.vue";
-import { parseManifest } from "./applicationSchema";
+import { parseManifest, MANIFEST_SHAPES } from "./applicationSchema";
+import BfButton from "../../shared/bf-button/BfButton.vue";
+import { fetchRepository, canUpdateManifest } from "./githubRepository";
 import AppPermissions from "../../user/code/AppPermissions.vue";
 import AppArchiveToggle from "../../user/code/AppArchiveToggle.vue";
 import { useGetToken } from "@/composables/useGetToken";
@@ -86,8 +88,25 @@ const isAppOwner = computed(() => {
   return !!ownerId && (ownerId === id || ownerId === intId);
 });
 
-// The manifest builder, opened for this app (its owner's Create/Edit app.yml).
+// The manifest builder, opened for this app. Anyone signed in may open it:
+// the owner as the page's main action, others to propose a file to the repo.
 const builderForApp = computed(() => ({ ...scopedRoute("application-manifest-builder"), query: { app: props.uuid } }));
+const builderLabel = computed(() => (hasManifest.value ? "Update app.yml" : "Create app.yml"));
+// The owner, or anyone who can push to the repository (github-service's
+// viewerCanPush), gets the main action and the owner's wording.
+const repository = ref(null);
+watch(
+  () => detail.value?.sourceUrl,
+  async (url) => {
+    repository.value = null;
+    const repo = parseGitHubRepo(url);
+    if (repo) repository.value = await fetchRepository(store.state.config?.api2Url, repo);
+  },
+  { immediate: true }
+);
+const canUpdate = computed(() => canUpdateManifest(isAppOwner.value, repository.value));
+const router = useRouter();
+const openBuilder = () => router.push(builderForApp.value);
 
 // Permissions only apply to private applications.
 const isPublic = computed(() => detail.value?.isPrivate === false);
@@ -252,8 +271,9 @@ const renderReadme = (markdown) => {
   manifest is optional: most applications don't have one, so every branch here
   has to tolerate its absence.
 
-  Parsing goes through applicationSchema's parseManifest(), which reads both the
-  nested shape the backend serves and the flat shape the manifest builder emits.
+  Parsing goes through applicationSchema's parseManifest(), which reads the
+  nested layout only, as the backend does; a file in the earlier flat layout
+  is reported (manifestParsed.earlier), not read.
 */
 const getManifestContent = (assets) => {
   if (!assets) return "";
@@ -280,6 +300,9 @@ const manifestParsed = computed(() => {
       return { ...empty, error: "Manifest is empty or not a YAML mapping" };
     }
     const { meta, schema } = parseManifest(doc);
+    // The earlier flat layout: nothing in it is read (the platform doesn't
+    // either), so it isn't "read successfully".
+    if (meta.shape === MANIFEST_SHAPES.FLAT) return { ...empty, earlier: true };
     return { ok: true, meta, schema, error: "" };
   } catch (err) {
     return {
@@ -339,6 +362,12 @@ const manifestTooltip = computed(() => {
       "using it to configure this application."
     );
   }
+  if (manifestParsed.value.earlier) {
+    return (
+      "This repository's app.yml uses an earlier layout that Pennsieve no longer " +
+      "reads, so the application runs on defaults. Update it in the manifest builder."
+    );
+  }
   if (hasManifest.value) {
     return (
       "This repository has an app.yml, but Pennsieve could not parse it, so the " +
@@ -363,9 +392,7 @@ const manifestTooltip = computed(() => {
 const activeTab = ref("readme");
 const showRawManifest = ref(false);
 
-watch(hasManifest, (has) => {
-  if (!has && activeTab.value === "manifest") activeTab.value = "readme";
-});
+// The app.yml tab is always there: without a file it offers to create one.
 
 
 // Members and teams power friendly-name resolution for the owner badge.
@@ -498,7 +525,6 @@ watch(
                 README
               </button>
               <button
-                v-if="hasManifest"
                 type="button"
                 role="tab"
                 class="detail-tab"
@@ -509,6 +535,9 @@ watch(
                 app.yml
               </button>
             </div>
+            <div class="readme-header-actions">
+              <bf-button v-if="activeTab === 'manifest' && canUpdate" class="compact flex" @click="openBuilder">{{ builderLabel }}</bf-button>
+              <button v-else-if="activeTab === 'manifest'" type="button" class="app-yml-btn" @click="openBuilder">{{ builderLabel }}</button>
             <el-tooltip
               v-if="githubRepoUrl"
               :content="canViewOnGitHub ? '' : 'This repo is private. Request permission from repo owner to view on Github.'"
@@ -534,6 +563,7 @@ watch(
                 </span>
               </span>
             </el-tooltip>
+            </div>
           </div>
           <!-- README tab -->
           <template v-if="activeTab === 'readme'">
@@ -557,7 +587,38 @@ watch(
 
           <!-- app.yml tab -->
           <template v-else>
-            <div v-if="!manifestParsed.ok" class="readme-empty">
+            <div v-if="!hasManifest" class="readme-empty app-yml-empty">
+              <p>
+                This app has no app.yml yet. It tells Pennsieve the app's inputs,
+                outputs, parameters and resources.
+              </p>
+              <bf-button v-if="canUpdate" class="compact flex" @click="openBuilder">{{ builderLabel }}</bf-button>
+              <button v-else type="button" class="app-yml-btn" @click="openBuilder">{{ builderLabel }}</button>
+            </div>
+            <div v-else-if="manifestParsed.earlier" class="manifest-detail">
+              <section class="manifest-block app-yml-earlier">
+                <p>
+                  This app.yml uses an earlier layout that Pennsieve no longer reads, so the
+                  app runs on defaults.
+                  {{ canUpdate ? "Update it in the builder." : "Its owner can update it in the builder." }}
+                </p>
+                <bf-button v-if="canUpdate" class="compact flex" @click="openBuilder">{{ builderLabel }}</bf-button>
+                <button v-else type="button" class="app-yml-btn" @click="openBuilder">{{ builderLabel }}</button>
+              </section>
+              <section v-if="manifestProblems.length" class="manifest-block manifest-problems">
+                <div class="validation-list">
+                  <div v-for="(p, i) in manifestProblems" :key="i" class="validation-item">
+                    <div class="field-name">{{ p.path }}</div>
+                    <div class="error-message">{{ p.message }}</div>
+                  </div>
+                </div>
+              </section>
+              <section class="manifest-block">
+                <h4 class="manifest-block-title">app.yml</h4>
+                <pre class="manifest-raw"><code>{{ manifestRaw }}</code></pre>
+              </section>
+            </div>
+            <div v-else-if="!manifestParsed.ok" class="readme-empty">
               <p>This app.yml could not be read.</p>
               <p class="manifest-error-detail">{{ manifestParsed.error }}</p>
             </div>
@@ -885,9 +946,15 @@ watch(
                     </span>
                   </div>
                 </div>
-                <router-link v-if="isAppOwner" :to="builderForApp" class="manifest-cta manifest-cta-primary">
-                  Edit app.yml
-                </router-link>
+              </template>
+
+              <!-- In the earlier layout: not read -->
+              <template v-else-if="manifestParsed.earlier">
+                <div class="manifest-status manifest-status-error">
+                  <span class="manifest-dot" />
+                  <span class="manifest-filename">app.yml</span>
+                  <span class="manifest-status-text">Earlier layout, not read</span>
+                </div>
               </template>
 
               <!-- Present but malformed -->
@@ -898,9 +965,6 @@ watch(
                   <span class="manifest-status-text">Could not be read</span>
                 </div>
                 <p class="manifest-error-detail">{{ manifestParsed.error }}</p>
-                <router-link v-if="isAppOwner" :to="builderForApp" class="manifest-cta manifest-cta-primary">
-                  Edit app.yml
-                </router-link>
               </template>
 
               <!-- Absent -->
@@ -914,9 +978,6 @@ watch(
                   <code>app.yml</code> to declare its runtime, resources,
                   parameters, and inputs/outputs.
                 </p>
-                <router-link v-if="isAppOwner" :to="builderForApp" class="manifest-cta manifest-cta-primary">
-                  Create app.yml
-                </router-link>
                 <router-link
                   :to="scopedRoute('application-manifest-guide')"
                   class="manifest-cta-secondary"
@@ -1142,6 +1203,45 @@ watch(
   justify-content: space-between;
   padding: 12px 16px;
   border-bottom: 1px solid theme.$gray_3;
+}
+.readme-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+/* Create/Update app.yml for someone who isn't the owner: an outline button. */
+.app-yml-btn {
+  padding: 6px 12px;
+  border: 1px solid theme.$gray_3;
+  border-radius: 3px;
+  background: theme.$white;
+  font: inherit;
+  font-size: 13px;
+  color: theme.$gray_6;
+  cursor: pointer;
+  white-space: nowrap;
+
+  &:hover {
+    border-color: theme.$purple_1;
+    color: theme.$purple_3;
+  }
+}
+.app-yml-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+.app-yml-earlier {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  border-left: 3px solid theme.$orange_1;
+
+  p {
+    margin: 0;
+  }
 }
 
 .readme-title {

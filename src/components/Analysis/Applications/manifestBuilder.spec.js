@@ -146,6 +146,20 @@ describe("the card preview", () => {
 });
 
 describe("prefillFromApp", () => {
+  it("starts from the app, and says so, when its app.yml is in the earlier flat layout", () => {
+    const app = {
+      name: "edf-nwb",
+      assets: { "app.yml": "schemaVersion: \"1.0\"\nname: EDF to NWB\napplicationType: processor\nresources:\n  cpu: 2048\n" },
+      params: [{ name: "TZ", type: "string", defaultValue: "UTC" }],
+    };
+    const start = prefillFromApp(app, { firstName: "Ada", lastName: "Lovelace" });
+    expect(start.earlierLayout).toBe(true);
+    expect(start.fromManifest).toBe(false);
+    expect(start.meta.name).toBe("edf-nwb");
+    expect(start.schema.resources).toEqual({ cpu: null, memory: null });
+    expect(start.schema.parameters.map((p) => p.name)).toEqual(["TZ"]);
+  });
+
   const profile = { firstName: "Ada", lastName: "Lovelace", email: "ada@example.org", orcid: { orcid: "https://orcid.org/0000-0002-1825-0097" } };
 
   it("opens the repository's app.yml when it has one", () => {
