@@ -193,24 +193,31 @@ export const createPort = (overrides = {}) => ({
  * A blank, fully-formed schema for a brand-new application.
  * @returns {ApplicationSchema}
  */
-// What a live (human-in-the-loop) app runs as: app.yml's runtime.sessionType.
-export const SESSION_TYPES = Object.freeze([
-  { value: "jupyter", label: "Jupyter (Python)" },
+// What a live (human-in-the-loop) app runs as: app.yml's runtime.sessionType,
+// the kind of session ("jupyter" is a notebook; others may come), and for a
+// Jupyter session its language, runtime.kernel.
+export const SESSION_TYPES = Object.freeze([{ value: "jupyter", label: "Jupyter notebook" }]);
+export const KERNELS = Object.freeze([
+  { value: "python", label: "Python" },
   { value: "r", label: "R" },
 ]);
 
-// runtime.interactive / runtime.sessionType as the editor holds them: a
-// sessionType alone also means interactive, and an interactive app without
-// one is a Jupyter session, as the platform reads it.
+// runtime.interactive / sessionType / kernel as the editor holds them. Older
+// app.yml files said sessionType r (or python) for a Jupyter session's
+// language; the editor opens those as jupyter with that kernel, so saving
+// writes today's shape. (The platform itself reads app.yml as written.)
 const parseSession = (runtime) => {
   const interactive = Boolean(runtime?.interactive || runtime?.sessionType);
-  const type = runtime?.sessionType === "python" ? "jupyter" : runtime?.sessionType;
-  return { interactive, sessionType: interactive ? type || "jupyter" : "" };
+  if (!interactive) return { interactive: false, sessionType: "", kernel: "" };
+  const legacyKernel = ["r", "python"].includes(runtime?.sessionType) ? runtime.sessionType : "";
+  const sessionType = legacyKernel ? "jupyter" : runtime?.sessionType || "jupyter";
+  const kernel = runtime?.kernel || legacyKernel || (sessionType === "jupyter" ? "python" : "");
+  return { interactive, sessionType, kernel };
 };
 
 export const createApplicationSchema = (overrides = {}) => ({
   resources: { cpu: null, memory: null },
-  runtime: { computeTypes: [...DEFAULT_COMPUTE_TYPES], interactive: false, sessionType: "" },
+  runtime: { computeTypes: [...DEFAULT_COMPUTE_TYPES], interactive: false, sessionType: "", kernel: "" },
   parameters: [],
   inputs: [],
   outputs: [],
@@ -565,11 +572,12 @@ export const buildManifest = (schema, meta = {}) => {
   if (meta.timeoutSeconds != null && meta.timeoutSeconds !== "") {
     runtime.timeoutSeconds = Number(meta.timeoutSeconds);
   }
-  // A live session (a notebook kernel), not a batch step: the one place an
-  // app declares it.
+  // A live session (a notebook), not a batch step: the one place an app
+  // declares it. A Jupyter session also says its language.
   if (s.runtime?.interactive) {
     runtime.interactive = true;
     runtime.sessionType = s.runtime.sessionType || "jupyter";
+    if (runtime.sessionType === "jupyter") runtime.kernel = s.runtime.kernel || "python";
   }
   manifest.runtime = runtime;
 

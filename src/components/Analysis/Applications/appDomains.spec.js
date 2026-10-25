@@ -38,6 +38,9 @@ describe("app domains", () => {
     expect(domainOf({ tags: ["statistics", "visualization"] }).key).toBe("stats");
     expect(domainOf({ tags: ["Format Conversion"] }).key).toBe("convert");
     expect(domainOf({ tags: [], runtime: { interactive: true } }).key).toBe("notebook");
+    expect(domainOf({ tags: [], runtime: { interactive: true, sessionType: "jupyter", kernel: "r" } }).key).toBe("notebook");
+    // Another kind of live session isn't a notebook.
+    expect(domainOf({ tags: [], runtime: { interactive: true, sessionType: "webapp" } })).toBeNull();
     expect(domainOf(null)).toBeNull();
   });
 

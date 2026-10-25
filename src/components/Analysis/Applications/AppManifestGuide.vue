@@ -97,8 +97,9 @@ const runtimeFields = [
   { name: "memory", type: "number", required: false, desc: "Default memory reservation in MB." },
   { name: "computeTypes", type: "string[]", required: false, desc: "Compute environments the application supports. A GPU application lists gpu here — there is no separate gpu block." },
   { name: "timeoutSeconds", type: "number", required: false, desc: "How long a run may take before it is timed out." },
-  { name: "interactive", type: "boolean", required: false, desc: "A live session people work in, such as a notebook kernel, rather than a batch step. In a workflow it runs as an interactive step, and the workflow waits until the session ends. The only place an app declares this." },
-  { name: "sessionType", type: "string", required: false, desc: "The kind of live session: jupyter (the default) or r. Setting it also makes the app interactive." },
+  { name: "interactive", type: "boolean", required: false, desc: "A live session people work in, such as a Jupyter notebook, rather than a batch step. In a workflow it runs as an interactive step, and the workflow waits until the session ends. The only place an app declares this: an app without an app.yml is never interactive." },
+  { name: "sessionType", type: "string", required: false, desc: "The kind of live session. jupyter (the default) is a notebook, and makes workflows using this app notebooks; other kinds may come." },
+  { name: "kernel", type: "string", required: false, desc: "For a jupyter session, the notebook's language: python (the default) or r." },
 ];
 
 const parameterFields = [

@@ -138,7 +138,9 @@ const { counters: orgCounters, isLoading: countersLoading, fetchCounters: fetchO
 // A run of a notebook workflow itself (Jupyter, R), by its definition or,
 // for a public one not in the list, its name.
 const workflowsById = computed(() => new Map(workflows.value.map((w) => [w.uuid, w])));
-const isNotebookRun = (r) => isNotebookWorkflow(workflowsById.value.get(r.workflowUuid) || { name: r.workflowName });
+// A notebook's run: its workflow is a notebook, or workflow-service flagged
+// the run a live session (for public notebooks this list doesn't hold).
+const isNotebookRun = (r) => !!r.interactive || isNotebookWorkflow(workflowsById.value.get(r.workflowUuid));
 const shownRuns = computed(() =>
   props.excludeNotebooks ? workflowInstances.value.filter((r) => !isNotebookRun(r)) : workflowInstances.value
 );

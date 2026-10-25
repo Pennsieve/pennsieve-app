@@ -52,16 +52,17 @@ describe("fitsAfter and paletteGroups", () => {
   });
   it("puts interactive apps (notebook kernels) in their own group, last", () => {
     const declares = (runtime) => [{ version: "v1", createdAt: "x", manifest: { runtime } }];
-    const jupyter = { uuid: "4", sourceUrl: "https://github.com/Pennsieve/pennsieve-jupyter-session", versions: declares({ interactive: true, sessionType: "jupyter" }) };
-    const rSession = { uuid: "5", sourceUrl: "https://github.com/Pennsieve/pennsieve-r-session.git", versions: declares({ sessionType: "r" }) };
+    const jupyter = { uuid: "4", sourceUrl: "https://github.com/Pennsieve/pennsieve-jupyter-session", versions: declares({ interactive: true, sessionType: "jupyter", kernel: "python" }) };
+    const rSession = { uuid: "5", sourceUrl: "https://github.com/Pennsieve/pennsieve-r-session.git", versions: declares({ interactive: true, sessionType: "jupyter", kernel: "r" }) };
     const undeclared = { uuid: "7", sourceUrl: "https://github.com/Pennsieve/pennsieve-jupyter-session-old", versions: [] };
     expect(sessionTypeOf(jupyter)).toBe("jupyter");
-    expect(sessionTypeOf(rSession)).toBe("r");
+    expect(sessionTypeOf(rSession)).toBe("jupyter");
     expect(sessionTypeOf(undeclared)).toBeNull();
     expect(sessionTypeOf(plot)).toBeNull();
-    const declared = { uuid: "6", sourceUrl: "https://github.com/o/my-viewer", versions: [{ version: "v1", createdAt: "x", manifest: { runtime: { sessionType: "r" } } }] };
-    expect(sessionTypeOf(declared)).toBe("r");
-    const flagged = { ...declared, versions: [{ version: "v1", createdAt: "x", manifest: { runtime: { interactive: true } } }] };
+    // Only interactive: true makes an app live; a session type alone doesn't.
+    const typeOnly = { uuid: "6", sourceUrl: "https://github.com/o/my-viewer", versions: [{ version: "v1", createdAt: "x", manifest: { runtime: { sessionType: "jupyter" } } }] };
+    expect(sessionTypeOf(typeOnly)).toBeNull();
+    const flagged = { ...typeOnly, versions: [{ version: "v1", createdAt: "x", manifest: { runtime: { interactive: true } } }] };
     expect(sessionTypeOf(flagged)).toBe("jupyter");
     const groups = paletteGroups([plot, jupyter, rSession], { name });
     expect(groups.map((g) => [g.key, g.apps.length])).toEqual([["all", 1], ["interactive", 2]]);
