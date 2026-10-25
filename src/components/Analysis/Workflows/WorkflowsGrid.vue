@@ -748,10 +748,16 @@ $card-height: 172px;
   &.pending { background: #f59e0b; }
   &.failed { background: theme.$status_red; }
 }
+/* Pennsieve's mark sits where the other badges do, in the top-right corner. */
 .official-mark {
   display: inline-flex;
+  flex-shrink: 0;
   align-items: center;
+  margin-left: auto;
   color: theme.$purple_3;
+}
+.official-mark + .wf-badge {
+  margin-left: 0;
 }
 
 .workflows-pagination {
