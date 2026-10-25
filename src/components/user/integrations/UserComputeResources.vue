@@ -77,7 +77,6 @@ function navigateToDetail(resource) {
           </p>
           <div class="connect-row">
             <bf-button @click="openConnect">Connect AWS account</bf-button>
-            <span class="cli-hint">Prefer the command line? <code>pennsieve account register</code></span>
           </div>
           <div class="documentation-link">
             <a href="https://docs.pennsieve.io/docs/registering-a-compute-resource" target="_blank" class="doc-link">
@@ -204,10 +203,6 @@ h2 {
   align-items: center;
   gap: 16px;
   margin: 16px 0 4px;
-}
-.cli-hint {
-  font-size: 12px;
-  color: theme.$gray_4;
 }
 .connection-badge {
   display: inline-block;
