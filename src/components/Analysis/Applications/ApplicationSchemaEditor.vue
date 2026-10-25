@@ -3,7 +3,7 @@
     <!-- ───────────── About: tags ───────────── -->
     <template v-if="part === 'tags'">
       <div class="field-row" data-field="application.tags" :class="{ 'has-problem': at('application.tags').length }">
-        <label class="field-label">Tags</label>
+        <label class="field-label">Tags <field-hint text="What the app is for; it colours its card and helps people find it." /></label>
         <div class="field-control">
           <el-select
             :model-value="schema.tags"
@@ -19,7 +19,6 @@
             <el-option v-for="t in SUGGESTED_TAGS" :key="t" :label="t" :value="t" />
           </el-select>
           <p v-for="m in at('application.tags')" :key="m" class="field-error">{{ m }}</p>
-          <p class="field-hint">What the app is for; it colours its card and helps people find it.</p>
         </div>
       </div>
     </template>
@@ -29,8 +28,10 @@
       <template v-for="block in ioBlocks" :key="block.key">
         <!-- Parameters, between what goes in and what comes out -->
         <div v-if="block.key === 'parameters'" class="sub-section">
-          <h5 class="sub-section-title">Parameters <span class="label-helper">optional</span></h5>
-          <p class="sub-section-hint">Settings people choose; defaults fill them in.</p>
+          <h5 class="sub-section-title">
+            Parameters <span class="label-helper">optional</span>
+            <field-hint text="Settings people choose when they run the app; defaults fill them in." />
+          </h5>
 
           <div
             v-for="(param, index) in schema.parameters"
@@ -160,8 +161,10 @@
 
         <!-- Inputs / Outputs -->
         <div v-else class="sub-section">
-          <h5 class="sub-section-title">{{ block.label }} <span class="label-helper">optional</span></h5>
-          <p class="sub-section-hint">{{ block.hint }}</p>
+          <h5 class="sub-section-title">
+            {{ block.label }} <span class="label-helper">optional</span>
+            <field-hint :text="block.hint" />
+          </h5>
 
           <div
             v-for="(port, index) in schema[block.key]"
@@ -247,7 +250,6 @@
 
     <!-- ───────────── How it runs: resources and compute types ───────────── -->
     <template v-else-if="part === 'runtime'">
-      <p v-if="kind === 'interactive'" class="sub-section-hint">Sessions are sized when they start; these are only defaults.</p>
       <component :is="kind === 'interactive' ? MoreOptions : 'div'" v-bind="resourceWrapProps" class="runtime-fields">
         <div class="field-row" data-field="runtime.cpu" :class="rowClass('runtime.cpu')">
           <label class="field-label">CPU</label>
@@ -295,6 +297,7 @@
 import { computed, onMounted, ref } from "vue";
 import { useStore } from "vuex";
 import MoreOptions from "./MoreOptions.vue";
+import FieldHint from "./FieldHint.vue";
 import { PARAM_TYPES, PARAM_TYPE_OPTIONS, createParameter, createPort, portDataTypeOptions, STANDARD_CPU_OPTIONS, getStandardMemoryOptions, isNumericType, mediaTypeMatches } from "./applicationSchema";
 import { SUGGESTED_TAGS, canonicalTag } from "./appDomains";
 
@@ -373,7 +376,7 @@ const ioBlocks = computed(() =>
 const resourceWrapProps = computed(() =>
   props.kind === "interactive"
     ? {
-        label: "Default CPU and memory",
+        label: "Default CPU and memory (sessions are sized when they start)",
         forceOpen: schema.value.resources.cpu != null || !!at("runtime.cpu").length || !!at("runtime.memory").length,
       }
     : {}
@@ -468,12 +471,6 @@ const removePort = (key, i) => schema.value[key].splice(i, 1);
   font-size: 13px;
   font-weight: 600;
   color: theme.$gray_6;
-}
-.sub-section-hint {
-  margin: 0 0 4px;
-  font-size: 12px;
-  line-height: 1.4;
-  color: theme.$gray_5;
 }
 .label-helper {
   margin-left: 4px;

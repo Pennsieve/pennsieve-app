@@ -7,9 +7,12 @@ import { ElMessage } from "element-plus";
 import BfButton from "../../shared/bf-button/BfButton.vue";
 import ApplicationSchemaEditor from "./ApplicationSchemaEditor.vue";
 import MoreOptions from "./MoreOptions.vue";
+import FieldHint from "./FieldHint.vue";
+import IconCopyDocument from "../../icons/IconCopyDocument.vue";
+import IconDirectDownload from "../../icons/IconDirectDownload.vue";
 import AppBanner from "./AppBanner.vue";
 import { fetchRepository, canUpdateManifest } from "./githubRepository";
-import { createApplicationSchema, buildManifest, manifestToYaml, parseManifest, KERNELS, MANIFEST_EXAMPLE_URL, MANIFEST_SHAPES } from "./applicationSchema";
+import { createApplicationSchema, buildManifest, manifestToYaml, parseManifest, KERNELS, MANIFEST_SHAPES } from "./applicationSchema";
 import { openAppYmlPullRequest } from "./pullRequest";
 import { builderProblems, validateManifestText } from "./manifestValidation";
 import {
@@ -29,7 +32,6 @@ import {
   repoOf,
 } from "./manifestBuilder";
 import { appTitle, runsOn } from "./appCards";
-import { useAppManifest } from "@/composables/useAppManifest";
 import { useGetToken } from "@/composables/useGetToken";
 
 const router = useRouter();
@@ -149,18 +151,10 @@ function openInBuilder() {
   checkOpen.value = false;
 }
 
-function startNew() {
-  load({ meta: blankMeta(), schema: createApplicationSchema() });
-  editingApp.value = "";
-  forApp.value = null;
-}
-
-const storeDialog = ref(false);
-function onOpenCommand(cmd) {
-  if (cmd === "file") openExisting();
-  else if (cmd === "store") storeDialog.value = true;
-  else startNew();
-}
+// The page title: the app's app.yml when opened for one.
+const pageTitle = computed(() => (forApp.value ? `app.yml for ${forApp.value.title}` : "Create an app.yml"));
+const earlierLayoutDetail =
+  "This app.yml uses an earlier layout that Pennsieve no longer reads, so nothing was loaded from it. Fill in the form and it writes the current layout.";
 
 async function openExisting() {
   checkOpen.value = true;
@@ -168,35 +162,9 @@ async function openExisting() {
   checkSection.value?.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
-// An app from the store: its newest version's app.yml.
-const { loadManifest } = useAppManifest();
-const editingApp = ref("");
-const loadingApp = ref(false);
 // Opened for an app (?app=): the form waits for it, shown as placeholders, and
 // fades in filled, instead of showing empty fields that fill in later.
 const openingApp = ref(!!route.query.app);
-const storeApps = computed(() =>
-  [...(store.getters["analysisModule/applications"] || [])].sort((a, b) => appTitle(a).localeCompare(appTitle(b)))
-);
-async function editApp(uuid) {
-  if (!uuid) return;
-  const app = storeApps.value.find((a) => a.uuid === uuid);
-  loadingApp.value = true;
-  try {
-    const parsed = await loadManifest(uuid);
-    storeDialog.value = false;
-    if (parsed) {
-      load(parsed);
-    } else {
-      // No app.yml yet: start one with its name.
-      load({ meta: { ...blankMeta(), name: appTitle(app), description: app?.description || "" }, schema: createApplicationSchema() });
-      ElMessage.info(`${appTitle(app)} has no app.yml yet: this starts one.`);
-    }
-  } finally {
-    loadingApp.value = false;
-  }
-}
-
 /*
   Opened for an app from its page (?app=<uuid>): its repository's app.yml, or
   a new one from what Pennsieve knows (prefillFromApp). The repository's
@@ -226,7 +194,6 @@ async function installationNeedingReview(owner) {
 }
 
 async function openForApp(uuid) {
-  loadingApp.value = true;
   try {
     const app = await store.dispatch("analysisModule/fetchApplication", uuid);
     const repo = repoOf(app?.sourceUrl);
@@ -251,7 +218,6 @@ async function openForApp(uuid) {
   } catch {
     ElMessage.error("Couldn't load that app; starting a new manifest.");
   } finally {
-    loadingApp.value = false;
     openingApp.value = false;
   }
 }
@@ -268,7 +234,6 @@ const appPageRoute = computed(() =>
 // ?check=1 (the app page's "check it" link) opens the check; ?app=<uuid> (its
 // Create/Edit app.yml) opens that app's.
 onMounted(async () => {
-  store.dispatch("analysisModule/fetchApplications").catch(() => {});
   if (route.query.app) await openForApp(String(route.query.app));
   if (route.query.check) await openExisting();
 });
@@ -336,60 +301,29 @@ const goToGuide = () =>
 <template>
   <div ref="root" class="manifest-builder">
     <header class="builder-header">
+      <router-link v-if="forApp" :to="appPageRoute" class="back-link">&larr; Back to the app</router-link>
       <div class="header-row">
-        <h1>Create an application manifest</h1>
-        <!-- Open: an app.yml you have, an app in the store, or start over -->
-        <el-dropdown trigger="click" @command="onOpenCommand">
-          <button type="button" class="app-outline-button">Open… &#9662;</button>
-          <template #dropdown>
-            <el-dropdown-menu>
-              <el-dropdown-item command="file">Open an app.yml…</el-dropdown-item>
-              <el-dropdown-item command="store">Edit an app from the store…</el-dropdown-item>
-              <el-dropdown-item command="new" divided>Start over</el-dropdown-item>
-            </el-dropdown-menu>
-          </template>
-        </el-dropdown>
+        <div class="title-block">
+          <h1>
+            {{ pageTitle }}
+            <a href="#" class="help-link" title="Manifest guide" aria-label="Manifest guide" @click.prevent="goToGuide">?</a>
+            <!-- Check an app.yml you have (for an app, its file is already loaded) -->
+            <a v-if="!forApp" href="#" class="check-link" @click.prevent="openExisting">Check an existing app.yml</a>
+          </h1>
+          <p v-if="forApp?.repo" class="header-sub">
+            <a :href="`https://github.com/${forApp.repo.fullName}`" target="_blank" rel="noopener">{{ forApp.repo.fullName }}</a>
+            <template v-if="!forApp.fromManifest && !forApp.hadManifest"> · new</template>
+          </p>
+          <!-- One short line each; the detail on hover -->
+          <p v-if="earlierLayout" class="header-note" :title="earlierLayoutDetail">
+            Earlier layout: starting from {{ forApp ? "the app's details" : "a blank form" }}
+          </p>
+          <p v-if="forApp && !forApp.canUpdate" class="header-note">
+            Not your app: copy or download the file and propose it to {{ forApp.repo ? forApp.repo.fullName : "its repository" }}.
+          </p>
+        </div>
       </div>
-      <p class="lede">
-        Describe your app, then add the <code>app.yml</code> to the root of its GitHub repository.
-        <a href="#" class="guide-link" @click.prevent="goToGuide">Manifest guide &rsaquo;</a>
-      </p>
     </header>
-
-    <!-- Opened from an app's page: whose app.yml this is -->
-    <div v-if="forApp" class="for-app">
-      <span>
-        Editing the app.yml for <strong>{{ forApp.title }}</strong>
-        <template v-if="forApp.repo"> · {{ forApp.repo.fullName }}</template>
-        <template v-if="!forApp.fromManifest && !forApp.hadManifest"> (new)</template>
-        <span v-if="!forApp.canUpdate" class="for-app-note">
-          You're not this app's owner: copy or download the file and propose it to
-          {{ forApp.repo ? forApp.repo.fullName : "its repository" }}.
-        </span>
-      </span>
-      <router-link :to="appPageRoute" class="for-app-link">Back to the app</router-link>
-    </div>
-
-    <!-- A loaded app.yml in the earlier flat layout: nothing was read from it -->
-    <div v-if="earlierLayout" class="earlier-layout">
-      This app.yml uses an earlier layout that Pennsieve no longer reads, so nothing was loaded
-      from it<template v-if="forApp">; the form starts from what Pennsieve knows about the app</template>.
-      Fill in the form and it writes the current layout.
-    </div>
-
-    <!-- Edit an app from the store: its newest app.yml -->
-    <el-dialog v-model="storeDialog" title="Edit an app from the store" width="440px" append-to-body>
-      <el-select
-        v-model="editingApp"
-        filterable
-        :loading="loadingApp"
-        placeholder="Search apps…"
-        class="store-select"
-        @change="editApp"
-      >
-        <el-option v-for="a in storeApps" :key="a.uuid" :label="appTitle(a)" :value="a.uuid" />
-      </el-select>
-    </el-dialog>
 
     <!-- Opened for an app: placeholders while it loads -->
     <div v-if="openingApp" class="builder-loading" aria-busy="true" aria-live="polite">
@@ -417,10 +351,7 @@ const goToGuide = () =>
             <h3 class="section-title">Open an existing app.yml</h3>
             <button type="button" class="app-outline-button" @click="checkOpen = false">Close</button>
           </div>
-          <p class="field-hint">
-            Paste an app.yml, or drop or pick the file, to check it against the schema Pennsieve validates releases
-            with, and open it here.
-          </p>
+          <p class="field-hint">Paste or drop an app.yml to check it, then open it here.</p>
           <div class="check-drop" @dragover.prevent @drop.prevent="onCheckDrop">
             <el-input
               v-model="checkText"
@@ -466,7 +397,7 @@ const goToGuide = () =>
           <h3 class="section-title">About</h3>
 
           <div class="field-row" data-field="kind" :class="{ 'has-problem': at('kind').length }">
-            <label class="field-label">Kind</label>
+            <label class="field-label">Kind <field-hint :text="kindHint" /></label>
             <div class="kind-row">
               <div class="kind-switch" role="radiogroup" aria-label="Kind of app">
                 <button
@@ -477,6 +408,7 @@ const goToGuide = () =>
                   class="kind-option"
                   :class="{ active: kind === k.value }"
                   :aria-checked="kind === k.value"
+                  :title="k.hint"
                   @click="kind = k.value"
                 >
                   {{ k.label }}
@@ -496,7 +428,6 @@ const goToGuide = () =>
                 </el-select>
               </template>
             </div>
-            <p class="field-hint">{{ kindHint }}</p>
             <p v-for="m in at('kind')" :key="m" class="field-error">{{ m }}</p>
           </div>
 
@@ -562,6 +493,7 @@ const goToGuide = () =>
                 class="preview-view"
                 :class="{ active: previewView === 'card' }"
                 :aria-selected="previewView === 'card'"
+                title="As it will look in the Gallery"
                 @click="previewView = 'card'"
               >
                 Card
@@ -578,22 +510,24 @@ const goToGuide = () =>
               </button>
             </div>
             <div class="preview-actions">
-              <button type="button" class="app-outline-button" @click="copyManifest">{{ copied ? "Copied!" : "Copy" }}</button>
-              <!-- For an app its owner (or a pusher) can update: a pull request is the main action -->
-              <template v-if="canOpenPullRequest">
-                <button type="button" class="app-outline-button" @click="downloadManifest">Download</button>
-                <el-tooltip :disabled="!problems.length" content="Fix the problems first" placement="top">
-                  <span>
-                    <bf-button
-                      class="compact flex"
-                      :disabled="!!problems.length || prSending"
-                      :processing="prSending"
-                      @click="openPullRequest"
-                    >Open a pull request</bf-button>
-                  </span>
-                </el-tooltip>
-              </template>
-              <bf-button v-else class="compact flex" @click="downloadManifest">Download</bf-button>
+              <!-- One main action: a pull request for an app its owner (or a
+                   pusher) can update, else Download. Copy (and Download, when
+                   the pull request is the main action) sit on the app.yml view. -->
+              <el-tooltip
+                v-if="canOpenPullRequest"
+                :content="problems.length ? 'Fix the problems first' : `Opens a pull request on ${forApp.repo.fullName} that adds or updates app.yml at its root`"
+                placement="top"
+              >
+                <span>
+                  <bf-button
+                    class="compact flex"
+                    :disabled="!!problems.length || prSending"
+                    :processing="prSending"
+                    @click="openPullRequest"
+                  >Open a pull request</bf-button>
+                </span>
+              </el-tooltip>
+              <bf-button v-else class="compact flex" @click="downloadManifest">Download app.yml</bf-button>
             </div>
           </div>
 
@@ -638,15 +572,24 @@ const goToGuide = () =>
                 </div>
               </div>
             </div>
-            <p class="preview-footnote">As it will look in the Gallery.</p>
           </div>
 
           <template v-else>
-            <pre class="preview-code"><code>{{ manifestYaml }}</code></pre>
-            <p class="preview-footnote">
-              Modeled on
-              <a :href="MANIFEST_EXAMPLE_URL" target="_blank" rel="noopener">app-manifest.v1.yml</a>
-            </p>
+            <div class="code-view">
+              <div class="code-tools">
+                <el-tooltip :content="copied ? 'Copied' : 'Copy'" placement="top">
+                  <button type="button" class="code-tool" aria-label="Copy" @click="copyManifest">
+                    <IconCopyDocument :width="14" :height="14" />
+                  </button>
+                </el-tooltip>
+                <el-tooltip v-if="canOpenPullRequest" content="Download app.yml" placement="top">
+                  <button type="button" class="code-tool" aria-label="Download app.yml" @click="downloadManifest">
+                    <IconDirectDownload :width="14" :height="14" />
+                  </button>
+                </el-tooltip>
+              </div>
+              <pre class="preview-code"><code>{{ manifestYaml }}</code></pre>
+            </div>
           </template>
         </div>
         <!-- The pull request's outcome -->
@@ -675,19 +618,10 @@ const goToGuide = () =>
           <p v-else>Couldn't open the pull request: {{ prOutcome.message }}</p>
         </div>
 
-        <!-- For an app: where the file goes -->
-        <p v-if="forApp?.repo && canOpenPullRequest && !prOutcome" class="preview-note">
-          Opens a pull request on {{ forApp.repo.fullName }} that adds or updates <code>app.yml</code> at its root.
-        </p>
-        <p v-else-if="forApp?.repo && !canOpenPullRequest" class="preview-note">
-          Add it to {{ forApp.repo.fullName }} as <code>app.yml</code> at the root, then publish a release.
-          <template v-if="prReview?.review_url">
-            <a :href="prReview.review_url" target="_blank" rel="noopener">Approve Pennsieve's GitHub update</a>
-            to open a pull request from here instead.
-          </template>
-        </p>
-        <p class="preview-note">
-          The version is the release's tag, and the license comes from the repository's LICENSE file.
+        <!-- For an app without a pull request: where the file goes -->
+        <p v-if="forApp?.repo && !canOpenPullRequest" class="preview-note">
+          Add it to {{ forApp.repo.fullName }} as <code>app.yml</code>, then publish a release.
+          <a v-if="prReview?.review_url" :href="prReview.review_url" target="_blank" rel="noopener">Approve Pennsieve's GitHub update</a>
         </p>
       </aside>
     </div>
@@ -707,6 +641,77 @@ const goToGuide = () =>
 .builder-header {
   margin-bottom: 20px;
 
+  .back-link {
+    display: inline-block;
+    margin-bottom: 6px;
+    font-size: 13px;
+    color: theme.$purple_3;
+    text-decoration: none;
+
+    &:hover {
+      text-decoration: underline;
+    }
+  }
+  .title-block {
+    min-width: 0;
+  }
+  .help-link {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    margin-left: 6px;
+    border: 1px solid theme.$gray_3;
+    border-radius: 50%;
+    font-size: 11px;
+    font-weight: 600;
+    color: theme.$gray_4;
+    text-decoration: none;
+    vertical-align: 2px;
+
+    &:hover {
+      border-color: theme.$purple_3;
+      color: theme.$purple_3;
+    }
+  }
+  .check-link {
+    margin-left: 12px;
+    font-size: 13px;
+    font-weight: 400;
+    color: theme.$purple_3;
+    text-decoration: none;
+    vertical-align: 2px;
+
+    &:hover {
+      text-decoration: underline;
+    }
+  }
+  .header-sub {
+    margin: 2px 0 0;
+    font-size: 13px;
+    color: theme.$gray_4;
+
+    a {
+      color: theme.$gray_5;
+      text-decoration: none;
+
+      &:hover {
+        color: theme.$purple_3;
+        text-decoration: underline;
+      }
+    }
+  }
+  /* A short notice line under the title, no box. */
+  .header-note {
+    margin: 4px 0 0;
+    padding-left: 8px;
+    border-left: 2px solid theme.$orange_1;
+    font-size: 12px;
+    color: theme.$gray_5;
+    cursor: default;
+  }
+
   .header-row {
     display: flex;
     align-items: center;
@@ -720,20 +725,6 @@ const goToGuide = () =>
     font-weight: 500;
     color: theme.$gray_6;
   }
-  .lede {
-    margin: 0;
-    max-width: 760px;
-    font-size: 14px;
-    line-height: 1.5;
-    color: theme.$gray_5;
-  }
-  .guide-link {
-    color: theme.$purple_3;
-    white-space: nowrap;
-  }
-}
-.store-select {
-  width: 100%;
 }
 
 /* The form, then the preview beside it. */
@@ -1092,6 +1083,40 @@ code {
   align-items: center;
   gap: 6px;
 }
+/* Copy and Download on the app.yml view, top right, as code views have them. */
+.code-view {
+  position: relative;
+
+  /* Room for the tools, so the first lines don't run under them. */
+  .preview-code {
+    padding-right: 72px;
+  }
+}
+.code-tools {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: flex;
+  gap: 2px;
+}
+.code-tool {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  border: none;
+  border-radius: 4px;
+  background: theme.$white;
+  color: theme.$gray_4;
+  cursor: pointer;
+
+  &:hover,
+  &:focus-visible {
+    background: theme.$gray_1;
+    color: theme.$purple_3;
+    outline: none;
+  }
+}
 .problem-section {
   display: flex;
   align-items: center;
@@ -1106,43 +1131,6 @@ code {
   background: theme.$red_tint;
   font-size: 11px;
   color: theme.$red_2;
-}
-.for-app {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin: 0 0 16px;
-  padding: 8px 12px;
-  border: 1px solid theme.$gray_2;
-  border-radius: 3px;
-  background: theme.$gray_1;
-  font-size: 13px;
-  color: theme.$gray_6;
-}
-.for-app-note {
-  display: block;
-  margin-top: 2px;
-  color: theme.$gray_5;
-}
-.earlier-layout {
-  margin: 0 0 16px;
-  padding: 8px 12px;
-  border: 1px solid theme.$gray_2;
-  border-left: 3px solid theme.$orange_1;
-  border-radius: 3px;
-  background: theme.$white;
-  font-size: 13px;
-  color: theme.$gray_6;
-}
-.for-app-link {
-  flex-shrink: 0;
-  color: theme.$purple_3;
-  text-decoration: none;
-
-  &:hover {
-    text-decoration: underline;
-  }
 }
 .preview-note {
   margin: 8px 2px 0;
@@ -1180,28 +1168,12 @@ code {
     white-space: pre;
   }
 }
-.preview-footnote {
-  margin: 0;
-  padding: 8px 14px;
-  border-top: 1px solid theme.$gray_2;
-  font-size: 12px;
-  color: theme.$gray_4;
-
-  a {
-    color: theme.$purple_3;
-  }
-}
 
 /* The Gallery card, as ApplicationsGrid draws it. */
 $card-height: 172px;
 .card-preview {
   padding: 16px;
   background: theme.$gray_1;
-
-  .preview-footnote {
-    padding: 8px 0 0;
-    border-top: none;
-  }
 }
 .app-card {
   display: flex;
