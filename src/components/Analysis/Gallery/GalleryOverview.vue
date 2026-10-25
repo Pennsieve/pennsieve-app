@@ -25,18 +25,16 @@ const view = computed({
 });
 
 const newWorkflow = () => router.push({ name: scoped("workflows"), query: { view: "builder" } });
+const newManifest = () => router.push({ name: scoped("application-manifest-builder") });
 </script>
 
 <template>
   <div class="gallery">
     <AnalysisViewBar v-model="view" :views="VIEWS">
       <bf-button v-if="view === 'workflows'" @click="newWorkflow">+ New Workflow</bf-button>
-      <div v-else class="gallery-links">
-        Publishing an app?
-        <router-link :to="{ name: scoped('application-manifest-builder') }">Manifest builder</router-link>
-        ·
-        <router-link :to="{ name: scoped('application-manifest-guide') }">Guide</router-link>
-      </div>
+      <!-- As + New Workflow: the Apps view's action is writing an app.yml (the
+           builder links its guide; an app's own page opens it prefilled). -->
+      <bf-button v-else @click="newManifest">+ New app.yml</bf-button>
     </AnalysisViewBar>
     <WorkflowsGrid v-if="view === 'workflows'" embedded />
     <ApplicationsGrid v-else embedded />
@@ -46,17 +44,4 @@ const newWorkflow = () => router.push({ name: scoped("workflows"), query: { view
 <style scoped lang="scss">
 @use "../../../styles/theme";
 
-.gallery-links {
-  font-size: 13px;
-  color: theme.$gray_4;
-
-  a {
-    color: theme.$link-color;
-    text-decoration: none;
-
-    &:hover {
-      color: theme.$link-color-hover;
-    }
-  }
-}
 </style>
