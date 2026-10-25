@@ -116,6 +116,10 @@ const sortedVersions = computed(() => {
   });
 });
 
+// The newest version's license: read by app-deploy-service from the
+// repository's LICENSE file at that release (an SPDX id), not from app.yml.
+const latestLicense = computed(() => sortedVersions.value.find((v) => v.license)?.license || "");
+
 const versionsPageCount = computed(() =>
   Math.max(1, Math.ceil(sortedVersions.value.length / versionsPageSize))
 );
@@ -626,8 +630,24 @@ watch(
                     >
                       {{ person.email }}
                     </a>
+                    <a
+                      v-if="person.orcid"
+                      :href="`https://orcid.org/${person.orcid}`"
+                      target="_blank"
+                      rel="noopener"
+                      class="manifest-link"
+                    >
+                      ORCID {{ person.orcid }}
+                    </a>
                   </li>
                 </ul>
+              </section>
+
+              <!-- License: the repository's, not app.yml's -->
+              <section v-if="latestLicense" class="manifest-block">
+                <h4 class="manifest-block-title">License</h4>
+                <span class="manifest-field-value">{{ latestLicense }}</span>
+                <span class="manifest-license-note">From the repository's LICENSE file.</span>
               </section>
 
               <!-- Parameters -->
@@ -1830,6 +1850,12 @@ watch(
   justify-content: center;
   margin-top: 12px;
   --el-pagination-hover-color: #{theme.$purple_3};
+}
+
+.manifest-license-note {
+  margin-left: 8px;
+  font-size: 12px;
+  color: theme.$gray_4;
 }
 </style>
 

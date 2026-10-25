@@ -472,13 +472,13 @@ describe('applicationSchema', () => {
   })
 
   describe('buildManifest', () => {
-    it('emits the version and metadata under `application`, with no $schema', () => {
+    it('emits the version and metadata under `application`, pointing at the published schema', () => {
       const m = buildManifest(createApplicationSchema(), {
         name: 'My App',
         description: 'Does things.',
         applicationType: 'processor',
       })
-      expect(m).not.toHaveProperty('$schema')
+      expect(m.$schema).toBe('https://schemas.pennsieve.io/app-manifest/v1.json')
       expect(m.schemaVersion).toBe('1.0')
       expect(m.application).toEqual({
         name: 'My App',
@@ -782,7 +782,7 @@ describe('applicationSchema', () => {
         timeoutSeconds: 300,
         shape: MANIFEST_SHAPES.NESTED,
       })
-      expect(meta.maintainers).toEqual([{ name: 'edmore', email: '' }])
+      expect(meta.maintainers).toEqual([{ name: 'edmore', email: '', orcid: '' }])
     })
 
     it('reads cpu/memory off `runtime` rather than `resources`', () => {

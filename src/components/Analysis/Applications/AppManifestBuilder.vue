@@ -25,7 +25,11 @@ const meta = reactive({
   name: "",
   description: "",
   applicationType: "processor",
+  // Who maintains the app: name, and optionally email and ORCID iD.
+  maintainers: [],
 });
+const addMaintainer = () => meta.maintainers.push({ name: "", email: "", orcid: "" });
+const removeMaintainer = (i) => meta.maintainers.splice(i, 1);
 
 const schema = ref(createApplicationSchema());
 
@@ -130,6 +134,23 @@ const goToGuide = () =>
               class="field-control"
             />
           </div>
+
+          <div class="field-row full-width">
+            <label class="field-label">Maintainers <span class="label-helper">optional</span></label>
+            <div class="field-control maintainers">
+              <div v-for="(m, i) in meta.maintainers" :key="i" class="maintainer-row">
+                <el-input v-model="m.name" placeholder="Name" size="small" />
+                <el-input v-model="m.email" placeholder="Email" size="small" />
+                <el-input v-model="m.orcid" placeholder="ORCID iD, e.g. 0000-0002-1825-0097" size="small" />
+                <el-button size="small" text @click="removeMaintainer(i)">Remove</el-button>
+              </div>
+              <el-button size="small" plain @click="addMaintainer">Add maintainer</el-button>
+            </div>
+          </div>
+          <p class="field-hint">
+            The version is the release's tag, and the license is read from the repository's
+            LICENSE file, so app.yml doesn't declare them.
+          </p>
         </section>
 
         <!-- Runtime, resources, parameters, ports, classification -->
@@ -364,5 +385,27 @@ code {
   .builder-preview {
     position: static;
   }
+}
+
+.label-helper {
+  font-weight: 400;
+  color: theme.$gray_4;
+}
+.maintainers {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+.maintainer-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1.4fr auto;
+  gap: 6px;
+  width: 100%;
+}
+.field-hint {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: theme.$gray_4;
 }
 </style>

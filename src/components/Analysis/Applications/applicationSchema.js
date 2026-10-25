@@ -185,6 +185,9 @@ export const createPort = (overrides = {}) => ({
   // type and cardinality rather than by `dataType`; we retain them for display
   // and validation. buildManifest() does not emit them.
   mediaTypes: [],
+  // EDAM format ids (format_3998), for scientific formats without a MIME
+  // type. With neither mediaTypes nor formats, a port takes any file.
+  formats: [],
   cardinality: "",
   ...overrides,
 });
@@ -353,8 +356,20 @@ const parsePort = (raw) =>
     // Carried through so port compatibility can compare media types when a
     // manifest describes ports that way.
     mediaTypes: asArray(raw?.mediaTypes).map(String),
+    formats: asArray(raw?.formats).map((f) => normalizeEdamFormat(f)).filter(Boolean),
     cardinality: typeof raw?.cardinality === "string" ? raw.cardinality : "",
   });
+
+/**
+ * An EDAM format id as app.yml writes it: `format_3998`, also from its
+ * http://edamontology.org/format_3998 URI.
+ */
+export const normalizeEdamFormat = (value) =>
+  String(value ?? "").trim().replace(/^https?:\/\/edamontology\.org\//, "");
+
+/** An ORCID iD as app.yml writes it: bare, also from its https://orcid.org/ form. */
+export const normalizeOrcid = (value) =>
+  String(value ?? "").trim().replace(/^https?:\/\/orcid\.org\//, "");
 
 /* ──────────────────────────────────────────────────────────────────────────
  * Serialization — editable ApplicationSchema  ->  API payload
@@ -465,6 +480,13 @@ export const MANIFEST_EXAMPLE_URL =
 export const MANIFEST_SCHEMA_VERSION = "1.0";
 
 /**
+ * The app.yml JSON Schema, published by app-deploy-service. A copy is bundled
+ * (app-manifest.v1.schema.json) for the specs; generated manifests point
+ * editors at the published one.
+ */
+export const MANIFEST_SCHEMA_URL = "https://schemas.pennsieve.io/app-manifest/v1.json";
+
+/**
  * Roles an application can play within a workflow. Only `processor` is
  * supported today, so it is the sole option the manifest builder offers and
  * the value any unrecognized `application.type` normalizes to.
@@ -511,14 +533,22 @@ const manifestParameter = (p) => {
   return out;
 };
 
+// A port as app.yml writes it: its media types (the editor's media type
+// select is `dataType`, kept in step with mediaTypes), its EDAM formats, or
+// neither, which takes any file. A non-MIME dataType from an older manifest
+// is kept as the (deprecated) dataType so it isn't lost.
+const isMediaType = (v) => /^[\w.+-]+\/[\w.+-]+$/.test(String(v || ""));
 const manifestPort = (port) => {
-  const out = {
-    name: (port.name || "").trim(),
-    dataType: port.dataType || "any",
-  };
-  if (port.required) out.required = true;
+  const out = { name: (port.name || "").trim() };
   if (port.description && port.description.trim())
     out.description = port.description.trim();
+  const media = asArray(port.mediaTypes).map(String).filter(isMediaType);
+  if (!media.length && isMediaType(port.dataType)) media.push(String(port.dataType));
+  if (media.length) out.mediaTypes = [...new Set(media)];
+  else if (port.dataType && port.dataType !== "any") out.dataType = port.dataType;
+  const formats = asArray(port.formats).map(normalizeEdamFormat).filter(Boolean);
+  if (formats.length) out.formats = [...new Set(formats)];
+  if (port.required) out.required = true;
   return out;
 };
 
@@ -538,6 +568,8 @@ const manifestPort = (port) => {
 export const buildManifest = (schema, meta = {}) => {
   const s = schema || createApplicationSchema();
   const manifest = {
+    // Written as the editor directive on app.yml's first line (manifestToYaml).
+    $schema: MANIFEST_SCHEMA_URL,
     schemaVersion: meta.schemaVersion || MANIFEST_SCHEMA_VERSION,
   };
 
@@ -553,7 +585,12 @@ export const buildManifest = (schema, meta = {}) => {
   const mMaintainers = asArray(meta.maintainers)
     .map((m) => (typeof m === "string" ? { name: m } : m))
     .filter((m) => m && str(m.name))
-    .map((m) => (str(m.email) ? { name: str(m.name), email: str(m.email) } : { name: str(m.name) }));
+    .map((m) => {
+      const person = { name: str(m.name) };
+      if (str(m.email)) person.email = str(m.email);
+      if (normalizeOrcid(m.orcid)) person.orcid = normalizeOrcid(m.orcid);
+      return person;
+    });
   if (mMaintainers.length) application.maintainers = mMaintainers;
 
   const mTags = asArray(s.tags).map(str).filter(Boolean);
@@ -600,8 +637,8 @@ export const buildManifest = (schema, meta = {}) => {
  * Serialize a manifest object to the YAML an author commits as `app.yml`. A
  * `$schema` carried by the manifest is emitted as a `yaml-language-server`
  * directive comment (the YAML convention for editor autocomplete/validation)
- * rather than a data key, so the body stays clean. buildManifest() does not set
- * one, so manifests written here carry no directive.
+ * rather than a data key, so the body stays clean. buildManifest() sets the
+ * published schema (MANIFEST_SCHEMA_URL), so editors validate as authors type.
  *
  * @param {Object} manifest  manifest object (e.g. from buildManifest)
  * @returns {string} app.yml text
@@ -668,8 +705,8 @@ const parseMaintainers = (raw) =>
   asArray(raw)
     .map((m) =>
       typeof m === "string"
-        ? { name: m.trim(), email: "" }
-        : { name: (m?.name ?? "").trim(), email: (m?.email ?? "").trim() },
+        ? { name: m.trim(), email: "", orcid: "" }
+        : { name: (m?.name ?? "").trim(), email: (m?.email ?? "").trim(), orcid: normalizeOrcid(m?.orcid) },
     )
     .filter((m) => m.name || m.email);
 
