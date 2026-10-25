@@ -123,12 +123,13 @@ export const domainOfTag = (tag) => BY_TAG.get(normalize(tag)) || null;
 // The app's domain: the first subject its tags name, since what an app is
 // about says more than what it does ("visualization, single-cell" is
 // Genomics); else the first task; else Notebook for an app
-// whose app.yml says it's a live session.
+// whose app.yml says it's a live Jupyter session.
 export function domainOf(manifest) {
   const named = (manifest?.tags || []).map(domainOfTag).filter(Boolean);
   const d = named.find((x) => x.subject) || named[0];
   if (d) return d;
-  if (manifest?.runtime?.interactive || manifest?.runtime?.sessionType) return DOMAINS.find((d) => d.key === "notebook");
+  const runtime = manifest?.runtime;
+  if (runtime?.interactive && (runtime.sessionType || "jupyter") === "jupyter") return DOMAINS.find((d) => d.key === "notebook");
   return null;
 }
 

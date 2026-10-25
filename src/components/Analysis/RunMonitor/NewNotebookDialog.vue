@@ -602,17 +602,13 @@ async function execute() {
       if (Object.keys(obj).length) dataTargets[node.id] = { params: obj };
     }
 
-    // This is the notebook launcher, so the processor node(s) ARE the
-    // interactive kernel — force interactive=true with the selected kernel's
-    // sessionType (the published definition may not surface the flag here).
-    const sessionType = notebookKernel(selectedWorkflow.value) || "jupyter";
+    // The session step is live because its app.yml says so; the run only sets
+    // its resources.
     const processorConfigs = [];
     for (const node of dag) {
       if (node.type === "data-source" || node.type === "data-target") continue;
       processorConfigs.push({
         nodeId: node.id,
-        interactive: true,
-        sessionType,
         cpu: resourceCpu.value,
         memory: resolvedMemory.value,
       });

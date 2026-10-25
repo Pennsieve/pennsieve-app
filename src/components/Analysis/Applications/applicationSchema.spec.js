@@ -959,16 +959,17 @@ describe('live sessions (runtime.interactive / sessionType)', () => {
 
     const live = createApplicationSchema()
     live.runtime.interactive = true
-    expect(buildManifest(live, { name: 'a' }).runtime).toMatchObject({ interactive: true, sessionType: 'jupyter' })
-    live.runtime.sessionType = 'r'
-    expect(buildManifest(live, { name: 'a' }).runtime).toMatchObject({ interactive: true, sessionType: 'r' })
+    expect(buildManifest(live, { name: 'a' }).runtime).toMatchObject({ interactive: true, sessionType: 'jupyter', kernel: 'python' })
+    live.runtime.kernel = 'r'
+    expect(buildManifest(live, { name: 'a' }).runtime).toMatchObject({ interactive: true, sessionType: 'jupyter', kernel: 'r' })
   })
 
-  it('reads them back, a sessionType alone meaning interactive', () => {
+  it('reads them back, opening an older sessionType r or python as jupyter with that kernel', () => {
     const read = (runtime) => parseManifest(dumpYaml({ application: { name: 'a' }, runtime })).schema.runtime
-    expect(read({ interactive: true })).toMatchObject({ interactive: true, sessionType: 'jupyter' })
-    expect(read({ sessionType: 'r' })).toMatchObject({ interactive: true, sessionType: 'r' })
-    expect(read({ sessionType: 'python' })).toMatchObject({ interactive: true, sessionType: 'jupyter' })
-    expect(read({ computeTypes: ['standard'] })).toMatchObject({ interactive: false, sessionType: '' })
+    expect(read({ interactive: true })).toMatchObject({ interactive: true, sessionType: 'jupyter', kernel: 'python' })
+    expect(read({ interactive: true, sessionType: 'jupyter', kernel: 'r' })).toMatchObject({ sessionType: 'jupyter', kernel: 'r' })
+    expect(read({ sessionType: 'r' })).toMatchObject({ interactive: true, sessionType: 'jupyter', kernel: 'r' })
+    expect(read({ sessionType: 'python' })).toMatchObject({ interactive: true, sessionType: 'jupyter', kernel: 'python' })
+    expect(read({ computeTypes: ['standard'] })).toMatchObject({ interactive: false, sessionType: '', kernel: '' })
   })
 })

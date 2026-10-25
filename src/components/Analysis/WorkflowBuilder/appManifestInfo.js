@@ -3,15 +3,14 @@
 // list's versions). Apps without an app.yml have none, and are shown and
 // used as before, marked "No manifest".
 import { validateAppConnection } from "../Applications/applicationSchema";
-// The session type of an interactive (human-in-the-loop) app, e.g. a
-// notebook kernel: "jupyter" or "r"; null for a batch app. Only as its
-// app.yml declares it (runtime.interactive, runtime.sessionType): the one
-// place an app says it's interactive.
+// The session type of an interactive (human-in-the-loop) app: "jupyter" (a
+// notebook) or another kind; null for a batch app. Only as its app.yml
+// declares it (runtime.interactive, runtime.sessionType): the one place an
+// app says it's interactive.
 export function sessionTypeOf(app) {
   const runtime = versionManifest(app)?.runtime;
-  if (runtime?.sessionType) return runtime.sessionType === "python" ? "jupyter" : runtime.sessionType;
-  if (runtime?.interactive) return "jupyter";
-  return null;
+  if (!runtime?.interactive) return null;
+  return runtime.sessionType || "jupyter";
 }
 
 const newestFirst = (versions) =>

@@ -58,8 +58,9 @@
         </div>
       </div>
 
-      <!-- runtime.interactive / sessionType: a live session the user works
-           in (a notebook kernel), where the workflow waits for them. -->
+      <!-- runtime.interactive / sessionType / kernel: a live session the user
+           works in (a Jupyter notebook, in Python or R), where the workflow
+           waits for them. -->
       <div class="field-row">
         <label class="field-label">Live session</label>
         <div class="field-control inline-checks">
@@ -73,11 +74,20 @@
           >
             <el-option v-for="t in SESSION_TYPES" :key="t.value" :label="t.label" :value="t.value" />
           </el-select>
+          <el-select
+            v-if="schema.runtime.interactive && schema.runtime.sessionType === 'jupyter'"
+            v-model="schema.runtime.kernel"
+            size="small"
+            class="session-type"
+            aria-label="Kernel"
+          >
+            <el-option v-for="k in KERNELS" :key="k.value" :label="k.label" :value="k.value" />
+          </el-select>
         </div>
       </div>
       <p class="schema-section-hint">
-        Turn on for an app people work in live, such as a notebook kernel: in a workflow it runs as an
-        interactive step, and the workflow waits until the session ends.
+        Turn on for an app people work in live, such as a Jupyter notebook: in a workflow it runs as an
+        interactive step, and the workflow waits until the session ends. Choose the notebook's language.
       </p>
     </section>
 
@@ -349,6 +359,7 @@ import {
   PARAM_TYPES,
   PARAM_TYPE_OPTIONS,
   SESSION_TYPES,
+  KERNELS,
   createParameter,
   createPort,
   portDataTypeOptions,
@@ -371,9 +382,11 @@ defineProps({
 
 const store = useStore();
 
-// A live session needs a session type; Jupyter unless chosen otherwise.
+// A live session needs a session type, Jupyter unless chosen otherwise, and a
+// Jupyter session its language, Python unless chosen otherwise.
 function onInteractiveChange(on) {
   schema.value.runtime.sessionType = on ? schema.value.runtime.sessionType || "jupyter" : "";
+  schema.value.runtime.kernel = on ? schema.value.runtime.kernel || "python" : "";
 }
 
 // A typed tag lands on the suggestion it spells ("EEG" -> "eeg"), so the

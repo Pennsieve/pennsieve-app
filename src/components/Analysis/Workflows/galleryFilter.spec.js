@@ -48,7 +48,7 @@ describe("applyFilters", () => {
   });
 
   it("keeps Pennsieve's notebooks", () => {
-    const jupyter = { name: "Pennsieve - Python Notebook - 3.12", official: true, dag: [{ id: "p", type: "processor", runtimeConfig: { interactive: true, sessionType: "python" } }] };
+    const jupyter = { name: "Pennsieve - Python Notebook - 3.12", official: true, notebook: { kernel: "python", savesTo: "dataset", worksWithoutDataset: false } };
     const lookalike = { ...jupyter, official: false };
     expect(applyFilters([spikes, jupyter, lookalike], { notebooksOnly: true })).toEqual([jupyter]);
   });

@@ -222,12 +222,13 @@ function nbCellsToCells(nbCells) {
   }));
 }
 
-// Jupyter kernelspec name to start for a given session/kernel type. The R image
-// registers IRkernel as "ir"; everything else is Python ("python3").
-const KERNEL_BY_SESSION = { r: "ir", jupyter: "python3", python: "python3" };
+// Jupyter kernelspec name to start for a notebook's language (its app.yml's
+// runtime.kernel). The R image registers IRkernel as "ir"; Python is
+// "python3".
+const KERNELSPEC = { r: "ir", python: "python3" };
 
-// The /session/connect response doesn't include the session type, but the run
-// record does (its interactive node's sessionType). Resolve which Jupyter kernel
+// The /session/connect response doesn't include the language, but the run
+// record does (its interactive node's runtimeConfig.kernel). Resolve which Jupyter kernel
 // to start from it. Without this we'd start the server's DEFAULT kernel — which
 // is "python3" even in the R image (it also ships a Python kernel), so an R
 // session would wrongly open Python. Defaults to python3 on any failure.
@@ -243,15 +244,12 @@ async function resolveKernelName(runId) {
     if (!resp.ok) return "python3";
     const run = await resp.json();
     const nodes = run?.dag || run?.processors || [];
-    const node = nodes.find(
-      (n) =>
-        n?.runtimeConfig?.interactive ||
-        n?.interactive ||
-        n?.runtimeConfig?.sessionType ||
-        n?.sessionType
-    );
-    const st = node && (node.runtimeConfig?.sessionType || node.sessionType);
-    return KERNEL_BY_SESSION[st] || "python3";
+    const node = nodes.find((n) => n?.runtimeConfig?.interactive);
+    const rc = node?.runtimeConfig || {};
+    // Runs from before kernels were declared recorded the language as
+    // sessionType r.
+    const kernel = rc.kernel || (rc.sessionType === "r" ? "r" : "python");
+    return KERNELSPEC[kernel] || "python3";
   } catch (_) {
     return "python3";
   }
