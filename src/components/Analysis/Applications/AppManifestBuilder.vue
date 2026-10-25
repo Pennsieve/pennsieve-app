@@ -171,6 +171,9 @@ async function openExisting() {
 const { loadManifest } = useAppManifest();
 const editingApp = ref("");
 const loadingApp = ref(false);
+// Opened for an app (?app=): the form waits for it, shown as placeholders, and
+// fades in filled, instead of showing empty fields that fill in later.
+const openingApp = ref(!!route.query.app);
 const storeApps = computed(() =>
   [...(store.getters["analysisModule/applications"] || [])].sort((a, b) => appTitle(a).localeCompare(appTitle(b)))
 );
@@ -242,11 +245,13 @@ async function openForApp(uuid) {
       canUpdate: canUpdateManifest(isOwner, repository),
       hadManifest: hasManifest,
     };
-    prReview.value = repo ? await installationNeedingReview(repo.owner) : null;
+    // The GitHub review hint can follow; the form needn't wait for it.
+    if (repo) installationNeedingReview(repo.owner).then((r) => (prReview.value = r));
   } catch {
     ElMessage.error("Couldn't load that app; starting a new manifest.");
   } finally {
     loadingApp.value = false;
+    openingApp.value = false;
   }
 }
 
@@ -359,7 +364,24 @@ const goToGuide = () =>
       </el-select>
     </el-dialog>
 
-    <div class="builder-body">
+    <!-- Opened for an app: placeholders while it loads -->
+    <div v-if="openingApp" class="builder-loading" aria-busy="true" aria-live="polite">
+      <p class="builder-loading-text">Loading the app's details…</p>
+      <div class="builder-body">
+        <div class="builder-form">
+          <div v-for="n in 4" :key="n" class="skeleton-field">
+            <span class="skeleton skeleton-label" />
+            <span class="skeleton skeleton-input" :class="{ 'skeleton-input--tall': n === 2 }" />
+          </div>
+        </div>
+        <aside class="builder-preview">
+          <span class="skeleton skeleton-card" />
+        </aside>
+      </div>
+    </div>
+
+    <transition name="builder-fade">
+    <div v-if="!openingApp" class="builder-body">
       <!-- ─────────────── Form ─────────────── -->
       <div class="builder-form">
         <!-- Open an existing app.yml: check it against the schema, then open it here -->
@@ -600,6 +622,7 @@ const goToGuide = () =>
         </p>
       </aside>
     </div>
+    </transition>
   </div>
 </template>
 
@@ -645,6 +668,51 @@ const goToGuide = () =>
 }
 
 /* The form, then the preview beside it. */
+.builder-loading-text {
+  margin: 0 0 16px;
+  font-size: 13px;
+  color: theme.$gray_4;
+}
+.skeleton {
+  display: block;
+  border-radius: 3px;
+  background: linear-gradient(90deg, theme.$gray_1 25%, theme.$gray_2 50%, theme.$gray_1 75%);
+  background-size: 200% 100%;
+  animation: builder-shimmer 1.4s ease-in-out infinite;
+}
+.skeleton-field {
+  margin-bottom: 20px;
+}
+.skeleton-label {
+  width: 120px;
+  height: 12px;
+  margin-bottom: 8px;
+}
+.skeleton-input {
+  width: 100%;
+  height: 32px;
+}
+.skeleton-input--tall {
+  height: 72px;
+}
+.skeleton-card {
+  width: 100%;
+  height: 200px;
+}
+@keyframes builder-shimmer {
+  from { background-position: 100% 0; }
+  to { background-position: -100% 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .skeleton { animation: none; }
+}
+.builder-fade-enter-active {
+  transition: opacity 0.2s ease;
+}
+.builder-fade-enter-from {
+  opacity: 0;
+}
+
 .builder-body {
   display: grid;
   grid-template-columns: minmax(0, 720px) minmax(0, 460px);
