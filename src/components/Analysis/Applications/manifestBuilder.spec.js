@@ -19,30 +19,33 @@ import {
 } from "./manifestBuilder";
 
 describe("what kind of app", () => {
-  it("a notebook writes a Jupyter session, no parameters, and any-files ports; switching back loses nothing", () => {
+  it("an interactive app writes a live session, no parameters, and any-files ports; switching back loses nothing", () => {
     const schema = createApplicationSchema({ parameters: [createParameter({ name: "threshold" })] });
     expect(appKind(schema)).toBe("batch");
 
-    setAppKind(schema, "notebook", "r");
-    expect(appKind(schema)).toBe("notebook");
+    setAppKind(schema, "interactive");
+    expect(appKind(schema)).toBe("interactive");
+    // Jupyter is the session type the platform runs; its language defaults to Python.
+    expect(schema.runtime).toMatchObject({ sessionType: "jupyter", kernel: "python" });
+    schema.runtime.kernel = "r";
     const m = buildManifest(manifestSchemaFor(schema), { name: "R notebook" });
     expect(m.runtime).toMatchObject({ interactive: true, sessionType: "jupyter", kernel: "r" });
     expect(m).not.toHaveProperty("parameters");
-    expect(m.inputs).toEqual([{ name: "files", description: "Files to open in the notebook, staged under input/" }]);
-    expect(m.outputs).toEqual([{ name: "files", description: "What the notebook writes under output/" }]);
+    expect(m.inputs).toEqual([{ name: "files", description: "Files to open in the session, staged under input/" }]);
+    expect(m.outputs).toEqual([{ name: "files", description: "What the session writes under output/" }]);
     expect(validateManifestDoc(m).valid).toBe(true);
 
     setAppKind(schema, "batch");
     const back = buildManifest(manifestSchemaFor(schema), { name: "a" });
     expect(back.runtime).not.toHaveProperty("interactive");
     expect(back.parameters.map((p) => p.name)).toEqual(["threshold"]);
-    // The notebook's ports stay: they're values the author has now.
+    // The session's ports stay: they're values the author has now.
     expect(back.inputs[0].name).toBe("files");
   });
 
-  it("keeps a notebook's own ports, and defaults its kernel to Python", () => {
+  it("keeps an interactive app's own ports, and defaults its kernel to Python", () => {
     const schema = createApplicationSchema({ inputs: [{ name: "edf", description: "", dataType: "any", mediaTypes: [], formats: [] }] });
-    setAppKind(schema, "notebook");
+    setAppKind(schema, "interactive");
     expect(schema.runtime.kernel).toBe("python");
     expect(schema.inputs.map((p) => p.name)).toEqual(["edf"]);
     expect(schema.outputs).toEqual([]);
@@ -53,7 +56,7 @@ describe("what kind of app", () => {
       "application:\n  name: R notebook\nruntime:\n  interactive: true\n  sessionType: jupyter\n  kernel: r\ninputs:\n  - name: files\n"
     );
     expect(parsed.meta.name).toBe("R notebook");
-    expect(appKind(parsed.schema)).toBe("notebook");
+    expect(appKind(parsed.schema)).toBe("interactive");
     expect(parsed.schema.runtime.kernel).toBe("r");
     expect(appKind(parseManifestText("application:\n  name: a\nruntime:\n  computeTypes: [standard]\n").schema)).toBe("batch");
   });
@@ -106,9 +109,9 @@ describe("sections and fields", () => {
     });
   });
 
-  it("doesn't check a notebook's (unwritten) parameters", () => {
+  it("doesn't check an interactive app's (unwritten) parameters", () => {
     const schema = createApplicationSchema({ parameters: [createParameter({ name: "" })] });
-    setAppKind(schema, "notebook");
+    setAppKind(schema, "interactive");
     expect(builderChecks({ name: "n" }, schema)).toEqual([]);
   });
 });
