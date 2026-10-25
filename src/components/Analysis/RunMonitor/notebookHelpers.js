@@ -82,13 +82,15 @@ export function kernelLabel(sessionType) {
   return sessionType;
 }
 
-// The kernels a notebook can start with here. Outside a workspace (My
-// Workspace) a run has no dataset to write to, so a kernel whose results go
-// to one would only fail; it isn't offered.
+// The kernels a notebook can start with here: active ones (an archived
+// kernel's runs still count as notebooks, but it can't start new ones), and
+// outside a workspace (My Workspace), where a run has no dataset to write
+// to, not those whose results go to one.
 export function launchableKernels(workflows = [], { personal = false } = {}) {
-  if (!personal) return workflows;
   return workflows.filter(
-    (wf) => !(wf?.dag || []).some((d) => d.type === "data-target" && targetWritesToDataset(d.targetType))
+    (wf) =>
+      wf?.isActive !== false &&
+      !(personal && (wf?.dag || []).some((d) => d.type === "data-target" && targetWritesToDataset(d.targetType)))
   );
 }
 
