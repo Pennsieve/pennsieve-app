@@ -5,6 +5,8 @@
       <div class="field-row" data-field="application.tags" :class="{ 'has-problem': at('application.tags').length }">
         <label class="field-label">Tags <field-hint text="What the app is for; it colours its card and helps people find it." /></label>
         <div class="field-control">
+          <!-- Preferred tags first (a domain's own, colouring the card), then
+               the aliases that colour it the same way. -->
           <el-select
             :model-value="schema.tags"
             multiple
@@ -12,13 +14,51 @@
             allow-create
             default-first-option
             :reserve-keyword="false"
-            placeholder="eeg, imaging, spike-sorting… or type your own"
+            :filter-method="(q) => (tagQuery = q)"
+            placeholder="Pick a preferred tag, or type your own"
             class="full"
+            popper-class="tag-options"
             @update:model-value="setTags"
+            @visible-change="(open) => open || (tagQuery = '')"
           >
-            <el-option v-for="t in SUGGESTED_TAGS" :key="t" :label="t" :value="t" />
+            <template #tag>
+              <el-tag
+                v-for="t in schema.tags"
+                :key="t"
+                closable
+                disable-transitions
+                class="domain-tag-chip"
+                :style="tagChipStyle(t)"
+                @close="removeTag(t)"
+              >{{ t }}</el-tag>
+            </template>
+            <el-option-group v-if="preferredOptions.length" label="Preferred">
+              <el-option v-for="o in preferredOptions" :key="o.tag" :label="o.tag" :value="o.tag">
+                <span class="tag-option">
+                  <span class="tag-dot" :style="{ background: domainColors(o.domain).accent }" />
+                  <svg class="tag-icon" viewBox="0 0 24 24" aria-hidden="true"><path :d="o.domain.icon" /></svg>
+                  <span class="tag-name">{{ o.tag }}</span>
+                  <span class="tag-meta">{{ o.domain.label }}</span>
+                </span>
+              </el-option>
+            </el-option-group>
+            <el-option-group v-if="aliasOptions.length" label="Also recognised">
+              <el-option v-for="o in aliasOptions" :key="o.tag" :label="o.tag" :value="o.tag">
+                <span class="tag-option tag-option--alias">
+                  <span class="tag-name">{{ o.tag }}</span>
+                  <span class="tag-meta">→ {{ o.domain.label }}</span>
+                </span>
+              </el-option>
+            </el-option-group>
           </el-select>
           <p v-for="m in at('application.tags')" :key="m" class="field-error">{{ m }}</p>
+          <p v-if="tagNudge" class="tag-note">
+            Also add <strong>{{ tagNudge.tag }}</strong>, the preferred tag for this domain?
+            <button type="button" class="tag-note-action" @click="setTags([...schema.tags, tagNudge.tag])">Add</button>
+          </p>
+          <p v-else-if="!hasDomainTag(schema.tags)" class="tag-note">
+            No domain tag, so the card is grey. Pick one from Preferred.
+          </p>
         </div>
       </div>
     </template>
@@ -299,7 +339,7 @@ import { useStore } from "vuex";
 import MoreOptions from "./MoreOptions.vue";
 import FieldHint from "./FieldHint.vue";
 import { PARAM_TYPES, PARAM_TYPE_OPTIONS, createParameter, createPort, portDataTypeOptions, STANDARD_CPU_OPTIONS, getStandardMemoryOptions, isNumericType, mediaTypeMatches } from "./applicationSchema";
-import { SUGGESTED_TAGS, canonicalTag } from "./appDomains";
+import { canonicalTag, preferredTagGroups, tagOptionMatches, tagDomainNudge, hasDomainTag, domainOfTag, domainColors } from "./appDomains";
 
 /**
  * One part of the app manifest builder's form, bound to an ApplicationSchema
@@ -330,6 +370,22 @@ const hasValue = (v) => v != null && v !== "";
 function setTags(tags) {
   schema.value.tags = [...new Set((tags || []).map(canonicalTag).filter(Boolean))];
 }
+const removeTag = (tag) => setTags(schema.value.tags.filter((t) => t !== tag));
+
+// The tag options, filtered by what's typed; preferred tags also match their
+// domain's aliases, so "spike" offers spike-sorting first.
+const tagQuery = ref("");
+const tagGroups = preferredTagGroups();
+const preferredOptions = computed(() => tagGroups.preferred.filter((o) => tagOptionMatches(o, tagQuery.value, { preferred: true })));
+const aliasOptions = computed(() => tagGroups.aliases.filter((o) => tagOptionMatches(o, tagQuery.value)));
+const tagNudge = computed(() => tagDomainNudge(schema.value.tags || []));
+// A chip in its domain's colours, as on the Gallery; neutral without one.
+const tagChipStyle = (tag) => {
+  const d = domainOfTag(tag);
+  if (!d) return {};
+  const c = domainColors(d);
+  return { "--el-tag-bg-color": c.bg, "--el-tag-border-color": c.line, "--el-tag-text-color": c.ink };
+};
 
 /*
   A port's media type is a platform package format, not a vocabulary this form
@@ -610,5 +666,70 @@ const removePort = (key, i) => schema.value[key].splice(i, 1);
 .mt-meta {
   font-size: 11px;
   color: theme.$gray_4;
+}
+.domain-tag-chip {
+  margin: 2px 4px 2px 0;
+  border-radius: 3px;
+  font-size: 12px;
+}
+.tag-note {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: theme.$gray_5;
+}
+.tag-note-action {
+  margin-left: 4px;
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  color: theme.$purple_3;
+  cursor: pointer;
+
+  &:hover {
+    text-decoration: underline;
+  }
+}
+</style>
+
+<style lang="scss">
+@use "../../../styles/theme";
+
+/* The tag dropdown is teleported, so its option styles can't be scoped. */
+.tag-options {
+  .tag-option {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+  }
+  .tag-dot {
+    width: 8px;
+    height: 8px;
+    flex-shrink: 0;
+    border-radius: 50%;
+  }
+  .tag-icon {
+    width: 14px;
+    height: 14px;
+    flex-shrink: 0;
+    fill: none;
+    stroke: theme.$gray_5;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+  .tag-name {
+    color: theme.$gray_6;
+  }
+  .tag-meta {
+    margin-left: auto;
+    padding-left: 12px;
+    font-size: 12px;
+    color: theme.$gray_4;
+  }
+  .tag-option--alias .tag-name {
+    color: theme.$gray_5;
+  }
 }
 </style>
