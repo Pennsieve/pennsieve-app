@@ -159,6 +159,7 @@ export const portDataTypeOptions = (packageFormats, declared = []) => {
       if (t.description) option.description = String(t.description);
       // A folder format (OME-Zarr): the app can take it unpacked.
       if (t.kind === "directory") option.kind = "directory";
+      if (asArray(t.folderExtensions).length) option.folderExtensions = asArray(t.folderExtensions).map(String);
       byValue.set(t.value, option);
       options.push(option);
     }
