@@ -350,7 +350,7 @@ const goToManifestBuilder = () => {
         <el-input
           v-model="searchQuery"
           placeholder="Search by name, description or repository…"
-          size="default"
+          size="small"
           clearable
           class="applications-search-input"
         />
