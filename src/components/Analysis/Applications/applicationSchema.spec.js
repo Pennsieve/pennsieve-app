@@ -18,6 +18,7 @@ import {
   manifestToYaml,
   serializeManifestYaml,
   parseManifest,
+  mediaTypeMatches,
   createPort,
   MANIFEST_SHAPES,
   detectManifestShape,
@@ -991,6 +992,23 @@ describe('whole-number parameters', () => {
   it('rejects a fractional value', () => {
     expect(validateParameterValue({ name: 'SIZE', type: 'integer' }, '2.5').valid).toBe(false)
     expect(validateParameterValue({ name: 'SIZE', type: 'integer' }, '3').valid).toBe(true)
+  })
+})
+
+describe('media type options', () => {
+  const formats = [
+    { value: 'application/x-hdf5', label: 'application/x-hdf5', name: 'HDF5', extensions: ['.h5'] },
+    { value: 'application/x-hdf5', label: 'application/x-hdf5', name: 'NeuroData Without Borders', extensions: ['.nwb'] },
+    { value: 'application/vnd.pennsieve.edf', label: 'application/vnd.pennsieve.edf', name: 'EDF Timeseries', extensions: ['.edf'] },
+  ]
+  it('names every format that shares a media type, and finds them by name or extension', () => {
+    const opts = portDataTypeOptions(formats)
+    const hdf5 = opts.find((o) => o.value === 'application/x-hdf5')
+    expect(hdf5.formats).toEqual(['HDF5', 'NeuroData Without Borders'])
+    expect(opts.filter((o) => o.value === 'application/x-hdf5')).toHaveLength(1)
+    expect(mediaTypeMatches(hdf5, 'nwb')).toBe(true)
+    expect(mediaTypeMatches(hdf5, '.h5')).toBe(true)
+    expect(mediaTypeMatches(opts.find((o) => o.value.endsWith('edf')), 'nwb')).toBe(false)
   })
 })
 
