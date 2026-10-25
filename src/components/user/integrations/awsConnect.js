@@ -7,16 +7,22 @@
 const ACCOUNT_ID = /^\d{12}$/;
 // arn:aws:iam::123456789012:role/Name, or role/path/Name
 const ROLE_ARN = /^arn:aws[a-z-]*:iam::(\d{12}):role\/(?:[\w+=,.@-]+\/)*([\w+=,.@-]+)$/;
+// Any other ARN that names an account: the stack's own, the first one the
+// console shows (arn:aws:cloudformation:us-east-1:123456789012:stack/…).
+const ANY_ARN = /^arn:aws[a-z-]*:[a-z0-9-]+:[a-z0-9-]*:(\d{12}):/;
 
 // What the user typed in the Verify step: a 12-digit account ID (spaces and
-// dashes allowed, as the console shows it: 1234-5678-9012) or the role's ARN
-// from the stack's Outputs. { accountId, roleName } or { error }.
+// dashes allowed, as the console shows it: 1234-5678-9012), the role's ARN
+// from the stack's Outputs, or any ARN in the account (the stack's).
+// { accountId, roleName } or { error }.
 export function parseAwsAccountInput(input) {
   const text = (input || "").trim();
   if (!text) return { error: "Enter your AWS account ID." };
   const arn = text.match(ROLE_ARN);
   if (arn) return { accountId: arn[1], roleName: arn[2] };
-  if (text.startsWith("arn:")) return { error: "That isn't a role's ARN (arn:aws:iam::<account>:role/<name>)." };
+  const other = text.match(ANY_ARN);
+  if (other) return { accountId: other[1], roleName: null };
+  if (text.startsWith("arn:")) return { error: "That ARN doesn't name an AWS account. Enter the 12-digit account ID." };
   const digits = text.replace(/[\s-]/g, "");
   if (ACCOUNT_ID.test(digits)) return { accountId: digits, roleName: null };
   return { error: "An AWS account ID is 12 digits." };
