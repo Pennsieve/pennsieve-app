@@ -52,6 +52,12 @@ const newManifest = () => router.push({ name: scoped("application-manifest-build
 .apps-search {
   width: 360px;
 }
+/* The global input style fixes inputs at 40px; this one is the height of the
+   small selects next to it. */
+.apps-search.el-input {
+  --el-input-height: 24px;
+  --el-input-inner-height: 22px;
+}
 .apps-body {
   flex: 1;
   min-height: 0;

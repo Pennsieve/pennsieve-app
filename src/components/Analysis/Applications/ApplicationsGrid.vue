@@ -576,6 +576,10 @@ const goToManifestBuilder = () => {
   flex: 1;
   max-width: 420px;
 }
+.applications-search-input.el-input {
+  --el-input-height: 24px;
+  --el-input-inner-height: 22px;
+}
 
 .sort-control {
   display: flex;
