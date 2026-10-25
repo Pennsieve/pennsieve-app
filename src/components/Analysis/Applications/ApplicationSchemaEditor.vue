@@ -179,8 +179,29 @@
               <div class="field-row" :data-field="`${block.key}.${index}.mediaTypes`" :class="rowClass(`${block.key}.${index}.mediaTypes`)">
                 <label class="field-label">Media type</label>
                 <div class="field-control">
-                  <el-select :model-value="port.dataType" class="full" @change="(v) => onPortDataTypeChange(port, v)">
-                    <el-option v-for="dt in portDataTypes" :key="dt.value" :label="dt.label" :value="dt.value" />
+                  <!-- Searchable by format name, extension or media type -->
+                  <el-select
+                    :model-value="port.dataType"
+                    class="full"
+                    filterable
+                    :filter-method="(q) => (mediaTypeQuery = q)"
+                    placeholder="Search formats, e.g. NWB, .edf"
+                    @visible-change="(open) => open || (mediaTypeQuery = '')"
+                    @change="(v) => onPortDataTypeChange(port, v)"
+                  >
+                    <el-option
+                      v-for="dt in portDataTypes.filter((o) => mediaTypeMatches(o, mediaTypeQuery))"
+                      :key="dt.value"
+                      :label="dt.formats && dt.formats.length ? `${dt.formats.join(' / ')} (${dt.value})` : dt.label"
+                      :value="dt.value"
+                    >
+                      <span class="mt-option">
+                        <span class="mt-name">{{ dt.formats && dt.formats.length ? dt.formats.join(" / ") : dt.label }}</span>
+                        <span v-if="dt.formats && dt.formats.length" class="mt-meta">
+                          {{ dt.value }}<template v-if="dt.extensions && dt.extensions.length"> · {{ dt.extensions.join(", ") }}</template>
+                        </span>
+                      </span>
+                    </el-option>
                   </el-select>
                   <p v-for="m in at(`${block.key}.${index}.mediaTypes`)" :key="m" class="field-error">{{ m }}</p>
                 </div>
@@ -293,10 +314,10 @@
 </template>
 
 <script setup>
-import { computed, onMounted } from "vue";
+import { computed, onMounted, ref } from "vue";
 import { useStore } from "vuex";
 import MoreOptions from "./MoreOptions.vue";
-import { PARAM_TYPES, PARAM_TYPE_OPTIONS, createParameter, createPort, portDataTypeOptions, STANDARD_CPU_OPTIONS, getStandardMemoryOptions, isNumericType } from "./applicationSchema";
+import { PARAM_TYPES, PARAM_TYPE_OPTIONS, createParameter, createPort, portDataTypeOptions, STANDARD_CPU_OPTIONS, getStandardMemoryOptions, isNumericType, mediaTypeMatches } from "./applicationSchema";
 import { SUGGESTED_TAGS, canonicalTag } from "./appDomains";
 import { edamOptions, normalizeFormatPick } from "./manifestBuilder";
 
@@ -340,6 +361,8 @@ onMounted(() => {
   if (props.part === "io") store.dispatch("analysisModule/fetchPackageFormats");
 });
 
+// The media type search, shared by the selects (one is open at a time).
+const mediaTypeQuery = ref("");
 const portDataTypes = computed(() =>
   portDataTypeOptions(store.state.analysisModule.packageFormats, [
     ...(schema.value.inputs || []).map((p) => p.dataType),
@@ -593,5 +616,19 @@ const removePort = (key, i) => schema.value[key].splice(i, 1);
 }
 .add-row {
   align-self: flex-start;
+}
+.mt-option {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.3;
+  padding: 4px 0;
+}
+.mt-name {
+  font-size: 13px;
+  color: theme.$gray_6;
+}
+.mt-meta {
+  font-size: 11px;
+  color: theme.$gray_4;
 }
 </style>

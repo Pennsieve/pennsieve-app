@@ -1152,11 +1152,13 @@ const actions = {
           const mediaTypes = Array.isArray(t?.mediaTypes)
             ? t.mediaTypes
             : [t?.mediaType ?? t?.format ?? t?.value ?? t?.name];
+          const extensions = Array.isArray(t?.extensions) ? t.extensions.map(String) : [];
           return mediaTypes.filter(Boolean).map((m) => ({
             value: String(m),
             label: String(m),
             name,
             description,
+            extensions,
           }));
         })
         .filter((t) => t.value);

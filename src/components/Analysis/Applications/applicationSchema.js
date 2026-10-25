@@ -102,21 +102,41 @@ export const FALLBACK_PORT_DATA_TYPES = Object.freeze([
  * @param {Array<{value: string, label: string}>} [packageFormats] from the store
  * @param {string[]} [declared]  dataTypes already present in the manifest
  */
+/** Whether a media type option matches a search: its formats' names, extensions or the type. */
+export const mediaTypeMatches = (option, query) => {
+  const q = String(query || "").trim().toLowerCase();
+  if (!q) return true;
+  return [option.value, option.label, ...(option.formats || []), ...(option.extensions || [])]
+    .filter(Boolean)
+    .some((s) => String(s).toLowerCase().includes(q));
+};
+
 export const portDataTypeOptions = (packageFormats, declared = []) => {
   const options = [...FALLBACK_PORT_DATA_TYPES];
   const seen = new Set(options.map((o) => o.value));
+  // Formats can share a media type (HDF5 and NWB are both
+  // application/x-hdf5): one option per media type, naming every format that
+  // uses it and their extensions, so searching "nwb" finds it.
+  const byValue = new Map();
   for (const t of asArray(packageFormats)) {
     if (!t?.value || seen.has(t.value)) continue;
-    seen.add(t.value);
-    // `name`/`description` come from the package format the media type belongs
-    // to. The port form does not collect them; selecting a media type copies
-    // them onto the port. Omitted when the server does not supply them so the
-    // option stays a bare {value, label}.
-    const option = { value: t.value, label: t.label || t.value };
-    if (t.name) option.name = String(t.name);
-    if (t.description) option.description = String(t.description);
-    options.push(option);
+    let option = byValue.get(t.value);
+    if (!option) {
+      // `name`/`description` come from the (first) package format the media
+      // type belongs to; selecting a media type copies them onto the port.
+      option = { value: t.value, label: t.label || t.value };
+      if (t.name) option.name = String(t.name);
+      if (t.description) option.description = String(t.description);
+      byValue.set(t.value, option);
+      options.push(option);
+    }
+    // Only when the server says so, so a bare {value, label} stays bare.
+    if (t.name && !(option.formats || []).includes(String(t.name))) (option.formats ||= []).push(String(t.name));
+    for (const e of asArray(t.extensions)) {
+      if (!(option.extensions || []).includes(String(e))) (option.extensions ||= []).push(String(e));
+    }
   }
+  for (const value of byValue.keys()) seen.add(value);
   for (const value of asArray(declared)) {
     if (!value || seen.has(value)) continue;
     seen.add(value);
