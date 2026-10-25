@@ -1,7 +1,5 @@
 import { describe, it, expect } from "vitest";
-import {
-  targetWritesToDataset, prefixParamName, targetParamFields, buildDataTargets, targetDatasetId, datasetName, searchDatasets,
-} from "./dataTargets";
+import { targetWritesToDataset, prefixParamName, targetParamFields, buildDataTargets, targetDatasetId, datasetName, searchDatasets, isPathPrefixParam, targetParamLabel, NOTIFY_OPTIONS, defaultsToRunName } from "./dataTargets";
 
 describe("targetWritesToDataset / prefixParamName", () => {
   it("built-ins write no dataset and take pathPrefix", () => {
@@ -82,5 +80,18 @@ describe("searchDatasets", () => {
     expect(calls[0]).toContain("https://api/datasets/paginated?");
     expect(calls[0]).toContain("query=mef");
     expect(calls[0]).toContain("api_key=tok");
+  });
+});
+
+describe("the notebook launcher's target params", () => {
+  it("leaves out the path prefix, names the download after the run, labels its params", () => {
+    expect(isPathPrefixParam("pathPrefix")).toBe(true);
+    expect(isPathPrefixParam("PATH_PREFIX")).toBe(true);
+    expect(isPathPrefixParam("name")).toBe(false);
+    expect(defaultsToRunName("download", "name")).toBe(true);
+    expect(defaultsToRunName("pennsieve", "name")).toBe(false);
+    expect(targetParamLabel("name")).toBe("Archive name");
+    expect(targetParamLabel("layerName")).toBe("layerName");
+    expect(NOTIFY_OPTIONS.map((o) => o.value)).toEqual(["auto", "email", "none"]);
   });
 });
