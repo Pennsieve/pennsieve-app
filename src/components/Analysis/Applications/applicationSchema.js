@@ -205,16 +205,15 @@ export const KERNELS = Object.freeze([
   { value: "r", label: "R" },
 ]);
 
-// runtime.interactive / sessionType / kernel as the editor holds them. Older
-// app.yml files said sessionType r (or python) for a Jupyter session's
-// language; the editor opens those as jupyter with that kernel, so saving
-// writes today's shape. (The platform itself reads app.yml as written.)
+// runtime.interactive / sessionType / kernel as the editor holds them, read
+// as written: an interactive app without a sessionType is a Jupyter session,
+// as the platform reads it, and a Jupyter session without a kernel starts as
+// Python.
 const parseSession = (runtime) => {
   const interactive = Boolean(runtime?.interactive || runtime?.sessionType);
   if (!interactive) return { interactive: false, sessionType: "", kernel: "" };
-  const legacyKernel = ["r", "python"].includes(runtime?.sessionType) ? runtime.sessionType : "";
-  const sessionType = legacyKernel ? "jupyter" : runtime?.sessionType || "jupyter";
-  const kernel = runtime?.kernel || legacyKernel || (sessionType === "jupyter" ? "python" : "");
+  const sessionType = runtime?.sessionType || "jupyter";
+  const kernel = runtime?.kernel || (sessionType === "jupyter" ? "python" : "");
   return { interactive, sessionType, kernel };
 };
 
@@ -242,18 +241,19 @@ const asArray = (v) => (Array.isArray(v) ? v : []);
 const parseParameter = (raw) => {
   if (raw == null) return createParameter();
 
-  // `validValues` / `defaultValue` are the keys app.yml and the API both use;
-  // `allowedValues` / `default` are read as legacy aliases only.
-  const validValues = asArray(raw.validValues ?? raw.allowedValues);
-  const defaultValue = raw.defaultValue ?? raw.default ?? null;
+  // `validValues` / `defaultValue`: the keys app.yml and the API both use.
+  const validValues = asArray(raw.validValues);
+  const defaultValue = raw.defaultValue ?? null;
 
   // A manifest has no separate "enum" type — a choice parameter is written as
   // `type: string` with `validValues`, so an explicit string type does not
   // out-vote the choices. A number or boolean keeps its declared type and
   // still offers its choices.
-  const declared = Object.values(PARAM_TYPES).includes(raw.type)
-    ? raw.type
-    : null;
+  // "enum" is the editor's own type for a choice, not one app.yml declares.
+  const declared =
+    raw.type !== PARAM_TYPES.ENUM && Object.values(PARAM_TYPES).includes(raw.type)
+      ? raw.type
+      : null;
   const type =
     validValues.length && (declared === null || declared === PARAM_TYPES.STRING)
       ? PARAM_TYPES.ENUM
@@ -696,6 +696,17 @@ export const detectManifestShape = (manifest) =>
     ? MANIFEST_SHAPES.NESTED
     : MANIFEST_SHAPES.FLAT;
 
+// The earlier flat layout (from the app's first JSON Schema, removed
+// 2026-08-31): no `application` mapping, and its metadata at the top level.
+// A file with neither (only runtime/parameters) isn't that layout, just
+// incomplete.
+const EARLIER_LAYOUT_KEYS = ["name", "description", "applicationType", "categories", "resources", "tags"];
+export const isEarlierLayout = (manifest) =>
+  detectManifestShape(manifest) === MANIFEST_SHAPES.FLAT &&
+  !!manifest &&
+  typeof manifest === "object" &&
+  EARLIER_LAYOUT_KEYS.some((k) => k in manifest);
+
 /**
  * Maintainers are `[{name, email?}]` in the manifest, but tolerate bare
  * strings so a hand-written `maintainers: [alice]` still reads.
@@ -728,23 +739,20 @@ export const parseManifest = (source) => {
   const manifest =
     typeof source === "string" ? loadYaml(source) || {} : source || {};
 
-  const nested = detectManifestShape(manifest) === MANIFEST_SHAPES.NESTED;
-  // In the nested shape the application metadata lives under `application`
-  // and cpu/memory sit on `runtime`; in the flat shape both are top-level.
-  const app = nested ? manifest.application || {} : manifest;
-  const runtime = manifest.runtime || {};
-  const resources = nested ? runtime : manifest.resources || {};
-
-  const rawType = nested ? app.type : app.applicationType;
+  // Only the nested layout is read: application metadata under
+  // `application`, cpu/memory on `runtime`. A file in the earlier flat layout
+  // (top-level name, applicationType, categories, resources) is reported as
+  // such (meta.shape FLAT) and read as nothing, as the platform reads it.
+  const earlier = isEarlierLayout(manifest);
+  const app = earlier ? {} : manifest.application || {};
+  const runtime = earlier ? {} : manifest.runtime || {};
 
   const meta = {
     name: typeof app.name === "string" ? app.name : "",
     description: typeof app.description === "string" ? app.description : "",
-    applicationType: APPLICATION_TYPES.some((t) => t.value === rawType)
-      ? rawType
+    applicationType: APPLICATION_TYPES.some((t) => t.value === app.type)
+      ? app.type
       : "processor",
-    // Present in the nested shape only; empty strings/arrays otherwise so
-    // callers never have to branch on shape.
     id: typeof app.id === "string" ? app.id : "",
     version: app.version == null ? "" : String(app.version),
     maintainers: parseMaintainers(app.maintainers),
@@ -752,31 +760,23 @@ export const parseManifest = (source) => {
       manifest.schemaVersion == null ? "" : String(manifest.schemaVersion),
     timeoutSeconds:
       typeof runtime.timeoutSeconds === "number" ? runtime.timeoutSeconds : null,
-    shape: nested ? MANIFEST_SHAPES.NESTED : MANIFEST_SHAPES.FLAT,
+    shape: earlier ? MANIFEST_SHAPES.FLAT : MANIFEST_SHAPES.NESTED,
   };
 
-  const schema = createApplicationSchema({
-    resources: {
-      cpu: resources.cpu ?? null,
-      memory: resources.memory ?? null,
-    },
-    runtime: { computeTypes: parseComputeTypes(runtime), ...parseSession(runtime) },
-    // Both manifest shapes go through parseParameter, which reads the
-    // canonical `defaultValue`/`validValues` and the legacy `default`/
-    // `allowedValues` alike.
-    parameters: asArray(manifest.parameters).map(parseParameter),
-    inputs: asArray(manifest.inputs).map(parsePort),
-    outputs: asArray(manifest.outputs).map(parsePort),
-    // An old app.yml's categories become tags, as the known spelling
-    // ("Format Conversion" -> "conversion"), so saving it again moves them.
-    tags: [
-      ...new Set(
-        [...asArray(nested ? app.tags : manifest.tags), ...asArray(nested ? app.categories : manifest.categories)]
-          .map((t) => canonicalTag(t))
-          .filter(Boolean)
-      ),
-    ],
-  });
+  const schema = earlier
+    ? createApplicationSchema()
+    : createApplicationSchema({
+        resources: {
+          cpu: runtime.cpu ?? null,
+          memory: runtime.memory ?? null,
+        },
+        runtime: { computeTypes: parseComputeTypes(runtime), ...parseSession(runtime) },
+        parameters: asArray(manifest.parameters).map(parseParameter),
+        inputs: asArray(manifest.inputs).map(parsePort),
+        outputs: asArray(manifest.outputs).map(parsePort),
+        // Tags as their known spelling ("EEG" -> "eeg").
+        tags: [...new Set(asArray(app.tags).map((t) => canonicalTag(t)).filter(Boolean))],
+      });
 
   return { meta, schema };
 };

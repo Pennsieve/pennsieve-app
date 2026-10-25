@@ -4,14 +4,7 @@
 // problem points at, the EDAM formats the picker offers, and the Gallery card
 // an app.yml gives.
 import { load as loadYaml } from "js-yaml";
-import {
-  createPort,
-  normalizeEdamFormat,
-  normalizeOrcid,
-  parseManifest,
-  PARAM_TYPES,
-  validateParameterValue,
-} from "./applicationSchema";
+import { createPort, normalizeEdamFormat, normalizeOrcid, parseManifest, PARAM_TYPES, validateParameterValue, isEarlierLayout } from "./applicationSchema";
 
 /* ─────────────── Kind: batch or interactive ─────────────── */
 
@@ -280,10 +273,16 @@ export function maintainerFromProfile(profile) {
 */
 export function prefillFromApp(app, profile = {}, { repoDescription = "" } = {}) {
   const raw = manifestAsset(app?.assets);
+  // An app.yml in the earlier flat layout isn't read (nor by the platform):
+  // start from what Pennsieve knows, and say the file was in that layout.
+  let earlierLayout = false;
   if (raw.trim()) {
     try {
       const doc = loadYaml(raw);
-      if (doc && typeof doc === "object" && !Array.isArray(doc)) return { ...parseManifest(doc), fromManifest: true };
+      if (doc && typeof doc === "object" && !Array.isArray(doc)) {
+        if (isEarlierLayout(doc)) earlierLayout = true;
+        else return { ...parseManifest(doc), fromManifest: true, earlierLayout };
+      }
     } catch {
       // A broken app.yml: start from what Pennsieve knows instead.
     }
@@ -306,6 +305,6 @@ export function prefillFromApp(app, profile = {}, { repoDescription = "" } = {})
         ...(Array.isArray(p.validValues) && p.validValues.length && { validValues: p.validValues }),
       })),
   };
-  return { ...parseManifest(doc), fromManifest: false };
+  return { ...parseManifest(doc), fromManifest: false, earlierLayout };
 }
 

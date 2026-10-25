@@ -8,7 +8,8 @@ import BfButton from "../../shared/bf-button/BfButton.vue";
 import ApplicationSchemaEditor from "./ApplicationSchemaEditor.vue";
 import MoreOptions from "./MoreOptions.vue";
 import AppBanner from "./AppBanner.vue";
-import { createApplicationSchema, buildManifest, manifestToYaml, parseManifest, KERNELS, MANIFEST_EXAMPLE_URL } from "./applicationSchema";
+import { fetchRepository, canUpdateManifest } from "./githubRepository";
+import { createApplicationSchema, buildManifest, manifestToYaml, parseManifest, KERNELS, MANIFEST_EXAMPLE_URL, MANIFEST_SHAPES } from "./applicationSchema";
 import { builderProblems, validateManifestText } from "./manifestValidation";
 import {
   APP_KINDS,
@@ -45,7 +46,12 @@ const blankMeta = () => ({ name: "", description: "", applicationType: "processo
 const meta = reactive(blankMeta());
 const schema = ref(createApplicationSchema());
 
+// Set when a loaded app.yml was in the earlier flat layout, which isn't read
+// (nor by the platform): the form starts from what could be read.
+const earlierLayout = ref(false);
+
 function load({ meta: m, schema: s }) {
+  earlierLayout.value = m.shape === MANIFEST_SHAPES.FLAT;
   Object.assign(meta, blankMeta(), {
     name: m.name,
     description: m.description,
@@ -205,15 +211,6 @@ async function getJson(url) {
   if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
   return resp.json();
 }
-async function repoDescription(repo) {
-  if (!repo) return "";
-  try {
-    const body = await getJson(`${api2Url.value}/repository/${encodeURIComponent(repo.owner)}/${encodeURIComponent(repo.repo)}`);
-    return body?.description || "";
-  } catch {
-    return "";
-  }
-}
 async function installationNeedingReview(owner) {
   try {
     const body = await getJson(`${api2Url.value}/github/installations`);
@@ -230,10 +227,21 @@ async function openForApp(uuid) {
     const app = await store.dispatch("analysisModule/fetchApplication", uuid);
     const repo = repoOf(app?.sourceUrl);
     const hasManifest = Object.keys(app?.assets || {}).some((k) => /^app\.ya?ml$/i.test(k));
-    const description = hasManifest ? "" : await repoDescription(repo);
-    const start = prefillFromApp(app, store.state.profile, { repoDescription: description });
+    const repository = await fetchRepository(api2Url.value, repo);
+    const start = prefillFromApp(app, store.state.profile, { repoDescription: repository?.description || "" });
     load(start);
-    forApp.value = { uuid, title: start.meta.name || appTitle(app), repo, fromManifest: start.fromManifest };
+    if (start.earlierLayout) earlierLayout.value = true;
+    const profile = store.state.profile || {};
+    const isOwner = !!app?.ownerId && (app.ownerId === profile.id || app.ownerId === profile.intId);
+    // The owner, or someone who can push to the repository, updates it here.
+    forApp.value = {
+      uuid,
+      title: start.meta.name || appTitle(app),
+      repo,
+      fromManifest: start.fromManifest,
+      canUpdate: canUpdateManifest(isOwner, repository),
+      hadManifest: hasManifest,
+    };
     prReview.value = repo ? await installationNeedingReview(repo.owner) : null;
   } catch {
     ElMessage.error("Couldn't load that app; starting a new manifest.");
@@ -321,9 +329,20 @@ const goToGuide = () =>
       <span>
         Editing the app.yml for <strong>{{ forApp.title }}</strong>
         <template v-if="forApp.repo"> · {{ forApp.repo.fullName }}</template>
-        <template v-if="!forApp.fromManifest"> (new)</template>
+        <template v-if="!forApp.fromManifest && !forApp.hadManifest"> (new)</template>
+        <span v-if="!forApp.canUpdate" class="for-app-note">
+          You're not this app's owner: copy or download the file and propose it to
+          {{ forApp.repo ? forApp.repo.fullName : "its repository" }}.
+        </span>
       </span>
       <router-link :to="appPageRoute" class="for-app-link">Back to the app</router-link>
+    </div>
+
+    <!-- A loaded app.yml in the earlier flat layout: nothing was read from it -->
+    <div v-if="earlierLayout" class="earlier-layout">
+      This app.yml uses an earlier layout that Pennsieve no longer reads, so nothing was loaded
+      from it<template v-if="forApp">; the form starts from what Pennsieve knows about the app</template>.
+      Fill in the form and it writes the current layout.
     </div>
 
     <!-- Edit an app from the store: its newest app.yml -->
@@ -961,6 +980,21 @@ code {
   border: 1px solid theme.$gray_2;
   border-radius: 3px;
   background: theme.$gray_1;
+  font-size: 13px;
+  color: theme.$gray_6;
+}
+.for-app-note {
+  display: block;
+  margin-top: 2px;
+  color: theme.$gray_5;
+}
+.earlier-layout {
+  margin: 0 0 16px;
+  padding: 8px 12px;
+  border: 1px solid theme.$gray_2;
+  border-left: 3px solid theme.$orange_1;
+  border-radius: 3px;
+  background: theme.$white;
   font-size: 13px;
   color: theme.$gray_6;
 }

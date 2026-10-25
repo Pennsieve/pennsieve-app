@@ -21,8 +21,9 @@ import {
   createPort,
   MANIFEST_SHAPES,
   detectManifestShape,
+  isEarlierLayout,
 } from './applicationSchema'
-import { dump as dumpYaml } from 'js-yaml'
+import { dump as dumpYaml, load as loadYaml } from 'js-yaml'
 
 describe('applicationSchema', () => {
   describe('parseParameters', () => {
@@ -90,12 +91,13 @@ describe('applicationSchema', () => {
       expect(explicit.required).toBe(false)
     })
 
-    it('reads the legacy `allowedValues` / `default` keys', () => {
+    it('reads only `validValues` / `defaultValue`, not the earlier `allowedValues` / `default` / `enum`', () => {
       const [p] = parseParameters({
-        paramSchema: [{ name: 'algo', allowedValues: ['a'], default: 'a' }],
+        paramSchema: [{ name: 'algo', type: 'enum', allowedValues: ['a'], default: 'a' }],
       })
-      expect(p.validValues).toEqual(['a'])
-      expect(p.defaultValue).toBe('a')
+      expect(p.validValues).toEqual([])
+      expect(p.defaultValue).toBeNull()
+      expect(p.type).toBe(PARAM_TYPES.STRING)
     })
   })
 
@@ -613,29 +615,47 @@ describe('applicationSchema', () => {
   })
 
   describe('parseManifest (round-trip)', () => {
-    it('parses YAML text back into meta + editable schema', () => {
+    it('reports an app.yml in the earlier flat layout and reads nothing from it', () => {
       const yaml = [
         'schemaVersion: "1.0"',
         'name: Spike Sorter',
         'description: Sorts spikes.',
-        'applicationType: preprocessor',
+        'applicationType: processor',
         'categories:',
         '  - Preprocessing',
-        'runtime:',
-        '  computeTypes:',
-        '    - standard',
-        '  gpu:',
-        '    enabled: true',
-        '    count: 2',
-        '    type: nvidia-t4',
         'resources:',
         '  cpu: 4096',
         '  memory: 16384',
         'parameters:',
         '  - name: threshold',
         '    type: number',
-        '    required: true',
         '    default: 5',
+      ].join('\n')
+
+      const { meta, schema } = parseManifest(yaml)
+      expect(meta).toMatchObject({ name: '', description: '', shape: MANIFEST_SHAPES.FLAT })
+      expect(isEarlierLayout(loadYaml(yaml))).toBe(true)
+      expect(schema).toEqual(createApplicationSchema())
+    })
+
+    it('reads a nested app.yml: metadata under application, cpu/memory and a legacy gpu block on runtime', () => {
+      const yaml = [
+        'application:',
+        '  name: Spike Sorter',
+        '  description: Sorts spikes.',
+        '  type: preprocessor',
+        'runtime:',
+        '  cpu: 4096',
+        '  memory: 16384',
+        '  computeTypes:',
+        '    - standard',
+        '  gpu:',
+        '    enabled: true',
+        'parameters:',
+        '  - name: threshold',
+        '    type: number',
+        '    required: true',
+        '    defaultValue: 5',
         '    min: 1',
         '    max: 20',
         'inputs:',
@@ -650,28 +670,13 @@ describe('applicationSchema', () => {
         description: 'Sorts spikes.',
         // `processor` is the only supported type, so any other value normalizes.
         applicationType: 'processor',
-        shape: MANIFEST_SHAPES.FLAT,
+        shape: MANIFEST_SHAPES.NESTED,
       })
       expect(schema.resources).toEqual({ cpu: 4096, memory: 16384 })
-      // The legacy gpu block folds into the compute types.
+      // The (deprecated, still allowed) gpu block folds into the compute types.
       expect(schema.runtime.computeTypes).toEqual(['standard', 'gpu'])
-      // An old app.yml's categories are read as tags, in the known spelling.
-      expect(schema.tags).toEqual(['preprocessing'])
-      expect(schema).not.toHaveProperty('categories')
-      // Manifest `default` maps back onto the editable `defaultValue`.
-      expect(schema.parameters[0]).toMatchObject({
-        name: 'threshold',
-        type: 'number',
-        required: true,
-        defaultValue: 5,
-        min: 1,
-        max: 20,
-      })
-      expect(schema.inputs[0]).toMatchObject({
-        name: 'recording',
-        dataType: 'timeseries',
-        required: true,
-      })
+      expect(schema.parameters[0]).toMatchObject({ name: 'threshold', type: 'number', required: true, defaultValue: 5, min: 1, max: 20 })
+      expect(schema.inputs[0]).toMatchObject({ name: 'recording', dataType: 'timeseries', required: true })
     })
 
     it('round-trips serialize -> parse without loss of meaningful fields', () => {
@@ -703,7 +708,7 @@ describe('applicationSchema', () => {
     })
 
     it('accepts an already-parsed object and falls back to defaults on partial input', () => {
-      const { meta, schema } = parseManifest({ name: 'Only A Name' })
+      const { meta, schema } = parseManifest({ application: { name: 'Only A Name' } })
       expect(meta).toMatchObject({
         name: 'Only A Name',
         description: '',
@@ -833,8 +838,8 @@ describe('applicationSchema', () => {
   */
   describe('canonical parameter form', () => {
     const CANONICAL = [
-      'schemaVersion: "1.0"',
-      'name: Demo',
+      'application:',
+      '  name: Demo',
       'parameters:',
       '  - name: threshold',
       '    type: number',
@@ -964,12 +969,11 @@ describe('live sessions (runtime.interactive / sessionType)', () => {
     expect(buildManifest(live, { name: 'a' }).runtime).toMatchObject({ interactive: true, sessionType: 'jupyter', kernel: 'r' })
   })
 
-  it('reads them back, opening an older sessionType r or python as jupyter with that kernel', () => {
+  it('reads them back as written; an earlier sessionType r is not turned into jupyter + r', () => {
     const read = (runtime) => parseManifest(dumpYaml({ application: { name: 'a' }, runtime })).schema.runtime
     expect(read({ interactive: true })).toMatchObject({ interactive: true, sessionType: 'jupyter', kernel: 'python' })
     expect(read({ interactive: true, sessionType: 'jupyter', kernel: 'r' })).toMatchObject({ sessionType: 'jupyter', kernel: 'r' })
-    expect(read({ sessionType: 'r' })).toMatchObject({ interactive: true, sessionType: 'jupyter', kernel: 'r' })
-    expect(read({ sessionType: 'python' })).toMatchObject({ interactive: true, sessionType: 'jupyter', kernel: 'python' })
+    expect(read({ sessionType: 'r' })).toMatchObject({ interactive: true, sessionType: 'r', kernel: '' })
     expect(read({ computeTypes: ['standard'] })).toMatchObject({ interactive: false, sessionType: '', kernel: '' })
   })
 })
