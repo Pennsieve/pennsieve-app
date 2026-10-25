@@ -51,11 +51,11 @@ inputs:
   - name: recording
     description: The EEG recording.
     # MIME types, and/or EDAM formats (https://edamontology.org/page) for
-    # scientific formats without one, e.g. format_3998 (EDF).
+    # scientific formats without one, e.g. format_3590 (HDF5).
     mediaTypes:
       - application/octet-stream
     formats:
-      - format_3998
+      - format_3590
 outputs:
   - name: spikes
     description: The detected spikes.

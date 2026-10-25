@@ -60,11 +60,11 @@ inputs:
   - name: recording
     description: The EEG recording.
     # MIME types, and/or EDAM formats (https://edamontology.org/page) for
-    # scientific formats without one, e.g. format_3998 (EDF).
+    # scientific formats without one, e.g. format_3590 (HDF5).
     mediaTypes:
       - application/octet-stream
     formats:
-      - format_3998
+      - format_3590
 outputs:
   - name: spikes
     description: The detected spikes.
@@ -140,7 +140,7 @@ const inputOutputFields = [
   { name: "name", type: "string", required: true, desc: "Name. Unique among inputs (or outputs)." },
   { name: "description", type: "string", required: false, desc: "What flows through this input or output." },
   { name: "mediaTypes", type: "string[]", required: false, desc: "Media types accepted or produced, e.g. application/octet-stream." },
-  { name: "formats", type: "string[]", required: false, desc: "EDAM format ids (https://edamontology.org/page), for scientific formats without a media type, e.g. format_3998 (EDF). With no mediaTypes or formats, any file." },
+  { name: "formats", type: "string[]", required: false, desc: "EDAM format ids (https://edamontology.org/page), for scientific formats without a media type, e.g. format_3590 (HDF5). With no mediaTypes or formats, any file." },
 ];
 </script>
 
@@ -199,7 +199,8 @@ const inputOutputFields = [
         <router-link :to="{ name: 'application-manifest-builder', query: { check: 1 } }">
           Check it against the schema
         </router-link>
-        in the manifest builder: paste it or drop the file, and see what to fix.
+        in the manifest builder (Start from → Open an existing app.yml): paste it or drop the file, see
+        what to fix, and open it there to edit.
       </p>
     </section>
 
