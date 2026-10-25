@@ -69,21 +69,13 @@ function navigateToDetail(resource) {
     <div class="resources-content">
       <!-- Setup Information Section -->
       <div class="info-section">
-        <div class="info-card">
-          <h3>Setting Up Compute Resources</h3>
+        <!-- One line on what these are, then connecting one. -->
+        <div class="info-card connect-card">
           <p>
-            Compute resources are your own cloud accounts (AWS) that Pennsieve runs compute nodes in.
-            As their owner, you choose which workspaces can create compute nodes on them.
+            Your AWS accounts, where Pennsieve runs your compute nodes. You choose which workspaces can use them.
+            <a href="https://docs.pennsieve.io/docs/registering-a-compute-resource" target="_blank" rel="noopener" class="doc-link">How it works</a>
           </p>
-          <div class="connect-row">
-            <bf-button @click="openConnect">Connect AWS account</bf-button>
-          </div>
-          <div class="documentation-link">
-            <a href="https://docs.pennsieve.io/docs/registering-a-compute-resource" target="_blank" class="doc-link">
-              View Full Documentation
-              <IconArrowRight :width="14" :height="14" style="margin-left: 4px;" />
-            </a>
-          </div>
+          <bf-button @click="openConnect">Connect AWS account</bf-button>
         </div>
       </div>
 
@@ -197,12 +189,26 @@ h2 {
   }
 }
 
-.connect-row {
+.connect-card {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
-  gap: 16px;
-  margin: 16px 0 4px;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 16px 20px;
+
+  p {
+    margin: 0;
+    font-size: 14px;
+    line-height: 1.5;
+    color: theme.$gray_5;
+  }
+  .doc-link {
+    margin-left: 4px;
+    white-space: nowrap;
+  }
+  .bf-button {
+    flex-shrink: 0;
+  }
 }
 .connection-badge {
   display: inline-block;
@@ -242,21 +248,6 @@ h2 {
   }
 }
 
-.documentation-link {
-  margin-top: 16px;
-
-  .doc-link {
-    display: inline-flex;
-    align-items: center;
-    font-size: 14px;
-    color: theme.$purple_3;
-    text-decoration: none;
-
-    &:hover {
-      text-decoration: underline;
-    }
-  }
-}
 
 .resources-section {
   h3 {
