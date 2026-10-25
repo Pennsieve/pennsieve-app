@@ -4,7 +4,7 @@
 // problem points at, the EDAM formats the picker offers, and the Gallery card
 // an app.yml gives.
 import { load as loadYaml } from "js-yaml";
-import { createPort, normalizeEdamFormat, normalizeOrcid, parseManifest, PARAM_TYPES, validateParameterValue, isEarlierLayout } from "./applicationSchema";
+import { createPort, normalizeEdamFormat, normalizeOrcid, parseManifest, PARAM_TYPES, validateParameterValue, isEarlierLayout, isNumericType } from "./applicationSchema";
 
 /* ─────────────── Kind: batch or interactive ─────────────── */
 
@@ -116,7 +116,7 @@ export function builderChecks(meta, schema) {
     if (p.type === PARAM_TYPES.ENUM && !(p.validValues || []).length) {
       out.push({ path: `${at}.validValues`, message: "is a choice but has no values" });
     }
-    if (p.type === PARAM_TYPES.NUMBER && p.min != null && p.max != null && p.min !== "" && p.max !== "" && Number(p.min) > Number(p.max)) {
+    if (isNumericType(p.type) && p.min != null && p.max != null && p.min !== "" && p.max !== "" && Number(p.min) > Number(p.max)) {
       out.push({ path: `${at}.max`, message: "is below min" });
     }
     if (p.defaultValue != null && p.defaultValue !== "") {

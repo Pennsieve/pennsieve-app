@@ -50,14 +50,19 @@ import {
 export const PARAM_TYPES = Object.freeze({
   STRING: "string",
   NUMBER: "number",
+  INTEGER: "integer",
   BOOLEAN: "boolean",
   ENUM: "enum",
 });
+
+/** Number and whole number: the types with a numeric default, min and max. */
+export const isNumericType = (type) => type === PARAM_TYPES.NUMBER || type === PARAM_TYPES.INTEGER;
 
 /** Human-facing labels + the Element Plus control each type maps to. */
 export const PARAM_TYPE_OPTIONS = Object.freeze([
   { value: PARAM_TYPES.STRING, label: "Text", control: "input" },
   { value: PARAM_TYPES.NUMBER, label: "Number", control: "number" },
+  { value: PARAM_TYPES.INTEGER, label: "Whole number", control: "number" },
   { value: PARAM_TYPES.BOOLEAN, label: "True / False", control: "switch" },
   { value: PARAM_TYPES.ENUM, label: "Choice", control: "select" },
 ]);
@@ -129,7 +134,7 @@ export const portDataTypeOptions = (packageFormats, declared = []) => {
  * @property {string} name                 Machine name (key passed to the app).
  * @property {string} [label]              Human-facing label; defaults to name.
  * @property {string} [description]        Help text shown next to the control.
- * @property {("string"|"number"|"boolean"|"enum")} type
+ * @property {("string"|"number"|"integer"|"boolean"|"enum")} type
  * @property {boolean} required            Must a value exist before a run?
  * @property {(string|number|boolean|null)} defaultValue  App-provided default.
  * @property {Array<string|number>} [validValues]  Permitted choices. Presence
@@ -393,7 +398,7 @@ const serializeParameter = (p) => {
   // the Workflow Builder read back off `paramSchema`.
   const choices = asArray(p.validValues);
   if (choices.length) out.validValues = choices;
-  if (p.type === PARAM_TYPES.NUMBER) {
+  if (isNumericType(p.type)) {
     if (p.min != null && p.min !== "") out.min = Number(p.min);
     if (p.max != null && p.max !== "") out.max = Number(p.max);
   }
@@ -526,7 +531,7 @@ const manifestParameter = (p) => {
   const choices = asArray(p.validValues).map(String);
   if (choices.length) out.validValues = choices;
 
-  if (p.type === PARAM_TYPES.NUMBER) {
+  if (isNumericType(p.type)) {
     if (p.min != null && p.min !== "") out.min = Number(p.min);
     if (p.max != null && p.max !== "") out.max = Number(p.max);
   }
@@ -834,7 +839,8 @@ export const extractDefaultParams = (parameters, overrides = {}) => {
 export function coerceParameterValue(param, value) {
   if (value == null || value === "") return null;
   switch (param?.type) {
-    case PARAM_TYPES.NUMBER: {
+    case PARAM_TYPES.NUMBER:
+    case PARAM_TYPES.INTEGER: {
       const n = Number(value);
       return Number.isFinite(n) ? n : null;
     }
@@ -865,10 +871,13 @@ export function validateParameterValue(param, value) {
   }
 
   switch (param.type) {
-    case PARAM_TYPES.NUMBER: {
+    case PARAM_TYPES.NUMBER:
+    case PARAM_TYPES.INTEGER: {
       const n = Number(value);
       if (!Number.isFinite(n))
         return { valid: false, error: "Must be a number" };
+      if (param.type === PARAM_TYPES.INTEGER && !Number.isInteger(n))
+        return { valid: false, error: "Must be a whole number" };
       if (param.min != null && n < Number(param.min))
         return { valid: false, error: `Must be ≥ ${param.min}` };
       if (param.max != null && n > Number(param.max))
@@ -905,7 +914,7 @@ export function validateParameters(parameters) {
       errors.push(`${where} is a choice but has no valid values`);
     }
     if (
-      p.type === PARAM_TYPES.NUMBER &&
+      isNumericType(p.type) &&
       p.min != null &&
       p.max != null &&
       p.min !== "" &&

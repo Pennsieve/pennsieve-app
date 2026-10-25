@@ -12,6 +12,8 @@ describe("githubRepository", () => {
   it("lets the owner or someone who can push update app.yml", () => {
     expect(canUpdateManifest(true, null)).toBe(true);
     expect(canUpdateManifest(false, { viewerCanPush: true })).toBe(true);
+    expect(canUpdateManifest(false, { viewer_can_push: true })).toBe(true);
+    expect(canUpdateManifest(false, { viewer_can_push: false })).toBe(false);
     expect(canUpdateManifest(false, { viewerCanPush: false })).toBe(false);
     expect(canUpdateManifest(false, { description: "no field" })).toBe(false);
     expect(canUpdateManifest(false, null)).toBe(false);

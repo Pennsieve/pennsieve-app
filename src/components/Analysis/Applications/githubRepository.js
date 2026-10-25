@@ -25,4 +25,6 @@ export async function fetchRepository(api2Url, repo, getToken = useGetToken) {
  * can push to the repository. Without the field (an older github-service, or
  * no access), only the owner.
  */
-export const canUpdateManifest = (isOwner, repository) => Boolean(isOwner) || repository?.viewerCanPush === true;
+// github-service names it viewer_can_push (its JSON is snake_case).
+export const canUpdateManifest = (isOwner, repository) =>
+  Boolean(isOwner) || repository?.viewer_can_push === true || repository?.viewerCanPush === true;
