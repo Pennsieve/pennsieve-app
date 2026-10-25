@@ -8,6 +8,7 @@
 //
 // Diverged enough from the standard run config that it lives on its own; opened
 // via v-model and emits `created` with the new run.
+import { isPathPrefixParam, targetParamLabel, NOTIFY_OPTIONS, defaultsToRunName } from "./dataTargets";
 import { computed, reactive, ref, watch } from "vue";
 import { useStore } from "vuex";
 import BfButton from "../../shared/bf-button/BfButton.vue";
@@ -126,7 +127,7 @@ const dataTargetNodes = computed(() =>
 // The notebook always writes results to its output/ folder (the platform handles
 // the upload), so the upload-bucket target param is not asked of the user — it's
 // hidden from the launcher and left to its default.
-const isHiddenTargetParam = (name) => /bucket/i.test(name || "");
+const isHiddenTargetParam = (name) => /bucket/i.test(name || "") || isPathPrefixParam(name);
 // The destination folder/path param defaults to "/" (dataset root) so output
 // lands in the root folder unless the user picks somewhere else.
 const isOutputFolderParam = (name) =>
@@ -193,6 +194,13 @@ const defaultRunName = computed(() => {
     "0"
   )}-${String(d.getDate()).padStart(2, "0")}`;
   return `${slug(kernel)}-${slug(user)}-${date}`;
+});
+
+// A download's archive name follows the run's name until it's edited.
+watch(runName, (val) => {
+  for (const cfg of Object.values(dataTargetConfigs)) {
+    for (const p of cfg.params || []) if (p.followsRunName) p.value = val;
+  }
 });
 
 // Keep the name set to the default until the user edits it themselves.
@@ -375,18 +383,27 @@ async function loadDefinition() {
       const tt = targetTypes.value.find((t) => t.targetType === node.targetType);
       const paramDefs = tt?.params || [];
       dataTargetConfigs[node.id] = {
-        params: paramDefs.map((pd) => ({
-          name: pd.name,
-          type: pd.type || "string",
-          description: pd.description || "",
-          required: pd.defaultValue == null,
-          value:
-            pd.defaultValue != null
-              ? String(pd.defaultValue)
-              : isOutputFolderParam(pd.name)
-              ? "/"
-              : "",
-        })),
+        params: paramDefs.map((pd) => {
+          const followsRunName = pd.defaultValue == null && defaultsToRunName(node.targetType, pd.name);
+          return {
+            name: pd.name,
+            type: pd.type || "string",
+            description: pd.description || "",
+            required: pd.defaultValue == null && !isPathPrefixParam(pd.name),
+            // Kept equal to the run's name until the user edits it.
+            followsRunName,
+            value:
+              pd.defaultValue != null
+                ? String(pd.defaultValue)
+                : followsRunName
+                ? runName.value
+                : isPathPrefixParam(pd.name)
+                ? ""
+                : isOutputFolderParam(pd.name)
+                ? "/"
+                : "",
+          };
+        }),
       };
     }
     if (dataSourceNodes.value.length > 0) {
@@ -979,17 +996,28 @@ async function execute() {
             >
               <div v-if="!isHiddenTargetParam(p.name)" class="target-param">
                 <label class="target-param-label">
-                  {{ p.name }}
+                  {{ targetParamLabel(p.name) }}
                   <span v-if="p.required" class="target-param-req">*</span>
                 </label>
-                <el-input
+                <el-select
+                  v-if="node.targetType === 'download' && p.name === 'notify'"
                   v-model="dataTargetConfigs[node.id].params[i].value"
-                  :placeholder="p.description || p.name"
                   size="small"
-                />
-                <div v-if="p.description" class="target-param-desc">
-                  {{ p.description }}
-                </div>
+                  class="target-param-select"
+                >
+                  <el-option v-for="o in NOTIFY_OPTIONS" :key="o.value" :label="o.label" :value="o.value" />
+                </el-select>
+                <template v-else>
+                  <el-input
+                    v-model="dataTargetConfigs[node.id].params[i].value"
+                    :placeholder="p.description || p.name"
+                    size="small"
+                    @input="p.followsRunName = false"
+                  />
+                  <div v-if="p.description && targetParamLabel(p.name) === p.name" class="target-param-desc">
+                    {{ p.description }}
+                  </div>
+                </template>
               </div>
             </template>
           </div>
@@ -1397,6 +1425,9 @@ async function execute() {
 }
 .target-param-req {
   color: theme.$red_2;
+}
+.target-param-select {
+  width: 100%;
 }
 .target-param-desc {
   font-size: 11px;
