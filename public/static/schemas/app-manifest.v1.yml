@@ -1,13 +1,23 @@
-# yaml-language-server: $schema=./pennsieve-app-schema.json
-schemaVersion: 1.0.0
+# yaml-language-server: $schema=https://schemas.pennsieve.io/app-manifest/v1.json
+#
+# An example app.yml, kept at the root of an app's repository. Its schema:
+# https://schemas.pennsieve.io/app-manifest/v1.json. The version is the
+# release's tag, and the license is read from the repository's LICENSE file,
+# so neither is declared here.
+schemaVersion: "1.0"
 application:
-  name: test-private-repo-3
-  description: this is a test repo for development purposes
-  version: 1.0.1
+  name: Spike detector
+  description: Finds interictal spikes in EEG recordings.
+  type: processor
   maintainers:
-    - name: edmore
+    - name: Ada Lovelace
+      email: ada@example.org
+      orcid: 0000-0002-1825-0097
+  # Keywords; a known subject or task (eeg, spikes, visualization…) places the
+  # app in the Gallery's colours and filters.
   tags:
-    - demo
+    - eeg
+    - spikes
 runtime:
   cpu: 1024
   memory: 2048
@@ -36,12 +46,27 @@ parameters:
     defaultValue: "false"
   - name: channel
     type: string
-    description: Channel to analyze (no default, treated as required).
+    description: Channel to analyze (no default, so a run must set it).
 inputs:
-  - description: Pipeline package file.
+  - name: recording
+    description: The EEG recording.
+    # MIME types, and/or EDAM formats (https://edamontology.org/page) for
+    # scientific formats without one, e.g. format_3998 (EDF).
     mediaTypes:
       - application/octet-stream
+    formats:
+      - format_3998
 outputs:
-  - description: Pipeline package file.
+  - name: spikes
+    description: The detected spikes.
     mediaTypes:
-      - application/octet-stream
+      - application/vnd.apache.parquet
+  # Without mediaTypes or formats, an input or output takes any file.
+
+# A live Jupyter notebook instead of a batch step declares, under runtime:
+#
+# runtime:
+#   interactive: true      # a session a person works in; the workflow waits
+#   sessionType: jupyter   # a Jupyter notebook
+#   kernel: python         # its language: python or r
+#   computeTypes: [standard]

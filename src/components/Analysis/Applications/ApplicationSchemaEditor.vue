@@ -302,6 +302,26 @@
               {{ port.description || "—" }}
             </span>
           </div>
+          <!-- EDAM formats: for scientific formats without a MIME type. -->
+          <div class="field-row full-width">
+            <label class="field-label">Formats <span class="label-helper">optional</span></label>
+            <el-select
+              v-model="port.formats"
+              multiple
+              filterable
+              allow-create
+              default-first-option
+              :reserve-keyword="false"
+              placeholder="format_3998"
+              size="small"
+              class="field-control"
+            />
+            <span class="field-hint">
+              EDAM format ids, for scientific formats without a media type (e.g. format_3998 for EDF).
+              <a href="https://edamontology.org/page" target="_blank" rel="noopener">Browse EDAM</a>.
+              With no media type or format, any file.
+            </span>
+          </div>
         </div>
         <button
           class="row-remove-btn"
@@ -608,5 +628,17 @@ const removePort = (key, i) => schema.value[key].splice(i, 1);
 .add-row-btn {
   width: 100%;
   margin-top: 6px;
+}
+
+.field-hint {
+  display: block;
+  margin-top: 4px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: theme.$gray_4;
+
+  a {
+    color: theme.$purple_3;
+  }
 }
 </style>
