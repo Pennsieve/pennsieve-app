@@ -1181,6 +1181,10 @@ const actions = {
           name: String(s.name || s.id),
           description: String(s.description || ""),
           spec: String(s.spec || ""),
+          uri: String(s.uri || ""),
+          // Where another structure may start (files/ in a published dataset).
+          contentRoot: String(s.contentRoot || ""),
+          versions: Array.isArray(s.versions) ? s.versions.map(String) : [],
         }));
       commit("UPDATE_PACKAGE_STRUCTURES", structures);
       commit("UPDATE_PACKAGE_FORMATS", result);

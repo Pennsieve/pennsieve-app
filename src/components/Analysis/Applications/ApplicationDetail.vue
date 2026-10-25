@@ -8,7 +8,7 @@ import { load as loadYaml } from "js-yaml";
 
 import IconInfoSmall from "../../icons/IconInfoSmall.vue";
 import MetricsDashboard from "../Metrics/MetricsDashboard.vue";
-import { parseManifest, MANIFEST_SHAPES, PARAM_TYPE_OPTIONS } from "./applicationSchema";
+import { parseManifest, MANIFEST_SHAPES, PARAM_TYPE_OPTIONS, conformsToList } from "./applicationSchema";
 import BfButton from "../../shared/bf-button/BfButton.vue";
 import { fetchRepository, canUpdateManifest } from "./githubRepository";
 import AppPermissions from "../../user/code/AppPermissions.vue";
@@ -343,7 +343,11 @@ const manifestSummary = computed(() => {
 
 /** Human-readable port descriptor: media types if present, else the dataType. */
 const portTypeLabel = (port) => {
-  if (port?.conformsTo) return `${port.conformsTo} folder`;
+  const structures = conformsToList(port?.conformsTo);
+  if (structures.length) {
+    const holds = port?.mediaTypes?.length ? `, holding ${port.mediaTypes.join(", ")}` : "";
+    return `${structures.join(" › ")} folder${holds}`;
+  }
   if (port?.mediaTypes?.length) {
     const types = port.mediaTypes.join(", ");
     return port.container === "directory" ? `${types} (as a folder)` : types;

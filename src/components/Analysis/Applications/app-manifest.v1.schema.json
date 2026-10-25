@@ -199,13 +199,19 @@
         "max": { "type": "number", "description": "For a number or integer: the largest value." }
       }
     },
+    "structureRef": {
+      "type": "string",
+      "description": "A structure id from the Pennsieve format registry, optionally with a version (bids, bids@1.9), or a link to a specification.",
+      "anyOf": [
+        { "pattern": "^[a-z0-9][a-z0-9-]*(@[0-9A-Za-z.+-]+)?$" },
+        { "pattern": "^https://[^\\s]+$" }
+      ]
+    },
     "port": {
       "type": "object",
       "description": "An input or output. Without mediaTypes, formats or conformsTo it accepts any file.",
       "additionalProperties": false,
       "required": ["name"],
-      "if": { "required": ["conformsTo"] },
-      "then": { "properties": { "container": { "const": "directory" } } },
       "properties": {
         "name": { "type": "string", "minLength": 1, "description": "Its name." },
         "description": { "type": "string", "description": "What it is." },
@@ -223,12 +229,14 @@
           "type": "string",
           "enum": ["file", "directory"],
           "default": "file",
-          "description": "How the app gets it, or writes it. file (the default): the package as stored; for a folder format such as OME-Zarr that's its zip (.ozx, .ts.zarr.zip). directory: the platform unpacks each package into its own folder (<name>.ome.zarr/) before the step, and packs each folder the app writes after it. An input can take several packages, so expect one or more folders."
+          "description": "How folder-format items (a registry format with kind directory, such as OME-Zarr or MEF3) are given to the app, or written by it. directory: each item as a plain folder with the format's folder ending (e.g. brain-01.ome.zarr/, session.mefd/); an input can take several, so expect one or more folders. file: each item as Pennsieve stores it, one compressed file. The default is file, except with conformsTo, where it is directory, since a structure is specified in its unpacked form (BIDS expects .ome.zarr folders). See https://github.com/Pennsieve/app-deploy-service/blob/main/docs/app-manifest-folders.md."
         },
         "conformsTo": {
-          "type": "string",
-          "pattern": "^[a-z0-9][a-z0-9-]*(@[0-9A-Za-z.+-]+)?$",
-          "description": "A folder structure from the Pennsieve format registry that the whole input follows, or that the app writes, with an optional version: e.g. bids or bids@1.9. The input is given as a folder tree with its paths kept, so it is always a folder: container is implied (only directory is allowed, and it can be left out)."
+          "description": "The folder structure the whole input follows, or that the app writes: a structure id from the Pennsieve format registry with an optional version (bids, bids@1.9), or a link to any other specification (https://…, matched only by the same link). A list nests structures, outermost first: [pennsieve-published-dataset, bids] is a published dataset whose files/ folder is BIDS. The input is always a folder tree with its paths kept; mediaTypes then say what the tree holds, and container how folder-format items in it are given (directory unless set).",
+          "oneOf": [
+            { "$ref": "#/$defs/structureRef" },
+            { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/structureRef" } }
+          ]
         },
         "required": { "type": "boolean", "description": "Whether a run must give it something." },
         "dataType": {

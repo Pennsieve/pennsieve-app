@@ -121,9 +121,10 @@ export const mediaTypeMatches = (option, query) => {
 export const structureOptionsFor = (structures, declared = []) => {
   const options = asArray(structures).filter((s) => s?.id).map((s) => ({ ...s }));
   const seen = new Set(options.map((s) => s.id));
-  for (const value of asArray(declared)) {
+  // Declared values may be lists (one per port); links aren't options.
+  for (const value of asArray(declared).flatMap(conformsToList)) {
     const id = structureId(value);
-    if (!id || seen.has(id)) continue;
+    if (!id || seen.has(id) || isStructureLink(id)) continue;
     seen.add(id);
     options.push({ id, name: id });
   }
@@ -250,11 +251,14 @@ export const createPort = (overrides = {}) => ({
   // EDAM format ids (format_3590), for scientific formats without a MIME
   // type. With neither mediaTypes nor formats, a port takes any file.
   formats: [],
-  // A folder structure the whole port follows (app.yml `conformsTo`): a
-  // registry id, optionally with a version (bids, bids@1.9).
-  conformsTo: "",
-  // "directory" when the app wants a folder format (OME-Zarr) unpacked; empty
-  // means the package as stored.
+  // The folder structures the whole port follows (app.yml `conformsTo`),
+  // outermost first: registry ids with an optional version (bids@1.9) or
+  // https links. [pennsieve-published-dataset, bids]: a published dataset
+  // whose files/ folder is BIDS.
+  conformsTo: [],
+  // How folder-format items (OME-Zarr) are given: "directory" or "file", as
+  // app.yml writes it; empty means the default (file, or directory on a
+  // structure port).
   container: "",
   cardinality: "",
   ...overrides,
@@ -425,8 +429,8 @@ const parsePort = (raw) =>
     // manifest describes ports that way.
     mediaTypes: asArray(raw?.mediaTypes).map(String),
     formats: asArray(raw?.formats).map((f) => normalizeEdamFormat(f)).filter(Boolean),
-    conformsTo: typeof raw?.conformsTo === "string" ? raw.conformsTo.trim() : "",
-    container: raw?.container === "directory" ? "directory" : "",
+    conformsTo: conformsToList(raw?.conformsTo),
+    container: raw?.container === "directory" || raw?.container === "file" ? raw.container : "",
     cardinality: typeof raw?.cardinality === "string" ? raw.cardinality : "",
   });
 
@@ -618,14 +622,45 @@ const manifestPort = (port) => {
   else if (port.dataType && port.dataType !== "any") out.dataType = port.dataType;
   const formats = asArray(port.formats).map(normalizeEdamFormat).filter(Boolean);
   if (formats.length) out.formats = [...new Set(formats)];
-  if (port.conformsTo && String(port.conformsTo).trim()) out.conformsTo = String(port.conformsTo).trim();
-  if (port.container === "directory") out.container = "directory";
+  const structures = conformsToList(port.conformsTo);
+  if (structures.length === 1) out.conformsTo = structures[0];
+  else if (structures.length > 1) out.conformsTo = structures;
+  if (port.container === "directory" || port.container === "file") out.container = port.container;
   if (port.required) out.required = true;
   return out;
 };
 
-/** A conformsTo's structure id, without its version: bids@1.9 → bids. */
-export const structureId = (conformsTo) => String(conformsTo || "").trim().split("@")[0];
+/** app.yml's conformsTo, one value or a list, as a list of trimmed entries. */
+export const conformsToList = (value) =>
+  (Array.isArray(value) ? value : value == null ? [] : [value])
+    .map((v) => String(v ?? "").trim())
+    .filter(Boolean);
+
+/** Whether a conformsTo entry is a link to a specification, not a registry id. */
+export const isStructureLink = (entry) => /^https?:\/\//i.test(String(entry || "").trim());
+
+/**
+ * A conformsTo entry's identity for matching: a registry id without its
+ * version (bids@1.9 → bids), or a link as written.
+ */
+export const structureId = (entry) => {
+  const s = String(entry || "").trim();
+  return isStructureLink(s) ? s : s.split("@")[0];
+};
+
+/**
+ * Can a tree that conforms to `output` (outermost first) feed an input that
+ * asks for `input`? When the input's list is the end of the output's:
+ * [pennsieve-published-dataset, bids] feeds bids (the app gets files/), but
+ * bids doesn't feed [pennsieve-published-dataset, bids].
+ */
+export const structuresCompatible = (output, input) => {
+  const out = conformsToList(output).map(structureId);
+  const inp = conformsToList(input).map(structureId);
+  if (!out.length || !inp.length || inp.length > out.length) return false;
+  const tail = out.slice(out.length - inp.length);
+  return tail.every((id, i) => id === inp[i]);
+};
 
 /**
  * Build the `app.yml` manifest object from the editable schema plus the
@@ -1018,9 +1053,15 @@ export function validateParameters(parameters) {
 export function arePortsCompatible(output, input) {
   if (!output || !input) return false;
 
-  // A folder structure only meets the same structure (any version).
-  if (output.conformsTo || input.conformsTo) {
-    return Boolean(output.conformsTo && input.conformsTo) && structureId(output.conformsTo) === structureId(input.conformsTo);
+  // A structure only meets a structure: the input's list the end of the
+  // output's, and, when both say what the tree holds, overlapping media types.
+  const outStructures = conformsToList(output.conformsTo);
+  const inStructures = conformsToList(input.conformsTo);
+  if (outStructures.length || inStructures.length) {
+    if (!structuresCompatible(outStructures, inStructures)) return false;
+    const o = asArray(output.mediaTypes);
+    const i = asArray(input.mediaTypes);
+    return !o.length || !i.length || o.some((t) => t === "*/*" || i.includes(t)) || i.includes("*/*");
   }
 
   const outMedia = asArray(output.mediaTypes);
@@ -1067,7 +1108,7 @@ export function validateAppConnection(sourceApp, targetApp) {
   const allInputs = asArray(targetApp?.inputs).map(parsePort);
 
   // A structure (conformsTo) is as checkable as a media type.
-  const declaresMedia = (port) => asArray(port.mediaTypes).length > 0 || Boolean(port.conformsTo);
+  const declaresMedia = (port) => asArray(port.mediaTypes).length > 0 || conformsToList(port.conformsTo).length > 0;
   // Media-type mode as soon as either side describes itself that way — which
   // is every manifest the backend serves. A port with no declared media type
   // is then not judgeable: excluded here and reported as unchecked below,
