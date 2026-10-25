@@ -16,6 +16,9 @@ import {
   edamOptions,
   normalizeFormatPick,
   previewApp,
+  prefillFromApp,
+  repoOf,
+  maintainerFromProfile,
 } from "./manifestBuilder";
 
 describe("what kind of app", () => {
@@ -139,5 +142,58 @@ describe("the card preview", () => {
     const app = previewApp(m);
     expect(app.name).toBe("Spikes");
     expect(app.versions[0].manifest).toMatchObject({ name: "Spikes", description: "Finds spikes", tags: ["eeg"] });
+  });
+});
+
+describe("prefillFromApp", () => {
+  const profile = { firstName: "Ada", lastName: "Lovelace", email: "ada@example.org", orcid: { orcid: "https://orcid.org/0000-0002-1825-0097" } };
+
+  it("opens the repository's app.yml when it has one", () => {
+    const app = {
+      sourceUrl: "https://github.com/org/spike-detect",
+      assets: { "app.yml": "application:\n  name: Spike detect\n  tags: [eeg]\nruntime:\n  cpu: 2048\n" },
+    };
+    const { meta, schema, fromManifest } = prefillFromApp(app, profile);
+    expect(fromManifest).toBe(true);
+    expect(meta.name).toBe("Spike detect");
+    expect(meta.maintainers).toEqual([]);
+    expect(schema.resources.cpu).toBe(2048);
+  });
+
+  it("starts from the repository, its parameters and the user when there's none", () => {
+    const app = {
+      sourceUrl: "https://github.com/org/spike-detect.git",
+      assets: { "README.md": "# hi" },
+      params: [
+        { name: "THRESHOLD", type: "number", defaultValue: "0.5", required: false },
+        { name: "MODE", validValues: ["fast", "slow"], required: true },
+        { name: "" },
+      ],
+    };
+    const { meta, schema, fromManifest } = prefillFromApp(app, profile, { repoDescription: "Finds spikes" });
+    expect(fromManifest).toBe(false);
+    expect(meta.name).toBe("spike-detect");
+    expect(meta.description).toBe("Finds spikes");
+    expect(meta.maintainers).toEqual([{ name: "Ada Lovelace", email: "ada@example.org", orcid: "0000-0002-1825-0097" }]);
+    expect(schema.parameters.map((p) => p.name)).toEqual(["THRESHOLD", "MODE"]);
+    expect(schema.runtime.interactive).toBeFalsy();
+  });
+
+  it("copes with missing fields and a broken app.yml", () => {
+    const { meta, schema } = prefillFromApp({ assets: { "app.yml": "application: [" } }, {});
+    expect(meta.name).toBe("");
+    expect(meta.maintainers).toEqual([]);
+    expect(schema.parameters).toEqual([]);
+    expect(prefillFromApp(null).meta.name).toBe("");
+  });
+
+  it("reads owner and repo from a GitHub URL", () => {
+    expect(repoOf("https://github.com/Pennsieve/seurat-processor")).toEqual({
+      owner: "Pennsieve",
+      repo: "seurat-processor",
+      fullName: "Pennsieve/seurat-processor",
+    });
+    expect(repoOf("")).toBeNull();
+    expect(maintainerFromProfile({})).toBeNull();
   });
 });
