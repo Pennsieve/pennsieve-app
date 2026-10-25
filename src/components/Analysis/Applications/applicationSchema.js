@@ -111,6 +111,34 @@ export const mediaTypeMatches = (option, query) => {
     .some((s) => String(s).toLowerCase().includes(q));
 };
 
+/**
+ * The folder structures a port can follow (BIDS): the registry's, plus any an
+ * app.yml already names that the registry doesn't, so they aren't lost.
+ *
+ * @param {Array<{id: string, name: string, description?: string}>} [structures]
+ * @param {string[]} [declared]  conformsTo values already in the manifest
+ */
+export const structureOptionsFor = (structures, declared = []) => {
+  const options = asArray(structures).filter((s) => s?.id).map((s) => ({ ...s }));
+  const seen = new Set(options.map((s) => s.id));
+  for (const value of asArray(declared)) {
+    const id = structureId(value);
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    options.push({ id, name: id });
+  }
+  return options;
+};
+
+/** Whether a structure option matches a search: its name, id or description. */
+export const structureMatches = (option, query) => {
+  const q = String(query || "").trim().toLowerCase();
+  if (!q) return true;
+  return [option.id, option.name, option.description, "folder", "structure"]
+    .filter(Boolean)
+    .some((s) => String(s).toLowerCase().includes(q));
+};
+
 export const portDataTypeOptions = (packageFormats, declared = []) => {
   const options = [...FALLBACK_PORT_DATA_TYPES];
   const seen = new Set(options.map((o) => o.value));
@@ -128,6 +156,8 @@ export const portDataTypeOptions = (packageFormats, declared = []) => {
       option = { value: t.value, label: t.label || t.value };
       if (t.name) option.name = String(t.name);
       if (t.description) option.description = String(t.description);
+      // A folder format (OME-Zarr): the app can take it unpacked.
+      if (t.kind === "directory") option.kind = "directory";
       byValue.set(t.value, option);
       options.push(option);
     }
@@ -220,6 +250,12 @@ export const createPort = (overrides = {}) => ({
   // EDAM format ids (format_3590), for scientific formats without a MIME
   // type. With neither mediaTypes nor formats, a port takes any file.
   formats: [],
+  // A folder structure the whole port follows (app.yml `conformsTo`): a
+  // registry id, optionally with a version (bids, bids@1.9).
+  conformsTo: "",
+  // "directory" when the app wants a folder format (OME-Zarr) unpacked; empty
+  // means the package as stored.
+  container: "",
   cardinality: "",
   ...overrides,
 });
@@ -389,6 +425,8 @@ const parsePort = (raw) =>
     // manifest describes ports that way.
     mediaTypes: asArray(raw?.mediaTypes).map(String),
     formats: asArray(raw?.formats).map((f) => normalizeEdamFormat(f)).filter(Boolean),
+    conformsTo: typeof raw?.conformsTo === "string" ? raw.conformsTo.trim() : "",
+    container: raw?.container === "directory" ? "directory" : "",
     cardinality: typeof raw?.cardinality === "string" ? raw.cardinality : "",
   });
 
@@ -580,9 +618,14 @@ const manifestPort = (port) => {
   else if (port.dataType && port.dataType !== "any") out.dataType = port.dataType;
   const formats = asArray(port.formats).map(normalizeEdamFormat).filter(Boolean);
   if (formats.length) out.formats = [...new Set(formats)];
+  if (port.conformsTo && String(port.conformsTo).trim()) out.conformsTo = String(port.conformsTo).trim();
+  if (port.container === "directory") out.container = "directory";
   if (port.required) out.required = true;
   return out;
 };
+
+/** A conformsTo's structure id, without its version: bids@1.9 → bids. */
+export const structureId = (conformsTo) => String(conformsTo || "").trim().split("@")[0];
 
 /**
  * Build the `app.yml` manifest object from the editable schema plus the
@@ -975,6 +1018,11 @@ export function validateParameters(parameters) {
 export function arePortsCompatible(output, input) {
   if (!output || !input) return false;
 
+  // A folder structure only meets the same structure (any version).
+  if (output.conformsTo || input.conformsTo) {
+    return Boolean(output.conformsTo && input.conformsTo) && structureId(output.conformsTo) === structureId(input.conformsTo);
+  }
+
   const outMedia = asArray(output.mediaTypes);
   const inMedia = asArray(input.mediaTypes);
   if (outMedia.length && inMedia.length) {
@@ -1018,7 +1066,8 @@ export function validateAppConnection(sourceApp, targetApp) {
   const allOutputs = asArray(sourceApp?.outputs).map(parsePort);
   const allInputs = asArray(targetApp?.inputs).map(parsePort);
 
-  const declaresMedia = (port) => asArray(port.mediaTypes).length > 0;
+  // A structure (conformsTo) is as checkable as a media type.
+  const declaresMedia = (port) => asArray(port.mediaTypes).length > 0 || Boolean(port.conformsTo);
   // Media-type mode as soon as either side describes itself that way — which
   // is every manifest the backend serves. A port with no declared media type
   // is then not judgeable: excluded here and reported as unchecked below,

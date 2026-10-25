@@ -56,6 +56,9 @@ const initialState = () => ({
   // by GET {api2Url}/packages/formats so the vocabulary follows the platform
   // rather than a list maintained in the front end.
   packageFormats: [],
+  // Folder structures (BIDS), from the same registry: what app.yml's
+  // conformsTo names.
+  packageStructures: [],
   packageFormatsLoaded: false,
   analyticsChannel: null,
   pendingRunConfig: null,
@@ -199,6 +202,9 @@ export const mutations = {
   UPDATE_PACKAGE_FORMATS(state, packageFormats) {
     state.packageFormats = packageFormats;
     state.packageFormatsLoaded = true;
+  },
+  UPDATE_PACKAGE_STRUCTURES(state, structures) {
+    state.packageStructures = structures;
   },
   UPDATE_WORKFLOW_ACTIVE_STATUS(state, { uuid, isActive }) {
     const workflow = state.workflows.find((w) => w.uuid === uuid);
@@ -1155,6 +1161,7 @@ const actions = {
           const extensions = Array.isArray(t?.extensions) ? t.extensions.map(String) : [];
           // The format's EDAM id, where EDAM has one (packages-service's registry).
           const edam = t?.edam ? String(t.edam) : "";
+          const kind = t?.kind === "directory" ? "directory" : "";
           return mediaTypes.filter(Boolean).map((m) => ({
             value: String(m),
             label: String(m),
@@ -1162,14 +1169,25 @@ const actions = {
             description,
             extensions,
             ...(edam && { edam }),
+            ...(kind && { kind }),
           }));
         })
         .filter((t) => t.value);
 
+      const structures = (Array.isArray(raw?.structures) ? raw.structures : [])
+        .filter((s) => s?.id)
+        .map((s) => ({
+          id: String(s.id),
+          name: String(s.name || s.id),
+          description: String(s.description || ""),
+          spec: String(s.spec || ""),
+        }));
+      commit("UPDATE_PACKAGE_STRUCTURES", structures);
       commit("UPDATE_PACKAGE_FORMATS", result);
       return result;
     } catch (err) {
       console.warn("Unable to load package formats; using built-in list.", err);
+      commit("UPDATE_PACKAGE_STRUCTURES", []);
       commit("UPDATE_PACKAGE_FORMATS", []);
       return [];
     }
