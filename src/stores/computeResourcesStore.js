@@ -301,6 +301,58 @@ export const useComputeResourcesStore = defineStore('computeResources', () => {
     return !!account?.enabledWorkspaces?.some(ws => ws.organizationId === orgId && ws.isPublic)
   }
 
+  // Connecting an AWS account in the browser (ConnectAwsAccountDialog): the
+  // same calls the Pennsieve agent makes (pennsieve-agent
+  // pkg/service/account.go), from the browser. Each resolves to the parsed
+  // body, or rejects with { status, body } for the dialog to explain.
+  const accountRequest = async (method, path, payload) => {
+    const token = await useGetToken()
+    const response = await fetch(`${siteConfig.api2Url}/compute/resources${path}`, {
+      method,
+      headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+      ...(payload && { body: JSON.stringify(payload) })
+    })
+    const text = await response.text()
+    let body = null
+    try { body = text ? JSON.parse(text) : null } catch { body = { message: text } }
+    if (!response.ok) return Promise.reject({ status: response.status, body })
+    return body
+  }
+
+  // A role setup: { roleName, externalId, cloudFormation?: { quickCreateUrl,
+  // cloudShellCommand, templateUrl, templateVersion }, ... }. The external ID
+  // is issued to this user, for this role, for 24 hours.
+  const requestRoleSetup = () => accountRequest('GET', '/role-policy?externalId=true')
+
+  // Registers the account once its role exists; account-service checks the
+  // role works with the external ID (and refuses without it). Then, as the
+  // agent does, asks for pull access to the app store's images.
+  const registerComputeAccount = async ({ accountId, roleName, externalId, name }) => {
+    const created = await accountRequest('POST', '/accounts', {
+      accountId,
+      accountType: 'AWS',
+      roleName,
+      externalId,
+      ...(name && { name })
+    })
+    try {
+      await accountRequest('POST', '/app-store/access', { accountId, accountType: 'AWS' })
+    } catch (error) {
+      // As the agent: the account is registered; pull access can be asked again
+      console.warn('App store access request failed:', error)
+    }
+    await fetchComputeAccounts(true)
+    return created
+  }
+
+  // Upgrade: points an existing registration (its nodes and sharing kept) at
+  // a role made from the template.
+  const switchComputeAccountRole = async (accountUuid, { roleName, externalId }) => {
+    const result = await accountRequest('POST', `/accounts/${accountUuid}/role`, { roleName, externalId })
+    await fetchComputeAccounts(true)
+    return result
+  }
+
   const fetchNodePermissions = async (nodeId, forceRefresh = false) => {
     // Return cached permissions if available and not forcing refresh
     if (!forceRefresh && permissionsLoaded.value[nodeId]) {
@@ -1574,6 +1626,11 @@ export const useComputeResourcesStore = defineStore('computeResources', () => {
   }
 
   return {
+    // Connecting an AWS account
+    requestRoleSetup,
+    registerComputeAccount,
+    switchComputeAccountRole,
+
     // State - Accounts
     computeAccounts,
     computeAccountsLoaded,

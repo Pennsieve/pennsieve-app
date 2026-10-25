@@ -1,12 +1,14 @@
 <script setup>
 import { reactive, ref, computed, onMounted } from 'vue'
 import { useStore } from 'vuex'
+import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { useGetToken } from '@/composables/useGetToken'
 import * as siteConfig from '@/site-config/site.json'
 import BfButton from '@/components/shared/bf-button/BfButton.vue'
 import BfEmptyPageState from '@/components/shared/bf-empty-page-state/BfEmptyPageState.vue'
 import CreateComputeNodeDialog from './CreateComputeNodeDialog.vue'
+import ConnectAwsAccountDialog from '@/components/user/integrations/ConnectAwsAccountDialog.vue'
 import ComputeNodeCard from './ComputeNodeCard.vue'
 import { useComputeResourcesStore } from '@/stores/computeResourcesStore'
 
@@ -119,9 +121,22 @@ const getUserName = (userId) => {
   return String(userId).includes(':') ? String(userId).split(':').pop() : String(userId)
 }
 
+const route = useRoute()
+const router = useRouter()
+// "Create a compute node on it", from connecting an account, lands here with
+// ?newNode=<account>: the create dialog opens on that account.
+const newNodeAccount = ref('')
 onMounted(() => {
   fetchComputeNodes()
+  if (route.query.newNode && canCreate.value) {
+    newNodeAccount.value = String(route.query.newNode)
+    const { newNode, ...rest } = route.query
+    router.replace({ query: rest })
+    createComputeNodeDialogVisible.value = true
+  }
 })
+
+const connectVisible = ref(false)
 
 async function fetchComputeNodes(forceRefresh = false) {
   try {
@@ -262,6 +277,7 @@ function openCreateDialog() {
 
 function closeCreateDialog() {
   createComputeNodeDialogVisible.value = false
+  newNodeAccount.value = ''
   // Refresh the list after creating
   fetchComputeNodes(true)
 }
@@ -330,10 +346,14 @@ async function confirmDeleteNode() {
           <div class="info-card">
             <h3>Getting started</h3>
             <ol class="setup-steps">
-              <li>Register your AWS account with the Pennsieve agent: <code>pennsieve account register</code></li>
+              <li>Connect your AWS account</li>
               <li>Click <strong>+ New Compute Node</strong> and choose that account</li>
               <li v-if="!isMyWorkspace">Choose who in the workspace can use it</li>
             </ol>
+            <div class="connect-row">
+              <bf-button class="secondary" @click="connectVisible = true">Connect AWS account</bf-button>
+              <span class="cli-hint">Prefer the command line? <code>pennsieve account register</code></span>
+            </div>
           </div>
         </div>
 
@@ -390,8 +410,10 @@ async function confirmDeleteNode() {
     <create-compute-node-dialog
       :dialog-visible="createComputeNodeDialogVisible"
       :personal="isMyWorkspace"
+      :initial-account="newNodeAccount"
       @close="closeCreateDialog"
     />
+    <ConnectAwsAccountDialog v-model="connectVisible" />
     
     <!-- Delete Node Confirmation Dialog -->
     <el-dialog
@@ -446,6 +468,18 @@ async function confirmDeleteNode() {
 
 <style scoped lang="scss">
 @use '../../../styles/_theme.scss';
+
+.connect-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px;
+  margin-top: 12px;
+}
+.cli-hint {
+  font-size: 12px;
+  color: theme.$gray_4;
+}
 
 .compute-nodes-container {
   margin: 0;
