@@ -343,7 +343,11 @@ const manifestSummary = computed(() => {
 
 /** Human-readable port descriptor: media types if present, else the dataType. */
 const portTypeLabel = (port) => {
-  if (port?.mediaTypes?.length) return port.mediaTypes.join(", ");
+  if (port?.conformsTo) return `${port.conformsTo} folder`;
+  if (port?.mediaTypes?.length) {
+    const types = port.mediaTypes.join(", ");
+    return port.container === "directory" ? `${types} (as a folder)` : types;
+  }
   return port?.dataType || "any";
 };
 

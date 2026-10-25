@@ -224,14 +224,26 @@
                 <div class="field-control">
                   <!-- Searchable by format name, extension or media type -->
                   <el-select
-                    :model-value="port.dataType"
+                    :model-value="portSelection(port)"
                     class="full"
                     filterable
                     :filter-method="(q) => (mediaTypeQuery = q)"
-                    placeholder="Search formats, e.g. NWB, .edf"
+                    placeholder="Search formats, e.g. NWB, .edf, BIDS"
                     @visible-change="(open) => open || (mediaTypeQuery = '')"
-                    @change="(v) => onPortDataTypeChange(port, v)"
+                    @change="(v) => onPortSelect(port, v)"
                   >
+                    <!-- A whole folder that follows a structure (BIDS): app.yml conformsTo -->
+                    <el-option
+                      v-for="s in structureOptions.filter((o) => structureMatches(o, mediaTypeQuery))"
+                      :key="`structure:${s.id}`"
+                      :label="`${s.name} folder`"
+                      :value="`structure:${s.id}`"
+                    >
+                      <span class="mt-option">
+                        <span class="mt-name">{{ s.name }} folder</span>
+                        <span class="mt-meta">Folder structure · {{ s.id }}</span>
+                      </span>
+                    </el-option>
                     <el-option
                       v-for="dt in portDataTypes.filter((o) => mediaTypeMatches(o, mediaTypeQuery))"
                       :key="dt.value"
@@ -241,12 +253,22 @@
                       <span class="mt-option">
                         <span class="mt-name">{{ dt.formats && dt.formats.length ? dt.formats.join(" / ") : dt.label }}</span>
                         <span v-if="dt.formats && dt.formats.length" class="mt-meta">
-                          {{ dt.value }}<template v-if="dt.extensions && dt.extensions.length"> · {{ dt.extensions.join(", ") }}</template><template v-if="dt.edam"> · EDAM {{ dt.edam }}</template>
+                          <template v-if="dt.kind === 'directory'">Folder format · </template>{{ dt.value }}<template v-if="dt.extensions && dt.extensions.length"> · {{ dt.extensions.join(", ") }}</template><template v-if="dt.edam"> · EDAM {{ dt.edam }}</template>
                         </span>
                       </span>
                     </el-option>
                   </el-select>
                   <p v-for="m in at(`${block.key}.${index}.mediaTypes`)" :key="m" class="field-error">{{ m }}</p>
+                </div>
+              </div>
+              <!-- A folder format (OME-Zarr): the stored zip, or unpacked -->
+              <div v-if="optionFor(port.dataType)?.kind === 'directory' || port.container" class="field-row">
+                <label class="field-label">{{ block.key === "inputs" ? "Given to the app as" : "Written as" }}</label>
+                <div class="field-control">
+                  <el-select :model-value="port.container || 'file'" class="full" @change="(v) => (port.container = v === 'directory' ? 'directory' : '')">
+                    <el-option label="The zip, as stored" value="file" />
+                    <el-option label="A folder" value="directory" />
+                  </el-select>
                 </div>
               </div>
               <div v-if="block.key === 'inputs'" class="field-row">
@@ -262,7 +284,7 @@
               <div class="field-row full-width" :data-field="`${block.key}.${index}.name`" :class="rowClass(`${block.key}.${index}.name`)">
                 <label class="field-label">Name</label>
                 <div class="field-control">
-                  <el-input v-if="port.dataType === 'any'" v-model="port.name" placeholder="files" maxlength="50" />
+                  <el-input v-if="port.dataType === 'any' && !port.conformsTo" v-model="port.name" placeholder="files" maxlength="50" />
                   <span v-else class="field-static" :class="{ 'is-empty': !port.name }">{{ port.name || "Select a media type" }}</span>
                   <p v-for="m in at(`${block.key}.${index}.name`)" :key="m" class="field-error">{{ m }}</p>
                 </div>
@@ -270,7 +292,7 @@
               <div class="field-row full-width" :data-field="`${block.key}.${index}.description`">
                 <label class="field-label">Description</label>
                 <div class="field-control">
-                  <el-input v-if="port.dataType === 'any'" v-model="port.description" placeholder="What goes here (optional)" />
+                  <el-input v-if="port.dataType === 'any' && !port.conformsTo" v-model="port.description" placeholder="What goes here (optional)" />
                   <span v-else class="field-static" :class="{ 'is-empty': !port.description }">{{ port.description || "—" }}</span>
                 </div>
               </div>
@@ -338,7 +360,7 @@ import { computed, onMounted, ref } from "vue";
 import { useStore } from "vuex";
 import MoreOptions from "./MoreOptions.vue";
 import FieldHint from "./FieldHint.vue";
-import { PARAM_TYPES, PARAM_TYPE_OPTIONS, createParameter, createPort, portDataTypeOptions, STANDARD_CPU_OPTIONS, getStandardMemoryOptions, isNumericType, mediaTypeMatches } from "./applicationSchema";
+import { PARAM_TYPES, PARAM_TYPE_OPTIONS, createParameter, createPort, portDataTypeOptions, STANDARD_CPU_OPTIONS, getStandardMemoryOptions, isNumericType, mediaTypeMatches, structureId, structureOptionsFor, structureMatches } from "./applicationSchema";
 import { canonicalTag, preferredTagGroups, tagOptionMatches, tagDomainNudge, hasDomainTag, domainOfTag, domainColors } from "./appDomains";
 
 /**
@@ -488,6 +510,36 @@ const onPortDataTypeChange = (port, value) => {
   // the app.yml had stay unless the port goes back to any file.
   const kept = (port.formats || []).filter((f) => f !== previous && f !== option?.edam);
   port.formats = port.dataType === "any" ? [] : [...kept, ...(option?.edam ? [option.edam] : [])];
+};
+
+/*
+  A port is either a file format (a media type) or a whole folder that
+  follows a structure (BIDS, app.yml conformsTo). One select offers both.
+*/
+const structureOptions = computed(() =>
+  structureOptionsFor(store.state.analysisModule.packageStructures, [
+    ...(schema.value.inputs || []).map((p) => p.conformsTo),
+    ...(schema.value.outputs || []).map((p) => p.conformsTo),
+  ])
+);
+const portSelection = (port) => (port.conformsTo ? `structure:${structureId(port.conformsTo)}` : port.dataType);
+const onPortSelect = (port, value) => {
+  const id = String(value || "").startsWith("structure:") ? value.slice("structure:".length) : "";
+  if (!id) {
+    port.conformsTo = "";
+    onPortDataTypeChange(port, value);
+    if (optionFor(port.dataType)?.kind !== "directory") port.container = "";
+    return;
+  }
+  const s = structureOptions.value.find((o) => o.id === id);
+  // Keep a version the app.yml named for the same structure (bids@1.9).
+  if (structureId(port.conformsTo) !== id) port.conformsTo = id;
+  port.dataType = "any";
+  port.mediaTypes = [];
+  port.formats = [];
+  port.container = "";
+  port.name = s?.name || id;
+  port.description = s?.description || "";
 };
 
 const onParamTypeChange = (param, type) => {
