@@ -91,10 +91,11 @@ async function verify() {
   verifyError.value = ''
   const roleName = setup.value?.roleName
   const externalId = setup.value?.externalId
+  const templateVersion = setup.value?.cloudFormation?.templateVersion
   isVerifying.value = true
   try {
     if (isUpgrade.value) {
-      await computeResourcesStore.switchComputeAccountRole(props.account.uuid, { roleName, externalId })
+      await computeResourcesStore.switchComputeAccountRole(props.account.uuid, { roleName, externalId, templateVersion })
       step.value = 'done'
       emit('connected', props.account)
       return
@@ -109,6 +110,7 @@ async function verify() {
       accountId: parsed.accountId,
       roleName,
       externalId,
+      templateVersion,
       name: name.value.trim(),
     })
     connected.value = created || {}
