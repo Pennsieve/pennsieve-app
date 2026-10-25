@@ -86,6 +86,9 @@ const isAppOwner = computed(() => {
   return !!ownerId && (ownerId === id || ownerId === intId);
 });
 
+// The manifest builder, opened for this app (its owner's Create/Edit app.yml).
+const builderForApp = computed(() => ({ ...scopedRoute("application-manifest-builder"), query: { app: props.uuid } }));
+
 // Permissions only apply to private applications.
 const isPublic = computed(() => detail.value?.isPrivate === false);
 
@@ -882,6 +885,9 @@ watch(
                     </span>
                   </div>
                 </div>
+                <router-link v-if="isAppOwner" :to="builderForApp" class="manifest-cta manifest-cta-primary">
+                  Edit app.yml
+                </router-link>
               </template>
 
               <!-- Present but malformed -->
@@ -892,11 +898,8 @@ watch(
                   <span class="manifest-status-text">Could not be read</span>
                 </div>
                 <p class="manifest-error-detail">{{ manifestParsed.error }}</p>
-                <router-link
-                  :to="scopedRoute('application-manifest-builder')"
-                  class="manifest-cta"
-                >
-                  Rebuild with the manifest builder
+                <router-link v-if="isAppOwner" :to="builderForApp" class="manifest-cta manifest-cta-primary">
+                  Edit app.yml
                 </router-link>
               </template>
 
@@ -911,11 +914,8 @@ watch(
                   <code>app.yml</code> to declare its runtime, resources,
                   parameters, and inputs/outputs.
                 </p>
-                <router-link
-                  :to="scopedRoute('application-manifest-builder')"
-                  class="manifest-cta manifest-cta-primary"
-                >
-                  Generate an app.yml
+                <router-link v-if="isAppOwner" :to="builderForApp" class="manifest-cta manifest-cta-primary">
+                  Create app.yml
                 </router-link>
                 <router-link
                   :to="scopedRoute('application-manifest-guide')"

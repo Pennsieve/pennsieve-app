@@ -23,9 +23,12 @@ import {
   fieldKeyOfPath,
   sectionOfPath,
   previewApp,
+  prefillFromApp,
+  repoOf,
 } from "./manifestBuilder";
 import { appTitle, runsOn } from "./appCards";
 import { useAppManifest } from "@/composables/useAppManifest";
+import { useGetToken } from "@/composables/useGetToken";
 
 const router = useRouter();
 const route = useRoute();
@@ -142,6 +145,7 @@ function openInBuilder() {
 function startNew() {
   load({ meta: blankMeta(), schema: createApplicationSchema() });
   editingApp.value = "";
+  forApp.value = null;
 }
 
 const storeDialog = ref(false);
@@ -183,9 +187,75 @@ async function editApp(uuid) {
   }
 }
 
-// ?check=1 (the app page's "check it" link) opens the check.
+/*
+  Opened for an app from its page (?app=<uuid>): its repository's app.yml, or
+  a new one from what Pennsieve knows (prefillFromApp). The repository's
+  description comes from github-service, which keeps it; GitHub topics aren't
+  kept anywhere, so tags start empty.
+*/
+const forApp = ref(null); // { uuid, title, repo, fromManifest }
+// The app's GitHub installation, when it hasn't approved Pennsieve's updated
+// permissions yet (so no pull request from here): its review link.
+const prReview = ref(null);
+const api2Url = computed(() => store.state.config?.api2Url || "");
+
+async function getJson(url) {
+  const token = await useGetToken();
+  const resp = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+  if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+  return resp.json();
+}
+async function repoDescription(repo) {
+  if (!repo) return "";
+  try {
+    const body = await getJson(`${api2Url.value}/github/repository/${encodeURIComponent(repo.owner)}/${encodeURIComponent(repo.repo)}`);
+    return body?.description || "";
+  } catch {
+    return "";
+  }
+}
+async function installationNeedingReview(owner) {
+  try {
+    const body = await getJson(`${api2Url.value}/github/installations`);
+    const list = Array.isArray(body) ? body : body?.installations || [];
+    return list.find((i) => i?.needs_review === true && String(i.name || "").toLowerCase() === owner.toLowerCase()) || null;
+  } catch {
+    return null;
+  }
+}
+
+async function openForApp(uuid) {
+  loadingApp.value = true;
+  try {
+    const app = await store.dispatch("analysisModule/fetchApplication", uuid);
+    const repo = repoOf(app?.sourceUrl);
+    const hasManifest = Object.keys(app?.assets || {}).some((k) => /^app\.ya?ml$/i.test(k));
+    const description = hasManifest ? "" : await repoDescription(repo);
+    const start = prefillFromApp(app, store.state.profile, { repoDescription: description });
+    load(start);
+    forApp.value = { uuid, title: start.meta.name || appTitle(app), repo, fromManifest: start.fromManifest };
+    prReview.value = repo ? await installationNeedingReview(repo.owner) : null;
+  } catch {
+    ElMessage.error("Couldn't load that app; starting a new manifest.");
+  } finally {
+    loadingApp.value = false;
+  }
+}
+
+// The app's page, to go back to.
+const appPageRoute = computed(() =>
+  forApp.value
+    ? route.params.orgId
+      ? { name: "application-detail", params: { orgId: route.params.orgId, uuid: forApp.value.uuid } }
+      : { name: "my-application-detail", params: { uuid: forApp.value.uuid } }
+    : null
+);
+
+// ?check=1 (the app page's "check it" link) opens the check; ?app=<uuid> (its
+// Create/Edit app.yml) opens that app's.
 onMounted(async () => {
   store.dispatch("analysisModule/fetchApplications").catch(() => {});
+  if (route.query.app) await openForApp(String(route.query.app));
   if (route.query.check) await openExisting();
 });
 
@@ -245,6 +315,16 @@ const goToGuide = () =>
         <a href="#" class="guide-link" @click.prevent="goToGuide">Manifest guide &rsaquo;</a>
       </p>
     </header>
+
+    <!-- Opened from an app's page: whose app.yml this is -->
+    <div v-if="forApp" class="for-app">
+      <span>
+        Editing the app.yml for <strong>{{ forApp.title }}</strong>
+        <template v-if="forApp.repo"> · {{ forApp.repo.fullName }}</template>
+        <template v-if="!forApp.fromManifest"> (new)</template>
+      </span>
+      <router-link :to="appPageRoute" class="for-app-link">Back to the app</router-link>
+    </div>
 
     <!-- Edit an app from the store: its newest app.yml -->
     <el-dialog v-model="storeDialog" title="Edit an app from the store" width="440px" append-to-body>
@@ -487,6 +567,15 @@ const goToGuide = () =>
             </p>
           </template>
         </div>
+        <!-- For an app: where the file goes. TODO(868mmz09m): "Open a pull
+             request" on forApp.repo goes here, once the GitHub App can. -->
+        <p v-if="forApp?.repo" class="preview-note">
+          Add it to {{ forApp.repo.fullName }} as <code>app.yml</code> at the root, then publish a release.
+          <template v-if="prReview?.review_url">
+            <a :href="prReview.review_url" target="_blank" rel="noopener">Approve Pennsieve's GitHub update</a>
+            to open a pull request from here instead.
+          </template>
+        </p>
         <p class="preview-note">
           The version is the release's tag, and the license comes from the repository's LICENSE file.
         </p>
@@ -861,6 +950,28 @@ code {
   background: theme.$red_tint;
   font-size: 11px;
   color: theme.$red_2;
+}
+.for-app {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0 0 16px;
+  padding: 8px 12px;
+  border: 1px solid theme.$gray_2;
+  border-radius: 3px;
+  background: theme.$gray_1;
+  font-size: 13px;
+  color: theme.$gray_6;
+}
+.for-app-link {
+  flex-shrink: 0;
+  color: theme.$purple_3;
+  text-decoration: none;
+
+  &:hover {
+    text-decoration: underline;
+  }
 }
 .preview-note {
   margin: 8px 2px 0;

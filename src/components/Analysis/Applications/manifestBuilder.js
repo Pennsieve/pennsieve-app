@@ -3,7 +3,15 @@
 // the builder's sections and which of them a problem belongs to, the field a
 // problem points at, the EDAM formats the picker offers, and the Gallery card
 // an app.yml gives.
-import { createPort, normalizeEdamFormat, PARAM_TYPES, validateParameterValue } from "./applicationSchema";
+import { load as loadYaml } from "js-yaml";
+import {
+  createPort,
+  normalizeEdamFormat,
+  normalizeOrcid,
+  parseManifest,
+  PARAM_TYPES,
+  validateParameterValue,
+} from "./applicationSchema";
 
 /* ─────────────── Kind: batch or interactive ─────────────── */
 
@@ -239,3 +247,65 @@ export function previewApp(manifest) {
     ],
   };
 }
+
+/* ─────────────── Opened for an app: its app.yml, or a start from what we know ─────────────── */
+
+// owner/repo from an app's GitHub source URL, or null.
+export function repoOf(sourceUrl) {
+  const m = String(sourceUrl || "").match(/github\.com\/([^/]+)\/([^/\s?#]+)/);
+  return m ? { owner: m[1], repo: m[2].replace(/\.git$/, ""), fullName: `${m[1]}/${m[2].replace(/\.git$/, "")}` } : null;
+}
+
+// The app.yml text among an app's repository files (the detail's assets).
+const manifestAsset = (assets) => {
+  const key = Object.keys(assets || {}).find((k) => /^app\.ya?ml$/i.test(k));
+  return key ? String(assets[key] || "") : "";
+};
+
+// The signed-in user as a maintainer: name, email, and ORCID iD if linked.
+export function maintainerFromProfile(profile) {
+  const name = [profile?.firstName, profile?.lastName].filter(Boolean).join(" ").trim();
+  if (!name) return null;
+  const orcid = normalizeOrcid(profile?.orcid?.orcid || "");
+  return { name, email: profile?.email || "", orcid };
+}
+
+/*
+  What the builder starts from when it's opened for an app (?app=<uuid>): its
+  repository's app.yml if it has one that reads; else a new manifest from what
+  Pennsieve knows of it: the repository's name and description, its current
+  parameters, and the signed-in user as maintainer. Pennsieve keeps no compute
+  settings or tags for an app without an app.yml, so those start at the
+  builder's defaults. { meta, schema, fromManifest }.
+*/
+export function prefillFromApp(app, profile = {}, { repoDescription = "" } = {}) {
+  const raw = manifestAsset(app?.assets);
+  if (raw.trim()) {
+    try {
+      const doc = loadYaml(raw);
+      if (doc && typeof doc === "object" && !Array.isArray(doc)) return { ...parseManifest(doc), fromManifest: true };
+    } catch {
+      // A broken app.yml: start from what Pennsieve knows instead.
+    }
+  }
+  const maintainer = maintainerFromProfile(profile);
+  const doc = {
+    application: {
+      name: app?.name || repoOf(app?.sourceUrl)?.repo || "",
+      description: repoDescription || app?.description || "",
+      maintainers: maintainer ? [maintainer] : [],
+    },
+    parameters: (Array.isArray(app?.params) ? app.params : [])
+      .filter((p) => p?.name)
+      .map((p) => ({
+        name: p.name,
+        type: p.type || PARAM_TYPES.STRING,
+        ...(p.description && { description: p.description }),
+        ...(p.required && { required: true }),
+        ...(p.defaultValue != null && p.defaultValue !== "" && { defaultValue: p.defaultValue }),
+        ...(Array.isArray(p.validValues) && p.validValues.length && { validValues: p.validValues }),
+      })),
+  };
+  return { ...parseManifest(doc), fromManifest: false };
+}
+
