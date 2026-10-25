@@ -2,6 +2,7 @@
 // workflow that hosts an interactive kernel; the kernel (python/r) is derived
 // from the workflow. Kept tiny + isolated so the matching rule is easy to adjust
 // as more notebook environments are published.
+import { targetWritesToDataset } from "./dataTargets";
 
 // Returns the kernel/session type for a workflow, or null if it isn't a
 // notebook. The authoritative signal is an interactive node's declared
@@ -79,4 +80,23 @@ export function kernelLabel(sessionType) {
   }
   if (sessionType === "r") return "R";
   return sessionType;
+}
+
+// The kernels a notebook can start with here. Outside a workspace (My
+// Workspace) a run has no dataset to write to, so a kernel whose results go
+// to one would only fail; it isn't offered.
+export function launchableKernels(workflows = [], { personal = false } = {}) {
+  if (!personal) return workflows;
+  return workflows.filter(
+    (wf) => !(wf?.dag || []).some((d) => d.type === "data-target" && targetWritesToDataset(d.targetType))
+  );
+}
+
+// Where a kernel's results go, in a word, to tell same-language kernels apart.
+export function kernelOutput(wf) {
+  const targets = (wf?.dag || []).filter((d) => d.type === "data-target").map((d) => d.targetType);
+  if (!targets.length) return "";
+  if (targets.every((t) => t === "download")) return "Results as a download";
+  if (targets.some((t) => targetWritesToDataset(t))) return "Results saved to a dataset";
+  return "";
 }
