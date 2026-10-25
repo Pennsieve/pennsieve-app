@@ -1012,3 +1012,27 @@ describe('media type options', () => {
   })
 })
 
+describe('EDAM from the media type', () => {
+  it("gives an option the formats' EDAM id only when all formats sharing it agree", () => {
+    const opts = portDataTypeOptions([
+      { value: 'text/csv', label: 'text/csv', name: 'CSV', edam: 'format_3752' },
+      { value: 'application/x-hdf5', label: 'application/x-hdf5', name: 'HDF5', edam: 'format_3590' },
+      { value: 'application/x-hdf5', label: 'application/x-hdf5', name: 'NeuroData Without Borders' },
+      { value: 'application/vnd.pennsieve.edf', label: 'application/vnd.pennsieve.edf', name: 'EDF Timeseries' },
+    ])
+    const by = (v) => opts.find((o) => o.value === v)
+    expect(by('text/csv').edam).toBe('format_3752')
+    expect(by('application/x-hdf5').edam).toBeUndefined()
+    expect(by('application/vnd.pennsieve.edf').edam).toBeUndefined()
+    expect(mediaTypeMatches(by('text/csv'), 'format_3752')).toBe(true)
+  })
+  it('keeps formats an app.yml declares through a round trip', () => {
+    const { schema } = parseManifest({
+      application: { name: 'n' },
+      inputs: [{ name: 'table', mediaTypes: ['text/csv'], formats: ['format_3752', 'format_3475'] }],
+    })
+    const out = buildManifest(schema, { name: 'n' })
+    expect(out.inputs[0].formats).toEqual(['format_3752', 'format_3475'])
+  })
+})
+

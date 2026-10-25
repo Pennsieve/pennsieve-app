@@ -198,7 +198,7 @@
                       <span class="mt-option">
                         <span class="mt-name">{{ dt.formats && dt.formats.length ? dt.formats.join(" / ") : dt.label }}</span>
                         <span v-if="dt.formats && dt.formats.length" class="mt-meta">
-                          {{ dt.value }}<template v-if="dt.extensions && dt.extensions.length"> · {{ dt.extensions.join(", ") }}</template>
+                          {{ dt.value }}<template v-if="dt.extensions && dt.extensions.length"> · {{ dt.extensions.join(", ") }}</template><template v-if="dt.edam"> · EDAM {{ dt.edam }}</template>
                         </span>
                       </span>
                     </el-option>
@@ -232,33 +232,11 @@
                 </div>
               </div>
 
-              <!-- EDAM formats, the advanced part -->
-              <more-options :force-open="!!(port.formats || []).length || !!at(`${block.key}.${index}.formats`).length">
-                <div class="field-row full-width" :data-field="`${block.key}.${index}.formats`" :class="rowClass(`${block.key}.${index}.formats`)">
-                  <label class="field-label">Formats</label>
-                  <div class="field-control">
-                    <el-select
-                      :model-value="port.formats"
-                      multiple
-                      filterable
-                      allow-create
-                      default-first-option
-                      :reserve-keyword="false"
-                      placeholder="Search formats, or type format_NNNN"
-                     
-                      class="full"
-                      @update:model-value="(v) => setFormats(port, v)"
-                    >
-                      <el-option v-for="f in edamOptions(port.formats)" :key="f.value" :label="f.label" :value="f.value" />
-                    </el-select>
-                    <p v-for="m in at(`${block.key}.${index}.formats`)" :key="m" class="field-error">{{ m }}</p>
-                    <p class="field-hint">
-                      For formats a media type doesn't name.
-                      <a href="https://edamontology.org/page" target="_blank" rel="noopener">Browse EDAM</a>
-                    </p>
-                  </div>
-                </div>
-              </more-options>
+              <!-- EDAM formats come with the media type; any others the app.yml
+                   already had are kept, shown here. -->
+              <p v-if="extraFormats(port).length" class="field-hint">
+                Also from app.yml: {{ extraFormats(port).join(", ") }} (EDAM)
+              </p>
             </div>
           </div>
 
@@ -319,7 +297,6 @@ import { useStore } from "vuex";
 import MoreOptions from "./MoreOptions.vue";
 import { PARAM_TYPES, PARAM_TYPE_OPTIONS, createParameter, createPort, portDataTypeOptions, STANDARD_CPU_OPTIONS, getStandardMemoryOptions, isNumericType, mediaTypeMatches } from "./applicationSchema";
 import { SUGGESTED_TAGS, canonicalTag } from "./appDomains";
-import { edamOptions, normalizeFormatPick } from "./manifestBuilder";
 
 /**
  * One part of the app manifest builder's form, bound to an ApplicationSchema
@@ -418,11 +395,6 @@ const toggleComputeType = (type, checked) => {
   schema.value.runtime.computeTypes = Array.from(types);
 };
 
-// EDAM formats as ids, whether picked by label or typed.
-const setFormats = (port, values) => {
-  port.formats = [...new Set((values || []).map(normalizeFormatPick).filter(Boolean))];
-};
-
 /*
   Parameter names are referenced by the running application, so they must be
   single tokens. Whitespace is stripped as it is typed (or pasted) rather than
@@ -438,14 +410,25 @@ const onParamNameInput = (param, value) => {
   `mediaTypes` is kept in step so a manifest round-trips. With "Any", the
   author names the port.
 */
+const optionFor = (value) => portDataTypes.value.find((o) => o.value === value);
+// The EDAM formats a port has beyond its media type's (kept from app.yml).
+const extraFormats = (port) => {
+  const edam = optionFor(port.dataType)?.edam;
+  return (port.formats || []).filter((f) => f !== edam);
+};
 const onPortDataTypeChange = (port, value) => {
+  const previous = optionFor(port.dataType)?.edam;
   port.dataType = value || "any";
-  const option = portDataTypes.value.find((o) => o.value === port.dataType);
+  const option = optionFor(port.dataType);
   if (port.dataType !== "any") {
     port.name = option?.name || "";
     port.description = option?.description || "";
   }
   port.mediaTypes = port.dataType && port.dataType !== "any" ? [port.dataType] : [];
+  // The media type brings its EDAM id; "Any" writes neither. Other formats
+  // the app.yml had stay unless the port goes back to any file.
+  const kept = (port.formats || []).filter((f) => f !== previous && f !== option?.edam);
+  port.formats = port.dataType === "any" ? [] : [...kept, ...(option?.edam ? [option.edam] : [])];
 };
 
 const onParamTypeChange = (param, type) => {

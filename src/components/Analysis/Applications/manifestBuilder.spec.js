@@ -11,10 +11,6 @@ import {
   builderChecks,
   problemsBySection,
   problemsByField,
-  EDAM_FORMATS,
-  edamLabel,
-  edamOptions,
-  normalizeFormatPick,
   previewApp,
   prefillFromApp,
   repoOf,
@@ -116,23 +112,6 @@ describe("sections and fields", () => {
     const schema = createApplicationSchema({ parameters: [createParameter({ name: "" })] });
     setAppKind(schema, "interactive");
     expect(builderChecks({ name: "n" }, schema)).toEqual([]);
-  });
-});
-
-describe("EDAM formats", () => {
-  it("offers well-formed, distinct ids, labelled", () => {
-    const ids = EDAM_FORMATS.map((f) => f.id);
-    expect(ids.every((id) => /^format_\d{4}$/.test(id))).toBe(true);
-    expect(new Set(ids).size).toBe(ids.length);
-    expect(edamLabel("format_3590")).toBe("HDF5 (format_3590)");
-    expect(edamLabel("format_9999")).toBe("format_9999");
-    expect(edamOptions(["format_9999"]).at(-1)).toEqual({ value: "format_9999", label: "format_9999" });
-  });
-
-  it("keeps an id whether picked, typed as a URI, or typed as a label", () => {
-    expect(normalizeFormatPick("format_3590")).toBe("format_3590");
-    expect(normalizeFormatPick("http://edamontology.org/format_3752")).toBe("format_3752");
-    expect(normalizeFormatPick("hdf5")).toBe("format_3590");
   });
 });
 
