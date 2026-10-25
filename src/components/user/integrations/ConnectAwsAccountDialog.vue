@@ -238,9 +238,6 @@ function createNode() {
           <bf-button v-if="!isUpgrade" @click="createNode">Create a compute node on it</bf-button>
         </template>
       </div>
-      <p v-if="step === 'start' && !isUpgrade" class="ca-cli">
-        Prefer the command line? <code>pennsieve account register</code>
-      </p>
     </template>
   </el-dialog>
 </template>
@@ -337,11 +334,5 @@ code {
   display: flex;
   justify-content: flex-end;
   gap: 8px;
-}
-.ca-cli {
-  margin: 12px 0 0;
-  text-align: right;
-  font-size: 12px;
-  color: theme.$gray_4;
 }
 </style>

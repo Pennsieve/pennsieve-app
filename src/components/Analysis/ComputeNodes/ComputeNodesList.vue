@@ -352,7 +352,6 @@ async function confirmDeleteNode() {
             </ol>
             <div class="connect-row">
               <bf-button class="secondary" @click="connectVisible = true">Connect AWS account</bf-button>
-              <span class="cli-hint">Prefer the command line? <code>pennsieve account register</code></span>
             </div>
           </div>
         </div>
@@ -475,10 +474,6 @@ async function confirmDeleteNode() {
   align-items: center;
   gap: 16px;
   margin-top: 12px;
-}
-.cli-hint {
-  font-size: 12px;
-  color: theme.$gray_4;
 }
 
 .compute-nodes-container {
