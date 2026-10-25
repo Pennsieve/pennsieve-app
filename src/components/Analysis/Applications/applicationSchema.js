@@ -106,7 +106,7 @@ export const FALLBACK_PORT_DATA_TYPES = Object.freeze([
 export const mediaTypeMatches = (option, query) => {
   const q = String(query || "").trim().toLowerCase();
   if (!q) return true;
-  return [option.value, option.label, ...(option.formats || []), ...(option.extensions || [])]
+  return [option.value, option.label, option.edam, ...(option.formats || []), ...(option.extensions || [])]
     .filter(Boolean)
     .some((s) => String(s).toLowerCase().includes(q));
 };
@@ -118,6 +118,7 @@ export const portDataTypeOptions = (packageFormats, declared = []) => {
   // application/x-hdf5): one option per media type, naming every format that
   // uses it and their extensions, so searching "nwb" finds it.
   const byValue = new Map();
+  const edamsByValue = new Map();
   for (const t of asArray(packageFormats)) {
     if (!t?.value || seen.has(t.value)) continue;
     let option = byValue.get(t.value);
@@ -135,6 +136,12 @@ export const portDataTypeOptions = (packageFormats, declared = []) => {
     for (const e of asArray(t.extensions)) {
       if (!(option.extensions || []).includes(String(e))) (option.extensions ||= []).push(String(e));
     }
+    (edamsByValue.get(t.value) || edamsByValue.set(t.value, []).get(t.value)).push(t.edam ? String(t.edam) : "");
+  }
+  // A media type's EDAM id: only when every format sharing it has the same one
+  // (HDF5 and NWB share application/x-hdf5; NWB has none, so neither gets it).
+  for (const [value, edams] of edamsByValue) {
+    if (edams.length && edams[0] && edams.every((e) => e === edams[0])) byValue.get(value).edam = edams[0];
   }
   for (const value of byValue.keys()) seen.add(value);
   for (const value of asArray(declared)) {

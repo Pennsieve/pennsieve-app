@@ -1153,12 +1153,15 @@ const actions = {
             ? t.mediaTypes
             : [t?.mediaType ?? t?.format ?? t?.value ?? t?.name];
           const extensions = Array.isArray(t?.extensions) ? t.extensions.map(String) : [];
+          // The format's EDAM id, where EDAM has one (packages-service's registry).
+          const edam = t?.edam ? String(t.edam) : "";
           return mediaTypes.filter(Boolean).map((m) => ({
             value: String(m),
             label: String(m),
             name,
             description,
             extensions,
+            ...(edam && { edam }),
           }));
         })
         .filter((t) => t.value);

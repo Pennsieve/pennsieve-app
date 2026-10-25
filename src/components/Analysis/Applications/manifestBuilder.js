@@ -1,7 +1,7 @@
 // The app manifest builder's own rules, pure so they're easy to test: what
 // kind of app it is (batch or interactive) and what that writes,
 // the builder's sections and which of them a problem belongs to, the field a
-// problem points at, the EDAM formats the picker offers, and the Gallery card
+// problem points at, and the Gallery card
 // an app.yml gives.
 import { load as loadYaml } from "js-yaml";
 import { createPort, normalizeEdamFormat, normalizeOrcid, parseManifest, PARAM_TYPES, validateParameterValue, isEarlierLayout, isNumericType } from "./applicationSchema";
@@ -142,74 +142,6 @@ export function problemsByField(problems) {
     if (key) (by[key] ||= []).push(p.message);
   }
   return by;
-}
-
-/* ─────────────── EDAM formats the picker offers ─────────────── */
-
-/**
- * Common research formats, by their EDAM format id. Each id was checked
- * against the EDAM ontology (EDAM_dev.owl, 1.26 dev, github.com/edamontology/
- * edamontology) and none is deprecated. EDF, BDF, NWB and MEF3 have no EDAM
- * format yet: describe those by media type. Any other format_NNNN can be typed.
- */
-export const EDAM_FORMATS = Object.freeze([
-  { id: "format_3752", label: "CSV" },
-  { id: "format_3475", label: "TSV" },
-  { id: "format_3464", label: "JSON" },
-  { id: "format_3750", label: "YAML" },
-  { id: "format_3590", label: "HDF5" },
-  { id: "format_3626", label: "MAT (MATLAB)" },
-  { id: "format_3650", label: "NetCDF" },
-  { id: "format_3915", label: "Zarr" },
-  { id: "format_4003", label: "NumPy" },
-  { id: "format_4002", label: "pickle" },
-  { id: "format_3549", label: "NIfTI-1 (nii)" },
-  { id: "format_3548", label: "DICOM" },
-  { id: "format_3591", label: "TIFF" },
-  { id: "format_3727", label: "OME-TIFF" },
-  { id: "format_3603", label: "PNG" },
-  { id: "format_3604", label: "SVG" },
-  { id: "format_3997", label: "MPEG-4" },
-  { id: "format_1930", label: "FASTQ" },
-  { id: "format_1929", label: "FASTA" },
-  { id: "format_2572", label: "BAM" },
-  { id: "format_2573", label: "SAM" },
-  { id: "format_3462", label: "CRAM" },
-  { id: "format_3016", label: "VCF" },
-  { id: "format_3003", label: "BED" },
-  { id: "format_1975", label: "GFF3" },
-  { id: "format_2306", label: "GTF" },
-  { id: "format_3913", label: "Loom" },
-  { id: "format_3244", label: "mzML" },
-  { id: "format_3620", label: "XLSX" },
-  { id: "format_3508", label: "PDF" },
-  { id: "format_2331", label: "HTML" },
-  { id: "format_3987", label: "ZIP" },
-  { id: "format_3981", label: "TAR" },
-]);
-
-// "HDF5 (format_3590)", or the id alone for one not in the list.
-export function edamLabel(id) {
-  const f = EDAM_FORMATS.find((x) => x.id === id);
-  return f ? `${f.label} (${f.id})` : id;
-}
-
-// The picker's options: the list, plus any id the port already has.
-export function edamOptions(selected = []) {
-  const known = new Set(EDAM_FORMATS.map((f) => f.id));
-  return [
-    ...EDAM_FORMATS.map((f) => ({ value: f.id, label: edamLabel(f.id) })),
-    ...selected.filter((id) => id && !known.has(id)).map((id) => ({ value: id, label: id })),
-  ];
-}
-
-// What the picker keeps of a typed or chosen value: an EDAM id, from its
-// http://edamontology.org/ form too, or a label from the list ("hdf5").
-export function normalizeFormatPick(value) {
-  const v = normalizeEdamFormat(value);
-  if (/^format_\d{4}$/.test(v)) return v;
-  const byLabel = EDAM_FORMATS.find((f) => f.label.toLowerCase() === v.toLowerCase());
-  return byLabel ? byLabel.id : v;
 }
 
 /* ─────────────── The Gallery card an app.yml gives ─────────────── */

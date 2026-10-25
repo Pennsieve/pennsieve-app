@@ -59,8 +59,8 @@ parameters:
 inputs:
   - name: recording
     description: The EEG recording.
-    # MIME types, and/or EDAM formats (https://edamontology.org/page) for
-    # scientific formats without one, e.g. format_3590 (HDF5).
+    # Pennsieve media types (GET /packages/formats). The builder adds the
+    # format's EDAM id (https://edamontology.org/page) when EDAM has one.
     mediaTypes:
       - application/octet-stream
     formats:
@@ -140,7 +140,7 @@ const inputOutputFields = [
   { name: "name", type: "string", required: true, desc: "Name. Unique among inputs (or outputs)." },
   { name: "description", type: "string", required: false, desc: "What flows through this input or output." },
   { name: "mediaTypes", type: "string[]", required: false, desc: "Media types accepted or produced, e.g. application/octet-stream." },
-  { name: "formats", type: "string[]", required: false, desc: "EDAM format ids (https://edamontology.org/page), for scientific formats without a media type, e.g. format_3590 (HDF5). With no mediaTypes or formats, any file." },
+  { name: "formats", type: "string[]", required: false, desc: "EDAM format ids (https://edamontology.org/page), e.g. format_3590 (HDF5). The builder fills this from the media type's format, where EDAM has an id; there's no separate control. With no mediaTypes or formats, any file." },
 ];
 </script>
 
