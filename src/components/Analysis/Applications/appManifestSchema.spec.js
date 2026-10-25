@@ -39,7 +39,7 @@ describe('the app.yml schema', () => {
         createParameter({ name: 'MODE', type: PARAM_TYPES.ENUM, validValues: ['fast', 'accurate'], defaultValue: 'fast' }),
         createParameter({ name: 'VERBOSE', type: PARAM_TYPES.BOOLEAN, defaultValue: false }),
       ],
-      inputs: [createPort({ name: 'recording', dataType: 'application/octet-stream', formats: ['http://edamontology.org/format_3998'], required: true })],
+      inputs: [createPort({ name: 'recording', dataType: 'application/octet-stream', formats: ['http://edamontology.org/format_3590'], required: true })],
       outputs: [createPort({ name: 'spikes', mediaTypes: ['application/vnd.apache.parquet'] }), createPort({ name: 'anything' })],
     })
     const m = buildManifest(schema, {
@@ -52,7 +52,7 @@ describe('the app.yml schema', () => {
     })
     expect(validate(m), problems()).toBe(true)
     expect(m.application.maintainers[0].orcid).toBe('0000-0002-1825-0097')
-    expect(m.inputs[0]).toMatchObject({ mediaTypes: ['application/octet-stream'], formats: ['format_3998'], required: true })
+    expect(m.inputs[0]).toMatchObject({ mediaTypes: ['application/octet-stream'], formats: ['format_3590'], required: true })
     expect(m.outputs[1]).toEqual({ name: 'anything' })
   })
 

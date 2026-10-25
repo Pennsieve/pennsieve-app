@@ -15,7 +15,7 @@ const validator = () => (validate ||= createSchemaValidator().compile(manifestSc
 // Hints for the patterns and formats app.yml uses, by the field they're on.
 const PATTERN_HINTS = [
   [/(^|\.)orcid$/, "must be an ORCID iD, like 0000-0002-1825-0097"],
-  [/\.formats\.\d+$/, "must be an EDAM format id, like format_3998"],
+  [/\.formats\.\d+$/, "must be an EDAM format id, like format_3590"],
   [/\.mediaTypes\.\d+$/, "must be a media type, like text/csv"],
   [/(^|\.)email$/, "must be an email address"],
 ];

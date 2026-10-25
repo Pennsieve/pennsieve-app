@@ -6,7 +6,7 @@ const batch = {
   application: { name: "spike-detect", description: "Finds spikes", tags: ["eeg"], maintainers: [{ name: "Ada", orcid: "0000-0002-1825-0097" }] },
   runtime: { cpu: 1024, memory: 2048, computeTypes: ["standard"] },
   parameters: [{ name: "THRESHOLD", type: "number", defaultValue: 0.5 }],
-  inputs: [{ name: "edf", mediaTypes: ["application/octet-stream"], formats: ["format_3998"] }],
+  inputs: [{ name: "edf", mediaTypes: ["application/octet-stream"], formats: ["format_3590"] }],
   outputs: [{ name: "spikes", mediaTypes: ["text/csv"] }],
 };
 const jupyter = {
@@ -47,7 +47,7 @@ describe("validateManifestDoc", () => {
       expect.arrayContaining([
         "application.maintainers.0.orcid: must be an ORCID iD, like 0000-0002-1825-0097",
         "application.maintainers.0.email: must be an email address",
-        "inputs.0.formats.0: must be an EDAM format id, like format_3998",
+        "inputs.0.formats.0: must be an EDAM format id, like format_3590",
         "inputs.0.mediaTypes.0: must be a media type, like text/csv",
       ])
     );

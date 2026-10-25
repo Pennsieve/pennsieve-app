@@ -185,7 +185,7 @@ export const createPort = (overrides = {}) => ({
   // type and cardinality rather than by `dataType`; we retain them for display
   // and validation. buildManifest() does not emit them.
   mediaTypes: [],
-  // EDAM format ids (format_3998), for scientific formats without a MIME
+  // EDAM format ids (format_3590), for scientific formats without a MIME
   // type. With neither mediaTypes nor formats, a port takes any file.
   formats: [],
   cardinality: "",
@@ -361,8 +361,8 @@ const parsePort = (raw) =>
   });
 
 /**
- * An EDAM format id as app.yml writes it: `format_3998`, also from its
- * http://edamontology.org/format_3998 URI.
+ * An EDAM format id as app.yml writes it: `format_3590`, also from its
+ * http://edamontology.org/format_3590 URI.
  */
 export const normalizeEdamFormat = (value) =>
   String(value ?? "").trim().replace(/^https?:\/\/edamontology\.org\//, "");
