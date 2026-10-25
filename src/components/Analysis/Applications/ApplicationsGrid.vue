@@ -593,7 +593,7 @@ const goToManifestBuilder = () => {
   gap: 6px;
   padding: 3px 10px;
   border: 1px solid var(--chip-line);
-  border-radius: 12px;
+  border-radius: 3px;
   background: theme.$white;
   font: inherit;
   font-size: 12px;

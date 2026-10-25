@@ -3295,7 +3295,7 @@ const openNodeSettings = (id) => {
   margin-left: 10px;
   padding: 2px 8px;
   border: 1px solid theme.$gray_2;
-  border-radius: 10px;
+  border-radius: 3px;
   background: theme.$white;
   font: inherit;
   font-size: 12px;
@@ -4440,7 +4440,7 @@ kbd {
 .visibility-badge {
   display: inline-block;
   padding: 1px 8px;
-  border-radius: 10px;
+  border-radius: 3px;
   font-size: 11px;
   font-weight: 600;
   line-height: 16px;

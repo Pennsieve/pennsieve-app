@@ -3981,7 +3981,7 @@ onUnmounted(() => {
   text-transform: uppercase;
   letter-spacing: 0.5px;
   padding: 2px 8px;
-  border-radius: 10px;
+  border-radius: 3px;
   white-space: nowrap;
 
   &.lambda {

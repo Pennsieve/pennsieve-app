@@ -297,7 +297,7 @@ defineExpose({ expanded })
 .pill {
   flex: 0 0 auto;
   padding: 1px 6px;
-  border-radius: 8px;
+  border-radius: 3px;
   font-size: 11px;
   font-weight: 600;
 }
