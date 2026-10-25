@@ -270,7 +270,7 @@ onMounted(async () => {
         <el-input
           v-model="searchQuery"
           placeholder="Search by name, app, input or output…"
-          size="default"
+          size="small"
           clearable
           class="workflows-search-input"
         />
