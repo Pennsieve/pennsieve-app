@@ -10,6 +10,7 @@ import {
   structureId,
   structureOptionsFor,
   structureMatches,
+  structuresCompatible,
 } from './applicationSchema'
 import { validateManifestDoc } from './manifestValidation'
 
@@ -56,17 +57,33 @@ describe('folder formats and structures in app.yml', () => {
 
   it('reads and writes conformsTo (with its version) and container', () => {
     const { meta, schema } = parseManifest(STRUCTURED)
-    expect(schema.inputs[0]).toMatchObject({ conformsTo: 'bids@1.9', container: '' })
-    expect(schema.inputs[1]).toMatchObject({ container: 'directory', conformsTo: '' })
+    expect(schema.inputs[0]).toMatchObject({ conformsTo: ['bids@1.9'], container: '' })
+    expect(schema.inputs[1]).toMatchObject({ container: 'directory', conformsTo: [] })
     const out = buildManifest(schema, meta)
     expect(out.inputs[0]).toEqual({ name: 'study', conformsTo: 'bids@1.9' })
     expect(out.inputs[1]).toEqual({ name: 'images', mediaTypes: ['application/vnd.pennsieve.ome-zarr'], container: 'directory' })
     expect(out.outputs[0]).not.toHaveProperty('container')
   })
 
-  it('only writes container when it is directory', () => {
-    const { meta, schema } = parseManifest('application:\n  name: a\ninputs:\n  - name: x\n    mediaTypes: [a/b]\n    container: file\n')
-    expect(buildManifest(schema, meta).inputs[0]).not.toHaveProperty('container')
+  it('keeps container as app.yml wrote it, and leaves it out when unset', () => {
+    const { meta, schema } = parseManifest('application:\n  name: a\ninputs:\n  - name: x\n    mediaTypes: [a/b]\n    container: file\n  - name: y\n    mediaTypes: [a/b]\n')
+    const out = buildManifest(schema, meta)
+    expect(out.inputs[0].container).toBe('file')
+    expect(out.inputs[1]).not.toHaveProperty('container')
+  })
+
+  it('reads and writes nested structures and links: a list stays a list, one stays one', () => {
+    const yml = [
+      'application:', '  name: a', 'inputs:',
+      '  - name: published', '    conformsTo: [pennsieve-published-dataset, bids]', '    mediaTypes: [application/vnd.pennsieve.ome-zarr]', '    container: file',
+      '  - name: lab', '    conformsTo: https://example.org/lab-layout/v2',
+    ].join('\n')
+    const { meta, schema } = parseManifest(yml)
+    expect(schema.inputs[0].conformsTo).toEqual(['pennsieve-published-dataset', 'bids'])
+    const out = buildManifest(schema, meta)
+    expect(out.inputs[0]).toEqual({ name: 'published', conformsTo: ['pennsieve-published-dataset', 'bids'], mediaTypes: ['application/vnd.pennsieve.ome-zarr'], container: 'file' })
+    expect(out.inputs[1]).toEqual({ name: 'lab', conformsTo: 'https://example.org/lab-layout/v2' })
+    expect(validateManifestDoc(loadYaml(yml))).toEqual({ valid: true, problems: [] })
   })
 
   it('passes the app.yml schema', () => {
@@ -81,10 +98,12 @@ describe('folder formats and structures in app.yml', () => {
     expect(text).toMatch(/conformsTo/)
   })
 
-  it('treats a structure as a folder: container: file is refused, directory is allowed', () => {
+  it('allows either container on a structure port: it describes the items in the tree', () => {
     const doc = (container) => loadYaml(`application:\n  name: a\ninputs:\n  - name: x\n    conformsTo: bids\n    container: ${container}\n`)
-    expect(JSON.stringify(validateManifestDoc(doc('file')).problems)).toMatch(/container/)
+    expect(validateManifestDoc(doc('file'))).toEqual({ valid: true, problems: [] })
     expect(validateManifestDoc(doc('directory'))).toEqual({ valid: true, problems: [] })
+    const bad = loadYaml('application:\n  name: a\ninputs:\n  - name: x\n    conformsTo: [bids, http://example.org/x]\n')
+    expect(JSON.stringify(validateManifestDoc(bad).problems)).toMatch(/conformsTo/)
   })
 
   it('matches structures by id, whatever the version', () => {
@@ -94,6 +113,22 @@ describe('folder formats and structures in app.yml', () => {
     // A folder of files with no structure doesn't feed a BIDS input.
     expect(arePortsCompatible(createPort({ mediaTypes: ['application/x-nifti'] }), bids)).toBe(false)
     expect(structureId('bids@1.9')).toBe('bids')
+    expect(structureId('https://example.org/x@2')).toBe('https://example.org/x@2')
+  })
+
+  it('lets a published dataset of BIDS feed a BIDS input, not the other way round', () => {
+    const ppdBids = createPort({ conformsTo: ['pennsieve-published-dataset', 'bids@1.9'] })
+    expect(arePortsCompatible(ppdBids, createPort({ conformsTo: ['bids'] }))).toBe(true)
+    expect(arePortsCompatible(ppdBids, createPort({ conformsTo: ['pennsieve-published-dataset', 'bids'] }))).toBe(true)
+    expect(arePortsCompatible(createPort({ conformsTo: ['bids'] }), createPort({ conformsTo: ['pennsieve-published-dataset', 'bids'] }))).toBe(false)
+    expect(structuresCompatible(['pennsieve-published-dataset', 'bids'], ['pennsieve-published-dataset'])).toBe(false)
+  })
+
+  it('also needs overlapping media types when both structure ports say what they hold', () => {
+    const zarr = ['application/vnd.pennsieve.ome-zarr']
+    expect(arePortsCompatible(createPort({ conformsTo: ['bids'], mediaTypes: zarr }), createPort({ conformsTo: ['bids'], mediaTypes: zarr }))).toBe(true)
+    expect(arePortsCompatible(createPort({ conformsTo: ['bids'], mediaTypes: ['text/csv'] }), createPort({ conformsTo: ['bids'], mediaTypes: zarr }))).toBe(false)
+    expect(arePortsCompatible(createPort({ conformsTo: ['bids'] }), createPort({ conformsTo: ['bids'], mediaTypes: zarr }))).toBe(true)
   })
 
   it('checks an edge into a BIDS input', () => {
@@ -105,8 +140,8 @@ describe('folder formats and structures in app.yml', () => {
   })
 
   it('offers the registry structures, plus ones app.yml names that it lacks', () => {
-    const opts = structureOptionsFor([{ id: 'bids', name: 'BIDS' }], ['bids@1.9', 'my-layout'])
-    expect(opts.map((o) => o.id)).toEqual(['bids', 'my-layout'])
+    const opts = structureOptionsFor([{ id: 'bids', name: 'BIDS' }], [['bids@1.9'], ['pennsieve-published-dataset', 'my-layout'], ['https://example.org/x']])
+    expect(opts.map((o) => o.id)).toEqual(['bids', 'pennsieve-published-dataset', 'my-layout'])
     expect(structureMatches(opts[0], 'bid')).toBe(true)
     expect(structureMatches(opts[0], 'nwb')).toBe(false)
   })

@@ -220,9 +220,9 @@
             <p v-for="m in at(`${block.key}.${index}`)" :key="m" class="field-error">{{ m }}</p>
             <div class="param-card-grid">
               <div class="field-row" :data-field="`${block.key}.${index}.mediaTypes`" :class="rowClass(`${block.key}.${index}.mediaTypes`)">
-                <label class="field-label">Media type</label>
+                <label class="field-label">{{ isStructurePort(port) ? "Folder structure" : "Media type" }}</label>
                 <div class="field-control">
-                  <!-- Searchable by format name, extension or media type -->
+                  <!-- Searchable by format name, extension, media type or structure -->
                   <el-select
                     :model-value="portSelection(port)"
                     class="full"
@@ -244,6 +244,12 @@
                         <span class="mt-meta">Folder structure · {{ s.id }}</span>
                       </span>
                     </el-option>
+                    <el-option v-if="structureMatches(LINK_OPTION, mediaTypeQuery)" :key="LINK_VALUE" :label="LINK_OPTION.name" :value="LINK_VALUE">
+                      <span class="mt-option">
+                        <span class="mt-name">{{ LINK_OPTION.name }}</span>
+                        <span class="mt-meta">Folder structure · a link to its specification</span>
+                      </span>
+                    </el-option>
                     <el-option
                       v-for="dt in portDataTypes.filter((o) => mediaTypeMatches(o, mediaTypeQuery))"
                       :key="dt.value"
@@ -261,13 +267,53 @@
                   <p v-for="m in at(`${block.key}.${index}.mediaTypes`)" :key="m" class="field-error">{{ m }}</p>
                 </div>
               </div>
-              <!-- A folder format (OME-Zarr): the stored zip, or unpacked -->
-              <div v-if="optionFor(port.dataType)?.kind === 'directory' || port.container" class="field-row">
+              <!-- A structure named by a link instead of a registry id -->
+              <div v-if="isStructurePort(port) && isStructureLink(port.conformsTo[0] || 'https://')" class="field-row full-width">
+                <label class="field-label">Specification link</label>
+                <div class="field-control">
+                  <el-input :model-value="port.conformsTo[0]" placeholder="https://example.org/lab-layout/v2" @update:model-value="(v) => (port.conformsTo = [String(v || '').trim(), ...port.conformsTo.slice(1)])" />
+                </div>
+              </div>
+              <!-- Nesting: a structure with a content root (files/) may hold another -->
+              <div v-if="contentRootOf(port)" class="field-row full-width">
+                <label class="field-label">Its {{ contentRootOf(port) }}/ folder follows</label>
+                <div class="field-control">
+                  <el-select :model-value="port.conformsTo[1] ? structureId(port.conformsTo[1]) : ''" class="full" @change="(v) => onInnerStructure(port, v)">
+                    <el-option label="No particular structure" value="" />
+                    <el-option v-for="s in structureOptions.filter((o) => o.id !== structureId(port.conformsTo[0]))" :key="s.id" :label="s.name" :value="s.id" />
+                  </el-select>
+                </div>
+              </div>
+              <!-- What a structure's tree holds (optional) -->
+              <div v-if="isStructurePort(port)" class="field-row full-width">
+                <label class="field-label">Contains <span class="label-helper">optional</span></label>
+                <div class="field-control">
+                  <el-select
+                    :model-value="port.mediaTypes"
+                    class="full"
+                    multiple
+                    filterable
+                    :filter-method="(q) => (mediaTypeQuery = q)"
+                    placeholder="Any files"
+                    @visible-change="(open) => open || (mediaTypeQuery = '')"
+                    @change="(v) => onContainsChange(port, v)"
+                  >
+                    <el-option
+                      v-for="dt in portDataTypes.filter((o) => o.value !== 'any' && mediaTypeMatches(o, mediaTypeQuery))"
+                      :key="dt.value"
+                      :label="dt.formats && dt.formats.length ? dt.formats.join(' / ') : dt.label"
+                      :value="dt.value"
+                    />
+                  </el-select>
+                </div>
+              </div>
+              <!-- Folder-format items (OME-Zarr): as stored, or as folders -->
+              <div v-if="showsContainer(port)" class="field-row">
                 <label class="field-label">{{ block.key === "inputs" ? "Given to the app as" : "Written as" }}</label>
                 <div class="field-control">
-                  <el-select :model-value="port.container || 'file'" class="full" @change="(v) => (port.container = v === 'directory' ? 'directory' : '')">
-                    <el-option label="The zip, as stored" value="file" />
-                    <el-option label="A folder" value="directory" />
+                  <el-select :model-value="containerChoice(port)" class="full" @change="(v) => onContainerChange(port, v)">
+                    <el-option label="Folders" value="directory" />
+                    <el-option label="As stored (compressed)" value="file" />
                   </el-select>
                 </div>
               </div>
@@ -284,7 +330,7 @@
               <div class="field-row full-width" :data-field="`${block.key}.${index}.name`" :class="rowClass(`${block.key}.${index}.name`)">
                 <label class="field-label">Name</label>
                 <div class="field-control">
-                  <el-input v-if="port.dataType === 'any' && !port.conformsTo" v-model="port.name" placeholder="files" maxlength="50" />
+                  <el-input v-if="port.dataType === 'any' || isStructurePort(port)" v-model="port.name" :placeholder="isStructurePort(port) ? 'study' : 'files'" maxlength="50" />
                   <span v-else class="field-static" :class="{ 'is-empty': !port.name }">{{ port.name || "Select a media type" }}</span>
                   <p v-for="m in at(`${block.key}.${index}.name`)" :key="m" class="field-error">{{ m }}</p>
                 </div>
@@ -292,7 +338,7 @@
               <div class="field-row full-width" :data-field="`${block.key}.${index}.description`">
                 <label class="field-label">Description</label>
                 <div class="field-control">
-                  <el-input v-if="port.dataType === 'any' && !port.conformsTo" v-model="port.description" placeholder="What goes here (optional)" />
+                  <el-input v-if="port.dataType === 'any' || isStructurePort(port)" v-model="port.description" placeholder="What goes here (optional)" />
                   <span v-else class="field-static" :class="{ 'is-empty': !port.description }">{{ port.description || "—" }}</span>
                 </div>
               </div>
@@ -360,7 +406,7 @@ import { computed, onMounted, ref } from "vue";
 import { useStore } from "vuex";
 import MoreOptions from "./MoreOptions.vue";
 import FieldHint from "./FieldHint.vue";
-import { PARAM_TYPES, PARAM_TYPE_OPTIONS, createParameter, createPort, portDataTypeOptions, STANDARD_CPU_OPTIONS, getStandardMemoryOptions, isNumericType, mediaTypeMatches, structureId, structureOptionsFor, structureMatches } from "./applicationSchema";
+import { PARAM_TYPES, PARAM_TYPE_OPTIONS, createParameter, createPort, portDataTypeOptions, STANDARD_CPU_OPTIONS, getStandardMemoryOptions, isNumericType, mediaTypeMatches, structureId, structureOptionsFor, structureMatches, isStructureLink, conformsToList } from "./applicationSchema";
 import { canonicalTag, preferredTagGroups, tagOptionMatches, tagDomainNudge, hasDomainTag, domainOfTag, domainColors } from "./appDomains";
 
 /**
@@ -522,24 +568,72 @@ const structureOptions = computed(() =>
     ...(schema.value.outputs || []).map((p) => p.conformsTo),
   ])
 );
-const portSelection = (port) => (port.conformsTo ? `structure:${structureId(port.conformsTo)}` : port.dataType);
+// A structure named by a link to its specification rather than a registry id.
+const LINK_VALUE = "structure:__link";
+const LINK_OPTION = { id: "__link", name: "Another folder structure (link)", description: "specification link url" };
+
+const isStructurePort = (port) => conformsToList(port.conformsTo).length > 0 || port.conformsTo?.[0] === "";
+const structureById = (id) => structureOptions.value.find((o) => o.id === id);
+const portSelection = (port) => {
+  const first = conformsToList(port.conformsTo)[0];
+  if (first !== undefined) return isStructureLink(first) ? LINK_VALUE : `structure:${structureId(first)}`;
+  return port.conformsTo?.[0] === "" ? LINK_VALUE : port.dataType;
+};
+// The content root of the port's outermost registry structure (files/ for a
+// published dataset), when it has one: another structure may start there.
+const contentRootOf = (port) => {
+  const first = conformsToList(port.conformsTo)[0];
+  return first && !isStructureLink(first) ? structureById(structureId(first))?.contentRoot || "" : "";
+};
 const onPortSelect = (port, value) => {
   const id = String(value || "").startsWith("structure:") ? value.slice("structure:".length) : "";
   if (!id) {
-    port.conformsTo = "";
+    port.conformsTo = [];
     onPortDataTypeChange(port, value);
     if (optionFor(port.dataType)?.kind !== "directory") port.container = "";
     return;
   }
-  const s = structureOptions.value.find((o) => o.id === id);
-  // Keep a version the app.yml named for the same structure (bids@1.9).
-  if (structureId(port.conformsTo) !== id) port.conformsTo = id;
-  port.dataType = "any";
-  port.mediaTypes = [];
-  port.formats = [];
-  port.container = "";
-  port.name = s?.name || id;
-  port.description = s?.description || "";
+  const wasStructure = isStructurePort(port);
+  if (id === "__link") {
+    const first = conformsToList(port.conformsTo)[0];
+    port.conformsTo = [first && isStructureLink(first) ? first : ""];
+  } else if (structureId(conformsToList(port.conformsTo)[0]) !== id) {
+    // A new outermost structure; one the app.yml named (bids@1.9, with its
+    // nesting) is kept as it was.
+    port.conformsTo = [id];
+  }
+  if (!wasStructure) {
+    // From a single file format to a tree: the author names it.
+    port.dataType = "any";
+    port.mediaTypes = [];
+    port.formats = [];
+    port.container = "";
+    port.name = "";
+    port.description = "";
+  }
+  if (!contentRootOf(port)) port.conformsTo = port.conformsTo.slice(0, 1);
+};
+const onInnerStructure = (port, id) => {
+  port.conformsTo = id ? [port.conformsTo[0], id] : port.conformsTo.slice(0, 1);
+};
+const onContainsChange = (port, values) => {
+  port.mediaTypes = asList(values);
+  port.formats = [...new Set(port.mediaTypes.map((v) => optionFor(v)?.edam).filter(Boolean))];
+  if (!showsContainer(port)) port.container = "";
+};
+const asList = (v) => (Array.isArray(v) ? v.map(String) : []);
+// Folder-format items only: a plain port's own media type, or one a
+// structure's tree holds.
+const showsContainer = (port) =>
+  Boolean(port.container) ||
+  (isStructurePort(port)
+    ? asList(port.mediaTypes).some((v) => optionFor(v)?.kind === "directory")
+    : optionFor(port.dataType)?.kind === "directory");
+// The default is folders on a structure port, and as stored otherwise.
+const containerChoice = (port) => port.container || (isStructurePort(port) ? "directory" : "file");
+const onContainerChange = (port, value) => {
+  const fallback = isStructurePort(port) ? "directory" : "file";
+  port.container = value === fallback ? "" : value;
 };
 
 const onParamTypeChange = (param, type) => {
