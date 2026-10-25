@@ -12,6 +12,7 @@ import { createApplicationSchema, buildManifest, manifestToYaml, parseManifest, 
 import { builderProblems, validateManifestText } from "./manifestValidation";
 import {
   APP_KINDS,
+  SESSION_KINDS,
   SECTIONS,
   appKind,
   setAppKind,
@@ -60,10 +61,11 @@ const kind = computed({
   get: () => appKind(schema.value),
   set: (k) => setAppKind(schema.value, k),
 });
+const kindHint = computed(() => APP_KINDS.find((k) => k.value === kind.value)?.hint || "");
 
 /* ─────────────── The manifest, and what's wrong with it ─────────────── */
 
-// A notebook writes no parameters; the batch step's stay in the form.
+// An interactive app writes no parameters; the batch app's stay in the form.
 const manifest = computed(() => buildManifest(manifestSchemaFor(schema.value), meta));
 const manifestYaml = computed(() => manifestToYaml(manifest.value));
 
@@ -81,7 +83,11 @@ const problems = computed(() => {
   });
   return [...checks, ...schemaProblems];
 });
-const bySection = computed(() => problemsBySection(problems.value));
+// The summary's groups: the sections with problems, in form order.
+const problemSections = computed(() => {
+  const by = problemsBySection(problems.value);
+  return SECTIONS.map((sec) => ({ ...sec, problems: by[sec.key] })).filter((sec) => sec.problems.length);
+});
 const byField = computed(() => problemsByField(problems.value));
 const at = (key) => byField.value[key] || [];
 
@@ -107,7 +113,7 @@ async function goToProblem(p) {
   }
 }
 
-/* ─────────────── Start from: new, an existing app.yml, an app ─────────────── */
+/* ─────────────── Open: an existing app.yml, an app, or start over ─────────────── */
 
 const checkOpen = ref(false);
 const checkText = ref("");
@@ -138,6 +144,13 @@ function startNew() {
   editingApp.value = "";
 }
 
+const storeDialog = ref(false);
+function onOpenCommand(cmd) {
+  if (cmd === "file") openExisting();
+  else if (cmd === "store") storeDialog.value = true;
+  else startNew();
+}
+
 async function openExisting() {
   checkOpen.value = true;
   await nextTick();
@@ -157,6 +170,7 @@ async function editApp(uuid) {
   loadingApp.value = true;
   try {
     const parsed = await loadManifest(uuid);
+    storeDialog.value = false;
     if (parsed) {
       load(parsed);
     } else {
@@ -212,48 +226,41 @@ const goToGuide = () =>
 <template>
   <div ref="root" class="manifest-builder">
     <header class="builder-header">
-      <h1>Create an application manifest</h1>
+      <div class="header-row">
+        <h1>Create an application manifest</h1>
+        <!-- Open: an app.yml you have, an app in the store, or start over -->
+        <el-dropdown trigger="click" @command="onOpenCommand">
+          <button type="button" class="app-outline-button">Open… &#9662;</button>
+          <template #dropdown>
+            <el-dropdown-menu>
+              <el-dropdown-item command="file">Open an app.yml…</el-dropdown-item>
+              <el-dropdown-item command="store">Edit an app from the store…</el-dropdown-item>
+              <el-dropdown-item command="new" divided>Start over</el-dropdown-item>
+            </el-dropdown-menu>
+          </template>
+        </el-dropdown>
+      </div>
       <p class="lede">
         Describe your app, then add the <code>app.yml</code> to the root of its GitHub repository.
-        <a href="#" class="guide-link" @click.prevent="goToGuide">Read the manifest guide &rsaquo;</a>
+        <a href="#" class="guide-link" @click.prevent="goToGuide">Manifest guide &rsaquo;</a>
       </p>
-      <!-- Start from: a blank one, an app.yml you have, or an app in the store -->
-      <div class="start-from">
-        <span class="start-label">Start from</span>
-        <button type="button" class="app-outline-button" @click="startNew">New</button>
-        <button type="button" class="app-outline-button" @click="openExisting">Open an existing app.yml</button>
-        <el-select
-          v-model="editingApp"
-          filterable
-          clearable
-          size="small"
-          :loading="loadingApp"
-          placeholder="Edit an app from the store…"
-          class="start-app"
-          @change="editApp"
-        >
-          <el-option v-for="a in storeApps" :key="a.uuid" :label="appTitle(a)" :value="a.uuid" />
-        </el-select>
-      </div>
     </header>
 
-    <div class="builder-body">
-      <!-- ─────────────── Section index ─────────────── -->
-      <nav class="section-index" aria-label="Sections">
-        <button
-          v-for="s in SECTIONS"
-          :key="s.key"
-          type="button"
-          class="index-item"
-          :class="{ 'has-problems': bySection[s.key].length }"
-          @click="goToSection(s.key)"
-        >
-          <span>{{ s.label }}</span>
-          <span v-if="bySection[s.key].length" class="index-count">{{ bySection[s.key].length }}</span>
-          <span v-else class="index-ok" aria-label="No problems">✓</span>
-        </button>
-      </nav>
+    <!-- Edit an app from the store: its newest app.yml -->
+    <el-dialog v-model="storeDialog" title="Edit an app from the store" width="440px" append-to-body>
+      <el-select
+        v-model="editingApp"
+        filterable
+        :loading="loadingApp"
+        placeholder="Search apps…"
+        class="store-select"
+        @change="editApp"
+      >
+        <el-option v-for="a in storeApps" :key="a.uuid" :label="appTitle(a)" :value="a.uuid" />
+      </el-select>
+    </el-dialog>
 
+    <div class="builder-body">
       <!-- ─────────────── Form ─────────────── -->
       <div class="builder-form">
         <!-- Open an existing app.yml: check it against the schema, then open it here -->
@@ -312,8 +319,8 @@ const goToGuide = () =>
 
           <div class="field-row" data-field="kind" :class="{ 'has-problem': at('kind').length }">
             <label class="field-label">Kind</label>
-            <div class="field-control">
-              <div class="kind-choice" role="radiogroup" aria-label="Kind of app">
+            <div class="kind-row">
+              <div class="kind-switch" role="radiogroup" aria-label="Kind of app">
                 <button
                   v-for="k in APP_KINDS"
                   :key="k.value"
@@ -324,42 +331,40 @@ const goToGuide = () =>
                   :aria-checked="kind === k.value"
                   @click="kind = k.value"
                 >
-                  <span class="kind-label">{{ k.label }}</span>
-                  <span class="kind-hint">{{ k.hint }}</span>
+                  {{ k.label }}
                 </button>
               </div>
-              <div v-if="kind === 'notebook'" class="kernel-row">
-                <span class="kernel-label">Language</span>
-                <el-select v-model="schema.runtime.kernel" size="small" class="kernel-select" aria-label="Kernel">
+              <template v-if="kind === 'interactive'">
+                <el-select v-model="schema.runtime.sessionType" class="kind-select" aria-label="Session">
+                  <el-option v-for="t in SESSION_KINDS" :key="t.value" :label="t.label" :value="t.value" />
+                </el-select>
+                <el-select
+                  v-if="schema.runtime.sessionType === 'jupyter'"
+                  v-model="schema.runtime.kernel"
+                  class="kind-select"
+                  aria-label="Language"
+                >
                   <el-option v-for="k in KERNELS" :key="k.value" :label="k.label" :value="k.value" />
                 </el-select>
-              </div>
-              <p v-for="m in at('kind')" :key="m" class="field-error">{{ m }}</p>
+              </template>
             </div>
+            <p class="field-hint">{{ kindHint }}</p>
+            <p v-for="m in at('kind')" :key="m" class="field-error">{{ m }}</p>
           </div>
 
           <div class="field-row" data-field="application.name" :class="{ 'has-problem': at('application.name').length }">
             <label class="field-label">Name <span class="req">*</span></label>
-            <div class="field-control">
-              <el-input v-model="meta.name" placeholder="my-application" maxlength="100" />
-              <p v-for="m in at('application.name')" :key="m" class="field-error">{{ m }}</p>
-            </div>
+            <el-input v-model="meta.name" placeholder="my-application" maxlength="100" />
+            <p v-for="m in at('application.name')" :key="m" class="field-error">{{ m }}</p>
           </div>
 
           <div class="field-row" data-field="application.description" :class="{ 'has-problem': at('application.description').length }">
             <label class="field-label">Description</label>
-            <div class="field-control">
-              <el-input v-model="meta.description" type="textarea" :rows="2" placeholder="What does this application do?" />
-              <p v-for="m in at('application.description')" :key="m" class="field-error">{{ m }}</p>
-            </div>
+            <el-input v-model="meta.description" type="textarea" :rows="2" placeholder="What does this application do?" />
+            <p v-for="m in at('application.description')" :key="m" class="field-error">{{ m }}</p>
           </div>
 
           <application-schema-editor v-model="schema" part="tags" :kind="kind" :problems="byField" />
-
-          <p class="field-hint indent">
-            The version is the release's tag, and the license is read from the repository's LICENSE file, so app.yml
-            doesn't declare them.
-          </p>
         </section>
 
         <!-- What it does: in, its settings, out -->
@@ -377,7 +382,6 @@ const goToGuide = () =>
         <!-- People -->
         <section :ref="(el) => (sectionEls.people = el)" class="builder-section">
           <h3 class="section-title">People <span class="label-helper">optional</span></h3>
-          <p class="field-hint">Who maintains the app.</p>
           <div
             v-for="(m, i) in meta.maintainers"
             :key="i"
@@ -386,12 +390,12 @@ const goToGuide = () =>
             :class="{ 'has-problem': at(`application.maintainers.${i}`).length }"
           >
             <div class="maintainer-row">
-              <el-input v-model="m.name" placeholder="Name" size="small" />
-              <el-input v-model="m.email" placeholder="Email (optional)" size="small" />
+              <el-input v-model="m.name" placeholder="Name" />
+              <el-input v-model="m.email" placeholder="Email (optional)" />
               <button type="button" class="app-outline-button" @click="removeMaintainer(i)">Remove</button>
             </div>
             <more-options label="ORCID iD" :force-open="!!m.orcid || !!at(`application.maintainers.${i}`).length">
-              <el-input v-model="m.orcid" placeholder="0000-0002-1825-0097" size="small" class="full-width" />
+              <el-input v-model="m.orcid" placeholder="0000-0002-1825-0097" class="full-width" />
             </more-options>
             <p v-for="msg in at(`application.maintainers.${i}`)" :key="msg" class="field-error">{{ msg }}</p>
           </div>
@@ -431,23 +435,26 @@ const goToGuide = () =>
             </div>
           </div>
 
+          <!-- Problems, by section; each goes to its field -->
           <div v-if="problems.length" class="preview-validation">
             <p class="preview-validation-title">
-              {{ problems.length }} {{ problems.length === 1 ? "item needs" : "items need" }} attention before you
-              publish:
+              {{ problems.length }} {{ problems.length === 1 ? "item needs" : "items need" }} attention
             </p>
-            <div class="validation-list">
-              <button
-                v-for="(p, i) in problems"
-                :key="i"
-                type="button"
-                class="validation-item validation-link"
-                @click="goToProblem(p)"
-              >
-                <span class="field-name">{{ p.path }}</span>
-                <span class="error-message">{{ p.message }}</span>
-              </button>
-            </div>
+            <template v-for="sec in problemSections" :key="sec.key">
+              <p class="problem-section">{{ sec.label }} <span class="problem-count">{{ sec.problems.length }}</span></p>
+              <div class="validation-list">
+                <button
+                  v-for="(p, i) in sec.problems"
+                  :key="i"
+                  type="button"
+                  class="validation-item validation-link"
+                  @click="goToProblem(p)"
+                >
+                  <span class="field-name">{{ p.path }}</span>
+                  <span class="error-message">{{ p.message }}</span>
+                </button>
+              </div>
+            </template>
           </div>
 
           <!-- The Gallery card this app.yml gives -->
@@ -480,6 +487,9 @@ const goToGuide = () =>
             </p>
           </template>
         </div>
+        <p class="preview-note">
+          The version is the release's tag, and the license comes from the repository's LICENSE file.
+        </p>
       </aside>
     </div>
   </div>
@@ -497,8 +507,15 @@ const goToGuide = () =>
 .builder-header {
   margin-bottom: 20px;
 
+  .header-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 4px;
+  }
   h1 {
-    margin: 0 0 6px;
+    margin: 0;
     font-size: 20px;
     font-weight: 500;
     color: theme.$gray_6;
@@ -515,80 +532,24 @@ const goToGuide = () =>
     white-space: nowrap;
   }
 }
-.start-from {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-  margin-top: 14px;
-}
-.start-label {
-  font-size: 12px;
-  color: theme.$gray_4;
-}
-.start-app {
-  width: 260px;
+.store-select {
+  width: 100%;
 }
 
+/* The form, then the preview beside it. */
 .builder-body {
   display: grid;
-  grid-template-columns: 150px minmax(0, 1fr) minmax(0, 460px);
-  gap: 28px;
+  grid-template-columns: minmax(0, 720px) minmax(0, 460px);
+  gap: 32px;
   align-items: start;
-}
-
-/* ─────────────── Section index ─────────────── */
-.section-index {
-  position: sticky;
-  top: 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-.index-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  padding: 6px 10px;
-  border: none;
-  border-left: 2px solid theme.$gray_2;
-  background: none;
-  font: inherit;
-  font-size: 13px;
-  color: theme.$gray_6;
-  text-align: left;
-  cursor: pointer;
-
-  &:hover {
-    border-left-color: theme.$purple_1;
-    color: theme.$purple_3;
-  }
-  &.has-problems {
-    border-left-color: theme.$red_1;
-  }
-}
-.index-count {
-  min-width: 18px;
-  padding: 0 5px;
-  border-radius: 3px;
-  background: theme.$red_tint;
-  font-size: 11px;
-  font-weight: 600;
-  text-align: center;
-  color: theme.$red_2;
-}
-.index-ok {
-  font-size: 12px;
-  color: theme.$green_2;
 }
 
 /* ─────────────── Form ─────────────── */
 .builder-form {
   display: flex;
   flex-direction: column;
-  gap: 28px;
-  padding-bottom: 64px;
+  gap: 24px;
+  padding-bottom: 48px;
 }
 .builder-section {
   display: flex;
@@ -596,13 +557,12 @@ const goToGuide = () =>
   gap: 12px;
   scroll-margin-top: 16px;
 }
+/* As the dashboards' section titles. */
 .section-title {
   margin: 0;
-  padding-bottom: 6px;
-  border-bottom: 1px solid theme.$gray_2;
   font-size: 14px;
   font-weight: 600;
-  color: theme.$gray_6;
+  color: theme.$gray_5;
 
   .label-helper {
     margin-left: 4px;
@@ -610,27 +570,21 @@ const goToGuide = () =>
   }
 }
 
+/* A field: its label above, then the control. */
 .field-row {
   display: flex;
-  align-items: flex-start;
-  gap: 12px;
+  flex-direction: column;
+  gap: 4px;
 
   > .field-label {
-    flex: 0 0 110px;
-    padding-top: 6px;
     font-size: 13px;
+    font-weight: 500;
     color: theme.$gray_6;
 
     .req {
       color: theme.$red_1;
     }
   }
-}
-.field-control {
-  display: flex;
-  flex: 1 1 auto;
-  flex-direction: column;
-  min-width: 0;
 }
 .has-problem :deep(.el-input__wrapper),
 .has-problem :deep(.el-textarea__inner),
@@ -648,64 +602,49 @@ const goToGuide = () =>
   font-size: 12px;
   line-height: 1.4;
   color: theme.$gray_4;
-
-  &.indent {
-    margin-left: 122px;
-  }
 }
 .label-helper {
   font-weight: 400;
   color: theme.$gray_4;
 }
 
-/* What kind of app: two choices side by side */
-.kind-choice {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
+/* What kind of app: a two-way switch, as the Analysis view switch, then
+   an interactive app's session and language. */
+.kind-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
   gap: 8px;
 }
-.kind-option {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: 10px 12px;
+.kind-switch {
+  display: inline-flex;
+  padding: 2px;
   border: 1px solid theme.$gray_2;
-  border-radius: 3px;
-  background: theme.$white;
+  border-radius: 6px;
+  background: theme.$gray_1;
+}
+.kind-option {
+  padding: 5px 14px;
+  border: none;
+  border-radius: 4px;
+  background: none;
   font: inherit;
-  text-align: left;
+  font-size: 13px;
+  font-weight: 500;
+  color: theme.$gray_5;
   cursor: pointer;
 
   &:hover {
-    border-color: theme.$purple_1;
+    color: theme.$purple_3;
   }
   &.active {
-    border-color: theme.$purple_3;
-    box-shadow: 0 0 0 1px theme.$purple_3 inset;
+    background: theme.$white;
+    color: theme.$purple_3;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
   }
 }
-.kind-label {
-  font-size: 13px;
-  font-weight: 600;
-  color: theme.$gray_6;
-}
-.kind-hint {
-  font-size: 12px;
-  line-height: 1.4;
-  color: theme.$gray_5;
-}
-.kernel-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-top: 10px;
-}
-.kernel-label {
-  font-size: 13px;
-  color: theme.$gray_6;
-}
-.kernel-select {
-  width: 160px;
+.kind-select {
+  width: 140px;
 }
 
 /* People */
@@ -908,6 +847,27 @@ code {
   align-items: center;
   gap: 6px;
 }
+.problem-section {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 8px 0 0;
+  font-weight: 600;
+  color: theme.$gray_6;
+}
+.problem-count {
+  padding: 0 5px;
+  border-radius: 3px;
+  background: theme.$red_tint;
+  font-size: 11px;
+  color: theme.$red_2;
+}
+.preview-note {
+  margin: 8px 2px 0;
+  font-size: 12px;
+  line-height: 1.4;
+  color: theme.$gray_4;
+}
 .preview-validation {
   max-height: 30vh;
   overflow: auto;
@@ -1035,28 +995,7 @@ $card-height: 172px;
   color: theme.$gray_6;
 }
 
-/* Narrower: the index goes on top, then the preview below the form. */
-@media (max-width: 1200px) {
-  .builder-body {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 420px);
-  }
-  .section-index {
-    grid-column: 1 / -1;
-    z-index: 2;
-    flex-direction: row;
-    flex-wrap: wrap;
-    padding: 6px 0;
-    background: theme.$white;
-  }
-  .index-item {
-    border-left: none;
-    border-bottom: 2px solid theme.$gray_2;
-
-    &.has-problems {
-      border-bottom-color: theme.$red_1;
-    }
-  }
-}
+/* Narrower: the preview below the form. */
 @media (max-width: 900px) {
   .builder-body {
     grid-template-columns: 1fr;

@@ -12,17 +12,14 @@
             allow-create
             default-first-option
             :reserve-keyword="false"
-            placeholder="Type a tag and press Enter"
+            placeholder="eeg, imaging, spike-sorting… or type your own"
             class="full"
             @update:model-value="setTags"
           >
             <el-option v-for="t in SUGGESTED_TAGS" :key="t" :label="t" :value="t" />
           </el-select>
           <p v-for="m in at('application.tags')" :key="m" class="field-error">{{ m }}</p>
-          <p class="field-hint">
-            What the app is for: they colour its card in the Gallery and help people find it. Pick from the
-            list where one fits (eeg, imaging, spike-sorting…), or type your own.
-          </p>
+          <p class="field-hint">What the app is for; it colours its card and helps people find it.</p>
         </div>
       </div>
     </template>
@@ -33,10 +30,7 @@
         <!-- Parameters, between what goes in and what comes out -->
         <div v-if="block.key === 'parameters'" class="sub-section">
           <h5 class="sub-section-title">Parameters <span class="label-helper">optional</span></h5>
-          <p class="sub-section-hint">
-            Settings people choose when they use the app; defaults set here fill them in when it's added to a
-            workflow.
-          </p>
+          <p class="sub-section-hint">Settings people choose; defaults fill them in.</p>
 
           <div
             v-for="(param, index) in schema.parameters"
@@ -54,7 +48,7 @@
                 <div class="field-control">
                   <el-input
                     :model-value="param.name"
-                    size="small"
+                   
                     placeholder="parameter"
                     maxlength="50"
                     @input="(v) => onParamNameInput(param, v)"
@@ -66,7 +60,7 @@
               <div class="field-row" :data-field="`parameters.${index}.type`" :class="rowClass(`parameters.${index}.type`)">
                 <label class="field-label">Type</label>
                 <div class="field-control">
-                  <el-select :model-value="param.type" size="small" class="full" @change="(v) => onParamTypeChange(param, v)">
+                  <el-select :model-value="param.type" class="full" @change="(v) => onParamTypeChange(param, v)">
                     <el-option v-for="t in PARAM_TYPE_OPTIONS" :key="t.value" :label="t.label" :value="t.value" />
                   </el-select>
                   <p v-for="m in at(`parameters.${index}.type`)" :key="m" class="field-error">{{ m }}</p>
@@ -91,7 +85,7 @@
                 <div class="field-control">
                   <el-select
                     v-model="param.validValues"
-                    size="small"
+                   
                     multiple
                     filterable
                     allow-create
@@ -112,21 +106,21 @@
                   <el-input
                     v-else-if="param.type === PARAM_TYPES.NUMBER"
                     v-model="param.defaultValue"
-                    size="small"
+                   
                     type="number"
                     placeholder="No default"
                   />
                   <el-select
                     v-else-if="param.type === PARAM_TYPES.ENUM"
                     v-model="param.defaultValue"
-                    size="small"
+                   
                     clearable
                     placeholder="No default"
                     class="full"
                   >
                     <el-option v-for="v in param.validValues" :key="v" :label="v" :value="v" />
                   </el-select>
-                  <el-input v-else v-model="param.defaultValue" size="small" placeholder="No default" />
+                  <el-input v-else v-model="param.defaultValue" placeholder="No default" />
                   <p v-for="m in at(`parameters.${index}.defaultValue`)" :key="m" class="field-error">{{ m }}</p>
                 </div>
               </div>
@@ -134,7 +128,7 @@
               <div class="field-row full-width" :data-field="`parameters.${index}.description`">
                 <label class="field-label">Description</label>
                 <div class="field-control">
-                  <el-input v-model="param.description" size="small" placeholder="What does this parameter control? (optional)" />
+                  <el-input v-model="param.description" placeholder="What does this parameter control? (optional)" />
                 </div>
               </div>
 
@@ -146,14 +140,14 @@
                 <div class="field-row" :data-field="`parameters.${index}.min`" :class="rowClass(`parameters.${index}.min`)">
                   <label class="field-label">Min</label>
                   <div class="field-control">
-                    <el-input v-model="param.min" size="small" type="number" placeholder="optional" />
+                    <el-input v-model="param.min" type="number" placeholder="optional" />
                     <p v-for="m in at(`parameters.${index}.min`)" :key="m" class="field-error">{{ m }}</p>
                   </div>
                 </div>
                 <div class="field-row" :data-field="`parameters.${index}.max`" :class="rowClass(`parameters.${index}.max`)">
                   <label class="field-label">Max</label>
                   <div class="field-control">
-                    <el-input v-model="param.max" size="small" type="number" placeholder="optional" />
+                    <el-input v-model="param.max" type="number" placeholder="optional" />
                     <p v-for="m in at(`parameters.${index}.max`)" :key="m" class="field-error">{{ m }}</p>
                   </div>
                 </div>
@@ -185,7 +179,7 @@
               <div class="field-row" :data-field="`${block.key}.${index}.mediaTypes`" :class="rowClass(`${block.key}.${index}.mediaTypes`)">
                 <label class="field-label">Media type</label>
                 <div class="field-control">
-                  <el-select :model-value="port.dataType" size="small" class="full" @change="(v) => onPortDataTypeChange(port, v)">
+                  <el-select :model-value="port.dataType" class="full" @change="(v) => onPortDataTypeChange(port, v)">
                     <el-option v-for="dt in portDataTypes" :key="dt.value" :label="dt.label" :value="dt.value" />
                   </el-select>
                   <p v-for="m in at(`${block.key}.${index}.mediaTypes`)" :key="m" class="field-error">{{ m }}</p>
@@ -204,7 +198,7 @@
               <div class="field-row full-width" :data-field="`${block.key}.${index}.name`" :class="rowClass(`${block.key}.${index}.name`)">
                 <label class="field-label">Name</label>
                 <div class="field-control">
-                  <el-input v-if="port.dataType === 'any'" v-model="port.name" size="small" placeholder="files" maxlength="50" />
+                  <el-input v-if="port.dataType === 'any'" v-model="port.name" placeholder="files" maxlength="50" />
                   <span v-else class="field-static" :class="{ 'is-empty': !port.name }">{{ port.name || "Select a media type" }}</span>
                   <p v-for="m in at(`${block.key}.${index}.name`)" :key="m" class="field-error">{{ m }}</p>
                 </div>
@@ -212,7 +206,7 @@
               <div class="field-row full-width" :data-field="`${block.key}.${index}.description`">
                 <label class="field-label">Description</label>
                 <div class="field-control">
-                  <el-input v-if="port.dataType === 'any'" v-model="port.description" size="small" placeholder="What goes here (optional)" />
+                  <el-input v-if="port.dataType === 'any'" v-model="port.description" placeholder="What goes here (optional)" />
                   <span v-else class="field-static" :class="{ 'is-empty': !port.description }">{{ port.description || "—" }}</span>
                 </div>
               </div>
@@ -230,7 +224,7 @@
                       default-first-option
                       :reserve-keyword="false"
                       placeholder="Search formats, or type format_NNNN"
-                      size="small"
+                     
                       class="full"
                       @update:model-value="(v) => setFormats(port, v)"
                     >
@@ -238,9 +232,8 @@
                     </el-select>
                     <p v-for="m in at(`${block.key}.${index}.formats`)" :key="m" class="field-error">{{ m }}</p>
                     <p class="field-hint">
-                      EDAM formats, for research formats a media type doesn't name.
-                      <a href="https://edamontology.org/page" target="_blank" rel="noopener">Browse EDAM</a>.
-                      With no media type or format, the port takes any file.
+                      For formats a media type doesn't name.
+                      <a href="https://edamontology.org/page" target="_blank" rel="noopener">Browse EDAM</a>
                     </p>
                   </div>
                 </div>
@@ -255,11 +248,8 @@
 
     <!-- ───────────── How it runs: resources and compute types ───────────── -->
     <template v-else-if="part === 'runtime'">
-      <p v-if="kind === 'notebook'" class="sub-section-hint">
-        A notebook is sized when it's started: New notebook picks its CPU and memory. Values set here are only
-        defaults for a run that doesn't choose.
-      </p>
-      <component :is="kind === 'notebook' ? MoreOptions : 'div'" v-bind="resourceWrapProps" class="runtime-fields">
+      <p v-if="kind === 'interactive'" class="sub-section-hint">Sessions are sized when they start; these are only defaults.</p>
+      <component :is="kind === 'interactive' ? MoreOptions : 'div'" v-bind="resourceWrapProps" class="runtime-fields">
         <div class="field-row" data-field="runtime.cpu" :class="rowClass('runtime.cpu')">
           <label class="field-label">CPU</label>
           <div class="field-control">
@@ -329,8 +319,8 @@ const props = defineProps({
   // Which part: "tags" (About), "io" (What it does: inputs, parameters,
   // outputs), "runtime" (How it runs).
   part: { type: String, required: true },
-  // "batch" or "notebook" (manifestBuilder.appKind): a notebook has no
-  // parameters, and its resources are only defaults.
+  // "batch" or "interactive" (manifestBuilder.appKind): an interactive app
+  // has no parameters, and its resources are only defaults.
   kind: { type: String, default: "batch" },
   // Problems by the field they point at: { "parameters.0.name": ["…"] }.
   problems: { type: Object, default: () => ({}) },
@@ -366,30 +356,30 @@ const portDataTypes = computed(() =>
 );
 
 // In, the app's settings, out: as the Gallery card and the workflow graph
-// read. A notebook has no settings of its own.
+// read. An interactive app has no settings of its own.
 const PORT_BLOCKS = {
   inputs: {
     key: "inputs",
     label: "Inputs",
     singular: "input",
-    hint: "What the app takes in. Used to check connections between apps in a workflow.",
+    hint: "What the app takes in.",
   },
   outputs: {
     key: "outputs",
     label: "Outputs",
     singular: "output",
-    hint: "What the app produces, for the apps after it.",
+    hint: "What the app produces.",
   },
 };
 const ioBlocks = computed(() =>
-  props.kind === "notebook"
+  props.kind === "interactive"
     ? [PORT_BLOCKS.inputs, PORT_BLOCKS.outputs]
     : [PORT_BLOCKS.inputs, { key: "parameters" }, PORT_BLOCKS.outputs]
 );
 
-// A notebook's CPU and memory are folded away: they're only defaults.
+// An interactive app's CPU and memory are folded away: they're only defaults.
 const resourceWrapProps = computed(() =>
-  props.kind === "notebook"
+  props.kind === "interactive"
     ? {
         label: "Default CPU and memory",
         forceOpen: schema.value.resources.cpu != null || !!at("runtime.cpu").length || !!at("runtime.memory").length,
@@ -494,15 +484,15 @@ const removePort = (key, i) => schema.value[key].splice(i, 1);
   color: theme.$gray_4;
 }
 
+/* A field: its label above, then the control. */
 .field-row {
   display: flex;
-  align-items: flex-start;
-  gap: 12px;
+  flex-direction: column;
+  gap: 4px;
 
   > .field-label {
-    flex: 0 0 110px;
-    padding-top: 6px;
     font-size: 13px;
+    font-weight: 500;
     color: theme.$gray_6;
   }
 }
@@ -531,7 +521,7 @@ const removePort = (key, i) => schema.value[key].splice(i, 1);
   color: theme.$red_2;
 }
 .field-hint {
-  margin: 4px 0 0;
+  margin: 2px 0 0;
   font-size: 12px;
   line-height: 1.4;
   color: theme.$gray_4;

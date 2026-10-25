@@ -1,40 +1,43 @@
 // The app manifest builder's own rules, pure so they're easy to test: what
-// kind of app it is (a batch step or a Jupyter notebook) and what that writes,
+// kind of app it is (batch or interactive) and what that writes,
 // the builder's sections and which of them a problem belongs to, the field a
 // problem points at, the EDAM formats the picker offers, and the Gallery card
 // an app.yml gives.
 import { createPort, normalizeEdamFormat, PARAM_TYPES, validateParameterValue } from "./applicationSchema";
 
-/* ─────────────── Kind: a batch step or a notebook ─────────────── */
+/* ─────────────── Kind: batch or interactive ─────────────── */
 
 export const APP_KINDS = Object.freeze([
-  { value: "batch", label: "Batch step", hint: "Runs on its inputs and exits, as a step in a workflow." },
-  { value: "notebook", label: "Notebook (Jupyter)", hint: "A live JupyterLab session people work in; the workflow waits until it ends." },
+  { value: "batch", label: "Batch", hint: "Runs on its inputs and exits, as a workflow step." },
+  { value: "interactive", label: "Interactive", hint: "A live session people work in; the workflow waits until it ends." },
 ]);
 
-// An app is a notebook when its app.yml says it's a live Jupyter session.
-export const appKind = (schema) => (schema?.runtime?.interactive ? "notebook" : "batch");
+// The interactive session types the platform runs today (runtime.sessionType).
+export const SESSION_KINDS = Object.freeze([{ value: "jupyter", label: "Jupyter" }]);
 
-// What a notebook takes and gives when nothing more is said: any files, as the
-// Pennsieve session apps declare them.
-export const notebookPorts = () => ({
-  inputs: [createPort({ name: "files", description: "Files to open in the notebook, staged under input/" })],
-  outputs: [createPort({ name: "files", description: "What the notebook writes under output/" })],
+// An app is interactive when its app.yml says it's a live session.
+export const appKind = (schema) => (schema?.runtime?.interactive ? "interactive" : "batch");
+
+// What an interactive app takes and gives when nothing more is said: any
+// files, as the Pennsieve session apps declare them.
+export const interactivePorts = () => ({
+  inputs: [createPort({ name: "files", description: "Files to open in the session, staged under input/" })],
+  outputs: [createPort({ name: "files", description: "What the session writes under output/" })],
 });
 
 /**
- * Switch the app's kind, in place. Nothing entered is dropped: a batch step's
- * parameters stay in the form (hidden, and not written) while it's a notebook,
- * so switching back finds them. A notebook with no inputs or outputs yet gets
- * the "any files" ones.
+ * Switch the app's kind, in place. Nothing entered is dropped: a batch app's
+ * parameters stay in the form (hidden, and not written) while it's
+ * interactive, so switching back finds them. An interactive app with no inputs
+ * or outputs yet gets the "any files" ones; a Jupyter session, a language.
  */
-export function setAppKind(schema, kind, kernel) {
+export function setAppKind(schema, kind) {
   const rt = schema.runtime;
-  if (kind === "notebook") {
+  if (kind === "interactive") {
     rt.interactive = true;
-    rt.sessionType = "jupyter";
-    rt.kernel = kernel || rt.kernel || "python";
-    if (!schema.inputs.length && !schema.outputs.length) Object.assign(schema, notebookPorts());
+    rt.sessionType = rt.sessionType || SESSION_KINDS[0].value;
+    if (rt.sessionType === "jupyter") rt.kernel = rt.kernel || "python";
+    if (!schema.inputs.length && !schema.outputs.length) Object.assign(schema, interactivePorts());
   } else {
     rt.interactive = false;
     rt.sessionType = "";
@@ -42,10 +45,10 @@ export function setAppKind(schema, kind, kernel) {
   }
 }
 
-// The schema the manifest is written from: a notebook's has no parameters
-// (they're the batch step's, kept in the form only).
+// The schema the manifest is written from: an interactive app's has no
+// parameters (they're the batch app's, kept in the form only).
 export const manifestSchemaFor = (schema) =>
-  appKind(schema) === "notebook" ? { ...schema, parameters: [] } : schema;
+  appKind(schema) === "interactive" ? { ...schema, parameters: [] } : schema;
 
 /* ─────────────── Sections and the fields problems point at ─────────────── */
 
@@ -56,7 +59,7 @@ export const SECTIONS = Object.freeze([
   { key: "people", label: "People" },
 ]);
 
-// The kind chooser owns these: they're what "Notebook (Jupyter)" writes.
+// The kind chooser owns these: they're what "Interactive" writes.
 const KIND_FIELDS = new Set(["runtime", "runtime.interactive", "runtime.sessionType", "runtime.kernel"]);
 
 // The section a problem's path ("inputs.0.formats.1") belongs to.
@@ -100,7 +103,7 @@ export function fieldKeyOfPath(path) {
 export function builderChecks(meta, schema) {
   const out = [];
   if (!String(meta?.name || "").trim()) out.push({ path: "application.name", message: "is required" });
-  if (appKind(schema) === "notebook") return out;
+  if (appKind(schema) === "interactive") return out;
   const seen = new Set();
   (schema?.parameters || []).forEach((p, i) => {
     const at = `parameters.${i}`;
