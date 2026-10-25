@@ -2,7 +2,7 @@
 // A compute node's allowed apps: open (any app may run) or a list of the
 // apps' source repositories that may. Data targets and service steps always
 // may.
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useStore } from 'vuex'
 import { ElMessage } from 'element-plus'
 import { useComputeResourcesStore } from '@/stores/computeResourcesStore'
@@ -24,17 +24,26 @@ const isSaving = ref(false)
 
 const isOpen = computed(() => allowedProcessors.value.length === 0)
 
-// Known apps, one per source repository.
+// Known apps, one per source repository. The app store's apps carry it as
+// sourceUrl (older ones as source.url), which is what a run's steps name.
+const sourceOf = (app) => app?.sourceUrl || app?.source?.url || ''
 const availableApplications = computed(() => {
   const apps = store.state.analysisModule?.applications || []
   const seen = new Set()
-  return apps.filter(app => {
-    if (!app.source?.url || seen.has(app.source.url)) return false
-    seen.add(app.source.url)
-    return true
-  })
+  return apps
+    .filter(app => {
+      const url = sourceOf(app)
+      if (!url || seen.has(url)) return false
+      seen.add(url)
+      return true
+    })
+    .map(app => ({ ...app, url: sourceOf(app) }))
 })
-const appName = (url) => availableApplications.value.find(a => a.source.url === url)?.name
+const appName = (url) => availableApplications.value.find(a => a.url === url)?.name
+// The list names its apps, so the apps are needed before editing too.
+onMounted(() => {
+  if (!(store.state.analysisModule?.applications || []).length) store.dispatch('analysisModule/fetchApplications')
+})
 
 function startEditing() {
   editingList.value = [...allowedProcessors.value]
@@ -113,10 +122,10 @@ async function save() {
           class="add-select"
           @change="addEntry"
         >
-          <el-option v-for="app in availableApplications" :key="app.uuid" :label="app.name" :value="app.source.url">
+          <el-option v-for="app in availableApplications" :key="app.url" :label="app.name" :value="app.url">
             <div class="app-option">
               <span>{{ app.name }}</span>
-              <span class="cn-mono cn-muted">{{ app.source.url }}</span>
+              <span class="cn-mono cn-muted">{{ app.url }}</span>
             </div>
           </el-option>
         </el-select>
