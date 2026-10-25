@@ -977,3 +977,20 @@ describe('live sessions (runtime.interactive / sessionType)', () => {
     expect(read({ computeTypes: ['standard'] })).toMatchObject({ interactive: false, sessionType: '', kernel: '' })
   })
 })
+
+describe('whole-number parameters', () => {
+  it('reads and writes type: integer', () => {
+    const { schema } = parseManifest({
+      application: { name: 'n' },
+      parameters: [{ name: 'SIZE', type: 'integer', defaultValue: '256', min: 1, max: 4096 }],
+    })
+    expect(schema.parameters[0].type).toBe('integer')
+    const out = buildManifest(schema, { name: 'n' })
+    expect(out.parameters[0]).toMatchObject({ name: 'SIZE', type: 'integer', min: 1, max: 4096 })
+  })
+  it('rejects a fractional value', () => {
+    expect(validateParameterValue({ name: 'SIZE', type: 'integer' }, '2.5').valid).toBe(false)
+    expect(validateParameterValue({ name: 'SIZE', type: 'integer' }, '3').valid).toBe(true)
+  })
+})
+

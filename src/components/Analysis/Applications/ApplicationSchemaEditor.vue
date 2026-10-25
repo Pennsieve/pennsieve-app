@@ -104,7 +104,7 @@
                 <div class="field-control">
                   <el-switch v-if="param.type === PARAM_TYPES.BOOLEAN" v-model="param.defaultValue" />
                   <el-input
-                    v-else-if="param.type === PARAM_TYPES.NUMBER"
+                    v-else-if="isNumericType(param.type)"
                     v-model="param.defaultValue"
                    
                     type="number"
@@ -134,7 +134,7 @@
 
               <!-- Min / Max (number), the advanced part -->
               <more-options
-                v-if="param.type === PARAM_TYPES.NUMBER"
+                v-if="isNumericType(param.type)"
                 :force-open="hasValue(param.min) || hasValue(param.max) || !!at(`parameters.${index}.min`).length || !!at(`parameters.${index}.max`).length"
               >
                 <div class="field-row" :data-field="`parameters.${index}.min`" :class="rowClass(`parameters.${index}.min`)">
@@ -296,15 +296,7 @@
 import { computed, onMounted } from "vue";
 import { useStore } from "vuex";
 import MoreOptions from "./MoreOptions.vue";
-import {
-  PARAM_TYPES,
-  PARAM_TYPE_OPTIONS,
-  createParameter,
-  createPort,
-  portDataTypeOptions,
-  STANDARD_CPU_OPTIONS,
-  getStandardMemoryOptions,
-} from "./applicationSchema";
+import { PARAM_TYPES, PARAM_TYPE_OPTIONS, createParameter, createPort, portDataTypeOptions, STANDARD_CPU_OPTIONS, getStandardMemoryOptions, isNumericType } from "./applicationSchema";
 import { SUGGESTED_TAGS, canonicalTag } from "./appDomains";
 import { edamOptions, normalizeFormatPick } from "./manifestBuilder";
 
@@ -438,7 +430,7 @@ const onParamTypeChange = (param, type) => {
   // A default carried over from another type is usually invalid; reset it.
   param.defaultValue = type === PARAM_TYPES.BOOLEAN ? false : null;
   if (type !== PARAM_TYPES.ENUM) param.validValues = [];
-  if (type !== PARAM_TYPES.NUMBER) {
+  if (!isNumericType(type)) {
     param.min = null;
     param.max = null;
   }
