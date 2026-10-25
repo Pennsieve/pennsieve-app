@@ -1162,6 +1162,8 @@ const actions = {
           // The format's EDAM id, where EDAM has one (packages-service's registry).
           const edam = t?.edam ? String(t.edam) : "";
           const kind = t?.kind === "directory" ? "directory" : "";
+          // A folder format's own endings (.ome.zarr, .mefd).
+          const folderExtensions = Array.isArray(t?.folderExtensions) ? t.folderExtensions.map(String) : [];
           return mediaTypes.filter(Boolean).map((m) => ({
             value: String(m),
             label: String(m),
@@ -1170,6 +1172,7 @@ const actions = {
             extensions,
             ...(edam && { edam }),
             ...(kind && { kind }),
+            ...(folderExtensions.length && { folderExtensions }),
           }));
         })
         .filter((t) => t.value);
