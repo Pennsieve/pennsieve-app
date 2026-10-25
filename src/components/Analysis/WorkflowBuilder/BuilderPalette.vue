@@ -43,7 +43,7 @@ const manifestBuilder = computed(() => ({
 }));
 // The tile's letters, from the app's name without its owner's
 // ("pennsieve-ai-analyze" -> "AA"), so an organization's apps don't all read
-// the same; its colours, its domain's, as in the Gallery.
+// the same; its colours, its domain's, as in the Library.
 const tileColors = (app) => {
   const c = appColors(app);
   return { background: c.tile, color: c.ink };

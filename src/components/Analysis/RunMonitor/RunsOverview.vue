@@ -182,7 +182,7 @@ const nothingRun = computed(
 );
 const onlyNotebooks = computed(() => props.excludeNotebooks && workflowInstances.value.length > 0);
 const toBuilder = () => router.replace({ query: { ...route.query, view: "builder" } });
-const galleryRoute = computed(() => ({ name: isMyWorkspace.value ? "my-gallery" : "gallery" }));
+const libraryRoute = computed(() => ({ name: isMyWorkspace.value ? "my-workflows" : "workflows", query: { view: "library" } }));
 
 /*
   Filtered Runs
@@ -350,7 +350,7 @@ const {
 const filteredWizardWorkflows = computed(() =>
   wizardWorkflowOptions.value.filter((w) => !isNotebookWorkflow(w))
 );
-// A preselected workflow (a Gallery card's Run, a rerun) that isn't among the
+// A preselected workflow (a Library card's Run, a rerun) that isn't among the
 // pages loaded, fetched on its own.
 const pickedWorkflow = ref(null);
 const pickWorkflow = async (workflowId) => {
@@ -414,7 +414,7 @@ const fetchDatasetOptions = async (query = "") => {
   }
 };
 
-// The Workflows tab opens the wizard, on a workflow when a Gallery card's Run
+// The Workflows tab opens the wizard, on a workflow when a Library card's Run
 // sent the user here: it starts at choosing the compute node.
 defineExpose({
   openWizardDialog: (workflowId) => {
@@ -612,7 +612,7 @@ onBeforeUnmount(() => {
             <bf-button @click="openWizardDialog">Run a workflow</bf-button>
             <template v-if="embedded">
               <bf-button class="secondary" @click="toBuilder">Build a workflow</bf-button>
-              <router-link :to="galleryRoute" class="runs-welcome-link">Browse the Gallery</router-link>
+              <router-link :to="libraryRoute" class="runs-welcome-link">Browse workflows</router-link>
             </template>
           </div>
         </div>

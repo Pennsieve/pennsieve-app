@@ -1,5 +1,5 @@
-// Searching, filtering and sorting the Gallery's workflows: pure, so the
-// rules are easy to test and change.
+// The Workflows tab's views, and searching, filtering and sorting its Library:
+// pure, so the rules are easy to test and change.
 import { appNames, ioSummary, outputLabel } from "./workflowSummary";
 import { normalizeUrl } from "../RunMonitor/runHelpers";
 import { versionManifest } from "../WorkflowBuilder/appManifestInfo";
@@ -35,16 +35,11 @@ export function outputOptions(list, targetTypes = []) {
     .sort((a, b) => a.label.localeCompare(b.label));
 }
 
-// officialOnly keeps Pennsieve's; notebooksOnly its notebooks (a notebook
-// kernel must be official, as on the Notebooks tab).
-export function applyFilters(
-  list,
-  { query, input = "any", output = "any", officialOnly = false, notebooksOnly = false, ...context } = {}
-) {
+// officialOnly keeps Pennsieve's.
+export function applyFilters(list, { query, input = "any", output = "any", officialOnly = false, ...context } = {}) {
   return list.filter(
     (wf) =>
       (!officialOnly || wf.official) &&
-      (!notebooksOnly || (wf.official && isNotebookWorkflow(wf))) &&
       (input === "any" || inputKind(wf) === input) &&
       (output === "any" || outputTypes(wf).includes(output)) &&
       matchesSearch(wf, query, context)
@@ -94,3 +89,21 @@ export function sortWorkflows(list, sort = "recent", { applications = [] } = {})
   }[sort] || tie;
   return [...list].sort(cmp);
 }
+
+// The Workflows tab's views: Library (the workflows), Live (their runs),
+// Builder. Without one in the URL, the view last used, else Library.
+export const WORKFLOW_VIEWS = [
+  { key: "library", label: "Library" },
+  { key: "live", label: "Live" },
+  { key: "builder", label: "Builder" },
+];
+export function workflowsView(requested, last) {
+  const known = (v) => WORKFLOW_VIEWS.some((o) => o.key === v);
+  if (known(requested)) return requested;
+  if (known(last)) return last;
+  return "library";
+}
+
+// The Library lists workflows to run; notebooks start on the Notebooks tab.
+export const libraryWorkflows = (list = []) => list.filter((wf) => !isNotebookWorkflow(wf));
+

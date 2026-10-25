@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { applyFilters, matchesSearch, outputOptions, sortWorkflows } from "./galleryFilter";
+import { applyFilters, libraryWorkflows, matchesSearch, outputOptions, sortWorkflows, workflowsView } from "./galleryFilter";
 
 const spikes = {
   name: "EEG spikes",
@@ -47,10 +47,9 @@ describe("applyFilters", () => {
     expect(applyFilters(all, { officialOnly: true })).toEqual([spikes]);
   });
 
-  it("keeps Pennsieve's notebooks", () => {
+  it("leaves notebooks out of the Library (they start on the Notebooks tab)", () => {
     const jupyter = { name: "Pennsieve - Python Notebook - 3.12", official: true, notebook: { kernel: "python", savesTo: "dataset", worksWithoutDataset: false } };
-    const lookalike = { ...jupyter, official: false };
-    expect(applyFilters([spikes, jupyter, lookalike], { notebooksOnly: true })).toEqual([jupyter]);
+    expect(libraryWorkflows([spikes, jupyter])).toEqual([spikes]);
   });
 
   it("offers the outputs the list has", () => {
@@ -94,3 +93,13 @@ describe("recommended order", () => {
     ]);
   });
 });
+
+describe("workflowsView", () => {
+  it("is the URL's view, else the one last used here, else Library", () => {
+    expect(workflowsView("live", "builder")).toBe("live");
+    expect(workflowsView(undefined, "builder")).toBe("builder");
+    expect(workflowsView(undefined, null)).toBe("library");
+    expect(workflowsView("apps", "nonsense")).toBe("library");
+  });
+});
+

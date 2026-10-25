@@ -493,7 +493,7 @@ const goToGuide = () =>
                 class="preview-view"
                 :class="{ active: previewView === 'card' }"
                 :aria-selected="previewView === 'card'"
-                title="As it will look in the Gallery"
+                title="As it will look on the Apps tab"
                 @click="previewView = 'card'"
               >
                 Card
@@ -553,7 +553,7 @@ const goToGuide = () =>
             </template>
           </div>
 
-          <!-- The Gallery card this app.yml gives -->
+          <!-- The app card this app.yml gives -->
           <div v-if="previewView === 'card'" class="card-preview">
             <div class="app-card">
               <div class="app-thumb">
@@ -1169,7 +1169,7 @@ code {
   }
 }
 
-/* The Gallery card, as ApplicationsGrid draws it. */
+/* The app card, as ApplicationsGrid draws it. */
 $card-height: 172px;
 .card-preview {
   padding: 16px;

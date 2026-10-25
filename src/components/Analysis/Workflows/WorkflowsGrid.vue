@@ -8,11 +8,10 @@ import IconAnalysis from "../../icons/IconAnalysis.vue";
 import IconPennsieveMark from "../../icons/IconPennsieveMark.vue";
 import WorkflowThumbnail from "../WorkflowGraph/WorkflowThumbnail.vue";
 import { ioSummary, appNames, usageLine } from "./workflowSummary";
-import { applyFilters, outputOptions, sortWorkflows, SORTS } from "./galleryFilter";
-import { isNotebookWorkflow } from "../RunMonitor/notebookHelpers";
+import { applyFilters, libraryWorkflows, outputOptions, sortWorkflows, SORTS } from "./galleryFilter";
 
 defineProps({
-  // Inside the Gallery, whose toolbar has the New Workflow button.
+  // Inside the Workflows tab's Library, whose bar has the New Workflow button.
   embedded: { type: Boolean, default: false },
 });
 
@@ -27,7 +26,7 @@ const isMyWorkspace = computed(() => !route.params.orgId);
 
 const searchQuery = ref("");
 const statusFilter = ref("active");
-const scopeFilter = ref("workspace"); // "workspace" | "public" | "pennsieve" (public, official only) | "notebooks" (Pennsieve's notebooks)
+const scopeFilter = ref("workspace"); // "workspace" | "public" | "pennsieve" (public, official only)
 const inputFilter = ref("any"); // "any" | "dataset" | "none"
 const outputFilter = ref("any"); // "any" | a target type
 
@@ -73,7 +72,6 @@ const scopeOptions = computed(() => [
   { label: isMyWorkspace.value ? "My workflows" : "This workspace", value: "workspace" },
   { label: "Public", value: "public" },
   { label: "Pennsieve", value: "pennsieve" },
-  { label: "Notebooks", value: "notebooks" },
 ]);
 
 // Pennsieve's are the public ones it has reviewed (official).
@@ -91,12 +89,11 @@ function clearFilters() {
 
 const filteredWorkflows = computed(() =>
   sortWorkflows(
-    applyFilters(workflows.value, {
+    applyFilters(libraryWorkflows(workflows.value), {
       query: searchQuery.value,
       input: inputFilter.value,
       output: outputFilter.value,
       officialOnly: scopeFilter.value === "pennsieve",
-      notebooksOnly: scopeFilter.value === "notebooks",
       applications: applications.value,
       targetTypes: targetTypes.value,
     }),
@@ -223,14 +220,9 @@ const fetchAllWorkflows = async () => {
 };
 
 
-// Run from a card: the Workflows tab's Live view, with the run wizard open on
-// this workflow; a notebook starts on the Notebooks tab instead, in its New
-// notebook dialog on this kernel.
+// Run from a card: the tab's Live view, with the run wizard open on this
+// workflow (notebooks aren't listed; they start on the Notebooks tab).
 const runWorkflow = (wf) => {
-  if (isNotebookWorkflow(wf)) {
-    router.push({ name: isMyWorkspace.value ? "my-notebooks" : "notebooks", query: { start: wf.uuid } });
-    return;
-  }
   router.push({ name: isMyWorkspace.value ? "my-workflows" : "workflows", query: { run: wf.uuid } });
 };
 
@@ -310,11 +302,7 @@ onMounted(async () => {
         </el-select>
       </div>
 
-      <p v-if="scopeFilter === 'notebooks'" class="scope-hint">
-        Pennsieve's notebooks: Start notebook opens one on the Notebooks tab,
-        where your notebooks and environments are.
-      </p>
-      <p v-else-if="scopeFilter === 'pennsieve'" class="scope-hint">
+      <p v-if="scopeFilter === 'pennsieve'" class="scope-hint">
         Workflows Pennsieve has reviewed and validated. They can be run from any workspace.
       </p>
       <p v-else-if="isPublicScope" class="scope-hint">
@@ -369,7 +357,7 @@ onMounted(async () => {
               <span class="wf-actions" @click.stop>
                 <button type="button" class="wf-action" @click="goToDetail(wf)">Open</button>
                 <button v-if="wf.isActive" type="button" class="wf-action wf-action--run" @click="runWorkflow(wf)">
-                  {{ isNotebookWorkflow(wf) ? "▶ Start notebook" : "▶ Run" }}
+                  ▶ Run
                 </button>
               </span>
             </div>

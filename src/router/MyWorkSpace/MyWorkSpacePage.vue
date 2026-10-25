@@ -168,9 +168,20 @@ export default {
         if (routeName === 'my-workflow-create') {
           return [{ name: 'Workflows', route: { name: 'my-workflows' } }, { name: 'New Workflow' }];
         }
-        // A workflow's page lives under the Gallery
+        // A workflow's page leads back to the Workflows tab's Library
         if (routeName === 'my-workflow-detail') {
-          return [{ name: 'Gallery', route: { name: 'my-gallery' } }, { name: 'Workflow' }];
+          return [{ name: 'Workflows', route: { name: 'my-workflows', query: { view: 'library' } } }, { name: 'Workflow' }];
+        }
+        if (routeName === 'my-apps') {
+          return [{ name: 'Apps' }];
+        }
+        const appPages = {
+          'my-application-detail': 'Application',
+          'my-application-manifest-guide': 'Manifest Guide',
+          'my-application-manifest-builder': 'Create Manifest',
+        };
+        if (appPages[routeName]) {
+          return [{ name: 'Apps', route: { name: 'my-apps' } }, { name: appPages[routeName] }];
         }
         if (routeName === 'my-compute-nodes') {
           return [{ name: 'Compute Nodes' }];

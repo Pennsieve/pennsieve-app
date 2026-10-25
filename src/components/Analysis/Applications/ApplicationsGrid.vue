@@ -22,15 +22,18 @@ import {
 } from "./appCards";
 
 defineProps({
-  // Inside the Gallery, whose toolbar links the manifest builder and guide.
+  // Inside the Apps tab, whose toolbar links the manifest builder.
   embedded: { type: Boolean, default: false },
+  // The Apps tab's bar has the search (v-model:search); then there's no
+  // search row here, and Sort moves to the filter row.
+  searchInBar: { type: Boolean, default: false },
 });
 
 
 /*
   Local State
 */
-const searchQuery = ref("");
+const searchQuery = defineModel("search", { type: String, default: "" });
 const visibilityFilter = ref("all");
 const statusFilter = ref("active");
 
@@ -180,7 +183,7 @@ watch(sortBy, (v) => {
   }
 });
 
-// "Used in 3 workflows" counts the workflows loaded for the Gallery.
+// "Used in 3 workflows" counts the workflows loaded for the Library.
 const workflows = computed(() => store.state.analysisModule.workflows || []);
 const usageText = (app) => {
   const n = workflowUses(app, workflows.value);
@@ -258,7 +261,7 @@ onMounted(() => {
   store
     .dispatch("analysisModule/fetchApplications", { includeArchived: statusFilter.value !== "active" })
     .catch(() => {});
-  // The workflows "Used in" counts, when the Gallery opened on Apps.
+  // The workflows "Used in" counts, when Apps opened before the Library.
   if (!workflows.value.length) {
     store.dispatch("analysisModule/fetchWorkflows", { limit: 100 }).catch(() => {});
   }
@@ -298,7 +301,7 @@ const goToManifestBuilder = () => {
 
 <template>
   <div class="applications-container">
-    <!-- Info Section (the Gallery has its own toolbar) -->
+    <!-- Info Section (the Apps tab has its own toolbar) -->
     <div v-if="!embedded" class="info-section">
       <div class="info-card">
         <h3>Applications</h3>
@@ -346,7 +349,7 @@ const goToManifestBuilder = () => {
 
     <!-- Applications Section -->
     <div class="applications-section">
-      <div class="applications-section-header">
+      <div v-if="!searchInBar" class="applications-section-header">
         <el-input
           v-model="searchQuery"
           placeholder="Search by name, description or repository…"
@@ -379,7 +382,13 @@ const goToManifestBuilder = () => {
           <el-option label="Runs anywhere" value="any" />
           <el-option v-for="t in computeChoices" :key="t" :label="`Runs on ${computeLabel(t)}`" :value="t" />
         </el-select>
-        <el-select v-model="statusFilter" size="small" class="status-select" aria-label="Status">
+        <label v-if="searchInBar" class="sort-control filter-sort">
+          Sort
+          <el-select v-model="sortBy" size="small" class="sort-select">
+            <el-option v-for="o in APP_SORTS" :key="o.value" :label="o.label" :value="o.value" />
+          </el-select>
+        </label>
+        <el-select v-model="statusFilter" size="small" class="status-select" :class="{ 'after-sort': searchInBar }" aria-label="Status">
           <el-option v-for="option in statusOptions" :key="option.value" :label="option.label" :value="option.value" />
         </el-select>
       </div>
@@ -482,7 +491,7 @@ const goToManifestBuilder = () => {
 @use "../../../styles/theme";
 @use "../../../styles/element/input";
 
-/* Lined up with the Gallery's toolbar and the Analysis tabs (32px). */
+/* Lined up with the Apps tab's toolbar and the Analysis tabs (32px). */
 .applications-container {
   padding: 20px 32px;
 }
@@ -579,7 +588,7 @@ const goToManifestBuilder = () => {
   width: 170px;
 }
 
-/* One row, all 24px tall, as on the Gallery's workflows. */
+/* One row, all 24px tall, as in the workflow Library. */
 /* The domains, in their banners' colours: a legend, and a filter. */
 .domain-row {
   display: flex;
@@ -661,6 +670,14 @@ const goToManifestBuilder = () => {
 }
 .status-select {
   width: 110px;
+  margin-left: auto;
+
+  &.after-sort {
+    margin-left: 0;
+  }
+}
+/* Sort and status together at the row's end (Apps tab). */
+.filter-sort {
   margin-left: auto;
 }
 

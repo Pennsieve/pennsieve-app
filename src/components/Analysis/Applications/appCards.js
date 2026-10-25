@@ -1,4 +1,4 @@
-// What the Gallery's app cards show, and how they're searched, filtered
+// What the Apps tab's cards show, and how they're searched, filtered
 // and sorted: pure, from the application records.
 import { normalizeUrl } from "../RunMonitor/runHelpers";
 import { versionManifest } from "../WorkflowBuilder/appManifestInfo";

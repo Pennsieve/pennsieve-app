@@ -161,7 +161,8 @@ const NotebooksOverview = () => import ('../components/Analysis/RunMonitor/Noteb
 const NotebookSession = () => import ('../components/Analysis/JupyterSession/NotebookSession.vue')
 const WorkflowBuilder = () => import ('../components/Analysis/WorkflowBuilder/WorkflowBuilder.vue')
 const WorkflowsOverview = () => import ('../components/Analysis/Workflows/WorkflowsOverview.vue')
-const GalleryOverview = () => import ('../components/Analysis/Gallery/GalleryOverview.vue')
+const AppsOverview = () => import ('../components/Analysis/Applications/AppsOverview.vue')
+import { galleryRedirect } from './galleryRedirect'
 
 /**
  * Metadata Components
@@ -525,8 +526,8 @@ const router = createRouter({
         {
           name: 'my-analysis',
           path: 'analysis',
-          // The Gallery first: what there is to run, before what's running
-          redirect: { name: 'my-gallery' },
+          // Workflows first (its Library): what there is to run
+          redirect: { name: 'my-workflows' },
           components: {
             stage: MyAnalysis,
             navigation: UserNavigation,
@@ -585,58 +586,67 @@ const router = createRouter({
               }
             },
             {
-              // Workflows and apps to use
-              name: 'my-gallery',
-              path: 'gallery',
-              component: GalleryOverview,
+              // The apps workflow steps run, and their app.yml
+              name: 'my-apps',
+              path: 'apps',
+              component: AppsOverview,
               meta: {
                 hideSecondaryNav: true,
-                title: 'Gallery',
-                description: 'Workflows and applications: your own, public ones, and ones shared with you.'
+                title: 'Apps',
+                description: 'The applications workflow steps run: your own, public ones, and ones shared with you.'
               }
             },
+            // The Gallery's old links: its Workflows view is the Workflows
+            // tab's Library, its Apps view the Apps tab.
             {
-              // Applications are in the Gallery's Apps view; old links land there.
+              name: 'my-gallery',
+              path: 'gallery',
+              redirect: galleryRedirect('my-')
+            },
+            { path: 'gallery/workflows/:uuid', redirect: (to) => ({ name: 'my-workflow-detail', params: to.params, query: to.query }) },
+            { path: 'gallery/apps/manifest-guide', redirect: (to) => ({ name: 'my-application-manifest-guide', query: to.query }) },
+            { path: 'gallery/apps/manifest-builder', redirect: (to) => ({ name: 'my-application-manifest-builder', query: to.query }) },
+            { path: 'gallery/apps/:uuid', redirect: (to) => ({ name: 'my-application-detail', params: to.params, query: to.query }) },
+            {
+              // Older still: the Applications tab
               name: 'my-applications',
               path: 'applications',
-              redirect: { name: 'my-gallery', query: { view: 'apps' } }
+              redirect: { name: 'my-apps' }
             },
-            // Workflow and app pages live under the Gallery, so its tab stays
-            // highlighted there; their old paths redirect.
             { path: 'applications/manifest-guide', redirect: { name: 'my-application-manifest-guide' } },
-            { path: 'applications/manifest-builder', redirect: { name: 'my-application-manifest-builder' } },
+            { path: 'applications/manifest-builder', redirect: (to) => ({ name: 'my-application-manifest-builder', query: to.query }) },
             { path: 'applications/:uuid', redirect: (to) => ({ name: 'my-application-detail', params: to.params }) },
             {
-              // Static paths before 'gallery/apps/:uuid'
+              // Static paths before 'apps/:uuid'
               name: 'my-application-manifest-guide',
-              path: 'gallery/apps/manifest-guide',
+              path: 'apps/manifest-guide',
               component: AppManifestGuide,
               meta: {
                 hideSecondaryNav: true,
-                backLink: { name: 'my-gallery', query: { view: 'apps' } },
+                backLink: { name: 'my-apps' },
                 title: 'Manifest Guide',
                 description: 'The app.yml manifest specification.'
               }
             },
             {
               name: 'my-application-manifest-builder',
-              path: 'gallery/apps/manifest-builder',
+              path: 'apps/manifest-builder',
               component: AppManifestBuilder,
               meta: {
                 hideSecondaryNav: true,
-                backLink: { name: 'my-gallery', query: { view: 'apps' } },
+                backLink: { name: 'my-apps' },
                 title: 'Manifest Builder',
                 description: 'Generate an app.yml manifest for your application.'
               }
             },
             {
               name: 'my-application-detail',
-              path: 'gallery/apps/:uuid',
+              path: 'apps/:uuid',
               component: ApplicationDetail,
               props: true,
               meta: {
                 hideSecondaryNav: true,
-                backLink: { name: 'my-gallery', query: { view: 'apps' } },
+                backLink: { name: 'my-apps' },
                 title: 'Application',
                 description: 'An application from the Pennsieve App Store.'
               }
@@ -648,7 +658,7 @@ const router = createRouter({
               meta: {
                 hideSecondaryNav: true,
                 title: 'Workflows',
-                description: 'Your workflow runs, and the builder for new workflows.'
+                description: 'Workflows to run (your own and public ones), their runs, and the builder.'
               }
             },
             {
@@ -662,16 +672,15 @@ const router = createRouter({
                 description: 'Create a workflow of your own, outside any workspace.'
               }
             },
-            // After 'workflows/new'
-            { path: 'workflows/:uuid', redirect: (to) => ({ name: 'my-workflow-detail', params: to.params }) },
             {
+              // After 'workflows/new'
               name: 'my-workflow-detail',
-              path: 'gallery/workflows/:uuid',
+              path: 'workflows/:uuid',
               component: WorkflowBuilder,
               props: true,
               meta: {
                 hideSecondaryNav: true,
-                backLink: { name: 'my-gallery' },
+                backLink: { name: 'my-workflows' },
                 title: 'Workflow',
                 description: 'A workflow of your own, or a public one.'
               }
@@ -2019,14 +2028,14 @@ const router = createRouter({
         page: Analysis,
         navigation: BfNavigation
       },
-      // The Gallery first: what there is to run, before what's running
+      // Workflows first (its Library): what there is to run
       redirect: {
-        name: 'gallery'
+        name: 'workflows'
       },
       props: true,
       children: [
         {
-          // Live (the workflow runs) and Builder (the workflows)
+          // Library (the workflows), Live (their runs) and Builder
           name: 'workflows',
           path: 'workflows',
           components: {
@@ -2041,10 +2050,9 @@ const router = createRouter({
           }
         },
         {
-          // Under the Gallery, so its tab stays highlighted; the old path
-          // redirects (after 'workflows/new').
+          // A workflow's page, under the Workflows tab (after 'workflows/new')
           name: 'workflow-detail',
-          path: 'gallery/workflows/:uuid',
+          path: 'workflows/:uuid',
           components: {
             stage: WorkflowBuilder,
           },
@@ -2107,42 +2115,51 @@ const router = createRouter({
           props: true
         },
         {
-          // Workflows and apps to use
-          name: 'gallery',
-          path: 'gallery',
+          // The apps workflow steps run, and their app.yml
+          name: 'apps',
+          path: 'apps',
           components: {
-            stage: GalleryOverview,
+            stage: AppsOverview,
           }
         },
+        // The Gallery's old links: its Workflows view is the Workflows tab's
+        // Library, its Apps view the Apps tab.
         {
-          // Applications are in the Gallery's Apps view; old links land there.
+          name: 'gallery',
+          path: 'gallery',
+          redirect: galleryRedirect()
+        },
+        { path: 'gallery/workflows/:uuid', redirect: (to) => ({ name: 'workflow-detail', params: to.params, query: to.query }) },
+        { path: 'gallery/apps/manifest-guide', redirect: (to) => ({ name: 'application-manifest-guide', params: to.params, query: to.query }) },
+        { path: 'gallery/apps/manifest-builder', redirect: (to) => ({ name: 'application-manifest-builder', params: to.params, query: to.query }) },
+        { path: 'gallery/apps/:uuid', redirect: (to) => ({ name: 'application-detail', params: to.params, query: to.query }) },
+        {
+          // Older still: the Applications tab
           name: 'applications',
           path: 'applications',
-          redirect: (to) => ({ name: 'gallery', params: to.params, query: { view: 'apps' } })
+          redirect: (to) => ({ name: 'apps', params: to.params })
         },
-        // App pages live under the Gallery, so its tab stays highlighted
-        // there; their old paths redirect.
-        { path: 'workflows/:uuid', redirect: (to) => ({ name: 'workflow-detail', params: to.params }) },
         { path: 'applications/manifest-guide', redirect: (to) => ({ name: 'application-manifest-guide', params: to.params }) },
-        { path: 'applications/manifest-builder', redirect: (to) => ({ name: 'application-manifest-builder', params: to.params }) },
+        { path: 'applications/manifest-builder', redirect: (to) => ({ name: 'application-manifest-builder', params: to.params, query: to.query }) },
         { path: 'applications/:uuid', redirect: (to) => ({ name: 'application-detail', params: to.params }) },
         {
+          // Static paths before 'apps/:uuid'
           name: 'application-manifest-guide',
-          path: 'gallery/apps/manifest-guide',
+          path: 'apps/manifest-guide',
           components: {
             stage: AppManifestGuide,
           }
         },
         {
           name: 'application-manifest-builder',
-          path: 'gallery/apps/manifest-builder',
+          path: 'apps/manifest-builder',
           components: {
             stage: AppManifestBuilder,
           }
         },
         {
           name: 'application-detail',
-          path: 'gallery/apps/:uuid',
+          path: 'apps/:uuid',
           components: {
             stage: ApplicationDetail,
           },

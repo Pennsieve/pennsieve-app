@@ -90,8 +90,8 @@ function onEnvCreated() {
 }
 const isLoading = ref(false);
 const dialogVisible = ref(false);
-// The kernel the New notebook dialog opens on: a Gallery card's "Start
-// notebook" lands here with ?start=<workflow>. The query goes once it's
+// The kernel the New notebook dialog opens on: a link to a notebook
+// workflow lands here with ?start=<workflow>. The query goes once it's
 // open, so a reload doesn't open it again.
 const startWorkflowId = ref("");
 function openNewNotebook(workflowId = "") {

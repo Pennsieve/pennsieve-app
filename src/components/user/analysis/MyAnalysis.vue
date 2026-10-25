@@ -5,16 +5,19 @@ import { runPageIsNotebook } from '@/components/Analysis/RunMonitor/notebookHelp
 
 const store = useStore()
 // A run's page sits under no tab's path: it lights up Notebooks for a
-// notebook's run, else Workflows (as do configuring a run and a new
-// workflow).
+// notebook's run, else Workflows (as do configuring a run, a new workflow
+// and a workflow's page). An app's pages are under the Apps tab's path.
 const runPage = (route) => route.name === 'my-run-detail'
 const isNotebook = (route) => runPageIsNotebook(route, store.getters['analysisModule/workflowInstances'])
 
 // Analysis outside any workspace, laid out like a workspace's Analysis page.
 const tabs = [
   {
-    name: 'Gallery',
-    to: 'my-gallery',
+    name: 'Workflows',
+    to: 'my-workflows',
+    activeWhen: (route) =>
+      (runPage(route) && !isNotebook(route)) ||
+      ['my-run-configure', 'my-workflow-create', 'my-workflow-detail'].includes(route.name),
   },
   {
     name: 'Notebooks',
@@ -22,10 +25,8 @@ const tabs = [
     activeWhen: (route) => runPage(route) && isNotebook(route),
   },
   {
-    name: 'Workflows',
-    to: 'my-workflows',
-    activeWhen: (route) =>
-      (runPage(route) && !isNotebook(route)) || ['my-run-configure', 'my-workflow-create'].includes(route.name),
+    name: 'Apps',
+    to: 'my-apps',
   },
   {
     name: 'Compute Nodes',
