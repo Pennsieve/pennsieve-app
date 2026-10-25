@@ -10,6 +10,7 @@ import MoreOptions from "./MoreOptions.vue";
 import AppBanner from "./AppBanner.vue";
 import { fetchRepository, canUpdateManifest } from "./githubRepository";
 import { createApplicationSchema, buildManifest, manifestToYaml, parseManifest, KERNELS, MANIFEST_EXAMPLE_URL, MANIFEST_SHAPES } from "./applicationSchema";
+import { openAppYmlPullRequest } from "./pullRequest";
 import { builderProblems, validateManifestText } from "./manifestValidation";
 import {
   APP_KINDS,
@@ -279,6 +280,32 @@ const cardApp = computed(() => previewApp(manifest.value));
 const cardTags = computed(() => (manifest.value.application?.tags || []).slice(0, 4));
 
 const copied = ref(false);
+/* ─────────────── Open a pull request on the app's repository ─────────────── */
+// For an app with a GitHub repo, someone who can update it (owner, or push
+// access) opens a pull request with this app.yml instead of copying it.
+// Hidden for the session if this Pennsieve can't yet (no route).
+const prUnavailable = ref(false);
+const prSending = ref(false);
+const prOutcome = ref(null);
+const canOpenPullRequest = computed(() => !!forApp.value?.repo && !!forApp.value?.canUpdate && !prUnavailable.value);
+async function openPullRequest() {
+  if (!canOpenPullRequest.value || problems.value.length || prSending.value) return;
+  prSending.value = true;
+  prOutcome.value = null;
+  try {
+    const token = await useGetToken();
+    const outcome = await openAppYmlPullRequest(api2Url.value, forApp.value.repo, manifestYaml.value, token);
+    if (outcome.kind === "unavailable") {
+      prUnavailable.value = true;
+      return;
+    }
+    prOutcome.value = outcome;
+  } finally {
+    prSending.value = false;
+  }
+}
+const githubIntegrationRoute = { name: "user-github" };
+
 const copyManifest = async () => {
   try {
     await navigator.clipboard.writeText(manifestYaml.value);
@@ -552,7 +579,21 @@ const goToGuide = () =>
             </div>
             <div class="preview-actions">
               <button type="button" class="app-outline-button" @click="copyManifest">{{ copied ? "Copied!" : "Copy" }}</button>
-              <bf-button class="compact flex" @click="downloadManifest">Download</bf-button>
+              <!-- For an app its owner (or a pusher) can update: a pull request is the main action -->
+              <template v-if="canOpenPullRequest">
+                <button type="button" class="app-outline-button" @click="downloadManifest">Download</button>
+                <el-tooltip :disabled="!problems.length" content="Fix the problems first" placement="top">
+                  <span>
+                    <bf-button
+                      class="compact flex"
+                      :disabled="!!problems.length || prSending"
+                      :processing="prSending"
+                      @click="openPullRequest"
+                    >Open a pull request</bf-button>
+                  </span>
+                </el-tooltip>
+              </template>
+              <bf-button v-else class="compact flex" @click="downloadManifest">Download</bf-button>
             </div>
           </div>
 
@@ -608,9 +649,37 @@ const goToGuide = () =>
             </p>
           </template>
         </div>
-        <!-- For an app: where the file goes. TODO(868mmz09m): "Open a pull
-             request" on forApp.repo goes here, once the GitHub App can. -->
-        <p v-if="forApp?.repo" class="preview-note">
+        <!-- The pull request's outcome -->
+        <div v-if="prOutcome" class="pr-outcome" :class="`pr-outcome--${prOutcome.kind}`" role="status">
+          <template v-if="prOutcome.kind === 'opened'">
+            <p>
+              Pull request <strong>#{{ prOutcome.number }}</strong> opened on {{ forApp.repo.fullName }}.
+              <a :href="prOutcome.url" target="_blank" rel="noopener">View on GitHub</a>
+            </p>
+            <p class="pr-outcome-note">Publish a release after merging it, so the App Store picks up the app.yml.</p>
+          </template>
+          <template v-else-if="prOutcome.kind === 'needsApproval'">
+            <p>Pennsieve's GitHub app needs your approval to open pull requests in {{ forApp.repo.owner }}.</p>
+            <p class="pr-outcome-note">
+              <a v-if="prOutcome.reviewUrl" :href="prOutcome.reviewUrl" target="_blank" rel="noopener">Review on GitHub</a>
+              <template v-if="prOutcome.organization"> · Only owners of {{ forApp.repo.owner }} can approve.</template>
+              Copy or Download still work.
+            </p>
+          </template>
+          <p v-else-if="prOutcome.kind === 'noPush'">
+            You can't push to {{ forApp.repo.fullName }}. Copy or download the file and propose it to its owners.
+          </p>
+          <p v-else-if="prOutcome.kind === 'notLinked'">
+            <router-link :to="githubIntegrationRoute">Link your GitHub account</router-link> to open pull requests, or copy or download the file.
+          </p>
+          <p v-else>Couldn't open the pull request: {{ prOutcome.message }}</p>
+        </div>
+
+        <!-- For an app: where the file goes -->
+        <p v-if="forApp?.repo && canOpenPullRequest && !prOutcome" class="preview-note">
+          Opens a pull request on {{ forApp.repo.fullName }} that adds or updates <code>app.yml</code> at its root.
+        </p>
+        <p v-else-if="forApp?.repo && !canOpenPullRequest" class="preview-note">
           Add it to {{ forApp.repo.fullName }} as <code>app.yml</code> at the root, then publish a release.
           <template v-if="prReview?.review_url">
             <a :href="prReview.review_url" target="_blank" rel="noopener">Approve Pennsieve's GitHub update</a>
@@ -1216,5 +1285,40 @@ $card-height: 172px;
   .builder-preview {
     position: static;
   }
+}
+.pr-outcome {
+  margin-top: 12px;
+  padding: 12px 14px;
+  border: 1px solid theme.$gray_2;
+  border-radius: 3px;
+  background: theme.$gray_1;
+  font-size: 13px;
+  color: theme.$gray_6;
+
+  p {
+    margin: 0;
+  }
+  a {
+    color: theme.$purple_3;
+  }
+}
+.pr-outcome--opened {
+  border-color: theme.$green_1;
+  background: theme.$green_tint;
+}
+.pr-outcome--needsApproval,
+.pr-outcome--noPush,
+.pr-outcome--notLinked {
+  border-color: theme.$orange_1;
+  background: theme.$orange_tint;
+}
+.pr-outcome--error {
+  border-color: theme.$red_1;
+  background: theme.$red_tint;
+}
+.pr-outcome-note {
+  margin-top: 4px !important;
+  font-size: 12px;
+  color: theme.$gray_5;
 }
 </style>
