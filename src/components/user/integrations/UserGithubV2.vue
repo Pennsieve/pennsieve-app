@@ -25,14 +25,18 @@
           Pennsieve's GitHub app was updated —
           {{ review.count }} installation{{ review.count === 1 ? "" : "s" }} need{{ review.count === 1 ? "s" : "" }} your approval.
         </span>
-        <a
-          v-if="review.single"
-          :href="review.single.review_url"
-          target="_blank"
-          rel="noopener noreferrer"
-          class="review-btn"
-          >Review on GitHub</a
-        >
+        <!-- One review link per installation (named when there are several). -->
+        <span class="review-actions">
+          <a
+            v-for="inst in review.pending"
+            :key="inst.id"
+            :href="inst.review_url"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="review-btn"
+            >{{ review.single ? "Review on GitHub" : `Review ${inst.name}` }}</a
+          >
+        </span>
       </div>
 
       <!-- Connection Status -->
@@ -386,6 +390,12 @@ async function confirmDelete() {
   background: theme.$orange_tint;
   font-size: 14px;
   color: theme.$gray_6;
+}
+.review-actions {
+  display: flex;
+  flex-wrap: wrap;
+  flex-shrink: 0;
+  gap: 8px;
 }
 .review-list {
   margin: 20px 0 0;
