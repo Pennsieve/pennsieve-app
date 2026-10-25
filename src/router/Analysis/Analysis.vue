@@ -2,7 +2,7 @@
   <bf-page>
     <bf-rafter slot="heading" class="primary" :org-id="orgId">
       <template #breadcrumb>
-        <org-breadcrumb page-name="Analysis" :crumbs="breadcrumbCrumbs" :page-route="{ name: 'gallery' }" />
+        <org-breadcrumb page-name="Analysis" :crumbs="breadcrumbCrumbs" :page-route="{ name: 'workflows' }" />
       </template>
     </bf-rafter>
     <div class="content-tabs">
@@ -60,19 +60,20 @@ export default {
       return runPageIsNotebook(this.$route, this.$store.getters["analysisModule/workflowInstances"]);
     },
     // A run's page sits under no tab's path: it lights up Notebooks for a
-    // notebook's run, else Workflows (as do configuring a run and a new
-    // workflow).
+    // notebook's run, else Workflows (as do configuring a run, a new workflow
+    // and a workflow's page). An app's pages are under the Apps tab's path.
     tabs() {
       const runPage = (route) => route.name === "run-detail";
       return [
-        { name: "Gallery", to: "gallery" },
-        { name: "Notebooks", to: "notebooks", activeWhen: (route) => runPage(route) && this.runIsNotebook },
         {
           name: "Workflows",
           to: "workflows",
           activeWhen: (route) =>
-            (runPage(route) && !this.runIsNotebook) || ["run-configure", "workflow-create"].includes(route.name),
+            (runPage(route) && !this.runIsNotebook) ||
+            ["run-configure", "workflow-create", "workflow-detail"].includes(route.name),
         },
+        { name: "Notebooks", to: "notebooks", activeWhen: (route) => runPage(route) && this.runIsNotebook },
+        { name: "Apps", to: "apps" },
         { name: "Compute Nodes", to: "compute-nodes" },
       ];
     },
@@ -83,7 +84,7 @@ export default {
       const topLevelTabs = {
         'notebooks': 'Notebooks',
         'workflows': 'Workflows',
-        'gallery': 'Gallery',
+        'apps': 'Apps',
         'compute-nodes': 'Compute Nodes',
       };
       if (topLevelTabs[routeName]) {
@@ -97,11 +98,11 @@ export default {
           ? { parent: 'Notebooks', parentRoute: { name: 'notebooks' } }
           : { parent: 'Workflows', parentRoute: { name: 'workflows' } },
         'run-configure': { parent: 'Workflows', parentRoute: { name: 'workflows' } },
-        'workflow-detail': { parent: 'Gallery', parentRoute: { name: 'gallery' } },
+        'workflow-detail': { parent: 'Workflows', parentRoute: { name: 'workflows', query: { view: 'library' } } },
         'workflow-create': { parent: 'Workflows', parentRoute: { name: 'workflows', query: { view: 'builder' } } },
-        'application-detail': { parent: 'Gallery', parentRoute: { name: 'gallery', query: { view: 'apps' } } },
-        'application-manifest-guide': { parent: 'Gallery', parentRoute: { name: 'gallery', query: { view: 'apps' } } },
-        'application-manifest-builder': { parent: 'Gallery', parentRoute: { name: 'gallery', query: { view: 'apps' } } },
+        'application-detail': { parent: 'Apps', parentRoute: { name: 'apps' } },
+        'application-manifest-guide': { parent: 'Apps', parentRoute: { name: 'apps' } },
+        'application-manifest-builder': { parent: 'Apps', parentRoute: { name: 'apps' } },
         'compute-node-management': { parent: 'Compute Nodes', parentRoute: { name: 'compute-nodes' } },
       };
       const sub = subPages[routeName];

@@ -29,7 +29,7 @@ const props = defineProps({
   // The published notebook workflows (one per kernel). Provided by the parent,
   // which already fetched them to gate the "New Notebook" button.
   notebookWorkflows: { type: Array, default: () => [] },
-  // The kernel to open on (a Gallery card's "Start notebook"); else the only
+  // The kernel to open on (a link's ?start=<workflow>); else the only
   // one, if there's just one.
   initialWorkflowId: { type: String, default: "" },
   // Launched from My Workspace, on the user's own compute node. There the

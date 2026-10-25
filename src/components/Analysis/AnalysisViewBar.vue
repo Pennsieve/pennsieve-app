@@ -1,18 +1,22 @@
 <script setup>
-// The bar under the Analysis tabs on Gallery, Workflows and Notebooks: the
-// view switch on the left (Workflows/Apps, Live/Builder, Live/Environments),
-// the view's action on the right. One component, so the switch and the first
+// The bar under the Analysis tabs on Workflows, Notebooks and Apps: the view
+// switch on the left (Library/Live/Builder, Live/Environments; Apps has its
+// search there instead, in the `lead` slot), the view's action on the right. One component, so the switch and the first
 // heading below it sit in the same place on every tab.
 defineProps({
-  views: { type: Array, required: true }, // [{ key, label }]
-  modelValue: { type: String, required: true },
+  views: { type: Array, default: () => [] }, // [{ key, label }]
+  modelValue: { type: String, default: "" },
 });
 const emit = defineEmits(["update:modelValue"]);
 </script>
 
 <template>
   <div class="view-bar">
-    <div class="view-switch" role="tablist">
+    <!-- A tab without views can put something there instead (Apps' search). -->
+    <div v-if="$slots.lead" class="view-lead">
+      <slot name="lead" />
+    </div>
+    <div v-else-if="views.length" class="view-switch" role="tablist">
       <button
         v-for="v in views"
         :key="v.key"
@@ -46,6 +50,11 @@ const emit = defineEmits(["update:modelValue"]);
   height: 68px;
   padding: 0 32px;
   background: theme.$white;
+}
+.view-lead {
+  display: flex;
+  align-items: center;
+  min-width: 0;
 }
 .view-switch {
   display: inline-flex;

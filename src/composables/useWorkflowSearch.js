@@ -86,7 +86,7 @@ export function useWorkflowSearch(sources = () => [{}]) {
     }
   }
 
-  // One workflow by id, for a preselected one (a Gallery card's Run, a rerun)
+  // One workflow by id, for a preselected one (a Library card's Run, a rerun)
   // that isn't among the pages loaded.
   const fetchWorkflow = async (id) => {
     try {

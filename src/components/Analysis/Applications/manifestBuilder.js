@@ -1,7 +1,7 @@
 // The app manifest builder's own rules, pure so they're easy to test: what
 // kind of app it is (batch or interactive) and what that writes,
 // the builder's sections and which of them a problem belongs to, the field a
-// problem points at, and the Gallery card
+// problem points at, and the app card
 // an app.yml gives.
 import { load as loadYaml } from "js-yaml";
 import { createPort, normalizeEdamFormat, normalizeOrcid, parseManifest, PARAM_TYPES, validateParameterValue, isEarlierLayout, isNumericType } from "./applicationSchema";
@@ -144,10 +144,10 @@ export function problemsByField(problems) {
   return by;
 }
 
-/* ─────────────── The Gallery card an app.yml gives ─────────────── */
+/* ──────────────── The app card an app.yml gives ──────────────── */
 
 /**
- * An app record as the Gallery reads it, from a manifest the builder wrote:
+ * An app record as the Apps tab reads it, from a manifest the builder wrote:
  * one version whose stored manifest is the app.yml's (tags, runtime and
  * ports at the top, as app-deploy-service keeps them).
  */

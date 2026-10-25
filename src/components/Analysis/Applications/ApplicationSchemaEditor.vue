@@ -379,7 +379,7 @@ const tagGroups = preferredTagGroups();
 const preferredOptions = computed(() => tagGroups.preferred.filter((o) => tagOptionMatches(o, tagQuery.value, { preferred: true })));
 const aliasOptions = computed(() => tagGroups.aliases.filter((o) => tagOptionMatches(o, tagQuery.value)));
 const tagNudge = computed(() => tagDomainNudge(schema.value.tags || []));
-// A chip in its domain's colours, as on the Gallery; neutral without one.
+// A chip in its domain's colours, as on the Apps tab; neutral without one.
 const tagChipStyle = (tag) => {
   const d = domainOfTag(tag);
   if (!d) return {};
@@ -406,7 +406,7 @@ const portDataTypes = computed(() =>
   ])
 );
 
-// In, the app's settings, out: as the Gallery card and the workflow graph
+// In, the app's settings, out: as the app card and the workflow graph
 // read. An interactive app has no settings of its own.
 const PORT_BLOCKS = {
   inputs: {

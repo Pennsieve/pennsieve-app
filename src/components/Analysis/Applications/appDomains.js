@@ -1,5 +1,5 @@
 // What an app is for, from the tags its app.yml declares: a short list of
-// domains, each with a hue and an icon, that the Gallery's app banners are
+// domains, each with a hue and an icon, that the Apps tab's banners are
 // coloured by. Tags are free text, so each domain lists the spellings people
 // use ("EEG", "iEEG", "electrophysiology"); a tag matches regardless of case
 // and punctuation. An app whose tags match none is grey: a colour always
@@ -206,7 +206,7 @@ export const appDomain = (app, tag) => domainOf(versionManifest(app, tag));
 export const appColors = (app, tag) => domainColors(appDomain(app, tag));
 
 // The domains of a list of apps, most common first, with how many apps each:
-// the Gallery's filter chips.
+// the Apps tab's filter chips.
 export function domainCounts(apps) {
   const counts = new Map();
   for (const app of apps || []) {

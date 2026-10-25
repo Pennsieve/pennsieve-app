@@ -68,11 +68,12 @@ const props = defineProps({
 
 const router = useRouter();
 const route = useRoute();
-// A workflow's page is in the Gallery, which it leads back to (My
+// A workflow's page leads back to the Workflows tab's Library (My
 // Workspace's pages live under My Analysis, with no orgId).
-const workflowsRoute = computed(() =>
-  route.params.orgId ? { name: "gallery" } : { name: "my-gallery" }
-);
+const workflowsRoute = computed(() => ({
+  name: route.params.orgId ? "workflows" : "my-workflows",
+  query: { view: "library" },
+}));
 
 /*
 Local State
@@ -1594,7 +1595,7 @@ const saveWorkflow = async () => {
   }
 };
 
-// The workflow page of a workflow (in the Gallery).
+// The workflow page of a workflow (opened from the Library).
 const workflowPage = (uuid, query) => ({
   name: route.params.orgId ? "workflow-detail" : "my-workflow-detail",
   params: { ...(route.params.orgId && { orgId: route.params.orgId }), uuid },
@@ -2006,7 +2007,7 @@ const openNodeSettings = (id) => {
     <div v-else-if="isReadOnly" class="builder-header">
       <span class="header-title">
         <router-link :to="workflowsRoute" class="header-back-link">
-          &larr; Gallery
+          &larr; Workflows
         </router-link>
         <span class="header-breadcrumb-sep">/</span>
         <span class="header-detail-name">{{
@@ -2097,7 +2098,7 @@ const openNodeSettings = (id) => {
             </template>
             <template v-else>
               <h3>No workflow loaded</h3>
-              <p>Return to the workflows gallery to select a workflow</p>
+              <p>Return to the workflow library to select a workflow</p>
             </template>
           </div>
 
@@ -2154,7 +2155,7 @@ const openNodeSettings = (id) => {
               <div v-if="!isReadOnly && nodes.length === 1 && nodes[0].type === 'data-source'" class="first-step-hint">
                 Add the first step with the <strong>+</strong> under Input data, or click an app in the list.
                 Or start from a workflow in the
-                <router-link :to="workflowsRoute" class="first-step-link">Gallery</router-link>
+                <router-link :to="workflowsRoute" class="first-step-link">Library</router-link>
                 and duplicate it.
               </div>
 

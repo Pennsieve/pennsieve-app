@@ -116,7 +116,7 @@ describe("sections and fields", () => {
 });
 
 describe("the card preview", () => {
-  it("reads the app.yml as the Gallery reads a version's manifest", () => {
+  it("reads the app.yml as the Apps tab reads a version's manifest", () => {
     const m = buildManifest(createApplicationSchema({ tags: ["eeg"] }), { name: "Spikes", description: "Finds spikes" });
     const app = previewApp(m);
     expect(app.name).toBe("Spikes");
