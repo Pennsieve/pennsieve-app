@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { targetWritesToDataset, prefixParamName, targetParamFields, buildDataTargets, targetDatasetId, datasetName, searchDatasets, isPathPrefixParam, targetParamLabel, NOTIFY_OPTIONS, defaultsToRunName } from "./dataTargets";
+import { targetWritesToDataset, prefixParamName, targetParamFields, buildDataTargets, targetDatasetId, datasetName, searchDatasets, isPathPrefixParam, targetParamLabel, defaultsToRunName } from "./dataTargets";
 
 describe("targetWritesToDataset / prefixParamName", () => {
   it("built-ins write no dataset and take pathPrefix", () => {
@@ -92,6 +92,5 @@ describe("the notebook launcher's target params", () => {
     expect(defaultsToRunName("pennsieve", "name")).toBe(false);
     expect(targetParamLabel("name")).toBe("Archive name");
     expect(targetParamLabel("layerName")).toBe("layerName");
-    expect(NOTIFY_OPTIONS.map((o) => o.value)).toEqual(["auto", "email", "none"]);
   });
 });

@@ -89,14 +89,9 @@ export const searchDatasets = async (apiUrl, query, { getToken, sendXhr, toQuery
 // so the launcher leaves it out (empty: everything).
 export const isPathPrefixParam = (name) => /^(pathPrefix|PATH_PREFIX)$/.test(name || "");
 
-// What the launcher calls a download target's params, and how it's notified.
-const PARAM_LABELS = { name: "Archive name", notify: "Tell me when it's ready" };
+// What the launcher calls a download target's params.
+const PARAM_LABELS = { name: "Archive name" };
 export const targetParamLabel = (name) => PARAM_LABELS[name] || name;
-export const NOTIFY_OPTIONS = [
-  { value: "auto", label: "By email, unless I'm on the archive's page" },
-  { value: "email", label: "By email" },
-  { value: "none", label: "Don't" },
-];
 
 // A download's archive is named after the notebook unless the user names it,
 // so the step can be clicked through.

@@ -8,7 +8,7 @@
 //
 // Diverged enough from the standard run config that it lives on its own; opened
 // via v-model and emits `created` with the new run.
-import { isPathPrefixParam, targetParamLabel, NOTIFY_OPTIONS, defaultsToRunName } from "./dataTargets";
+import { isPathPrefixParam, targetParamLabel, defaultsToRunName } from "./dataTargets";
 import { computed, reactive, ref, watch } from "vue";
 import { useStore } from "vuex";
 import BfButton from "../../shared/bf-button/BfButton.vue";
@@ -995,19 +995,20 @@ async function execute() {
               :key="p.name"
             >
               <div v-if="!isHiddenTargetParam(p.name)" class="target-param">
-                <label class="target-param-label">
-                  {{ targetParamLabel(p.name) }}
-                  <span v-if="p.required" class="target-param-req">*</span>
-                </label>
-                <el-select
+                <!-- Notify: one checkbox. "auto" emails unless you're on the
+                     archive's page, which is what "email me" should mean. -->
+                <el-checkbox
                   v-if="node.targetType === 'download' && p.name === 'notify'"
-                  v-model="dataTargetConfigs[node.id].params[i].value"
-                  size="small"
-                  class="target-param-select"
+                  :model-value="p.value !== 'none'"
+                  @update:model-value="(on) => (dataTargetConfigs[node.id].params[i].value = on ? 'auto' : 'none')"
                 >
-                  <el-option v-for="o in NOTIFY_OPTIONS" :key="o.value" :label="o.label" :value="o.value" />
-                </el-select>
+                  Email me when it's ready
+                </el-checkbox>
                 <template v-else>
+                  <label class="target-param-label">
+                    {{ targetParamLabel(p.name) }}
+                    <span v-if="p.required" class="target-param-req">*</span>
+                  </label>
                   <el-input
                     v-model="dataTargetConfigs[node.id].params[i].value"
                     :placeholder="p.description || p.name"
@@ -1425,9 +1426,6 @@ async function execute() {
 }
 .target-param-req {
   color: theme.$red_2;
-}
-.target-param-select {
-  width: 100%;
 }
 .target-param-desc {
   font-size: 11px;
