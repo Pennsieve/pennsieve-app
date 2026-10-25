@@ -225,6 +225,7 @@
                 <div class="field-control">
                   <el-input v-if="portMode(port) !== 'file' || port.dataType === 'any'" v-model="port.name" :placeholder="portMode(port) === 'layout' ? 'study' : 'files'" maxlength="50" />
                   <span v-else class="field-static" :class="{ 'is-empty': !port.name }">{{ port.name || "Select a media type" }}</span>
+                  <p v-if="portMode(port) !== 'file' || port.dataType === 'any'" class="field-hint">A label for this {{ block.singular }}; not a folder name.</p>
                   <p v-for="m in at(`${block.key}.${index}.name`)" :key="m" class="field-error">{{ m }}</p>
                 </div>
               </div>
@@ -234,7 +235,7 @@
                 folder format (OME-Zarr), or one folder with a set layout (BIDS).
               -->
               <div class="field-row full-width">
-                <label class="field-label">{{ block.key === "inputs" ? "Each item given is" : "Each item written is" }}</label>
+                <label class="field-label">{{ block.key === "inputs" ? "It takes" : "It writes" }}</label>
                 <div class="field-control">
                   <div class="kind-switch" role="radiogroup" :aria-label="`What each ${block.singular} item is`">
                     <button
@@ -317,8 +318,8 @@
                         </span>
                       </el-option>
                     </el-select>
-                    <p class="field-hint">
-                      The folder {{ block.key === "inputs" ? "given" : "written" }} is the root of the layout<template v-if="port.conformsTo[1]">, and {{ structureName(port.conformsTo[1]) }} starts at its {{ contentRootOf(port) }}/ folder</template>.
+                    <p v-if="port.conformsTo[0]" class="field-hint">
+                      The folder {{ block.key === "inputs" ? "picked" : "written" }}, whatever its name, is the root of the {{ structureName(port.conformsTo[0]) }} layout<template v-if="layoutRootFile(port.conformsTo[0])"> ({{ layoutRootFile(port.conformsTo[0]) }} directly inside it)</template><template v-if="port.conformsTo[1]">, and {{ structureName(port.conformsTo[1]) }} starts at its {{ contentRootOf(port) }}/ folder</template>.
                     </p>
                   </div>
                 </div>
@@ -381,7 +382,7 @@
               </div>
               <!-- EDAM formats come with the media type; any others the app.yml
                    already had are kept, shown here. -->
-              <p v-if="extraFormats(port).length" class="field-hint">
+              <p v-if="portMode(port) !== 'layout' && extraFormats(port).length" class="field-hint">
                 Also from app.yml: {{ extraFormats(port).join(", ") }} (EDAM)
               </p>
             </div>
@@ -612,9 +613,9 @@ const structureOptions = computed(() =>
   a format or layout yet.
 */
 const PORT_MODES = [
-  { value: "file", label: "A file", hint: "Each item is one file: an EDF recording, a DICOM slice, a CSV table. A folder of them is fine, paths are kept." },
-  { value: "folder", label: "A folder", hint: "Each item is a folder that is one thing, of a folder format: an .ome.zarr image, a .mefd session." },
-  { value: "layout", label: "One folder with a set layout", hint: "The whole input is one folder tree laid out by a standard, such as BIDS or a Pennsieve published dataset." },
+  { value: "file", label: "Files", hint: "Each item is one file: an EDF recording, a DICOM slice, a CSV table. A folder of them is fine; paths are kept." },
+  { value: "folder", label: "Folders of a format", hint: "Each item is a folder that is one thing, in a folder format: an .ome.zarr image, a .mefd session." },
+  { value: "layout", label: "One folder with a set layout", hint: "One folder tree laid out by a standard, such as BIDS or a Pennsieve published dataset." },
 ];
 const chosenModes = reactive(new WeakMap());
 const portMode = (port) => {
@@ -641,6 +642,14 @@ const formatChoices = (port) =>
 const isStructurePort = (port) => portMode(port) === "layout";
 const structureById = (id) => structureOptions.value.find((o) => o.id === id);
 const structureName = (entry) => structureById(structureId(entry))?.name || entry;
+// The file that marks a layout's root, for the hint; layouts the builder
+// doesn't know get none.
+const LAYOUT_ROOT_FILES = {
+  bids: "dataset_description.json",
+  "pennsieve-published-dataset": "manifest.json",
+  "ro-crate": "ro-crate-metadata.json",
+};
+const layoutRootFile = (entry) => LAYOUT_ROOT_FILES[structureId(entry)] || "";
 // The content root of the port's outermost registry layout (files/ for a
 // published dataset), when it has one: another layout may start there.
 const contentRootOf = (port) => {
