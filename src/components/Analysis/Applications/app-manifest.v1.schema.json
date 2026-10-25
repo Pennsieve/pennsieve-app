@@ -214,7 +214,7 @@
         },
         "formats": {
           "type": "array",
-          "description": "EDAM format identifiers (https://edamontology.org/page), for scientific formats without a MIME type, e.g. format_3998 (EDF) or http://edamontology.org/format_3961.",
+          "description": "EDAM format identifiers (https://edamontology.org/page), for scientific formats without a MIME type, e.g. format_3590 (HDF5) or http://edamontology.org/format_3549 (NIfTI-1). EDAM has no id for some formats (EDF, NWB, MEF3); use mediaTypes for those.",
           "items": { "type": "string", "pattern": "^(http://edamontology\\.org/)?format_\\d{4}$" }
         },
         "required": { "type": "boolean", "description": "Whether a run must give it something." },
