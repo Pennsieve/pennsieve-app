@@ -208,7 +208,7 @@ async function getJson(url) {
 async function repoDescription(repo) {
   if (!repo) return "";
   try {
-    const body = await getJson(`${api2Url.value}/github/repository/${encodeURIComponent(repo.owner)}/${encodeURIComponent(repo.repo)}`);
+    const body = await getJson(`${api2Url.value}/repository/${encodeURIComponent(repo.owner)}/${encodeURIComponent(repo.repo)}`);
     return body?.description || "";
   } catch {
     return "";
