@@ -1,5 +1,5 @@
 <script setup>
-import { computed, reactive, ref } from "vue";
+import { computed, nextTick, onMounted, reactive, ref } from "vue";
 import { useRouter, useRoute } from "vue-router";
 
 import ApplicationSchemaEditor from "./ApplicationSchemaEditor.vue";
@@ -8,8 +8,10 @@ import {
   buildManifest,
   serializeManifestYaml,
   validateParameters,
+  parseManifest,
   MANIFEST_EXAMPLE_URL,
 } from "./applicationSchema";
+import { builderProblems, validateManifestText } from "./manifestValidation";
 
 const router = useRouter();
 const route = useRoute();
@@ -55,7 +57,56 @@ const validation = computed(() => {
   if (!meta.name.trim()) errors.push("Application name is required");
   const paramResult = validateParameters(schema.value.parameters);
   errors.push(...paramResult.errors);
-  return { valid: errors.length === 0, errors };
+  // Then the schema app-deploy-service checks releases against, on what the
+  // builder writes, leaving out what the checks above already say.
+  const problems = builderProblems(manifest.value, {
+    nameMissing: !meta.name.trim(),
+    paramErrors: paramResult.errors.length > 0,
+  });
+  return { valid: errors.length === 0 && problems.length === 0, errors, problems };
+});
+const attentionCount = computed(() => validation.value.errors.length + validation.value.problems.length);
+
+/*
+  Check an app.yml: paste one, or drop or pick the file, to see whether it
+  follows the schema; a readable one can be opened here to fix it.
+*/
+const checkOpen = ref(false);
+const checkText = ref("");
+const checkFileName = ref("");
+const checkResult = computed(() => (checkText.value.trim() ? validateManifestText(checkText.value) : null));
+const checkSection = ref(null);
+
+function readCheckFile(file) {
+  if (!file) return;
+  checkFileName.value = file.name;
+  const reader = new FileReader();
+  reader.onload = () => (checkText.value = String(reader.result || ""));
+  reader.readAsText(file);
+}
+const onCheckFile = (event) => readCheckFile(event.target.files?.[0]);
+const onCheckDrop = (event) => readCheckFile(event.dataTransfer?.files?.[0]);
+
+// Load the checked app.yml into the form, to fix it here.
+function openInBuilder() {
+  const doc = checkResult.value?.doc;
+  if (!doc) return;
+  const parsed = parseManifest(doc);
+  meta.name = parsed.meta.name;
+  meta.description = parsed.meta.description;
+  meta.applicationType = parsed.meta.applicationType;
+  meta.maintainers = parsed.meta.maintainers.map((m) => ({ ...m }));
+  schema.value = parsed.schema;
+  checkOpen.value = false;
+}
+
+// ?check=1 (the app page's "check it" link) opens the check.
+onMounted(async () => {
+  if (route.query.check) {
+    checkOpen.value = true;
+    await nextTick();
+    checkSection.value?.scrollIntoView({ block: "start" });
+  }
 });
 
 /*
@@ -111,6 +162,58 @@ const goToGuide = () =>
     <div class="builder-body">
       <!-- ─────────────── Form ─────────────── -->
       <div class="builder-form">
+        <!-- Check an existing app.yml against the schema -->
+        <section ref="checkSection" class="check-section">
+          <button type="button" class="check-toggle" :aria-expanded="checkOpen" @click="checkOpen = !checkOpen">
+            <span class="caret" :class="{ open: checkOpen }">▸</span>
+            Check an app.yml
+          </button>
+          <div v-if="checkOpen" class="check-body">
+            <p class="field-hint">
+              Paste an app.yml, or drop or pick the file, to check it against the schema Pennsieve
+              validates releases with.
+            </p>
+            <div class="check-drop" @dragover.prevent @drop.prevent="onCheckDrop">
+              <el-input
+                v-model="checkText"
+                type="textarea"
+                :rows="8"
+                placeholder="application:&#10;  name: my-application&#10;…"
+                class="check-input"
+              />
+            </div>
+            <div class="check-actions">
+              <label class="app-outline-button">
+                Choose a file…
+                <input type="file" accept=".yml,.yaml,text/yaml" class="check-file" @change="onCheckFile" />
+              </label>
+              <span v-if="checkFileName" class="check-file-name">{{ checkFileName }}</span>
+            </div>
+
+            <template v-if="checkResult">
+              <div v-if="checkResult.valid" class="validation-success">
+                <h4>✅ Valid app.yml</h4>
+                <p>It follows the app.yml schema.</p>
+              </div>
+              <div v-else class="validation-section">
+                <div class="validation-header">
+                  <h4>Validation Issues</h4>
+                  <p>Fix these so the release's app.yml follows the schema:</p>
+                </div>
+                <div class="validation-list">
+                  <div v-for="(p, i) in checkResult.problems" :key="i" class="validation-item">
+                    <div class="field-name">{{ p.path }}</div>
+                    <div class="error-message">{{ p.message }}</div>
+                  </div>
+                </div>
+              </div>
+              <button v-if="checkResult.doc" type="button" class="app-outline-button" @click="openInBuilder">
+                Open in the builder
+              </button>
+            </template>
+          </div>
+        </section>
+
         <section class="schema-section">
           <h4 class="schema-section-title">Details</h4>
 
@@ -177,12 +280,18 @@ const goToGuide = () =>
             class="preview-validation"
           >
             <p class="preview-validation-title">
-              {{ validation.errors.length }} item(s) need attention before you
+              {{ attentionCount }} item(s) need attention before you
               publish:
             </p>
-            <ul>
-              <li v-for="(err, i) in validation.errors" :key="i">{{ err }}</li>
-            </ul>
+            <div class="validation-list">
+              <div v-for="(err, i) in validation.errors" :key="`e${i}`" class="validation-item">
+                <div class="error-message">{{ err }}</div>
+              </div>
+              <div v-for="(p, i) in validation.problems" :key="`p${i}`" class="validation-item">
+                <div class="field-name">{{ p.path }}</div>
+                <div class="error-message">{{ p.message }}</div>
+              </div>
+            </div>
           </div>
 
           <pre class="preview-code"><code>{{ manifestYaml }}</code></pre>
@@ -338,14 +447,122 @@ code {
     margin: 0 0 6px;
     font-weight: 500;
   }
+}
 
-  ul {
-    margin: 0;
-    padding-left: 18px;
+/* Validation issues, as the metadata record generator shows them: the field,
+   then what's wrong. */
+.validation-list {
+  display: flex;
+  flex-direction: column;
+}
+.validation-item {
+  padding: 8px 0;
+  border-bottom: 1px solid theme.$gray_2;
+
+  &:last-child {
+    border-bottom: none;
+    padding-bottom: 0;
   }
+  .field-name {
+    margin-bottom: 2px;
+    font-size: 13px;
+    font-weight: 500;
+    color: theme.$gray_6;
+  }
+  .error-message {
+    font-size: 12px;
+    line-height: 1.4;
+    color: theme.$gray_5;
+  }
+}
+.validation-section,
+.validation-success {
+  padding: 12px 14px;
+  border: 1px solid theme.$gray_2;
+  background: theme.$gray_1;
 
-  li {
-    line-height: 1.5;
+  h4 {
+    margin: 0 0 4px;
+    font-size: 14px;
+    font-weight: 600;
+    color: theme.$gray_6;
+  }
+  p {
+    margin: 0 0 6px;
+    font-size: 12px;
+    color: theme.$gray_5;
+  }
+}
+
+/* Check an app.yml */
+.check-section {
+  border: 1px solid theme.$gray_2;
+  background: #fff;
+}
+.check-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 10px 14px;
+  border: none;
+  background: none;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  color: theme.$gray_6;
+  text-align: left;
+  cursor: pointer;
+
+  .caret {
+    font-size: 11px;
+    transition: transform 0.15s ease;
+    &.open {
+      transform: rotate(90deg);
+    }
+  }
+}
+.check-body {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 0 14px 14px;
+
+  .check-drop,
+  .check-input,
+  .validation-section,
+  .validation-success {
+    width: 100%;
+    box-sizing: border-box;
+  }
+}
+.check-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.check-file {
+  display: none;
+}
+.check-file-name {
+  font-size: 12px;
+  color: theme.$gray_4;
+}
+/* The small outline buttons Applications uses. */
+.app-outline-button {
+  padding: 3px 10px;
+  border: 1px solid theme.$gray_3;
+  border-radius: 4px;
+  background: theme.$white;
+  font: inherit;
+  font-size: 12px;
+  color: theme.$gray_6;
+  cursor: pointer;
+
+  &:hover {
+    border-color: theme.$purple_1;
+    color: theme.$purple_3;
   }
 }
 
