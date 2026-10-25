@@ -521,7 +521,7 @@ const STATUS_LABEL = { ready: "Ready", building: "Building", failed: "Failed", u
   font-size: 11px;
   font-weight: 500;
   padding: 2px 8px;
-  border-radius: 10px;
+  border-radius: 3px;
   white-space: nowrap;
 
   &.is-ready {
