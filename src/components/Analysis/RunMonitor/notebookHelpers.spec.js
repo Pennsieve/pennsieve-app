@@ -7,6 +7,7 @@ describe("launchableKernels", () => {
   it("leaves out kernels that write to a dataset outside a workspace", () => {
     expect(launchableKernels([py, pyDownload], { personal: true })).toEqual([pyDownload]);
     expect(launchableKernels([py, pyDownload])).toEqual([py, pyDownload]);
+    expect(launchableKernels([py, { ...pyDownload, isActive: false }])).toEqual([py]);
   });
   it("names where results go", () => {
     expect(kernelOutput(pyDownload)).toBe("Results as a download");
