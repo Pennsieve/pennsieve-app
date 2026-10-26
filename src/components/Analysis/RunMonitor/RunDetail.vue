@@ -72,6 +72,7 @@ import {
   runDisplayName,
   RUN_NAME_MAX_LENGTH,
 } from "./runHelpers";
+import { sourceLabel, sourceHints, hintLine, portsOfStep, missingFilesMessage } from "../WorkflowGraph/sourceInputs";
 
 // Shown in a workspace (/:orgId/analysis/runs/...) and in My Workspace
 // (/my-workspace/analysis/runs/...), where there's no organization and a run
@@ -118,6 +119,17 @@ const configLayers = ref([]);
 
 // File picker dialog state
 const filePickerVisible = ref(false);
+// The picker names the input its source feeds and what that input takes
+// (sourceInputs.js): "Select files for signals", "signals takes CSV files".
+const sourcePicker = computed(() => {
+  const id = filePickerNodeId.value;
+  const dag = configDefinition.value?.dag || [];
+  const name = id ? sourceLabel(id, dag, "") : "";
+  return {
+    title: name ? `Select files for ${name}` : "Select Files",
+    hint: id ? hintLine(sourceHints(id, dag, portsOfStep(dag, availableApplications.value))) : "",
+  };
+});
 const filePickerNodeId = ref(null);
 const filePickerFiles = ref([]);
 const filePickerAncestorList = ref([]);
@@ -485,7 +497,7 @@ const definitionToNodesAndEdges = (definition) => {
       id: d.id,
       type: nodeType,
       data: {
-        label: labelForDagNode(d, availableApplications.value, targetTypes.value),
+        label: labelForDagNode(d, availableApplications.value, targetTypes.value, dag),
         nodeType: d.type,
         sourceUrl: d.sourceUrl,
         targetType: d.targetType || null,
@@ -556,7 +568,7 @@ const runToNodesAndEdges = (run) => {
       id: d.id,
       type: nodeType,
       data: {
-        label: labelForDagNode(d, availableApplications.value, targetTypes.value),
+        label: labelForDagNode(d, availableApplications.value, targetTypes.value, dag),
         status: d.status || "NOT_STARTED",
         processorType: d.type,
         sourceUrl: d.sourceUrl,
@@ -913,7 +925,7 @@ const executeWorkflow = async () => {
   );
   if (missingSources.length > 0) {
     EventBus.$emit("toast", {
-      detail: { type: "error", msg: `Select files for ${missingSources.length === 1 ? "data source" : `${missingSources.length} data sources`}` },
+      detail: { type: "error", msg: missingFilesMessage(missingSources.map((d) => d.id), configDefinition.value?.dag || []) },
     });
     return;
   }
@@ -939,7 +951,7 @@ const executeWorkflow = async () => {
     if (dagNode.type === "processor") {
       const missing = (cfg.schemaParams || []).filter((p) => p.required && !p.value?.trim());
       if (missing.length > 0) {
-        const nodeLabel = labelForDagNode(dagNode, availableApplications.value, targetTypes.value) || nodeId;
+        const nodeLabel = labelForDagNode(dagNode, availableApplications.value, targetTypes.value, dag) || nodeId;
         const names = missing.map((p) => p.name).join(", ");
         EventBus.$emit("toast", {
           detail: { type: "error", msg: `${nodeLabel}: missing required parameter${missing.length > 1 ? "s" : ""} ${names}` },
@@ -1364,7 +1376,7 @@ const nodeMetricLabel = (nodeId) => {
   const activity = selectedWorkflowActivity.value;
   if (!activity?.dag) return nodeId;
   const d = activity.dag.find((n) => n.id === nodeId);
-  return d ? labelForDagNode(d, availableApplications.value, targetTypes.value) : nodeId;
+  return d ? labelForDagNode(d, availableApplications.value, targetTypes.value, activity.dag) : nodeId;
 };
 
 // Detailed cards: how long a step ran (ticking while it runs), its resources
@@ -2552,12 +2564,13 @@ onUnmounted(() => {
     <!-- File Picker Dialog -->
     <el-dialog
       v-model="filePickerVisible"
-      title="Select Files"
+      :title="sourcePicker.title"
       width="800px"
       :close-on-click-modal="false"
       @close="closeFilePicker"
     >
       <div class="file-picker-content">
+        <p v-if="sourcePicker.hint" class="file-picker-hint">{{ sourcePicker.hint }}</p>
         <div class="file-picker-header">
           <span class="selected-count">
             <strong>{{ fileCountForNode(filePickerNodeId) }}</strong>
@@ -4218,5 +4231,10 @@ onUnmounted(() => {
   display: flex;
   justify-content: flex-end;
   gap: 8px;
+}
+.file-picker-hint {
+  margin: 0 0 8px;
+  font-size: 13px;
+  color: #6b7280;
 }
 </style>

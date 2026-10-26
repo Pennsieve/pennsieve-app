@@ -21,6 +21,7 @@ import toQueryParams from "@/utils/toQueryParams";
 import EventBus from "@/utils/event-bus";
 import { notebookKernel, kernelLabel, interactiveCapable, launchableKernels, kernelOutput, nonSavingAlternative } from "./notebookHelpers";
 import { STANDARD_CPU_OPTIONS, getStandardMemoryOptions } from "./runHelpers";
+import { sourceLabel } from "../WorkflowGraph/sourceInputs";
 import * as siteConfig from "@/site-config/site.json";
 import { viewsServiceUrl, viewForDataset, viewDataSource } from "@/utils/viewsService";
 
@@ -1005,7 +1006,7 @@ async function execute() {
               :class="{ active: node.id === currentSourceNodeId }"
               @click="selectSourceNode(node.id)"
             >
-              {{ node.name || node.id }}
+              {{ sourceLabel(node.id, configDefinition?.dag || [], node.name || "Input data") }}
               <span class="source-tab-count">{{ fileCountForNode(node.id) }}</span>
             </button>
           </div>
