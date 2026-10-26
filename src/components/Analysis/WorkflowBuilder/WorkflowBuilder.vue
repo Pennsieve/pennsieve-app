@@ -41,7 +41,7 @@ import { useAppManifest } from "@/composables/useAppManifest";
 import BuilderBar from "./BuilderBar.vue";
 import BuilderPalette from "./BuilderPalette.vue";
 import ParamField from "./ParamField.vue";
-import { ioLine, sessionTypeOf, versionManifest } from "./appManifestInfo";
+import { ioLine, sessionTypeOf, versionManifest, shortMediaType } from "./appManifestInfo";
 import { appColors } from "../Applications/appDomains";
 import { diffLines, manifestDiff, versionWarnings } from "./manifestDiff";
 import { builderReadiness } from "./builderReadiness";
@@ -756,6 +756,10 @@ const definitionToNodesAndEdges = (workflow, applications) => {
         id: `e${dep}-${p.id}`,
         source: dep,
         target: p.id,
+        // Named, so a step with output ports draws it from its main point;
+        // attachPorts moves it to a port once the manifest is in.
+        sourceHandle: "source",
+        targetHandle: "target",
         animated: false,
         style: { stroke: nodeTypeColor(srcNode?.type) },
       });
@@ -1075,7 +1079,8 @@ const connectNodes = (sourceId, targetId, sourceHandle) => {
     id: `e${sourceId}-${targetId}`,
     source: sourceId,
     target: targetId,
-    ...(port && { sourceHandle }),
+    sourceHandle: port ? sourceHandle : "source",
+    targetHandle: "target",
     animated: false,
     style: { stroke: nodeTypeColor(src.type) },
   });
@@ -1138,7 +1143,7 @@ const stepWarning = (id) => {
   const unset = node?.type === "default" ? requiredUnset(node) : [];
   return unset.length ? `No value for ${unset.map((p) => `"${p}"`).join(", ")} (can be given when running)` : "";
 };
-const portTypes = (port) => (port.mediaTypes || []).map((t) => String(t).split("/").pop().toUpperCase()).join(", ");
+const portTypes = (port) => (port.mediaTypes || []).map(shortMediaType).join(", ");
 
 // The + under a step: pick what comes next.
 const pickerFor = ref(null); // the step the picker adds after
@@ -2381,7 +2386,14 @@ const openNodeSettings = (id) => {
                   </div>
                   <div v-else-if="!data.hasManifest" class="node-ports node-ports--none">No manifest</div>
                 </div>
-                <Handle id="source" type="source" :position="Position.Bottom" />
+                <!-- With output ports, the main point (all outputs, to another
+                     app) moves to the side, clear of the ports and the +. -->
+                <Handle
+                  id="source"
+                  type="source"
+                  :position="routedOutputs(data.manifestPorts).length ? Position.Right : Position.Bottom"
+                  :title="routedOutputs(data.manifestPorts).length ? 'All outputs: connect to another app' : undefined"
+                />
                 <button
                   v-if="!isReadOnly"
                   type="button"
@@ -4055,8 +4067,10 @@ kbd {
   background: theme.$purple_3;
   border: 2px solid theme.$white;
 }
+/* On the step's bottom edge, under its chip: the chip's bottom is the
+   node's padding (14px) plus its border (1px) above the edge. */
 .node-port--routed .port-handle {
-  bottom: -11px;
+  bottom: -15px;
 }
 
 /* The + under a step: what comes next. Shown on hover and selection. */
