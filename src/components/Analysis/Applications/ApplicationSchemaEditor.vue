@@ -236,20 +236,9 @@
               <div class="field-row full-width">
                 <label class="field-label">{{ block.key === "inputs" ? "It takes" : "It writes" }}</label>
                 <div class="field-control">
-                  <div class="kind-switch" role="radiogroup" :aria-label="`What each ${block.singular} item is`">
-                    <button
-                      v-for="m in PORT_MODES"
-                      :key="m.value"
-                      type="button"
-                      role="radio"
-                      class="kind-option"
-                      :class="{ active: portMode(port) === m.value }"
-                      :aria-checked="portMode(port) === m.value"
-                      @click="setPortMode(port, m.value)"
-                    >
-                      {{ m.label }}
-                    </button>
-                  </div>
+                  <el-radio-group :model-value="portMode(port)" size="small" :aria-label="`What the ${block.singular} is made of`" @update:model-value="(v) => setPortMode(port, v)">
+                    <el-radio-button v-for="m in PORT_MODES" :key="m.value" :value="m.value">{{ m.label }}</el-radio-button>
+                  </el-radio-group>
                   <p class="field-hint">{{ PORT_MODES.find((m) => m.value === portMode(port)).hint }}</p>
                 </div>
               </div>
@@ -382,20 +371,9 @@
               <div v-if="block.key === 'inputs'" class="field-row full-width">
                 <label class="field-label">Placed at</label>
                 <div class="field-control">
-                  <div class="kind-switch" role="radiogroup" aria-label="Where the input is placed">
-                    <button
-                      v-for="pl in PLACEMENTS"
-                      :key="pl.value"
-                      type="button"
-                      role="radio"
-                      class="kind-option"
-                      :class="{ active: (port.placement || 'root') === pl.value }"
-                      :aria-checked="(port.placement || 'root') === pl.value"
-                      @click="port.placement = pl.value === 'root' ? '' : pl.value"
-                    >
-                      {{ pl.label }}
-                    </button>
-                  </div>
+                  <el-radio-group :model-value="port.placement || 'root'" size="small" aria-label="Where the input is placed" @update:model-value="(v) => (port.placement = v === 'root' ? '' : v)">
+                    <el-radio-button v-for="pl in PLACEMENTS" :key="pl.value" :value="pl.value">{{ pl.label }}</el-radio-button>
+                  </el-radio-group>
                   <p class="field-hint">
                     Data is at <code>$INPUT_DIR/<template v-if="port.placement === 'subfolder'">{{ port.name || "&lt;name&gt;" }}/</template></code><template v-if="(port.placement || 'root') === 'root'">, beside any other input placed at the root</template>.
                   </p>
@@ -863,34 +841,6 @@ const removePort = (key, i) => schema.value[key].splice(i, 1);
   font-size: 13px;
   font-weight: 600;
   color: theme.$gray_6;
-}
-.kind-switch {
-  display: inline-flex;
-  flex-wrap: wrap;
-  padding: 2px;
-  border: 1px solid theme.$gray_2;
-  border-radius: 6px;
-  background: theme.$gray_1;
-}
-.kind-option {
-  padding: 5px 14px;
-  border: none;
-  border-radius: 4px;
-  background: none;
-  font: inherit;
-  font-size: 13px;
-  font-weight: 500;
-  color: theme.$gray_5;
-  cursor: pointer;
-
-  &:hover {
-    color: theme.$purple_3;
-  }
-  &.active {
-    background: theme.$white;
-    color: theme.$purple_3;
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
-  }
 }
 .link-button {
   padding: 0;
