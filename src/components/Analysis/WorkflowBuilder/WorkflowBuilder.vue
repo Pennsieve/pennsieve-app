@@ -1,5 +1,5 @@
 <script setup>
-import { computed, h, ref, reactive, onMounted, onBeforeUnmount, nextTick, watch } from "vue";
+import { computed, h, ref, reactive, onMounted, onBeforeUnmount, nextTick, watch, provide } from "vue";
 
 import { useStore } from "vuex";
 import { useRouter, useRoute } from "vue-router";
@@ -46,6 +46,7 @@ import { clearManifestDraft } from "../Applications/manifestDrafts";
 import { diffLines, manifestDiff, versionWarnings } from "./manifestDiff";
 import { builderReadiness } from "./builderReadiness";
 import StepPicker from "./StepPicker.vue";
+import LinkEdge from "./LinkEdge.vue";
 import { useGraphHistory, snapshot } from "./graphHistory";
 import { canConnect, neighbourInDirection } from "./graphEditing";
 import {
@@ -75,7 +76,7 @@ import {
 import { requiredUnset } from "./builderReadiness";
 import { fitsAfter } from "./appManifestInfo";
 
-const { onNodeClick, onPaneClick, onConnect, onConnectStart, onConnectEnd, screenToFlowCoordinate, fitView } =
+const { onNodeClick, onPaneClick, onConnect, onConnectStart, onConnectEnd, onEdgeUpdate, screenToFlowCoordinate, fitView } =
   useVueFlow();
 
 const props = defineProps({
@@ -1757,6 +1758,33 @@ const history = useGraphHistory({
   Shift-Cmd/Ctrl-Z (or Ctrl-Y) redoes, arrows move between steps, Esc
   deselects. Not while typing.
 */
+// A link's × (LinkEdge) removes it.
+const removeLink = (id) => {
+  if (isReadOnly.value) return;
+  dropEdges((e) => e.id === id);
+  revalidateEdges();
+};
+provide("removeLink", removeLink);
+provide("linksEditable", () => !isReadOnly.value);
+
+// Dragging an end of a link to another point moves it: the new link is
+// checked as one drawn there, and the old one stays if it's refused.
+onEdgeUpdate(({ edge, connection }) => {
+  if (isReadOnly.value) return;
+  const old = edges.value.find((e) => e.id === edge.id);
+  if (!old) return;
+  dropEdges((e) => e.id === edge.id);
+  const moved = connectNodes(connection.source, connection.target, connection.sourceHandle, connection.targetHandle);
+  if (!moved) {
+    edges.value.push(old);
+    // An output port's link to a data target set its prefix: set it again.
+    const port = portOfHandle(old.sourceHandle);
+    const tgt = port && nodes.value.find((n) => n.id === old.target && n.type === "data-target");
+    if (tgt?.data.targetType) tgt.data.defaultParams = withPortPrefix(tgt.data.defaultParams, port, prefixParamOf(getTargetTypeParams(tgt.data.targetType)));
+    revalidateEdges();
+  }
+});
+
 const deleteSelection = () => {
   const selectedEdges = edges.value.filter((e) => e.selected).map((e) => e.id);
   const selectedNodes = nodes.value.filter((n) => n.selected).map((n) => n.id);
@@ -2421,7 +2449,12 @@ const openNodeSettings = (id) => {
               :pan-on-drag="true"
               :zoom-on-scroll="true"
               :delete-key-code="null"
+              :edges-updatable="!isReadOnly"
             >
+              <!-- Links: a × to remove one, on hover or when selected -->
+              <template #edge-default="edgeProps">
+                <LinkEdge v-bind="edgeProps" />
+              </template>
               <Background pattern-color="#aaa" :gap="16" />
               <Controls position="bottom-right" />
               <MiniMap v-if="nodes.length > 6" position="bottom-left" pannable zoomable />

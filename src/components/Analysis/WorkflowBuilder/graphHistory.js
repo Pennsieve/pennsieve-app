@@ -31,7 +31,8 @@ export function snapshotKey(s) {
       const { application, manifestPorts, hasManifest, ...data } = n.data || {};
       return [n.id, n.type, Math.round(n.position.x), Math.round(n.position.y), data, application?.uuid];
     }),
-    e: s.edges.map((e) => [e.source, e.target]),
+    // Which points a link joins too: moving it to another input is an edit.
+    e: s.edges.map((e) => [e.source, e.target, e.sourceHandle || "", e.targetHandle || ""]),
   });
 }
 
