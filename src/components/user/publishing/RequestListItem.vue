@@ -89,25 +89,20 @@
               </button>
             </template>
 
-            <!-- Rejected actions -->
-            <template v-else-if="isRejected">
+            <template v-else-if="isRejected || isWithdrawn">
               <button
-                class="text-link"
-                @click.stop="triggerRequest(DatasetProposalAction.RESUBMIT)"
+                class="text-link primary-action"
+                @click.stop="triggerRequest(DatasetProposalAction.COPY_TO_DRAFT)"
               >
-                Resubmit
+                Copy to new draft
+              </button>
+              <button
+                class="text-link secondary-action"
+                @click.stop="triggerRequest(DatasetProposalAction.REMOVE)"
+              >
+                Remove
               </button>
             </template>
-
-            <!-- Withdrawn actions -->
-            <!-- <template v-else-if="isWithdrawn">
-              <button 
-                class="text-link"
-                @click.stop="triggerRequest(DatasetProposalAction.EDIT)"
-              >
-                Edit & Resubmit
-              </button>
-            </template> -->
           </div>
         </div>
       </div>
@@ -135,7 +130,7 @@ const emit = defineEmits([
   "submit",
   "withdraw",
   "open-dataset",
-  "resubmit",
+  "copy-to-draft",
 ]);
 
 // Store

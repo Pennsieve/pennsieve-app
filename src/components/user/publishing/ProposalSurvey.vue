@@ -29,6 +29,14 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
+  allowCopyToDraft: {
+    type: Boolean,
+    default: false,
+  },
+  copiedFrom: {
+    type: Object,
+    default: () => null,
+  },
 });
 
 const emit = defineEmits([
@@ -39,6 +47,7 @@ const emit = defineEmits([
   "recreate-and-submit-proposal",
   "accept",
   "reject",
+  "copy-to-draft",
   "update:dialogVisible",
 ]);
 
@@ -91,20 +100,15 @@ const submitterName = computed(() => props.proposal?.ownerName || "");
 
 const submitterEmail = computed(() => props.proposal?.emailAddress || "");
 
-const proposalStatus = computed(() => {
-  const statusMap = {
-    DRAFT: "Draft",
-    SUBMITTED: "Submitted",
-    ACCEPTED: "Accepted",
-    REJECTED: "Rejected",
-    WITHDRAWN: "Withdrawn",
-  };
-  const status = props.proposal?.proposalStatus;
-  return status ? statusMap[status] || status : "";
-});
+const statusLabels = {
+  DRAFT: "Draft",
+  SUBMITTED: "Submitted",
+  ACCEPTED: "Accepted",
+  REJECTED: "Rejected",
+  WITHDRAWN: "Withdrawn",
+};
 
-const submittedOn = computed(() => {
-  const timestamp = props.proposal?.submittedAt || props.proposal?.updatedAt;
+function formatTimestamp(timestamp) {
   if (!timestamp) {
     return "";
   }
@@ -118,7 +122,46 @@ const submittedOn = computed(() => {
     month: "short",
     day: "numeric",
   });
+}
+
+const proposalStatus = computed(() => {
+  const status = props.proposal?.proposalStatus;
+  return status ? statusLabels[status] || status : "";
 });
+
+const submittedOn = computed(() =>
+  formatTimestamp(props.proposal?.submittedAt || props.proposal?.updatedAt)
+);
+
+const canCopyToDraft = computed(
+  () =>
+    props.allowCopyToDraft &&
+    ["WITHDRAWN", "REJECTED"].includes(props.proposal?.proposalStatus)
+);
+
+const copiedFromSummary = computed(() => {
+  const sourceProposal = props.copiedFrom;
+  if (!sourceProposal) {
+    return "";
+  }
+  const status = statusLabels[sourceProposal.proposalStatus] || "";
+  const closedOn = formatTimestamp(
+    sourceProposal.rejectedAt || sourceProposal.withdrawnAt
+  );
+  const statusDetail = [status, closedOn].filter(Boolean).join(" ");
+  return statusDetail
+    ? `"${sourceProposal.name || "Untitled Proposal"}" (${statusDetail})`
+    : `"${sourceProposal.name || "Untitled Proposal"}"`;
+});
+
+const hasRepositorySelected = computed(() =>
+  Boolean(currentRepository.value?.organizationNodeId)
+);
+
+// The original repository may have been removed since the proposal was made
+const isCopiedRepositoryMissing = computed(
+  () => Boolean(props.copiedFrom) && !props.repository?.organizationNodeId
+);
 
 const hasSubmissionSummary = computed(
   () =>
@@ -132,6 +175,7 @@ const hasSubmissionSummary = computed(
 );
 
 const readyToSave = computed(() => {
+  if (!hasRepositorySelected.value) return false;
   // For updating existing proposals, allow saving even if incomplete
   if (props.proposal) {
     return true;
@@ -143,6 +187,7 @@ const readyToSave = computed(() => {
 const readyToSubmit = computed(() => {
   // Require all fields including all questions for submission
   return (
+    hasRepositorySelected.value &&
     proposal.value.name &&
     proposal.value.description &&
     allRepoQuestionsAnswered.value
@@ -250,9 +295,9 @@ function initializeSelectedRepository() {
   // Set the initial repository from props
   selectedRepository.value = props.repository || {};
 
-  // If editing an existing proposal, store its survey answers for the current repository
+  // If editing or copying a proposal, store its survey answers for the current repository
   if (
-    props.proposal &&
+    (props.proposal || props.copiedFrom) &&
     props.repository?.organizationNodeId &&
     proposal.value.survey
   ) {
@@ -263,26 +308,28 @@ function initializeSelectedRepository() {
 }
 
 function populateForm() {
-  if (props.proposal) {
-    // Editing existing proposal - populate with existing data
+  // Answers to questions the repository no longer asks are dropped on save,
+  // since save only maps the current repository's questions
+  const sourceProposal = props.proposal || props.copiedFrom;
+  if (sourceProposal) {
     proposal.value = {
-      name: props.proposal.name || "",
-      description: props.proposal.description || "",
+      name: sourceProposal.name || "",
+      description: sourceProposal.description || "",
       survey: {},
     };
 
     // Convert survey array to object format for the form
-    if (Array.isArray(props.proposal.survey)) {
+    if (Array.isArray(sourceProposal.survey)) {
       const surveyObject = {};
-      props.proposal.survey.forEach((item) => {
+      sourceProposal.survey.forEach((item) => {
         if (item.questionId !== undefined && item.response) {
           surveyObject[item.questionId] = item.response;
         }
       });
       proposal.value.survey = surveyObject;
-    } else if (props.proposal.survey && typeof props.proposal.survey === "object") {
+    } else if (sourceProposal.survey && typeof sourceProposal.survey === "object") {
       // Already keyed by question id
-      proposal.value.survey = { ...props.proposal.survey };
+      proposal.value.survey = { ...sourceProposal.survey };
     }
   } else {
     // New proposal - clear form
@@ -296,6 +343,10 @@ function acceptProposal() {
 
 function rejectProposal() {
   emit("reject", props.proposal);
+}
+
+function copyToDraft() {
+  emit("copy-to-draft", props.proposal);
 }
 
 function handleRepositoryChange(repository) {
@@ -465,12 +516,26 @@ function submitProposal() {
           >
             Reject Proposal
           </bf-button>
+          <bf-button v-if="canCopyToDraft" class="primary" @click="copyToDraft">
+            Copy to new draft
+          </bf-button>
           <bf-button
             @click="closeDialog"
-            :class="showReviewActions ? 'secondary' : 'primary'"
+            :class="showReviewActions || canCopyToDraft ? 'secondary' : 'primary'"
           >
             Close
           </bf-button>
+        </div>
+
+        <div class="copied-from-notice" v-if="copiedFrom && !readOnly">
+          <p>
+            Copied from {{ copiedFromSummary }}. Saving creates a new proposal;
+            the original stays in your list.
+          </p>
+          <p v-if="isCopiedRepositoryMissing" class="copied-from-warning">
+            The original repository is no longer available. Choose a repository
+            below.
+          </p>
         </div>
 
         <!-- Progress Indicator -->
@@ -1237,6 +1302,26 @@ function submitProposal() {
   gap: 8px;
   padding: 0 0 24px 0;
   margin-top: 24px;
+}
+
+.copied-from-notice {
+  margin-bottom: 24px;
+  padding: 12px 16px;
+  border: 1px solid theme.$purple_tint;
+  border-radius: 4px;
+  background: theme.$gray_1;
+
+  p {
+    margin: 0;
+    color: theme.$gray_6;
+    font-size: 14px;
+    line-height: 1.5;
+  }
+
+  .copied-from-warning {
+    margin-top: 8px;
+    color: theme.$orange_1;
+  }
 }
 
 .submission-summary {

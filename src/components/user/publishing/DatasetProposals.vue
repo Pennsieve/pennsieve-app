@@ -49,7 +49,7 @@
             @submit="submitProposal"
             @withdraw="withdrawProposal"
             @open-dataset="openDataset"
-            @resubmit="resubmitProposal"
+            @copy-to-draft="copyProposalToDraft"
           />
         </div>
       </div>
@@ -80,7 +80,10 @@
       :dialog-visible="showProposalDialog"
       :repository="selectedRepository"
       :proposal="activeProposal"
-      :read-only="activeProposal && !['DRAFT', 'WITHDRAWN'].includes(activeProposal.proposalStatus)"
+      :copied-from="copySourceProposal"
+      :read-only="Boolean(activeProposal) && activeProposal.proposalStatus !== 'DRAFT'"
+      allow-copy-to-draft
+      @copy-to-draft="copyProposalToDraft"
       @create-proposal="handleCreateProposal"
       @submit-proposal="handleSubmitProposal"
       @recreate-proposal="handleRecreateProposal"
@@ -106,7 +109,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, watch, nextTick } from 'vue'
 import { useStore } from 'vuex'
 import { useRouter } from 'vue-router'
 import { useProposalStore } from '@/stores/proposalStore'
@@ -126,6 +129,7 @@ const error = ref('')
 const showProposalDialog = ref(false)
 const selectedRepository = ref({})
 const activeProposal = ref({})
+const copySourceProposal = ref(null)
 const confirmationDialogVisible = ref(false)
 const confirmationDialog = ref({
   action: '',
@@ -267,6 +271,7 @@ const closeProposalDialog = () => {
   showProposalDialog.value = false
   selectedRepository.value = {}
   activeProposal.value = {}
+  copySourceProposal.value = null
 }
 
 const editProposal = (proposal) => {
@@ -324,16 +329,25 @@ const withdrawProposal = (proposal) => {
     action: 'withdraw',
     actionMessage: `Withdraw Dataset Proposal: "${proposal.name}"?`,
     resource: proposal,
-    warningMessage: `This will withdraw your proposal from ${repositoryName}. You can resubmit it later if needed.`,
+    warningMessage: `This will withdraw your proposal from ${repositoryName}. A withdrawn proposal can't be resubmitted, but you can copy it into a new draft.`,
     confirmActionLabel: 'Withdraw',
     cancelActionLabel: 'Cancel',
   }
   confirmationDialogVisible.value = true
 }
 
-const resubmitProposal = (proposal) => {
-  // Navigate to open repositories page to select a new repository for resubmission
-  router.push({ name: 'open-repositories' })
+const copyProposalToDraft = async (sourceProposal) => {
+  if (showProposalDialog.value) {
+    closeProposalDialog()
+    await nextTick()
+  }
+
+  copySourceProposal.value = sourceProposal
+  activeProposal.value = null
+  selectedRepository.value = repositories.value.find(repo =>
+    repo.organizationNodeId === sourceProposal.organizationNodeId
+  ) || {}
+  showProposalDialog.value = true
 }
 
 const openDataset = (proposal) => {
