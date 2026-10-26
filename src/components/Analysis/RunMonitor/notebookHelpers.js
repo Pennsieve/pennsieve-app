@@ -62,3 +62,13 @@ const SAVES_TO = {
 export function kernelOutput(wf) {
   return SAVES_TO[wf?.notebook?.savesTo] || "";
 }
+
+// For a notebook that saves results to a dataset, the same-language kernel
+// that doesn't (results as a download, or kept in the session): what someone
+// who can only view the dataset can start instead. Null if there's none.
+export function nonSavingAlternative(kernels = [], wf) {
+  if (wf?.notebook?.savesTo !== "dataset") return null;
+  const kernel = notebookKernel(wf);
+  const others = kernels.filter((k) => k.uuid !== wf.uuid && notebookKernel(k) === kernel);
+  return others.find((k) => k.notebook?.savesTo === "download") || others.find((k) => k.notebook?.savesTo === "none") || null;
+}

@@ -14,6 +14,12 @@ export const BUILTIN_TARGET_TYPES = ["download", "persistent-layer"];
 export const targetWritesToDataset = (targetType) =>
   !!targetType && !BUILTIN_TARGET_TYPES.includes(targetType);
 
+// Whether a dataset role (the API's dataset "role": viewer, editor, manager,
+// owner) can take a target's files: workflow-service refuses a run whose
+// creator is below Editor on any dataset its targets write to.
+const WRITE_ROLES = ["editor", "manager", "owner"];
+export const canWriteDataset = (role) => WRITE_ROLES.includes((role || "").toLowerCase());
+
 // The name of the target type's path-prefix param.
 export const prefixParamName = (targetType) =>
   BUILTIN_TARGET_TYPES.includes(targetType) ? "pathPrefix" : "PATH_PREFIX";

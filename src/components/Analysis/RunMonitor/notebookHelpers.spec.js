@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { launchableKernels, kernelOutput, notebookKernel, isNotebookWorkflow, kernelLabel } from "./notebookHelpers";
+import { launchableKernels, kernelOutput, notebookKernel, isNotebookWorkflow, kernelLabel, nonSavingAlternative } from "./notebookHelpers";
 
 // workflow-service's computed field: a notebook only when a step's app.yml
 // declares an interactive Jupyter session.
@@ -31,5 +31,23 @@ describe("launchableKernels", () => {
     expect(kernelOutput(py)).toBe("Results saved to a dataset");
     expect(kernelOutput(r)).toBe("Results stay in the session");
     expect(kernelOutput({})).toBe("");
+  });
+});
+
+describe("nonSavingAlternative", () => {
+  const nb = (uuid, kernel, savesTo) => ({ uuid, notebook: { kernel, savesTo } });
+  const pyDataset = nb("a", "python", "dataset");
+  const pyNone = nb("b", "python", "none");
+  const pyDownload = nb("c", "python", "download");
+  const rDownload = nb("d", "r", "download");
+
+  it("offers the same language's download notebook first, then one that saves nothing", () => {
+    expect(nonSavingAlternative([pyDataset, pyNone, pyDownload, rDownload], pyDataset)).toBe(pyDownload);
+    expect(nonSavingAlternative([pyDataset, pyNone, rDownload], pyDataset)).toBe(pyNone);
+  });
+
+  it("offers nothing for a notebook that doesn't save to a dataset, or with no same-language one", () => {
+    expect(nonSavingAlternative([pyDataset, pyDownload], pyDownload)).toBeNull();
+    expect(nonSavingAlternative([pyDataset, rDownload], pyDataset)).toBeNull();
   });
 });
