@@ -510,7 +510,8 @@ const goToManifestBuilder = () => {
 
 .applications-section-header {
   display: flex;
-  align-items: center;
+  /* The sort lines up with the bottom of the (taller) search box. */
+  align-items: flex-end;
   justify-content: space-between;
   gap: 16px;
   margin-bottom: 16px;
