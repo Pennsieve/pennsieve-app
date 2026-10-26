@@ -481,11 +481,26 @@ onMounted(async () => {
   justify-self: end;
   margin-left: 0;
 }
-/* Narrow: one column. */
-@media (max-width: 900px) {
+/* Narrower: the input and output filters go, and the search fills its row
+   next to Sort; the scope buttons sit next to Status. */
+@media (max-width: 1100px) {
   .list-toolbar {
-    grid-template-columns: 1fr;
-    grid-template-areas: "search" "filters" "sort" "status";
+    grid-template-columns: 1fr auto;
+    grid-template-areas:
+      "search sort"
+      "filters status";
+  }
+  .list-toolbar .io-select {
+    display: none;
+  }
+  .list-toolbar .scope-buttons {
+    border-right: none;
+  }
+}
+/* Narrowest: the select alone says what it sorts by. */
+@media (max-width: 640px) {
+  .toolbar-sort {
+    font-size: 0;
   }
 }
 .sort-control {
