@@ -83,3 +83,11 @@ describe("builderReadiness: links", () => {
   });
 });
 
+describe("readinessLabel", () => {
+  it("counts what to fix and what to check", () => {
+    const r = (blocking, warnings) => ({ blocking: Array(blocking).fill({}), warnings: Array(warnings).fill({}) });
+    expect(readinessLabel(r(1, 1))).toBe("1 to fix · 1 to check");
+    expect(readinessLabel(r(1, 0))).toBe("1 thing to fix");
+    expect(readinessLabel(r(0, 2))).toBe("Ready · 2 to check");
+  });
+});

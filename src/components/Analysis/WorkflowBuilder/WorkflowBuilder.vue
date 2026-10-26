@@ -4649,23 +4649,20 @@ kbd {
   white-space: nowrap;
   color: theme.$gray_5;
 }
+/* The steps: no box or rules, the kinds' bars separate them; a row shows
+   it's clickable on hover. */
 .step-list {
   margin: 0 0 10px;
   padding: 0;
   list-style: none;
-  border: 1px solid theme.$gray_2;
-  border-radius: 4px;
-  background: theme.$white;
-}
-.step-list li + li {
-  border-top: 1px solid theme.$gray_2;
 }
 .step-list-item {
   display: flex;
   align-items: center;
   gap: 8px;
   width: 100%;
-  padding: 7px 10px;
+  padding: 6px 8px;
+  border-radius: 3px;
   border: none;
   background: none;
   font: inherit;
@@ -4704,16 +4701,23 @@ kbd {
   text-align: center;
   color: theme.$white;
 }
+/* The name keeps its width (its number tells steps apart); the detail
+   beside it gives way, whole on hover. */
 .step-list-name {
-  flex: 1;
-  min-width: 0;
+  flex-shrink: 0;
+  max-width: 70%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   color: theme.$gray_6;
 }
 .step-list-meta {
-  flex-shrink: 0;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: right;
   font-size: 12px;
   color: theme.$gray_4;
 }
