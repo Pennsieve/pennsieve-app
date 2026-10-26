@@ -5011,10 +5011,6 @@ kbd {
       border-color: theme.$gray_4;
       box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.15);
     }
-    &.selected .custom-node.processor-node {
-      border-color: theme.$orange_2;
-      box-shadow: 0 0 0 2px rgba(224, 145, 42, 0.35);
-    }
   }
 }
 
@@ -5029,6 +5025,20 @@ kbd {
   transition: all 0.2s;
   position: relative;
   z-index: 1;
+
+  // What a step is, as a strip on the left over the border (as on the
+  // compact cards); the border says its state (selected, a warning; on a
+  // run, running or failed). The kinds set --type-strip.
+  &::before {
+    content: "";
+    position: absolute;
+    top: -1px;
+    bottom: -1px;
+    left: -1px;
+    width: 5px;
+    border-radius: 4px 0 0 4px;
+    background: var(--type-strip, transparent);
+  }
 
   &:hover {
     border-color: theme.$black;
@@ -5193,24 +5203,15 @@ kbd {
     }
   }
 
-  /* An app step: the processor orange (as the compact step's strip), like
-     Input data's indigo and a target's slate. */
+  /* An app step: white, with the processor orange as its strip. Input
+     data and targets keep a light tint of their colour, so data in and out
+     reads apart from the work between. */
   &.processor-node {
-    border-color: theme.$orange_2;
-    background: theme.$orange_tint;
-
-    &:hover {
-      border-color: theme.$orange_2;
-      box-shadow: 0 2px 8px rgba(224, 145, 42, 0.3);
-    }
-
-    .node-port {
-      background: theme.$white;
-    }
+    --type-strip: #{theme.$orange_2};
   }
 
   &.data-source-node {
-    border-color: #6366f1;
+    --type-strip: #6366f1;
     background: #eef2ff;
 
     .node-header {
@@ -5220,7 +5221,7 @@ kbd {
   }
 
   &.data-target-node {
-    border-color: #64748b;
+    --type-strip: #64748b;
     background: #f1f5f9;
 
     .node-body {
