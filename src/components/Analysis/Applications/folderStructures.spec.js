@@ -118,6 +118,15 @@ describe('folder formats and structures in app.yml', () => {
     expect(JSON.stringify(validateManifestDoc(bad).problems)).toMatch(/name/)
   })
 
+  it('refuses folders of no format, but not a layout without files in it', () => {
+    const none = loadYaml('application:\n  name: a\ninputs:\n  - name: x\n    container: directory\n')
+    expect(validateManifestDoc(none).problems).toEqual([{ path: 'inputs.0.mediaTypes', message: 'needs a folder format: pick one, e.g. OME-Zarr or MEF3' }])
+    const layout = loadYaml('application:\n  name: a\ninputs:\n  - name: x\n    conformsTo: bids\n    container: directory\n')
+    expect(validateManifestDoc(layout)).toEqual({ valid: true, problems: [] })
+    const named = loadYaml('application:\n  name: a\ninputs:\n  - name: My recordings\n    placement: subfolder\n')
+    expect(validateManifestDoc(named).problems).toEqual([{ path: 'inputs.0.name', message: 'as a folder name (its own folder), can only have lowercase letters, numbers and dashes' }])
+  })
+
   it('matches structures by id, whatever the version', () => {
     const bids = createPort({ conformsTo: 'bids' })
     expect(arePortsCompatible(createPort({ conformsTo: 'bids@1.9' }), bids)).toBe(true)
