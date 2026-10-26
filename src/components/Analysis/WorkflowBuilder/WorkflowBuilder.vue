@@ -2897,7 +2897,7 @@ const openNodeSettings = (id) => {
                   v-if="!detailed"
                   kind="target"
                   :class="connectClass(id)"
-                  :label="getTargetTypeLabel(data.targetType)"
+                  :label="data.targetType ? nodeName({ id, type: 'data-target', data }) : getTargetTypeLabel(data.targetType)"
                   :runtime="data.computeType"
                 >
                     <button
@@ -2912,7 +2912,7 @@ const openNodeSettings = (id) => {
                   <div class="node-header">
                     <span class="node-type-badge target-badge">Target</span>
                     <span class="node-title">{{
-                      getTargetTypeLabel(data.targetType)
+                      data.targetType ? nodeName({ id, type: 'data-target', data }) : getTargetTypeLabel(data.targetType)
                     }}</span>
                     <button
                       v-if="!isReadOnly"
