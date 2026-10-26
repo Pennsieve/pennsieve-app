@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { targetWritesToDataset, prefixParamName, targetParamFields, buildDataTargets, targetDatasetId, datasetName, searchDatasets, isPathPrefixParam, targetParamLabel, defaultsToRunName } from "./dataTargets";
+import { targetWritesToDataset, prefixParamName, targetParamFields, buildDataTargets, targetDatasetId, datasetName, searchDatasets, isPathPrefixParam, targetParamLabel, defaultsToRunName, canWriteDataset } from "./dataTargets";
 
 describe("targetWritesToDataset / prefixParamName", () => {
   it("built-ins write no dataset and take pathPrefix", () => {
@@ -92,5 +92,10 @@ describe("the notebook launcher's target params", () => {
     expect(defaultsToRunName("pennsieve", "name")).toBe(false);
     expect(targetParamLabel("name")).toBe("Archive name");
     expect(targetParamLabel("layerName")).toBe("layerName");
+  });
+
+  it("writes only to datasets where the role is Editor or above", () => {
+    expect(["owner", "manager", "editor", "Editor"].every(canWriteDataset)).toBe(true);
+    expect(["viewer", "", undefined, null].some(canWriteDataset)).toBe(false);
   });
 });
