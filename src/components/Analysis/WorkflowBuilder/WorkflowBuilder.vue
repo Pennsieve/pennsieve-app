@@ -17,7 +17,6 @@ import IconFile from "../../icons/IconFile.vue";
 import IconCollection from "../../icons/IconCollection.vue";
 import IconAnalysis from "../../icons/IconAnalysis.vue";
 import IconInfoSmall from "../../icons/IconInfoSmall.vue";
-import IconPencil from "../../icons/IconPencil.vue";
 import IconPennsieveMark from "../../icons/IconPennsieveMark.vue";
 import {
   STANDARD_CPU_OPTIONS,
@@ -2315,14 +2314,6 @@ const openNodeSettings = (id) => {
                     <span v-if="stepWarning(id)" class="step-warn" :title="stepWarning(id)" />
                     <button
                       v-if="!isReadOnly"
-                      class="settings-btn"
-                      @click.stop="openNodeSettings(id)"
-                      title="Configure"
-                    >
-                      <IconPencil :width="12" :height="12" />
-                    </button>
-                    <button
-                      v-if="!isReadOnly"
                       class="remove-btn"
                       @click.stop="removeNode(id)"
                     >
@@ -2356,14 +2347,6 @@ const openNodeSettings = (id) => {
                       title="Using a draft app.yml saved in this browser, not the released one. A release must declare the same outputs for its links to work. Clear the draft in the app.yml builder."
                     >Draft</span>
                     <span v-if="stepWarning(id)" class="step-warn" :title="stepWarning(id)" />
-                    <button
-                      v-if="!isReadOnly"
-                      class="settings-btn node-action"
-                      @click.stop="openNodeSettings(id)"
-                      title="Configure"
-                    >
-                      <IconPencil :width="12" :height="12" />
-                    </button>
                     <button
                       v-if="!isReadOnly"
                       class="remove-btn node-action"
@@ -2605,14 +2588,6 @@ const openNodeSettings = (id) => {
                 >
                     <button
                       v-if="!isReadOnly"
-                      class="settings-btn"
-                      @click.stop="openNodeSettings(id)"
-                      title="Configure"
-                    >
-                      <IconPencil :width="12" :height="12" />
-                    </button>
-                    <button
-                      v-if="!isReadOnly"
                       class="remove-btn"
                       @click.stop="removeNode(id)"
                     >
@@ -2625,14 +2600,6 @@ const openNodeSettings = (id) => {
                     <span class="node-title">{{
                       getTargetTypeLabel(data.targetType)
                     }}</span>
-                    <button
-                      v-if="!isReadOnly"
-                      class="settings-btn"
-                      @click.stop="openNodeSettings(id)"
-                      title="Configure"
-                    >
-                      <IconPencil :width="12" :height="12" />
-                    </button>
                     <button
                       v-if="!isReadOnly"
                       class="remove-btn"
