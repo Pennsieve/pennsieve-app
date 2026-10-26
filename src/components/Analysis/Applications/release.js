@@ -37,11 +37,11 @@ export function latestVersion(tags) {
 
 /**
  * The next patch, minor and major versions after latest, keeping its "v" (or
- * its absence). With no release yet: v1.0.0 for all three to start from.
+ * its absence). With no release yet, the first: v0.0.1, v0.1.0 or v1.0.0.
  */
 export function nextVersions(latest) {
   const v = parseVersion(latest);
-  if (!v) return { patch: "v1.0.0", minor: "v1.0.0", major: "v1.0.0" };
+  if (!v) return { patch: "v0.0.1", minor: "v0.1.0", major: "v1.0.0" };
   const p = v.prefix;
   // A pre-release's next patch is the release itself (v1.2.0-rc.1 -> v1.2.0).
   const patch = v.pre ? `${p}${v.major}.${v.minor}.${v.patch}` : `${p}${v.major}.${v.minor}.${v.patch + 1}`;
