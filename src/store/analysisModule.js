@@ -416,7 +416,9 @@ const actions = {
   },
   updateApplicationPermissions: async ({ rootState }, { uuid, payload }) => {
     if (!uuid) throw new Error("Missing application uuid");
-    const url = `${rootState.config.api2Url}/applications/store/${uuid}/permissions`;
+    // The workspace being viewed, when there is one: never the token's
+    // active organization (app-deploy-service verifies it).
+    const url = withWorkspace(`${rootState.config.api2Url}/applications/store/${uuid}/permissions`, rootState);
     const userToken = await useGetToken();
     const resp = await fetch(url, {
       method: "PUT",

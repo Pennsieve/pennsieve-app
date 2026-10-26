@@ -9,7 +9,9 @@ import { computed, ref, watch } from "vue";
 import { useStore } from "vuex";
 import { ElMessage } from "element-plus";
 import BfButton from "@/components/shared/bf-button/BfButton.vue";
-import { shareCandidates, sharePayload } from "./appSharing";
+import { useGetToken } from "@/composables/useGetToken";
+import { shareCandidates, sharePayload, emailToLookUp } from "./appSharing";
+import { useWorkspaceMembers } from "./useWorkspaceMembers";
 
 const props = defineProps({
   modelValue: { type: Boolean, default: false },
@@ -36,6 +38,9 @@ const VISIBILITY = [
 ];
 const TYPE_LABEL = { user: "Person", team: "Team", workspace: "Workspace" };
 
+// People from all the caller's workspaces (shared with the app page).
+const { allMembers, load: loadAllMembers } = useWorkspaceMembers();
+
 const visibility = ref("private");
 const list = ref([]);
 const picked = ref(null);
@@ -51,6 +56,7 @@ watch(
     list.value = props.entries.map((e) => ({ ...e }));
     query.value = "";
     picked.value = null;
+    loadAllMembers();
   },
   { immediate: true }
 );
@@ -59,15 +65,45 @@ const profile = computed(() => store.state.profile);
 const isMe = (id) => id != null && (String(id) === String(profile.value?.id) || String(id) === String(profile.value?.intId));
 const isOwner = (id) => id != null && String(id) === String(props.ownerId);
 
+// People from all the caller's workspaces; teams only from the one being
+// viewed (a team means something only inside its workspace).
 const sources = computed(() => ({
-  members: props.organizationId ? store.state.orgMembers || [] : [],
+  members: allMembers.value,
   teams: props.organizationId ? store.state.teams || [] : [],
   organizations: store.state.organizations || [],
 }));
 const candidates = computed(() => shareCandidates(query.value, sources.value, list.value, props.organizationId));
-const noPeople = computed(() => !props.organizationId);
+// Someone outside all of them: a whole email address, looked up.
+const lookupEmail = computed(() => emailToLookUp(query.value, allMembers.value, list.value));
+const lookingUp = ref(false);
+
+const lookUp = async (email) => {
+  lookingUp.value = true;
+  try {
+    const token = await useGetToken();
+    const resp = await fetch(`${store.state.config.apiUrl}/user/email/${encodeURIComponent(email)}?api_key=${token}`);
+    const user = resp.ok ? await resp.json() : null;
+    if (!user?.id) {
+      ElMessage({ type: "info", message: `No Pennsieve account uses ${email}.` });
+      return;
+    }
+    if (list.value.some((e) => e.type === "user" && e.id === user.id)) return;
+    const name = `${user.firstName || ""} ${user.lastName || ""}`.trim() || email;
+    list.value.push({ type: "user", id: user.id, name, email, organizationId: props.organizationId || null });
+  } catch {
+    ElMessage.error(`Couldn't look up ${email}. Please try again.`);
+  } finally {
+    lookingUp.value = false;
+  }
+};
 
 const add = (key) => {
+  if (String(key).startsWith("lookup:")) {
+    lookUp(String(key).slice("lookup:".length));
+    picked.value = null;
+    query.value = "";
+    return;
+  }
   const c = candidates.value.find((x) => `${x.type}:${x.id}` === key);
   if (c) list.value.push({ type: c.type, id: c.id, name: c.name, organizationId: c.organizationId });
   picked.value = null;
@@ -119,10 +155,17 @@ const save = async () => {
         class="sa-search"
         filterable
         :filter-method="(q) => (query = q)"
-        :placeholder="noPeople ? 'Add a workspace' : 'Add people, teams or workspaces'"
+        :loading="lookingUp"
+        placeholder="Add people, teams or workspaces"
         @visible-change="(open) => open || (query = '')"
         @change="add"
       >
+        <el-option v-if="lookupEmail" :key="`lookup:${lookupEmail}`" :label="`Look up ${lookupEmail}`" :value="`lookup:${lookupEmail}`">
+          <span class="sa-option">
+            <span class="sa-option-name">Look up {{ lookupEmail }}</span>
+            <span class="sa-option-type">Pennsieve account</span>
+          </span>
+        </el-option>
         <el-option v-for="c in candidates" :key="`${c.type}:${c.id}`" :label="c.name" :value="`${c.type}:${c.id}`">
           <span class="sa-option">
             <span class="sa-option-name">{{ c.name }}</span>
@@ -130,7 +173,10 @@ const save = async () => {
           </span>
         </el-option>
       </el-select>
-      <p v-if="noPeople" class="sa-hint">To add people or teams, open this app from the workspace they're in.</p>
+      <p class="sa-hint">
+        People from all your workspaces<template v-if="organizationId">, teams from this one</template>, or anyone on Pennsieve by
+        their whole email address. A person you add can use the app everywhere, including their My Workspace.
+      </p>
 
       <ul class="sa-list">
         <li v-for="e in list" :key="`${e.type}:${e.id}`" class="sa-entry">

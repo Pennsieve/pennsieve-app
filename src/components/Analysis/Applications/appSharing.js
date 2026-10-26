@@ -94,7 +94,10 @@ export function shareCandidates(query, { members = [], teams = [], organizations
   const out = [];
   for (const m of members) {
     if (m?.id && !taken.has(`user:${m.id}`) && hit(fullName(m), m.email)) {
-      out.push({ type: "user", id: m.id, name: fullName(m) || m.email || m.id, detail: m.email || "", organizationId: orgId });
+      // Where the caller knows them from (mergeMembers): "ada@… · SPARC".
+      const via = (m.via || []).join(", ");
+      const detail = [m.email, via].filter(Boolean).join(" · ");
+      out.push({ type: "user", id: m.id, name: fullName(m) || m.email || m.id, detail, organizationId: m.viaOrgId || orgId });
     }
   }
   for (const t of teams) {
@@ -128,4 +131,41 @@ export function sharePayload(entries, visibility, meId, orgId) {
     teams: of("team").map((e) => ({ entityId: e.id, organizationId: e.organizationId || orgId })),
     workspaces: of("workspace").map((e) => ({ entityId: e.id, organizationId: e.organizationId || e.id })),
   };
+}
+
+/**
+ * The members of every workspace the caller is in, once each, with the
+ * workspaces they share with the caller (via) and one of them (viaOrgId).
+ * perWorkspace: [{ orgId, orgName, members }].
+ */
+export function mergeMembers(perWorkspace) {
+  const byId = new Map();
+  for (const ws of perWorkspace || []) {
+    for (const m of ws?.members || []) {
+      if (!m?.id) continue;
+      const seen = byId.get(m.id);
+      if (seen) {
+        if (ws.orgName && !seen.via.includes(ws.orgName)) seen.via.push(ws.orgName);
+      } else {
+        byId.set(m.id, { ...m, via: ws.orgName ? [ws.orgName] : [], viaOrgId: ws.orgId || null });
+      }
+    }
+  }
+  return [...byId.values()];
+}
+
+const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/**
+ * The full email address to look up, when the search is one and no one in
+ * reach or already shared has it; "" otherwise. Only a whole address is
+ * looked up, so the dialog can't be used to browse who has an account.
+ */
+export function emailToLookUp(query, members = [], entries = []) {
+  const q = String(query || "").trim();
+  if (!EMAIL.test(q)) return "";
+  const lower = q.toLowerCase();
+  if (members.some((m) => String(m?.email || "").toLowerCase() === lower)) return "";
+  if ((entries || []).some((e) => String(e?.email || "").toLowerCase() === lower)) return "";
+  return q;
 }

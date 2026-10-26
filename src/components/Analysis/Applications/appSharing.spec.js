@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { entryType, makeNamer, accessEntries, accessSummary, shareCandidates, sharePayload } from "./appSharing";
+import { entryType, makeNamer, accessEntries, accessSummary, shareCandidates, sharePayload, mergeMembers, emailToLookUp } from "./appSharing";
 
 const profile = { id: "N:user:me", intId: 1, firstName: "Joost", lastName: "Wagenaar" };
 const members = [
@@ -78,5 +78,24 @@ describe("app sharing", () => {
       teams: [],
       workspaces: [{ entityId: "N:organization:sparc", organizationId: "N:organization:sparc" }],
     });
+  });
+
+  it("offers people from all the caller's workspaces, once each, saying where from", () => {
+    const merged = mergeMembers([
+      { orgId: "o1", orgName: "SPARC", members: [members[0]] },
+      { orgId: "o2", orgName: "Penn Neuro", members: [members[0], members[1]] },
+    ]);
+    expect(merged.map((m) => `${m.firstName}:${m.via.join("+")}:${m.viaOrgId}`)).toEqual(["Ada:SPARC+Penn Neuro:o1", "Alan:Penn Neuro:o2"]);
+    const [ada] = shareCandidates("ada", { members: merged }, []);
+    expect(ada.detail).toBe("ada@example.org · SPARC, Penn Neuro");
+    expect(ada.organizationId).toBe("o1");
+  });
+
+  it("looks up a whole email address only, and only when no one in reach has it", () => {
+    expect(emailToLookUp("grace@example.org", members)).toBe("grace@example.org");
+    expect(emailToLookUp("ADA@example.org", members)).toBe("");
+    expect(emailToLookUp("grace@", members)).toBe("");
+    expect(emailToLookUp("grace", members)).toBe("");
+    expect(emailToLookUp("grace@example.org", [], [{ type: "user", email: "grace@example.org" }])).toBe("");
   });
 });
