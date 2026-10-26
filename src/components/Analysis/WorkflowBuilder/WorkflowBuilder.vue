@@ -1560,7 +1560,9 @@ const revalidateEdges = () => {
       const mediaTypes = portMediaTypes(result.metInputs);
       return {
         ...next,
-        style: { stroke: VALID_EDGE_COLOR, strokeWidth: 2 },
+        // The usual weight: a link that fits needs no attention; the ✓ says
+        // it. A link that doesn't fit stays heavier (dashed, red).
+        style: { stroke: VALID_EDGE_COLOR },
         label: mediaTypes.length && detailed.value ? `\u2713 ${shortTypes(mediaTypes)}` : "\u2713",
         ...(detailed.value
           ? labelBox("#eaf9ef", VALID_EDGE_COLOR, "#0f7a3f")
