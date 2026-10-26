@@ -73,6 +73,14 @@ const sources = computed(() => ({
   organizations: store.state.organizations || [],
 }));
 const candidates = computed(() => shareCandidates(query.value, sources.value, list.value, props.organizationId));
+const GROUPS = [
+  { type: "workspace", label: "Workspaces" },
+  { type: "team", label: "Teams" },
+  { type: "user", label: "People" },
+];
+const candidateGroups = computed(() =>
+  GROUPS.map((g) => ({ ...g, items: candidates.value.filter((c) => c.type === g.type) })).filter((g) => g.items.length)
+);
 // Someone outside all of them: a whole email address, looked up.
 const lookupEmail = computed(() => emailToLookUp(query.value, allMembers.value, list.value));
 const lookingUp = ref(false);
@@ -153,6 +161,8 @@ const save = async () => {
       <el-select
         v-model="picked"
         class="sa-search"
+        fit-input-width
+        popper-class="sa-dropdown"
         filterable
         :filter-method="(q) => (query = q)"
         :loading="lookingUp"
@@ -163,15 +173,18 @@ const save = async () => {
         <el-option v-if="lookupEmail" :key="`lookup:${lookupEmail}`" :label="`Look up ${lookupEmail}`" :value="`lookup:${lookupEmail}`">
           <span class="sa-option">
             <span class="sa-option-name">Look up {{ lookupEmail }}</span>
-            <span class="sa-option-type">Pennsieve account</span>
+            <span class="sa-option-detail">A Pennsieve account outside your workspaces</span>
           </span>
         </el-option>
-        <el-option v-for="c in candidates" :key="`${c.type}:${c.id}`" :label="c.name" :value="`${c.type}:${c.id}`">
-          <span class="sa-option">
-            <span class="sa-option-name">{{ c.name }}</span>
-            <span class="sa-option-type">{{ c.type === "user" ? c.detail : TYPE_LABEL[c.type] }}</span>
-          </span>
-        </el-option>
+        <!-- Grouped: workspaces, teams, people -->
+        <el-option-group v-for="g in candidateGroups" :key="g.type" :label="g.label">
+          <el-option v-for="c in g.items" :key="`${c.type}:${c.id}`" :label="c.name" :value="`${c.type}:${c.id}`">
+            <span class="sa-option" :title="c.allWorkspaces ? `In ${c.allWorkspaces}` : undefined">
+              <span class="sa-option-name">{{ c.name }}</span>
+              <span v-if="c.type === 'user'" class="sa-option-detail">{{ c.detail }}</span>
+            </span>
+          </el-option>
+        </el-option-group>
       </el-select>
       <p class="sa-hint">
         People from all your workspaces<template v-if="organizationId">, teams from this one</template>, or anyone on Pennsieve by
@@ -246,10 +259,17 @@ p.sa-hint {
 }
 .sa-option {
   display: flex;
-  justify-content: space-between;
-  gap: 12px;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.3;
 }
-.sa-option-type {
+.sa-option-name,
+.sa-option-detail {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sa-option-detail {
   font-size: 12px;
   color: theme.$gray_4;
 }
@@ -310,5 +330,17 @@ p.sa-hint {
   display: flex;
   justify-content: flex-end;
   gap: 8px;
+}
+</style>
+
+<style lang="scss">
+/* The dropdown is teleported, so these aren't scoped: two-line options. */
+.sa-dropdown .el-select-dropdown__item {
+  height: auto;
+  padding-top: 6px;
+  padding-bottom: 6px;
+}
+.sa-dropdown .el-select-group__wrap:not(:last-of-type)::after {
+  margin: 4px 12px;
 }
 </style>

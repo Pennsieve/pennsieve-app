@@ -87,7 +87,10 @@ describe("app sharing", () => {
     ]);
     expect(merged.map((m) => `${m.firstName}:${m.via.join("+")}:${m.viaOrgId}`)).toEqual(["Ada:SPARC+Penn Neuro:o1", "Alan:Penn Neuro:o2"]);
     const [ada] = shareCandidates("ada", { members: merged }, []);
-    expect(ada.detail).toBe("ada@example.org · SPARC, Penn Neuro");
+    expect(ada.detail).toBe("ada@example.org · SPARC +1");
+    expect(ada.allWorkspaces).toBe("SPARC, Penn Neuro");
+    // Integration (service) accounts have no email: not offered.
+    expect(shareCandidates("", { members: [{ id: "N:user:bot", firstName: "Integration", lastName: "User" }] }, [])).toEqual([]);
     expect(ada.organizationId).toBe("o1");
   });
 

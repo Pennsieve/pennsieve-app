@@ -93,11 +93,20 @@ export function shareCandidates(query, { members = [], teams = [], organizations
   const hit = (...texts) => !q || texts.some((t) => String(t || "").toLowerCase().includes(q));
   const out = [];
   for (const m of members) {
-    if (m?.id && !taken.has(`user:${m.id}`) && hit(fullName(m), m.email)) {
-      // Where the caller knows them from (mergeMembers): "ada@… · SPARC".
-      const via = (m.via || []).join(", ");
-      const detail = [m.email, via].filter(Boolean).join(" · ");
-      out.push({ type: "user", id: m.id, name: fullName(m) || m.email || m.id, detail, organizationId: m.viaOrgId || orgId });
+    // People only: integration (service) accounts have no email.
+    if (m?.id && m.email && !taken.has(`user:${m.id}`) && hit(fullName(m), m.email)) {
+      // Where the caller knows them from (mergeMembers): the first
+      // workspace, and how many more ("SPARC +2").
+      const via = m.via || [];
+      const where = via.length ? `${via[0]}${via.length > 1 ? ` +${via.length - 1}` : ""}` : "";
+      out.push({
+        type: "user",
+        id: m.id,
+        name: fullName(m) || m.email,
+        detail: [m.email, where].filter(Boolean).join(" · "),
+        allWorkspaces: via.join(", "),
+        organizationId: m.viaOrgId || orgId,
+      });
     }
   }
   for (const t of teams) {
