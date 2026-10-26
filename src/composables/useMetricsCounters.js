@@ -33,9 +33,10 @@ export function useMetricsCounters({ scope, id, range: timeRange } = {}) {
     // For scoped calls, require an id
     if (scopeVal && !idVal) return
     const orgId = store.state.activeOrganization?.organization?.id
-    // Outside a workspace (My Workspace) only the caller's own counters
-    // exist: the user scope, which needs no organization.
-    if (!orgId && scopeVal) {
+    // Outside a workspace (My Workspace): the caller's own counters (the user
+    // scope), and an app's, which count its runs everywhere (allowed for a
+    // public app or its owner). Workflow and instance counters need one.
+    if (!orgId && scopeVal && scopeVal !== 'application') {
       counters.value = null
       return
     }
@@ -46,7 +47,7 @@ export function useMetricsCounters({ scope, id, range: timeRange } = {}) {
     try {
       const token = await useGetToken()
       const api2Url = store.state.config.api2Url
-      const params = new URLSearchParams(orgId ? { organization_id: orgId } : { scope: 'user' })
+      const params = new URLSearchParams(orgId ? { organization_id: orgId } : scopeVal ? {} : { scope: 'user' })
       if (scopeVal) {
         params.set('scope', scopeVal)
         params.set('id', idVal)
@@ -61,6 +62,12 @@ export function useMetricsCounters({ scope, id, range: timeRange } = {}) {
           headers: { Authorization: `Bearer ${token}` },
         }
       )
+      // Not ours to see (someone else's private app outside a workspace), or
+      // a service that doesn't allow it yet: no counters, not an error.
+      if (!orgId && scopeVal && (resp.status === 400 || resp.status === 403)) {
+        counters.value = null
+        return
+      }
       if (!resp.ok) {
         throw new Error(`Failed to fetch metrics counters (${resp.status})`)
       }
