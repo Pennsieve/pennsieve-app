@@ -249,7 +249,7 @@
                 <div class="field-control">
                   <!-- Searchable by format name, extension or media type -->
                   <el-select
-                    :model-value="port.dataType"
+                    :model-value="portMode(port) === 'folder' && port.dataType === 'any' ? '' : port.dataType"
                     class="full"
                     filterable
                     :filter-method="(q) => (mediaTypeQuery = q)"
