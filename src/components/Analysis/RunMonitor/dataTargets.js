@@ -102,3 +102,16 @@ export const targetParamLabel = (name) => PARAM_LABELS[name] || name;
 // A download's archive is named after the notebook unless the user names it,
 // so the step can be clicked through.
 export const defaultsToRunName = (targetType, paramName) => targetType === "download" && paramName === "name";
+
+// A target's params as its card on a run's graph lists them: without those
+// the canvas already shows (the path prefix, when a line leaves the output
+// it names) and those left at their default. params: [{ key, value }];
+// paramDefs: the target type's ({ name, defaultValue }).
+export const shownTargetParams = (params, paramDefs = [], prefixShown = false) => {
+  const defaults = new Map((paramDefs || []).map((pd) => [pd.name, pd.defaultValue]));
+  return (params || []).filter(({ key, value }) => {
+    if (prefixShown && isPathPrefixParam(key)) return false;
+    const d = defaults.get(key);
+    return d == null || String(d) !== String(value);
+  });
+};

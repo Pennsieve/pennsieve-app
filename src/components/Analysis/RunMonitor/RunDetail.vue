@@ -30,7 +30,7 @@ import { useSendXhr } from "@/mixins/request/request_composable";
 import toQueryParams from "@/utils/toQueryParams";
 import LayerNameSelector from "./LayerNameSelector.vue";
 import TargetDatasetField from "./TargetDatasetField.vue";
-import { targetWritesToDataset, targetParamFields, buildDataTargets, targetDatasetId, datasetName } from "./dataTargets";
+import { targetWritesToDataset, targetParamFields, buildDataTargets, targetDatasetId, datasetName, shownTargetParams } from "./dataTargets";
 import DownloadItem from "@/components/downloads/DownloadItem.vue";
 import { useDownloadsStore } from "@/stores/downloadsStore";
 
@@ -77,7 +77,8 @@ import { portEdges, stepPoints } from "../WorkflowGraph/runPorts";
 import PortChips from "../WorkflowGraph/PortChips.vue";
 import LlmMark from "../WorkflowGraph/LlmMark.vue";
 import { inputHandleId } from "../WorkflowBuilder/inputPorts";
-import { portHandleId } from "../WorkflowBuilder/outputPorts";
+import { portHandleId, portOfHandle } from "../WorkflowBuilder/outputPorts";
+import { stepNames } from "../WorkflowBuilder/stepNames";
 
 // Shown in a workspace (/:orgId/analysis/runs/...) and in My Workspace
 // (/my-workspace/analysis/runs/...), where there's no organization and a run
@@ -534,6 +535,38 @@ const hasPortChips = (id, data, side) => pointsOf(id, data, side).some((p) => p.
 const pointStyle = (points, p) =>
   points.length > 1 ? { left: `calc(11px + (100% - 22px) * ${p.at}) !important` } : undefined;
 
+// Titles that tell steps apart, numbered top to bottom when two share a
+// name ("test-ports-processor (1)", "(2)"), as in the builder.
+const canvasTitles = computed(() =>
+  stepNames(
+    [...nodes.value].sort((a, b) => (a.position?.y ?? 0) - (b.position?.y ?? 0) || (a.position?.x ?? 0) - (b.position?.x ?? 0)),
+    (n) => (n.type === "data-target" ? n.data?.targetType || n.data?.label : n.data?.label)
+  )
+);
+const titleOf = (id, data) => canvasTitles.value.get(id) || data.targetType || data.label;
+
+// A step that finished needs no badge: the ✓ by its title and its green
+// border say so. Pending, running, failed and canceled steps keep theirs.
+const doneStep = (data) => mode.value === "browse" && data.status === "SUCCEEDED";
+
+// A source with one file shows its name; with more, how many.
+const sourceDetail = (data) => {
+  if (data.packageCount === 1) {
+    const name = browseFileInfo.value[data.packageIds[0]]?.name;
+    if (name) return name;
+  }
+  return `${data.packageCount} file${data.packageCount !== 1 ? "s" : ""}`;
+};
+
+// A target's params on its card, without those at their default or the
+// path prefix a line from an output's port already shows.
+const targetParamsShown = (id, data) =>
+  shownTargetParams(
+    data.params,
+    getTargetTypeDefinition(data.targetType)?.params,
+    detailed.value && edges.value.some((e) => e.target === id && portOfHandle(e.sourceHandle))
+  );
+
 /*
   Convert a workflow definition's dag to VueFlow nodes/edges (for configure mode)
 */
@@ -750,6 +783,10 @@ const loadRun = async (runId) => {
       const result = runToNodesAndEdges(activity);
       nodes.value = result.nodes;
       edges.value = result.edges;
+      // Single-file sources show the file's name on their cards.
+      for (const n of result.nodes) {
+        if (n.type === "data-source" && n.data.packageCount === 1) fetchPackageNames(n.data.packageIds);
+      }
       if (needsLayout(result)) autoLayout();
       else setTimeout(() => fitView({ padding: 0.2, maxZoom: 1 }), 50);
     }
@@ -1691,7 +1728,7 @@ onUnmounted(() => {
                 <CompactFlowNode
                   v-if="!detailed"
                   kind="processor"
-                  :label="data.label"
+                  :label="titleOf(id, data)"
                   :status="mode === 'browse' ? data.status : ''"
                   :runtime="mode === 'browse' ? data.executionTarget : nodeConfigs[id]?.executionTarget"
                   :unmet="nodeUnmetCount(id, 'processor')"
@@ -1717,7 +1754,7 @@ onUnmounted(() => {
                     </button>
                   </template>
                 </CompactFlowNode>
-                <div v-else class="custom-node" :class="mode === 'browse' ? statusClass(data.status) : 'processor-node'">
+                <div v-else class="custom-node" :class="mode === 'browse' ? [statusClass(data.status), 'app-step'] : 'processor-node'">
                   <span v-if="nodeUnmetCount(id, 'processor') > 0" class="node-unmet-badge">{{ nodeUnmetCount(id, 'processor') }}</span>
                   <div
                     v-if="mode === 'browse' && interactiveSessionAvailable && id === interactiveProcessor?.id"
@@ -1743,13 +1780,14 @@ onUnmounted(() => {
                   </div>
                   <PortChips v-if="hasPortChips(id, data, 'in')" :points="pointsOf(id, data, 'in')" side="in" />
                   <div class="node-header">
-                    <span class="node-title" :title="data.label">{{ data.label }}</span>
+                    <span class="node-title" :title="titleOf(id, data)">{{ titleOf(id, data) }}</span>
                     <LlmMark v-if="data.llm" />
+                    <span v-if="doneStep(data)" class="node-done" title="Complete" aria-label="Complete">✓</span>
                   </div>
                   <div class="node-tags">
                     <span v-if="mode === 'browse' && data.executionTarget" class="node-type-badge exec-badge">{{ data.executionTarget }}</span>
                     <span v-if="mode === 'configure' && nodeConfigs[id]?.executionTarget" class="node-type-badge exec-badge">{{ nodeConfigs[id].executionTarget }}</span>
-                    <span v-if="mode === 'browse'" class="node-status-badge" :class="statusDotClass(data.status)">{{ statusLabel(data.status) }}</span>
+                    <span v-if="mode === 'browse' && !doneStep(data)" class="node-status-badge" :class="statusDotClass(data.status)">{{ statusLabel(data.status) }}</span>
                   </div>
                   <div v-if="mode === 'browse' && processorFacts(id, data).length" class="node-facts">
                     {{ processorFacts(id, data).join(" · ") }}
@@ -1795,27 +1833,27 @@ onUnmounted(() => {
                 <CompactFlowNode
                   v-if="!detailed"
                   kind="source"
-                  :label="data.label"
+                  :label="titleOf(id, data)"
                   :unmet="nodeUnmetCount(id, 'data-source')"
                   :detail="mode === 'configure'
                     ? `${fileCountForNode(id)} file${fileCountForNode(id) !== 1 ? 's' : ''} selected`
                     : data.view
                     ? 'Public dataset'
                     : data.packageCount != null
-                    ? `${data.packageCount} file${data.packageCount !== 1 ? 's' : ''}`
+                    ? sourceDetail(data)
                     : ''"
                 />
                 <div v-else class="custom-node data-source-node" :class="{ 'has-files': mode === 'configure' && fileCountForNode(id) > 0 }">
                   <span v-if="nodeUnmetCount(id, 'data-source') > 0" class="node-unmet-badge">{{ nodeUnmetCount(id, 'data-source') }}</span>
                   <div class="node-header">
-                    <span class="node-title" :title="data.label">{{ data.label }}</span>
+                    <span class="node-title" :title="titleOf(id, data)">{{ titleOf(id, data) }}</span>
                   </div>
                   <div class="node-tags">
                     <span v-if="mode === 'browse' && data.view" class="node-tag-info" :title="viewSourceLabel(data.view)">
                       {{ viewSourceLabel(data.view) }}
                     </span>
-                    <span v-else-if="mode === 'browse' && data.packageCount != null" class="node-tag-info">
-                      {{ data.packageCount }} file{{ data.packageCount !== 1 ? 's' : '' }}
+                    <span v-else-if="mode === 'browse' && data.packageCount != null" class="node-tag-info" :title="sourceDetail(data)">
+                      {{ sourceDetail(data) }}
                     </span>
                     <template v-if="mode === 'configure'">
                       <span class="node-tag-info">
@@ -1836,7 +1874,7 @@ onUnmounted(() => {
                 <CompactFlowNode
                   v-if="!detailed"
                   kind="target"
-                  :label="data.targetType || data.label"
+                  :label="titleOf(id, data)"
                   :status="mode === 'browse' ? data.status : ''"
                   :runtime="nodeConfigs[id]?.computeType || data.computeType"
                   :unmet="nodeUnmetCount(id, 'data-target')"
@@ -1844,24 +1882,25 @@ onUnmounted(() => {
                 <div v-else class="custom-node data-target-node" :class="mode === 'browse' ? statusClass(data.status) : ''">
                   <span v-if="nodeUnmetCount(id, 'data-target') > 0" class="node-unmet-badge">{{ nodeUnmetCount(id, 'data-target') }}</span>
                   <div class="node-header">
-                    <span class="node-title" :title="data.targetType || data.label">{{ data.targetType || data.label }}</span>
+                    <span class="node-title" :title="titleOf(id, data)">{{ titleOf(id, data) }}</span>
+                    <span v-if="doneStep(data)" class="node-done" title="Complete" aria-label="Complete">✓</span>
                   </div>
                   <div class="node-tags">
                     <span v-if="nodeConfigs[id]?.computeType || data.computeType" class="node-type-badge exec-badge">
                       {{ nodeConfigs[id]?.computeType || data.computeType }}
                     </span>
-                    <span v-if="mode === 'browse'" class="node-status-badge" :class="statusDotClass(data.status)">{{ statusLabel(data.status) }}</span>
+                    <span v-if="mode === 'browse' && !doneStep(data)" class="node-status-badge" :class="statusDotClass(data.status)">{{ statusLabel(data.status) }}</span>
                   </div>
                   <div v-if="mode === 'browse' && targetFacts(data).length" class="node-facts">
                     {{ targetFacts(data).join(" · ") }}
                   </div>
                   <div class="node-body">
-                    <div v-if="mode === 'browse' && data.params?.length > 0" class="param-preview">
-                      <div v-for="(p, i) in data.params.slice(0, 3)" :key="i" class="param-row">
+                    <div v-if="mode === 'browse' && targetParamsShown(id, data).length > 0" class="param-preview">
+                      <div v-for="(p, i) in targetParamsShown(id, data).slice(0, 3)" :key="i" class="param-row">
                         <span class="param-key">{{ p.key }}</span>
                         <span v-if="p.value" class="param-val">{{ p.value }}</span>
                       </div>
-                      <span v-if="data.params.length > 3" class="param-more">+{{ data.params.length - 3 }} more</span>
+                      <span v-if="targetParamsShown(id, data).length > 3" class="param-more">+{{ targetParamsShown(id, data).length - 3 }} more</span>
                     </div>
                     <template v-if="mode === 'configure'">
                       <div v-if="nodeConfigs[id]?.params?.length > 0" class="param-preview">
@@ -3391,12 +3430,37 @@ onUnmounted(() => {
     align-items: center;
     gap: 4px;
     margin-top: 4px;
+
+    &:empty {
+      display: none;
+    }
   }
 
   &.processor-node {
     --port-chip-bg: #{theme.$white};
     background: theme.$orange_tint;
     border-color: theme.$orange_2;
+  }
+
+  // An app step on a run: white, with the processor orange as a strip on
+  // the left (as on the compact cards), so the border can say its status.
+  &.app-step::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: 4px;
+    border-radius: 3px 0 0 3px;
+    background: theme.$orange_2;
+  }
+
+  // Finished: a ✓ by the title, in place of a status badge.
+  .node-done {
+    flex-shrink: 0;
+    font-size: 15px;
+    font-weight: 700;
+    color: theme.$status_green;
   }
 
   .node-tag-info {
@@ -3555,7 +3619,14 @@ onUnmounted(() => {
     border-radius: 4px;
     flex-shrink: 0;
 
-    &.exec-badge { background: rgba(5, 150, 105, 0.12); color: #047857; }
+    // How it runs, not how it's doing: neutral, so colour stays with status.
+    &.exec-badge {
+      background: none;
+      border: 1px solid theme.$gray_3;
+      padding: 1px 7px;
+      color: theme.$gray_5;
+      font-weight: 600;
+    }
   }
 }
 

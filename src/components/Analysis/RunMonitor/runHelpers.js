@@ -177,6 +177,8 @@ export const formatDuration = (start, end) => {
 export const formatCost = (cost) => {
   if (cost == null) return "N/A";
   if (cost === 0) return "$0.00";
+  // Not "$0.0000": a cost too small for four decimals isn't none.
+  if (cost < 0.0001) return "< $0.0001";
   if (cost < 0.01) return `$${cost.toFixed(4)}`;
   return `$${cost.toFixed(2)}`;
 };
