@@ -47,6 +47,7 @@ const customAssetTypeNodes = reactive(new Set());
 import {
   statusClass,
   graphStatusColor,
+  statusMarkOf,
   nodeBorderColor,
   statusDotClass,
   statusLabel,
@@ -550,12 +551,7 @@ const titleOf = (id, data) => canvasTitles.value.get(id) || data.targetType || d
 // in the title row once it has ended (✓ done, ✕ failed, – canceled); while
 // it runs, its type strip pulses (.blue-node); pending, nothing. The word is
 // the mark's title.
-const STATUS_MARKS = {
-  SUCCEEDED: { glyph: "✓", cls: "node-mark--done" },
-  FAILED: { glyph: "✕", cls: "node-mark--failed" },
-  CANCELED: { glyph: "–", cls: "node-mark--canceled" },
-};
-const statusMark = (data) => (mode.value === "browse" && STATUS_MARKS[data.status]) || null;
+const statusMark = (data) => (mode.value === "browse" && statusMarkOf(data.status)) || null;
 
 // A source with one file shows its name; with more, how many.
 const sourceDetail = (data) => {
@@ -1789,7 +1785,7 @@ onUnmounted(() => {
                     <span
                       v-if="statusMark(data)"
                       class="node-mark"
-                      :class="statusMark(data).cls"
+                      :class="`node-mark--${statusMark(data).kind}`"
                       :title="statusLabel(data.status)"
                       :aria-label="statusLabel(data.status)"
                     >{{ statusMark(data).glyph }}</span>
@@ -1894,7 +1890,7 @@ onUnmounted(() => {
                     <span
                       v-if="statusMark(data)"
                       class="node-mark"
-                      :class="statusMark(data).cls"
+                      :class="`node-mark--${statusMark(data).kind}`"
                       :title="statusLabel(data.status)"
                       :aria-label="statusLabel(data.status)"
                     >{{ statusMark(data).glyph }}</span>
