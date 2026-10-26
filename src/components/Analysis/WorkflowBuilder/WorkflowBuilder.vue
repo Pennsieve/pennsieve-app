@@ -489,6 +489,8 @@ const setManifestPorts = (node, parsed) => {
     outputs: parsed.schema.outputs || [],
   };
   node.data.hasManifest = true;
+  // Ports from a draft app.yml (saved in this browser, not released).
+  node.data.draftManifest = parsed.draft || null;
   // A reopened workflow's links into data targets leave from the output
   // ports their prefixes name, once the ports are known.
   edges.value = attachPorts(edges.value, nodes.value);
@@ -2301,6 +2303,11 @@ const openNodeSettings = (id) => {
                   <div class="node-header">
                     <span class="node-type-badge processor-badge">{{ data.interactive ? "Interactive" : "Processor" }}</span>
                     <span class="node-title">{{ data.label }}</span>
+                    <span
+                      v-if="data.draftManifest"
+                      class="draft-badge"
+                      title="Using a draft app.yml saved in this browser, not the released one. A release must declare the same outputs for its links to work. Clear the draft in the app.yml builder."
+                    >Draft app.yml</span>
                     <span v-if="stepWarning(id)" class="step-warn" :title="stepWarning(id)" />
                     <button
                       v-if="!isReadOnly"
@@ -4014,6 +4021,15 @@ kbd {
   border-radius: 3px;
   background: theme.$gray_0;
   color: theme.$gray_5;
+}
+.draft-badge {
+  padding: 0 5px;
+  border: 1px dashed theme.$orange_1;
+  border-radius: 3px;
+  font-size: 10px;
+  font-weight: 600;
+  color: theme.$orange_1;
+  white-space: nowrap;
 }
 .port-prefix-note {
   margin: -4px 0 10px;
