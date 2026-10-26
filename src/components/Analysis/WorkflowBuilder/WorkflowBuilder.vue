@@ -1503,8 +1503,10 @@ const revalidateEdges = () => {
           strokeWidth: 2,
           strokeDasharray: "6 4",
         },
-        label:
-          result.reason === "no-overlap"
+        // Compact: the verdict only (the issues list has the detail).
+        label: !detailed.value
+          ? "\u2715"
+          : result.reason === "no-overlap"
             ? "\u26A0 media type mismatch"
             : mediaTypes.length
               ? `\u26A0 needs ${shortTypes(mediaTypes)}`
@@ -1524,7 +1526,7 @@ const revalidateEdges = () => {
 
     // Input data into an app, or an app into a target: nothing to check,
     // but say what flows there, in grey.
-    const flows = flowTypes(edge);
+    const flows = detailed.value ? flowTypes(edge) : "";
     if (result.state === "skip" && flows) {
       return {
         ...next,
@@ -1543,7 +1545,7 @@ const revalidateEdges = () => {
       return {
         ...next,
         style: { stroke: VALID_EDGE_COLOR, strokeWidth: 2 },
-        label: mediaTypes.length ? `\u2713 ${shortTypes(mediaTypes)}` : "\u2713",
+        label: mediaTypes.length && detailed.value ? `\u2713 ${shortTypes(mediaTypes)}` : "\u2713",
         labelShowBg: true,
         labelBgPadding: [6, 3],
         labelBgBorderRadius: 2,
@@ -1723,6 +1725,8 @@ const changeDensity = (value) => {
   const to = layoutBox(value, DETAILED_BOX);
   setDetailed(value);
   nodes.value = recenter(nodes.value, from, to);
+  // Labels say more in detail: the types; compact shows only ✓ or ✕.
+  revalidateEdges();
   if (value && overlaps(nodes.value, to)) autoLayout();
   else setTimeout(() => fitView({ padding: 0.2, maxZoom: 1 }), 50);
 };
