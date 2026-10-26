@@ -1278,6 +1278,9 @@ const stepWarning = (id) => {
   return unset.length ? `No value for ${unset.map((p) => `"${p}"`).join(", ")} (can be given when running)` : "";
 };
 const portTypes = (port) => (port.mediaTypes || []).map(shortMediaType).join(", ");
+// A link's label names types as the port chips do (CSV, not text/csv), so
+// labels on links into neighbouring inputs fit side by side.
+const shortTypes = (mediaTypes) => [...new Set(mediaTypes.map(shortMediaType))].join(", ");
 
 // The + under a step: pick what comes next.
 const pickerFor = ref(null); // the step the picker adds after
@@ -1488,7 +1491,7 @@ const revalidateEdges = () => {
           result.reason === "no-overlap"
             ? "\u26A0 media type mismatch"
             : mediaTypes.length
-              ? `\u26A0 needs ${mediaTypes.join(", ")}`
+              ? `\u26A0 needs ${shortTypes(mediaTypes)}`
               : "\u26A0 incompatible",
         labelShowBg: true,
         labelBgPadding: [6, 3],
@@ -1509,7 +1512,7 @@ const revalidateEdges = () => {
       return {
         ...next,
         style: { stroke: VALID_EDGE_COLOR, strokeWidth: 2 },
-        label: mediaTypes.length ? `\u2713 ${mediaTypes.join(", ")}` : "\u2713",
+        label: mediaTypes.length ? `\u2713 ${shortTypes(mediaTypes)}` : "\u2713",
         labelShowBg: true,
         labelBgPadding: [6, 3],
         labelBgBorderRadius: 2,
