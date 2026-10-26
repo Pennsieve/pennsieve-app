@@ -546,9 +546,16 @@ const canvasTitles = computed(() =>
 );
 const titleOf = (id, data) => canvasTitles.value.get(id) || data.targetType || data.label;
 
-// A step that finished needs no badge: the ✓ by its title and its green
-// border say so. Pending, running, failed and canceled steps keep theirs.
-const doneStep = (data) => mode.value === "browse" && data.status === "SUCCEEDED";
+// A step's status on its card, without changing the card's shape: a mark
+// in the title row once it has ended (✓ done, ✕ failed, – canceled); while
+// it runs, its type strip pulses (.blue-node); pending, nothing. The word is
+// the mark's title.
+const STATUS_MARKS = {
+  SUCCEEDED: { glyph: "✓", cls: "node-mark--done" },
+  FAILED: { glyph: "✕", cls: "node-mark--failed" },
+  CANCELED: { glyph: "–", cls: "node-mark--canceled" },
+};
+const statusMark = (data) => (mode.value === "browse" && STATUS_MARKS[data.status]) || null;
 
 // A source with one file shows its name; with more, how many.
 const sourceDetail = (data) => {
@@ -1779,10 +1786,15 @@ onUnmounted(() => {
                     <span class="node-title" :title="titleOf(id, data)">{{ titleOf(id, data) }}</span>
                     <RuntimeMark :runtime="mode === 'browse' ? data.executionTarget : nodeConfigs[id]?.executionTarget" />
                     <LlmMark v-if="data.llm" />
-                    <span v-if="doneStep(data)" class="node-done" title="Complete" aria-label="Complete">✓</span>
+                    <span
+                      v-if="statusMark(data)"
+                      class="node-mark"
+                      :class="statusMark(data).cls"
+                      :title="statusLabel(data.status)"
+                      :aria-label="statusLabel(data.status)"
+                    >{{ statusMark(data).glyph }}</span>
                   </div>
                   <div class="node-tags">
-                    <span v-if="mode === 'browse' && !doneStep(data)" class="node-status-badge" :class="statusDotClass(data.status)">{{ statusLabel(data.status) }}</span>
                   </div>
                   <div v-if="mode === 'browse' && processorFacts(id, data).length" class="node-facts">
                     {{ processorFacts(id, data).join(" · ") }}
@@ -1879,10 +1891,15 @@ onUnmounted(() => {
                   <div class="node-header">
                     <span class="node-title" :title="titleOf(id, data)">{{ titleOf(id, data) }}</span>
                     <RuntimeMark :runtime="nodeConfigs[id]?.computeType || data.computeType" />
-                    <span v-if="doneStep(data)" class="node-done" title="Complete" aria-label="Complete">✓</span>
+                    <span
+                      v-if="statusMark(data)"
+                      class="node-mark"
+                      :class="statusMark(data).cls"
+                      :title="statusLabel(data.status)"
+                      :aria-label="statusLabel(data.status)"
+                    >{{ statusMark(data).glyph }}</span>
                   </div>
                   <div class="node-tags">
-                    <span v-if="mode === 'browse' && !doneStep(data)" class="node-status-badge" :class="statusDotClass(data.status)">{{ statusLabel(data.status) }}</span>
                   </div>
                   <div v-if="mode === 'browse' && targetFacts(data).length" class="node-facts">
                     {{ targetFacts(data).join(" · ") }}
@@ -3448,12 +3465,15 @@ onUnmounted(() => {
   }
 
   // Finished: a ✓ by the title, in place of a status badge.
-  .node-done {
+  .node-mark {
     flex-shrink: 0;
     font-size: 15px;
     font-weight: 700;
-    color: theme.$status_green;
+    line-height: 1;
   }
+  .node-mark--done { color: theme.$status_green; }
+  .node-mark--failed { color: theme.$status_red; }
+  .node-mark--canceled { color: theme.$gray_4; }
 
   .node-tag-info {
     font-size: 10px;
@@ -3493,23 +3513,7 @@ onUnmounted(() => {
     letter-spacing: 0.5px;
 
     &.dot-gray { background: theme.$gray_2; color: theme.$gray_5; }
-    &.dot-blue {
-      display: inline-flex;
-      align-items: center;
-      gap: 5px;
-      background: #e0f7fa;
-      color: #0e7490;
-
-      // Running: a small dot that pulses, the one moving thing on a card.
-      &::before {
-        content: "";
-        width: 6px;
-        height: 6px;
-        border-radius: 50%;
-        background: #06b6d4;
-        animation: running-dot 1.6s ease-in-out infinite;
-      }
-    }
+    &.dot-blue { background: #e0f7fa; color: #0e7490; }
     &.dot-green { background: rgba(23, 187, 98, 0.12); color: #17BB62; }
     &.dot-red { background: #fee2e2; color: #b91c1c; }
     &.dot-amber { background: #fef3c7; color: #92400e; }
@@ -3577,8 +3581,8 @@ onUnmounted(() => {
   }
 
   &.gray-node { border-color: theme.$gray_4; }
-  &.blue-node { border-color: #06b6d4; }
-  // Running: a cyan border, still; the badge's dot shows it's live.
+  // Running: the type strip pulses; the card and its border stay still.
+  &.blue-node::before { animation: strip-pulse 1.6s ease-in-out infinite; }
   // Succeeded: no colour, the ✓ by the title says it (graphStatusColor).
   &.green-node { border-color: theme.$gray_3; }
   &.red-node { border-color: theme.$status_red; }
@@ -3590,7 +3594,6 @@ onUnmounted(() => {
     &.has-files { border-color: theme.$status_green; }
     &.green-node { border-color: theme.$gray_3; }
     &.red-node { border-color: theme.$status_red; }
-    &.blue-node { border-color: #06b6d4; }
   }
 
   &.data-target-node {
@@ -3599,7 +3602,6 @@ onUnmounted(() => {
 
     &.green-node { border-color: theme.$gray_3; }
     &.red-node { border-color: theme.$status_red; }
-    &.blue-node { border-color: #06b6d4; }
 
     .node-body {
       margin-top: 6px;
@@ -3630,9 +3632,9 @@ onUnmounted(() => {
   }
 }
 
-@keyframes running-dot {
+@keyframes strip-pulse {
   0%, 100% { opacity: 1; }
-  50% { opacity: 0.3; }
+  50% { opacity: 0.25; }
 }
 
 /* Status dots */
