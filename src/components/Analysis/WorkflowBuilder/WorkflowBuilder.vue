@@ -538,6 +538,27 @@ const getTargetTypeLabel = (targetType) =>
 const onTargetTypeChange = (data) => {
   const types = getComputeTypesForTarget(data.targetType);
   data.computeType = types.length ? types[0] : null;
+  applyPortPrefix(data);
+};
+
+// A target fed by an output port takes that output's folder, in the prefix
+// parameter its type reads (PATH_PREFIX or pathPrefix). A type that takes
+// no prefix can't take part of an output: the port's link is removed.
+const applyPortPrefix = (data) => {
+  // The settings panel's data may be the step's or a copy: find the step.
+  const node = nodes.value.find((n) => n.data === data) || nodes.value.find((n) => n.id === selectedNode.value?.id);
+  const edge = node && edges.value.find((e) => e.target === node.id && portOfHandle(e.sourceHandle));
+  if (!edge) return;
+  const port = portOfHandle(edge.sourceHandle);
+  const key = prefixParamOf(getTargetTypeParams(data.targetType));
+  node.data.defaultParams = withoutPortPrefix(node.data.defaultParams, port);
+  if (key) {
+    node.data.defaultParams = withPortPrefix(node.data.defaultParams, port, key);
+    return;
+  }
+  dropEdges((e) => e.id === edge.id);
+  revalidateEdges();
+  ElMessage({ type: "info", showClose: true, message: `This kind of data target takes a step's whole output, so the link from the ${port} output was removed. Connect it from "all outputs" instead.` });
 };
 
 const toggleTargetEdit = (nodeId) => {
@@ -1070,7 +1091,8 @@ const connectNodes = (sourceId, targetId, sourceHandle) => {
       ElMessage({ type: "info", showClose: true, message: "A data target fed by an output takes that one link. Remove its other link first." });
       return false;
     }
-    if (!prefixParamOf(getTargetTypeParams(tgt.data.targetType))) {
+    // No type picked yet: the prefix is set when it is (onTargetTypeChange).
+    if (tgt.data.targetType && !prefixParamOf(getTargetTypeParams(tgt.data.targetType))) {
       ElMessage({ type: "info", showClose: true, message: "This kind of data target takes a step's whole output, not one output. Connect it from the step's main connection point." });
       return false;
     }
@@ -1085,7 +1107,7 @@ const connectNodes = (sourceId, targetId, sourceHandle) => {
     style: { stroke: nodeTypeColor(src.type) },
   });
   // The target takes only this output's folder: OUTPUT_DIR/<port>/.
-  if (port) tgt.data.defaultParams = withPortPrefix(tgt.data.defaultParams, port, prefixParamOf(getTargetTypeParams(tgt.data.targetType)));
+  if (port && tgt.data.targetType) tgt.data.defaultParams = withPortPrefix(tgt.data.defaultParams, port, prefixParamOf(getTargetTypeParams(tgt.data.targetType)));
   reportConnectionCheck(src, tgt);
   revalidateEdges();
   return true;
