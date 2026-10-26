@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref, watch } from "vue";
+import { computed, onBeforeUnmount, ref, watch } from "vue";
 import { useStore } from "vuex";
 import { useRoute, useRouter } from "vue-router";
 import { marked } from "marked";
@@ -11,6 +11,7 @@ import MetricsDashboard from "../Metrics/MetricsDashboard.vue";
 import { parseManifest, MANIFEST_SHAPES, PARAM_TYPE_OPTIONS, conformsToList } from "./applicationSchema";
 import BfButton from "../../shared/bf-button/BfButton.vue";
 import { fetchRepository, canUpdateManifest } from "./githubRepository";
+import ReleaseDialog from "./ReleaseDialog.vue";
 import AppPermissions from "../../user/code/AppPermissions.vue";
 import AppArchiveToggle from "../../user/code/AppArchiveToggle.vue";
 import { useGetToken } from "@/composables/useGetToken";
@@ -107,6 +108,40 @@ watch(
 const canUpdate = computed(() => canUpdateManifest(isAppOwner.value, repository.value));
 const router = useRouter();
 const openBuilder = () => router.push(builderForApp.value);
+
+/*
+  Release: anyone who can push publishes a release from here, as themselves.
+  The app store adds the version from the release webhook; the page checks
+  back until it's there. Releasing on GitHub keeps working too.
+*/
+const releaseOpen = ref(false);
+const releaseRepo = computed(() => parseGitHubRepo(detail.value?.sourceUrl));
+const canRelease = computed(() => !!releaseRepo.value && canUpdate.value);
+// Versions already out: the repository's releases and the app store's.
+const knownTags = computed(() => [
+  ...(repository.value?.releases || []).map((r) => r.label),
+  ...(detail.value?.versions || []).map((v) => v.version),
+].filter(Boolean));
+let releaseWatch = null;
+const stopReleaseWatch = () => {
+  if (releaseWatch) clearTimeout(releaseWatch);
+  releaseWatch = null;
+};
+const onReleased = ({ tag }) => {
+  stopReleaseWatch();
+  const bare = (s) => String(s || "").replace(/^v/, "");
+  let tries = 0;
+  // Every 20 s for up to 10 minutes, until the app store has the version.
+  const check = async () => {
+    tries += 1;
+    await loadDetail(props.uuid);
+    const there = (detail.value?.versions || []).some((v) => bare(v.version) === bare(tag));
+    if (!there && tries < 30) releaseWatch = setTimeout(check, 20000);
+    else releaseWatch = null;
+  };
+  releaseWatch = setTimeout(check, 20000);
+};
+onBeforeUnmount(stopReleaseWatch);
 
 // Permissions only apply to private applications.
 const isPublic = computed(() => detail.value?.isPrivate === false);
@@ -549,6 +584,7 @@ watch(
               </button>
             </div>
             <div class="readme-header-actions">
+              <bf-button v-if="canRelease" class="compact flex secondary" @click="releaseOpen = true">Release</bf-button>
               <bf-button v-if="activeTab === 'manifest' && canUpdate" class="compact flex" @click="openBuilder">{{ builderLabel }}</bf-button>
               <button v-else-if="activeTab === 'manifest'" type="button" class="app-yml-btn" @click="openBuilder">{{ builderLabel }}</button>
             <el-tooltip
@@ -1089,6 +1125,14 @@ watch(
         </div>
       </div>
     </div>
+    <ReleaseDialog
+      v-if="canRelease"
+      v-model="releaseOpen"
+      :api2-url="store.state.config?.api2Url || ''"
+      :repo="releaseRepo"
+      :known-tags="knownTags"
+      @released="onReleased"
+    />
   </div>
 </template>
 
