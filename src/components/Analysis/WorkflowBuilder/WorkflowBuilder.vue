@@ -1433,6 +1433,17 @@ const reportConnectionCheck = (srcNode, tgtNode) => {
   });
 };
 
+// A step's one-line summary: version, CPU and memory, and where it runs
+// when that isn't the default ("v1.3.6 · 1 vCPU · 2 GB").
+const stepMeta = (data) => {
+  const version = data.tag || latestVersion(data.application)?.version || "";
+  const cpu = data.computeType !== "lambda" && data.cpu ? `${+(Number(data.cpu) / 1024).toFixed(2)} vCPU` : "";
+  const memory = data.memory ? formatResourceLabel(data.memory) : "";
+  const where = data.computeType && data.computeType !== "standard" ? computeTypeName(data.computeType) : "";
+  return [version, cpu, memory, where].filter(Boolean).join(" · ");
+};
+const computeTypeName = (t) => ({ gpu: "GPU", lambda: "Lambda" })[t] || t.charAt(0).toUpperCase() + t.slice(1);
+
 // Where output port i of n sits on the step's bottom edge: the middle of
 // its column. The detailed card has 11px of padding and border each side;
 // the compact one spreads them evenly. !important beats the connectors'
@@ -2335,18 +2346,19 @@ const openNodeSettings = (id) => {
                       {{ p.name }}<template v-if="portTypes(p)"> · {{ portTypes(p) }}</template>
                     </span>
                   </div>
+                  <!-- What the step is, on one line; actions on hover or selection -->
                   <div class="node-header">
-                    <span class="node-type-badge processor-badge">{{ data.interactive ? "Interactive" : "Processor" }}</span>
-                    <span class="node-title">{{ data.label }}</span>
+                    <span v-if="data.interactive" class="node-type-badge processor-badge">Interactive</span>
+                    <span class="node-title" :title="data.label">{{ data.label }}</span>
                     <span
                       v-if="data.draftManifest"
                       class="draft-badge"
                       title="Using a draft app.yml saved in this browser, not the released one. A release must declare the same outputs for its links to work. Clear the draft in the app.yml builder."
-                    >Draft app.yml</span>
+                    >Draft</span>
                     <span v-if="stepWarning(id)" class="step-warn" :title="stepWarning(id)" />
                     <button
                       v-if="!isReadOnly"
-                      class="settings-btn"
+                      class="settings-btn node-action"
                       @click.stop="openNodeSettings(id)"
                       title="Configure"
                     >
@@ -2354,41 +2366,21 @@ const openNodeSettings = (id) => {
                     </button>
                     <button
                       v-if="!isReadOnly"
-                      class="remove-btn"
+                      class="remove-btn node-action"
+                      title="Remove"
                       @click.stop="removeNode(id)"
                     >
                       &times;
                     </button>
                   </div>
-                  <div
-                    v-if="data.tag || (data.application && latestVersion(data.application))"
-                    class="node-description"
-                  >
-                    <span class="version-tag">{{
-                      data.tag || latestVersion(data.application)?.version
-                    }}</span>
+                  <!-- Version and resources, one muted line; a badge only when outdated -->
+                  <div class="node-meta">
+                    <span>{{ stepMeta(data) }}</span>
                     <span
-                      v-if="
-                        data.tag &&
-                        latestVersion(data.application) &&
-                        data.tag !== latestVersion(data.application).version
-                      "
+                      v-if="data.tag && latestVersion(data.application) && data.tag !== latestVersion(data.application).version"
                       class="version-outdated-badge"
-                    >
-                      older — latest
-                      {{ latestVersion(data.application).version }}
-                    </span>
-                    <span v-else class="version-latest-badge">latest</span>
-                  </div>
-                  <div class="node-resources">
-                    <template v-if="data.computeType !== 'lambda'">
-                      CPU: {{ data.cpu || "N/A" }} |
-                    </template>
-                    Memory:
-                    {{ data.memory ? formatResourceLabel(data.memory) : "N/A" }}
-                    <span v-if="data.computeType" class="runtime-tag">{{
-                      data.computeType
-                    }}</span>
+                      :title="`This step uses ${data.tag}; ${latestVersion(data.application).version} is the latest`"
+                    >update: {{ latestVersion(data.application).version }}</span>
                   </div>
                   <div
                     v-if="data.manifestPorts?.outputs?.length"
@@ -4085,6 +4077,22 @@ kbd {
   background: theme.$gray_0;
   color: theme.$gray_5;
 }
+/* A step's version and resources: one muted line. */
+.node-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 2px;
+  font-size: 11px;
+  color: theme.$gray_4;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* Edit and remove: on hover or when the step is selected. */
+:deep(.vue-flow__node:not(.selected):not(:hover)) .node-action {
+  opacity: 0;
+}
 .draft-badge {
   padding: 0 5px;
   border: 1px dashed theme.$orange_1;
@@ -4313,9 +4321,9 @@ kbd {
   .node-header {
     display: flex;
     justify-content: space-between;
-    align-items: flex-start;
+    align-items: center;
     gap: 8px;
-    margin-bottom: 4px;
+    margin-bottom: 2px;
   }
 
   .node-title {
@@ -4323,8 +4331,13 @@ kbd {
     font-size: 15px;
     color: theme.$black;
     flex: 1;
+    min-width: 0;
     line-height: 1.3;
     text-align: left;
+    // One line; the full name on hover.
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .settings-btn {
