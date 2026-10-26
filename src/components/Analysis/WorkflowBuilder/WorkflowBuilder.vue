@@ -41,7 +41,8 @@ import BuilderBar from "./BuilderBar.vue";
 import BuilderPalette from "./BuilderPalette.vue";
 import ParamField from "./ParamField.vue";
 import { ioLine, sessionTypeOf, versionManifest, shortMediaType } from "./appManifestInfo";
-import { appColors } from "../Applications/appDomains";
+import { appColors, domainOf, domainColors } from "../Applications/appDomains";
+import { clearManifestDraft } from "../Applications/manifestDrafts";
 import { diffLines, manifestDiff, versionWarnings } from "./manifestDiff";
 import { builderReadiness } from "./builderReadiness";
 import StepPicker from "./StepPicker.vue";
@@ -268,6 +269,68 @@ const manifestsKnown = computed(() =>
   (availableApplications.value || []).some((a) => (a.versions || []).some((v) => v.manifest)),
 );
 const ioTypes = (port) => ioLine({ inputs: [port], outputs: [] }).replace(/ → .*$/, "");
+
+/*
+  The app step's panel: what the app is (its app.yml as the step loaded it,
+  a draft when one is in use), and where each input comes from and each
+  output goes on the canvas.
+*/
+const stepAbout = computed(() => {
+  const node = selectedNode.value;
+  if (node?.type !== "default") return null;
+  const about = node.data?.manifestAbout;
+  const released = stepManifest.value;
+  const version = (node.data?.application?.versions || []).find((v) => v.version === node.data?.tag);
+  return {
+    description: about?.description || released?.description || node.data?.application?.description || "",
+    maintainers: about?.maintainers?.length ? about.maintainers : released?.maintainers || [],
+    tags: about?.tags?.length ? about.tags : released?.tags || [],
+    license: version?.license || "",
+  };
+});
+const tagStyle = (tag) => {
+  const c = domainColors(domainOf({ tags: [tag] }));
+  return { background: c.bg, color: c.ink, borderColor: c.line };
+};
+const nodeLabel = (id) => nodes.value.find((n) => n.id === id)?.data?.label || "a step";
+// Where the step's inputs come from: the steps linked into it.
+const stepSources = computed(() => {
+  const node = selectedNode.value;
+  if (!node) return [];
+  return edges.value.filter((e) => e.target === node.id).map((e) => nodeLabel(e.source));
+});
+// Each output's links: by its port, or through "all outputs".
+const stepPorts = computed(() => {
+  const node = selectedNode.value;
+  if (node?.type !== "default") return { inputs: [], outputs: [], routed: false, allTo: [] };
+  const ports = node.data?.manifestPorts || stepManifest.value || { inputs: [], outputs: [] };
+  const routed = routedOutputs(ports).length > 0;
+  const out = edges.value.filter((e) => e.source === node.id);
+  const portName = (e) => portOfHandle(e.sourceHandle);
+  return {
+    inputs: ports.inputs || [],
+    outputs: (ports.outputs || []).map((p) => ({
+      ...p,
+      to: routed ? out.filter((e) => portName(e) === p.name).map((e) => nodeLabel(e.target)) : [],
+    })),
+    routed,
+    allTo: out.filter((e) => !portName(e)).map((e) => nodeLabel(e.target)),
+  };
+});
+const clearStepDraft = async (node) => {
+  const uuid = node?.data?.application?.uuid;
+  if (!uuid) return;
+  clearManifestDraft(uuid);
+  // Every step of that app goes back to its released app.yml.
+  await Promise.all(
+    nodes.value
+      .filter((n) => n.data?.application?.uuid === uuid)
+      .map(async (n) => {
+        const parsed = await loadManifest(uuid);
+        if (parsed) setManifestPorts(n, parsed);
+      })
+  );
+};
 const showAdvanced = ref(false);
 
 /*
@@ -486,6 +549,13 @@ const setManifestPorts = (node, parsed) => {
   node.data.manifestPorts = {
     inputs: parsed.schema.inputs || [],
     outputs: parsed.schema.outputs || [],
+  };
+  // What the step's panel says about the app, from the same app.yml (a draft
+  // when one is in use).
+  node.data.manifestAbout = {
+    description: parsed.meta?.description || "",
+    maintainers: parsed.meta?.maintainers || [],
+    tags: parsed.schema?.tags || [],
   };
   node.data.hasManifest = true;
   // Ports from a draft app.yml (saved in this browser, not released).
@@ -1440,6 +1510,13 @@ const stepMeta = (data) => {
   const memory = data.memory ? formatResourceLabel(data.memory) : "";
   const where = data.computeType && data.computeType !== "standard" ? computeTypeName(data.computeType) : "";
   return [version, cpu, memory, where].filter(Boolean).join(" · ");
+};
+// The folded resources line: "1 vCPU · 2 GB · Standard".
+const resourcesSummary = (data) => {
+  const cpu = data?.computeType !== "lambda" && data?.cpu ? `${+(Number(data.cpu) / 1024).toFixed(2)} vCPU` : "";
+  const memory = data?.memory ? formatResourceLabel(data.memory) : "";
+  const where = data?.computeType ? computeTypeName(data.computeType) : "";
+  return [cpu, memory, where].filter(Boolean).join(" · ");
 };
 const computeTypeName = (t) => ({ gpu: "GPU", lambda: "Lambda" })[t] || t.charAt(0).toUpperCase() + t.slice(1);
 
@@ -2644,8 +2721,8 @@ const openNodeSettings = (id) => {
           <el-collapse-item :title="selectedNode ? 'Step' : 'Workflow'" name="information">
             <!-- Selected Node Info -->
             <template v-if="selectedNode">
-              <h4 class="sidebar-section-title">{{ selectedNode.data?.label || "Step" }}</h4>
-              <div class="info-card">
+              <h4 v-if="selectedNode.type !== 'default'" class="sidebar-section-title">{{ selectedNode.data?.label || "Step" }}</h4>
+              <div v-if="selectedNode.type !== 'default'" class="info-card">
                 <div class="info-row">
                   <span class="info-label">Name</span>
                   <span class="info-value">{{
@@ -2709,45 +2786,117 @@ const openNodeSettings = (id) => {
                 </template>
               </div>
 
-              <!-- About an app step: from its app.yml -->
+              <!-- An app step: what it is, then its inputs and outputs -->
               <template v-if="selectedNode.type === 'default'">
-                <div class="about">
-                  <p v-if="stepManifest?.description" class="about-desc">{{ stepManifest.description }}</p>
-                  <template v-if="stepManifest">
-                    <div v-if="(stepManifest.inputs || []).length" class="about-ports">
-                      <span class="about-label">Takes</span>
-                      <span v-for="p in stepManifest.inputs" :key="'i' + p.name" class="about-port" :title="p.description">
-                        {{ p.name }}<template v-if="(p.mediaTypes || []).length"> · {{ ioTypes(p) }}</template>
-                      </span>
-                    </div>
-                    <div v-if="(stepManifest.outputs || []).length" class="about-ports">
-                      <span class="about-label">Produces</span>
-                      <span v-for="p in stepManifest.outputs" :key="'o' + p.name" class="about-port" :title="p.description">
-                        {{ p.name }}<template v-if="(p.mediaTypes || []).length"> · {{ ioTypes(p) }}</template>
-                      </span>
-                    </div>
-                  </template>
-                  <p v-else-if="manifestsKnown" class="about-none">
-                    This app has no app.yml, so its inputs, outputs and parameters aren't described.
-                    <router-link
-                      v-if="selectedNode.data.application?.ownerId === profile?.id"
-                      :to="{ name: route.params.orgId ? 'application-manifest-builder' : 'my-application-manifest-builder' }"
-                    >Create one with the manifest builder</router-link>
-                  </p>
-                  <div class="about-links">
-                    <button v-if="selectedNode.data.application?.uuid" type="button" class="text-link-btn" @click="viewAppYml(selectedNode)">
-                      View app.yml
-                    </button>
-                    <router-link
-                      v-if="selectedNode.data.application?.uuid"
-                      :to="{
-                        name: route.params.orgId ? 'application-detail' : 'my-application-detail',
-                        params: { ...(route.params.orgId && { orgId: route.params.orgId }), uuid: selectedNode.data.application.uuid },
-                      }"
-                      class="text-link-btn"
-                    >App page →</router-link>
-                  </div>
+                <div class="step-head">
+                  <h3 class="step-name" :title="selectedNode.data?.label">{{ selectedNode.data?.label || "Step" }}</h3>
+                  <el-select
+                    v-if="canEditConfig && selectedNode.data.application?.versions?.length"
+                    :model-value="selectedNode.data.tag"
+                    size="small"
+                    class="step-version"
+                    aria-label="Version"
+                    @update:model-value="requestVersion"
+                  >
+                    <el-option
+                      v-for="v in sortedVersions(selectedNode.data.application)"
+                      :key="v.version"
+                      :label="versionOptionLabel(selectedNode.data.application, v)"
+                      :value="v.version"
+                    />
+                  </el-select>
+                  <span v-else class="step-version-text">{{ selectedNode.data.tag || "" }}</span>
                 </div>
+                <p v-if="selectedNode.data.draftManifest" class="step-draft">
+                  Using a draft app.yml saved in this browser.
+                  <button type="button" class="text-link-btn" @click="clearStepDraft(selectedNode)">Use the released one</button>
+                </p>
+                <div v-if="newerVersion" class="update-note">
+                  <div class="update-head">
+                    <span>Update available: <strong>{{ newerVersion }}</strong></span>
+                    <button v-if="canEditConfig" type="button" class="text-link-btn" @click="requestVersion(newerVersion)">Update</button>
+                  </div>
+                  <ul v-if="updateLines.length" class="update-lines">
+                    <li v-for="l in updateLines" :key="l">{{ l }}</li>
+                  </ul>
+                  <p v-else class="update-lines-none">No changes declared in app.yml.</p>
+                </div>
+                <p v-if="stepAbout?.description" class="step-desc">{{ stepAbout.description }}</p>
+                <div v-if="stepAbout?.tags?.length" class="step-tags">
+                  <span v-for="tag in stepAbout.tags" :key="tag" class="step-tag" :style="tagStyle(tag)">{{ tag }}</span>
+                </div>
+                <p v-if="stepAbout?.maintainers?.length || stepAbout?.license" class="step-by">
+                  <template v-if="stepAbout.maintainers.length">Maintained by {{ stepAbout.maintainers.map((m) => m.name).filter(Boolean).join(", ") }}</template>
+                  <template v-if="stepAbout.maintainers.length && stepAbout.license"> · </template>
+                  <template v-if="stepAbout.license">{{ stepAbout.license }}</template>
+                </p>
+                <p v-if="!stepManifest && !selectedNode.data.hasManifest && manifestsKnown" class="about-none">
+                  This app has no app.yml, so its inputs, outputs and parameters aren't described.
+                  <router-link
+                    v-if="selectedNode.data.application?.ownerId === profile?.id"
+                    :to="{ name: route.params.orgId ? 'application-manifest-builder' : 'my-application-manifest-builder' }"
+                  >Create one with the manifest builder</router-link>
+                </p>
+                <div class="about-links">
+                  <router-link
+                    v-if="selectedNode.data.application?.uuid"
+                    :to="{
+                      name: route.params.orgId ? 'application-detail' : 'my-application-detail',
+                      params: { ...(route.params.orgId && { orgId: route.params.orgId }), uuid: selectedNode.data.application.uuid },
+                    }"
+                    class="text-link-btn"
+                  >App page ›</router-link>
+                  <button v-if="selectedNode.data.application?.uuid" type="button" class="text-link-btn" @click="viewAppYml(selectedNode)">app.yml ›</button>
+                  <a
+                    v-if="selectedNode.data.application?.sourceUrl"
+                    :href="selectedNode.data.application.sourceUrl"
+                    target="_blank"
+                    rel="noopener"
+                    class="text-link-btn"
+                  >GitHub ›</a>
+                </div>
+
+                <!-- Inputs: where they come from -->
+                <template v-if="stepPorts.inputs.length">
+                  <h4 class="sidebar-section-title">Inputs</h4>
+                  <div class="port-list">
+                    <div v-for="p in stepPorts.inputs" :key="'i' + p.name" class="port-item">
+                      <div class="port-line">
+                        <span class="port-name">{{ p.name }}</span>
+                        <span v-if="ioTypes(p)" class="port-types">{{ ioTypes(p) }}</span>
+                        <span class="port-link">{{ stepSources.length ? `from ${stepSources.join(", ")}` : "not connected" }}</span>
+                      </div>
+                      <p v-if="p.description" class="port-desc">{{ p.description }}</p>
+                    </div>
+                  </div>
+                </template>
+
+                <!-- Outputs: where each goes -->
+                <template v-if="stepPorts.outputs.length">
+                  <h4 class="sidebar-section-title">
+                    Outputs
+                    <span v-if="stepPorts.routed" class="section-note">each in OUTPUT_DIR/&lt;name&gt;/</span>
+                  </h4>
+                  <div class="port-list">
+                    <div v-for="p in stepPorts.outputs" :key="'o' + p.name" class="port-item">
+                      <div class="port-line">
+                        <span class="port-name">{{ p.name }}</span>
+                        <span v-if="ioTypes(p)" class="port-types">{{ ioTypes(p) }}</span>
+                        <span v-if="stepPorts.routed" class="port-link">{{ p.to.length ? `→ ${p.to.join(", ")}` : "not connected" }}</span>
+                      </div>
+                      <p v-if="p.description" class="port-desc">{{ p.description }}</p>
+                    </div>
+                    <div v-if="stepPorts.routed" class="port-item">
+                      <div class="port-line">
+                        <span class="port-name port-name--all">all outputs</span>
+                        <span class="port-link">{{ stepPorts.allTo.length ? `→ ${stepPorts.allTo.join(", ")}` : "not connected" }}</span>
+                      </div>
+                    </div>
+                    <div v-else-if="stepPorts.allTo.length" class="port-item">
+                      <span class="port-link">→ {{ stepPorts.allTo.join(", ") }}</span>
+                    </div>
+                  </div>
+                </template>
               </template>
 
               <!-- Data target runtime config (editable in create mode) -->
@@ -2827,54 +2976,12 @@ const openNodeSettings = (id) => {
                 </div>
               </template>
 
-              <!-- The step's app version (pinned), and what an update changes -->
-              <template
-                v-if="
-                  selectedNode.type === 'default' &&
-                  selectedNode.data.application?.versions?.length
-                "
-              >
-                <h4 class="sidebar-section-title">Version</h4>
-                <div class="info-card">
-                  <div class="info-row">
-                    <span class="info-label">Version</span>
-                    <el-select
-                      v-if="canEditConfig"
-                      :model-value="selectedNode.data.tag"
-                      size="small"
-                      class="info-inline-select"
-                      @update:model-value="requestVersion"
-                    >
-                      <el-option
-                        v-for="v in sortedVersions(selectedNode.data.application)"
-                        :key="v.version"
-                        :label="versionOptionLabel(selectedNode.data.application, v)"
-                        :value="v.version"
-                      />
-                    </el-select>
-                    <span v-else class="info-value">{{ selectedNode.data.tag || "—" }}</span>
-                  </div>
-                  <div v-if="newerVersion" class="update-note">
-                    <div class="update-head">
-                      <span>Update available: <strong>{{ newerVersion }}</strong></span>
-                      <button v-if="canEditConfig" type="button" class="text-link-btn" @click="requestVersion(newerVersion)">
-                        Update
-                      </button>
-                    </div>
-                    <ul v-if="updateLines.length" class="update-lines">
-                      <li v-for="l in updateLines" :key="l">{{ l }}</li>
-                    </ul>
-                    <p v-else class="update-lines-none">No changes declared in app.yml.</p>
-                  </div>
-                </div>
-              </template>
-
               <!-- Processor settings (editable in create mode): folded, as
                    the app's own resources usually do. -->
               <template v-if="selectedNode.type === 'default' && !isReadOnly">
                 <button type="button" class="advanced-toggle" :aria-expanded="showAdvanced" @click="showAdvanced = !showAdvanced">
                   <span class="advanced-caret" :class="{ open: showAdvanced }">▸</span>
-                  Advanced: compute and resources
+                  Compute and resources<span class="advanced-summary">{{ resourcesSummary(selectedNode.data) }}</span>
                 </button>
                 <div v-show="showAdvanced" class="info-card">
                   <div class="info-row">
@@ -4150,6 +4257,117 @@ kbd {
   }
 }
 
+/* An app step's panel: name and version, what it is, then its ports. */
+.step-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 2px 0 6px;
+}
+.step-name {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: theme.$gray_6;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.step-version {
+  width: 140px;
+  flex-shrink: 0;
+}
+.step-version-text {
+  font-size: 12px;
+  color: theme.$gray_4;
+}
+.step-draft {
+  margin: 0 0 8px;
+  padding: 6px 8px;
+  border: 1px dashed theme.$orange_1;
+  border-radius: 4px;
+  font-size: 12px;
+  color: theme.$gray_5;
+}
+.step-desc {
+  margin: 4px 0 8px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: theme.$gray_6;
+}
+.step-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+.step-tag {
+  padding: 0 6px;
+  border: 1px solid;
+  border-radius: 3px;
+  font-size: 11px;
+}
+.step-by {
+  margin: 0 0 6px;
+  font-size: 12px;
+  color: theme.$gray_4;
+}
+.section-note {
+  margin-left: 6px;
+  font-size: 11px;
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
+  color: theme.$gray_4;
+}
+.port-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+.port-item {
+  padding: 6px 8px;
+  border: 1px solid theme.$gray_2;
+  border-radius: 4px;
+  background: theme.$white;
+}
+.port-line {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 12px;
+}
+.port-name {
+  font-weight: 600;
+  color: theme.$gray_6;
+  &--all {
+    font-weight: 400;
+    font-style: italic;
+    color: theme.$gray_5;
+  }
+}
+.port-types {
+  color: theme.$gray_4;
+}
+.port-link {
+  margin-left: auto;
+  color: theme.$gray_5;
+  white-space: nowrap;
+}
+.port-desc {
+  margin: 2px 0 0;
+  font-size: 12px;
+  line-height: 1.4;
+  color: theme.$gray_4;
+}
+.advanced-summary {
+  margin-left: 6px;
+  font-weight: 400;
+  color: theme.$gray_4;
+}
 .about {
   margin: 4px 0 10px;
   font-size: 12px;
