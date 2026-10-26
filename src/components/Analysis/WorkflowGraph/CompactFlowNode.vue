@@ -4,6 +4,7 @@
 // the detailed cards), the status as the dot on the right, and a runtime
 // other than standard as a small tag. The page's actions for the node (end
 // a session, configure, remove) go in the default slot, shown on hover.
+import RuntimeMark from "./RuntimeMark.vue";
 import { computed } from "vue";
 import { statusBorderColor, statusLabel } from "../RunMonitor/runHelpers";
 import { COMPACT_BOX } from "./graphDensity";
@@ -37,6 +38,8 @@ const KIND_LABEL = { source: "Source", processor: "Processor", target: "Target" 
 
 const stripColor = computed(() => props.accent || KIND_COLOR[props.kind] || KIND_COLOR.processor);
 const showRuntime = computed(() => props.runtime && props.runtime !== "standard");
+// Lambda and GPU have a mark (RuntimeMark); others (interactive) a word.
+const hasMark = computed(() => ["lambda", "gpu"].includes(props.runtime));
 const tooltip = computed(() =>
   [
     `${KIND_LABEL[props.kind] || "Node"}: ${props.label}`,
@@ -63,7 +66,8 @@ const tooltip = computed(() =>
   >
     <span v-if="unmet > 0" class="cfn__unmet">{{ unmet }}</span>
     <span class="cfn__label">{{ label }}</span>
-    <span v-if="showRuntime" class="cfn__runtime">{{ runtime }}</span>
+    <RuntimeMark v-if="hasMark" :runtime="runtime" compact />
+    <span v-else-if="showRuntime" class="cfn__runtime">{{ runtime }}</span>
     <span class="cfn__actions" @click.stop>
       <slot />
     </span>

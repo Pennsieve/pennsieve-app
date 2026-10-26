@@ -76,6 +76,7 @@ import { sourceLabel, sourceHints, hintLine, portsOfStep, missingFilesMessage } 
 import { portEdges, stepPoints } from "../WorkflowGraph/runPorts";
 import PortChips from "../WorkflowGraph/PortChips.vue";
 import LlmMark from "../WorkflowGraph/LlmMark.vue";
+import RuntimeMark from "../WorkflowGraph/RuntimeMark.vue";
 import { inputHandleId } from "../WorkflowBuilder/inputPorts";
 import { portHandleId, portOfHandle } from "../WorkflowBuilder/outputPorts";
 import { stepNames } from "../WorkflowBuilder/stepNames";
@@ -1776,12 +1777,11 @@ onUnmounted(() => {
                   <PortChips v-if="hasPortChips(id, data, 'in')" :points="pointsOf(id, data, 'in')" side="in" />
                   <div class="node-header">
                     <span class="node-title" :title="titleOf(id, data)">{{ titleOf(id, data) }}</span>
+                    <RuntimeMark :runtime="mode === 'browse' ? data.executionTarget : nodeConfigs[id]?.executionTarget" />
                     <LlmMark v-if="data.llm" />
                     <span v-if="doneStep(data)" class="node-done" title="Complete" aria-label="Complete">✓</span>
                   </div>
                   <div class="node-tags">
-                    <span v-if="mode === 'browse' && data.executionTarget" class="node-type-badge exec-badge">{{ data.executionTarget }}</span>
-                    <span v-if="mode === 'configure' && nodeConfigs[id]?.executionTarget" class="node-type-badge exec-badge">{{ nodeConfigs[id].executionTarget }}</span>
                     <span v-if="mode === 'browse' && !doneStep(data)" class="node-status-badge" :class="statusDotClass(data.status)">{{ statusLabel(data.status) }}</span>
                   </div>
                   <div v-if="mode === 'browse' && processorFacts(id, data).length" class="node-facts">
@@ -1878,12 +1878,10 @@ onUnmounted(() => {
                   <span v-if="nodeUnmetCount(id, 'data-target') > 0" class="node-unmet-badge">{{ nodeUnmetCount(id, 'data-target') }}</span>
                   <div class="node-header">
                     <span class="node-title" :title="titleOf(id, data)">{{ titleOf(id, data) }}</span>
+                    <RuntimeMark :runtime="nodeConfigs[id]?.computeType || data.computeType" />
                     <span v-if="doneStep(data)" class="node-done" title="Complete" aria-label="Complete">✓</span>
                   </div>
                   <div class="node-tags">
-                    <span v-if="nodeConfigs[id]?.computeType || data.computeType" class="node-type-badge exec-badge">
-                      {{ nodeConfigs[id]?.computeType || data.computeType }}
-                    </span>
                     <span v-if="mode === 'browse' && !doneStep(data)" class="node-status-badge" :class="statusDotClass(data.status)">{{ statusLabel(data.status) }}</span>
                   </div>
                   <div v-if="mode === 'browse' && targetFacts(data).length" class="node-facts">
@@ -3613,15 +3611,6 @@ onUnmounted(() => {
     padding: 2px 8px;
     border-radius: 4px;
     flex-shrink: 0;
-
-    // How it runs, not how it's doing: neutral, so colour stays with status.
-    &.exec-badge {
-      background: none;
-      border: 1px solid theme.$gray_3;
-      padding: 1px 7px;
-      color: theme.$gray_5;
-      font-weight: 600;
-    }
   }
 }
 
