@@ -4071,7 +4071,6 @@ const openNodeSettings = (id) => {
 .checklist-status {
   margin: 0 0 8px;
   padding: 6px 10px;
-  border-radius: 4px;
   font-size: 13px;
   font-weight: 600;
   &.is-block {
