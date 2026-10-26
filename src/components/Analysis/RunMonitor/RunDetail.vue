@@ -1749,7 +1749,7 @@ onUnmounted(() => {
                     </button>
                   </template>
                 </CompactFlowNode>
-                <div v-else class="custom-node" :class="mode === 'browse' ? [statusClass(data.status), 'app-step'] : 'processor-node'">
+                <div v-else class="custom-node app-step" :class="mode === 'browse' ? statusClass(data.status) : ''">
                   <span v-if="nodeUnmetCount(id, 'processor') > 0" class="node-unmet-badge">{{ nodeUnmetCount(id, 'processor') }}</span>
                   <div
                     v-if="mode === 'browse' && interactiveSessionAvailable && id === interactiveProcessor?.id"
@@ -3378,10 +3378,10 @@ onUnmounted(() => {
   100% { box-shadow: 0 0 0 0 rgba(1, 31, 91, 0); }
 }
 
-/* The builder's cards: the background says what a step is (a source's
-   indigo, a target's slate), the border how it's doing. An app's card is
-   white on a run, as the status colours clash with its orange; it has the
-   orange only while the run is being configured (no status yet). */
+/* The builder's cards: the strip on the left says what a step is (an app's
+   orange, a source's indigo, a target's slate; sources and targets have a
+   light tint too), the border how it's doing: grey, or cyan while it runs
+   and red when it failed. */
 .custom-node {
   position: relative;
   background: white;
@@ -3431,16 +3431,10 @@ onUnmounted(() => {
     }
   }
 
-  &.processor-node {
-    --port-chip-bg: #{theme.$white};
-    background: theme.$orange_tint;
-    border-color: theme.$orange_2;
-  }
-
-  // An app step on a run: white, with the processor orange as a strip on
-  // the left (as on the compact cards), so the border can say its status.
-  // Over the card's left border, so no status colour shows beside it.
-  &.app-step::before {
+  // What a step is, as a strip on the left over the border (as on the
+  // compact cards); the border says its state (selected, a warning; on a
+  // run, running or failed). The kinds set --type-strip.
+  &::before {
     content: "";
     position: absolute;
     top: -1px;
@@ -3448,7 +3442,11 @@ onUnmounted(() => {
     left: -1px;
     width: 5px;
     border-radius: 4px 0 0 4px;
-    background: theme.$orange_2;
+    background: var(--type-strip, transparent);
+  }
+
+  &.app-step {
+    --type-strip: #{theme.$orange_2};
   }
 
   // Finished: a ✓ by the title, in place of a status badge.
@@ -3572,20 +3570,20 @@ onUnmounted(() => {
   &.red-node { border-color: theme.$status_red; }
 
   &.data-source-node {
-    border-color: #6366f1;
+    --type-strip: #6366f1;
     background: #eef2ff;
 
     &.has-files { border-color: theme.$status_green; }
-    &.green-node { border-color: #6366f1; }
+    &.green-node { border-color: theme.$gray_3; }
     &.red-node { border-color: theme.$status_red; }
     &.blue-node { border-color: #06b6d4; }
   }
 
   &.data-target-node {
+    --type-strip: #64748b;
     background: #f1f5f9;
-    border-color: #64748b;
 
-    &.green-node { border-color: #64748b; }
+    &.green-node { border-color: theme.$gray_3; }
     &.red-node { border-color: theme.$status_red; }
     &.blue-node { border-color: #06b6d4; }
 
