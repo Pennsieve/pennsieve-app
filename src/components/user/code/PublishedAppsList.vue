@@ -149,7 +149,7 @@ const scrollToTargetApp = async () => {
 const fetchApps = async () => {
   isLoading.value = true
   try {
-    await store.dispatch('analysisModule/fetchApplications', { force: true })
+    await store.dispatch('analysisModule/fetchApplications', { force: true, includeDeployments: true })
   } catch (err) {
     console.error('Failed to fetch applications:', err)
   } finally {

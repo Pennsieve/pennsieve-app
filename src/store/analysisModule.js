@@ -325,7 +325,7 @@ const actions = {
   },
   fetchApplications: async (
     { state, commit, rootState },
-    { force, includeArchived } = {}
+    { force, includeArchived, includeDeployments } = {}
   ) => {
     if (!force && state.applicationsLoaded) return;
     try {
@@ -340,6 +340,9 @@ const actions = {
       if (orgId) params.set("organization_id", orgId);
       // Archived applications are excluded by default; opt in with includeArchived.
       if (includeArchived) params.set("includeArchived", "true");
+      // Deployment histories only when a page shows them (app-deploy-service
+      // leaves them out of lists by default).
+      if (includeDeployments) params.set("include", "deployments");
       const path = orgId ? "store" : "store/me";
       const url = `${rootState.config.api2Url}/applications/${path}?${params}`;
       const resp = await fetch(url, {
