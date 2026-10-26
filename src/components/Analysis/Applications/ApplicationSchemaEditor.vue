@@ -275,7 +275,7 @@
                   <p v-if="portMode(port) === 'file' && optionFor(port.dataType)?.kind === 'directory'" class="field-hint">
                     {{ optionFor(port.dataType).formats?.[0] || port.dataType }} is a folder format. As files, the app
                     {{ block.key === "inputs" ? "gets" : "writes" }} each one as stored<template v-if="optionFor(port.dataType).extensions?.length"> ({{ optionFor(port.dataType).extensions.join(", ") }})</template>.
-                    <button type="button" class="link-button" @click="setPortMode(port, 'folder', { keepFormat: true })">Use folders<template v-if="optionFor(port.dataType).folderExtensions?.length"> ({{ optionFor(port.dataType).folderExtensions.map((e) => `*${e}/`).join(", ") }})</template> instead</button>
+                    <button type="button" class="link-button" @click="setPortMode(port, 'folder')">Use folders<template v-if="optionFor(port.dataType).folderExtensions?.length"> ({{ optionFor(port.dataType).folderExtensions.map((e) => `*${e}/`).join(", ") }})</template> instead</button>
                   </p>
                   <p v-for="m in at(`${block.key}.${index}.mediaTypes`)" :key="m" class="field-error">{{ m }}</p>
                 </div>
@@ -650,22 +650,27 @@ const portMode = (port) => {
   if (port.container === "directory") return "folder";
   return chosenModes.get(toRaw(port)) || "file";
 };
-const setPortMode = (port, mode, { keepFormat = false } = {}) => {
+const setPortMode = (port, mode) => {
   if (portMode(port) === mode) return;
+  const before = optionFor(port.dataType);
   chosenModes.set(toRaw(port), mode);
   port.conformsTo = [];
   port.container = mode === "folder" ? "directory" : "";
-  // Start the new mode clean, unless the format carries over (a folder
-  // format picked as files, switched to folders).
-  if (keepFormat) return;
+  // A format carries over when it fits: any format as files, a folder
+  // format as folders. Otherwise start clean, and drop a name and
+  // description that were only the old format's suggestion.
+  const fits = before && port.dataType !== "any" && (mode === "file" || (mode === "folder" && before.kind === "directory"));
+  if (fits) return;
   port.dataType = "any";
   port.mediaTypes = [];
   port.formats = [];
+  if (before && port.name === identifierFrom(before.name)) port.name = "";
+  if (before && port.description === (before.description || "")) port.description = "";
 };
 // A file is any format; a folder only a folder format.
 const formatChoices = (port) =>
   portMode(port) === "folder"
-    ? portDataTypes.value.filter((o) => o.kind === "directory" || o.value === port.dataType)
+    ? portDataTypes.value.filter((o) => o.kind === "directory" || (o.value === port.dataType && o.value !== "any"))
     : portDataTypes.value;
 
 const isStructurePort = (port) => portMode(port) === "layout";
