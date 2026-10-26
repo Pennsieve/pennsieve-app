@@ -3493,7 +3493,23 @@ onUnmounted(() => {
     letter-spacing: 0.5px;
 
     &.dot-gray { background: theme.$gray_2; color: theme.$gray_5; }
-    &.dot-blue { background: #e0f7fa; color: #0e7490; }
+    &.dot-blue {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      background: #e0f7fa;
+      color: #0e7490;
+
+      // Running: a small dot that pulses, the one moving thing on a card.
+      &::before {
+        content: "";
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: #06b6d4;
+        animation: running-dot 1.6s ease-in-out infinite;
+      }
+    }
     &.dot-green { background: rgba(23, 187, 98, 0.12); color: #17BB62; }
     &.dot-red { background: #fee2e2; color: #b91c1c; }
     &.dot-amber { background: #fef3c7; color: #92400e; }
@@ -3562,7 +3578,7 @@ onUnmounted(() => {
 
   &.gray-node { border-color: theme.$gray_4; }
   &.blue-node { border-color: #06b6d4; }
-  &.blue-node.animate { animation: node-pulse 3s ease-in-out infinite; }
+  // Running: a cyan border, still; the badge's dot shows it's live.
   // Succeeded: no colour, the ✓ by the title says it (graphStatusColor).
   &.green-node { border-color: theme.$gray_3; }
   &.red-node { border-color: theme.$status_red; }
@@ -3614,10 +3630,9 @@ onUnmounted(() => {
   }
 }
 
-@keyframes node-pulse {
-  0% { background: #f8faff; box-shadow: 0 0 6px rgba(6, 182, 212, 0.3); }
-  50% { background: #e0f7fa; box-shadow: 0 0 18px rgba(6, 182, 212, 0.5); }
-  100% { background: #f8faff; box-shadow: 0 0 6px rgba(6, 182, 212, 0.3); }
+@keyframes running-dot {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
 }
 
 /* Status dots */
