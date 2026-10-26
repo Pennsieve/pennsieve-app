@@ -2173,10 +2173,23 @@ onNodeClick(({ node }) => {
   }
 });
 
-onPaneClick(() => {
+onPaneClick(() => deselectStep());
+
+// Back to the workflow: no step selected.
+function deselectStep() {
   nodes.value.forEach((n) => (n.selected = false));
   selectedNode.value = null;
-});
+}
+
+// The workflow's steps, top to bottom as on the canvas, for the panel's list.
+const stepListNodes = computed(() =>
+  [...nodes.value].sort((a, b) => (a.position?.y ?? 0) - (b.position?.y ?? 0) || (a.position?.x ?? 0) - (b.position?.x ?? 0))
+);
+const stepListMeta = (n) => {
+  if (n.type === "data-source") return "Input data";
+  if (n.type === "data-target") return getTargetTypeLabel(n.data?.targetType);
+  return n.data?.tag || latestVersion(n.data?.application)?.version || "";
+};
 
 const openNodeSettings = (id) => {
   nodes.value.forEach((n) => (n.selected = false));
@@ -2725,9 +2738,17 @@ const openNodeSettings = (id) => {
             <el-icon><ArrowRight /></el-icon>
           </button>
         </div>
-        <el-collapse v-model="accordionActiveNames" class="sidebar-accordion">
-          <!-- Information Section -->
-          <el-collapse-item :title="selectedNode ? 'Step' : 'Workflow'" name="information">
+        <!-- The selected step, or the workflow: the panel's content, never
+             folded. The breadcrumb goes back to the workflow. -->
+        <div class="panel-main">
+          <nav class="panel-crumbs" aria-label="Details">
+            <button v-if="selectedNode" type="button" class="crumb-link" @click="deselectStep">Workflow</button>
+            <span v-else class="crumb-current">Workflow</span>
+            <template v-if="selectedNode">
+              <span class="crumb-sep">›</span>
+              <span class="crumb-current" :title="selectedNode.data?.label">{{ selectedNode.data?.label || "Step" }}</span>
+            </template>
+          </nav>
             <!-- Selected Node Info -->
             <template v-if="selectedNode">
               <h4 v-if="selectedNode.type !== 'default'" class="sidebar-section-title">{{ selectedNode.data?.label || "Step" }}</h4>
@@ -3333,10 +3354,26 @@ const openNodeSettings = (id) => {
               </template>
             </template>
 
-            <div v-if="!selectedWorkflow && !selectedNode" class="info-empty">
-              Select a workflow or click a node to see details
+            <!-- Nothing selected: every step, to open one -->
+            <template v-if="!selectedNode && nodes.length">
+              <h4 class="sidebar-section-title">Steps</h4>
+              <ul class="step-list">
+                <li v-for="n in stepListNodes" :key="n.id">
+                  <button type="button" class="step-list-item" @click="onReadinessSelect({ nodeId: n.id })">
+                    <span class="step-list-dot" :class="{ warn: stepWarning(n.id) }" :title="stepWarning(n.id) || 'Ready'" />
+                    <span class="step-list-name">{{ n.data?.label || "Step" }}</span>
+                    <span class="step-list-meta">{{ stepListMeta(n) }}</span>
+                  </button>
+                </li>
+              </ul>
+            </template>
+
+            <div v-if="!selectedWorkflow && !selectedNode && !nodes.length" class="info-empty">
+              Select a workflow or add a step to see details
             </div>
-          </el-collapse-item>
+        </div>
+
+        <el-collapse v-model="accordionActiveNames" class="sidebar-accordion">
 
           <!-- Workflow Metrics Section -->
           <el-collapse-item
@@ -4283,6 +4320,87 @@ kbd {
 }
 
 /* An app step's panel: name and version, what it is, then its ports. */
+/* The panel's fixed top: breadcrumb, then the step or the workflow. */
+.panel-main {
+  padding: 0 0 8px;
+}
+.panel-crumbs {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  margin: 4px 0 10px;
+  font-size: 12px;
+  color: theme.$gray_4;
+}
+.crumb-link {
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  color: theme.$purple_3;
+  cursor: pointer;
+  &:hover {
+    text-decoration: underline;
+  }
+}
+.crumb-current {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: theme.$gray_5;
+}
+.step-list {
+  margin: 0 0 10px;
+  padding: 0;
+  list-style: none;
+  border: 1px solid theme.$gray_2;
+  border-radius: 4px;
+  background: theme.$white;
+}
+.step-list li + li {
+  border-top: 1px solid theme.$gray_2;
+}
+.step-list-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 10px;
+  border: none;
+  background: none;
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+  &:hover {
+    background: theme.$gray_1;
+  }
+}
+.step-list-dot {
+  flex-shrink: 0;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: theme.$green_1;
+  &.warn {
+    background: theme.$orange_1;
+  }
+}
+.step-list-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: theme.$gray_6;
+}
+.step-list-meta {
+  flex-shrink: 0;
+  font-size: 12px;
+  color: theme.$gray_4;
+}
 .step-head {
   display: flex;
   align-items: center;
