@@ -17,6 +17,7 @@ import IconArrowRight from "../../icons/IconArrowRight.vue";
 import IconControllerPlay from "../../icons/IconControllerPlay.vue";
 import IconXCircle from "../../icons/IconXCircle.vue";
 import { endInteractiveSession } from "@/composables/useJupyterSession";
+import { markSessionEnded, sessionEnded, endingPhase } from "./endedSessions";
 import AnalysisFilesTable from "../../FilesTable/AnalysisFilesTable.vue";
 import BreadcrumbNavigation from "../../datasets/files/BreadcrumbNavigation/BreadcrumbNavigation.vue";
 import { useGetToken } from "@/composables/useGetToken";
@@ -71,6 +72,7 @@ import {
   runDisplayName,
   RUN_NAME_MAX_LENGTH,
 } from "./runHelpers";
+import { sourceLabel, sourceHints, hintLine, portsOfStep, missingFilesMessage } from "../WorkflowGraph/sourceInputs";
 
 // Shown in a workspace (/:orgId/analysis/runs/...) and in My Workspace
 // (/my-workspace/analysis/runs/...), where there's no organization and a run
@@ -117,6 +119,17 @@ const configLayers = ref([]);
 
 // File picker dialog state
 const filePickerVisible = ref(false);
+// The picker names the input its source feeds and what that input takes
+// (sourceInputs.js): "Select files for signals", "signals takes CSV files".
+const sourcePicker = computed(() => {
+  const id = filePickerNodeId.value;
+  const dag = configDefinition.value?.dag || [];
+  const name = id ? sourceLabel(id, dag, "") : "";
+  return {
+    title: name ? `Select files for ${name}` : "Select Files",
+    hint: id ? hintLine(sourceHints(id, dag, portsOfStep(dag, availableApplications.value))) : "",
+  };
+});
 const filePickerNodeId = ref(null);
 const filePickerFiles = ref([]);
 const filePickerAncestorList = ref([]);
@@ -363,9 +376,26 @@ watch(runArchive, (archive, previous) => {
   });
 });
 
+// A session ended here or in the notebook: the run saves it and finishes
+// (endedSessions), so End and Open are no longer offered.
+const sessionEnding = computed(() => {
+  const activity = selectedWorkflowActivity.value;
+  if (!activity?.uuid || !interactiveProcessor.value) return null;
+  const step = nodes.value.find((n) => n.id === interactiveProcessor.value.id);
+  return endingPhase({
+    ended: sessionEnded(activity.uuid),
+    runStatus: activity.status,
+    sessionStepStatus: step?.data?.status,
+  });
+});
+const ENDING_MESSAGE = {
+  saving: "Session ended. Saving the notebook and its output files; the workflow continues once they're saved. This can take a few minutes.",
+  finishing: "Session ended and saved. Running the rest of the workflow…",
+};
+
 const interactiveSessionAvailable = computed(() => {
   const activity = selectedWorkflowActivity.value;
-  if (!activity?.uuid || !interactiveProcessor.value) return false;
+  if (!activity?.uuid || !interactiveProcessor.value || sessionEnding.value) return false;
   return !isTerminalStatus(activity.status);
 });
 
@@ -395,6 +425,7 @@ const confirmEndSession = async () => {
   endingSession.value = true;
   try {
     await endInteractiveSession(activity.uuid);
+    markSessionEnded(activity.uuid);
     confirmEndOpen.value = false;
   } catch (e) {
     errorBanner.value = e?.message || "Could not end the interactive session.";
@@ -466,7 +497,7 @@ const definitionToNodesAndEdges = (definition) => {
       id: d.id,
       type: nodeType,
       data: {
-        label: labelForDagNode(d, availableApplications.value, targetTypes.value),
+        label: labelForDagNode(d, availableApplications.value, targetTypes.value, dag),
         nodeType: d.type,
         sourceUrl: d.sourceUrl,
         targetType: d.targetType || null,
@@ -537,7 +568,7 @@ const runToNodesAndEdges = (run) => {
       id: d.id,
       type: nodeType,
       data: {
-        label: labelForDagNode(d, availableApplications.value, targetTypes.value),
+        label: labelForDagNode(d, availableApplications.value, targetTypes.value, dag),
         status: d.status || "NOT_STARTED",
         processorType: d.type,
         sourceUrl: d.sourceUrl,
@@ -894,7 +925,7 @@ const executeWorkflow = async () => {
   );
   if (missingSources.length > 0) {
     EventBus.$emit("toast", {
-      detail: { type: "error", msg: `Select files for ${missingSources.length === 1 ? "data source" : `${missingSources.length} data sources`}` },
+      detail: { type: "error", msg: missingFilesMessage(missingSources.map((d) => d.id), configDefinition.value?.dag || []) },
     });
     return;
   }
@@ -920,7 +951,7 @@ const executeWorkflow = async () => {
     if (dagNode.type === "processor") {
       const missing = (cfg.schemaParams || []).filter((p) => p.required && !p.value?.trim());
       if (missing.length > 0) {
-        const nodeLabel = labelForDagNode(dagNode, availableApplications.value, targetTypes.value) || nodeId;
+        const nodeLabel = labelForDagNode(dagNode, availableApplications.value, targetTypes.value, dag) || nodeId;
         const names = missing.map((p) => p.name).join(", ");
         EventBus.$emit("toast", {
           detail: { type: "error", msg: `${nodeLabel}: missing required parameter${missing.length > 1 ? "s" : ""} ${names}` },
@@ -1345,7 +1376,7 @@ const nodeMetricLabel = (nodeId) => {
   const activity = selectedWorkflowActivity.value;
   if (!activity?.dag) return nodeId;
   const d = activity.dag.find((n) => n.id === nodeId);
-  return d ? labelForDagNode(d, availableApplications.value, targetTypes.value) : nodeId;
+  return d ? labelForDagNode(d, availableApplications.value, targetTypes.value, activity.dag) : nodeId;
 };
 
 // Detailed cards: how long a step ran (ticking while it runs), its resources
@@ -1523,7 +1554,10 @@ onUnmounted(() => {
           <span v-if="runName && runTimeLabel" class="header-workflow-name">{{ runTimeLabel }}</span>
           <span v-if="runWorkflowName" class="header-workflow-name">{{ runWorkflowName }}</span>
         </span>
-        <div v-if="interactiveSessionAvailable" class="header-actions">
+        <div v-if="sessionEnding" class="header-actions">
+          <span class="session-ending-status"><span class="session-ending-spinner" />Ending session…</span>
+        </div>
+        <div v-else-if="interactiveSessionAvailable" class="header-actions">
           <bf-button class="secondary" :disabled="endingSession" @click="endSession">
             {{ endingSession ? 'Ending…' : 'End Session' }}
           </bf-button>
@@ -1557,6 +1591,9 @@ onUnmounted(() => {
     </el-dialog>
 
     <!-- Error Banner -->
+    <div v-if="mode === 'browse' && sessionEnding" class="info-banner" role="status">
+      {{ ENDING_MESSAGE[sessionEnding] }}
+    </div>
     <div v-if="errorBanner" class="error-banner">
       <span class="error-banner-msg">
         {{ errorBanner }}
@@ -1597,7 +1634,7 @@ onUnmounted(() => {
 
             <div v-if="nodes.length > 0" class="canvas-toolbar">
               <span v-if="mode === 'browse'" class="header-status-badge" :class="statusDotClass(selectedWorkflowActivity?.status)">
-                {{ statusLabel(selectedWorkflowActivity?.status) }}
+                {{ sessionEnding ? "Ending session" : statusLabel(selectedWorkflowActivity?.status) }}
               </span>
               <GraphDensityToggle :detailed="detailed" @update:detailed="changeDensity" />
               <button class="auto-layout-btn" @click="autoLayout">
@@ -2527,12 +2564,13 @@ onUnmounted(() => {
     <!-- File Picker Dialog -->
     <el-dialog
       v-model="filePickerVisible"
-      title="Select Files"
+      :title="sourcePicker.title"
       width="800px"
       :close-on-click-modal="false"
       @close="closeFilePicker"
     >
       <div class="file-picker-content">
+        <p v-if="sourcePicker.hint" class="file-picker-hint">{{ sourcePicker.hint }}</p>
         <div class="file-picker-header">
           <span class="selected-count">
             <strong>{{ fileCountForNode(filePickerNodeId) }}</strong>
@@ -2960,6 +2998,34 @@ onUnmounted(() => {
   overflow: hidden;
 }
 
+.info-banner {
+  padding: 10px 16px;
+  background: #EEF2FF;
+  border-bottom: 1px solid #C7D2FE;
+  color: #1E3A8A;
+  font-size: 13px;
+  line-height: 1.4;
+}
+.session-ending-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: #4B5563;
+}
+.session-ending-spinner {
+  width: 12px;
+  height: 12px;
+  border: 2px solid #C7D2FE;
+  border-top-color: #4F46E5;
+  border-radius: 50%;
+  animation: session-ending-spin 0.9s linear infinite;
+}
+@keyframes session-ending-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
 .error-banner {
   display: flex;
   align-items: center;
@@ -4165,5 +4231,10 @@ onUnmounted(() => {
   display: flex;
   justify-content: flex-end;
   gap: 8px;
+}
+.file-picker-hint {
+  margin: 0 0 8px;
+  font-size: 13px;
+  color: #6b7280;
 }
 </style>

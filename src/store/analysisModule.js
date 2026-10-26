@@ -325,7 +325,7 @@ const actions = {
   },
   fetchApplications: async (
     { state, commit, rootState },
-    { force, includeArchived } = {}
+    { force, includeArchived, includeDeployments } = {}
   ) => {
     if (!force && state.applicationsLoaded) return;
     try {
@@ -340,6 +340,9 @@ const actions = {
       if (orgId) params.set("organization_id", orgId);
       // Archived applications are excluded by default; opt in with includeArchived.
       if (includeArchived) params.set("includeArchived", "true");
+      // Deployment histories only when a page shows them (app-deploy-service
+      // leaves them out of lists by default).
+      if (includeDeployments) params.set("include", "deployments");
       const path = orgId ? "store" : "store/me";
       const url = `${rootState.config.api2Url}/applications/${path}?${params}`;
       const resp = await fetch(url, {
@@ -416,7 +419,9 @@ const actions = {
   },
   updateApplicationPermissions: async ({ rootState }, { uuid, payload }) => {
     if (!uuid) throw new Error("Missing application uuid");
-    const url = `${rootState.config.api2Url}/applications/store/${uuid}/permissions`;
+    // The workspace being viewed, when there is one: never the token's
+    // active organization (app-deploy-service verifies it).
+    const url = withWorkspace(`${rootState.config.api2Url}/applications/store/${uuid}/permissions`, rootState);
     const userToken = await useGetToken();
     const resp = await fetch(url, {
       method: "PUT",
@@ -1162,6 +1167,8 @@ const actions = {
           // The format's EDAM id, where EDAM has one (packages-service's registry).
           const edam = t?.edam ? String(t.edam) : "";
           const kind = t?.kind === "directory" ? "directory" : "";
+          // A folder format's own endings (.ome.zarr, .mefd).
+          const folderExtensions = Array.isArray(t?.folderExtensions) ? t.folderExtensions.map(String) : [];
           return mediaTypes.filter(Boolean).map((m) => ({
             value: String(m),
             label: String(m),
@@ -1170,6 +1177,7 @@ const actions = {
             extensions,
             ...(edam && { edam }),
             ...(kind && { kind }),
+            ...(folderExtensions.length && { folderExtensions }),
           }));
         })
         .filter((t) => t.value);

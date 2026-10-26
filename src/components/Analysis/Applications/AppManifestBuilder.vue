@@ -14,6 +14,7 @@ import AppBanner from "./AppBanner.vue";
 import { fetchRepository, canUpdateManifest } from "./githubRepository";
 import { createApplicationSchema, buildManifest, manifestToYaml, parseManifest, KERNELS, MANIFEST_SHAPES } from "./applicationSchema";
 import { openAppYmlPullRequest } from "./pullRequest";
+import { saveManifestDraft, getManifestDraft, clearManifestDraft } from "./manifestDrafts";
 import { builderProblems, validateManifestText } from "./manifestValidation";
 import {
   APP_KINDS,
@@ -245,6 +246,28 @@ const cardApp = computed(() => previewApp(manifest.value));
 const cardTags = computed(() => (manifest.value.application?.tags || []).slice(0, 4));
 
 const copied = ref(false);
+/* ─────────────── Preview a draft in the workflow builder ─────────────── */
+// The draft is kept in this browser only; the workflow builder uses it for
+// this app's steps until it's cleared.
+const draftVersion = ref(0);
+const hasDraft = computed(() => (draftVersion.value, !!forApp.value?.uuid && !!getManifestDraft(forApp.value.uuid)));
+const previewInWorkflowBuilder = () => {
+  if (!forApp.value?.uuid) return;
+  if (!saveManifestDraft(forApp.value.uuid, manifestYaml.value)) {
+    ElMessage({ type: "warning", message: "This browser didn't allow saving the draft (private window or blocked site data)." });
+    return;
+  }
+  draftVersion.value += 1;
+  const orgId = route.params.orgId;
+  router.push(orgId ? { name: "workflows", params: { orgId }, query: { view: "builder" } } : { name: "my-workflows", query: { view: "builder" } });
+};
+const clearDraft = () => {
+  if (!forApp.value?.uuid) return;
+  clearManifestDraft(forApp.value.uuid);
+  draftVersion.value += 1;
+  ElMessage({ type: "success", message: "Draft cleared: the workflow builder uses the released app.yml again." });
+};
+
 /* ─────────────── Open a pull request on the app's repository ─────────────── */
 // For an app with a GitHub repo, someone who can update it (owner, or push
 // access) opens a pull request with this app.yml instead of copying it.
@@ -528,6 +551,17 @@ const goToGuide = () =>
                 </span>
               </el-tooltip>
               <bf-button v-else class="compact flex" @click="downloadManifest">Download app.yml</bf-button>
+              <!-- Try the draft's inputs and outputs in the workflow builder first -->
+              <el-tooltip
+                v-if="forApp?.uuid"
+                content="Saves this draft in this browser only and opens the workflow builder, where this app's steps use it. Nothing is published."
+                placement="top"
+              >
+                <span>
+                  <bf-button class="compact flex secondary" :disabled="!!problems.length" @click="previewInWorkflowBuilder">Preview in workflow builder</bf-button>
+                </span>
+              </el-tooltip>
+              <a v-if="hasDraft" href="#" class="draft-clear" @click.prevent="clearDraft">Clear the saved draft</a>
             </div>
           </div>
 
@@ -599,7 +633,10 @@ const goToGuide = () =>
               Pull request <strong>#{{ prOutcome.number }}</strong> opened on {{ forApp.repo.fullName }}.
               <a :href="prOutcome.url" target="_blank" rel="noopener">View on GitHub</a>
             </p>
-            <p class="pr-outcome-note">Publish a release after merging it, so the App Store picks up the app.yml.</p>
+            <p class="pr-outcome-note">
+              After merging it, release a version so the App Store picks up the app.yml:
+              <router-link :to="appPageRoute">Release a version on the app page</router-link>.
+            </p>
           </template>
           <template v-else-if="prOutcome.kind === 'needsApproval'">
             <p>Pennsieve's GitHub app needs your approval to open pull requests in {{ forApp.repo.owner }}.</p>
@@ -1171,6 +1208,11 @@ code {
 
 /* The app card, as ApplicationsGrid draws it. */
 $card-height: 172px;
+.draft-clear {
+  font-size: 12px;
+  color: theme.$gray_5;
+  white-space: nowrap;
+}
 .card-preview {
   padding: 16px;
   background: theme.$gray_1;

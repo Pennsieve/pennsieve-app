@@ -32,6 +32,10 @@ describe("media types", () => {
     expect(shortMediaType("application/vnd.apache.parquet")).toBe("PARQUET");
     expect(shortMediaType("application/x-rds")).toBe("RDS");
     expect(shortMediaType("application/octet-stream")).toBe("File");
+    expect(shortMediaType("application/vnd.pennsieve.open-ephys")).toBe("OPEN-EPHYS");
+    expect(shortMediaType("application/vnd.pennsieve.ome-zarr")).toBe("OME-ZARR");
+    expect(shortMediaType("application/vnd.pennsieve.nwb-zarr")).toBe("NWB-ZARR");
+    expect(shortMediaType("application/x-nifti-gz")).toBe("NIFTI");
     expect(ioLine(edfToJson)).toBe("EDF → JSON");
     expect(ioLine({ inputs: [], outputs: [] })).toBe("");
     expect(ioLine(null)).toBe("");

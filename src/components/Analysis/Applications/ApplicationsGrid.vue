@@ -98,54 +98,12 @@ const latestVersion = (app) => {
 
 
 /*
-  README previews (fetched lazily per app from GitHub)
+  A card's text when the app has no description: the short README summary
+  app-deploy-service sends with each app (its first paragraph, read at
+  release). Nothing is fetched from GitHub per card: that was one request
+  per app, rate-limited (60/hour), and failing for private repositories.
 */
-const readmePreviews = ref({});
-
-const stripMarkdown = (md) =>
-  md
-    .replace(/```[\s\S]*?```/g, "")
-    .replace(/!\[[^\]]*\]\([^)]+\)/g, "")
-    .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
-    .replace(/<[^>]+>/g, "")
-    .replace(/^#{1,6}\s+/gm, "")
-    .replace(/[*_`~>]/g, "")
-    .replace(/\s+/g, " ")
-    .trim();
-
-const fetchReadmeFor = async (app) => {
-  if (!app?.uuid || readmePreviews.value[app.uuid] !== undefined) return;
-  const info = parseGitHubRepo(app.sourceUrl);
-  if (!info) {
-    readmePreviews.value[app.uuid] = "";
-    return;
-  }
-  readmePreviews.value[app.uuid] = "";
-  try {
-    const resp = await fetch(
-      `https://api.github.com/repos/${info.owner}/${info.repo}/readme`,
-      { headers: { Accept: "application/vnd.github.v3.json" } }
-    );
-    if (!resp.ok) return;
-    const data = await resp.json();
-    const decoded = new TextDecoder().decode(
-      Uint8Array.from(atob(data.content.replace(/\n/g, "")), (c) =>
-        c.charCodeAt(0)
-      )
-    );
-    readmePreviews.value[app.uuid] = stripMarkdown(decoded);
-  } catch {
-    // leave preview empty
-  }
-};
-
-watch(
-  applications,
-  (apps) => {
-    (apps || []).forEach((app) => fetchReadmeFor(app));
-  },
-  { immediate: true }
-);
+const readmeSummary = (app) => app?.summary || "";
 
 const visibilityLabel = (app) => {
   const visibility = app?.visibility;
@@ -229,7 +187,7 @@ const filteredApplications = computed(() => {
     list = list.filter((app) => app.status === "archived");
   }
 
-  list = list.filter((app) => matchesAppSearch(app, searchQuery.value, readmePreviews.value[app.uuid]));
+  list = list.filter((app) => matchesAppSearch(app, searchQuery.value, readmeSummary(app)));
   if (computeFilter.value !== "any") {
     list = list.filter((app) => (app.runtimeConfig?.computeTypes || []).includes(computeFilter.value));
   }
@@ -353,7 +311,6 @@ const goToManifestBuilder = () => {
         <el-input
           v-model="searchQuery"
           placeholder="Search by name, description or repository…"
-          size="small"
           clearable
           class="applications-search-input"
         />
@@ -436,7 +393,7 @@ const goToManifestBuilder = () => {
               <span v-else-if="visibilityLabel(app)" class="app-badge">{{ visibilityLabel(app) }}</span>
             </div>
             <p class="app-description">
-              {{ appDescription(app) || readmePreviews[app.uuid] || "No description." }}
+              {{ appDescription(app) || readmeSummary(app) || "No description." }}
             </p>
             <div v-if="appTags(app).length" class="app-tags">
               <span v-for="t in appTags(app)" :key="t" class="app-tag">{{ t }}</span>
@@ -553,7 +510,8 @@ const goToManifestBuilder = () => {
 
 .applications-section-header {
   display: flex;
-  align-items: center;
+  /* The sort lines up with the bottom of the (taller) search box. */
+  align-items: flex-end;
   justify-content: space-between;
   gap: 16px;
   margin-bottom: 16px;
@@ -573,12 +531,8 @@ const goToManifestBuilder = () => {
 }
 
 .applications-search-input {
+  /* The row's width up to the sort, so it lines up with the cards below. */
   flex: 1;
-  max-width: 420px;
-}
-.applications-search-input.el-input {
-  --el-input-height: 24px;
-  --el-input-inner-height: 22px;
 }
 
 .sort-control {

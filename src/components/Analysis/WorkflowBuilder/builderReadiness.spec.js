@@ -49,3 +49,45 @@ describe("requiredUnset", () => {
     expect(requiredUnset(n)).toEqual(["a"]);
   });
 });
+
+describe("a step that lacks a required input from all its upstream steps", () => {
+  it("is a warning on the step, naming what's missing", () => {
+    const r = builderReadiness({
+      name: "w",
+      nodes: [src, app(), tgt()],
+      edges: chain,
+      edgeIssues: [{ id: "step:a", targetId: "a", target: "spike", reason: "missing-required", mediaTypes: ["text/csv"] }],
+    });
+    const item = r.items.find((i) => i.id === "step:a");
+    expect(item).toMatchObject({ level: "warn", nodeId: "a" });
+    expect(item.text).toBe("spike needs text/csv, which none of the steps before it produce");
+    expect(item.edgeId).toBeUndefined();
+  });
+});
+
+describe("builderReadiness: links", () => {
+  it("names a link's output and input, and what it needs, with the steps underneath", () => {
+    const r = builderReadiness({
+      name: "x",
+      nodes: [],
+      edgeIssues: [
+        { id: "e1", source: "Test Ports Processor (1)", target: "Test Ports Processor (2)", targetId: "b", output: "summary", input: "signals", needs: "CSV" },
+        { id: "e2", source: "spike", target: "plot", targetId: "p" },
+      ],
+    });
+    const [link, plain] = r.warnings;
+    expect(link.text).toBe("summary → signals: needs CSV");
+    expect(link.detail).toBe("Test Ports Processor (1) → Test Ports Processor (2)");
+    expect(link.edgeId).toBe("e1");
+    expect(plain.text).toBe("spike → plot: the types don't match");
+  });
+});
+
+describe("readinessLabel", () => {
+  it("counts what to fix and what to check", () => {
+    const r = (blocking, warnings) => ({ blocking: Array(blocking).fill({}), warnings: Array(warnings).fill({}) });
+    expect(readinessLabel(r(1, 1))).toBe("1 to fix · 1 to check");
+    expect(readinessLabel(r(1, 0))).toBe("1 thing to fix");
+    expect(readinessLabel(r(0, 2))).toBe("Ready · 2 to check");
+  });
+});

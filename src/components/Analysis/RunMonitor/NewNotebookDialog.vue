@@ -8,7 +8,7 @@
 //
 // Diverged enough from the standard run config that it lives on its own; opened
 // via v-model and emits `created` with the new run.
-import { isPathPrefixParam, targetParamLabel, defaultsToRunName } from "./dataTargets";
+import { isPathPrefixParam, targetParamLabel, defaultsToRunName, targetWritesToDataset, canWriteDataset, searchDatasets } from "./dataTargets";
 import { computed, reactive, ref, watch } from "vue";
 import { useStore } from "vuex";
 import BfButton from "../../shared/bf-button/BfButton.vue";
@@ -19,8 +19,9 @@ import { useGetToken } from "@/composables/useGetToken";
 import { useSendXhr } from "@/mixins/request/request_composable";
 import toQueryParams from "@/utils/toQueryParams";
 import EventBus from "@/utils/event-bus";
-import { notebookKernel, kernelLabel, interactiveCapable, launchableKernels, kernelOutput } from "./notebookHelpers";
+import { notebookKernel, kernelLabel, interactiveCapable, launchableKernels, kernelOutput, nonSavingAlternative } from "./notebookHelpers";
 import { STANDARD_CPU_OPTIONS, getStandardMemoryOptions } from "./runHelpers";
+import { sourceLabel } from "../WorkflowGraph/sourceInputs";
 import * as siteConfig from "@/site-config/site.json";
 import { viewsServiceUrl, viewForDataset, viewDataSource } from "@/utils/viewsService";
 
@@ -173,6 +174,44 @@ const selectedDataset = computed(
   () => datasetOptions.value.find((d) => d.content?.id === form.value.datasetId) || null
 );
 
+/* ------------------------------------------------ view-only datasets ------- */
+// A notebook whose results are saved to a dataset saves them to the chosen
+// one, and workflow-service refuses a run whose creator can't write there
+// (below Editor). On a dataset they can only view, they either start the same
+// kernel's notebook that doesn't save to a dataset, or save the results to
+// another dataset they can edit (each target's own datasetId).
+const savesToDataset = computed(() => selectedWorkflow.value?.notebook?.savesTo === "dataset");
+const isViewOnly = (ds) => savesToDataset.value && !canWriteDataset(ds?.role);
+const viewOnly = computed(() => !props.personal && !!selectedDataset.value && isViewOnly(selectedDataset.value));
+const alternativeKernel = computed(() => nonSavingAlternative(kernelChoices.value, selectedWorkflow.value));
+
+const resultsDatasetId = ref("");
+const resultsQuery = ref("");
+const resultsOptions = ref([]);
+const resultsLoading = ref(false);
+let resultsTimer = null;
+const resultsDataset = computed(() => resultsOptions.value.find((d) => d.content?.id === resultsDatasetId.value) || null);
+const fetchResultsOptions = async (query = "") => {
+  resultsLoading.value = true;
+  try {
+    const found = await searchDatasets(config.value.apiUrl, query, { getToken: useGetToken, sendXhr: useSendXhr, toQueryParams });
+    resultsOptions.value = found.filter((d) => canWriteDataset(d.role));
+  } catch (err) {
+    console.error("Failed to fetch datasets:", err);
+    resultsOptions.value = [];
+  } finally {
+    resultsLoading.value = false;
+  }
+};
+const onResultsSearch = (query) => {
+  clearTimeout(resultsTimer);
+  resultsTimer = setTimeout(() => fetchResultsOptions(query), 300);
+};
+watch(viewOnly, (v) => {
+  if (!v) resultsDatasetId.value = "";
+  else if (!resultsOptions.value.length) fetchResultsOptions();
+});
+
 /* ------------------------------------------------------------- run name ----- */
 const profile = computed(() => store.state.profile);
 const nameTouched = ref(false);
@@ -236,7 +275,7 @@ const canNext = computed(() => {
     case 4:
       return props.personal || dataSourcesComplete.value;
     case 5:
-      return dataTargetsComplete.value;
+      return dataTargetsComplete.value && (!viewOnly.value || !!resultsDatasetId.value);
     default:
       return true;
   }
@@ -540,6 +579,8 @@ function reset() {
   resourceMemory.value = AUTO_MEMORY;
   step.value = 0;
   configDefinition.value = null;
+  resultsDatasetId.value = "";
+  resultsQuery.value = "";
   Object.keys(dataSourceFiles).forEach((k) => delete dataSourceFiles[k]);
   Object.keys(dataTargetConfigs).forEach((k) => delete dataTargetConfigs[k]);
   store.commit("analysisModule/CLEAR_SELECTED_FILES");
@@ -599,7 +640,11 @@ async function execute() {
       (dataTargetConfigs[node.id]?.params || []).forEach((p) => {
         if (p.value?.trim()) obj[p.name] = p.value;
       });
-      if (Object.keys(obj).length) dataTargets[node.id] = { params: obj };
+      const entry = {};
+      if (Object.keys(obj).length) entry.params = obj;
+      // On a view-only dataset, the results go to the one chosen for them.
+      if (viewOnly.value && targetWritesToDataset(node.targetType)) entry.datasetId = resultsDatasetId.value;
+      if (Object.keys(entry).length) dataTargets[node.id] = entry;
     }
 
     // The session step is live because its app.yml says so; the run only sets
@@ -893,6 +938,20 @@ async function execute() {
             {{ selectedDataset.content.description }}
           </div>
         </div>
+        <div v-if="viewOnly" class="view-only-note">
+          <p>
+            You can view this dataset but not save to it, and this notebook saves
+            its results to a dataset.
+          </p>
+          <p v-if="alternativeKernel">
+            <button type="button" class="view-only-switch" @click="form.workflowId = alternativeKernel.uuid">
+              Start the {{ kernelLabel(notebookKernel(alternativeKernel)) }} notebook with
+              {{ kernelOutput(alternativeKernel).toLowerCase() || "no saved results" }}
+            </button>
+            instead, or
+          </p>
+          <p>{{ alternativeKernel ? "c" : "C" }}hoose a dataset you can edit for the results in the next steps.</p>
+        </div>
         <template v-else>
           <el-input
             v-model="datasetSearchQuery"
@@ -911,7 +970,10 @@ async function execute() {
               class="wizard-card"
               @click="form.datasetId = ds.content?.id"
             >
-              <div class="wizard-card-name">{{ ds.content?.name }}</div>
+              <div class="wizard-card-name">
+                {{ ds.content?.name }}
+                <span v-if="isViewOnly(ds)" class="wizard-card-tag">View only</span>
+              </div>
               <div v-if="ds.content?.description" class="wizard-card-desc">
                 {{ ds.content.description }}
               </div>
@@ -944,7 +1006,7 @@ async function execute() {
               :class="{ active: node.id === currentSourceNodeId }"
               @click="selectSourceNode(node.id)"
             >
-              {{ node.name || node.id }}
+              {{ sourceLabel(node.id, configDefinition?.dag || [], node.name || "Input data") }}
               <span class="source-tab-count">{{ fileCountForNode(node.id) }}</span>
             </button>
           </div>
@@ -983,8 +1045,43 @@ async function execute() {
         <p class="wizard-step-desc">
           Configure where the notebook's results are saved.
         </p>
+        <div v-if="viewOnly" class="target-block">
+          <div class="target-block-title">Save results to</div>
+          <div class="target-param-desc">
+            You can only view {{ selectedDataset?.content?.name }}: choose a dataset you can edit.
+          </div>
+          <div v-if="resultsDataset" class="wizard-selection">
+            <div class="wizard-selection-header">
+              <span class="wizard-selection-name">{{ resultsDataset.content?.name }}</span>
+              <button class="wizard-selection-clear" @click="resultsDatasetId = ''">&times;</button>
+            </div>
+          </div>
+          <template v-else>
+            <el-input
+              v-model="resultsQuery"
+              placeholder="Search datasets you can edit..."
+              clearable
+              class="wizard-search"
+              @input="onResultsSearch"
+            />
+            <div class="wizard-cards">
+              <div v-if="resultsLoading" class="wizard-cards-loading">Searching...</div>
+              <div
+                v-for="ds in resultsOptions"
+                :key="ds.content?.id"
+                class="wizard-card"
+                @click="resultsDatasetId = ds.content?.id"
+              >
+                <div class="wizard-card-name">{{ ds.content?.name }}</div>
+              </div>
+              <div v-if="!resultsLoading && !resultsOptions.length" class="wizard-cards-loading">
+                No datasets you can edit found
+              </div>
+            </div>
+          </template>
+        </div>
         <div
-          v-if="dataTargetNodes.length === 0 || !hasVisibleTargetParams"
+          v-if="!viewOnly && (dataTargetNodes.length === 0 || !hasVisibleTargetParams)"
           class="wizard-cards-loading"
         >
           This notebook saves results to its output folder automatically — no
@@ -1058,6 +1155,10 @@ async function execute() {
           <div v-if="!personal" class="wizard-summary-row">
             <span class="wizard-summary-label">Dataset</span>
             <span class="wizard-summary-value">{{ selectedDataset?.content?.name }}</span>
+          </div>
+          <div v-if="viewOnly" class="wizard-summary-row">
+            <span class="wizard-summary-label">Results saved to</span>
+            <span class="wizard-summary-value">{{ resultsDataset?.content?.name }}</span>
           </div>
           <div v-if="!personal" class="wizard-summary-row">
             <span class="wizard-summary-label">Input files</span>
@@ -1202,6 +1303,38 @@ async function execute() {
 .wizard-card:hover {
   border-color: theme.$purple_1;
   background: theme.$gray_1;
+}
+.view-only-note {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-radius: 6px;
+  background: theme.$gray_1;
+  font-size: 13px;
+  color: theme.$gray_6;
+  p {
+    margin: 0 0 4px;
+  }
+  p:last-child {
+    margin-bottom: 0;
+  }
+}
+.view-only-switch {
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  color: theme.$purple_1;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.wizard-card-tag {
+  margin-left: 6px;
+  padding: 0 6px;
+  border-radius: 3px;
+  background: theme.$gray_1;
+  font-size: 11px;
+  font-weight: 400;
+  color: theme.$gray_5;
 }
 .wizard-card-name {
   font-weight: 600;

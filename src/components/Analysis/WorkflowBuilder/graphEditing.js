@@ -1,10 +1,13 @@
 // Rules for editing the builder's graph: pure, on Vue Flow nodes and edges.
+import { routedInputs } from "./inputPorts";
 
 // Whether a connection from src to tgt may be made: not to itself, not into
-// an input, not out of an output, and not twice.
+// an input, not out of an output, and not twice (except into an app with an
+// input point each, where each link goes to another input: linkAllowed).
 export function canConnect(src, tgt, edges = []) {
   if (!src || !tgt || src.id === tgt.id) return false;
   if (tgt.type === "data-source" || src.type === "data-target") return false;
+  if (routedInputs(tgt.data?.manifestPorts).length) return true;
   return !edges.some((e) => e.source === src.id && e.target === tgt.id);
 }
 

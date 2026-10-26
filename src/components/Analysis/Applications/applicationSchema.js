@@ -159,6 +159,7 @@ export const portDataTypeOptions = (packageFormats, declared = []) => {
       if (t.description) option.description = String(t.description);
       // A folder format (OME-Zarr): the app can take it unpacked.
       if (t.kind === "directory") option.kind = "directory";
+      if (asArray(t.folderExtensions).length) option.folderExtensions = asArray(t.folderExtensions).map(String);
       byValue.set(t.value, option);
       options.push(option);
     }
@@ -260,6 +261,9 @@ export const createPort = (overrides = {}) => ({
   // app.yml writes it; empty means the default (file, or directory on a
   // structure port).
   container: "",
+  // Where an input's data goes: "root" of INPUT_DIR or its own "subfolder"
+  // (INPUT_DIR/<name>/), as app.yml writes it; empty means root.
+  placement: "",
   cardinality: "",
   ...overrides,
 });
@@ -431,6 +435,7 @@ const parsePort = (raw) =>
     formats: asArray(raw?.formats).map((f) => normalizeEdamFormat(f)).filter(Boolean),
     conformsTo: conformsToList(raw?.conformsTo),
     container: raw?.container === "directory" || raw?.container === "file" ? raw.container : "",
+    placement: raw?.placement === "root" || raw?.placement === "subfolder" ? raw.placement : "",
     cardinality: typeof raw?.cardinality === "string" ? raw.cardinality : "",
   });
 
@@ -626,7 +631,41 @@ const manifestPort = (port) => {
   if (structures.length === 1) out.conformsTo = structures[0];
   else if (structures.length > 1) out.conformsTo = structures;
   if (port.container === "directory" || port.container === "file") out.container = port.container;
+  if (port.placement === "root" || port.placement === "subfolder") out.placement = port.placement;
   if (port.required) out.required = true;
+  return out;
+};
+
+/**
+ * Inputs at the root of INPUT_DIR that would mix with another root input,
+ * each with why. Inputs of different media types can share the root: the app
+ * tells them apart by type. They mix when they can't be told apart (a shared
+ * media type, or one takes any file), or when one is a layout, which owns the
+ * root (a BIDS tree).
+ *
+ * @param {PortSchema[]} inputs
+ * @returns {Map<PortSchema, {other: PortSchema, why: string}>}
+ */
+export const rootInputCollisions = (inputs) => {
+  const root = asArray(inputs).filter((p) => (p?.placement || "root") === "root");
+  const out = new Map();
+  const why = (a, b) => {
+    const layout = [a, b].find((p) => conformsToList(p.conformsTo).length);
+    if (layout) return `${layout.name || "a layout"} is a layout and fills the root`;
+    const am = asArray(a.mediaTypes);
+    const bm = asArray(b.mediaTypes);
+    const any = [a, b].find((p) => !asArray(p.mediaTypes).length);
+    if (any) return `${any.name || "an input"} takes any file`;
+    const shared = am.find((t) => bm.includes(t));
+    return shared ? `both take ${shared}` : "";
+  };
+  for (const a of root) {
+    for (const b of root) {
+      if (a === b || out.has(a)) continue;
+      const reason = why(a, b);
+      if (reason) out.set(a, { other: b, why: reason });
+    }
+  }
   return out;
 };
 
@@ -1160,6 +1199,26 @@ export function validateAppConnection(sourceApp, targetApp) {
     checked: true,
     reason: null,
     unmetInputs: [],
+    metInputs,
+  };
+}
+
+/**
+ * Are a step's required inputs met by all its upstream steps together? A
+ * single link only knows its own source's outputs, so it can't judge a
+ * required input another upstream step provides. This takes every upstream
+ * app's outputs at once.
+ *
+ * @param {Array<ApplicationSchema|Object>} sourceApps  every upstream app
+ * @param {ApplicationSchema|Object} targetApp
+ * @returns {{checked: boolean, unmetRequired: PortSchema[], metInputs: PortSchema[]}}
+ */
+export function validateStepInputs(sourceApps, targetApp) {
+  const outputs = asArray(sourceApps).flatMap((app) => asArray(app?.outputs));
+  const { checked, reason, unmetInputs, metInputs } = validateAppConnection({ outputs }, targetApp);
+  return {
+    checked,
+    unmetRequired: reason === "unmet-required" ? unmetInputs : [],
     metInputs,
   };
 }

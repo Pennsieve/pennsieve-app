@@ -1,3 +1,4 @@
+import { sourceLabel } from "../WorkflowGraph/sourceInputs";
 /**
  * Shared pure utility functions for RunsOverview and RunDetail.
  */
@@ -107,8 +108,10 @@ export const targetTypeName = (targetType, targetTypes = []) => {
 export const getTargetTypeLabel = (targetType, targetTypes = []) =>
   targetType ? targetTypeName(targetType, targetTypes) : "Data Target";
 
-export const labelForDagNode = (d, applications, targetTypes = []) => {
-  if (d.type === "data-source") return "Data Source";
+// A data source is named after the app inputs its links feed ("signals"),
+// given the run's or workflow's DAG; else "Data Source".
+export const labelForDagNode = (d, applications, targetTypes = [], dag = []) => {
+  if (d.type === "data-source") return sourceLabel(d.id, dag, "Data Source");
   if (d.type === "data-target") return getTargetTypeLabel(d.targetType, targetTypes);
   const matchedApp = findAppByUrl(d.sourceUrl, applications);
   return matchedApp ? matchedApp.name : extractRepoName(d.sourceUrl) || d.type || d.id;

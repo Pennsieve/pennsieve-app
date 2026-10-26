@@ -258,46 +258,46 @@ onMounted(async () => {
 
     <!-- Workflows Section -->
     <div class="workflows-section">
-      <div class="workflows-section-header">
+      <!-- Search over the filters, as wide as them; sort and status on the right -->
+      <div class="list-toolbar">
         <el-input
           v-model="searchQuery"
           placeholder="Search by name, app, input or output…"
-          size="small"
           clearable
-          class="workflows-search-input"
+          class="workflows-search-input toolbar-search"
         />
-        <label class="sort-control">
+        <label class="sort-control toolbar-sort">
           Sort
           <el-select v-model="sortBy" size="small" class="sort-select">
             <el-option v-for="o in SORTS" :key="o.value" :label="o.label" :value="o.value" />
           </el-select>
         </label>
-      </div>
 
-      <div class="filter-row">
-        <div class="status-buttons scope-buttons">
-          <button
-            v-for="option in scopeOptions"
-            :key="option.value"
-            class="filter-btn"
-            :class="{ active: scopeFilter === option.value }"
-            @click="scopeFilter = option.value"
-          >
-            {{ option.label }}
-          </button>
+        <div class="filter-row toolbar-filters">
+          <div class="status-buttons scope-buttons">
+            <button
+              v-for="option in scopeOptions"
+              :key="option.value"
+              class="filter-btn"
+              :class="{ active: scopeFilter === option.value }"
+              @click="scopeFilter = option.value"
+            >
+              {{ option.label }}
+            </button>
+          </div>
+
+          <el-select v-model="inputFilter" size="small" class="io-select" aria-label="Input">
+            <el-option label="Any input" value="any" />
+            <el-option label="Takes a dataset" value="dataset" />
+            <el-option label="No input" value="none" />
+          </el-select>
+          <el-select v-model="outputFilter" size="small" class="io-select" aria-label="Output">
+            <el-option label="Any output" value="any" />
+            <el-option v-for="o in outputChoices" :key="o.value" :label="o.label" :value="o.value" />
+          </el-select>
         </div>
 
-        <el-select v-model="inputFilter" size="small" class="io-select" aria-label="Input">
-          <el-option label="Any input" value="any" />
-          <el-option label="Takes a dataset" value="dataset" />
-          <el-option label="No input" value="none" />
-        </el-select>
-        <el-select v-model="outputFilter" size="small" class="io-select" aria-label="Output">
-          <el-option label="Any output" value="any" />
-          <el-option v-for="o in outputChoices" :key="o.value" :label="o.label" :value="o.value" />
-        </el-select>
-
-        <el-select v-model="statusFilter" size="small" class="status-select" aria-label="Status">
+        <el-select v-model="statusFilter" size="small" class="status-select toolbar-status" aria-label="Status">
           <el-option v-for="option in filterOptions" :key="option.value" :label="option.label" :value="option.value" />
         </el-select>
       </div>
@@ -434,7 +434,8 @@ onMounted(async () => {
 
 .workflows-section-header {
   display: flex;
-  align-items: center;
+  /* The sort lines up with the bottom of the (taller) search box. */
+  align-items: flex-end;
   justify-content: space-between;
   gap: 16px;
   margin-bottom: 16px;
@@ -448,13 +449,59 @@ onMounted(async () => {
 }
 
 .workflows-search-input {
+  /* The row's width up to the sort, so it lines up with the cards below. */
   flex: 1;
-  max-width: 420px;
 }
-/* As tall as the small selects beside it, not the global 40px. */
-.workflows-search-input.el-input {
-  --el-input-height: 24px;
-  --el-input-inner-height: 22px;
+/* Search over the filters and as wide as them (the left column is sized by
+   the filters); sort and status on the right, each on its row. */
+.list-toolbar {
+  display: grid;
+  grid-template-columns: max-content 1fr auto;
+  grid-template-areas:
+    "search . sort"
+    "filters . status";
+  align-items: end;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+.toolbar-search {
+  grid-area: search;
+  width: 100%;
+}
+.toolbar-sort {
+  grid-area: sort;
+  justify-self: end;
+}
+.list-toolbar .toolbar-filters {
+  grid-area: filters;
+  margin-bottom: 0;
+}
+.list-toolbar .toolbar-status {
+  grid-area: status;
+  justify-self: end;
+  margin-left: 0;
+}
+/* Narrower: the input and output filters go, and the search fills its row
+   next to Sort; the scope buttons sit next to Status. */
+@media (max-width: 1100px) {
+  .list-toolbar {
+    grid-template-columns: 1fr auto;
+    grid-template-areas:
+      "search sort"
+      "filters status";
+  }
+  .list-toolbar .io-select {
+    display: none;
+  }
+  .list-toolbar .scope-buttons {
+    border-right: none;
+  }
+}
+/* Narrowest: the select alone says what it sorts by. */
+@media (max-width: 640px) {
+  .toolbar-sort {
+    font-size: 0;
+  }
 }
 .sort-control {
   display: flex;

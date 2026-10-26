@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref, watch } from "vue";
+import { computed, onBeforeUnmount, ref, watch } from "vue";
 import { useStore } from "vuex";
 import { useRoute, useRouter } from "vue-router";
 import { marked } from "marked";
@@ -11,7 +11,11 @@ import MetricsDashboard from "../Metrics/MetricsDashboard.vue";
 import { parseManifest, MANIFEST_SHAPES, PARAM_TYPE_OPTIONS, conformsToList } from "./applicationSchema";
 import BfButton from "../../shared/bf-button/BfButton.vue";
 import { fetchRepository, canUpdateManifest } from "./githubRepository";
-import AppPermissions from "../../user/code/AppPermissions.vue";
+import ReleaseDialog from "./ReleaseDialog.vue";
+import ShareAppDialog from "./ShareAppDialog.vue";
+import { accessEntries, accessSummary, makeNamer } from "./appSharing";
+import { useWorkspaceMembers } from "./useWorkspaceMembers";
+import { fetchReleaseStatus, releaseNudge } from "./release";
 import AppArchiveToggle from "../../user/code/AppArchiveToggle.vue";
 import { useGetToken } from "@/composables/useGetToken";
 import { useSendXhr } from "@/mixins/request/request_composable";
@@ -70,12 +74,6 @@ const repoName = computed(
   () => parseGitHubDisplay(detail.value?.sourceUrl) || "Unknown repo"
 );
 
-const visibilityLabel = computed(() => {
-  const visibility = detail.value?.visibility;
-  if (visibility !== "public" && visibility !== "private") return null;
-  return visibility === "private" ? "Private" : "Public";
-});
-
 const githubRepoUrl = computed(() => {
   const info = parseGitHubRepo(detail.value?.sourceUrl);
   return info ? `https://github.com/${info.owner}/${info.repo}` : null;
@@ -108,23 +106,102 @@ const canUpdate = computed(() => canUpdateManifest(isAppOwner.value, repository.
 const router = useRouter();
 const openBuilder = () => router.push(builderForApp.value);
 
-// Permissions only apply to private applications.
-const isPublic = computed(() => detail.value?.isPrivate === false);
+/*
+  Release: anyone who can push publishes a release from here, as themselves.
+  The app store adds the version from the release webhook; the page checks
+  back until it's there. Releasing on GitHub keeps working too.
+*/
+const releaseOpen = ref(false);
+const releaseRepo = computed(() => parseGitHubRepo(detail.value?.sourceUrl));
+const canRelease = computed(() => !!releaseRepo.value && canUpdate.value);
+// Versions already out: the repository's releases and the app store's.
+const knownTags = computed(() => [
+  ...(repository.value?.releases || []).map((r) => r.label),
+  ...(detail.value?.versions || []).map((v) => v.version),
+].filter(Boolean));
+// Where the default branch stands against the latest release: Release is
+// offered when there's something new, with a nudge saying how much.
+const releaseStatus = ref(null);
+const loadReleaseStatus = async () => {
+  releaseStatus.value = null;
+  if (!canRelease.value) return;
+  const token = await useGetToken();
+  releaseStatus.value = await fetchReleaseStatus(store.state.config?.api2Url, releaseRepo.value, token);
+};
+watch(canRelease, loadReleaseStatus, { immediate: true });
+const nothingToRelease = computed(() => releaseStatus.value?.canRelease === false);
+const nudge = computed(() => releaseNudge(releaseStatus.value));
+let releaseWatch = null;
+const stopReleaseWatch = () => {
+  if (releaseWatch) clearTimeout(releaseWatch);
+  releaseWatch = null;
+};
+const onReleased = ({ tag }) => {
+  stopReleaseWatch();
+  loadReleaseStatus();
+  const bare = (s) => String(s || "").replace(/^v/, "");
+  let tries = 0;
+  // Every 20 s for up to 10 minutes, until the app store has the version.
+  const check = async () => {
+    tries += 1;
+    await loadDetail(props.uuid);
+    const there = (detail.value?.versions || []).some((v) => bare(v.version) === bare(tag));
+    if (!there && tries < 30) releaseWatch = setTimeout(check, 20000);
+    else releaseWatch = null;
+  };
+  releaseWatch = setTimeout(check, 20000);
+};
+onBeforeUnmount(stopReleaseWatch);
 
-// Private GitHub repos return 401 from raw.githubusercontent.com, so we can't
-// render their README (or its images) in the browser. Show a link instead.
+// Permissions only apply to private applications.
+const isPublic = computed(() => detail.value?.visibility === "public" || detail.value?.isPrivate === false);
+
+// Private GitHub repos return 401 from raw.githubusercontent.com, so their
+// README's own images can't load in the browser; the README text comes with
+// the app's details (app-deploy-service reads it at release) and is shown.
 const isPrivateRepo = computed(
   () => detail.value?.visibility === "private" || detail.value?.isPrivate === true
 );
 
-// Anyone can open a public repo on GitHub. A private repo is only viewable by
-// the owner (others must request permission from the repo owner).
-const canViewOnGitHub = computed(() => !isPrivateRepo.value || isAppOwner.value);
+// Anyone can open a public repo on GitHub. A private repo: its owner and
+// anyone who can push to it (others must request permission from its owner).
+const canViewOnGitHub = computed(() => !isPrivateRepo.value || canUpdate.value);
 
 // Keep the local detail in sync when the archive toggle changes status.
 const onArchiveChange = (status) => {
   if (detail.value) detail.value = { ...detail.value, status };
 };
+
+/*
+  Who can use this app: visibility, and who a private app is shared with,
+  summarized at the top of the side panel; the owner shares from the header
+  (ShareAppDialog). Visibility and access change together, so the page reloads.
+*/
+const permissions = ref([]);
+const shareOpen = ref(false);
+// People shared with may come from any of the caller's workspaces: name them.
+const { allMembers, load: loadAllMembers } = useWorkspaceMembers();
+watch(permissions, (perms) => {
+  if ((perms || []).some((p) => p?.entityType === "user" || p?.userId)) loadAllMembers();
+});
+const viewingOrgId = computed(() => store.state.activeOrganization?.organization?.id || null);
+const accessList = computed(() =>
+  accessEntries(
+    permissions.value,
+    makeNamer({
+      profile: profile.value,
+      members: [...(store.state.orgMembers || []), ...allMembers.value],
+      teams: store.state.teams || [],
+      organizations: store.state.organizations || [],
+    }),
+    viewingOrgId.value
+  )
+);
+const accessLine = computed(() => accessSummary(accessList.value, detail.value?.ownerId));
+// Chips: who else has access, the first few.
+const accessChips = computed(() =>
+  accessList.value.filter((e) => !(e.type === "user" && String(e.id) === String(detail.value?.ownerId)))
+);
 
 // Visibility may change via the permissions editor — reload to reflect it.
 const reloadAfterPermissions = () => loadDetail(props.uuid);
@@ -261,9 +338,21 @@ const renderReadme = (markdown) => {
   const rawHtml = marked.parse(markdown);
   const doc = new DOMParser().parseFromString(rawHtml, "text/html");
   const sourceUrl = detail.value?.sourceUrl;
+  const repo = parseGitHubRepo(sourceUrl);
+  const ownRaw = repo ? `https://raw.githubusercontent.com/${repo.owner}/${repo.repo}/`.toLowerCase() : "";
   doc.querySelectorAll("img").forEach((img) => {
     const src = img.getAttribute("src");
-    if (src) img.setAttribute("src", resolveAssetUrl(src, sourceUrl));
+    if (!src) return;
+    const resolved = resolveAssetUrl(src, sourceUrl);
+    // A private repo's own images need GitHub sign-in: a note, not a broken image.
+    if (isPrivateRepo.value && ownRaw && resolved.toLowerCase().startsWith(ownRaw)) {
+      const note = doc.createElement("span");
+      note.className = "readme-image-private";
+      note.textContent = `Image not shown (private repository)${img.getAttribute("alt") ? `: ${img.getAttribute("alt")}` : ""}`;
+      img.replaceWith(note);
+      return;
+    }
+    img.setAttribute("src", resolved);
   });
   readmeHtml.value = DOMPurify.sanitize(doc.body.innerHTML);
 };
@@ -449,22 +538,19 @@ const loadDetail = async (uuid) => {
   if (!uuid) return;
   detailLoading.value = true;
   try {
-    const [detailResult] = await Promise.allSettled([
+    const [detailResult, permissionsResult] = await Promise.allSettled([
       store.dispatch("analysisModule/fetchApplication", uuid),
       store.dispatch("analysisModule/fetchApplicationPermissions", uuid),
       ensureOrgData(),
     ]);
 
+    const perms = permissionsResult?.status === "fulfilled" ? permissionsResult.value : null;
+    permissions.value = Array.isArray(perms) ? perms : perms?.access || perms?.permissions || [];
     if (detailResult.status === "fulfilled") {
       detail.value = detailResult.value;
-      // Only render the README for public repos. Private repo assets aren't
-      // reachable from the browser, so we surface a GitHub link instead.
-      const detailIsPrivate =
-        detailResult.value?.visibility === "private" ||
-        detailResult.value?.isPrivate === true;
-      if (!detailIsPrivate) {
-        renderReadme(getReadmeContent(detailResult.value?.assets));
-      }
+      // The README comes with the details, also for private repos; only
+      // their own images are left out (renderReadme).
+      renderReadme(getReadmeContent(detailResult.value?.assets));
     } else {
       console.error(detailResult.reason);
       detailError.value = "Failed to load application";
@@ -492,6 +578,22 @@ watch(
           <span class="header-detail-name">{{ repoName }}</span>
         </template>
       </span>
+      <!-- The page's main action: publish a release (the app store follows) -->
+      <div v-if="detail && (canRelease || isAppOwner)" class="header-actions">
+        <bf-button v-if="isAppOwner" class="compact flex secondary" @click="shareOpen = true">Share</bf-button>
+        <template v-if="canRelease">
+        <span v-if="nudge" class="release-nudge">{{ nudge }}</span>
+        <el-tooltip
+          :disabled="!nothingToRelease"
+          :content="`Nothing new since ${releaseStatus?.latestTag}: the ${releaseStatus?.target} branch is at that release.`"
+          placement="bottom"
+        >
+          <span>
+            <bf-button class="compact flex" :disabled="nothingToRelease" @click="releaseOpen = true">Release a version</bf-button>
+          </span>
+        </el-tooltip>
+        </template>
+      </div>
     </div>
 
     <!-- Loading -->
@@ -580,22 +682,10 @@ watch(
           </div>
           <!-- README tab -->
           <template v-if="activeTab === 'readme'">
-            <div v-if="isPrivateRepo" class="readme-empty readme-private">
-              <p>README preview isn't available for private repositories.</p>
-              <a
-                v-if="githubRepoUrl"
-                :href="githubRepoUrl"
-                target="_blank"
-                rel="noopener noreferrer"
-                class="readme-github-link"
-              >
-                View README on GitHub
-              </a>
-            </div>
-            <div v-else-if="!readmeHtml" class="readme-empty">
+            <div v-if="readmeHtml" class="readme-content" v-html="readmeHtml" />
+            <div v-else class="readme-empty">
               No README available
             </div>
-            <div v-else class="readme-content" v-html="readmeHtml" />
           </template>
 
           <!-- app.yml tab -->
@@ -876,6 +966,25 @@ watch(
 
       <!-- Right: Sidebar -->
       <div class="applications-sidebar">
+        <!-- Who can use this app: the first thing in the side panel -->
+        <div class="sidebar-access">
+          <h4 class="sidebar-access-title">Who can use this app</h4>
+          <p class="access-visibility">
+            <strong>{{ isPublic ? "Public" : "Private" }}</strong>
+            <template v-if="detail.ownerId"> · owned by {{ getUserName(detail.ownerId) }}</template>
+          </p>
+          <p class="access-line">
+            <template v-if="isPublic">Anyone on Pennsieve can find it and use it in workflows.</template>
+            <template v-else>{{ accessLine || "Only its owner, so far." }}</template>
+          </p>
+          <div v-if="!isPublic && accessChips.length" class="access-chips">
+            <span v-for="e in accessChips.slice(0, 4)" :key="`${e.type}:${e.id}`" class="access-chip" :title="e.type">{{ e.name }}</span>
+            <span v-if="accessChips.length > 4" class="access-chip access-chip--more">+{{ accessChips.length - 4 }}</span>
+          </div>
+          <a v-if="isAppOwner" href="#" class="access-manage" @click.prevent="shareOpen = true">Manage access ›</a>
+          <p v-else-if="!isPublic" class="access-ask">To get access, ask {{ getUserName(detail.ownerId) }}.</p>
+        </div>
+
         <el-collapse v-model="accordionActiveNames" class="sidebar-accordion">
           <el-collapse-item title="Information" name="information">
             <div class="info-card">
@@ -886,10 +995,6 @@ watch(
               <div v-if="detail.sourceType" class="info-row">
                 <span class="info-label">Source</span>
                 <span class="info-value">{{ detail.sourceType }}</span>
-              </div>
-              <div v-if="visibilityLabel" class="info-row">
-                <span class="info-label">Visibility</span>
-                <span class="info-value">{{ visibilityLabel }}</span>
               </div>
               <div v-if="detail.createdAt" class="info-row">
                 <span class="info-label">Created</span>
@@ -1003,14 +1108,12 @@ watch(
               </template>
             </div>
 
+            <!-- Read only here; archiving is in the danger zone -->
             <div class="info-actions archive-actions">
               <span class="info-label">Status</span>
-              <app-archive-toggle
-                :uuid="detail.uuid"
-                :owner-id="detail.ownerId"
-                :status="detail.status"
-                @change="onArchiveChange"
-              />
+              <span class="status-tag" :class="{ 'status-tag--archived': detail.status === 'archived' }">
+                {{ detail.status === "archived" ? "Archived" : "Active" }}
+              </span>
             </div>
 
           </el-collapse-item>
@@ -1078,17 +1181,40 @@ watch(
           </el-collapse-item>
         </el-collapse>
 
-        <div class="sidebar-permissions">
-          <app-permissions
+        <!-- Archiving: the owner only, out of the way of everyday settings -->
+        <div v-if="isAppOwner" class="sidebar-danger">
+          <h4 class="sidebar-danger-title">Danger zone</h4>
+          <app-archive-toggle
+            variant="button"
             :uuid="detail.uuid"
             :owner-id="detail.ownerId"
-            :is-public="isPublic"
-            :organization-id="detail.organizationId"
-            @updated="reloadAfterPermissions"
+            :status="detail.status"
+            @change="onArchiveChange"
           />
         </div>
       </div>
     </div>
+    <ShareAppDialog
+      v-if="detail && isAppOwner"
+      v-model="shareOpen"
+      :uuid="detail.uuid"
+      :app-name="repoName"
+      :is-public="isPublic"
+      :owner-id="detail.ownerId"
+      :organization-id="viewingOrgId"
+      :entries="accessList"
+      @saved="reloadAfterPermissions"
+    />
+    <ReleaseDialog
+      v-if="canRelease"
+      v-model="releaseOpen"
+      :api2-url="store.state.config?.api2Url || ''"
+      :repo="releaseRepo"
+      :known-tags="knownTags"
+      :status="releaseStatus"
+      :default-branch="releaseStatus?.target || ''"
+      @released="onReleased"
+    />
   </div>
 </template>
 
@@ -1140,6 +1266,19 @@ watch(
     font-weight: 600;
     font-size: 14px;
     color: theme.$black;
+  }
+
+  .header-actions {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  // "3 new commits since v1.3.6": a release is due.
+  .release-nudge {
+    font-size: 12px;
+    color: theme.$orange_2;
   }
 }
 
@@ -1294,6 +1433,15 @@ watch(
   font-size: 14px;
 }
 
+// A private repository's own image, which needs GitHub sign-in to load.
+.readme-content :deep(.readme-image-private) {
+  display: inline-block;
+  padding: 2px 6px;
+  border: 1px dashed theme.$gray_3;
+  border-radius: 3px;
+  font-size: 12px;
+  color: theme.$gray_4;
+}
 .readme-private {
   display: flex;
   flex-direction: column;
@@ -1896,6 +2044,77 @@ watch(
   margin-top: 12px;
 }
 
+.sidebar-access {
+  background: theme.$white;
+  border: 1px solid theme.$gray_3;
+  padding: 14px 16px;
+  margin-bottom: 12px;
+  p {
+    margin: 0 0 6px;
+    font-size: 13px;
+    line-height: 1.45;
+    color: theme.$gray_5;
+  }
+}
+.sidebar-access-title {
+  margin: 0 0 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: theme.$gray_6;
+}
+.access-visibility strong {
+  color: theme.$gray_6;
+}
+.access-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 2px 0 8px;
+}
+.access-chip {
+  padding: 1px 7px;
+  border-radius: 3px;
+  background: theme.$gray_1;
+  font-size: 12px;
+  color: theme.$gray_5;
+  &--more {
+    color: theme.$gray_4;
+  }
+}
+.access-manage {
+  font-size: 13px;
+  font-weight: 500;
+  color: theme.$purple_3;
+}
+p.access-ask {
+  margin: 0;
+  font-size: 12px;
+  color: theme.$gray_4;
+}
+.sidebar-danger {
+  background: theme.$white;
+  border: 1px solid theme.$gray_3;
+  padding: 16px;
+  margin-top: 12px;
+}
+.sidebar-danger-title {
+  margin: 0 0 10px;
+  font-size: 13px;
+  font-weight: 600;
+  color: theme.$gray_6;
+}
+.status-tag {
+  padding: 1px 8px;
+  border-radius: 3px;
+  background: theme.$green_tint;
+  color: theme.$green_2;
+  font-size: 12px;
+  font-weight: 600;
+  &--archived {
+    background: theme.$gray_1;
+    color: theme.$gray_5;
+  }
+}
 .sidebar-permissions {
   background: theme.$white;
   border: 1px solid theme.$gray_3;

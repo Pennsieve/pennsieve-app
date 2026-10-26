@@ -33,7 +33,7 @@ const label = computed(() => {
         <span v-if="ins.more" class="ab-type ab-type--more">+{{ ins.more }}</span>
         <span v-if="!ins.types.length" class="ab-type ab-type--any">Any</span>
       </div>
-      <span class="ab-edge" />
+      <span class="ab-edge ab-edge--in" />
     </template>
 
     <span class="ab-tile" :class="{ 'ab-tile--small': b.manifest && hasIo }">
@@ -44,7 +44,7 @@ const label = computed(() => {
     </span>
 
     <template v-if="b.manifest && hasIo">
-      <span class="ab-edge" />
+      <span class="ab-edge ab-edge--out" />
       <div class="ab-types" :title="b.outputs.length ? `Out: ${b.outputs.join(', ')}` : undefined">
         <span v-for="t in outs.types" :key="t" class="ab-type">{{ t }}</span>
         <span v-if="outs.more" class="ab-type ab-type--more">+{{ outs.more }}</span>
@@ -100,10 +100,18 @@ const label = computed(() => {
   font-weight: 500;
   color: theme.$gray_4;
 }
+/* A short stem off the tile, stopping short of the types: it says where
+   things go in and come out, without seeming to join one of several. */
 .ab-edge {
   width: 2px;
-  height: 12px;
+  height: 7px;
   background: var(--ab-line);
+}
+.ab-edge--in {
+  margin-top: 5px;
+}
+.ab-edge--out {
+  margin-bottom: 5px;
 }
 .ab-tile {
   position: relative;

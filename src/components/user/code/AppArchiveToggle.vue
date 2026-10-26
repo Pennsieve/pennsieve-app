@@ -10,6 +10,7 @@
 import { computed, ref } from 'vue'
 import { useStore } from 'vuex'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import BfButton from '@/components/shared/bf-button/BfButton.vue'
 
 const props = defineProps({
   uuid: {
@@ -24,6 +25,12 @@ const props = defineProps({
   status: {
     type: String,
     default: 'active',
+  },
+  // 'switch' (an Active/Archived switch) or 'button' (an Archive / Restore
+  // button with what it does, for a page's danger zone).
+  variant: {
+    type: String,
+    default: 'switch',
   },
 })
 
@@ -83,10 +90,28 @@ const handleArchiveToggle = async () => {
     isArchiving.value = false
   }
 }
+
+// The button form: the same change; a cancelled confirmation or a failure
+// leaves things as they were (the handler already said why).
+const onButton = () => handleArchiveToggle().catch(() => {})
 </script>
 
 <template>
+  <div v-if="variant === 'button'" class="archive-danger">
+    <p v-if="!isArchived">
+      Archive this app: it leaves active workspaces, and workflows that use it can no longer run it. Its record is kept, and
+      you can restore it later.
+    </p>
+    <p v-else>This app is archived. Restore it to make it available in workspaces and workflows again.</p>
+    <bf-button
+      :class="isArchived ? 'secondary' : 'red'"
+      :processing="isArchiving"
+      :disabled="isArchiving"
+      @click="onButton"
+    >{{ isArchived ? 'Restore app' : 'Archive app' }}</bf-button>
+  </div>
   <el-tooltip
+    v-else
     :content="ownerTooltip"
     placement="top"
     :disabled="isAppOwner"
@@ -105,6 +130,25 @@ const handleArchiveToggle = async () => {
 </template>
 
 <style scoped lang="scss">
+@use '../../../styles/theme';
+
+.archive-danger {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid theme.$red_1;
+  border-radius: 6px;
+  background: theme.$red_tint;
+
+  p {
+    margin: 0;
+    font-size: 13px;
+    line-height: 1.5;
+    color: theme.$gray_6;
+  }
+}
 .archive-toggle-wrap {
   display: inline-flex;
   align-items: center;

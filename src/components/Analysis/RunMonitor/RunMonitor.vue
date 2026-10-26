@@ -22,6 +22,7 @@ import LayerNameSelector from "./LayerNameSelector.vue";
 import TargetDatasetField from "./TargetDatasetField.vue";
 import { targetWritesToDataset, targetParamFields, buildDataTargets, targetDatasetId, datasetName } from "./dataTargets";
 import { validateRunName, runDisplayName, RUN_NAME_MAX_LENGTH, targetTypeName } from "./runHelpers";
+import { sourceLabel, sourceHints, hintLine, portsOfStep, missingFilesMessage } from "../WorkflowGraph/sourceInputs";
 
 const { onNodeClick, onPaneClick, fitView, updateNodeData } = useVueFlow();
 
@@ -76,6 +77,17 @@ const rerunSource = ref(null); // the run object to copy config from when rerunn
 
 // File picker dialog state
 const filePickerVisible = ref(false);
+// The picker names the input its source feeds and what that input takes
+// (sourceInputs.js): "Select files for signals", "signals takes CSV files".
+const sourcePicker = computed(() => {
+  const id = filePickerNodeId.value;
+  const dag = configDefinition.value?.dag || [];
+  const name = id ? sourceLabel(id, dag, "") : "";
+  return {
+    title: name ? `Select files for ${name}` : "Select Files",
+    hint: id ? hintLine(sourceHints(id, dag, portsOfStep(dag, availableApplications.value))) : "",
+  };
+});
 const filePickerNodeId = ref(null);
 const filePickerFiles = ref([]);
 const filePickerAncestorList = ref([]);
@@ -478,7 +490,7 @@ const definitionToNodesAndEdges = (definition) => {
       id: d.id,
       type: nodeType,
       data: {
-        label: labelForDagNode(d),
+        label: labelForDagNode(d, undefined, undefined, dag),
         nodeType: d.type,
         sourceUrl: d.sourceUrl,
         targetType: d.targetType || null,
@@ -558,7 +570,7 @@ const runToNodesAndEdges = (run) => {
       id: d.id,
       type: nodeType,
       data: {
-        label: labelForDagNode(d),
+        label: labelForDagNode(d, undefined, undefined, dag),
         status: d.status || "NOT_STARTED",
         processorType: d.type,
         sourceUrl: d.sourceUrl,
@@ -1095,7 +1107,7 @@ const executeWorkflow = async () => {
   );
   if (missingSources.length > 0) {
     EventBus.$emit("toast", {
-      detail: { type: "error", msg: `Select files for ${missingSources.length === 1 ? "data source" : `${missingSources.length} data sources`}` },
+      detail: { type: "error", msg: missingFilesMessage(missingSources.map((d) => d.id), configDefinition.value?.dag || []) },
     });
     return;
   }
@@ -1550,7 +1562,7 @@ const nodeMetricLabel = (nodeId) => {
   const activity = selectedWorkflowActivity.value;
   if (!activity?.dag) return nodeId;
   const d = activity.dag.find((n) => n.id === nodeId);
-  return d ? labelForDagNode(d) : nodeId;
+  return d ? labelForDagNode(d, undefined, undefined, activity.dag) : nodeId;
 };
 
 const selectedNodeMetrics = computed(() => {
@@ -2712,12 +2724,13 @@ onUnmounted(() => {
     <!-- File Picker Dialog -->
     <el-dialog
       v-model="filePickerVisible"
-      title="Select Files"
+      :title="sourcePicker.title"
       width="800px"
       :close-on-click-modal="false"
       @close="closeFilePicker"
     >
       <div class="file-picker-content">
+        <p v-if="sourcePicker.hint" class="file-picker-hint">{{ sourcePicker.hint }}</p>
         <div class="file-picker-header">
           <span class="selected-count">
             <strong>{{ fileCountForNode(filePickerNodeId) }}</strong>
@@ -4752,5 +4765,10 @@ onUnmounted(() => {
 .wizard-footer-right {
   display: flex;
   gap: 8px;
+}
+.file-picker-hint {
+  margin: 0 0 8px;
+  font-size: 13px;
+  color: #6b7280;
 }
 </style>
