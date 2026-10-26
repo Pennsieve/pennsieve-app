@@ -59,6 +59,19 @@ import {
   PREFIX_PARAMS,
   attachPorts,
 } from "./outputPorts";
+import {
+  routedInputs,
+  inputHandleId,
+  inputOfHandle,
+  edgeId,
+  linkAllowed,
+  linksOf,
+  edgesForStep,
+  attachInputPorts,
+  linkKeys,
+  edgeLink,
+  linkPorts,
+} from "./inputPorts";
 import { requiredUnset } from "./builderReadiness";
 import { fitsAfter } from "./appManifestInfo";
 
@@ -571,7 +584,7 @@ const setManifestPorts = (node, parsed) => {
   node.data.draftManifest = parsed.draft || null;
   // A reopened workflow's links into data targets leave from the output
   // ports their prefixes name, once the ports are known.
-  edges.value = attachPorts(edges.value, nodes.value);
+  edges.value = attachInputPorts(attachPorts(edges.value, nodes.value), nodes.value);
   // A manifest can land after the user has already drawn the edge — the
   // connection was made against no port information at all, so re-check
   // everything now that we have some.
@@ -845,24 +858,25 @@ const definitionToNodesAndEdges = (workflow, applications) => {
     };
   });
 
-  // Build edges from dependsOn
+  // Build edges from the steps' links (inputs) and dependsOn
   const procMap = Object.fromEntries(processors.map((p) => [p.id, p]));
   const resultEdges = [];
   for (const p of processors) {
-    for (const dep of p.dependsOn || []) {
-      const srcNode = procMap[dep];
-      resultEdges.push({
-        id: `e${dep}-${p.id}`,
-        source: dep,
-        target: p.id,
-        // Named, so a step with output ports draws it from its main point;
-        // attachPorts moves it to a port once the manifest is in.
+    resultEdges.push(
+      ...edgesForStep(p, ({ source, target, data }) => ({
+        id: data ? `e${source}:${data.output || ""}-${target}:${data.input}` : `e${source}-${target}`,
+        source,
+        target,
+        // Named, so a step with ports draws it from its main points;
+        // attachPorts and attachInputPorts move it to its ports once the
+        // manifests are in. A link keeps its input and output until then.
         sourceHandle: "source",
         targetHandle: "target",
+        ...(data && { data }),
         animated: false,
-        style: { stroke: nodeTypeColor(srcNode?.type) },
-      });
-    }
+        style: { stroke: nodeTypeColor(procMap[source]?.type) },
+      }))
+    );
   }
 
   return {
@@ -1154,17 +1168,35 @@ const addNode = (type, app, position) => {
 
 // Connects two steps, with the same checks and feedback as dragging a
 // connection between them.
-const connectNodes = (sourceId, targetId, sourceHandle) => {
+const LINK_REFUSED = {
+  "input-taken": (input) => `The ${input} input already has a link. Remove it first.`,
+  "unknown-input": (input) => `This step has no ${input} input.`,
+  "port-to-all": () => "Connect an output to one of the step's inputs.",
+  mixed: () => "These steps are already linked the other way: link them all to inputs, or all to the step's top point.",
+  duplicate: () => "These points are already linked.",
+};
+
+const connectNodes = (sourceId, targetId, sourceHandle, targetHandle) => {
   const src = nodes.value.find((n) => n.id === sourceId);
   const tgt = nodes.value.find((n) => n.id === targetId);
   if (!canConnect(src, tgt, edges.value)) return false;
   const port = portOfHandle(sourceHandle);
-  if (port) {
-    // An output port routes one output to one data target.
-    if (!canConnectFromHandle(src, tgt, sourceHandle)) {
-      ElMessage({ type: "info", showClose: true, message: `The ${port} output connects to a data target. Connect apps from the step's main connection point.` });
+  const input = inputOfHandle(targetHandle);
+  if (tgt.type === "default") {
+    const verdict = linkAllowed(src, tgt, sourceHandle, targetHandle, edges.value);
+    if (!verdict.ok) {
+      ElMessage({ type: "info", showClose: true, message: LINK_REFUSED[verdict.reason]?.(input) || "These points can't be linked." });
       return false;
     }
+  }
+  if (port) {
+    // An output port routes one output to one data target, or to an app.
+    if (!canConnectFromHandle(src, tgt, sourceHandle)) {
+      ElMessage({ type: "info", showClose: true, message: `The ${port} output connects to a data target or to another app's input.` });
+      return false;
+    }
+  }
+  if (port && tgt.type === "data-target") {
     if (edges.value.some((e) => e.target === targetId)) {
       ElMessage({ type: "info", showClose: true, message: "A data target fed by an output takes that one link. Remove its other link first." });
       return false;
@@ -1175,18 +1207,18 @@ const connectNodes = (sourceId, targetId, sourceHandle) => {
       return false;
     }
   }
+  const handles = { sourceHandle: port ? sourceHandle : "source", targetHandle: input ? targetHandle : "target" };
   edges.value.push({
-    id: `e${sourceId}-${targetId}`,
+    id: edgeId(sourceId, targetId, handles.sourceHandle, handles.targetHandle),
     source: sourceId,
     target: targetId,
-    sourceHandle: port ? sourceHandle : "source",
-    targetHandle: "target",
+    ...handles,
     animated: false,
     style: { stroke: nodeTypeColor(src.type) },
   });
-  // The target takes only this output's folder: OUTPUT_DIR/<port>/.
-  if (port && tgt.data.targetType) tgt.data.defaultParams = withPortPrefix(tgt.data.defaultParams, port, prefixParamOf(getTargetTypeParams(tgt.data.targetType)));
-  reportConnectionCheck(src, tgt);
+  // A data target takes only this output's folder: OUTPUT_DIR/<port>/.
+  if (port && tgt.type === "data-target" && tgt.data.targetType) tgt.data.defaultParams = withPortPrefix(tgt.data.defaultParams, port, prefixParamOf(getTargetTypeParams(tgt.data.targetType)));
+  reportConnectionCheck(src, tgt, edges.value[edges.value.length - 1]);
   revalidateEdges();
   return true;
 };
@@ -1279,7 +1311,7 @@ onConnect((params) => {
 
   // Self-loops, duplicates, into an input or out of an output are refused;
   // the rest get a toast and the persistent marks (connectNodes).
-  connectNodes(params.source, params.target, params.sourceHandle);
+  connectNodes(params.source, params.target, params.sourceHandle, params.targetHandle);
 });
 
 /*
@@ -1329,6 +1361,16 @@ const classifyEdge = (edge) => {
   const target = tgt.data?.manifestPorts;
   if (!source || !target) return { state: "unchecked", src, tgt };
 
+  // A link to a named input: this output (or all of them) against that input.
+  const joined = linkPorts(edgeLink(edge, tgt, edges.value), source, target);
+  if (joined) {
+    const link = validateAppConnection({ outputs: joined.outputs }, { inputs: [joined.input] });
+    if (!link.checked) return { state: "unchecked", src, tgt };
+    return link.compatible
+      ? { state: "ok", src, tgt, metInputs: link.metInputs }
+      : { state: "invalid", src, tgt, reason: link.reason, unmetInputs: link.unmetInputs };
+  }
+
   const { compatible, checked, reason, unmetInputs, metInputs } =
     validateAppConnection(source, target);
   // Manifests present but nothing comparable on the ports — no media types
@@ -1348,14 +1390,23 @@ const classifyEdge = (edge) => {
 };
 
 // Required inputs no upstream step provides, for steps fed by more than one
-// app (with one, the link itself says so).
+// app or with links to inputs (with one plain link, the link itself says
+// so). An input with a link is provided; the others are judged against the
+// steps linked to "all inputs".
+const linkedInputNames = (n) =>
+  new Set(edges.value.filter((e) => e.target === n.id).map((e) => edgeLink(e, n, edges.value)?.input).filter(Boolean));
 const stepInputIssues = () =>
   nodes.value
-    .filter((n) => isAppNode(n) && n.data?.manifestPorts && upstreamApps(n.id).length > 1)
+    .filter((n) => isAppNode(n) && n.data?.manifestPorts && (upstreamApps(n.id).length > 1 || linkedInputNames(n).size))
     .map((n) => {
+      const linked = linkedInputNames(n);
+      const plainSources = edges.value
+        .filter((e) => e.target === n.id && !edgeLink(e, n, edges.value))
+        .map((e) => nodes.value.find((x) => x.id === e.source))
+        .filter((x) => isAppNode(x) && x.data?.manifestPorts);
       const { checked, unmetRequired } = validateStepInputs(
-        upstreamApps(n.id).map((u) => u.data.manifestPorts),
-        n.data.manifestPorts,
+        plainSources.map((u) => u.data.manifestPorts),
+        { ...n.data.manifestPorts, inputs: (n.data.manifestPorts.inputs || []).filter((p) => !linked.has(p.name)) },
       );
       return checked && unmetRequired.length
         ? {
@@ -1473,10 +1524,28 @@ const revalidateEdges = () => {
   uncheckedEdgeCount.value = unchecked;
 };
 
-const reportConnectionCheck = (srcNode, tgtNode) => {
+const reportConnectionCheck = (srcNode, tgtNode, edge) => {
   const source = srcNode?.data?.manifestPorts;
   const target = tgtNode?.data?.manifestPorts;
   if (!source || !target) return;
+
+  // A link to a named input: that output (or any of them) against that input.
+  const joined = edge && linkPorts(edgeLink(edge, tgtNode, edges.value), source, target);
+  if (joined) {
+    const link = validateAppConnection({ outputs: joined.outputs }, { inputs: [joined.input] });
+    if (!link.checked || link.compatible) return;
+    const accepts = portMediaTypes([joined.input]).join(", ");
+    ElMessage({
+      type: "warning",
+      duration: 6000,
+      showClose: true,
+      message:
+        `${joined.outputs.length === 1 ? `The ${joined.outputs[0].name} output of ${srcNode.data.label} doesn't` : `No output of ${srcNode.data.label}`} ` +
+        `match the ${joined.input.name} input of ${tgtNode.data.label}${accepts ? ` (accepts ${accepts})` : ""}. ` +
+        "The connection was made — check it before running.",
+    });
+    return;
+  }
 
   const { compatible, checked, reason, unmetInputs, metInputs } =
     validateAppConnection(source, target);
@@ -1546,7 +1615,7 @@ const feedingPort = (nodeId) => portOfHandle(edges.value.find((e) => e.target ==
 const dropEdges = (matches) => {
   edges.value.filter(matches).forEach((e) => {
     const port = portOfHandle(e.sourceHandle);
-    const tgt = port && nodes.value.find((n) => n.id === e.target);
+    const tgt = port && nodes.value.find((n) => n.id === e.target && n.type === "data-target");
     if (tgt) tgt.data.defaultParams = withoutPortPrefix(tgt.data.defaultParams, port);
   });
   edges.value = edges.value.filter((e) => !matches(e));
@@ -1829,10 +1898,9 @@ const workflowPage = (uuid, query) => ({
 // what it depends on from the incoming edges.
 const serializeProcessors = () => {
   return nodes.value.map((node) => {
-    // Build dependsOn from incoming edges (edges whose target is this node)
-    const dependsOn = edges.value
-      .filter((e) => e.target === node.id)
-      .map((e) => e.source);
+    // Build dependsOn from incoming edges (edges whose target is this node),
+    // each step once: two links can join the same steps
+    const dependsOn = [...new Set(edges.value.filter((e) => e.target === node.id).map((e) => e.source))];
 
     const saved = positionToSave(node);
     const position = { x: saved.x, y: saved.y };
@@ -1874,6 +1942,9 @@ const serializeProcessors = () => {
       dependsOn: dependsOn,
       position,
     };
+    // Which input each link feeds, and from which output (ports)
+    const inputs = linksOf(node, edges.value);
+    if (inputs.length) proc.inputs = inputs;
     if (node.data.cpu) proc.cpu = node.data.cpu;
     if (node.data.memory) proc.memory = node.data.memory;
     if (node.data.interactive) {
@@ -1955,10 +2026,9 @@ const cancelEdit = async () => {
 const sameShape = () => {
   const dag = selectedWorkflow.value?.dag || [];
   const ids = (list) => list.map((x) => x).sort().join(",");
-  const savedEdges = dag.flatMap((p) => (p.dependsOn || []).map((d) => `${d}>${p.id}`));
   return (
     ids(dag.map((p) => p.id)) === ids(nodes.value.map((n) => n.id)) &&
-    ids(savedEdges) === ids(edges.value.map((e) => `${e.source}>${e.target}`))
+    ids(linkKeys(dag)) === ids(linkKeys(serializeProcessors()))
   );
 };
 
@@ -2396,7 +2466,25 @@ const openNodeSettings = (id) => {
               </div>
 
               <template #node-default="{ data, id }">
-                <Handle id="target" type="target" :position="Position.Top" />
+                <!-- Two or more inputs: one connection point each, on the top
+                     edge over its column, and the step's main point (all
+                     inputs, each source whole at the root) last. -->
+                <Handle
+                  v-for="(p, i) in routedInputs(data.manifestPorts)"
+                  :key="`in:${p.name}`"
+                  :id="inputHandleId(p.name)"
+                  type="target"
+                  :position="Position.Top"
+                  :title="`${p.name}: link an output or a step to this input`"
+                  :style="{ left: portHandleLeft(i, routedInputs(data.manifestPorts).length + 1) }"
+                />
+                <Handle
+                  id="target"
+                  type="target"
+                  :position="Position.Top"
+                  :title="routedInputs(data.manifestPorts).length ? 'All inputs: each step linked here is given whole, at the root of the input folder' : undefined"
+                  :style="routedInputs(data.manifestPorts).length ? { left: portHandleLeft(routedInputs(data.manifestPorts).length, routedInputs(data.manifestPorts).length + 1) } : undefined"
+                />
                 <CompactFlowNode
                   v-if="!detailed"
                   kind="processor"
@@ -2425,16 +2513,32 @@ const openNodeSettings = (id) => {
                   :class="connectClass(id)"
                   :style="{
                     ...(stepAccent(data) && { boxShadow: `inset 4px 0 0 ${stepAccent(data)}` }),
-                    // Room for each output's column (about 90px), up to the card's max.
-                    ...(routedOutputs(data.manifestPorts).length && {
-                      minWidth: `${Math.min(350, 90 * (routedOutputs(data.manifestPorts).length + 1) + 30)}px`,
+                    // Room for each port's column (about 90px), up to the card's max.
+                    ...((routedOutputs(data.manifestPorts).length || routedInputs(data.manifestPorts).length) && {
+                      minWidth: `${Math.min(350, 90 * (Math.max(routedOutputs(data.manifestPorts).length, routedInputs(data.manifestPorts).length) + 1) + 30)}px`,
                     }),
                   }"
                 >
-                  <div v-if="data.manifestPorts?.inputs?.length" class="node-ports node-ports--in">
-                    <span v-for="p in data.manifestPorts.inputs" :key="p.name" class="node-port" :title="p.description">
-                      {{ p.name }}<template v-if="portTypes(p)"> · {{ portTypes(p) }}</template>
+                  <div
+                    v-if="data.manifestPorts?.inputs?.length"
+                    class="node-ports node-ports--in"
+                    :class="{ 'node-ports--routed': routedInputs(data.manifestPorts).length }"
+                    :style="routedInputs(data.manifestPorts).length ? { gridTemplateColumns: `repeat(${routedInputs(data.manifestPorts).length + 1}, minmax(0, 1fr))` } : undefined"
+                  >
+                    <span
+                      v-for="p in data.manifestPorts.inputs"
+                      :key="p.name"
+                      class="node-port"
+                      :class="{ 'node-port--routed': routedInputs(data.manifestPorts).length }"
+                      :title="[p.name, portTypes(p), p.description].filter(Boolean).join(' · ')"
+                    >
+                      {{ p.name }}<template v-if="portTypes(p) && !routedInputs(data.manifestPorts).length"> · {{ portTypes(p) }}</template>
                     </span>
+                    <span
+                      v-if="routedInputs(data.manifestPorts).length"
+                      class="node-port node-port--all"
+                      title="All inputs: each step linked here is given whole, at the root of the input folder"
+                    >all inputs</span>
                   </div>
                   <!-- What the step is, on one line; actions on hover or selection -->
                   <div class="node-header">
@@ -4195,8 +4299,8 @@ kbd {
 }
 .node-ports--in {
   margin-bottom: 4px;
-  /* Over the step's single input connector (top centre); each input gets its
-     own connector with input ports (phase 2). */
+  /* Over the step's input connector (top centre); with two or more inputs,
+     each over its own connector (node-ports--routed). */
   justify-content: center;
 }
 .node-ports--out {
@@ -4246,8 +4350,8 @@ kbd {
   font-size: 12px;
   color: theme.$gray_5;
 }
-/* Two or more outputs: chips in equal columns, so each output's
-   connection point can sit under the middle of its column. */
+/* Two or more outputs (or inputs): chips in equal columns, so each one's
+   connection point can sit under (or over) the middle of its column. */
 .node-ports--routed {
   display: grid;
   justify-items: center;
