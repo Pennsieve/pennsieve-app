@@ -11,6 +11,7 @@ import {
   structureOptionsFor,
   structureMatches,
   structuresCompatible,
+  rootInputCollisions,
 } from './applicationSchema'
 import { validateManifestDoc } from './manifestValidation'
 
@@ -104,6 +105,48 @@ describe('folder formats and structures in app.yml', () => {
     expect(validateManifestDoc(doc('directory'))).toEqual({ valid: true, problems: [] })
     const bad = loadYaml('application:\n  name: a\ninputs:\n  - name: x\n    conformsTo: [bids, http://example.org/x]\n')
     expect(JSON.stringify(validateManifestDoc(bad).problems)).toMatch(/conformsTo/)
+  })
+
+  it('reads and writes placement, and leaves it out when unset', () => {
+    const yml = 'application:\n  name: a\ninputs:\n  - name: recordings\n    placement: subfolder\n  - name: study\n    conformsTo: bids\n'
+    const { meta, schema } = parseManifest(yml)
+    expect(schema.inputs[0].placement).toBe('subfolder')
+    const out = buildManifest(schema, meta)
+    expect(out.inputs[0].placement).toBe('subfolder')
+    expect(out.inputs[1]).not.toHaveProperty('placement')
+    expect(validateManifestDoc(loadYaml(yml))).toEqual({ valid: true, problems: [] })
+    const bad = loadYaml('application:\n  name: a\ninputs:\n  - name: My recordings\n    placement: subfolder\n')
+    expect(JSON.stringify(validateManifestDoc(bad).problems)).toMatch(/name/)
+  })
+
+  it('refuses folders of no format, but not a layout without files in it', () => {
+    const none = loadYaml('application:\n  name: a\ninputs:\n  - name: x\n    container: directory\n')
+    expect(validateManifestDoc(none).problems).toEqual([{ path: 'inputs.0.mediaTypes', message: 'needs a folder format: pick one, e.g. OME-Zarr or MEF3' }])
+    const layout = loadYaml('application:\n  name: a\ninputs:\n  - name: x\n    conformsTo: bids\n    container: directory\n')
+    expect(validateManifestDoc(layout)).toEqual({ valid: true, problems: [] })
+    const named = loadYaml('application:\n  name: a\ninputs:\n  - name: My recordings\n    placement: subfolder\n')
+    expect(validateManifestDoc(named).problems).toEqual([{ path: 'inputs.0.name', message: 'as a folder name (its own folder), can only have lowercase letters, numbers and dashes' }])
+  })
+
+  it('lets inputs of different types share the root, and flags the ones that would mix', () => {
+    const pdf = { name: 'pdf', mediaTypes: ['application/pdf'] }
+    const ephys = { name: 'open-ephys', mediaTypes: ['application/vnd.pennsieve.open-ephys'] }
+    expect(rootInputCollisions([pdf, ephys]).size).toBe(0)
+    const pdf2 = { name: 'more-pdf', mediaTypes: ['application/pdf'] }
+    expect(rootInputCollisions([pdf, pdf2]).get(pdf).why).toBe('both take application/pdf')
+    const anything = { name: 'anything' }
+    expect(rootInputCollisions([pdf, anything]).get(pdf).why).toBe('anything takes any file')
+    const study = { name: 'study', conformsTo: ['bids'] }
+    expect(rootInputCollisions([study, pdf]).get(pdf).why).toBe('study is a layout and fills the root')
+    // In its own folder, nothing mixes.
+    expect(rootInputCollisions([study, { ...pdf, placement: 'subfolder' }]).size).toBe(0)
+  })
+
+  it('needs folder-safe output names once there are two or more outputs', () => {
+    const one = loadYaml('application:\n  name: a\noutputs:\n  - name: My Figures\n')
+    expect(validateManifestDoc(one)).toEqual({ valid: true, problems: [] })
+    const two = loadYaml('application:\n  name: a\noutputs:\n  - name: labels\n  - name: My Figures\n')
+    expect(validateManifestDoc(two).problems).toEqual([{ path: 'outputs.1.name', message: 'is a folder name with two or more outputs: lowercase letters, numbers and dashes' }])
   })
 
   it('matches structures by id, whatever the version', () => {

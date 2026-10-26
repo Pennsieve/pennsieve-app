@@ -29,8 +29,10 @@
     },
     "outputs": {
       "type": "array",
-      "description": "What the app writes.",
-      "items": { "$ref": "#/$defs/port" }
+      "description": "What the app writes. With one output it is the whole of OUTPUT_DIR; with two or more, each is written to its own folder, OUTPUT_DIR/<name>/, so a workflow can route each output on its own (names must then be folder-safe).",
+      "items": { "$ref": "#/$defs/port" },
+      "if": { "minItems": 2 },
+      "then": { "items": { "properties": { "name": { "pattern": "^[a-z0-9][a-z0-9-]*$" } } } }
     },
     "commandArguments": {
       "type": "array",
@@ -212,8 +214,19 @@
       "description": "An input or output. Without mediaTypes, formats or conformsTo it accepts any file.",
       "additionalProperties": false,
       "required": ["name"],
+      "allOf": [
+        {
+          "if": { "required": ["placement"], "properties": { "placement": { "const": "subfolder" } } },
+          "then": { "properties": { "name": { "pattern": "^[a-z0-9][a-z0-9-]*$" } } }
+        },
+        {
+          "$comment": "Folders of a format need the format: container directory without conformsTo names at least one media type.",
+          "if": { "required": ["container"], "properties": { "container": { "const": "directory" } }, "not": { "required": ["conformsTo"] } },
+          "then": { "required": ["mediaTypes"], "properties": { "mediaTypes": { "minItems": 1 } } }
+        }
+      ],
       "properties": {
-        "name": { "type": "string", "minLength": 1, "description": "Its name." },
+        "name": { "type": "string", "minLength": 1, "description": "Its name: an identifier, e.g. study. With placement subfolder it is also the input's folder name." },
         "description": { "type": "string", "description": "What it is." },
         "mediaTypes": {
           "type": "array",
@@ -237,6 +250,12 @@
             { "$ref": "#/$defs/structureRef" },
             { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/structureRef" } }
           ]
+        },
+        "placement": {
+          "type": "string",
+          "enum": ["root", "subfolder"],
+          "default": "root",
+          "description": "Where an input's data is placed. root (the default): at the root of INPUT_DIR. subfolder: in its own folder, INPUT_DIR/<name>/, so inputs that would collide (two BIDS trees) stay apart; the name must then be folder-safe (lowercase letters, numbers, dashes). Inputs of different media types can share the root (the app tells them apart by type); inputs that share a type, take any file, or are a layout need their own folders."
         },
         "required": { "type": "boolean", "description": "Whether a run must give it something." },
         "dataType": {

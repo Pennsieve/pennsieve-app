@@ -18,6 +18,8 @@ const PATTERN_HINTS = [
   [/\.formats\.\d+$/, "must be an EDAM format id, like format_3590"],
   [/\.mediaTypes\.\d+$/, "must be a media type, like text/csv"],
   [/(^|\.)email$/, "must be an email address"],
+  // With two or more outputs, each is written to OUTPUT_DIR/<name>/.
+  [/^outputs\.\d+\.name$/, "is a folder name with two or more outputs: lowercase letters, numbers and dashes"],
 ];
 const patternHint = (path) =>
   (PATTERN_HINTS.find(([re]) => re.test(path)) || [null, "isn't in the expected form"])[1];
@@ -29,6 +31,13 @@ const RUNTIME_RULES = [
   "kernel only applies to a Jupyter session: set sessionType: jupyter",
 ];
 
+// An input or output's if/then rules ($defs/port allOf 0..1), as their own
+// sentences, each on the field it's about.
+const PORT_RULES = [
+  { field: "name", message: "as a folder name (its own folder), can only have lowercase letters, numbers and dashes" },
+  { field: "mediaTypes", message: "needs a folder format: pick one, e.g. OME-Zarr or MEF3" },
+];
+
 const TYPE_NAMES = { object: "a mapping", array: "a list" };
 
 function problemFor(error) {
@@ -37,6 +46,13 @@ function problemFor(error) {
   if (rule) return { path: "runtime", message: RUNTIME_RULES[Number(rule[1])] };
 
   const path = errorFieldPath(error);
+  // Ajv reports a $ref'd definition's own path: #/allOf/<n>/then/… for a port.
+  const portRule = /^(inputs|outputs)\.\d+/.test(path) && schemaPath.match(/^#\/allOf\/(\d)\/then\//);
+  if (portRule && PORT_RULES[Number(portRule[1])]) {
+    const { field, message } = PORT_RULES[Number(portRule[1])];
+    const port = path.replace(/\.(name|mediaTypes)$/, "");
+    return { path: `${port}.${field}`, message };
+  }
   switch (keyword) {
     case "if":
       return null; // the then-branch error says why

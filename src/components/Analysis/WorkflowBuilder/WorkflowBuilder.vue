@@ -41,13 +41,24 @@ import { useAppManifest } from "@/composables/useAppManifest";
 import BuilderBar from "./BuilderBar.vue";
 import BuilderPalette from "./BuilderPalette.vue";
 import ParamField from "./ParamField.vue";
-import { ioLine, sessionTypeOf, versionManifest } from "./appManifestInfo";
+import { ioLine, sessionTypeOf, versionManifest, shortMediaType } from "./appManifestInfo";
 import { appColors } from "../Applications/appDomains";
 import { diffLines, manifestDiff, versionWarnings } from "./manifestDiff";
 import { builderReadiness } from "./builderReadiness";
 import StepPicker from "./StepPicker.vue";
 import { useGraphHistory, snapshot } from "./graphHistory";
 import { canConnect, neighbourInDirection } from "./graphEditing";
+import {
+  routedOutputs,
+  portHandleId,
+  portOfHandle,
+  canConnectFromHandle,
+  withPortPrefix,
+  withoutPortPrefix,
+  prefixParamOf,
+  PREFIX_PARAMS,
+  attachPorts,
+} from "./outputPorts";
 import { requiredUnset } from "./builderReadiness";
 import { fitsAfter } from "./appManifestInfo";
 
@@ -478,6 +489,11 @@ const setManifestPorts = (node, parsed) => {
     outputs: parsed.schema.outputs || [],
   };
   node.data.hasManifest = true;
+  // Ports from a draft app.yml (saved in this browser, not released).
+  node.data.draftManifest = parsed.draft || null;
+  // A reopened workflow's links into data targets leave from the output
+  // ports their prefixes name, once the ports are known.
+  edges.value = attachPorts(edges.value, nodes.value);
   // A manifest can land after the user has already drawn the edge — the
   // connection was made against no port information at all, so re-check
   // everything now that we have some.
@@ -522,6 +538,27 @@ const getTargetTypeLabel = (targetType) =>
 const onTargetTypeChange = (data) => {
   const types = getComputeTypesForTarget(data.targetType);
   data.computeType = types.length ? types[0] : null;
+  applyPortPrefix(data);
+};
+
+// A target fed by an output port takes that output's folder, in the prefix
+// parameter its type reads (PATH_PREFIX or pathPrefix). A type that takes
+// no prefix can't take part of an output: the port's link is removed.
+const applyPortPrefix = (data) => {
+  // The settings panel's data may be the step's or a copy: find the step.
+  const node = nodes.value.find((n) => n.data === data) || nodes.value.find((n) => n.id === selectedNode.value?.id);
+  const edge = node && edges.value.find((e) => e.target === node.id && portOfHandle(e.sourceHandle));
+  if (!edge) return;
+  const port = portOfHandle(edge.sourceHandle);
+  const key = prefixParamOf(getTargetTypeParams(data.targetType));
+  node.data.defaultParams = withoutPortPrefix(node.data.defaultParams, port);
+  if (key) {
+    node.data.defaultParams = withPortPrefix(node.data.defaultParams, port, key);
+    return;
+  }
+  dropEdges((e) => e.id === edge.id);
+  revalidateEdges();
+  ElMessage({ type: "info", showClose: true, message: `This kind of data target takes a step's whole output, so the link from the ${port} output was removed. Connect it from "all outputs" instead.` });
 };
 
 const toggleTargetEdit = (nodeId) => {
@@ -740,6 +777,10 @@ const definitionToNodesAndEdges = (workflow, applications) => {
         id: `e${dep}-${p.id}`,
         source: dep,
         target: p.id,
+        // Named, so a step with output ports draws it from its main point;
+        // attachPorts moves it to a port once the manifest is in.
+        sourceHandle: "source",
+        targetHandle: "target",
         animated: false,
         style: { stroke: nodeTypeColor(srcNode?.type) },
       });
@@ -1035,17 +1076,38 @@ const addNode = (type, app, position) => {
 
 // Connects two steps, with the same checks and feedback as dragging a
 // connection between them.
-const connectNodes = (sourceId, targetId) => {
+const connectNodes = (sourceId, targetId, sourceHandle) => {
   const src = nodes.value.find((n) => n.id === sourceId);
   const tgt = nodes.value.find((n) => n.id === targetId);
   if (!canConnect(src, tgt, edges.value)) return false;
+  const port = portOfHandle(sourceHandle);
+  if (port) {
+    // An output port routes one output to one data target.
+    if (!canConnectFromHandle(src, tgt, sourceHandle)) {
+      ElMessage({ type: "info", showClose: true, message: `The ${port} output connects to a data target. Connect apps from the step's main connection point.` });
+      return false;
+    }
+    if (edges.value.some((e) => e.target === targetId)) {
+      ElMessage({ type: "info", showClose: true, message: "A data target fed by an output takes that one link. Remove its other link first." });
+      return false;
+    }
+    // No type picked yet: the prefix is set when it is (onTargetTypeChange).
+    if (tgt.data.targetType && !prefixParamOf(getTargetTypeParams(tgt.data.targetType))) {
+      ElMessage({ type: "info", showClose: true, message: "This kind of data target takes a step's whole output, not one output. Connect it from the step's main connection point." });
+      return false;
+    }
+  }
   edges.value.push({
     id: `e${sourceId}-${targetId}`,
     source: sourceId,
     target: targetId,
+    sourceHandle: port ? sourceHandle : "source",
+    targetHandle: "target",
     animated: false,
     style: { stroke: nodeTypeColor(src.type) },
   });
+  // The target takes only this output's folder: OUTPUT_DIR/<port>/.
+  if (port && tgt.data.targetType) tgt.data.defaultParams = withPortPrefix(tgt.data.defaultParams, port, prefixParamOf(getTargetTypeParams(tgt.data.targetType)));
   reportConnectionCheck(src, tgt);
   revalidateEdges();
   return true;
@@ -1103,7 +1165,7 @@ const stepWarning = (id) => {
   const unset = node?.type === "default" ? requiredUnset(node) : [];
   return unset.length ? `No value for ${unset.map((p) => `"${p}"`).join(", ")} (can be given when running)` : "";
 };
-const portTypes = (port) => (port.mediaTypes || []).map((t) => String(t).split("/").pop().toUpperCase()).join(", ");
+const portTypes = (port) => (port.mediaTypes || []).map(shortMediaType).join(", ");
 
 // The + under a step: pick what comes next.
 const pickerFor = ref(null); // the step the picker adds after
@@ -1139,7 +1201,7 @@ onConnect((params) => {
 
   // Self-loops, duplicates, into an input or out of an output are refused;
   // the rest get a toast and the persistent marks (connectNodes).
-  connectNodes(params.source, params.target);
+  connectNodes(params.source, params.target, params.sourceHandle);
 });
 
 /*
@@ -1371,14 +1433,35 @@ const reportConnectionCheck = (srcNode, tgtNode) => {
   });
 };
 
+// Where output port i of n sits on the step's bottom edge: the middle of
+// its column. The detailed card has 11px of padding and border each side;
+// the compact one spreads them evenly. !important beats the connectors'
+// own left: 50%.
+const portHandleLeft = (i, n) =>
+  detailed.value
+    ? `calc(11px + (100% - 22px) * ${(i + 0.5) / n}) !important`
+    : `${((i + 1) * 100) / (n + 1)}% !important`;
+
+// The output port feeding a node, or "" when none does.
+const feedingPort = (nodeId) => portOfHandle(edges.value.find((e) => e.target === nodeId && e.sourceHandle)?.sourceHandle);
+
+// Removes the edges that match, and the path prefix an output port's link
+// set on its data target.
+const dropEdges = (matches) => {
+  edges.value.filter(matches).forEach((e) => {
+    const port = portOfHandle(e.sourceHandle);
+    const tgt = port && nodes.value.find((n) => n.id === e.target);
+    if (tgt) tgt.data.defaultParams = withoutPortPrefix(tgt.data.defaultParams, port);
+  });
+  edges.value = edges.value.filter((e) => !matches(e));
+};
+
 const removeNode = (nodeId) => {
   const nodeIndex = nodes.value.findIndex((n) => n.id === nodeId);
   if (nodeIndex === -1) return;
 
   // Remove associated edges
-  edges.value = edges.value.filter(
-    (edge) => edge.source !== nodeId && edge.target !== nodeId,
-  );
+  dropEdges((edge) => edge.source === nodeId || edge.target === nodeId);
 
   // Remove node
   nodes.value.splice(nodeIndex, 1);
@@ -1513,7 +1596,7 @@ const deleteSelection = () => {
   const selectedEdges = edges.value.filter((e) => e.selected).map((e) => e.id);
   const selectedNodes = nodes.value.filter((n) => n.selected).map((n) => n.id);
   if (selectedEdges.length) {
-    edges.value = edges.value.filter((e) => !selectedEdges.includes(e.id));
+    dropEdges((e) => selectedEdges.includes(e.id));
     revalidateEdges();
   }
   selectedNodes.forEach((id) => removeNode(id));
@@ -2213,6 +2296,11 @@ const openNodeSettings = (id) => {
                   :accent="stepAccent(data)"
                   :class="connectClass(id)"
                 >
+                    <span
+                      v-if="data.draftManifest"
+                      class="draft-badge draft-badge--compact"
+                      title="Using a draft app.yml saved in this browser, not the released one. Switch to the detailed view to see its inputs and outputs."
+                    >Draft</span>
                     <span v-if="stepWarning(id)" class="step-warn" :title="stepWarning(id)" />
                     <button
                       v-if="!isReadOnly"
@@ -2234,7 +2322,13 @@ const openNodeSettings = (id) => {
                   v-else
                   class="custom-node"
                   :class="connectClass(id)"
-                  :style="stepAccent(data) ? { boxShadow: `inset 4px 0 0 ${stepAccent(data)}` } : undefined"
+                  :style="{
+                    ...(stepAccent(data) && { boxShadow: `inset 4px 0 0 ${stepAccent(data)}` }),
+                    // Room for each output's column (about 90px), up to the card's max.
+                    ...(routedOutputs(data.manifestPorts).length && {
+                      minWidth: `${Math.min(350, 90 * (routedOutputs(data.manifestPorts).length + 1) + 30)}px`,
+                    }),
+                  }"
                 >
                   <div v-if="data.manifestPorts?.inputs?.length" class="node-ports node-ports--in">
                     <span v-for="p in data.manifestPorts.inputs" :key="p.name" class="node-port" :title="p.description">
@@ -2244,6 +2338,11 @@ const openNodeSettings = (id) => {
                   <div class="node-header">
                     <span class="node-type-badge processor-badge">{{ data.interactive ? "Interactive" : "Processor" }}</span>
                     <span class="node-title">{{ data.label }}</span>
+                    <span
+                      v-if="data.draftManifest"
+                      class="draft-badge"
+                      title="Using a draft app.yml saved in this browser, not the released one. A release must declare the same outputs for its links to work. Clear the draft in the app.yml builder."
+                    >Draft app.yml</span>
                     <span v-if="stepWarning(id)" class="step-warn" :title="stepWarning(id)" />
                     <button
                       v-if="!isReadOnly"
@@ -2291,14 +2390,53 @@ const openNodeSettings = (id) => {
                       data.computeType
                     }}</span>
                   </div>
-                  <div v-if="data.manifestPorts?.outputs?.length" class="node-ports node-ports--out">
-                    <span v-for="p in data.manifestPorts.outputs" :key="p.name" class="node-port" :title="p.description">
-                      {{ p.name }}<template v-if="portTypes(p)"> · {{ portTypes(p) }}</template>
+                  <div
+                    v-if="data.manifestPorts?.outputs?.length"
+                    class="node-ports node-ports--out"
+                    :class="{ 'node-ports--routed': routedOutputs(data.manifestPorts).length }"
+                    :style="routedOutputs(data.manifestPorts).length ? { gridTemplateColumns: `repeat(${routedOutputs(data.manifestPorts).length + 1}, minmax(0, 1fr))` } : undefined"
+                  >
+                    <span
+                      v-for="p in data.manifestPorts.outputs"
+                      :key="p.name"
+                      class="node-port"
+                      :class="{ 'node-port--routed': routedOutputs(data.manifestPorts).length }"
+                      :title="[p.name, portTypes(p), p.description].filter(Boolean).join(' · ') + (routedOutputs(data.manifestPorts).length ? ' — connect to a data target to send it there' : '')"
+                    >
+                      <!-- Routed: the name only, cut to its column; the rest on hover -->
+                      {{ p.name }}<template v-if="portTypes(p) && !routedOutputs(data.manifestPorts).length"> · {{ portTypes(p) }}</template>
                     </span>
+                    <!-- The step's main point, last: all outputs, to another app -->
+                    <span
+                      v-if="routedOutputs(data.manifestPorts).length"
+                      class="node-port node-port--all"
+                      title="All outputs together: connect to another app"
+                    >all outputs</span>
                   </div>
                   <div v-else-if="!data.hasManifest" class="node-ports node-ports--none">No manifest</div>
                 </div>
-                <Handle id="source" type="source" :position="Position.Bottom" />
+                <!-- Two or more outputs: one connection point each, on the
+                     bottom edge under its column (the chips sit in equal
+                     columns inside the 15px padding), half under the card
+                     like the other connectors. -->
+                <Handle
+                  v-for="(p, i) in routedOutputs(data.manifestPorts)"
+                  :key="p.name"
+                  :id="portHandleId(p.name)"
+                  type="source"
+                  :position="Position.Bottom"
+                  :title="`${p.name}: connect to a data target to send this output there`"
+                  :style="{ left: portHandleLeft(i, routedOutputs(data.manifestPorts).length + 1) }"
+                />
+                <!-- With output ports, the main point (all outputs, to another
+                     app) is the last column, under its "all outputs" chip. -->
+                <Handle
+                  id="source"
+                  type="source"
+                  :position="Position.Bottom"
+                  :title="routedOutputs(data.manifestPorts).length ? 'All outputs together: connect to another app' : undefined"
+                  :style="routedOutputs(data.manifestPorts).length ? { left: portHandleLeft(routedOutputs(data.manifestPorts).length, routedOutputs(data.manifestPorts).length + 1) } : undefined"
+                />
                 <button
                   v-if="!isReadOnly"
                   type="button"
@@ -2705,16 +2843,24 @@ const openNodeSettings = (id) => {
                       0
                     "
                   >
-                    <ParamField
+                    <template
                       v-for="param in getTargetTypeParams(
                         selectedNode.data.targetType,
                       )"
                       :key="param.name"
-                      :param="param"
-                      :editable="canEditConfig"
-                      :model-value="selectedNode.data.defaultParams?.[param.name]"
-                      @update:model-value="(v) => setDefaultParam(param.name, v)"
-                    />
+                    >
+                      <!-- Fed by an output port: the prefix is that output's folder -->
+                      <ParamField
+                        :param="param"
+                        :editable="canEditConfig && !(PREFIX_PARAMS.includes(param.name) && feedingPort(selectedNode.id))"
+                        :model-value="selectedNode.data.defaultParams?.[param.name]"
+                        @update:model-value="(v) => setDefaultParam(param.name, v)"
+                      />
+                      <p v-if="PREFIX_PARAMS.includes(param.name) && feedingPort(selectedNode.id)" class="port-prefix-note">
+                        Set by the <strong>{{ feedingPort(selectedNode.id) }}</strong> output it's connected to: this target takes only
+                        that output's folder.
+                      </p>
+                    </template>
                   </template>
                   <div v-else class="info-row">
                     <span class="info-value">No parameters</span>
@@ -3920,10 +4066,13 @@ kbd {
   font-size: 10px;
 }
 .node-ports--in {
-  margin-bottom: 6px;
+  margin-bottom: 4px;
+  /* Over the step's single input connector (top centre); each input gets its
+     own connector with input ports (phase 2). */
+  justify-content: center;
 }
 .node-ports--out {
-  margin-top: 6px;
+  margin-top: 5px;
 }
 .node-ports--none {
   margin-top: 6px;
@@ -3935,6 +4084,42 @@ kbd {
   border-radius: 3px;
   background: theme.$gray_0;
   color: theme.$gray_5;
+}
+.draft-badge {
+  padding: 0 5px;
+  border: 1px dashed theme.$orange_1;
+  border-radius: 3px;
+  font-size: 10px;
+  font-weight: 600;
+  color: theme.$orange_1;
+  white-space: nowrap;
+}
+.draft-badge--compact {
+  margin-right: 4px;
+}
+.port-prefix-note {
+  margin: -4px 0 10px;
+  font-size: 12px;
+  color: theme.$gray_5;
+}
+/* Two or more outputs: chips in equal columns, so each output's
+   connection point can sit under the middle of its column. */
+.node-ports--routed {
+  display: grid;
+  justify-items: center;
+  /* Many outputs: the card grows to its max width, then names are cut. */
+  min-width: 0;
+  .node-port {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+.node-port--all {
+  background: none;
+  border: 1px dashed theme.$gray_3;
+  color: theme.$gray_4;
 }
 
 /* The + under a step: what comes next. Shown on hover and selection. */
@@ -4112,7 +4297,7 @@ kbd {
   background: white;
   border: 1px solid theme.$gray_3;
   border-radius: 4px;
-  padding: 14px;
+  padding: 8px 10px;
   min-width: 250px;
   max-width: 350px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
@@ -4129,8 +4314,8 @@ kbd {
     display: flex;
     justify-content: space-between;
     align-items: flex-start;
-    gap: 10px;
-    margin-bottom: 8px;
+    gap: 8px;
+    margin-bottom: 4px;
   }
 
   .node-title {
@@ -4139,6 +4324,7 @@ kbd {
     color: theme.$black;
     flex: 1;
     line-height: 1.3;
+    text-align: left;
   }
 
   .settings-btn {
@@ -4183,7 +4369,7 @@ kbd {
   .node-description {
     font-size: 12px;
     color: theme.$gray_4;
-    margin-bottom: 8px;
+    margin-bottom: 4px;
     line-height: 1.4;
     display: flex;
     align-items: center;
@@ -4227,8 +4413,8 @@ kbd {
     font-size: 11px;
     color: theme.$gray_5;
     font-weight: 500;
-    margin-top: 8px;
-    padding-top: 8px;
+    margin-top: 6px;
+    padding-top: 6px;
     border-top: 1px solid theme.$gray_2;
     display: flex;
     align-items: center;
