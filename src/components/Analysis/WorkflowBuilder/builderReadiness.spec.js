@@ -49,3 +49,18 @@ describe("requiredUnset", () => {
     expect(requiredUnset(n)).toEqual(["a"]);
   });
 });
+
+describe("a step that lacks a required input from all its upstream steps", () => {
+  it("is a warning on the step, naming what's missing", () => {
+    const r = builderReadiness({
+      name: "w",
+      nodes: [src, app(), tgt()],
+      edges: chain,
+      edgeIssues: [{ id: "step:a", targetId: "a", target: "spike", reason: "missing-required", mediaTypes: ["text/csv"] }],
+    });
+    const item = r.items.find((i) => i.id === "step:a");
+    expect(item).toMatchObject({ level: "warn", nodeId: "a" });
+    expect(item.text).toBe("spike needs text/csv, which none of the steps before it produce");
+    expect(item.edgeId).toBeUndefined();
+  });
+});
