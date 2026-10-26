@@ -41,7 +41,7 @@ import BuilderBar from "./BuilderBar.vue";
 import BuilderPalette from "./BuilderPalette.vue";
 import ParamField from "./ParamField.vue";
 import { ioLine, sessionTypeOf, versionManifest, shortMediaType } from "./appManifestInfo";
-import { appColors, domainOfTag, domainColors } from "../Applications/appDomains";
+import { domainOfTag, domainColors } from "../Applications/appDomains";
 import { clearManifestDraft } from "../Applications/manifestDrafts";
 import { diffLines, manifestDiff, versionWarnings } from "./manifestDiff";
 import { builderReadiness, readinessLabel } from "./builderReadiness";
@@ -1129,7 +1129,10 @@ const onDrop = (event) => {
 // An app step's domain colour (its pinned version's app.yml tags), for its
 // strip on the canvas; none for an app without a domain, which keeps the
 // processor's own.
-const stepAccent = (data) => (data?.application ? appColors(data.application, data.tag)?.accent || "" : "");
+// Whether a step's app calls language models through Pennsieve: its version's
+// app.yml declares runtime.llm (LLM access is opt-in). Shown as an icon.
+const usesLLM = (data) => !!versionManifest(data?.application, data?.tag)?.runtime?.llm;
+const LLM_TITLE = "Calls language models through Pennsieve (runtime.llm in its app.yml)";
 
 const makeNode = (type, app, position) => {
   const id = generateNodeId();
@@ -2601,9 +2604,11 @@ const openNodeSettings = (id) => {
                   kind="processor"
                   :label="nodeName({ id, type: 'default', data })"
                   :runtime="data.interactive ? 'interactive' : data.computeType"
-                  :accent="stepAccent(data)"
                   :class="connectClass(id)"
                 >
+                    <span v-if="usesLLM(data)" class="llm-mark llm-mark--compact" :title="LLM_TITLE" aria-label="Calls language models">
+                      <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5l1.4 3.6 3.6 1.4-3.6 1.4L8 11.5 6.6 7.9 3 6.5l3.6-1.4zM12.5 10l.6 1.4 1.4.6-1.4.6-.6 1.4-.6-1.4-1.4-.6 1.4-.6z" /></svg>
+                    </span>
                     <span
                       v-if="data.draftManifest"
                       class="draft-badge draft-badge--compact"
@@ -2623,7 +2628,6 @@ const openNodeSettings = (id) => {
                   class="custom-node processor-node"
                   :class="connectClass(id)"
                   :style="{
-                    ...(stepAccent(data) && { boxShadow: `inset 4px 0 0 ${stepAccent(data)}` }),
                     // Room for each port's column (about 90px), up to the card's max.
                     ...((routedOutputs(data.manifestPorts).length || routedInputs(data.manifestPorts).length) && {
                       minWidth: `${Math.min(350, 90 * (Math.max(routedOutputs(data.manifestPorts).length, routedInputs(data.manifestPorts).length) + 1) + 30)}px`,
@@ -2655,6 +2659,9 @@ const openNodeSettings = (id) => {
                   <div class="node-header">
                     <span v-if="data.interactive" class="node-type-badge processor-badge">Interactive</span>
                     <span class="node-title" :title="nodeName({ id, type: 'default', data })">{{ nodeName({ id, type: 'default', data }) }}</span>
+                    <span v-if="usesLLM(data)" class="llm-mark" :title="LLM_TITLE" aria-label="Calls language models">
+                      <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5l1.4 3.6 3.6 1.4-3.6 1.4L8 11.5 6.6 7.9 3 6.5l3.6-1.4zM12.5 10l.6 1.4 1.4.6-1.4.6-.6 1.4-.6-1.4-1.4-.6 1.4-.6z" /></svg>
+                    </span>
                     <span
                       v-if="data.draftManifest"
                       class="draft-badge"
@@ -5134,8 +5141,7 @@ kbd {
   }
 
   /* An app step: the processor orange (as the compact step's strip), like
-     Input data's indigo and a target's slate. A domain app keeps its
-     domain's strip on the left (stepAccent). */
+     Input data's indigo and a target's slate. */
   &.processor-node {
     border-color: theme.$orange_2;
     background: theme.$orange_tint;
@@ -5567,5 +5573,24 @@ kbd {
   color: #b45309;
   white-space: nowrap;
   margin-left: 6px;
+}
+/* A step whose app calls language models (runtime.llm): a small sparkle. */
+.llm-mark {
+  display: inline-flex;
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  color: theme.$status_purple;
+
+  svg {
+    width: 100%;
+    height: 100%;
+    fill: currentColor;
+  }
+}
+.llm-mark--compact {
+  width: 13px;
+  height: 13px;
+  margin-right: 4px;
 }
 </style>
