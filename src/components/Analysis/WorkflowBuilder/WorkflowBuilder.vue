@@ -2366,17 +2366,24 @@ const openNodeSettings = (id) => {
                     v-if="data.manifestPorts?.outputs?.length"
                     class="node-ports node-ports--out"
                     :class="{ 'node-ports--routed': routedOutputs(data.manifestPorts).length }"
-                    :style="routedOutputs(data.manifestPorts).length ? { gridTemplateColumns: `repeat(${routedOutputs(data.manifestPorts).length}, 1fr)` } : undefined"
+                    :style="routedOutputs(data.manifestPorts).length ? { gridTemplateColumns: `repeat(${routedOutputs(data.manifestPorts).length + 1}, minmax(0, 1fr))` } : undefined"
                   >
                     <span
                       v-for="p in data.manifestPorts.outputs"
                       :key="p.name"
                       class="node-port"
                       :class="{ 'node-port--routed': routedOutputs(data.manifestPorts).length }"
-                      :title="routedOutputs(data.manifestPorts).length ? `${p.description || p.name} — connect to a data target to send it there` : p.description"
+                      :title="[p.name, portTypes(p), p.description].filter(Boolean).join(' · ') + (routedOutputs(data.manifestPorts).length ? ' — connect to a data target to send it there' : '')"
                     >
-                      {{ p.name }}<template v-if="portTypes(p)"> · {{ portTypes(p) }}</template>
+                      <!-- Routed: the name only, cut to its column; the rest on hover -->
+                      {{ p.name }}<template v-if="portTypes(p) && !routedOutputs(data.manifestPorts).length"> · {{ portTypes(p) }}</template>
                     </span>
+                    <!-- The step's main point, last: all outputs, to another app -->
+                    <span
+                      v-if="routedOutputs(data.manifestPorts).length"
+                      class="node-port node-port--all"
+                      title="All outputs together: connect to another app"
+                    >all outputs</span>
                   </div>
                   <div v-else-if="!data.hasManifest" class="node-ports node-ports--none">No manifest</div>
                 </div>
@@ -2391,15 +2398,16 @@ const openNodeSettings = (id) => {
                   type="source"
                   :position="Position.Bottom"
                   :title="`${p.name}: connect to a data target to send this output there`"
-                  :style="{ left: portHandleLeft(i, routedOutputs(data.manifestPorts).length) }"
+                  :style="{ left: portHandleLeft(i, routedOutputs(data.manifestPorts).length + 1) }"
                 />
                 <!-- With output ports, the main point (all outputs, to another
-                     app) moves to the side, clear of the ports and the +. -->
+                     app) is the last column, under its "all outputs" chip. -->
                 <Handle
                   id="source"
                   type="source"
-                  :position="routedOutputs(data.manifestPorts).length ? Position.Right : Position.Bottom"
-                  :title="routedOutputs(data.manifestPorts).length ? 'All outputs: connect to another app' : undefined"
+                  :position="Position.Bottom"
+                  :title="routedOutputs(data.manifestPorts).length ? 'All outputs together: connect to another app' : undefined"
+                  :style="routedOutputs(data.manifestPorts).length ? { left: portHandleLeft(routedOutputs(data.manifestPorts).length, routedOutputs(data.manifestPorts).length + 1) } : undefined"
                 />
                 <button
                   v-if="!isReadOnly"
@@ -4068,6 +4076,19 @@ kbd {
 .node-ports--routed {
   display: grid;
   justify-items: center;
+  /* Many outputs: the card grows to its max width, then names are cut. */
+  min-width: 0;
+  .node-port {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+.node-port--all {
+  background: none;
+  border: 1px dashed theme.$gray_3;
+  color: theme.$gray_4;
 }
 
 /* The + under a step: what comes next. Shown on hover and selection. */
