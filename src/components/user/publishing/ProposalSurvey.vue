@@ -576,7 +576,7 @@ function submitProposal() {
               />
             </div>
             <div class="repo-details">
-              <h2>{{ currentRepository.displayName }}</h2>
+              <h2>{{ currentRepository.displayName || "Repository unavailable" }}</h2>
               <p class="repo-description" v-if="currentRepository.description">
                 {{ currentRepository.description }}
               </p>

@@ -26,8 +26,8 @@
       </div>
 
       <!-- Error State -->
-      <div v-else-if="error" class="error-state">
-        <p class="error-message">{{ error }}</p>
+      <div v-else-if="loadError" class="error-state">
+        <p class="error-message">{{ loadError }}</p>
         <bf-button @click="fetchProposals" class="secondary">
           Try Again
         </bf-button>
@@ -113,6 +113,7 @@
 import { ref, computed, onMounted, watch, nextTick } from 'vue'
 import { useStore } from 'vuex'
 import { useRouter } from 'vue-router'
+import { ElMessage } from 'element-plus'
 import { useProposalStore } from '@/stores/proposalStore'
 import BfButton from '@/components/shared/bf-button/BfButton.vue'
 import RequestListItem from './RequestListItem.vue'
@@ -128,7 +129,7 @@ const { isSavingProposal, saveProposal } = useProposalSave()
 
 // Reactive data
 const isLoading = ref(false)
-const error = ref('')
+const loadError = ref('')
 const showProposalDialog = ref(false)
 const selectedRepository = ref({})
 const activeProposal = ref({})
@@ -160,16 +161,14 @@ const profile = computed(() => store.state.profile)
 // Methods
 const fetchProposals = async () => {
   isLoading.value = true
-  error.value = ''
-  
-  try {
-    await proposalStore.fetchProposals()
-  } catch (err) {
-    error.value = 'Failed to load proposals. Please try again.'
-    console.error('Error fetching proposals:', err)
-  } finally {
-    isLoading.value = false
+  loadError.value = ''
+
+  // The store swallows fetch errors and reports them through proposalsError
+  await proposalStore.fetchProposals()
+  if (proposalStore.proposalsError) {
+    loadError.value = 'Failed to load proposals. Please try again.'
   }
+  isLoading.value = false
 }
 
 const fetchRepositories = async () => {
@@ -208,18 +207,13 @@ const closeProposalDialog = () => {
 
 const editProposal = (proposal) => {
   activeProposal.value = proposal
-  
-  // Find the repository for this proposal
-  const repository = repositories.value.find(repo => 
+
+  // Open even when the repository is gone: read-only proposals can still be
+  // viewed or copied, and the dialog won't save a draft until a repository is picked
+  selectedRepository.value = repositories.value.find(repo =>
     repo.organizationNodeId === proposal.organizationNodeId
-  )
-  
-  if (repository) {
-    selectedRepository.value = repository
-    showProposalDialog.value = true
-  } else {
-    error.value = 'Repository not found for this proposal.'
-  }
+  ) || {}
+  showProposalDialog.value = true
 }
 
 const removeProposal = (proposal) => {
@@ -289,7 +283,12 @@ const openDataset = (proposal) => {
 
 const handleConfirmedAction = async (event) => {
   const { action, resource } = event
-  
+  const actionMessages = {
+    remove: { success: 'Proposal removed', failure: 'Could not remove proposal. Please try again.' },
+    submit: { success: 'Proposal submitted', failure: 'Could not submit proposal. Please try again.' },
+    withdraw: { success: 'Proposal withdrawn', failure: 'Could not withdraw proposal. Please try again.' },
+  }
+
   try {
     switch (action) {
       case 'remove':
@@ -302,11 +301,11 @@ const handleConfirmedAction = async (event) => {
         await proposalStore.withdrawProposal(resource)
         break
     }
+    ElMessage.success(actionMessages[action].success)
   } catch (err) {
-    error.value = `Failed to ${action} proposal. Please try again.`
-    console.error(`Error ${action} proposal:`, err)
+    ElMessage.error(actionMessages[action].failure)
   }
-  
+
   closeConfirmationDialog()
 }
 
