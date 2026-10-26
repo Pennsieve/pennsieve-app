@@ -35,6 +35,7 @@ import { COMPACT_BOX, layoutBox, overlaps, recenter, useGraphDensity } from "../
 import {
   toParamSchema,
   validateAppConnection,
+  validateStepInputs,
 } from "../Applications/applicationSchema";
 import { useAppManifest } from "@/composables/useAppManifest";
 import BuilderBar from "./BuilderBar.vue";
@@ -1167,6 +1168,14 @@ const uncheckedEdgeCount = ref(0);
 
 const isAppNode = (node) => node?.type === "default";
 
+// The app steps with a manifest that feed a step: what its inputs can be
+// judged against.
+const upstreamApps = (targetId) =>
+  edges.value
+    .filter((e) => e.target === targetId)
+    .map((e) => nodes.value.find((n) => n.id === e.source))
+    .filter((n) => isAppNode(n) && n.data?.manifestPorts);
+
 const classifyEdge = (edge) => {
   const src = nodes.value.find((n) => n.id === edge.source);
   const tgt = nodes.value.find((n) => n.id === edge.target);
@@ -1185,10 +1194,40 @@ const classifyEdge = (edge) => {
   // Manifests present but nothing comparable on the ports — no media types
   // declared on one side. Reported as unchecked, not as a match.
   if (!checked) return { state: "unchecked", src, tgt };
+  // With more than one upstream step, a required input may come from
+  // another one: the link is fine as long as it feeds something, and the
+  // step's own check (stepInputIssues) says what's still missing.
+  if (reason === "unmet-required" && upstreamApps(tgt.id).length > 1) {
+    return metInputs.length
+      ? { state: "ok", src, tgt, metInputs }
+      : { state: "invalid", src, tgt, reason: "no-overlap", unmetInputs };
+  }
   return compatible
     ? { state: "ok", src, tgt, metInputs }
     : { state: "invalid", src, tgt, reason, unmetInputs };
 };
+
+// Required inputs no upstream step provides, for steps fed by more than one
+// app (with one, the link itself says so).
+const stepInputIssues = () =>
+  nodes.value
+    .filter((n) => isAppNode(n) && n.data?.manifestPorts && upstreamApps(n.id).length > 1)
+    .map((n) => {
+      const { checked, unmetRequired } = validateStepInputs(
+        upstreamApps(n.id).map((u) => u.data.manifestPorts),
+        n.data.manifestPorts,
+      );
+      return checked && unmetRequired.length
+        ? {
+            id: `step:${n.id}`,
+            targetId: n.id,
+            target: n.data.label,
+            reason: "missing-required",
+            mediaTypes: portMediaTypes(unmetRequired),
+          }
+        : null;
+    })
+    .filter(Boolean);
 
 /*
   Media types are what the check compares, so they are also what it reports.
@@ -1289,7 +1328,7 @@ const revalidateEdges = () => {
     return next;
   });
 
-  edgeIssues.value = issues;
+  edgeIssues.value = [...issues, ...stepInputIssues()];
   validEdgeCount.value = validated;
   uncheckedEdgeCount.value = unchecked;
 };
@@ -1308,6 +1347,11 @@ const reportConnectionCheck = (srcNode, tgtNode) => {
 
   // A match shows on the edge itself; only a mismatch is worth a toast.
   if (compatible) return;
+
+  // Fed by other steps too: this link only has to feed something. What the
+  // step as a whole still lacks shows in the readiness list.
+  const others = upstreamApps(tgtNode.id).filter((n) => n.id !== srcNode.id);
+  if (reason === "unmet-required" && others.length && metInputs.length) return;
 
   const mediaTypes = portMediaTypes(unmetInputs).join(", ");
   const detail =

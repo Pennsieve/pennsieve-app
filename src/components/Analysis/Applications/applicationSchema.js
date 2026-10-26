@@ -1203,6 +1203,26 @@ export function validateAppConnection(sourceApp, targetApp) {
   };
 }
 
+/**
+ * Are a step's required inputs met by all its upstream steps together? A
+ * single link only knows its own source's outputs, so it can't judge a
+ * required input another upstream step provides. This takes every upstream
+ * app's outputs at once.
+ *
+ * @param {Array<ApplicationSchema|Object>} sourceApps  every upstream app
+ * @param {ApplicationSchema|Object} targetApp
+ * @returns {{checked: boolean, unmetRequired: PortSchema[], metInputs: PortSchema[]}}
+ */
+export function validateStepInputs(sourceApps, targetApp) {
+  const outputs = asArray(sourceApps).flatMap((app) => asArray(app?.outputs));
+  const { checked, reason, unmetInputs, metInputs } = validateAppConnection({ outputs }, targetApp);
+  return {
+    checked,
+    unmetRequired: reason === "unmet-required" ? unmetInputs : [],
+    metInputs,
+  };
+}
+
 /* ──────────────────────────────────────────────────────────────────────────
  * Resource helpers (thin re-exports so consumers have one import surface)
  * ────────────────────────────────────────────────────────────────────────── */
