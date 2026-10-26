@@ -1717,7 +1717,7 @@ onUnmounted(() => {
                     </button>
                   </template>
                 </CompactFlowNode>
-                <div v-else class="custom-node processor-node" :class="mode === 'browse' ? statusClass(data.status) : ''">
+                <div v-else class="custom-node" :class="mode === 'browse' ? statusClass(data.status) : 'processor-node'">
                   <span v-if="nodeUnmetCount(id, 'processor') > 0" class="node-unmet-badge">{{ nodeUnmetCount(id, 'processor') }}</span>
                   <div
                     v-if="mode === 'browse' && interactiveSessionAvailable && id === interactiveProcessor?.id"
@@ -3344,8 +3344,10 @@ onUnmounted(() => {
   100% { box-shadow: 0 0 0 0 rgba(1, 31, 91, 0); }
 }
 
-/* The builder's cards: the background says what a step is (an app's
-   orange, a source's indigo, a target's slate), the border how it's doing. */
+/* The builder's cards: the background says what a step is (a source's
+   indigo, a target's slate), the border how it's doing. An app's card is
+   white on a run, as the status colours clash with its orange; it has the
+   orange only while the run is being configured (no status yet). */
 .custom-node {
   position: relative;
   background: white;
@@ -3392,6 +3394,7 @@ onUnmounted(() => {
   }
 
   &.processor-node {
+    --port-chip-bg: #{theme.$white};
     background: theme.$orange_tint;
     border-color: theme.$orange_2;
   }
