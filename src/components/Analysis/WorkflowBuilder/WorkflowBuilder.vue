@@ -778,6 +778,14 @@ const versionOptionLabel = (app, v) => {
     : v.version;
 };
 
+// The minimap, from this many steps: below it, fit-to-view does the job.
+const MINIMAP_FROM = 15;
+const minimapColor = (node) => {
+  if (node.type === "data-source") return "#6366f1";
+  if (node.type === "data-target") return "#64748b";
+  return "#E0912A"; // the processor orange ($orange_2)
+};
+
 const nodeTypeColor = (type) => {
   if (type === "data-source") return "#6366f1";
   if (type === "data-target") return "#64748b";
@@ -2471,7 +2479,21 @@ const openNodeSettings = (id) => {
               </template>
               <Background pattern-color="#aaa" :gap="16" />
               <Controls position="bottom-right" />
-              <MiniMap v-if="nodes.length > 6" position="bottom-left" pannable zoomable />
+              <!-- Only for big workflows: steps in their kinds' colours, the
+                   view as an outlined window -->
+              <MiniMap
+                v-if="nodes.length >= MINIMAP_FROM"
+                position="bottom-left"
+                pannable
+                zoomable
+                :width="160"
+                :height="110"
+                :node-color="minimapColor"
+                :node-border-radius="2"
+                mask-color="rgba(241, 245, 249, 0.6)"
+                mask-stroke-color="#475569"
+                :mask-stroke-width="2"
+              />
 
               <div class="canvas-toolbar">
                 <GraphDensityToggle
