@@ -64,3 +64,22 @@ describe("a step that lacks a required input from all its upstream steps", () =>
     expect(item.edgeId).toBeUndefined();
   });
 });
+
+describe("builderReadiness: links", () => {
+  it("names a link's output and input, and what it needs, with the steps underneath", () => {
+    const r = builderReadiness({
+      name: "x",
+      nodes: [],
+      edgeIssues: [
+        { id: "e1", source: "Test Ports Processor (1)", target: "Test Ports Processor (2)", targetId: "b", output: "summary", input: "signals", needs: "CSV" },
+        { id: "e2", source: "spike", target: "plot", targetId: "p" },
+      ],
+    });
+    const [link, plain] = r.warnings;
+    expect(link.text).toBe("summary → signals: needs CSV");
+    expect(link.detail).toBe("Test Ports Processor (1) → Test Ports Processor (2)");
+    expect(link.edgeId).toBe("e1");
+    expect(plain.text).toBe("spike → plot: the types don't match");
+  });
+});
+
