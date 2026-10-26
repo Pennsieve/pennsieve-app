@@ -244,7 +244,7 @@
               </div>
 
               <!-- A file or a folder: its format -->
-              <div v-if="portMode(port) !== 'layout'" class="field-row full-width" :data-field="`${block.key}.${index}.mediaTypes`" :class="rowClass(`${block.key}.${index}.mediaTypes`)">
+              <div v-if="portMode(port) !== 'layout'" class="field-row full-width" :data-field="`${block.key}.${index}.mediaTypes`" :class="{ 'has-problem': formatProblems(port, `${block.key}.${index}.mediaTypes`).length > 0 }">
                 <label class="field-label">{{ portMode(port) === "folder" ? "Folder format" : "Media type" }}</label>
                 <div class="field-control">
                   <!-- Searchable by format name, extension or media type -->
@@ -254,7 +254,7 @@
                     filterable
                     :filter-method="(q) => (mediaTypeQuery = q)"
                     :placeholder="portMode(port) === 'folder' ? 'e.g. OME-Zarr, MEF3' : 'Search formats, e.g. NWB, .edf'"
-                    @visible-change="(open) => open || (mediaTypeQuery = '')"
+                    @visible-change="(open) => open || ((mediaTypeQuery = ''), formatTouched.add(toRaw(port)))"
                     @change="(v) => onPortDataTypeChange(port, v)"
                   >
                     <el-option
@@ -277,7 +277,7 @@
                     {{ block.key === "inputs" ? "gets" : "writes" }} each one as stored<template v-if="optionFor(port.dataType).extensions?.length"> ({{ optionFor(port.dataType).extensions.join(", ") }})</template>.
                     <button type="button" class="link-button" @click="setPortMode(port, 'folder')">Use folders<template v-if="optionFor(port.dataType).folderExtensions?.length"> ({{ optionFor(port.dataType).folderExtensions.map((e) => `*${e}/`).join(", ") }})</template> instead</button>
                   </p>
-                  <p v-for="m in at(`${block.key}.${index}.mediaTypes`)" :key="m" class="field-error">{{ m }}</p>
+                  <p v-for="m in formatProblems(port, `${block.key}.${index}.mediaTypes`)" :key="m" class="field-error">{{ m }}</p>
                 </div>
               </div>
 
@@ -645,6 +645,11 @@ const PLACEMENTS = [
   { value: "subfolder", label: "Its own folder" },
 ];
 const chosenModes = reactive(new WeakMap());
+// "Needs a folder format" waits until the author has opened the format list
+// and left it empty, rather than appearing the moment Folders is chosen.
+const formatTouched = reactive(new WeakSet());
+const formatProblems = (port, key) =>
+  portMode(port) === "folder" && port.dataType === "any" && !formatTouched.has(toRaw(port)) ? [] : at(key);
 const portMode = (port) => {
   if (conformsToList(port.conformsTo).length) return "layout";
   if (port.container === "directory") return "folder";

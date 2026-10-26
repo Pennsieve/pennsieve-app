@@ -212,8 +212,17 @@
       "description": "An input or output. Without mediaTypes, formats or conformsTo it accepts any file.",
       "additionalProperties": false,
       "required": ["name"],
-      "if": { "required": ["placement"], "properties": { "placement": { "const": "subfolder" } } },
-      "then": { "properties": { "name": { "pattern": "^[a-z0-9][a-z0-9-]*$" } } },
+      "allOf": [
+        {
+          "if": { "required": ["placement"], "properties": { "placement": { "const": "subfolder" } } },
+          "then": { "properties": { "name": { "pattern": "^[a-z0-9][a-z0-9-]*$" } } }
+        },
+        {
+          "$comment": "Folders of a format need the format: container directory without conformsTo names at least one media type.",
+          "if": { "required": ["container"], "properties": { "container": { "const": "directory" } }, "not": { "required": ["conformsTo"] } },
+          "then": { "required": ["mediaTypes"], "properties": { "mediaTypes": { "minItems": 1 } } }
+        }
+      ],
       "properties": {
         "name": { "type": "string", "minLength": 1, "description": "Its name: an identifier, e.g. study. With placement subfolder it is also the input's folder name." },
         "description": { "type": "string", "description": "What it is." },
