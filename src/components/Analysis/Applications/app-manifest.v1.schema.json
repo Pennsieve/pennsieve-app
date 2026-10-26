@@ -199,9 +199,17 @@
         "max": { "type": "number", "description": "For a number or integer: the largest value." }
       }
     },
+    "structureRef": {
+      "type": "string",
+      "description": "A structure id from the Pennsieve format registry, optionally with a version (bids, bids@1.9), or a link to a specification.",
+      "anyOf": [
+        { "pattern": "^[a-z0-9][a-z0-9-]*(@[0-9A-Za-z.+-]+)?$" },
+        { "pattern": "^https://[^\\s]+$" }
+      ]
+    },
     "port": {
       "type": "object",
-      "description": "An input or output. Without mediaTypes or formats it accepts any file.",
+      "description": "An input or output. Without mediaTypes, formats or conformsTo it accepts any file.",
       "additionalProperties": false,
       "required": ["name"],
       "properties": {
@@ -216,6 +224,19 @@
           "type": "array",
           "description": "EDAM format identifiers (https://edamontology.org/page), for scientific formats without a MIME type, e.g. format_3590 (HDF5) or http://edamontology.org/format_3549 (NIfTI-1). EDAM has no id for some formats (EDF, NWB, MEF3); use mediaTypes for those.",
           "items": { "type": "string", "pattern": "^(http://edamontology\\.org/)?format_\\d{4}$" }
+        },
+        "container": {
+          "type": "string",
+          "enum": ["file", "directory"],
+          "default": "file",
+          "description": "How folder-format items (a registry format with kind directory, such as OME-Zarr or MEF3) are given to the app, or written by it. directory: each item as a plain folder with the format's folder ending (e.g. brain-01.ome.zarr/, session.mefd/); an input can take several, so expect one or more folders. file: each item as Pennsieve stores it, one compressed file. The default is file, except with conformsTo, where it is directory, since a structure is specified in its unpacked form (BIDS expects .ome.zarr folders). See https://github.com/Pennsieve/app-deploy-service/blob/main/docs/app-manifest-folders.md."
+        },
+        "conformsTo": {
+          "description": "The folder structure the whole input follows, or that the app writes: a structure id from the Pennsieve format registry with an optional version (bids, bids@1.9), or a link to any other specification (https://…, matched only by the same link). A list nests structures, outermost first: [pennsieve-published-dataset, bids] is a published dataset whose files/ folder is BIDS. The input is always a folder tree with its paths kept; mediaTypes then say what the tree holds, and container how folder-format items in it are given (directory unless set).",
+          "oneOf": [
+            { "$ref": "#/$defs/structureRef" },
+            { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/structureRef" } }
+          ]
         },
         "required": { "type": "boolean", "description": "Whether a run must give it something." },
         "dataType": {
