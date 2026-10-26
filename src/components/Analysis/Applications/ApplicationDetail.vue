@@ -14,6 +14,7 @@ import { fetchRepository, canUpdateManifest } from "./githubRepository";
 import ReleaseDialog from "./ReleaseDialog.vue";
 import ShareAppDialog from "./ShareAppDialog.vue";
 import { accessEntries, accessSummary, makeNamer } from "./appSharing";
+import { useWorkspaceMembers } from "./useWorkspaceMembers";
 import { fetchReleaseStatus, releaseNudge } from "./release";
 import AppArchiveToggle from "../../user/code/AppArchiveToggle.vue";
 import { useGetToken } from "@/composables/useGetToken";
@@ -178,13 +179,18 @@ const onArchiveChange = (status) => {
 */
 const permissions = ref([]);
 const shareOpen = ref(false);
+// People shared with may come from any of the caller's workspaces: name them.
+const { allMembers, load: loadAllMembers } = useWorkspaceMembers();
+watch(permissions, (perms) => {
+  if ((perms || []).some((p) => p?.entityType === "user" || p?.userId)) loadAllMembers();
+});
 const viewingOrgId = computed(() => store.state.activeOrganization?.organization?.id || null);
 const accessList = computed(() =>
   accessEntries(
     permissions.value,
     makeNamer({
       profile: profile.value,
-      members: store.state.orgMembers || [],
+      members: [...(store.state.orgMembers || []), ...allMembers.value],
       teams: store.state.teams || [],
       organizations: store.state.organizations || [],
     }),
