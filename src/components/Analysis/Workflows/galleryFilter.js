@@ -92,16 +92,21 @@ export function sortWorkflows(list, sort = "recent", { applications = [] } = {})
 
 // The Workflows tab's views: Library (the workflows), Live (their runs),
 // Builder. Without one in the URL, the view last used, else Library.
+// Live first: what's running and how it went is what's looked at most; then
+// the Library, to start a workflow; then the Builder, to make one.
 export const WORKFLOW_VIEWS = [
-  { key: "library", label: "Library" },
   { key: "live", label: "Live" },
+  { key: "library", label: "Library" },
   { key: "builder", label: "Builder" },
 ];
-export function workflowsView(requested, last) {
+// The view to show: the one asked for (?view), else the one last used here,
+// else, on a first visit, Live when the workspace has runs (hasRuns) and the
+// Library when it has none (nothing to watch yet).
+export function workflowsView(requested, last, hasRuns = false) {
   const known = (v) => WORKFLOW_VIEWS.some((o) => o.key === v);
   if (known(requested)) return requested;
   if (known(last)) return last;
-  return "library";
+  return hasRuns ? "live" : "library";
 }
 
 // The Library lists workflows to run; notebooks start on the Notebooks tab.

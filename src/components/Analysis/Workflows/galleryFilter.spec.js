@@ -99,6 +99,9 @@ describe("workflowsView", () => {
     expect(workflowsView("live", "builder")).toBe("live");
     expect(workflowsView(undefined, "builder")).toBe("builder");
     expect(workflowsView(undefined, null)).toBe("library");
+    // A first visit: Live when there are runs to see, the Library when none.
+    expect(workflowsView(undefined, null, true)).toBe("live");
+    expect(workflowsView(undefined, "library", true)).toBe("library");
     expect(workflowsView("apps", "nonsense")).toBe("library");
   });
 });
