@@ -382,10 +382,23 @@
               <div v-if="block.key === 'inputs'" class="field-row full-width">
                 <label class="field-label">Placed at</label>
                 <div class="field-control">
-                  <el-radio-group :model-value="port.placement || 'root'" @update:model-value="(v) => (port.placement = v === 'root' ? '' : v)">
-                    <el-radio value="root">The root of INPUT_DIR</el-radio>
-                    <el-radio value="subfolder">Its own folder: <code>INPUT_DIR/{{ port.name || "<name>" }}/</code></el-radio>
-                  </el-radio-group>
+                  <div class="kind-switch" role="radiogroup" aria-label="Where the input is placed">
+                    <button
+                      v-for="pl in PLACEMENTS"
+                      :key="pl.value"
+                      type="button"
+                      role="radio"
+                      class="kind-option"
+                      :class="{ active: (port.placement || 'root') === pl.value }"
+                      :aria-checked="(port.placement || 'root') === pl.value"
+                      @click="port.placement = pl.value === 'root' ? '' : pl.value"
+                    >
+                      {{ pl.label }}
+                    </button>
+                  </div>
+                  <p class="field-hint">
+                    Data is at <code>$INPUT_DIR/<template v-if="port.placement === 'subfolder'">{{ port.name || "&lt;name&gt;" }}/</template></code><template v-if="(port.placement || 'root') === 'root'">, beside any other input placed at the root</template>.
+                  </p>
                   <p v-if="(port.placement || 'root') === 'root' && rootInputs.length > 1" class="field-error">
                     {{ rootInputs.length }} inputs are at the root of INPUT_DIR and would mix. Give all but one their own folder.
                   </p>
@@ -647,6 +660,11 @@ const PORT_MODES = [
   { value: "file", label: "Files", hint: "Each item is one file: an EDF recording, a DICOM slice, a CSV table. A folder of them is fine; paths are kept." },
   { value: "folder", label: "Folders of a format", hint: "Each item is a folder that is one thing, in a folder format: an .ome.zarr image, a .mefd session." },
   { value: "layout", label: "One folder with a set layout", hint: "One folder tree laid out by a standard, such as BIDS or a Pennsieve published dataset." },
+];
+// Where an input's data goes in INPUT_DIR (app.yml placement).
+const PLACEMENTS = [
+  { value: "root", label: "Root of INPUT_DIR" },
+  { value: "subfolder", label: "Its own folder" },
 ];
 const chosenModes = reactive(new WeakMap());
 const portMode = (port) => {
