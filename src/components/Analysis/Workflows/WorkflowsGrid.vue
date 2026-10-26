@@ -448,8 +448,8 @@ onMounted(async () => {
 }
 
 .workflows-search-input {
+  /* The row's width up to the sort, so it lines up with the cards below. */
   flex: 1;
-  max-width: 420px;
 }
 .sort-control {
   display: flex;
