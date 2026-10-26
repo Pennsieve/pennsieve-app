@@ -7,6 +7,7 @@
 import { onMounted, onBeforeUnmount, nextTick, ref, computed, watch } from "vue";
 import { useRoute, useRouter, onBeforeRouteLeave } from "vue-router";
 import { useJupyterSession } from "@/composables/useJupyterSession";
+import { markSessionEnded } from "../RunMonitor/endedSessions";
 import NotebookCell from "./NotebookCell.vue";
 import FileBrowser from "./FileBrowser.vue";
 import InputsPanel from "./InputsPanel.vue";
@@ -473,7 +474,11 @@ async function endSession(saveFirst) {
     ending.value = false;
     if (status.value === "closed") confirmEnd.value = false;
   }
-  if (status.value === "closed") router.replace(runRoute.value);
+  if (status.value === "closed") {
+    // The run page says it's saving and finishing, not just "Running".
+    markSessionEnded(props.runId);
+    router.replace(runRoute.value);
+  }
 }
 
 // Command-mode keyboard shortcuts (ignored while a CodeMirror editor has focus).
