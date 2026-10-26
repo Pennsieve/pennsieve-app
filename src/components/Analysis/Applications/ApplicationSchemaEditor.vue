@@ -368,6 +368,17 @@
                 </div>
               </div>
               <!-- Where the input's data goes in INPUT_DIR -->
+              <!-- Where an output is written: the whole OUTPUT_DIR, or its own folder -->
+              <div v-if="block.key === 'outputs'" class="field-row full-width">
+                <label class="field-label">Written to</label>
+                <div class="field-control">
+                  <span class="field-static"><code>$OUTPUT_DIR/<template v-if="(schema.outputs || []).length > 1">{{ port.name || "&lt;name&gt;" }}/</template></code></span>
+                  <p class="field-hint">
+                    <template v-if="(schema.outputs || []).length > 1">With two or more outputs, each goes in its own folder, so a workflow can send each one to its own data target.</template>
+                    <template v-else>With one output, it's the whole of OUTPUT_DIR.</template>
+                  </p>
+                </div>
+              </div>
               <div v-if="block.key === 'inputs'" class="field-row full-width">
                 <label class="field-label">Placed at</label>
                 <div class="field-control">

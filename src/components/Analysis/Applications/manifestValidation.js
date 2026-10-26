@@ -18,6 +18,8 @@ const PATTERN_HINTS = [
   [/\.formats\.\d+$/, "must be an EDAM format id, like format_3590"],
   [/\.mediaTypes\.\d+$/, "must be a media type, like text/csv"],
   [/(^|\.)email$/, "must be an email address"],
+  // With two or more outputs, each is written to OUTPUT_DIR/<name>/.
+  [/^outputs\.\d+\.name$/, "is a folder name with two or more outputs: lowercase letters, numbers and dashes"],
 ];
 const patternHint = (path) =>
   (PATTERN_HINTS.find(([re]) => re.test(path)) || [null, "isn't in the expected form"])[1];

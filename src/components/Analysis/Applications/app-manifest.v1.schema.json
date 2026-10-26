@@ -29,8 +29,10 @@
     },
     "outputs": {
       "type": "array",
-      "description": "What the app writes.",
-      "items": { "$ref": "#/$defs/port" }
+      "description": "What the app writes. With one output it is the whole of OUTPUT_DIR; with two or more, each is written to its own folder, OUTPUT_DIR/<name>/, so a workflow can route each output on its own (names must then be folder-safe).",
+      "items": { "$ref": "#/$defs/port" },
+      "if": { "minItems": 2 },
+      "then": { "items": { "properties": { "name": { "pattern": "^[a-z0-9][a-z0-9-]*$" } } } }
     },
     "commandArguments": {
       "type": "array",
