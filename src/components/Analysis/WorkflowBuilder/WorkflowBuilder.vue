@@ -48,6 +48,17 @@ import { builderReadiness } from "./builderReadiness";
 import StepPicker from "./StepPicker.vue";
 import { useGraphHistory, snapshot } from "./graphHistory";
 import { canConnect, neighbourInDirection } from "./graphEditing";
+import {
+  routedOutputs,
+  portHandleId,
+  portOfHandle,
+  canConnectFromHandle,
+  withPortPrefix,
+  withoutPortPrefix,
+  prefixParamOf,
+  PREFIX_PARAMS,
+  attachPorts,
+} from "./outputPorts";
 import { requiredUnset } from "./builderReadiness";
 import { fitsAfter } from "./appManifestInfo";
 
@@ -478,6 +489,9 @@ const setManifestPorts = (node, parsed) => {
     outputs: parsed.schema.outputs || [],
   };
   node.data.hasManifest = true;
+  // A reopened workflow's links into data targets leave from the output
+  // ports their prefixes name, once the ports are known.
+  edges.value = attachPorts(edges.value, nodes.value);
   // A manifest can land after the user has already drawn the edge — the
   // connection was made against no port information at all, so re-check
   // everything now that we have some.
@@ -1035,17 +1049,36 @@ const addNode = (type, app, position) => {
 
 // Connects two steps, with the same checks and feedback as dragging a
 // connection between them.
-const connectNodes = (sourceId, targetId) => {
+const connectNodes = (sourceId, targetId, sourceHandle) => {
   const src = nodes.value.find((n) => n.id === sourceId);
   const tgt = nodes.value.find((n) => n.id === targetId);
   if (!canConnect(src, tgt, edges.value)) return false;
+  const port = portOfHandle(sourceHandle);
+  if (port) {
+    // An output port routes one output to one data target.
+    if (!canConnectFromHandle(src, tgt, sourceHandle)) {
+      ElMessage({ type: "info", showClose: true, message: `The ${port} output connects to a data target. Connect apps from the step's main connection point.` });
+      return false;
+    }
+    if (edges.value.some((e) => e.target === targetId)) {
+      ElMessage({ type: "info", showClose: true, message: "A data target fed by an output takes that one link. Remove its other link first." });
+      return false;
+    }
+    if (!prefixParamOf(getTargetTypeParams(tgt.data.targetType))) {
+      ElMessage({ type: "info", showClose: true, message: "This kind of data target takes a step's whole output, not one output. Connect it from the step's main connection point." });
+      return false;
+    }
+  }
   edges.value.push({
     id: `e${sourceId}-${targetId}`,
     source: sourceId,
     target: targetId,
+    ...(port && { sourceHandle }),
     animated: false,
     style: { stroke: nodeTypeColor(src.type) },
   });
+  // The target takes only this output's folder: OUTPUT_DIR/<port>/.
+  if (port) tgt.data.defaultParams = withPortPrefix(tgt.data.defaultParams, port, prefixParamOf(getTargetTypeParams(tgt.data.targetType)));
   reportConnectionCheck(src, tgt);
   revalidateEdges();
   return true;
@@ -1139,7 +1172,7 @@ onConnect((params) => {
 
   // Self-loops, duplicates, into an input or out of an output are refused;
   // the rest get a toast and the persistent marks (connectNodes).
-  connectNodes(params.source, params.target);
+  connectNodes(params.source, params.target, params.sourceHandle);
 });
 
 /*
@@ -1371,14 +1404,26 @@ const reportConnectionCheck = (srcNode, tgtNode) => {
   });
 };
 
+// The output port feeding a node, or "" when none does.
+const feedingPort = (nodeId) => portOfHandle(edges.value.find((e) => e.target === nodeId && e.sourceHandle)?.sourceHandle);
+
+// Removes the edges that match, and the path prefix an output port's link
+// set on its data target.
+const dropEdges = (matches) => {
+  edges.value.filter(matches).forEach((e) => {
+    const port = portOfHandle(e.sourceHandle);
+    const tgt = port && nodes.value.find((n) => n.id === e.target);
+    if (tgt) tgt.data.defaultParams = withoutPortPrefix(tgt.data.defaultParams, port);
+  });
+  edges.value = edges.value.filter((e) => !matches(e));
+};
+
 const removeNode = (nodeId) => {
   const nodeIndex = nodes.value.findIndex((n) => n.id === nodeId);
   if (nodeIndex === -1) return;
 
   // Remove associated edges
-  edges.value = edges.value.filter(
-    (edge) => edge.source !== nodeId && edge.target !== nodeId,
-  );
+  dropEdges((edge) => edge.source === nodeId || edge.target === nodeId);
 
   // Remove node
   nodes.value.splice(nodeIndex, 1);
@@ -1513,7 +1558,7 @@ const deleteSelection = () => {
   const selectedEdges = edges.value.filter((e) => e.selected).map((e) => e.id);
   const selectedNodes = nodes.value.filter((n) => n.selected).map((n) => n.id);
   if (selectedEdges.length) {
-    edges.value = edges.value.filter((e) => !selectedEdges.includes(e.id));
+    dropEdges((e) => selectedEdges.includes(e.id));
     revalidateEdges();
   }
   selectedNodes.forEach((id) => removeNode(id));
@@ -2205,6 +2250,18 @@ const openNodeSettings = (id) => {
 
               <template #node-default="{ data, id }">
                 <Handle id="target" type="target" :position="Position.Top" />
+                <template v-if="!detailed">
+                  <Handle
+                    v-for="(p, i) in routedOutputs(data.manifestPorts)"
+                    :key="p.name"
+                    :id="portHandleId(p.name)"
+                    type="source"
+                    :position="Position.Bottom"
+                    class="port-handle port-handle--compact"
+                    :style="{ left: `${((i + 1) * 100) / (routedOutputs(data.manifestPorts).length + 2)}%` }"
+                    :title="`${p.name}: connect to a data target to send this output there`"
+                  />
+                </template>
                 <CompactFlowNode
                   v-if="!detailed"
                   kind="processor"
@@ -2292,8 +2349,22 @@ const openNodeSettings = (id) => {
                     }}</span>
                   </div>
                   <div v-if="data.manifestPorts?.outputs?.length" class="node-ports node-ports--out">
-                    <span v-for="p in data.manifestPorts.outputs" :key="p.name" class="node-port" :title="p.description">
+                    <span
+                      v-for="p in data.manifestPorts.outputs"
+                      :key="p.name"
+                      class="node-port"
+                      :class="{ 'node-port--routed': routedOutputs(data.manifestPorts).length }"
+                      :title="routedOutputs(data.manifestPorts).length ? `${p.description || p.name} — connect to a data target to send it there` : p.description"
+                    >
                       {{ p.name }}<template v-if="portTypes(p)"> · {{ portTypes(p) }}</template>
+                      <!-- Two or more outputs: each its own connection point -->
+                      <Handle
+                        v-if="routedOutputs(data.manifestPorts).length"
+                        :id="portHandleId(p.name)"
+                        type="source"
+                        :position="Position.Bottom"
+                        class="port-handle"
+                      />
                     </span>
                   </div>
                   <div v-else-if="!data.hasManifest" class="node-ports node-ports--none">No manifest</div>
@@ -2705,16 +2776,24 @@ const openNodeSettings = (id) => {
                       0
                     "
                   >
-                    <ParamField
+                    <template
                       v-for="param in getTargetTypeParams(
                         selectedNode.data.targetType,
                       )"
                       :key="param.name"
-                      :param="param"
-                      :editable="canEditConfig"
-                      :model-value="selectedNode.data.defaultParams?.[param.name]"
-                      @update:model-value="(v) => setDefaultParam(param.name, v)"
-                    />
+                    >
+                      <!-- Fed by an output port: the prefix is that output's folder -->
+                      <ParamField
+                        :param="param"
+                        :editable="canEditConfig && !(PREFIX_PARAMS.includes(param.name) && feedingPort(selectedNode.id))"
+                        :model-value="selectedNode.data.defaultParams?.[param.name]"
+                        @update:model-value="(v) => setDefaultParam(param.name, v)"
+                      />
+                      <p v-if="PREFIX_PARAMS.includes(param.name) && feedingPort(selectedNode.id)" class="port-prefix-note">
+                        Set by the <strong>{{ feedingPort(selectedNode.id) }}</strong> output it's connected to: this target takes only
+                        that output's folder.
+                      </p>
+                    </template>
                   </template>
                   <div v-else class="info-row">
                     <span class="info-value">No parameters</span>
@@ -3935,6 +4014,25 @@ kbd {
   border-radius: 3px;
   background: theme.$gray_0;
   color: theme.$gray_5;
+}
+.port-prefix-note {
+  margin: -4px 0 10px;
+  font-size: 12px;
+  color: theme.$gray_5;
+}
+/* An output with its own connection point (two or more outputs). */
+.node-port--routed {
+  position: relative;
+  padding-bottom: 2px;
+}
+.port-handle {
+  width: 9px;
+  height: 9px;
+  background: theme.$purple_3;
+  border: 2px solid theme.$white;
+}
+.node-port--routed .port-handle {
+  bottom: -11px;
 }
 
 /* The + under a step: what comes next. Shown on hover and selection. */

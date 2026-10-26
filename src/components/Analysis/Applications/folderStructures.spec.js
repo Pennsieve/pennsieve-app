@@ -142,6 +142,13 @@ describe('folder formats and structures in app.yml', () => {
     expect(rootInputCollisions([study, { ...pdf, placement: 'subfolder' }]).size).toBe(0)
   })
 
+  it('needs folder-safe output names once there are two or more outputs', () => {
+    const one = loadYaml('application:\n  name: a\noutputs:\n  - name: My Figures\n')
+    expect(validateManifestDoc(one)).toEqual({ valid: true, problems: [] })
+    const two = loadYaml('application:\n  name: a\noutputs:\n  - name: labels\n  - name: My Figures\n')
+    expect(validateManifestDoc(two).problems).toEqual([{ path: 'outputs.1.name', message: 'is a folder name with two or more outputs: lowercase letters, numbers and dashes' }])
+  })
+
   it('matches structures by id, whatever the version', () => {
     const bids = createPort({ conformsTo: 'bids' })
     expect(arePortsCompatible(createPort({ conformsTo: 'bids@1.9' }), bids)).toBe(true)
