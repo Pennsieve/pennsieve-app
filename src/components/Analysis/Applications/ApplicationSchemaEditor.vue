@@ -225,7 +225,7 @@
                 <div class="field-control">
                   <el-input v-if="portMode(port) !== 'file' || port.dataType === 'any'" v-model="port.name" :placeholder="portMode(port) === 'layout' ? 'study' : 'files'" maxlength="50" />
                   <span v-else class="field-static" :class="{ 'is-empty': !port.name }">{{ port.name || "Select a media type" }}</span>
-                  <p v-if="portMode(port) !== 'file' || port.dataType === 'any'" class="field-hint">A label for this {{ block.singular }}; not a folder name.</p>
+                  <p v-if="portMode(port) !== 'file' || port.dataType === 'any'" class="field-hint">An identifier, e.g. <code>study</code> (lowercase, no spaces).</p>
                   <p v-for="m in at(`${block.key}.${index}.name`)" :key="m" class="field-error">{{ m }}</p>
                 </div>
               </div>
@@ -283,6 +283,12 @@
                       </span>
                     </el-option>
                   </el-select>
+                  <!-- A folder format picked as files: say what the app gets -->
+                  <p v-if="portMode(port) === 'file' && optionFor(port.dataType)?.kind === 'directory'" class="field-hint">
+                    {{ optionFor(port.dataType).formats?.[0] || port.dataType }} is a folder format. As files, the app
+                    {{ block.key === "inputs" ? "gets" : "writes" }} each one as stored<template v-if="optionFor(port.dataType).extensions?.length"> ({{ optionFor(port.dataType).extensions.join(", ") }})</template>.
+                    <button type="button" class="link-button" @click="setPortMode(port, 'folder', { keepFormat: true })">Use folders<template v-if="optionFor(port.dataType).folderExtensions?.length"> ({{ optionFor(port.dataType).folderExtensions.map((e) => `*${e}/`).join(", ") }})</template> instead</button>
+                  </p>
                   <p v-for="m in at(`${block.key}.${index}.mediaTypes`)" :key="m" class="field-error">{{ m }}</p>
                 </div>
               </div>
@@ -623,12 +629,14 @@ const portMode = (port) => {
   if (port.container === "directory") return "folder";
   return chosenModes.get(toRaw(port)) || "file";
 };
-const setPortMode = (port, mode) => {
+const setPortMode = (port, mode, { keepFormat = false } = {}) => {
   if (portMode(port) === mode) return;
   chosenModes.set(toRaw(port), mode);
-  // Start the new mode clean: what one mode picked means nothing in another.
   port.conformsTo = [];
   port.container = mode === "folder" ? "directory" : "";
+  // Start the new mode clean, unless the format carries over (a folder
+  // format picked as files, switched to folders).
+  if (keepFormat) return;
   port.dataType = "any";
   port.mediaTypes = [];
   port.formats = [];
@@ -839,6 +847,15 @@ const removePort = (key, i) => schema.value[key].splice(i, 1);
     color: theme.$purple_3;
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
   }
+}
+.link-button {
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  color: theme.$purple_3;
+  cursor: pointer;
+  text-decoration: underline;
 }
 .mt-wrap {
   white-space: normal;
