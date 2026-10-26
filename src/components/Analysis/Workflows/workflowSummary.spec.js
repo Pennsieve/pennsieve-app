@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { ioSummary, appNames, usageLine } from "./workflowSummary";
+import { ioSummary, appNames, usageLine, cardText } from "./workflowSummary";
 
 const wf = {
   dag: [
@@ -32,5 +32,14 @@ describe("usageLine", () => {
     expect(usageLine({ metrics: { totalRuns: 12, lastRunAt: "x" } }, () => "2 days ago")).toBe("Run 12× · last 2 days ago");
     expect(usageLine({ metrics: { totalRuns: 3 } }, () => "")).toBe("Run 3×");
     expect(usageLine({}, () => "")).toBe("Never run");
+  });
+});
+
+describe("cardText", () => {
+  it("is the summary, else the description as plain text", () => {
+    expect(cardText({ summary: "Ports and LLM", description: "# Long" })).toBe("Ports and LLM");
+    expect(cardText({ description: "End-to-end test.\n\n- **signals** (CSV) and `events` feed [A](https://x).\n## Next" }))
+      .toBe("End-to-end test. signals (CSV) and events feed A. Next");
+    expect(cardText({})).toBe("");
   });
 });
