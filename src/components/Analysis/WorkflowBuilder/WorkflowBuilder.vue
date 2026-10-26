@@ -41,7 +41,7 @@ import BuilderBar from "./BuilderBar.vue";
 import BuilderPalette from "./BuilderPalette.vue";
 import ParamField from "./ParamField.vue";
 import { ioLine, sessionTypeOf, versionManifest, shortMediaType } from "./appManifestInfo";
-import { appColors, domainOf, domainColors } from "../Applications/appDomains";
+import { appColors, domainOfTag, domainColors } from "../Applications/appDomains";
 import { clearManifestDraft } from "../Applications/manifestDrafts";
 import { diffLines, manifestDiff, versionWarnings } from "./manifestDiff";
 import { builderReadiness } from "./builderReadiness";
@@ -289,7 +289,7 @@ const stepAbout = computed(() => {
   };
 });
 const tagStyle = (tag) => {
-  const c = domainColors(domainOf({ tags: [tag] }));
+  const c = domainColors(domainOfTag(tag));
   return { background: c.bg, color: c.ink, borderColor: c.line };
 };
 const nodeLabel = (id) => nodes.value.find((n) => n.id === id)?.data?.label || "a step";
