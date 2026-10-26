@@ -262,7 +262,6 @@ onMounted(async () => {
         <el-input
           v-model="searchQuery"
           placeholder="Search by name, app, input or output…"
-          size="small"
           clearable
           class="workflows-search-input"
         />
@@ -450,11 +449,6 @@ onMounted(async () => {
 .workflows-search-input {
   flex: 1;
   max-width: 420px;
-}
-/* As tall as the small selects beside it, not the global 40px. */
-.workflows-search-input.el-input {
-  --el-input-height: 24px;
-  --el-input-inner-height: 22px;
 }
 .sort-control {
   display: flex;
