@@ -39,7 +39,10 @@ export function shortMediaType(t) {
   if (t === "application/octet-stream") return "File";
   let sub = String(t).split("/").pop().replace(/^x-/, "").split("+")[0];
   if (sub.startsWith("vnd.")) sub = sub.split(".").pop();
-  return sub.split(/[.-]/)[0].toUpperCase();
+  // The whole name ("open-ephys" -> "OPEN-EPHYS", "ome-zarr" -> "OME-ZARR"):
+  // cutting at the first dash left "OPEN" and "OME". Only a compression
+  // suffix is dropped ("nifti-gz" -> "NIFTI").
+  return sub.replace(/-(gz|gzip|zip)$/, "").toUpperCase();
 }
 
 const portsLabel = (ports) => {
