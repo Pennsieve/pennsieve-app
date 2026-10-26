@@ -332,6 +332,15 @@ const clearStepDraft = async (node) => {
   );
 };
 const showAdvanced = ref(false);
+// An app step's panel: Settings (what you set) or About (what the app is).
+// Settings when the workflow can be edited, About when it can't.
+const stepTab = ref("settings");
+watch(
+  () => selectedNode.value?.id,
+  () => {
+    stepTab.value = canEditConfig.value ? "settings" : "about";
+  }
+);
 
 /*
   A step's app version: pinned (data.tag). Switching shows what changes,
@@ -2790,6 +2799,20 @@ const openNodeSettings = (id) => {
               <template v-if="selectedNode.type === 'default'">
                 <div class="step-head">
                   <h3 class="step-name" :title="selectedNode.data?.label">{{ selectedNode.data?.label || "Step" }}</h3>
+                </div>
+                <p v-if="selectedNode.data.draftManifest" class="step-draft">
+                  Using a draft app.yml saved in this browser.
+                  <button type="button" class="text-link-btn" @click="clearStepDraft(selectedNode)">Use the released one</button>
+                </p>
+                <!-- What you set for this step, or what the app is -->
+                <el-radio-group v-model="stepTab" size="small" class="step-tabs" aria-label="Step details">
+                  <el-radio-button value="settings">Settings</el-radio-button>
+                  <el-radio-button value="about">About</el-radio-button>
+                </el-radio-group>
+
+                <template v-if="stepTab === 'settings'">
+                <h4 class="sidebar-section-title">Version</h4>
+                <div class="step-version-row">
                   <el-select
                     v-if="canEditConfig && selectedNode.data.application?.versions?.length"
                     :model-value="selectedNode.data.tag"
@@ -2805,12 +2828,8 @@ const openNodeSettings = (id) => {
                       :value="v.version"
                     />
                   </el-select>
-                  <span v-else class="step-version-text">{{ selectedNode.data.tag || "" }}</span>
+                  <span v-else class="step-version-text">{{ selectedNode.data.tag || "—" }}</span>
                 </div>
-                <p v-if="selectedNode.data.draftManifest" class="step-draft">
-                  Using a draft app.yml saved in this browser.
-                  <button type="button" class="text-link-btn" @click="clearStepDraft(selectedNode)">Use the released one</button>
-                </p>
                 <div v-if="newerVersion" class="update-note">
                   <div class="update-head">
                     <span>Update available: <strong>{{ newerVersion }}</strong></span>
@@ -2821,6 +2840,10 @@ const openNodeSettings = (id) => {
                   </ul>
                   <p v-else class="update-lines-none">No changes declared in app.yml.</p>
                 </div>
+                </template>
+
+                <!-- About: read only, from the app.yml and the canvas -->
+                <template v-if="stepTab === 'about'">
                 <p v-if="stepAbout?.description" class="step-desc">{{ stepAbout.description }}</p>
                 <div v-if="stepAbout?.tags?.length" class="step-tags">
                   <span v-for="tag in stepAbout.tags" :key="tag" class="step-tag" :style="tagStyle(tag)">{{ tag }}</span>
@@ -2896,6 +2919,7 @@ const openNodeSettings = (id) => {
                       <span class="port-link">→ {{ stepPorts.allTo.join(", ") }}</span>
                     </div>
                   </div>
+                </template>
                 </template>
               </template>
 
@@ -2978,7 +3002,7 @@ const openNodeSettings = (id) => {
 
               <!-- Processor settings (editable in create mode): folded, as
                    the app's own resources usually do. -->
-              <template v-if="selectedNode.type === 'default' && !isReadOnly">
+              <template v-if="selectedNode.type === 'default' && !isReadOnly && stepTab === 'settings'">
                 <button type="button" class="advanced-toggle" :aria-expanded="showAdvanced" @click="showAdvanced = !showAdvanced">
                   <span class="advanced-caret" :class="{ open: showAdvanced }">▸</span>
                   Compute and resources<span class="advanced-summary">{{ resourcesSummary(selectedNode.data) }}</span>
@@ -3099,6 +3123,7 @@ const openNodeSettings = (id) => {
               <template
                 v-if="
                   selectedNode.type === 'default' &&
+                  stepTab === 'settings' &&
                   selectedNodeParamSchema.length > 0
                 "
               >
@@ -4276,8 +4301,13 @@ kbd {
   text-overflow: ellipsis;
 }
 .step-version {
-  width: 140px;
-  flex-shrink: 0;
+  width: 100%;
+}
+.step-version-row {
+  margin-bottom: 8px;
+}
+.step-tabs {
+  margin: 4px 0 10px;
 }
 .step-version-text {
   font-size: 12px;
