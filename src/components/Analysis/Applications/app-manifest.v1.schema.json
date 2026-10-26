@@ -253,7 +253,7 @@
           "type": "string",
           "enum": ["root", "subfolder"],
           "default": "root",
-          "description": "Where an input's data is placed. root (the default): at the root of INPUT_DIR. subfolder: in its own folder, INPUT_DIR/<name>/, so inputs that would collide (two BIDS trees) stay apart; the name must then be folder-safe (lowercase letters, numbers, dashes). At most one input may be at the root."
+          "description": "Where an input's data is placed. root (the default): at the root of INPUT_DIR. subfolder: in its own folder, INPUT_DIR/<name>/, so inputs that would collide (two BIDS trees) stay apart; the name must then be folder-safe (lowercase letters, numbers, dashes). Inputs of different media types can share the root (the app tells them apart by type); inputs that share a type, take any file, or are a layout need their own folders."
         },
         "required": { "type": "boolean", "description": "Whether a run must give it something." },
         "dataType": {

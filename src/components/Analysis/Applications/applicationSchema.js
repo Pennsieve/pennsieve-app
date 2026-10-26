@@ -636,6 +636,39 @@ const manifestPort = (port) => {
   return out;
 };
 
+/**
+ * Inputs at the root of INPUT_DIR that would mix with another root input,
+ * each with why. Inputs of different media types can share the root: the app
+ * tells them apart by type. They mix when they can't be told apart (a shared
+ * media type, or one takes any file), or when one is a layout, which owns the
+ * root (a BIDS tree).
+ *
+ * @param {PortSchema[]} inputs
+ * @returns {Map<PortSchema, {other: PortSchema, why: string}>}
+ */
+export const rootInputCollisions = (inputs) => {
+  const root = asArray(inputs).filter((p) => (p?.placement || "root") === "root");
+  const out = new Map();
+  const why = (a, b) => {
+    const layout = [a, b].find((p) => conformsToList(p.conformsTo).length);
+    if (layout) return `${layout.name || "a layout"} is a layout and fills the root`;
+    const am = asArray(a.mediaTypes);
+    const bm = asArray(b.mediaTypes);
+    const any = [a, b].find((p) => !asArray(p.mediaTypes).length);
+    if (any) return `${any.name || "an input"} takes any file`;
+    const shared = am.find((t) => bm.includes(t));
+    return shared ? `both take ${shared}` : "";
+  };
+  for (const a of root) {
+    for (const b of root) {
+      if (a === b || out.has(a)) continue;
+      const reason = why(a, b);
+      if (reason) out.set(a, { other: b, why: reason });
+    }
+  }
+  return out;
+};
+
 /** app.yml's conformsTo, one value or a list, as a list of trimmed entries. */
 export const conformsToList = (value) =>
   (Array.isArray(value) ? value : value == null ? [] : [value])

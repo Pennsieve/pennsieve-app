@@ -377,8 +377,8 @@
                   <p class="field-hint">
                     Data is at <code>$INPUT_DIR/<template v-if="port.placement === 'subfolder'">{{ port.name || "&lt;name&gt;" }}/</template></code><template v-if="(port.placement || 'root') === 'root'">, beside any other input placed at the root</template>.
                   </p>
-                  <p v-if="(port.placement || 'root') === 'root' && rootInputs.length > 1" class="field-error">
-                    {{ rootInputs.length }} inputs are at the root of INPUT_DIR and would mix. Give all but one their own folder.
+                  <p v-if="rootCollisions.get(port)" class="field-error">
+                    Mixes with {{ rootCollisions.get(port).other.name || "another input" }} at the root of INPUT_DIR: {{ rootCollisions.get(port).why }}. Give one of them its own folder.
                   </p>
                   <p v-else-if="port.placement === 'subfolder' && port.name && !/^[a-z0-9][a-z0-9-]*$/.test(port.name)" class="field-error">
                     As a folder name, the name can only have lowercase letters, numbers and dashes.
@@ -454,7 +454,7 @@ import { computed, onMounted, reactive, ref, toRaw } from "vue";
 import { useStore } from "vuex";
 import MoreOptions from "./MoreOptions.vue";
 import FieldHint from "./FieldHint.vue";
-import { PARAM_TYPES, PARAM_TYPE_OPTIONS, createParameter, createPort, portDataTypeOptions, STANDARD_CPU_OPTIONS, getStandardMemoryOptions, isNumericType, mediaTypeMatches, structureId, structureOptionsFor, structureMatches, isStructureLink, conformsToList } from "./applicationSchema";
+import { PARAM_TYPES, PARAM_TYPE_OPTIONS, createParameter, createPort, portDataTypeOptions, STANDARD_CPU_OPTIONS, getStandardMemoryOptions, isNumericType, mediaTypeMatches, structureId, structureOptionsFor, structureMatches, isStructureLink, conformsToList, rootInputCollisions } from "./applicationSchema";
 import { canonicalTag, preferredTagGroups, tagOptionMatches, tagDomainNudge, hasDomainTag, domainOfTag, domainColors } from "./appDomains";
 
 /**
@@ -680,7 +680,7 @@ const formatChoices = (port) =>
 
 const isStructurePort = (port) => portMode(port) === "layout";
 // Inputs placed at the root of INPUT_DIR: more than one would mix.
-const rootInputs = computed(() => (schema.value.inputs || []).filter((p) => (p.placement || "root") === "root"));
+const rootCollisions = computed(() => rootInputCollisions(schema.value.inputs || []));
 const structureById = (id) => structureOptions.value.find((o) => o.id === id);
 const structureName = (entry) => structureById(structureId(entry))?.name || entry;
 // The file that marks a layout's root, for the hint; layouts the builder

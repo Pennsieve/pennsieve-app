@@ -11,6 +11,7 @@ import {
   structureOptionsFor,
   structureMatches,
   structuresCompatible,
+  rootInputCollisions,
 } from './applicationSchema'
 import { validateManifestDoc } from './manifestValidation'
 
@@ -125,6 +126,20 @@ describe('folder formats and structures in app.yml', () => {
     expect(validateManifestDoc(layout)).toEqual({ valid: true, problems: [] })
     const named = loadYaml('application:\n  name: a\ninputs:\n  - name: My recordings\n    placement: subfolder\n')
     expect(validateManifestDoc(named).problems).toEqual([{ path: 'inputs.0.name', message: 'as a folder name (its own folder), can only have lowercase letters, numbers and dashes' }])
+  })
+
+  it('lets inputs of different types share the root, and flags the ones that would mix', () => {
+    const pdf = { name: 'pdf', mediaTypes: ['application/pdf'] }
+    const ephys = { name: 'open-ephys', mediaTypes: ['application/vnd.pennsieve.open-ephys'] }
+    expect(rootInputCollisions([pdf, ephys]).size).toBe(0)
+    const pdf2 = { name: 'more-pdf', mediaTypes: ['application/pdf'] }
+    expect(rootInputCollisions([pdf, pdf2]).get(pdf).why).toBe('both take application/pdf')
+    const anything = { name: 'anything' }
+    expect(rootInputCollisions([pdf, anything]).get(pdf).why).toBe('anything takes any file')
+    const study = { name: 'study', conformsTo: ['bids'] }
+    expect(rootInputCollisions([study, pdf]).get(pdf).why).toBe('study is a layout and fills the root')
+    // In its own folder, nothing mixes.
+    expect(rootInputCollisions([study, { ...pdf, placement: 'subfolder' }]).size).toBe(0)
   })
 
   it('matches structures by id, whatever the version', () => {
