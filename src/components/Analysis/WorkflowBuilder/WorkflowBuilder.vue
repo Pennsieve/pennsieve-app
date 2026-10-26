@@ -1462,6 +1462,29 @@ const portMediaTypes = (ports) => {
   edges, ports already in memory) and idempotent, so it can be called from
   anywhere the graph changes rather than trying to patch single edges.
 */
+// A link's label in a box (detailed view).
+const labelBox = (fill, border, text) => ({
+  labelShowBg: true,
+  labelBgPadding: [6, 3],
+  labelBgBorderRadius: 2,
+  labelBgStyle: { fill, stroke: border },
+  labelStyle: { fill: text, fontSize: 11, fontWeight: 600 },
+});
+
+// The compact view's lone ✓ or ✕: no box, just a halo in the canvas colour so
+// the line doesn't run through it.
+const bareMark = (color) => ({
+  labelShowBg: false,
+  labelStyle: {
+    fill: color,
+    fontSize: 16,
+    fontWeight: 700,
+    stroke: "#f7f7f7",
+    strokeWidth: 4,
+    paintOrder: "stroke",
+  },
+});
+
 const revalidateEdges = () => {
   const issues = [];
   let unchecked = 0;
@@ -1511,11 +1534,9 @@ const revalidateEdges = () => {
             : mediaTypes.length
               ? `\u26A0 needs ${shortTypes(mediaTypes)}`
               : "\u26A0 incompatible",
-        labelShowBg: true,
-        labelBgPadding: [6, 3],
-        labelBgBorderRadius: 2,
-        labelBgStyle: { fill: "#fdecec", stroke: INVALID_EDGE_COLOR },
-        labelStyle: { fill: INVALID_EDGE_COLOR, fontSize: 11, fontWeight: 600 },
+        ...(detailed.value
+          ? labelBox("#fdecec", INVALID_EDGE_COLOR, INVALID_EDGE_COLOR)
+          : bareMark(INVALID_EDGE_COLOR)),
       };
     }
 
@@ -1531,11 +1552,7 @@ const revalidateEdges = () => {
       return {
         ...next,
         label: flows,
-        labelShowBg: true,
-        labelBgPadding: [6, 3],
-        labelBgBorderRadius: 2,
-        labelBgStyle: { fill: "#f3f4f6", stroke: "#d1d5db" },
-        labelStyle: { fill: "#4b5563", fontSize: 11, fontWeight: 600 },
+        ...labelBox("#f3f4f6", "#d1d5db", "#4b5563"),
       };
     }
 
@@ -1546,11 +1563,9 @@ const revalidateEdges = () => {
         ...next,
         style: { stroke: VALID_EDGE_COLOR, strokeWidth: 2 },
         label: mediaTypes.length && detailed.value ? `\u2713 ${shortTypes(mediaTypes)}` : "\u2713",
-        labelShowBg: true,
-        labelBgPadding: [6, 3],
-        labelBgBorderRadius: 2,
-        labelBgStyle: { fill: "#eaf9ef", stroke: VALID_EDGE_COLOR },
-        labelStyle: { fill: "#0f7a3f", fontSize: 11, fontWeight: 600 },
+        ...(detailed.value
+          ? labelBox("#eaf9ef", VALID_EDGE_COLOR, "#0f7a3f")
+          : bareMark("#0f7a3f")),
       };
     }
 
