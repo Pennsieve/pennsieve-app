@@ -1522,6 +1522,21 @@ const revalidateEdges = () => {
       return { ...next, style: { stroke, strokeDasharray: "2 4" } };
     }
 
+    // Input data into an app, or an app into a target: nothing to check,
+    // but say what flows there, in grey.
+    const flows = flowTypes(edge);
+    if (result.state === "skip" && flows) {
+      return {
+        ...next,
+        label: flows,
+        labelShowBg: true,
+        labelBgPadding: [6, 3],
+        labelBgBorderRadius: 2,
+        labelBgStyle: { fill: "#f3f4f6", stroke: "#d1d5db" },
+        labelStyle: { fill: "#4b5563", fontSize: 11, fontWeight: 600 },
+      };
+    }
+
     if (result.state === "ok") {
       validated += 1;
       const mediaTypes = portMediaTypes(result.metInputs);
@@ -1543,6 +1558,30 @@ const revalidateEdges = () => {
   edgeIssues.value = [...issues, ...stepInputIssues()];
   validEdgeCount.value = validated;
   uncheckedEdgeCount.value = unchecked;
+};
+
+// What flows over a link that isn't checked: into an app, the types its
+// linked input takes (all its inputs' on "all inputs"); into a target, the
+// types of the output feeding it (all outputs' from "all outputs"). "" when
+// the app.yml says nothing about them.
+const flowTypes = (edge) => {
+  const src = nodes.value.find((n) => n.id === edge.source);
+  const tgt = nodes.value.find((n) => n.id === edge.target);
+  let ports = [];
+  if (src?.type === "data-source" && isAppNode(tgt)) {
+    const inputs = tgt.data?.manifestPorts?.inputs || [];
+    const link = edgeLink(edge, tgt, edges.value);
+    ports = link ? inputs.filter((p) => p.name === link.input) : inputs;
+  } else if (isAppNode(src) && tgt?.type === "data-target") {
+    const outputs = src.data?.manifestPorts?.outputs || [];
+    const port = portOfHandle(edge.sourceHandle);
+    ports = port ? outputs.filter((p) => p.name === port) : outputs;
+  } else {
+    return "";
+  }
+  const layouts = ports.flatMap((p) => [].concat(p.conformsTo || []).slice(-1)).map((c) => String(c).split("@")[0].toUpperCase());
+  const types = ports.flatMap((p) => p.mediaTypes || []);
+  return [...new Set([...layouts, ...types.map(shortMediaType)])].join(", ");
 };
 
 const reportConnectionCheck = (srcNode, tgtNode, edge) => {
