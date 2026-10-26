@@ -1411,6 +1411,15 @@ const reportConnectionCheck = (srcNode, tgtNode) => {
   });
 };
 
+// Where output port i of n sits on the step's bottom edge: the middle of
+// its column. The detailed card has 15px of padding and border each side;
+// the compact one spreads them evenly. !important beats the connectors'
+// own left: 50%.
+const portHandleLeft = (i, n) =>
+  detailed.value
+    ? `calc(15px + (100% - 30px) * ${(i + 0.5) / n}) !important`
+    : `${((i + 1) * 100) / (n + 1)}% !important`;
+
 // The output port feeding a node, or "" when none does.
 const feedingPort = (nodeId) => portOfHandle(edges.value.find((e) => e.target === nodeId && e.sourceHandle)?.sourceHandle);
 
@@ -2257,18 +2266,6 @@ const openNodeSettings = (id) => {
 
               <template #node-default="{ data, id }">
                 <Handle id="target" type="target" :position="Position.Top" />
-                <template v-if="!detailed">
-                  <Handle
-                    v-for="(p, i) in routedOutputs(data.manifestPorts)"
-                    :key="p.name"
-                    :id="portHandleId(p.name)"
-                    type="source"
-                    :position="Position.Bottom"
-                    class="port-handle port-handle--compact"
-                    :style="{ left: `${((i + 1) * 100) / (routedOutputs(data.manifestPorts).length + 2)}%` }"
-                    :title="`${p.name}: connect to a data target to send this output there`"
-                  />
-                </template>
                 <CompactFlowNode
                   v-if="!detailed"
                   kind="processor"
@@ -2365,7 +2362,12 @@ const openNodeSettings = (id) => {
                       data.computeType
                     }}</span>
                   </div>
-                  <div v-if="data.manifestPorts?.outputs?.length" class="node-ports node-ports--out">
+                  <div
+                    v-if="data.manifestPorts?.outputs?.length"
+                    class="node-ports node-ports--out"
+                    :class="{ 'node-ports--routed': routedOutputs(data.manifestPorts).length }"
+                    :style="routedOutputs(data.manifestPorts).length ? { gridTemplateColumns: `repeat(${routedOutputs(data.manifestPorts).length}, 1fr)` } : undefined"
+                  >
                     <span
                       v-for="p in data.manifestPorts.outputs"
                       :key="p.name"
@@ -2374,18 +2376,23 @@ const openNodeSettings = (id) => {
                       :title="routedOutputs(data.manifestPorts).length ? `${p.description || p.name} — connect to a data target to send it there` : p.description"
                     >
                       {{ p.name }}<template v-if="portTypes(p)"> · {{ portTypes(p) }}</template>
-                      <!-- Two or more outputs: each its own connection point -->
-                      <Handle
-                        v-if="routedOutputs(data.manifestPorts).length"
-                        :id="portHandleId(p.name)"
-                        type="source"
-                        :position="Position.Bottom"
-                        class="port-handle"
-                      />
                     </span>
                   </div>
                   <div v-else-if="!data.hasManifest" class="node-ports node-ports--none">No manifest</div>
                 </div>
+                <!-- Two or more outputs: one connection point each, on the
+                     bottom edge under its column (the chips sit in equal
+                     columns inside the 15px padding), half under the card
+                     like the other connectors. -->
+                <Handle
+                  v-for="(p, i) in routedOutputs(data.manifestPorts)"
+                  :key="p.name"
+                  :id="portHandleId(p.name)"
+                  type="source"
+                  :position="Position.Bottom"
+                  :title="`${p.name}: connect to a data target to send this output there`"
+                  :style="{ left: portHandleLeft(i, routedOutputs(data.manifestPorts).length) }"
+                />
                 <!-- With output ports, the main point (all outputs, to another
                      app) moves to the side, clear of the ports and the +. -->
                 <Handle
@@ -4056,21 +4063,11 @@ kbd {
   font-size: 12px;
   color: theme.$gray_5;
 }
-/* An output with its own connection point (two or more outputs). */
-.node-port--routed {
-  position: relative;
-  padding-bottom: 2px;
-}
-/* Output port dots look like the other connectors: centred on the step's
-   edge with the card covering their top half, so only the lower half shows.
-   They sit inside the card, so the top half is clipped instead. */
-.port-handle {
-  clip-path: inset(50% -3px -3px -3px);
-}
-/* Under its chip: the chip's bottom is the node's padding (14px) plus its
-   border (1px) above the edge. */
-.node-port--routed .port-handle {
-  bottom: -15px;
+/* Two or more outputs: chips in equal columns, so each output's
+   connection point can sit under the middle of its column. */
+.node-ports--routed {
+  display: grid;
+  justify-items: center;
 }
 
 /* The + under a step: what comes next. Shown on hover and selection. */
