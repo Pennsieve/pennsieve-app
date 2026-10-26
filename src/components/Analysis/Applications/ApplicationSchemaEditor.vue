@@ -223,9 +223,8 @@
               <div class="field-row full-width" :data-field="`${block.key}.${index}.name`" :class="rowClass(`${block.key}.${index}.name`)">
                 <label class="field-label">Name</label>
                 <div class="field-control">
-                  <el-input v-if="portMode(port) !== 'file' || port.dataType === 'any'" v-model="port.name" :placeholder="portMode(port) === 'layout' ? 'study' : 'files'" maxlength="50" />
-                  <span v-else class="field-static" :class="{ 'is-empty': !port.name }">{{ port.name || "Select a media type" }}</span>
-                  <p v-if="portMode(port) !== 'file' || port.dataType === 'any'" class="field-hint">An identifier, e.g. <code>study</code> (lowercase, no spaces).</p>
+                  <el-input v-model="port.name" :placeholder="portMode(port) === 'layout' ? 'study' : 'recordings'" maxlength="50" />
+                  <p class="field-hint">An identifier, e.g. <code>study</code> (lowercase, no spaces).</p>
                   <p v-for="m in at(`${block.key}.${index}.name`)" :key="m" class="field-error">{{ m }}</p>
                 </div>
               </div>
@@ -376,8 +375,7 @@
               <div class="field-row full-width" :data-field="`${block.key}.${index}.description`">
                 <label class="field-label">Description</label>
                 <div class="field-control">
-                  <el-input v-if="portMode(port) !== 'file' || port.dataType === 'any'" v-model="port.description" placeholder="What goes here (optional)" />
-                  <span v-else class="field-static" :class="{ 'is-empty': !port.description }">{{ port.description || "—" }}</span>
+                  <el-input v-model="port.description" placeholder="What goes here (optional)" />
                 </div>
               </div>
               <!-- Where the input's data goes in INPUT_DIR -->
@@ -602,13 +600,23 @@ const extraFormats = (port) => {
   const edam = optionFor(port.dataType)?.edam;
   return (port.formats || []).filter((f) => f !== edam);
 };
+// A format's name as an identifier: "TS-Zarr timeseries" -> ts-zarr-timeseries.
+const identifierFrom = (text) =>
+  String(text || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
 const onPortDataTypeChange = (port, value) => {
-  const previous = optionFor(port.dataType)?.edam;
+  const before = optionFor(port.dataType);
+  const previous = before?.edam;
   port.dataType = value || "any";
   const option = optionFor(port.dataType);
   if (port.dataType !== "any") {
-    port.name = option?.name || "";
-    port.description = option?.description || "";
+    // The name is the author's identifier: only an empty one, or one the
+    // previous format suggested, follows the format.
+    const suggested = (o) => [identifierFrom(o?.name), o?.name || ""].filter(Boolean);
+    if (!port.name || suggested(before).includes(port.name)) port.name = identifierFrom(option?.name);
+    if (!port.description || port.description === (before?.description || "")) port.description = option?.description || "";
   }
   port.mediaTypes = port.dataType && port.dataType !== "any" ? [port.dataType] : [];
   // The media type brings its EDAM id; "Any" writes neither. Other formats
