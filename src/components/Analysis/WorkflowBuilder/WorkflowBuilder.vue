@@ -44,7 +44,6 @@ import BuilderPalette from "./BuilderPalette.vue";
 import ParamField from "./ParamField.vue";
 import { ioLine, sessionTypeOf, versionManifest, shortMediaType } from "./appManifestInfo";
 import { domainOfTag, domainColors } from "../Applications/appDomains";
-import { clearManifestDraft } from "../Applications/manifestDrafts";
 import { diffLines, manifestDiff, versionWarnings } from "./manifestDiff";
 import { builderReadiness, readinessLabel } from "./builderReadiness";
 import { stepNames } from "./stepNames";
@@ -289,9 +288,8 @@ const manifestsKnown = computed(() =>
 const ioTypes = (port) => ioLine({ inputs: [port], outputs: [] }).replace(/ → .*$/, "");
 
 /*
-  The app step's panel: what the app is (its app.yml as the step loaded it,
-  a draft when one is in use), and where each input comes from and each
-  output goes on the canvas.
+  The app step's panel: what the app is (its app.yml as the step loaded
+  it), and where each input comes from and each output goes on the canvas.
 */
 const stepAbout = computed(() => {
   const node = selectedNode.value;
@@ -335,20 +333,6 @@ const stepPorts = computed(() => {
     allTo: out.filter((e) => !portName(e)).map((e) => nodeLabel(e.target)),
   };
 });
-const clearStepDraft = async (node) => {
-  const uuid = node?.data?.application?.uuid;
-  if (!uuid) return;
-  clearManifestDraft(uuid);
-  // Every step of that app goes back to its released app.yml.
-  await Promise.all(
-    nodes.value
-      .filter((n) => n.data?.application?.uuid === uuid)
-      .map(async (n) => {
-        const parsed = await loadManifest(uuid);
-        if (parsed) setManifestPorts(n, parsed);
-      })
-  );
-};
 const showAdvanced = ref(false);
 // An app step's panel: Settings (what you set) or About (what the app is).
 // Settings when the workflow can be edited, About when it can't.
@@ -577,16 +561,13 @@ const setManifestPorts = (node, parsed) => {
     inputs: parsed.schema.inputs || [],
     outputs: parsed.schema.outputs || [],
   };
-  // What the step's panel says about the app, from the same app.yml (a draft
-  // when one is in use).
+  // What the step's panel says about the app, from the same app.yml.
   node.data.manifestAbout = {
     description: parsed.meta?.description || "",
     maintainers: parsed.meta?.maintainers || [],
     tags: parsed.schema?.tags || [],
   };
   node.data.hasManifest = true;
-  // Ports from a draft app.yml (saved in this browser, not released).
-  node.data.draftManifest = parsed.draft || null;
   // A reopened workflow's links into data targets leave from the output
   // ports their prefixes name, once the ports are known.
   edges.value = attachInputPorts(attachPorts(edges.value, nodes.value), nodes.value);
@@ -2666,11 +2647,6 @@ const openNodeSettings = (id) => {
                   :class="connectClass(id)"
                 >
                     <LlmMark v-if="usesLLM(data)" compact />
-                    <span
-                      v-if="data.draftManifest"
-                      class="draft-badge draft-badge--compact"
-                      title="Using a draft app.yml saved in this browser, not the released one. Switch to the detailed view to see its inputs and outputs."
-                    >Draft</span>
                     <span v-if="stepWarning(id)" class="step-warn" :title="stepWarning(id)" />
                     <button
                       v-if="!isReadOnly"
@@ -2718,11 +2694,6 @@ const openNodeSettings = (id) => {
                     <span class="node-title" :title="nodeName({ id, type: 'default', data })">{{ nodeName({ id, type: 'default', data }) }}</span>
                     <RuntimeMark :runtime="data.computeType" />
                     <LlmMark v-if="usesLLM(data)" />
-                    <span
-                      v-if="data.draftManifest"
-                      class="draft-badge"
-                      title="Using a draft app.yml saved in this browser, not the released one. A release must declare the same outputs for its links to work. Clear the draft in the app.yml builder."
-                    >Draft</span>
                     <span v-if="stepWarning(id)" class="step-warn" :title="stepWarning(id)" />
                     <button
                       v-if="!isReadOnly"
@@ -3110,10 +3081,6 @@ const openNodeSettings = (id) => {
                 <div class="step-head">
                   <h3 class="step-name" :title="selectedNode.data?.label">{{ selectedNode.data?.label || "Step" }}</h3>
                 </div>
-                <p v-if="selectedNode.data.draftManifest" class="step-draft">
-                  Using a draft app.yml saved in this browser.
-                  <button type="button" class="text-link-btn" @click="clearStepDraft(selectedNode)">Use the released one</button>
-                </p>
                 <!-- What you set for this step, or what the app is -->
                 <el-radio-group v-model="stepTab" size="small" class="step-tabs" aria-label="Step details">
                   <el-radio-button value="settings">Settings</el-radio-button>
@@ -4556,18 +4523,6 @@ kbd {
 :deep(.vue-flow__node:not(.selected):not(:hover)) .node-action {
   opacity: 0;
 }
-.draft-badge {
-  padding: 0 5px;
-  border: 1px dashed theme.$orange_1;
-  border-radius: 3px;
-  font-size: 10px;
-  font-weight: 600;
-  color: theme.$orange_1;
-  white-space: nowrap;
-}
-.draft-badge--compact {
-  margin-right: 4px;
-}
 .port-prefix-note {
   margin: -4px 0 10px;
   font-size: 12px;
@@ -4809,14 +4764,6 @@ kbd {
 .step-version-text {
   font-size: 12px;
   color: theme.$gray_4;
-}
-.step-draft {
-  margin: 0 0 8px;
-  padding: 6px 8px;
-  border: 1px dashed theme.$orange_1;
-  border-radius: 4px;
-  font-size: 12px;
-  color: theme.$gray_5;
 }
 .step-desc {
   margin: 4px 0 8px;
