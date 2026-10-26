@@ -29,6 +29,7 @@ import {
 import BfButton from "../../shared/bf-button/BfButton.vue";
 import MetricsDashboard from "../Metrics/MetricsDashboard.vue";
 import CompactFlowNode from "../WorkflowGraph/CompactFlowNode.vue";
+import LlmMark from "../WorkflowGraph/LlmMark.vue";
 import GraphDensityToggle from "../WorkflowGraph/GraphDensityToggle.vue";
 import { COMPACT_BOX, layoutBox, overlaps, recenter, useGraphDensity } from "../WorkflowGraph/graphDensity";
 import {
@@ -1132,8 +1133,6 @@ const onDrop = (event) => {
 // Whether a step's app calls language models through Pennsieve: its version's
 // app.yml declares runtime.llm (LLM access is opt-in). Shown as an icon.
 const usesLLM = (data) => !!versionManifest(data?.application, data?.tag)?.runtime?.llm;
-const LLM_TITLE = "Calls language models through Pennsieve (runtime.llm in its app.yml)";
-
 const makeNode = (type, app, position) => {
   const id = generateNodeId();
   if (type === "data-source") {
@@ -2664,9 +2663,7 @@ const openNodeSettings = (id) => {
                   :runtime="data.interactive ? 'interactive' : data.computeType"
                   :class="connectClass(id)"
                 >
-                    <span v-if="usesLLM(data)" class="llm-mark llm-mark--compact" :title="LLM_TITLE" aria-label="Calls language models">
-                      <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5l1.4 3.6 3.6 1.4-3.6 1.4L8 11.5 6.6 7.9 3 6.5l3.6-1.4zM12.5 10l.6 1.4 1.4.6-1.4.6-.6 1.4-.6-1.4-1.4-.6 1.4-.6z" /></svg>
-                    </span>
+                    <LlmMark v-if="usesLLM(data)" compact />
                     <span
                       v-if="data.draftManifest"
                       class="draft-badge draft-badge--compact"
@@ -2717,9 +2714,7 @@ const openNodeSettings = (id) => {
                   <div class="node-header">
                     <span v-if="data.interactive" class="node-type-badge processor-badge">Interactive</span>
                     <span class="node-title" :title="nodeName({ id, type: 'default', data })">{{ nodeName({ id, type: 'default', data }) }}</span>
-                    <span v-if="usesLLM(data)" class="llm-mark" :title="LLM_TITLE" aria-label="Calls language models">
-                      <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5l1.4 3.6 3.6 1.4-3.6 1.4L8 11.5 6.6 7.9 3 6.5l3.6-1.4zM12.5 10l.6 1.4 1.4.6-1.4.6-.6 1.4-.6-1.4-1.4-.6 1.4-.6z" /></svg>
-                    </span>
+                    <LlmMark v-if="usesLLM(data)" />
                     <span
                       v-if="data.draftManifest"
                       class="draft-badge"
@@ -5633,22 +5628,4 @@ kbd {
   margin-left: 6px;
 }
 /* A step whose app calls language models (runtime.llm): a small sparkle. */
-.llm-mark {
-  display: inline-flex;
-  flex-shrink: 0;
-  width: 16px;
-  height: 16px;
-  color: theme.$status_purple;
-
-  svg {
-    width: 100%;
-    height: 100%;
-    fill: currentColor;
-  }
-}
-.llm-mark--compact {
-  width: 13px;
-  height: 13px;
-  margin-right: 4px;
-}
 </style>
