@@ -2300,7 +2300,13 @@ const openNodeSettings = (id) => {
                   v-else
                   class="custom-node"
                   :class="connectClass(id)"
-                  :style="stepAccent(data) ? { boxShadow: `inset 4px 0 0 ${stepAccent(data)}` } : undefined"
+                  :style="{
+                    ...(stepAccent(data) && { boxShadow: `inset 4px 0 0 ${stepAccent(data)}` }),
+                    // Room for each output's column (about 90px), up to the card's max.
+                    ...(routedOutputs(data.manifestPorts).length && {
+                      minWidth: `${Math.min(350, 90 * (routedOutputs(data.manifestPorts).length + 1) + 30)}px`,
+                    }),
+                  }"
                 >
                   <div v-if="data.manifestPorts?.inputs?.length" class="node-ports node-ports--in">
                     <span v-for="p in data.manifestPorts.inputs" :key="p.name" class="node-port" :title="p.description">
