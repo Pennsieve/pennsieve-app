@@ -4061,14 +4061,14 @@ kbd {
   position: relative;
   padding-bottom: 2px;
 }
+/* Output port dots look like the other connectors: centred on the step's
+   edge with the card covering their top half, so only the lower half shows.
+   They sit inside the card, so the top half is clipped instead. */
 .port-handle {
-  width: 9px;
-  height: 9px;
-  background: theme.$purple_3;
-  border: 2px solid theme.$white;
+  clip-path: inset(50% -3px -3px -3px);
 }
-/* On the step's bottom edge, under its chip: the chip's bottom is the
-   node's padding (14px) plus its border (1px) above the edge. */
+/* Under its chip: the chip's bottom is the node's padding (14px) plus its
+   border (1px) above the edge. */
 .node-port--routed .port-handle {
   bottom: -15px;
 }
