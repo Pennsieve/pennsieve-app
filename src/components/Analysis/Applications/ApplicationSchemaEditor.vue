@@ -277,7 +277,7 @@
                       <span class="mt-option">
                         <span class="mt-name">{{ dt.formats && dt.formats.length ? dt.formats.join(" / ") : dt.label }}</span>
                         <span v-if="dt.formats && dt.formats.length" class="mt-meta">
-                          {{ dt.value }}<template v-if="portMode(port) === 'folder' && dt.folderExtensions && dt.folderExtensions.length"> · {{ dt.folderExtensions.map((e) => `*${e}/`).join(", ") }}</template><template v-else-if="dt.extensions && dt.extensions.length"> · {{ dt.extensions.join(", ") }}</template><template v-if="dt.edam"> · EDAM {{ dt.edam }}</template>
+                          {{ dt.value }}<template v-if="portMode(port) === 'folder' && dt.folderExtensions && dt.folderExtensions.length"> · {{ dt.folderExtensions.map((e) => `*${e}/`).join(", ") }}</template><template v-else-if="dt.extensions && dt.extensions.length"> · {{ dt.extensions.join(", ") }}</template>
                         </span>
                       </span>
                     </el-option>
@@ -619,10 +619,11 @@ const onPortDataTypeChange = (port, value) => {
     if (!port.description || port.description === (before?.description || "")) port.description = option?.description || "";
   }
   port.mediaTypes = port.dataType && port.dataType !== "any" ? [port.dataType] : [];
-  // The media type brings its EDAM id; "Any" writes neither. Other formats
-  // the app.yml had stay unless the port goes back to any file.
-  const kept = (port.formats || []).filter((f) => f !== previous && f !== option?.edam);
-  port.formats = port.dataType === "any" ? [] : [...kept, ...(option?.edam ? [option.edam] : [])];
+  // EDAM ids aren't written: the registry maps each media type to its own.
+  // Ones the app.yml had stay, apart from the previous media type's, unless
+  // the port goes back to any file.
+  const kept = (port.formats || []).filter((f) => f !== previous);
+  port.formats = port.dataType === "any" ? [] : kept;
 };
 
 /*
@@ -700,7 +701,6 @@ const onInnerStructure = (port, id) => {
 };
 const onContainsChange = (port, values) => {
   port.mediaTypes = asList(values);
-  port.formats = [...new Set(port.mediaTypes.map((v) => optionFor(v)?.edam).filter(Boolean))];
   if (!showsContainer(port)) port.container = "";
 };
 const asList = (v) => (Array.isArray(v) ? v.map(String) : []);
