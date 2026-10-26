@@ -83,6 +83,7 @@ export function releaseOutcome(status, body = {}) {
   if (code === "no_push_access") return { kind: "noPush" };
   if (code === "github_not_linked") return { kind: "notLinked" };
   if (code === "tag_exists") return { kind: "tagExists", message: body?.message || "" };
+  if (code === "nothing_to_release") return { kind: "nothingNew", message: body?.message || "" };
   if (code === "invalid_tag" || code === "invalid_app_yml") return { kind: "invalid", message: body?.message || "" };
   if (status === 404 && !code) return { kind: "unavailable" };
   return { kind: "error", message: body?.message || `The request failed (${status}).` };
@@ -113,4 +114,31 @@ export async function publishRelease(api2Url, repo, release, token, fetchImpl = 
   } catch (err) {
     return { kind: "error", message: err?.message || "The request failed." };
   }
+}
+
+/**
+ * Where the default branch stands against the latest release (github-service
+ * GET /repository/{owner}/{repo}/release): { latestTag, latestUrl, target,
+ * commitsSince, canRelease }, or null when it can't be told (then Release
+ * stays offered and the server still refuses a release with nothing new).
+ */
+export async function fetchReleaseStatus(api2Url, repo, token, fetchImpl = fetch) {
+  try {
+    const resp = await fetchImpl(
+      `${api2Url}/repository/${encodeURIComponent(repo.owner)}/${encodeURIComponent(repo.repo)}/release`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    if (!resp.ok) return null;
+    const body = await resp.json();
+    return typeof body?.canRelease === "boolean" ? body : null;
+  } catch {
+    return null;
+  }
+}
+
+// The nudge next to Release: "3 new commits since v1.3.6", or "".
+export function releaseNudge(status) {
+  if (!status?.latestTag || !status.commitsSince) return "";
+  const n = status.commitsSince;
+  return `${n} new commit${n === 1 ? "" : "s"} since ${status.latestTag}`;
 }

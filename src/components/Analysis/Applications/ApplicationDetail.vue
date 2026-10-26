@@ -12,6 +12,7 @@ import { parseManifest, MANIFEST_SHAPES, PARAM_TYPE_OPTIONS, conformsToList } fr
 import BfButton from "../../shared/bf-button/BfButton.vue";
 import { fetchRepository, canUpdateManifest } from "./githubRepository";
 import ReleaseDialog from "./ReleaseDialog.vue";
+import { fetchReleaseStatus, releaseNudge } from "./release";
 import AppPermissions from "../../user/code/AppPermissions.vue";
 import AppArchiveToggle from "../../user/code/AppArchiveToggle.vue";
 import { useGetToken } from "@/composables/useGetToken";
@@ -122,6 +123,18 @@ const knownTags = computed(() => [
   ...(repository.value?.releases || []).map((r) => r.label),
   ...(detail.value?.versions || []).map((v) => v.version),
 ].filter(Boolean));
+// Where the default branch stands against the latest release: Release is
+// offered when there's something new, with a nudge saying how much.
+const releaseStatus = ref(null);
+const loadReleaseStatus = async () => {
+  releaseStatus.value = null;
+  if (!canRelease.value) return;
+  const token = await useGetToken();
+  releaseStatus.value = await fetchReleaseStatus(store.state.config?.api2Url, releaseRepo.value, token);
+};
+watch(canRelease, loadReleaseStatus, { immediate: true });
+const nothingToRelease = computed(() => releaseStatus.value?.canRelease === false);
+const nudge = computed(() => releaseNudge(releaseStatus.value));
 let releaseWatch = null;
 const stopReleaseWatch = () => {
   if (releaseWatch) clearTimeout(releaseWatch);
@@ -129,6 +142,7 @@ const stopReleaseWatch = () => {
 };
 const onReleased = ({ tag }) => {
   stopReleaseWatch();
+  loadReleaseStatus();
   const bare = (s) => String(s || "").replace(/^v/, "");
   let tries = 0;
   // Every 20 s for up to 10 minutes, until the app store has the version.
@@ -535,6 +549,19 @@ watch(
           <span class="header-detail-name">{{ repoName }}</span>
         </template>
       </span>
+      <!-- The page's main action: publish a release (the app store follows) -->
+      <div v-if="detail && canRelease" class="header-actions">
+        <span v-if="nudge" class="release-nudge">{{ nudge }}</span>
+        <el-tooltip
+          :disabled="!nothingToRelease"
+          :content="`Nothing new since ${releaseStatus?.latestTag}: the ${releaseStatus?.target} branch is at that release.`"
+          placement="bottom"
+        >
+          <span>
+            <bf-button class="compact flex" :disabled="nothingToRelease" @click="releaseOpen = true">Release a version</bf-button>
+          </span>
+        </el-tooltip>
+      </div>
     </div>
 
     <!-- Loading -->
@@ -592,7 +619,6 @@ watch(
               </button>
             </div>
             <div class="readme-header-actions">
-              <bf-button v-if="canRelease" class="compact flex secondary" @click="releaseOpen = true">Release</bf-button>
               <bf-button v-if="activeTab === 'manifest' && canUpdate" class="compact flex" @click="openBuilder">{{ builderLabel }}</bf-button>
               <button v-else-if="activeTab === 'manifest'" type="button" class="app-yml-btn" @click="openBuilder">{{ builderLabel }}</button>
             <el-tooltip
@@ -1035,14 +1061,12 @@ watch(
               </template>
             </div>
 
+            <!-- Read only here; archiving is in the danger zone -->
             <div class="info-actions archive-actions">
               <span class="info-label">Status</span>
-              <app-archive-toggle
-                :uuid="detail.uuid"
-                :owner-id="detail.ownerId"
-                :status="detail.status"
-                @change="onArchiveChange"
-              />
+              <span class="status-tag" :class="{ 'status-tag--archived': detail.status === 'archived' }">
+                {{ detail.status === "archived" ? "Archived" : "Active" }}
+              </span>
             </div>
 
           </el-collapse-item>
@@ -1119,6 +1143,18 @@ watch(
             @updated="reloadAfterPermissions"
           />
         </div>
+
+        <!-- Archiving: the owner only, out of the way of everyday settings -->
+        <div v-if="isAppOwner" class="sidebar-danger">
+          <h4 class="sidebar-danger-title">Danger zone</h4>
+          <app-archive-toggle
+            variant="button"
+            :uuid="detail.uuid"
+            :owner-id="detail.ownerId"
+            :status="detail.status"
+            @change="onArchiveChange"
+          />
+        </div>
       </div>
     </div>
     <ReleaseDialog
@@ -1127,6 +1163,8 @@ watch(
       :api2-url="store.state.config?.api2Url || ''"
       :repo="releaseRepo"
       :known-tags="knownTags"
+      :status="releaseStatus"
+      :default-branch="releaseStatus?.target || ''"
       @released="onReleased"
     />
   </div>
@@ -1180,6 +1218,19 @@ watch(
     font-weight: 600;
     font-size: 14px;
     color: theme.$black;
+  }
+
+  .header-actions {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  // "3 new commits since v1.3.6": a release is due.
+  .release-nudge {
+    font-size: 12px;
+    color: theme.$orange_2;
   }
 }
 
@@ -1945,6 +1996,30 @@ watch(
   margin-top: 12px;
 }
 
+.sidebar-danger {
+  background: theme.$white;
+  border: 1px solid theme.$gray_3;
+  padding: 16px;
+  margin-top: 12px;
+}
+.sidebar-danger-title {
+  margin: 0 0 10px;
+  font-size: 13px;
+  font-weight: 600;
+  color: theme.$gray_6;
+}
+.status-tag {
+  padding: 1px 8px;
+  border-radius: 3px;
+  background: theme.$green_tint;
+  color: theme.$green_2;
+  font-size: 12px;
+  font-weight: 600;
+  &--archived {
+    background: theme.$gray_1;
+    color: theme.$gray_5;
+  }
+}
 .sidebar-permissions {
   background: theme.$white;
   border: 1px solid theme.$gray_3;

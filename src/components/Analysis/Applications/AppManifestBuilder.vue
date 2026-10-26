@@ -633,7 +633,10 @@ const goToGuide = () =>
               Pull request <strong>#{{ prOutcome.number }}</strong> opened on {{ forApp.repo.fullName }}.
               <a :href="prOutcome.url" target="_blank" rel="noopener">View on GitHub</a>
             </p>
-            <p class="pr-outcome-note">Publish a release after merging it, so the App Store picks up the app.yml.</p>
+            <p class="pr-outcome-note">
+              After merging it, release a version so the App Store picks up the app.yml:
+              <router-link :to="appPageRoute">Release a version on the app page</router-link>.
+            </p>
           </template>
           <template v-else-if="prOutcome.kind === 'needsApproval'">
             <p>Pennsieve's GitHub app needs your approval to open pull requests in {{ forApp.repo.owner }}.</p>
