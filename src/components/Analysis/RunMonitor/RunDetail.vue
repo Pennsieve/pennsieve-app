@@ -46,7 +46,7 @@ const customAssetTypeNodes = reactive(new Set());
 
 import {
   statusClass,
-  statusBorderColor,
+  graphStatusColor,
   nodeBorderColor,
   statusDotClass,
   statusLabel,
@@ -740,7 +740,7 @@ const onProcessorStatusUpdate = (raw) => {
   updateNodeData(data.nodeId, { status: data.status });
   edges.value = edges.value.map((edge) => {
     if (edge.source === data.nodeId) {
-      return { ...edge, style: { ...edge.style, stroke: statusBorderColor(data.status) } };
+      return { ...edge, style: { ...edge.style, stroke: graphStatusColor(data.status) } };
     }
     return edge;
   });
@@ -1706,7 +1706,7 @@ onUnmounted(() => {
 
             <!-- Processor node template -->
             <template #node-default="{ data, id }">
-              <div :style="{ '--node-border-color': mode === 'browse' ? statusBorderColor(data.status) : '#cccccc', '--handle-target-color': incomingEdgeColor(id) }">
+              <div :style="{ '--node-border-color': mode === 'browse' ? graphStatusColor(data.status) : '#cccccc', '--handle-target-color': incomingEdgeColor(id) }">
                 <!-- Detailed: a connection point per input port (and the
                      step's main one when a line uses it); compact: one. -->
                 <template v-if="detailed">
@@ -1864,7 +1864,7 @@ onUnmounted(() => {
 
             <!-- Data-target node template -->
             <template #node-data-target="{ data, id }">
-              <div :style="{ '--node-border-color': mode === 'browse' ? (data.status && data.status !== 'NOT_STARTED' ? statusBorderColor(data.status) : '#64748b') : '#64748b', '--handle-target-color': incomingEdgeColor(id) }">
+              <div :style="{ '--node-border-color': mode === 'browse' ? (data.status && !['NOT_STARTED', 'SUCCEEDED'].includes(data.status) ? graphStatusColor(data.status) : '#64748b') : '#64748b', '--handle-target-color': incomingEdgeColor(id) }">
                 <Handle id="target" type="target" :position="Position.Top" />
                 <CompactFlowNode
                   v-if="!detailed"
@@ -3567,7 +3567,8 @@ onUnmounted(() => {
   &.gray-node { border-color: theme.$gray_4; }
   &.blue-node { border-color: #06b6d4; }
   &.blue-node.animate { animation: node-pulse 3s ease-in-out infinite; }
-  &.green-node { border-color: theme.$status_green; }
+  // Succeeded: no colour, the ✓ by the title says it (graphStatusColor).
+  &.green-node { border-color: theme.$gray_3; }
   &.red-node { border-color: theme.$status_red; }
 
   &.data-source-node {
@@ -3575,7 +3576,7 @@ onUnmounted(() => {
     background: #eef2ff;
 
     &.has-files { border-color: theme.$status_green; }
-    &.green-node { border-color: theme.$status_green; }
+    &.green-node { border-color: #6366f1; }
     &.red-node { border-color: theme.$status_red; }
     &.blue-node { border-color: #06b6d4; }
   }
@@ -3584,7 +3585,7 @@ onUnmounted(() => {
     background: #f1f5f9;
     border-color: #64748b;
 
-    &.green-node { border-color: theme.$status_green; }
+    &.green-node { border-color: #64748b; }
     &.red-node { border-color: theme.$status_red; }
     &.blue-node { border-color: #06b6d4; }
 

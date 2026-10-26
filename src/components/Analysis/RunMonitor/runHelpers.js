@@ -35,8 +35,12 @@ export const statusBorderColor = (status) => {
   }
 };
 
+// On a run's graph, colour marks what needs a look (running, failed): a
+// step that succeeded is as quiet as one yet to start, its ✓ says it's done.
+export const graphStatusColor = (status) => statusBorderColor(status === "SUCCEEDED" ? "NOT_STARTED" : status);
+
 export const nodeBorderColor = (type, status) => {
-  if (status) return statusBorderColor(status);
+  if (status) return graphStatusColor(status);
   if (type === "data-source") return "#6366f1";
   if (type === "data-target") return "#64748b";
   return "#cccccc";
