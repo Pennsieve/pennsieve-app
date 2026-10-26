@@ -12,8 +12,9 @@ import { parseManifest, MANIFEST_SHAPES, PARAM_TYPE_OPTIONS, conformsToList } fr
 import BfButton from "../../shared/bf-button/BfButton.vue";
 import { fetchRepository, canUpdateManifest } from "./githubRepository";
 import ReleaseDialog from "./ReleaseDialog.vue";
+import ShareAppDialog from "./ShareAppDialog.vue";
+import { accessEntries, accessSummary, makeNamer } from "./appSharing";
 import { fetchReleaseStatus, releaseNudge } from "./release";
-import AppPermissions from "../../user/code/AppPermissions.vue";
 import AppArchiveToggle from "../../user/code/AppArchiveToggle.vue";
 import { useGetToken } from "@/composables/useGetToken";
 import { useSendXhr } from "@/mixins/request/request_composable";
@@ -71,12 +72,6 @@ const parseGitHubDisplay = (sourceUrl) => {
 const repoName = computed(
   () => parseGitHubDisplay(detail.value?.sourceUrl) || "Unknown repo"
 );
-
-const visibilityLabel = computed(() => {
-  const visibility = detail.value?.visibility;
-  if (visibility !== "public" && visibility !== "private") return null;
-  return visibility === "private" ? "Private" : "Public";
-});
 
 const githubRepoUrl = computed(() => {
   const info = parseGitHubRepo(detail.value?.sourceUrl);
@@ -158,7 +153,7 @@ const onReleased = ({ tag }) => {
 onBeforeUnmount(stopReleaseWatch);
 
 // Permissions only apply to private applications.
-const isPublic = computed(() => detail.value?.isPrivate === false);
+const isPublic = computed(() => detail.value?.visibility === "public" || detail.value?.isPrivate === false);
 
 // Private GitHub repos return 401 from raw.githubusercontent.com, so their
 // README's own images can't load in the browser; the README text comes with
@@ -175,6 +170,32 @@ const canViewOnGitHub = computed(() => !isPrivateRepo.value || canUpdate.value);
 const onArchiveChange = (status) => {
   if (detail.value) detail.value = { ...detail.value, status };
 };
+
+/*
+  Who can use this app: visibility, and who a private app is shared with,
+  summarized at the top of the side panel; the owner shares from the header
+  (ShareAppDialog). Visibility and access change together, so the page reloads.
+*/
+const permissions = ref([]);
+const shareOpen = ref(false);
+const viewingOrgId = computed(() => store.state.activeOrganization?.organization?.id || null);
+const accessList = computed(() =>
+  accessEntries(
+    permissions.value,
+    makeNamer({
+      profile: profile.value,
+      members: store.state.orgMembers || [],
+      teams: store.state.teams || [],
+      organizations: store.state.organizations || [],
+    }),
+    viewingOrgId.value
+  )
+);
+const accessLine = computed(() => accessSummary(accessList.value, detail.value?.ownerId));
+// Chips: who else has access, the first few.
+const accessChips = computed(() =>
+  accessList.value.filter((e) => !(e.type === "user" && String(e.id) === String(detail.value?.ownerId)))
+);
 
 // Visibility may change via the permissions editor — reload to reflect it.
 const reloadAfterPermissions = () => loadDetail(props.uuid);
@@ -511,12 +532,14 @@ const loadDetail = async (uuid) => {
   if (!uuid) return;
   detailLoading.value = true;
   try {
-    const [detailResult] = await Promise.allSettled([
+    const [detailResult, permissionsResult] = await Promise.allSettled([
       store.dispatch("analysisModule/fetchApplication", uuid),
       store.dispatch("analysisModule/fetchApplicationPermissions", uuid),
       ensureOrgData(),
     ]);
 
+    const perms = permissionsResult?.status === "fulfilled" ? permissionsResult.value : null;
+    permissions.value = Array.isArray(perms) ? perms : perms?.access || perms?.permissions || [];
     if (detailResult.status === "fulfilled") {
       detail.value = detailResult.value;
       // The README comes with the details, also for private repos; only
@@ -550,7 +573,9 @@ watch(
         </template>
       </span>
       <!-- The page's main action: publish a release (the app store follows) -->
-      <div v-if="detail && canRelease" class="header-actions">
+      <div v-if="detail && (canRelease || isAppOwner)" class="header-actions">
+        <bf-button v-if="isAppOwner" class="compact flex secondary" @click="shareOpen = true">Share</bf-button>
+        <template v-if="canRelease">
         <span v-if="nudge" class="release-nudge">{{ nudge }}</span>
         <el-tooltip
           :disabled="!nothingToRelease"
@@ -561,6 +586,7 @@ watch(
             <bf-button class="compact flex" :disabled="nothingToRelease" @click="releaseOpen = true">Release a version</bf-button>
           </span>
         </el-tooltip>
+        </template>
       </div>
     </div>
 
@@ -934,6 +960,25 @@ watch(
 
       <!-- Right: Sidebar -->
       <div class="applications-sidebar">
+        <!-- Who can use this app: the first thing in the side panel -->
+        <div class="sidebar-access">
+          <h4 class="sidebar-access-title">Who can use this app</h4>
+          <p class="access-visibility">
+            <strong>{{ isPublic ? "Public" : "Private" }}</strong>
+            <template v-if="detail.ownerId"> · owned by {{ getUserName(detail.ownerId) }}</template>
+          </p>
+          <p class="access-line">
+            <template v-if="isPublic">Anyone on Pennsieve can find it and use it in workflows.</template>
+            <template v-else>{{ accessLine || "Only its owner, so far." }}</template>
+          </p>
+          <div v-if="!isPublic && accessChips.length" class="access-chips">
+            <span v-for="e in accessChips.slice(0, 4)" :key="`${e.type}:${e.id}`" class="access-chip" :title="e.type">{{ e.name }}</span>
+            <span v-if="accessChips.length > 4" class="access-chip access-chip--more">+{{ accessChips.length - 4 }}</span>
+          </div>
+          <a v-if="isAppOwner" href="#" class="access-manage" @click.prevent="shareOpen = true">Manage access ›</a>
+          <p v-else-if="!isPublic" class="access-ask">To get access, ask {{ getUserName(detail.ownerId) }}.</p>
+        </div>
+
         <el-collapse v-model="accordionActiveNames" class="sidebar-accordion">
           <el-collapse-item title="Information" name="information">
             <div class="info-card">
@@ -944,10 +989,6 @@ watch(
               <div v-if="detail.sourceType" class="info-row">
                 <span class="info-label">Source</span>
                 <span class="info-value">{{ detail.sourceType }}</span>
-              </div>
-              <div v-if="visibilityLabel" class="info-row">
-                <span class="info-label">Visibility</span>
-                <span class="info-value">{{ visibilityLabel }}</span>
               </div>
               <div v-if="detail.createdAt" class="info-row">
                 <span class="info-label">Created</span>
@@ -1134,16 +1175,6 @@ watch(
           </el-collapse-item>
         </el-collapse>
 
-        <div class="sidebar-permissions">
-          <app-permissions
-            :uuid="detail.uuid"
-            :owner-id="detail.ownerId"
-            :is-public="isPublic"
-            :organization-id="detail.organizationId"
-            @updated="reloadAfterPermissions"
-          />
-        </div>
-
         <!-- Archiving: the owner only, out of the way of everyday settings -->
         <div v-if="isAppOwner" class="sidebar-danger">
           <h4 class="sidebar-danger-title">Danger zone</h4>
@@ -1157,6 +1188,17 @@ watch(
         </div>
       </div>
     </div>
+    <ShareAppDialog
+      v-if="detail && isAppOwner"
+      v-model="shareOpen"
+      :uuid="detail.uuid"
+      :app-name="repoName"
+      :is-public="isPublic"
+      :owner-id="detail.ownerId"
+      :organization-id="viewingOrgId"
+      :entries="accessList"
+      @saved="reloadAfterPermissions"
+    />
     <ReleaseDialog
       v-if="canRelease"
       v-model="releaseOpen"
@@ -1996,6 +2038,53 @@ watch(
   margin-top: 12px;
 }
 
+.sidebar-access {
+  background: theme.$white;
+  border: 1px solid theme.$gray_3;
+  padding: 14px 16px;
+  margin-bottom: 12px;
+  p {
+    margin: 0 0 6px;
+    font-size: 13px;
+    line-height: 1.45;
+    color: theme.$gray_5;
+  }
+}
+.sidebar-access-title {
+  margin: 0 0 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: theme.$gray_6;
+}
+.access-visibility strong {
+  color: theme.$gray_6;
+}
+.access-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 2px 0 8px;
+}
+.access-chip {
+  padding: 1px 7px;
+  border-radius: 3px;
+  background: theme.$gray_1;
+  font-size: 12px;
+  color: theme.$gray_5;
+  &--more {
+    color: theme.$gray_4;
+  }
+}
+.access-manage {
+  font-size: 13px;
+  font-weight: 500;
+  color: theme.$purple_3;
+}
+p.access-ask {
+  margin: 0;
+  font-size: 12px;
+  color: theme.$gray_4;
+}
 .sidebar-danger {
   background: theme.$white;
   border: 1px solid theme.$gray_3;
