@@ -40,6 +40,17 @@ export function builderReadiness({ name = "", nodes = [], edges = [], edgeIssues
   }
 
   for (const issue of edgeIssues) {
+    // A step fed by several steps that still lacks a required input.
+    if (issue.reason === "missing-required") {
+      const types = (issue.mediaTypes || []).join(", ");
+      items.push({
+        id: issue.id,
+        level: "warn",
+        nodeId: issue.targetId,
+        text: `${issue.target} needs ${types || "a required input"}, which none of the steps before it produce`,
+      });
+      continue;
+    }
     items.push({
       id: `edge:${issue.id}`,
       level: "warn",
