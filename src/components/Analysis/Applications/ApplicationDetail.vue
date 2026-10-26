@@ -146,15 +146,16 @@ onBeforeUnmount(stopReleaseWatch);
 // Permissions only apply to private applications.
 const isPublic = computed(() => detail.value?.isPrivate === false);
 
-// Private GitHub repos return 401 from raw.githubusercontent.com, so we can't
-// render their README (or its images) in the browser. Show a link instead.
+// Private GitHub repos return 401 from raw.githubusercontent.com, so their
+// README's own images can't load in the browser; the README text comes with
+// the app's details (app-deploy-service reads it at release) and is shown.
 const isPrivateRepo = computed(
   () => detail.value?.visibility === "private" || detail.value?.isPrivate === true
 );
 
-// Anyone can open a public repo on GitHub. A private repo is only viewable by
-// the owner (others must request permission from the repo owner).
-const canViewOnGitHub = computed(() => !isPrivateRepo.value || isAppOwner.value);
+// Anyone can open a public repo on GitHub. A private repo: its owner and
+// anyone who can push to it (others must request permission from its owner).
+const canViewOnGitHub = computed(() => !isPrivateRepo.value || canUpdate.value);
 
 // Keep the local detail in sync when the archive toggle changes status.
 const onArchiveChange = (status) => {
@@ -296,9 +297,21 @@ const renderReadme = (markdown) => {
   const rawHtml = marked.parse(markdown);
   const doc = new DOMParser().parseFromString(rawHtml, "text/html");
   const sourceUrl = detail.value?.sourceUrl;
+  const repo = parseGitHubRepo(sourceUrl);
+  const ownRaw = repo ? `https://raw.githubusercontent.com/${repo.owner}/${repo.repo}/`.toLowerCase() : "";
   doc.querySelectorAll("img").forEach((img) => {
     const src = img.getAttribute("src");
-    if (src) img.setAttribute("src", resolveAssetUrl(src, sourceUrl));
+    if (!src) return;
+    const resolved = resolveAssetUrl(src, sourceUrl);
+    // A private repo's own images need GitHub sign-in: a note, not a broken image.
+    if (isPrivateRepo.value && ownRaw && resolved.toLowerCase().startsWith(ownRaw)) {
+      const note = doc.createElement("span");
+      note.className = "readme-image-private";
+      note.textContent = `Image not shown (private repository)${img.getAttribute("alt") ? `: ${img.getAttribute("alt")}` : ""}`;
+      img.replaceWith(note);
+      return;
+    }
+    img.setAttribute("src", resolved);
   });
   readmeHtml.value = DOMPurify.sanitize(doc.body.innerHTML);
 };
@@ -492,14 +505,9 @@ const loadDetail = async (uuid) => {
 
     if (detailResult.status === "fulfilled") {
       detail.value = detailResult.value;
-      // Only render the README for public repos. Private repo assets aren't
-      // reachable from the browser, so we surface a GitHub link instead.
-      const detailIsPrivate =
-        detailResult.value?.visibility === "private" ||
-        detailResult.value?.isPrivate === true;
-      if (!detailIsPrivate) {
-        renderReadme(getReadmeContent(detailResult.value?.assets));
-      }
+      // The README comes with the details, also for private repos; only
+      // their own images are left out (renderReadme).
+      renderReadme(getReadmeContent(detailResult.value?.assets));
     } else {
       console.error(detailResult.reason);
       detailError.value = "Failed to load application";
@@ -616,22 +624,10 @@ watch(
           </div>
           <!-- README tab -->
           <template v-if="activeTab === 'readme'">
-            <div v-if="isPrivateRepo" class="readme-empty readme-private">
-              <p>README preview isn't available for private repositories.</p>
-              <a
-                v-if="githubRepoUrl"
-                :href="githubRepoUrl"
-                target="_blank"
-                rel="noopener noreferrer"
-                class="readme-github-link"
-              >
-                View README on GitHub
-              </a>
-            </div>
-            <div v-else-if="!readmeHtml" class="readme-empty">
+            <div v-if="readmeHtml" class="readme-content" v-html="readmeHtml" />
+            <div v-else class="readme-empty">
               No README available
             </div>
-            <div v-else class="readme-content" v-html="readmeHtml" />
           </template>
 
           <!-- app.yml tab -->
@@ -1338,6 +1334,15 @@ watch(
   font-size: 14px;
 }
 
+// A private repository's own image, which needs GitHub sign-in to load.
+.readme-content :deep(.readme-image-private) {
+  display: inline-block;
+  padding: 2px 6px;
+  border: 1px dashed theme.$gray_3;
+  border-radius: 3px;
+  font-size: 12px;
+  color: theme.$gray_4;
+}
 .readme-private {
   display: flex;
   flex-direction: column;
