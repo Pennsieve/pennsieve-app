@@ -30,6 +30,7 @@ import BfButton from "../../shared/bf-button/BfButton.vue";
 import MetricsDashboard from "../Metrics/MetricsDashboard.vue";
 import CompactFlowNode from "../WorkflowGraph/CompactFlowNode.vue";
 import LlmMark from "../WorkflowGraph/LlmMark.vue";
+import RuntimeMark from "../WorkflowGraph/RuntimeMark.vue";
 import GraphDensityToggle from "../WorkflowGraph/GraphDensityToggle.vue";
 import { COMPACT_BOX, layoutBox, overlaps, recenter, useGraphDensity } from "../WorkflowGraph/graphDensity";
 import {
@@ -1658,14 +1659,13 @@ const reportConnectionCheck = (srcNode, tgtNode, edge) => {
   });
 };
 
-// A step's one-line summary: version, CPU and memory, and where it runs
-// when that isn't the default ("v1.3.6 · 1 vCPU · 2 GB").
+// A step's one-line summary: version, CPU and memory ("v1.3.6 · 1 vCPU ·
+// 2 GB"). Where it runs, when not the default, is a mark (RuntimeMark).
 const stepMeta = (data) => {
   const version = data.tag || latestVersion(data.application)?.version || "";
   const cpu = data.computeType !== "lambda" && data.cpu ? `${+(Number(data.cpu) / 1024).toFixed(2)} vCPU` : "";
   const memory = data.memory ? formatResourceLabel(data.memory) : "";
-  const where = data.computeType && data.computeType !== "standard" ? computeTypeName(data.computeType) : "";
-  return [version, cpu, memory, where].filter(Boolean).join(" · ");
+  return [version, cpu, memory].filter(Boolean).join(" · ");
 };
 // The folded resources line: "1 vCPU · 2 GB · Standard".
 const resourcesSummary = (data) => {
@@ -2716,6 +2716,7 @@ const openNodeSettings = (id) => {
                   <div class="node-header">
                     <span v-if="data.interactive" class="node-type-badge processor-badge">Interactive</span>
                     <span class="node-title" :title="nodeName({ id, type: 'default', data })">{{ nodeName({ id, type: 'default', data }) }}</span>
+                    <RuntimeMark :runtime="data.computeType" />
                     <LlmMark v-if="usesLLM(data)" />
                     <span
                       v-if="data.draftManifest"
@@ -2976,6 +2977,7 @@ const openNodeSettings = (id) => {
                     <span class="node-title">{{
                       data.targetType ? nodeName({ id, type: 'data-target', data }) : getTargetTypeLabel(data.targetType)
                     }}</span>
+                    <RuntimeMark :runtime="data.computeType" />
                     <button
                       v-if="!isReadOnly"
                       class="remove-btn"
@@ -2983,11 +2985,6 @@ const openNodeSettings = (id) => {
                     >
                       &times;
                     </button>
-                  </div>
-                  <div class="node-body">
-                    <span v-if="data.computeType" class="runtime-tag">{{
-                      data.computeType
-                    }}</span>
                   </div>
                 </div>
               </template>
@@ -5163,19 +5160,6 @@ kbd {
     gap: 8px;
   }
 
-  .runtime-tag {
-    font-size: 10px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    padding: 2px 8px;
-    border-radius: 2px;
-    background: rgba(5, 150, 105, 0.12);
-    color: #047857;
-    white-space: nowrap;
-    margin-left: auto;
-  }
-
   .node-badge {
     margin-top: 8px;
     margin-bottom: 8px;
@@ -5246,19 +5230,6 @@ kbd {
         color: #64748b;
         background: rgba(100, 116, 139, 0.1);
       }
-    }
-
-    .runtime-tag {
-      font-size: 10px;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      padding: 2px 8px;
-      border-radius: 2px;
-      background: rgba(5, 150, 105, 0.12);
-      color: #047857;
-      white-space: nowrap;
-      display: inline-block;
     }
 
     .target-edit {
