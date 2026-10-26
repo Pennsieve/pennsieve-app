@@ -47,6 +47,7 @@ import { diffLines, manifestDiff, versionWarnings } from "./manifestDiff";
 import { builderReadiness } from "./builderReadiness";
 import StepPicker from "./StepPicker.vue";
 import LinkEdge from "./LinkEdge.vue";
+import { sourceLabel, sourceHints, hintLine } from "../WorkflowGraph/sourceInputs";
 import { useGraphHistory, snapshot } from "./graphHistory";
 import { canConnect, neighbourInDirection } from "./graphEditing";
 import {
@@ -2279,6 +2280,16 @@ function deselectStep() {
   selectedNode.value = null;
 }
 
+// Input data is named after the app inputs it's linked to ("signals"), as
+// on the run dialogs and a run's page (sourceInputs.js); other steps by
+// their label.
+const linkedSteps = computed(() =>
+  nodes.value.filter((n) => n.type === "default").map((n) => ({ id: n.id, inputs: linksOf(n, edges.value) }))
+);
+const nodeName = (n) => (n?.type === "data-source" ? sourceLabel(n.id, linkedSteps.value) : n?.data?.label || "");
+const sourceFeeds = (id) =>
+  hintLine(sourceHints(id, linkedSteps.value, (stepId) => nodes.value.find((n) => n.id === stepId)?.data?.manifestPorts));
+
 // The workflow's steps, top to bottom as on the canvas, for the panel's list.
 const stepListNodes = computed(() =>
   [...nodes.value].sort((a, b) => (a.position?.y ?? 0) - (b.position?.y ?? 0) || (a.position?.x ?? 0) - (b.position?.x ?? 0))
@@ -2411,7 +2422,7 @@ const openNodeSettings = (id) => {
         :applications="availableApplications"
         :app-name="appDisplayName"
         :step-ports="selectedNode?.type === 'default' ? selectedNode.data?.manifestPorts || null : null"
-        :step-label="selectedNode?.data?.label || ''"
+        :step-label="nodeName(selectedNode)"
         :loading="isLoading"
         @add="(type, app) => addStep(type, app)"
         @dragstart="(app, event, type) => onDragStart(app, event, type)"
@@ -2778,7 +2789,7 @@ const openNodeSettings = (id) => {
                   v-if="!detailed"
                   kind="source"
                   :class="connectClass(id)"
-                  :label="data.label"
+                  :label="nodeName({ id, type: 'data-source' })"
                 >
                     <button
                       v-if="!isReadOnly"
@@ -2791,7 +2802,7 @@ const openNodeSettings = (id) => {
                 <div v-else class="custom-node data-source-node" :class="connectClass(id)">
                   <div class="node-header">
                     <span class="node-type-badge source-badge">Source</span>
-                    <span class="node-title">{{ data.label }}</span>
+                    <span class="node-title" :title="sourceFeeds(id) || undefined">{{ nodeName({ id, type: 'data-source' }) }}</span>
                     <button
                       v-if="!isReadOnly"
                       class="remove-btn"
@@ -2893,7 +2904,7 @@ const openNodeSettings = (id) => {
                 <div class="info-row">
                   <span class="info-label">Name</span>
                   <span class="info-value">{{
-                    selectedNode.data?.label || "Unnamed"
+                    nodeName(selectedNode) || "Unnamed"
                   }}</span>
                 </div>
                 <div class="info-row">
@@ -2901,6 +2912,10 @@ const openNodeSettings = (id) => {
                   <span class="info-value">{{
                     { "data-source": "Input data", "data-target": "Output", default: "App" }[selectedNode.type] || selectedNode.type
                   }}</span>
+                </div>
+                <div v-if="selectedNode.type === 'data-source' && sourceFeeds(selectedNode.id)" class="info-row">
+                  <span class="info-label">Feeds</span>
+                  <span class="info-value">{{ sourceFeeds(selectedNode.id) }}</span>
                 </div>
                 <template v-if="selectedNode.data?.application?.description">
                   <div class="info-row">
@@ -3498,7 +3513,7 @@ const openNodeSettings = (id) => {
                 <li v-for="n in stepListNodes" :key="n.id">
                   <button type="button" class="step-list-item" @click="onReadinessSelect({ nodeId: n.id })">
                     <span class="step-list-dot" :class="{ warn: stepWarning(n.id) }" :title="stepWarning(n.id) || 'Ready'" />
-                    <span class="step-list-name">{{ n.data?.label || "Step" }}</span>
+                    <span class="step-list-name">{{ nodeName(n) || "Step" }}</span>
                     <span class="step-list-meta">{{ stepListMeta(n) }}</span>
                   </button>
                 </li>
