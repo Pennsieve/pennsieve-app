@@ -21,7 +21,8 @@ describe("releases", () => {
     expect(nextVersions("v1.3.6")).toEqual({ patch: "v1.3.7", minor: "v1.4.0", major: "v2.0.0" });
     expect(nextVersions("0.4.1")).toEqual({ patch: "0.4.2", minor: "0.5.0", major: "1.0.0" });
     expect(nextVersions("v1.2.0-rc.1").patch).toBe("v1.2.0");
-    expect(nextVersions("")).toEqual({ patch: "v1.0.0", minor: "v1.0.0", major: "v1.0.0" });
+    // A first release: an early version or a first stable one.
+    expect(nextVersions("")).toEqual({ patch: "v0.0.1", minor: "v0.1.0", major: "v1.0.0" });
   });
 
   it("refuse a tag that's taken, not a version, or not newer", () => {
