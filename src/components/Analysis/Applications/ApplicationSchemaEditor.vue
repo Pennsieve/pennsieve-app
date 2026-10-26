@@ -380,6 +380,22 @@
                   <span v-else class="field-static" :class="{ 'is-empty': !port.description }">{{ port.description || "—" }}</span>
                 </div>
               </div>
+              <!-- Where the input's data goes in INPUT_DIR -->
+              <div v-if="block.key === 'inputs'" class="field-row full-width">
+                <label class="field-label">Placed at</label>
+                <div class="field-control">
+                  <el-radio-group :model-value="port.placement || 'root'" @update:model-value="(v) => (port.placement = v === 'root' ? '' : v)">
+                    <el-radio value="root">The root of INPUT_DIR</el-radio>
+                    <el-radio value="subfolder">Its own folder: <code>INPUT_DIR/{{ port.name || "<name>" }}/</code></el-radio>
+                  </el-radio-group>
+                  <p v-if="(port.placement || 'root') === 'root' && rootInputs.length > 1" class="field-error">
+                    {{ rootInputs.length }} inputs are at the root of INPUT_DIR and would mix. Give all but one their own folder.
+                  </p>
+                  <p v-else-if="port.placement === 'subfolder' && port.name && !/^[a-z0-9][a-z0-9-]*$/.test(port.name)" class="field-error">
+                    As a folder name, the name can only have lowercase letters, numbers and dashes.
+                  </p>
+                </div>
+              </div>
               <div v-if="block.key === 'inputs'" class="field-row">
                 <label class="field-label">Required</label>
                 <div class="field-control">
@@ -648,6 +664,8 @@ const formatChoices = (port) =>
     : portDataTypes.value;
 
 const isStructurePort = (port) => portMode(port) === "layout";
+// Inputs placed at the root of INPUT_DIR: more than one would mix.
+const rootInputs = computed(() => (schema.value.inputs || []).filter((p) => (p.placement || "root") === "root"));
 const structureById = (id) => structureOptions.value.find((o) => o.id === id);
 const structureName = (entry) => structureById(structureId(entry))?.name || entry;
 // The file that marks a layout's root, for the hint; layouts the builder

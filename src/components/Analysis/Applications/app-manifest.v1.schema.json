@@ -212,8 +212,10 @@
       "description": "An input or output. Without mediaTypes, formats or conformsTo it accepts any file.",
       "additionalProperties": false,
       "required": ["name"],
+      "if": { "required": ["placement"], "properties": { "placement": { "const": "subfolder" } } },
+      "then": { "properties": { "name": { "pattern": "^[a-z0-9][a-z0-9-]*$" } } },
       "properties": {
-        "name": { "type": "string", "minLength": 1, "description": "Its name." },
+        "name": { "type": "string", "minLength": 1, "description": "Its name: an identifier, e.g. study. With placement subfolder it is also the input's folder name." },
         "description": { "type": "string", "description": "What it is." },
         "mediaTypes": {
           "type": "array",
@@ -237,6 +239,12 @@
             { "$ref": "#/$defs/structureRef" },
             { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/structureRef" } }
           ]
+        },
+        "placement": {
+          "type": "string",
+          "enum": ["root", "subfolder"],
+          "default": "root",
+          "description": "Where an input's data is placed. root (the default): at the root of INPUT_DIR. subfolder: in its own folder, INPUT_DIR/<name>/, so inputs that would collide (two BIDS trees) stay apart; the name must then be folder-safe (lowercase letters, numbers, dashes). At most one input may be at the root."
         },
         "required": { "type": "boolean", "description": "Whether a run must give it something." },
         "dataType": {

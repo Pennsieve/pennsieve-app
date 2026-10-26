@@ -106,6 +106,18 @@ describe('folder formats and structures in app.yml', () => {
     expect(JSON.stringify(validateManifestDoc(bad).problems)).toMatch(/conformsTo/)
   })
 
+  it('reads and writes placement, and leaves it out when unset', () => {
+    const yml = 'application:\n  name: a\ninputs:\n  - name: recordings\n    placement: subfolder\n  - name: study\n    conformsTo: bids\n'
+    const { meta, schema } = parseManifest(yml)
+    expect(schema.inputs[0].placement).toBe('subfolder')
+    const out = buildManifest(schema, meta)
+    expect(out.inputs[0].placement).toBe('subfolder')
+    expect(out.inputs[1]).not.toHaveProperty('placement')
+    expect(validateManifestDoc(loadYaml(yml))).toEqual({ valid: true, problems: [] })
+    const bad = loadYaml('application:\n  name: a\ninputs:\n  - name: My recordings\n    placement: subfolder\n')
+    expect(JSON.stringify(validateManifestDoc(bad).problems)).toMatch(/name/)
+  })
+
   it('matches structures by id, whatever the version', () => {
     const bids = createPort({ conformsTo: 'bids' })
     expect(arePortsCompatible(createPort({ conformsTo: 'bids@1.9' }), bids)).toBe(true)
