@@ -27,7 +27,10 @@ const visible = computed({
   set: (v) => emit("update:modelValue", v),
 });
 
-const latest = computed(() => latestVersion(props.knownTags));
+// The latest release: of the versions known (the repository's, the app
+// store's) and the one the release check found (status.latestTag), which
+// the repository list doesn't always have.
+const latest = computed(() => latestVersion([...props.knownTags, props.status?.latestTag].filter(Boolean)));
 const suggestions = computed(() => nextVersions(latest.value));
 const BUMPS = [
   { key: "patch", label: "Patch", hint: "fixes" },
