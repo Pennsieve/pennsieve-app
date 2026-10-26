@@ -56,8 +56,9 @@ const title = (p) =>
   padding: 0 5px;
   overflow: hidden;
   border-radius: 3px;
-  // White on an app card's orange, as in the builder.
-  background: theme.$white;
+  // Grey on a white card; a card can set its own (white on the builder's
+  // orange).
+  background: var(--port-chip-bg, #{theme.$gray_0});
   color: theme.$gray_5;
   text-overflow: ellipsis;
   white-space: nowrap;
