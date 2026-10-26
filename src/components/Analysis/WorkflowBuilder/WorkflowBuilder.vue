@@ -1412,12 +1412,12 @@ const reportConnectionCheck = (srcNode, tgtNode) => {
 };
 
 // Where output port i of n sits on the step's bottom edge: the middle of
-// its column. The detailed card has 15px of padding and border each side;
+// its column. The detailed card has 11px of padding and border each side;
 // the compact one spreads them evenly. !important beats the connectors'
 // own left: 50%.
 const portHandleLeft = (i, n) =>
   detailed.value
-    ? `calc(15px + (100% - 30px) * ${(i + 0.5) / n}) !important`
+    ? `calc(11px + (100% - 22px) * ${(i + 0.5) / n}) !important`
     : `${((i + 1) * 100) / (n + 1)}% !important`;
 
 // The output port feeding a node, or "" when none does.
@@ -4044,13 +4044,13 @@ kbd {
   font-size: 10px;
 }
 .node-ports--in {
-  margin-bottom: 6px;
+  margin-bottom: 4px;
   /* Over the step's single input connector (top centre); each input gets its
      own connector with input ports (phase 2). */
   justify-content: center;
 }
 .node-ports--out {
-  margin-top: 6px;
+  margin-top: 5px;
 }
 .node-ports--none {
   margin-top: 6px;
@@ -4275,7 +4275,7 @@ kbd {
   background: white;
   border: 1px solid theme.$gray_3;
   border-radius: 4px;
-  padding: 14px;
+  padding: 8px 10px;
   min-width: 250px;
   max-width: 350px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
@@ -4292,8 +4292,8 @@ kbd {
     display: flex;
     justify-content: space-between;
     align-items: flex-start;
-    gap: 10px;
-    margin-bottom: 8px;
+    gap: 8px;
+    margin-bottom: 4px;
   }
 
   .node-title {
@@ -4302,6 +4302,7 @@ kbd {
     color: theme.$black;
     flex: 1;
     line-height: 1.3;
+    text-align: left;
   }
 
   .settings-btn {
@@ -4346,7 +4347,7 @@ kbd {
   .node-description {
     font-size: 12px;
     color: theme.$gray_4;
-    margin-bottom: 8px;
+    margin-bottom: 4px;
     line-height: 1.4;
     display: flex;
     align-items: center;
@@ -4390,8 +4391,8 @@ kbd {
     font-size: 11px;
     color: theme.$gray_5;
     font-weight: 500;
-    margin-top: 8px;
-    padding-top: 8px;
+    margin-top: 6px;
+    padding-top: 6px;
     border-top: 1px solid theme.$gray_2;
     display: flex;
     align-items: center;
