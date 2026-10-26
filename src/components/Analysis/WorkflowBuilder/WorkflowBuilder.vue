@@ -4045,6 +4045,9 @@ kbd {
 }
 .node-ports--in {
   margin-bottom: 6px;
+  /* Over the step's single input connector (top centre); each input gets its
+     own connector with input ports (phase 2). */
+  justify-content: center;
 }
 .node-ports--out {
   margin-top: 6px;
