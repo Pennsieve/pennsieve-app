@@ -44,7 +44,8 @@ import { ioLine, sessionTypeOf, versionManifest, shortMediaType } from "./appMan
 import { appColors, domainOfTag, domainColors } from "../Applications/appDomains";
 import { clearManifestDraft } from "../Applications/manifestDrafts";
 import { diffLines, manifestDiff, versionWarnings } from "./manifestDiff";
-import { builderReadiness } from "./builderReadiness";
+import { builderReadiness, readinessLabel } from "./builderReadiness";
+import { stepNames } from "./stepNames";
 import StepPicker from "./StepPicker.vue";
 import LinkEdge from "./LinkEdge.vue";
 import { sourceLabel, sourceHints, hintLine } from "../WorkflowGraph/sourceInputs";
@@ -1425,7 +1426,7 @@ const stepInputIssues = () =>
         ? {
             id: `step:${n.id}`,
             targetId: n.id,
-            target: n.data.label,
+            target: nodeName(n),
             reason: "missing-required",
             mediaTypes: portMediaTypes(unmetRequired),
           }
@@ -1480,13 +1481,17 @@ const revalidateEdges = () => {
 
     if (result.state === "invalid") {
       const mediaTypes = portMediaTypes(result.unmetInputs);
+      const link = edgeLink(edge, result.tgt, edges.value);
       issues.push({
         id: edge.id,
+        sourceId: edge.source,
         targetId: edge.target,
-        source: result.src.data.label,
-        target: result.tgt.data.label,
+        source: nodeName(result.src),
+        target: nodeName(result.tgt),
         reason: result.reason,
         mediaTypes,
+        needs: shortTypes(mediaTypes),
+        ...(link && { output: link.output || "", input: link.input }),
       });
       return {
         ...next,
@@ -1721,12 +1726,28 @@ const readiness = computed(() =>
     nodes: nodes.value,
     edges: edges.value,
     edgeIssues: edgeIssues.value,
+    nameOf: nodeName,
   }),
 );
 const saving = ref(false);
 
 // A readiness item was clicked: show its step.
+const panelTitleRef = ref(null);
 const onReadinessSelect = (item) => {
+  // The name: its field at the top of the panel.
+  if (item.id === "name") {
+    panelTitleRef.value?.focus();
+    return;
+  }
+  // A link: select it, and show the two steps it joins.
+  const edge = item.edgeId && edges.value.find((e) => e.id === item.edgeId);
+  if (edge) {
+    nodes.value.forEach((n) => (n.selected = false));
+    edges.value.forEach((e) => (e.selected = e.id === edge.id));
+    selectedNode.value = null;
+    setTimeout(() => fitView({ nodes: [edge.source, edge.target], padding: 0.4, maxZoom: 1.2, duration: 300 }), 50);
+    return;
+  }
   if (!item.nodeId) return;
   openNodeSettings(item.nodeId);
   setTimeout(() => fitView({ nodes: [item.nodeId], padding: 0.6, maxZoom: 1.2, duration: 300 }), 50);
@@ -2297,7 +2318,17 @@ function deselectStep() {
 const linkedSteps = computed(() =>
   nodes.value.filter((n) => n.type === "default").map((n) => ({ id: n.id, inputs: linksOf(n, edges.value) }))
 );
-const nodeName = (n) => (n?.type === "data-source" ? sourceLabel(n.id, linkedSteps.value) : n?.data?.label || "");
+// A step's own name: input data after the inputs it feeds, an output after
+// what it is, an app by its label.
+const baseName = (n) => {
+  if (n?.type === "data-source") return sourceLabel(n.id, linkedSteps.value);
+  if (n?.type === "data-target") return n.data?.targetType ? getTargetTypeLabel(n.data.targetType) : "Output";
+  return n?.data?.label || "";
+};
+// Names that tell steps apart, numbered when two share one (stepNames.js),
+// on the canvas and in the panel alike.
+const stepNameMap = computed(() => stepNames(stepListNodes.value, baseName));
+const nodeName = (n) => (n ? stepNameMap.value.get(n.id) || baseName(n) : "");
 const sourceFeeds = (id) =>
   hintLine(sourceHints(id, linkedSteps.value, (stepId) => nodes.value.find((n) => n.id === stepId)?.data?.manifestPorts));
 
@@ -2305,11 +2336,22 @@ const sourceFeeds = (id) =>
 const stepListNodes = computed(() =>
   [...nodes.value].sort((a, b) => (a.position?.y ?? 0) - (b.position?.y ?? 0) || (a.position?.x ?? 0) - (b.position?.x ?? 0))
 );
+// What a step's row says beside its name: what input data feeds, what feeds
+// an output (and which of its outputs), an app's version.
 const stepListMeta = (n) => {
-  if (n.type === "data-source") return "Input data";
-  if (n.type === "data-target") return getTargetTypeLabel(n.data?.targetType);
+  const byId = (id) => nodes.value.find((x) => x.id === id);
+  if (n.type === "data-source") {
+    const fed = edges.value.filter((e) => e.source === n.id).map((e) => nodeName(byId(e.target)));
+    return fed.length ? `→ ${[...new Set(fed)].join(", ")}` : "not connected";
+  }
+  if (n.type === "data-target") {
+    const from = edges.value.filter((e) => e.target === n.id)
+      .map((e) => [nodeName(byId(e.source)), portOfHandle(e.sourceHandle)].filter(Boolean).join(" · "));
+    return from.length ? `← ${from.join(", ")}` : "not connected";
+  }
   return n.data?.tag || latestVersion(n.data?.application)?.version || "";
 };
+const stepKind = (n) => (n.type === "data-source" ? "source" : n.type === "data-target" ? "target" : "app");
 
 const openNodeSettings = (id) => {
   nodes.value.forEach((n) => (n.selected = false));
@@ -2557,7 +2599,7 @@ const openNodeSettings = (id) => {
                 <CompactFlowNode
                   v-if="!detailed"
                   kind="processor"
-                  :label="data.label"
+                  :label="nodeName({ id, type: 'default', data })"
                   :runtime="data.interactive ? 'interactive' : data.computeType"
                   :accent="stepAccent(data)"
                   :class="connectClass(id)"
@@ -2612,7 +2654,7 @@ const openNodeSettings = (id) => {
                   <!-- What the step is, on one line; actions on hover or selection -->
                   <div class="node-header">
                     <span v-if="data.interactive" class="node-type-badge processor-badge">Interactive</span>
-                    <span class="node-title" :title="data.label">{{ data.label }}</span>
+                    <span class="node-title" :title="nodeName({ id, type: 'default', data })">{{ nodeName({ id, type: 'default', data }) }}</span>
                     <span
                       v-if="data.draftManifest"
                       class="draft-badge"
@@ -2914,14 +2956,25 @@ const openNodeSettings = (id) => {
         <!-- The selected step, or the workflow: the panel's content, never
              folded. The breadcrumb goes back to the workflow. -->
         <div class="panel-main">
-          <nav class="panel-crumbs" aria-label="Details">
-            <button v-if="selectedNode" type="button" class="crumb-link" @click="deselectStep">Workflow</button>
-            <span v-else class="crumb-current">Workflow</span>
-            <template v-if="selectedNode">
-              <span class="crumb-sep">›</span>
-              <span class="crumb-current" :title="selectedNode.data?.label">{{ selectedNode.data?.label || "Step" }}</span>
-            </template>
+          <!-- A step: the way back to the workflow, by name -->
+          <nav v-if="selectedNode" class="panel-crumbs" aria-label="Details">
+            <button type="button" class="crumb-link" @click="deselectStep">{{ workflowName.trim() || "Untitled workflow" }}</button>
+            <span class="crumb-sep">›</span>
+            <span class="crumb-current" :title="nodeName(selectedNode)">{{ nodeName(selectedNode) || "Step" }}</span>
           </nav>
+          <!-- The workflow: its name as the panel's title, edited in place
+               (the same name as the bar's) -->
+          <template v-else>
+            <input
+              v-if="!isReadOnly"
+              ref="panelTitleRef"
+              v-model="workflowName"
+              class="panel-title panel-title-input"
+              placeholder="Untitled workflow"
+              aria-label="Workflow name"
+            />
+            <h3 v-else class="panel-title">{{ workflowName.trim() || "Untitled workflow" }}</h3>
+          </template>
             <!-- Selected Node Info -->
             <template v-if="selectedNode">
               <h4 v-if="selectedNode.type !== 'default'" class="sidebar-section-title">{{ selectedNode.data?.label || "Step" }}</h4>
@@ -3412,20 +3465,21 @@ const openNodeSettings = (id) => {
             <!-- Building, nothing selected: what's left, and how -->
             <template v-if="!selectedNode && mode !== 'browse'">
               <h4 class="sidebar-section-title">Checklist</h4>
-              <ul class="checklist">
-                <li v-if="!readiness.items.length" class="checklist-done">Ready to save.</li>
+              <!-- Where it stands, then what to do: each item goes to its step or link -->
+              <p
+                class="checklist-status"
+                :class="readiness.blocking.length ? 'is-block' : readiness.warnings.length ? 'is-warn' : 'is-ready'"
+              >{{ readinessLabel(readiness) }}</p>
+              <ul v-if="readiness.items.length" class="checklist">
                 <li v-for="item in readiness.items" :key="item.id">
                   <button type="button" class="checklist-item" :class="`is-${item.level}`" @click="onReadinessSelect(item)">
                     <span class="checklist-dot" />
-                    {{ item.text }}
+                    <span class="checklist-text">
+                      {{ item.text }}
+                      <span v-if="item.detail" class="checklist-detail">{{ item.detail }}</span>
+                    </span>
                   </button>
                 </li>
-              </ul>
-              <h4 class="sidebar-section-title">Tips</h4>
-              <ul class="tips">
-                <li>Click a step to see and change its settings.</li>
-                <li><strong>+</strong> under a step adds the next one; drag between steps to connect them.</li>
-                <li><kbd>Delete</kbd> removes the selection; <kbd>⌘Z</kbd> / <kbd>⇧⌘Z</kbd> undo and redo; arrows move between steps.</li>
               </ul>
             </template>
 
@@ -3537,11 +3591,23 @@ const openNodeSettings = (id) => {
               <ul class="step-list">
                 <li v-for="n in stepListNodes" :key="n.id">
                   <button type="button" class="step-list-item" @click="onReadinessSelect({ nodeId: n.id })">
-                    <span class="step-list-dot" :class="{ warn: stepWarning(n.id) }" :title="stepWarning(n.id) || 'Ready'" />
+                    <!-- Its kind's colour, as on the canvas; a warning only when it needs attention -->
+                    <span class="step-list-kind" :class="`is-${stepKind(n)}`" />
                     <span class="step-list-name">{{ nodeName(n) || "Step" }}</span>
-                    <span class="step-list-meta">{{ stepListMeta(n) }}</span>
+                    <span v-if="stepWarning(n.id)" class="step-list-warn" :title="stepWarning(n.id)">!</span>
+                    <span class="step-list-meta" :title="stepListMeta(n)">{{ stepListMeta(n) }}</span>
                   </button>
                 </li>
+              </ul>
+            </template>
+
+            <!-- Building, nothing selected: how, last (read once) -->
+            <template v-if="!selectedNode && mode !== 'browse'">
+              <h4 class="sidebar-section-title">Tips</h4>
+              <ul class="tips">
+                <li>Click a step to see and change its settings.</li>
+                <li><strong>+</strong> under a step adds the next one; drag between steps to connect them.</li>
+                <li><kbd>Delete</kbd> removes the selection; <kbd>⌘Z</kbd> / <kbd>⇧⌘Z</kbd> undo and redo; arrows move between steps.</li>
               </ul>
             </template>
 
@@ -4001,8 +4067,34 @@ const openNodeSettings = (id) => {
 .checklist-item.is-block .checklist-dot {
   background: theme.$status_red;
 }
-.checklist-done {
-  color: theme.$status_green;
+/* The checklist's verdict, first: what's left, or ready. */
+.checklist-status {
+  margin: 0 0 8px;
+  padding: 6px 10px;
+  border-radius: 4px;
+  font-size: 13px;
+  font-weight: 600;
+  &.is-block {
+    background: #fdecec;
+    color: #b42318;
+  }
+  &.is-warn {
+    background: theme.$orange_tint;
+    color: #9a5b0c;
+  }
+  &.is-ready {
+    background: #eaf9ef;
+    color: #0f7a3f;
+  }
+}
+.checklist-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.checklist-detail {
+  font-size: 12px;
+  color: theme.$gray_4;
 }
 .tips li {
   margin-bottom: 6px;
@@ -4501,6 +4593,36 @@ kbd {
 .panel-main {
   padding: 0 0 8px;
 }
+/* The workflow's name, as the panel's title; edited in place. */
+.panel-title {
+  display: block;
+  width: 100%;
+  margin: 4px 0 12px;
+  padding: 2px 4px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: none;
+  font: inherit;
+  font-size: 18px;
+  font-weight: 600;
+  color: theme.$gray_6;
+  box-sizing: border-box;
+}
+.panel-title-input {
+  margin-left: -5px;
+  &::placeholder {
+    color: theme.$gray_4;
+    font-weight: 500;
+  }
+  &:hover {
+    border-color: theme.$gray_2;
+  }
+  &:focus {
+    outline: none;
+    border-color: theme.$purple_1;
+    background: theme.$white;
+  }
+}
 .panel-crumbs {
   display: flex;
   align-items: center;
@@ -4555,15 +4677,33 @@ kbd {
     background: theme.$gray_1;
   }
 }
-.step-list-dot {
+/* A step's kind, in the canvas's colours. */
+.step-list-kind {
   flex-shrink: 0;
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: theme.$green_1;
-  &.warn {
-    background: theme.$orange_1;
+  width: 4px;
+  height: 16px;
+  border-radius: 2px;
+  &.is-source {
+    background: #6366f1;
   }
+  &.is-app {
+    background: theme.$orange_2;
+  }
+  &.is-target {
+    background: #64748b;
+  }
+}
+.step-list-warn {
+  flex-shrink: 0;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: theme.$orange_1;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 14px;
+  text-align: center;
+  color: theme.$white;
 }
 .step-list-name {
   flex: 1;

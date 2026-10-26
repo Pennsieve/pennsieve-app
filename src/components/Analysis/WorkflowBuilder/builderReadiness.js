@@ -4,11 +4,13 @@
 //
 // Blocking items stop Save; warnings don't (an incompatible connection may be
 // fine, and a required parameter can be given when the workflow is run).
-// Each item names the node it's about, so clicking it selects the node.
+// Each item names the node it's about, so clicking it selects the node (and
+// a link's, its link). nameOf names steps as the panel does (numbered when
+// two share a name).
 
-export function builderReadiness({ name = "", nodes = [], edges = [], edgeIssues = [] } = {}) {
+export function builderReadiness({ name = "", nodes = [], edges = [], edgeIssues = [], nameOf } = {}) {
   const items = [];
-  const label = (n) => n?.data?.label || "A step";
+  const label = (n) => (nameOf && nameOf(n)) || n?.data?.label || "A step";
 
   if (!name.trim()) items.push({ id: "name", level: "block", text: "Give the workflow a name" });
 
@@ -51,12 +53,17 @@ export function builderReadiness({ name = "", nodes = [], edges = [], edgeIssues
       });
       continue;
     }
+    // A link to a named input: which output and input, and what it needs;
+    // the two steps underneath.
+    const needs = issue.needs ? `needs ${issue.needs}` : "the types don't match";
     items.push({
       id: `edge:${issue.id}`,
       level: "warn",
       edgeId: issue.id,
       nodeId: issue.targetId,
-      text: `${issue.source} → ${issue.target}: the types don't match`,
+      ...(issue.input
+        ? { text: `${issue.output || "all outputs"} → ${issue.input}: ${needs}`, detail: `${issue.source} → ${issue.target}` }
+        : { text: `${issue.source} → ${issue.target}: ${needs}` }),
     });
   }
 
