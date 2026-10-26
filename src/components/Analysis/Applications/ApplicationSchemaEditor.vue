@@ -297,6 +297,8 @@
                       filterable
                       :filter-method="(q) => (mediaTypeQuery = q)"
                       placeholder="e.g. BIDS, SPARC SDS"
+                      fit-input-width
+                      popper-class="described-options"
                       @visible-change="(open) => open || (mediaTypeQuery = '')"
                       @change="(v) => onLayoutChange(port, v)"
                     >
@@ -308,7 +310,7 @@
                       >
                         <span class="mt-option">
                           <span class="mt-name">{{ s.name }}</span>
-                          <span v-if="s.description" class="mt-meta mt-wrap">{{ s.description }}</span>
+                          <span v-if="s.description" class="mt-meta mt-wrap" :title="s.description">{{ s.description }}</span>
                         </span>
                       </el-option>
                     </el-select>
@@ -946,6 +948,23 @@ const removePort = (key, i) => schema.value[key].splice(i, 1);
 
 <style lang="scss">
 @use "../../../styles/theme";
+
+/* Options with a description (layouts): as wide as the field, each
+   description wrapped to at most two lines. Teleported, so not scoped. */
+.described-options .el-select-dropdown__item {
+  height: auto;
+  padding-top: 4px;
+  padding-bottom: 4px;
+  line-height: 1.3;
+  white-space: normal;
+
+  .mt-wrap {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+}
 
 /* The tag dropdown is teleported, so its option styles can't be scoped. */
 .tag-options {
