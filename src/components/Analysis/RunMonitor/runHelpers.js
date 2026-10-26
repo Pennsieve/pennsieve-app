@@ -35,6 +35,16 @@ export const statusBorderColor = (status) => {
   }
 };
 
+// A step's status on a run's graph card, which keeps its shape: a mark once
+// it has ended (✓ done, ✕ failed, – canceled), none while pending or
+// running (its type strip pulses then). kind: done | failed | canceled.
+const STATUS_MARKS = {
+  SUCCEEDED: { glyph: "✓", kind: "done" },
+  FAILED: { glyph: "✕", kind: "failed" },
+  CANCELED: { glyph: "–", kind: "canceled" },
+};
+export const statusMarkOf = (status) => STATUS_MARKS[status] || null;
+
 // On a run's graph, colour marks what needs a look (running, failed): a
 // step that succeeded is as quiet as one yet to start, its ✓ says it's done.
 export const graphStatusColor = (status) => statusBorderColor(status === "SUCCEEDED" ? "NOT_STARTED" : status);
