@@ -1446,8 +1446,8 @@ const nodeMetricLabel = (nodeId) => {
   return d ? labelForDagNode(d, availableApplications.value, targetTypes.value, activity.dag) : nodeId;
 };
 
-// Detailed cards: how long a step ran (ticking while it runs), its resources
-// and, once the run's metrics are in, its cost.
+// Detailed cards: how long a step ran (ticking while it runs) and its
+// resources. Costs are in the run's metrics, not on each card.
 const nowTick = ref(Date.now());
 let nowTimer = null;
 onMounted(() => {
@@ -1455,14 +1455,9 @@ onMounted(() => {
 });
 onBeforeUnmount(() => clearInterval(nowTimer));
 
-const nodeCostLabel = (nodeId) => {
-  const nm = runMetrics.value?.nodeMetrics?.find((m) => m.nodeId === nodeId);
-  const cost = Number(nm?.estimatedCost);
-  return nm && cost > 0 ? formatCost(cost) : "";
-};
 const nodeRunTime = (data) => formatRunTime(nodeDurationSec(data, nowTick.value));
 const processorFacts = (id, data) =>
-  [data.version, formatResources(data.cpu, data.memory), nodeRunTime(data), nodeCostLabel(id)].filter(Boolean);
+  [data.version, formatResources(data.cpu, data.memory), nodeRunTime(data)].filter(Boolean);
 const targetFacts = (data) => [nodeRunTime(data)].filter(Boolean);
 const viewSourceLabel = (view) => {
   const info = view && browseViewInfo.value[view.viewId];
@@ -3444,14 +3439,15 @@ onUnmounted(() => {
 
   // An app step on a run: white, with the processor orange as a strip on
   // the left (as on the compact cards), so the border can say its status.
+  // Over the card's left border, so no status colour shows beside it.
   &.app-step::before {
     content: "";
     position: absolute;
-    top: 0;
-    bottom: 0;
-    left: 0;
-    width: 4px;
-    border-radius: 3px 0 0 3px;
+    top: -1px;
+    bottom: -1px;
+    left: -1px;
+    width: 5px;
+    border-radius: 4px 0 0 4px;
     background: theme.$orange_2;
   }
 
