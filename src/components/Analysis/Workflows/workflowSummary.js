@@ -44,3 +44,19 @@ export function usageLine(wf, relativeTime) {
   const rel = last ? relativeTime(last) : "";
   return rel ? `Run ${total}× · last ${rel}` : `Run ${total}×`;
 }
+
+// What a card says a workflow is: its summary (the short line written for
+// that), else its description as plain text, since descriptions are Markdown
+// ("- **signals** feed…" reads as "signals feed…").
+export function cardText(wf) {
+  const summary = String(wf?.summary || "").trim();
+  if (summary) return summary;
+  return String(wf?.description || "")
+    .replace(/```[\s\S]*?```/g, " ")
+    .replace(/!\[[^\]]*\]\([^)]*\)/g, "")
+    .replace(/\[([^\]]*)\]\([^)]*\)/g, "$1")
+    .replace(/^\s*(#{1,6}|[-*+]|\d+\.)\s+/gm, "")
+    .replace(/[*_`~>]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}

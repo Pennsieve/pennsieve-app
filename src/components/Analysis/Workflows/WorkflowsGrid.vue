@@ -7,7 +7,7 @@ import BfButton from "../../shared/bf-button/BfButton.vue";
 import IconAnalysis from "../../icons/IconAnalysis.vue";
 import IconPennsieveMark from "../../icons/IconPennsieveMark.vue";
 import WorkflowThumbnail from "../WorkflowGraph/WorkflowThumbnail.vue";
-import { ioSummary, appNames, usageLine } from "./workflowSummary";
+import { ioSummary, appNames, usageLine, cardText } from "./workflowSummary";
 import { applyFilters, libraryWorkflows, outputOptions, sortWorkflows, SORTS } from "./galleryFilter";
 
 defineProps({
@@ -341,7 +341,7 @@ onMounted(async () => {
               <span v-if="!wf.isActive" class="wf-badge">Inactive</span>
               <span v-else-if="wf.visibility === 'public' && !wf.official" class="wf-badge">Public</span>
             </div>
-            <p class="wf-description">{{ wf.description || "No description." }}</p>
+            <p class="wf-description">{{ cardText(wf) || "No description." }}</p>
             <div class="wf-io">{{ ioSummary(wf, targetTypes) }}</div>
             <div v-if="appNames(wf, applications).length" class="wf-apps">
               <span v-for="name in appNames(wf, applications).slice(0, 3)" :key="name" class="wf-app">{{ name }}</span>
@@ -769,9 +769,12 @@ $card-height: 172px;
 }
 
 .wf-description {
+  /* Two whole lines: the card has a fixed height, and shrinking the
+     description to fit cut its second line in half. */
+  flex-shrink: 0;
   font-size: 13px;
   color: theme.$gray_5;
-  margin: 4px 0 8px 0;
+  margin: 2px 0 4px 0;
   line-height: 1.4;
   word-break: break-word;
 }
