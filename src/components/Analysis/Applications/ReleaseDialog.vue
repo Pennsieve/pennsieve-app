@@ -17,6 +17,8 @@ const props = defineProps({
   // Versions already released: the repository's releases and the app store's.
   knownTags: { type: Array, default: () => [] },
   defaultBranch: { type: String, default: "" },
+  // Where the branch stands against the latest release (fetchReleaseStatus).
+  status: { type: Object, default: null },
 });
 const emit = defineEmits(["update:modelValue", "released"]);
 
@@ -95,7 +97,7 @@ const fullName = computed(() => `${props.repo.owner}/${props.repo.repo}`);
         Tags <strong>{{ target || defaultBranch || "the default branch" }}</strong> on
         <a :href="`https://github.com/${fullName}`" target="_blank" rel="noopener">{{ fullName }}</a>
         and publishes a release, as you. The app store then adds the version.
-        <template v-if="latest"> The latest is <strong>{{ latest }}</strong>.</template>
+        <template v-if="latest"> The latest is <strong>{{ latest }}</strong><template v-if="status?.commitsSince">, with {{ status.commitsSince }} new commit{{ status.commitsSince === 1 ? "" : "s" }} since</template>.</template>
       </p>
 
       <div class="rd-field">
@@ -126,7 +128,8 @@ const fullName = computed(() => `${props.repo.owner}/${props.repo.repo}`);
 
       <!-- Why it didn't happen -->
       <div v-if="outcome" class="rd-outcome">
-        <template v-if="outcome.kind === 'tagExists'">{{ outcome.message || `${tag} already exists.` }} Pick a new version.</template>
+        <template v-if="outcome.kind === 'nothingNew'">{{ outcome.message || "Nothing new since the latest release." }}</template>
+        <template v-else-if="outcome.kind === 'tagExists'">{{ outcome.message || `${tag} already exists.` }} Pick a new version.</template>
         <template v-else-if="outcome.kind === 'needsApproval'">
           Pennsieve's GitHub app needs approval on {{ repo.owner }} to publish releases.
           <a v-if="outcome.reviewUrl" :href="outcome.reviewUrl" target="_blank" rel="noopener">Review it on GitHub</a>

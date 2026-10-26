@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { isVersionTag, latestVersion, nextVersions, tagProblem, releaseOutcome, publishRelease } from "./release";
+import { isVersionTag, latestVersion, nextVersions, tagProblem, releaseOutcome, publishRelease, fetchReleaseStatus, releaseNudge } from "./release";
 
 describe("releases", () => {
   it("take version tags only", () => {
@@ -54,5 +54,21 @@ describe("releases", () => {
     expect(url).toBe("https://api2/repository/o/r/release");
     expect(JSON.parse(init.body)).toEqual({ tag: "v1.0.1" });
     expect(init.headers.Authorization).toBe("Bearer tok");
+  });
+
+  it("nudge when the branch has commits since the latest release", () => {
+    expect(releaseNudge({ latestTag: "v1.3.6", commitsSince: 3, canRelease: true })).toBe("3 new commits since v1.3.6");
+    expect(releaseNudge({ latestTag: "v1.3.6", commitsSince: 1, canRelease: true })).toBe("1 new commit since v1.3.6");
+    expect(releaseNudge({ latestTag: "v1.3.6", commitsSince: 0, canRelease: false })).toBe("");
+    expect(releaseNudge({ latestTag: "", commitsSince: 0, canRelease: true })).toBe("");
+    expect(releaseOutcome(409, { code: "nothing_to_release" }).kind).toBe("nothingNew");
+  });
+
+  it("read the release status, or nothing when it can't be told", async () => {
+    const ok = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ latestTag: "v1", commitsSince: 0, canRelease: false }) });
+    expect((await fetchReleaseStatus("https://api2", { owner: "o", repo: "r" }, "t", ok)).canRelease).toBe(false);
+    expect(ok.mock.calls[0][0]).toBe("https://api2/repository/o/r/release");
+    const missing = vi.fn().mockResolvedValue({ ok: false, json: async () => ({}) });
+    expect(await fetchReleaseStatus("https://api2", { owner: "o", repo: "r" }, "t", missing)).toBeNull();
   });
 });
