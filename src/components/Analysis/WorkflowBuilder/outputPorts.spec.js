@@ -29,9 +29,11 @@ describe("output ports", () => {
     expect(portOfHandle(null)).toBe("");
   });
 
-  it("connect to data targets only, from an output the app declares", () => {
+  it("connect to data targets and apps, from an output the app declares", () => {
     expect(canConnectFromHandle(app(two), target(), portHandleId("nwb"))).toBe(true);
-    expect(canConnectFromHandle(app(two), app(one, "b"), portHandleId("nwb"))).toBe(false);
+    // To an app's input (linked inputs, inputPorts).
+    expect(canConnectFromHandle(app(two), app(one, "b"), portHandleId("nwb"))).toBe(true);
+    expect(canConnectFromHandle(app(two), { id: "s", type: "data-source" }, portHandleId("nwb"))).toBe(false);
     expect(canConnectFromHandle(app(two), target(), portHandleId("missing"))).toBe(false);
     // The step's single point connects anywhere, as before.
     expect(canConnectFromHandle(app(two), app(one, "b"), "source")).toBe(true);

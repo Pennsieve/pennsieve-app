@@ -23,11 +23,11 @@ export const portOfHandle = (handle) =>
   typeof handle === "string" && handle.startsWith(HANDLE_PREFIX) ? handle.slice(HANDLE_PREFIX.length) : "";
 
 // Whether a link may leave from this handle to tgt: an output port connects
-// to a data target only. Links between apps by port come with input ports;
-// until then a step's outputs reach the next app through its single point.
+// to a data target, or to an app (to one of its inputs when it has a point
+// per input: inputPorts' linkAllowed says which).
 export function canConnectFromHandle(src, tgt, handle) {
   if (!portOfHandle(handle)) return true;
-  if (tgt?.type !== "data-target") return false;
+  if (tgt?.type !== "data-target" && tgt?.type !== "default") return false;
   return routedOutputs(src?.data?.manifestPorts).some((p) => p.name === portOfHandle(handle));
 }
 
