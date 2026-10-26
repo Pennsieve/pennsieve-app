@@ -2542,7 +2542,7 @@ const openNodeSettings = (id) => {
                 </CompactFlowNode>
                 <div
                   v-else
-                  class="custom-node"
+                  class="custom-node processor-node"
                   :class="connectClass(id)"
                   :style="{
                     ...(stepAccent(data) && { boxShadow: `inset 4px 0 0 ${stepAccent(data)}` }),
@@ -4768,6 +4768,10 @@ kbd {
       border-color: theme.$gray_4;
       box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.15);
     }
+    &.selected .custom-node.processor-node {
+      border-color: theme.$orange_2;
+      box-shadow: 0 0 0 2px rgba(224, 145, 42, 0.35);
+    }
   }
 }
 
@@ -4943,6 +4947,23 @@ kbd {
     .node-badge {
       background: theme.$status_green;
       color: white;
+    }
+  }
+
+  /* An app step: the processor orange (as the compact step's strip), like
+     Input data's indigo and a target's slate. A domain app keeps its
+     domain's strip on the left (stepAccent). */
+  &.processor-node {
+    border-color: theme.$orange_2;
+    background: theme.$orange_tint;
+
+    &:hover {
+      border-color: theme.$orange_2;
+      box-shadow: 0 2px 8px rgba(224, 145, 42, 0.3);
+    }
+
+    .node-port {
+      background: theme.$white;
     }
   }
 
