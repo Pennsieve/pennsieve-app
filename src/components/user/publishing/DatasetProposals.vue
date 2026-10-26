@@ -82,12 +82,13 @@
       :proposal="activeProposal"
       :copied-from="copySourceProposal"
       :read-only="Boolean(activeProposal) && activeProposal.proposalStatus !== 'DRAFT'"
+      :processing="isSavingProposal"
       allow-copy-to-draft
       @copy-to-draft="copyProposalToDraft"
-      @create-proposal="handleCreateProposal"
+      @create-proposal="handleSaveProposal"
       @submit-proposal="handleSubmitProposal"
-      @recreate-proposal="handleRecreateProposal"
-      @recreate-and-submit-proposal="handleRecreateAndSubmitProposal"
+      @recreate-proposal="handleSaveProposal"
+      @recreate-and-submit-proposal="handleSubmitProposal"
       @close="closeProposalDialog"
     />
 
@@ -118,10 +119,12 @@ import RequestListItem from './RequestListItem.vue'
 import ProposalSurvey from './ProposalSurvey.vue'
 import ConfirmationDialog from '@/components/shared/ConfirmationDialog/ConfirmationDialog.vue'
 import IconDocument from '@/components/icons/IconDocument.vue'
+import { useProposalSave } from '@/composables/useProposalSave'
 
 const store = useStore()
 const proposalStore = useProposalStore()
 const router = useRouter()
+const { isSavingProposal, saveProposal } = useProposalSave()
 
 // Reactive data
 const isLoading = ref(false)
@@ -184,86 +187,15 @@ const startNewProposal = () => {
   showProposalDialog.value = true
 }
 
-const handleCreateProposal = async (proposalData) => {
-  try {
-    // Check if we're editing an existing proposal (has nodeId) or creating new
-    if (proposalData.nodeId) {
-      // Editing existing proposal - use PUT API
-      await proposalStore.updateProposal(proposalData, profile.value)
-    } else {
-      // Creating new proposal - use POST API
-      await proposalStore.storeNewProposal(proposalData, profile.value)
-    }
+const handleSaveProposal = async (proposalData) => {
+  if (await saveProposal(proposalData)) {
     closeProposalDialog()
-  } catch (err) {
-    const action = proposalData.nodeId ? 'update' : 'create'
-    error.value = `Failed to ${action} proposal. Please try again.`
-    console.error(`Error ${action}ing proposal:`, err)
   }
 }
 
 const handleSubmitProposal = async (proposalData) => {
-  try {
-    let proposalToSubmit = proposalData
-    
-    // If editing existing proposal, first update it
-    if (proposalData.nodeId) {
-      const response = await proposalStore.updateProposal(proposalData, profile.value)
-      proposalToSubmit = response.result
-    } else {
-      // If creating new proposal, first save it as DRAFT
-      const response = await proposalStore.storeNewProposal(proposalData, profile.value)
-      proposalToSubmit = response.result
-    }
-    
-    // Now submit the proposal
-    if (proposalToSubmit?.nodeId) {
-      await proposalStore.submitProposal(proposalToSubmit)
-    }
-    
+  if (await saveProposal(proposalData, { submit: true })) {
     closeProposalDialog()
-  } catch (err) {
-    error.value = 'Failed to submit proposal. Please try again.'
-    console.error('Error submitting proposal:', err)
-  }
-}
-
-const handleRecreateProposal = async (proposalData) => {
-  try {
-    // First delete the original proposal
-    await proposalStore.removeProposal(proposalData._originalProposal)
-    
-    // Then create the new proposal with the new repository
-    delete proposalData._originalProposal
-    delete proposalData._requiresRecreation
-    await proposalStore.storeNewProposal(proposalData, profile.value)
-    
-    closeProposalDialog()
-  } catch (err) {
-    error.value = 'Failed to move proposal to new repository. Please try again.'
-    console.error('Error recreating proposal:', err)
-  }
-}
-
-const handleRecreateAndSubmitProposal = async (proposalData) => {
-  try {
-    // First delete the original proposal
-    await proposalStore.removeProposal(proposalData._originalProposal)
-    
-    // Then create the new proposal with the new repository
-    delete proposalData._originalProposal
-    delete proposalData._requiresRecreation
-    const response = await proposalStore.storeNewProposal(proposalData, profile.value)
-    
-    // Now submit the new proposal
-    if (response.result?.nodeId) {
-      await proposalStore.submitProposal(response.result)
-    }
-    
-    closeProposalDialog()
-  } catch (err) {
-    error.value = 'Failed to move and submit proposal to new repository. Please try again.'
-    console.error('Error recreating and submitting proposal:', err)
   }
 }
 

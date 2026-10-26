@@ -37,6 +37,12 @@ const props = defineProps({
     type: Object,
     default: () => null,
   },
+  // The parent owns the API calls and closes the dialog on success, so the
+  // form stays filled in for a retry if the call fails
+  processing: {
+    type: Boolean,
+    default: false,
+  },
 });
 
 const emit = defineEmits([
@@ -62,6 +68,8 @@ const proposal = ref({
 
 const selectedRepository = ref({});
 const surveyAnswersByRepository = ref({});
+// Which button triggered the pending request, so only that one shows a spinner
+const pendingAction = ref("");
 
 const profile = computed(() => store.state.profile);
 const availableRepositories = computed(() => proposalStore.repositories);
@@ -356,6 +364,7 @@ function handleRepositoryChange(repository) {
 function handleDialogUpdate(visible) {
   // Allow ESC key and explicit close actions
   if (!visible) {
+    if (props.processing) return;
     closeDialog();
   } else {
     emit("update:dialogVisible", visible);
@@ -363,7 +372,8 @@ function handleDialogUpdate(visible) {
 }
 
 function saveProposal() {
-  if (!readyToSave.value) return;
+  if (!readyToSave.value || props.processing) return;
+  pendingAction.value = "save";
 
   const surveyResponses = repositoryQuestions.value
     .map((question) => ({
@@ -409,12 +419,11 @@ function saveProposal() {
     // New proposal - normal creation
     emit("create-proposal", proposalData);
   }
-
-  closeDialog();
 }
 
 function submitProposal() {
-  if (!readyToSubmit.value) return;
+  if (!readyToSubmit.value || props.processing) return;
+  pendingAction.value = "submit";
 
   const surveyResponses = repositoryQuestions.value
     .map((question) => ({
@@ -460,8 +469,6 @@ function submitProposal() {
     // New proposal - create and submit
     emit("submit-proposal", proposalData);
   }
-
-  closeDialog();
 }
 </script>
 
@@ -731,19 +738,25 @@ function submitProposal() {
           </div>
 
           <div class="action-buttons">
-            <bf-button @click="closeDialog" class="secondary">
+            <bf-button
+              @click="closeDialog"
+              class="secondary"
+              :disabled="processing"
+            >
               Cancel
             </bf-button>
             <bf-button
               class="secondary"
-              :disabled="!readyToSave"
+              :disabled="!readyToSave || processing"
+              :processing="processing && pendingAction === 'save'"
               @click="saveProposal"
             >
               {{ props.proposal ? "Update Proposal" : "Save Proposal" }}
             </bf-button>
             <bf-button
               class="primary"
-              :disabled="!readyToSubmit"
+              :disabled="!readyToSubmit || processing"
+              :processing="processing && pendingAction === 'submit'"
               @click="submitProposal"
             >
               Submit Proposal
