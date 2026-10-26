@@ -52,7 +52,9 @@ export const DOMAINS = [
     tag: "machine-learning",
     hue: 280,
     aliases: ["ml", "ai", "deep-learning", "neural-network", "llm", "classification", "prediction", "inference"],
-    icon: "M5 6h.01M5 18h.01M12 12h.01M19 6h.01M19 18h.01M5 6l7 6 7-6M5 18l7-6 7 6",
+    // A small network in layers (3, 2, 1), left to right: not an X, which
+    // in a round badge reads as a close button.
+    icon: "M4 6h.01M4 12h.01M4 18h.01M12 9h.01M12 15h.01M20 12h.01M4 6l8 3M4 12l8-3M4 12l8 3M4 18l8-3M12 9l8 3M12 15l8-3",
   },
   {
     key: "stats",
