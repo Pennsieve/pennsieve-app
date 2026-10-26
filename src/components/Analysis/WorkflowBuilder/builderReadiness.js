@@ -93,9 +93,12 @@ export function requiredUnset(node) {
     .filter((name) => name && (set[name] == null || set[name] === ""));
 }
 
-// "Ready to save", "1 thing to fix", "3 things to fix".
+// "Ready to save", "Ready · 2 to check", "3 things to fix", and with both,
+// "1 to fix · 1 to check", so it counts every item listed.
 export function readinessLabel(r) {
   const n = r.blocking.length;
-  if (!n) return r.warnings.length ? `Ready · ${r.warnings.length} to check` : "Ready to save";
+  const w = r.warnings.length;
+  if (!n) return w ? `Ready · ${w} to check` : "Ready to save";
+  if (w) return `${n} to fix · ${w} to check`;
   return `${n} ${n === 1 ? "thing" : "things"} to fix`;
 }
