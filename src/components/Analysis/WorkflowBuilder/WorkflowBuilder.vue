@@ -2272,6 +2272,11 @@ const openNodeSettings = (id) => {
                   :accent="stepAccent(data)"
                   :class="connectClass(id)"
                 >
+                    <span
+                      v-if="data.draftManifest"
+                      class="draft-badge draft-badge--compact"
+                      title="Using a draft app.yml saved in this browser, not the released one. Switch to the detailed view to see its inputs and outputs."
+                    >Draft</span>
                     <span v-if="stepWarning(id)" class="step-warn" :title="stepWarning(id)" />
                     <button
                       v-if="!isReadOnly"
@@ -4030,6 +4035,9 @@ kbd {
   font-weight: 600;
   color: theme.$orange_1;
   white-space: nowrap;
+}
+.draft-badge--compact {
+  margin-right: 4px;
 }
 .port-prefix-note {
   margin: -4px 0 10px;
