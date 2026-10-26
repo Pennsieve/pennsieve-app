@@ -261,6 +261,9 @@ export const createPort = (overrides = {}) => ({
   // app.yml writes it; empty means the default (file, or directory on a
   // structure port).
   container: "",
+  // Where an input's data goes: "root" of INPUT_DIR or its own "subfolder"
+  // (INPUT_DIR/<name>/), as app.yml writes it; empty means root.
+  placement: "",
   cardinality: "",
   ...overrides,
 });
@@ -432,6 +435,7 @@ const parsePort = (raw) =>
     formats: asArray(raw?.formats).map((f) => normalizeEdamFormat(f)).filter(Boolean),
     conformsTo: conformsToList(raw?.conformsTo),
     container: raw?.container === "directory" || raw?.container === "file" ? raw.container : "",
+    placement: raw?.placement === "root" || raw?.placement === "subfolder" ? raw.placement : "",
     cardinality: typeof raw?.cardinality === "string" ? raw.cardinality : "",
   });
 
@@ -627,6 +631,7 @@ const manifestPort = (port) => {
   if (structures.length === 1) out.conformsTo = structures[0];
   else if (structures.length > 1) out.conformsTo = structures;
   if (port.container === "directory" || port.container === "file") out.container = port.container;
+  if (port.placement === "root" || port.placement === "subfolder") out.placement = port.placement;
   if (port.required) out.required = true;
   return out;
 };
