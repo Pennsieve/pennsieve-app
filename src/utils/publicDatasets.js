@@ -44,6 +44,9 @@ export async function searchPublicDatasets(query = '', { sendXhr = useSendXhr, c
 export async function browsePublicFiles({ id, version, path = '', limit = 500, offset = 0 }, { sendXhr = useSendXhr, config = siteConfig } = {}) {
   const params = new URLSearchParams({ limit, offset })
   if (path) params.set('path', path)
-  const response = await sendXhr(`${config.discoverUrl}/datasets/${id}/versions/${version}/files/browse?${params.toString()}`, { method: 'GET' })
+  const response = await sendXhr(
+    `${config.discoverUrl}/datasets/${encodeURIComponent(id)}/versions/${encodeURIComponent(version)}/files/browse?${params.toString()}`,
+    { method: 'GET' }
+  )
   return { files: response?.files || [], totalCount: response?.totalCount || 0 }
 }

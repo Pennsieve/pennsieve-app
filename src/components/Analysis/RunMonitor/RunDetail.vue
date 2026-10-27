@@ -33,6 +33,7 @@ import TargetDatasetField from "./TargetDatasetField.vue";
 import { targetWritesToDataset, targetParamFields, buildDataTargets, targetDatasetId, datasetName, shownTargetParams, datasetSummary, sortDatasets, isPathPrefixParam } from "./dataTargets";
 import DatasetOptionRow from "./DatasetOptionRow.vue";
 import PublicFilesPicker from "./PublicFilesPicker.vue";
+import { picksKey } from "./publicPicks";
 import IoPill from "../WorkflowGraph/IoPill.vue";
 import { withInterfaceNodes, destinationChoices, NO_DESTINATION } from "./workflowInterface";
 import { importStatusUrl, importSummary, importStillMoving, isDatasetImport } from "./runImports";
@@ -1078,6 +1079,39 @@ const cancelConfigure = () => {
 // The run's name as given, for naming what the run makes before it exists.
 const trimmedRunName = () => (initiateForm.value.name || "").trim();
 
+// The views made for inputs' public files, by input: { key, view }. Execute
+// again with the same picks (after the run failed to start) uses them
+// again, rather than leaving a new set behind each time.
+const runViews = {};
+// views-service's longest view name.
+const VIEW_NAME_MAX = 255;
+
+// Makes a view of each input's public files (all at once) and returns them
+// as data sources, or null when one couldn't be made (it says why).
+const publicInputViews = async (dag) => {
+  const inputs = Object.entries(publicPicks).filter(([id, picks]) => picks?.length && !leftOutInputs[id]);
+  try {
+    const made = await Promise.all(
+      inputs.map(async ([id, picks]) => {
+        const key = picksKey(picks);
+        if (runViews[id]?.key !== key) {
+          const label = sourceLabel(id, dag, "input");
+          const name = `${trimmedRunName() || "Run"}: ${label}`.slice(0, VIEW_NAME_MAX);
+          runViews[id] = { key, view: await createRunView({ name, picks }) };
+        }
+        return [id, viewDataSource(runViews[id].view)];
+      })
+    );
+    return Object.fromEntries(made);
+  } catch (err) {
+    console.error("Failed to prepare public files:", err);
+    EventBus.$emit("toast", {
+      detail: { type: "error", msg: `Couldn't prepare the public files for this run: ${err?.message || "views-service failed"}` },
+    });
+    return null;
+  }
+};
+
 const executeWorkflow = async () => {
   const dag = configDefinition.value?.dag || [];
 
@@ -1157,12 +1191,9 @@ const executeWorkflow = async () => {
       dataSources[nodeId] = own && own !== runDatasetId.value ? { packageIds: ids, datasetId: own } : { packageIds: ids };
     });
     // Public files: one view per input, kept for the run.
-    for (const [nodeId, picks] of Object.entries(publicPicks)) {
-      if (!picks?.length || leftOutInputs[nodeId]) continue;
-      const label = sourceLabel(nodeId, dag, "input");
-      const view = await createRunView({ name: `${trimmedRunName() || "Run"}: ${label}`, picks });
-      dataSources[nodeId] = viewDataSource(view);
-    }
+    const views = await publicInputViews(dag);
+    if (!views) return;
+    Object.assign(dataSources, views);
 
     const processorConfigs = [];
     Object.entries(nodeConfigs).forEach(([nodeId, cfg]) => {
@@ -1419,6 +1450,8 @@ watch(
 );
 const filesOf = (f) =>
   f.content?.packageType === "Collection" ? folderFiles[f.content.id]?.names || [] : [f.content?.name || ""];
+// A public folder isn't looked into (its files aren't listed here), so only
+// its picked files are checked.
 const chosenFileNames = (nodeId) => [
   ...(dataSourceFiles[nodeId] || []).flatMap(filesOf),
   ...(publicPicks[nodeId] || []).filter((p) => !p.isFolder).map((p) => p.name),
@@ -1919,8 +1952,11 @@ const pickerDataset = computed(() => {
 // order), else where pickers start, for a workflow with no inputs.
 const runDatasetId = computed(() => {
   if (isMyWorkspace.value) return "";
-  const first = dataSourceNodes.value.find((d) => !publicPicks[d.id]?.length);
-  return (first && sourceDatasetOf(first.id)) || initiateForm.value.datasetId || "";
+  const inputs = dataSourceNodes.value.filter((d) => !publicPicks[d.id]?.length);
+  // Every input public: the run reads no workspace dataset, so it names
+  // none (an output that writes to one asks for its own).
+  if (dataSourceNodes.value.length && !inputs.length) return "";
+  return (inputs[0] && sourceDatasetOf(inputs[0].id)) || initiateForm.value.datasetId || "";
 });
 const workflowHasInputs = computed(() => dataSourceNodes.value.length > 0);
 // A dataset output with no dataset: none of its own and nothing to follow.
