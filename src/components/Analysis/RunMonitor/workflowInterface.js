@@ -24,6 +24,7 @@ export const withInterfaceNodes = (wf) => {
     type: "data-source",
     name: input.name,
     dependsOn: [],
+    ...(input.position && { position: input.position }),
     input,
   }));
   const targets = (wf.outputs || []).map((output) => ({
@@ -33,6 +34,7 @@ export const withInterfaceNodes = (wf) => {
     targetType: output.default?.targetType || output.accepts?.[0] || "",
     dependsOn: [output.from?.step].filter(Boolean),
     defaultParams: output.default?.params || {},
+    ...(output.position && { position: output.position }),
     output,
   }));
   return { ...wf, dag: [...sources, ...steps, ...targets] };
