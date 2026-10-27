@@ -885,7 +885,7 @@ async function execute() {
       <aside v-if="!stepHasChoices" class="nb-info">
         <p class="nb-info__about">{{ stepAbout }}</p>
         <template v-if="soFar.length">
-          <h4 class="nb-info__title">So far</h4>
+          <h4 class="nb-info__title">This session</h4>
           <dl class="nb-info__list">
             <template v-for="row in soFar" :key="row.label">
               <dt>{{ row.label }}</dt>
