@@ -1842,7 +1842,7 @@ const selectedDestinations = computed(() =>
   selectedOutput.value ? destinationChoices(selectedOutput.value, { targetTypes: targetTypes.value, myWorkspace: isMyWorkspace.value }) : []
 );
 const destinationLabel = (t) =>
-  t === NO_DESTINATION ? "No destination (kept with the run's logs)" : getTargetTypeLabel(t, targetTypes.value);
+  t === NO_DESTINATION ? "Don't save" : getTargetTypeLabel(t, targetTypes.value);
 
 // Another destination for an output: its params, runtime and dataset start
 // again from that target type's (and the output's default, when it's that).
@@ -2593,7 +2593,7 @@ onUnmounted(() => {
                 </el-select>
               </div>
               <p v-if="selectedOutput && nodeConfigs[selectedNode.id].targetType === NO_DESTINATION" class="configure-hint">
-                This run won't send {{ selectedOutput.name }} anywhere; its results stay with the run's logs.
+                The run still makes {{ selectedOutput.name }}, but doesn't save it anywhere.
               </p>
               <template v-if="nodeConfigs[selectedNode.id].targetType !== NO_DESTINATION">
               <div v-if="!getTargetTypeDefinition(selectedNode.data?.targetType)" class="target-type-missing">

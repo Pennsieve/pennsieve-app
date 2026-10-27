@@ -8,7 +8,7 @@
 */
 import { targetWritesToDataset } from "./dataTargets";
 
-// No destination: an output's results stay in the run's logs.
+// No destination: the run still makes the output, but doesn't save it.
 export const NO_DESTINATION = "none";
 
 export const hasInterface = (wf) => (wf?.inputs?.length || 0) + (wf?.outputs?.length || 0) > 0;
