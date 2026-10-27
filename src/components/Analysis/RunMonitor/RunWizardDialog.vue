@@ -14,6 +14,7 @@ import RunWorkflowSummary from "../Workflows/RunWorkflowSummary.vue";
 import { useWorkflowSearch } from "@/composables/useWorkflowSearch";
 import { isNotebookWorkflow } from "./notebookHelpers";
 import { needsDataset } from "./runSetup";
+import { viewsServiceUrl } from "@/utils/viewsService";
 
 const store = useStore();
 const route = useRoute();
@@ -28,7 +29,9 @@ const storeWorkflows = computed(() => store.state.analysisModule.workflows || []
 const applications = computed(() => store.getters["analysisModule/applications"] || []);
 const targetTypes = computed(() => store.getters["analysisModule/targetTypes"] || []);
 
-const selectable = (wf) => wf.isActive && !(isMyWorkspace.value && needsDataset(wf));
+// Inputs can take public datasets' files where views-service is deployed.
+const datasetNeeded = (wf) => needsDataset(wf, { publicInputs: !!viewsServiceUrl() });
+const selectable = (wf) => wf.isActive && !(isMyWorkspace.value && datasetNeeded(wf));
 
 // The dialog's own list, searched and paged on the server (#825), so a
 // workflow past the first page can be found: the workspace's workflows, or in
@@ -122,7 +125,7 @@ defineExpose({ open, rerun });
             <div class="rw__card-meta">
               <span v-if="!wf.isActive" class="rw__badge">Archived</span>
               <span
-                v-else-if="isMyWorkspace && needsDataset(wf)"
+                v-else-if="isMyWorkspace && datasetNeeded(wf)"
                 class="rw__badge"
                 title="This workflow reads from or writes to a dataset, which isn't available outside a workspace yet"
               >Needs a dataset</span>

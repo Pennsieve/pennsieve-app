@@ -62,9 +62,11 @@ export function defaultNode(requested, remembered, nodes, fits) {
 // write to one: a data target that writes to a dataset, or, of a workflow with
 // outputs, a required output that accepts only datasets. Downloads and
 // reference data need none (as the compute node allows on a user's run).
-export const needsDataset = (wf) => {
-  if (hasInterface(wf)) return (wf.inputs?.length || 0) > 0 || !worksWithoutDataset(wf.outputs);
+// Where inputs can take public datasets' files (publicInputs: views-service
+// is deployed), inputs need no dataset either.
+export const needsDataset = (wf, { publicInputs = false } = {}) => {
+  if (hasInterface(wf)) return (!publicInputs && (wf.inputs?.length || 0) > 0) || !worksWithoutDataset(wf.outputs);
   return (wf?.dag || []).some(
-    (d) => d.type === "data-source" || (d.type === "data-target" && targetWritesToDataset(d.targetType))
+    (d) => (d.type === "data-source" && !publicInputs) || (d.type === "data-target" && targetWritesToDataset(d.targetType))
   );
 };
