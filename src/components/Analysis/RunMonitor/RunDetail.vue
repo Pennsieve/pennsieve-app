@@ -3178,13 +3178,8 @@ onUnmounted(() => {
     >
       <div class="file-picker-content">
         <p v-if="sourcePicker.hint" class="file-picker-hint">{{ sourcePicker.hint }}</p>
-        <el-switch
-          v-if="pickerTypes"
-          v-model="pickerAllowOtherTypes"
-          class="file-picker-types"
-          :active-text="`Allow files other than ${pickerTypes}`"
-        />
-        <div v-if="!isMyWorkspace" class="file-picker-dataset">
+        <div v-if="!isMyWorkspace || pickerTypes" class="file-picker-dataset">
+          <template v-if="!isMyWorkspace">
           <label for="picker-dataset">Dataset</label>
           <el-select
             id="picker-dataset"
@@ -3203,6 +3198,15 @@ onUnmounted(() => {
             </el-option>
           </el-select>
           <span v-if="sourceDatasets[filePickerNodeId]" class="file-picker-dataset-note">Not the other inputs' dataset</span>
+          </template>
+          <el-switch
+            v-if="pickerTypes"
+            v-model="pickerAllowOtherTypes"
+            size="small"
+            class="file-picker-types"
+            active-text="Allow other file types"
+            :title="`Also let files that aren't ${pickerTypes} be chosen (the check goes by file extension)`"
+          />
         </div>
         <div v-if="pickerDataset" class="file-picker-dataset-head">
           <img :src="pickerDataset.banner || '/images/banner-placeholder.jpg'" alt="" />
@@ -4533,7 +4537,7 @@ onUnmounted(() => {
   }
 }
 .file-picker-types {
-  margin-bottom: 10px;
+  margin-left: auto;
 }
 .file-picker-empty {
   margin: 16px 0;
