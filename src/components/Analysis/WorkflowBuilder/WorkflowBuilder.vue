@@ -4603,10 +4603,13 @@ kbd {
   padding: 6px 16px 6px 8px;
   border: 2px solid var(--io-color);
   border-radius: 999px;
-  background: theme.$white;
+  /* The light tint of its colour that input data and outputs have always
+     had, so data in and out reads apart from the white steps. */
+  background: #eef2ff;
 
   &.data-target-node {
     --io-color: #64748b;
+    background: #f1f5f9;
   }
 }
 .io-node__circle {
@@ -4617,7 +4620,7 @@ kbd {
   width: 26px;
   height: 26px;
   border-radius: 50%;
-  background: color-mix(in srgb, var(--io-color) 12%, transparent);
+  background: theme.$white;
   color: var(--io-color);
 }
 .io-node__text {
