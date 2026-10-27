@@ -30,6 +30,8 @@ describe("compute node page", () => {
     expect(nodeStatus({})).toBe("Pending");
     expect(canToggleStatus({ status: "Paused" })).toBe(true);
     expect(canToggleStatus({ status: "Pending" })).toBe(false);
+    expect(nodeStatus({ status: "Updating" })).toBe("Updating");
+    expect(canToggleStatus({ status: "Updating" })).toBe(false);
   });
 
   it("names the deployment mode", () => {

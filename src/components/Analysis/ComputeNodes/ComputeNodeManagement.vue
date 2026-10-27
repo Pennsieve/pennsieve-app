@@ -121,7 +121,7 @@ async function toggleStatus() {
 }
 
 const STATUS_PILL = { Enabled: 'is-on', Paused: 'is-warn', Destroying: 'is-bad', Failed: 'is-bad' }
-const STATUS_TEXT = { Enabled: 'Running', Paused: 'Paused', Pending: 'Setting up', Destroying: 'Being destroyed', Failed: 'Failed' }
+const STATUS_TEXT = { Enabled: 'Running', Paused: 'Paused', Pending: 'Setting up', Updating: 'Updating', Destroying: 'Being destroyed', Failed: 'Failed' }
 </script>
 
 <template>
@@ -148,7 +148,7 @@ const STATUS_TEXT = { Enabled: 'Running', Paused: 'Paused', Pending: 'Setting up
       <!-- The node's name is the page title (the breadcrumb's); its status
            goes next to it. -->
       <Teleport defer to="#page-title-extra">
-        <span class="cn-pill" :class="STATUS_PILL[status]">{{ STATUS_TEXT[status] }}</span>
+        <span class="cn-pill" :class="STATUS_PILL[status]">{{ STATUS_TEXT[status] }}{{ status === 'Updating' && computeNode?.pendingProvisionerImageTag ? ` to ${computeNode.pendingProvisionerImageTag}` : '' }}</span>
       </Teleport>
       <AnalysisViewBar v-model="tab" :views="NODE_TABS">
         <!-- Pausing in Pennsieve's warning style (red outline), resuming in

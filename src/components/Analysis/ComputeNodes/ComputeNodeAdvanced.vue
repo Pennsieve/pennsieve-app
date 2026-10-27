@@ -117,7 +117,8 @@ async function confirmDestroy() {
             <dt>Node software</dt>
             <dd>
               <span>{{ currentVersion || 'Unknown version' }}</span>
-              <span v-if="updateAvailable" class="cn-pill is-warn">Update available: {{ latestVersion }}</span>
+              <span v-if="node.pendingProvisionerImageTag" class="cn-pill">Updating to {{ node.pendingProvisionerImageTag }}</span>
+              <span v-else-if="updateAvailable" class="cn-pill is-warn">Update available: {{ latestVersion }}</span>
               <span v-else-if="latestVersion" class="cn-pill is-on">Up to date</span>
               <button type="button"
                 v-if="canManage && updateAvailable"
