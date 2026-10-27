@@ -621,10 +621,12 @@ const sourceSubOf = (id, data) => {
   if (data.status === "FAILED") return "Couldn't get its files";
   return data.view ? "Public dataset" : data.packageCount != null ? sourceDetail(data) : "";
 };
-// An input whose files are being prepared or downloaded: it says STARTED
-// while the run is still going (a run that ended meanwhile leaves it so).
+// An input whose files are being prepared or downloaded: it says STARTED,
+// and the run is still pending (a run is marked running once its inputs are
+// on the node, so an input left STARTED, e.g. by a node that couldn't
+// report its end, isn't shown as still preparing).
 const inputStaging = (data) =>
-  mode.value === "browse" && data.status === "STARTED" && !isTerminalStatus(selectedWorkflowActivity.value?.status);
+  mode.value === "browse" && data.status === "STARTED" && ["NOT_STARTED", "", undefined].includes(selectedWorkflowActivity.value?.status);
 const targetSubOf = (id, data) => {
   if (mode.value === "configure") {
     if (isUnsaved(id)) return "Not saved";
