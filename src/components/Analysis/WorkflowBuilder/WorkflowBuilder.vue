@@ -274,6 +274,12 @@ const togglePanel = (which) => {
     // not kept
   }
 };
+// A folded panel's rail opens it; on the start screen it also leaves the
+// start screen for the canvas.
+const openPanel = (which) => {
+  if (landing.value) landing.value = false;
+  if (!panels.value[which]) togglePanel(which);
+};
 // Selecting a step opens the inspector, if folded.
 watch(selectedNode, (n) => {
   if (n && !panels.value.inspector) panels.value = { ...panels.value, inspector: true };
@@ -2587,12 +2593,12 @@ const openNodeSettings = (id) => {
     <div class="builder-content">
       <!-- Left: what can be added (create and edit) -->
       <button
-        v-if="!isReadOnly && !panels.palette && !landing"
+        v-if="!isReadOnly && (!panels.palette || landing)"
         type="button"
         class="panel-rail"
         title="Show the steps you can add"
         aria-label="Show the steps you can add"
-        @click="togglePanel('palette')"
+        @click="openPanel('palette')"
       >
         <el-icon><ArrowRight /></el-icon>
         <span class="panel-rail-label">Add steps</span>
@@ -3053,18 +3059,18 @@ const openNodeSettings = (id) => {
 
       <!-- Sidebar (Right) -->
       <button
-        v-if="!panels.inspector && !landing"
+        v-if="!panels.inspector || landing"
         type="button"
         class="panel-rail panel-rail--right"
         title="Show details"
         aria-label="Show details"
-        @click="togglePanel('inspector')"
+        @click="openPanel('inspector')"
       >
         <el-icon><ArrowLeft /></el-icon>
         <span class="panel-rail-label">Details</span>
       </button>
-      <!-- The start screen shows on its own: no panels, no toolbar -->
-      <div v-else-if="!landing" ref="sidebarRef" class="applications-sidebar">
+      <!-- On the start screen both panels are folded to their rails -->
+      <div v-else ref="sidebarRef" class="applications-sidebar">
         <div class="insp-top">
           <span>Details</span>
           <button type="button" class="insp-fold" title="Fold the details" aria-label="Fold the details" @click="togglePanel('inspector')">
