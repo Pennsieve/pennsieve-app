@@ -117,7 +117,12 @@ const initiateForm = ref({ workflowId: "", computeNodeId: "", datasetId: "", nam
 const runNameError = ref("");
 const configDefinition = ref(null);
 const dataSourceFiles = reactive({});
-// A data source's own dataset, when its files aren't from the run's ("").
+// Each input picks the dataset its files come from. initiateForm.datasetId
+// is only where a new input's picker starts (the dataset used last for this
+// workflow, a rerun's, or the first one picked); sourceDatasets holds an
+// input's own when it differs. A run has no dataset of its own: the request's
+// datasetId is the first input's (runDatasetId), for nodes and webhooks that
+// still read it.
 const sourceDatasets = reactive({});
 const sourceDatasetOf = (nodeId) => sourceDatasets[nodeId] || initiateForm.value.datasetId;
 const nodeConfigs = reactive({});
@@ -1008,8 +1013,8 @@ const executeWorkflow = async () => {
     ? "This workflow reads from or writes to a dataset, so it runs in a workspace, not in My Workspace."
     : !initiateForm.value.computeNodeId
     ? "Choose a compute node for the run."
-    : !isMyWorkspace.value && !initiateForm.value.datasetId
-      ? "Choose a dataset for the run."
+    : missingTargetDataset.value
+      ? `Choose the dataset ${missingTargetDataset.value} writes to.`
       : setupNodeUnfit.value.length
         ? `${computeNodeName(initiateForm.value.computeNodeId)} can't run this workflow: ${setupNodeUnfit.value.join(", ")}.`
         : "";
@@ -1066,8 +1071,8 @@ const executeWorkflow = async () => {
     const dataSources = {};
     Object.entries(dataSourceFiles).forEach(([nodeId, files]) => {
       const ids = files.map((f) => f.content?.id).filter(Boolean);
-      const own = sourceDatasets[nodeId];
-      dataSources[nodeId] = own && own !== initiateForm.value.datasetId ? { packageIds: ids, datasetId: own } : { packageIds: ids };
+      const own = sourceDatasetOf(nodeId);
+      dataSources[nodeId] = own && own !== runDatasetId.value ? { packageIds: ids, datasetId: own } : { packageIds: ids };
     });
 
     const processorConfigs = [];
@@ -1106,7 +1111,7 @@ const executeWorkflow = async () => {
       if (Object.keys(obj).length > 0) processorParams[nodeId] = obj;
     });
 
-    const dataTargets = buildDataTargets(dag, nodeConfigs, initiateForm.value.datasetId);
+    const dataTargets = buildDataTargets(dag, nodeConfigs, runDatasetId.value);
 
     const trimmedName = nameResult.value;
     const payload = {
@@ -1115,7 +1120,7 @@ const executeWorkflow = async () => {
         computeNodeId: initiateForm.value.computeNodeId,
         ...(processorConfigs.length > 0 && { processorConfigs }),
       },
-      datasetId: initiateForm.value.datasetId,
+      ...(runDatasetId.value && { datasetId: runDatasetId.value }),
       dataSources,
       ...(trimmedName && { name: trimmedName }),
       ...(Object.keys(dataTargets).length > 0 && { dataTargets }),
@@ -1124,7 +1129,7 @@ const executeWorkflow = async () => {
     };
 
     await store.dispatch("analysisModule/createRun", payload);
-    rememberSetup(route.params.orgId || "", initiateForm.value.workflowId, initiateForm.value);
+    rememberSetup(route.params.orgId || "", initiateForm.value.workflowId, { ...initiateForm.value, datasetId: runDatasetId.value });
     EventBus.$emit("toast", { detail: { type: "success", msg: "Workflow executed successfully." } });
 
     router.push(scopedRoute("runs"));
@@ -1172,6 +1177,8 @@ const openFilePicker = (nodeId) => {
 const onPickerDatasetChange = (datasetId) => {
   const nodeId = filePickerNodeId.value;
   if (!nodeId) return;
+  // The first dataset picked is where the other inputs' pickers start.
+  if (!initiateForm.value.datasetId) initiateForm.value.datasetId = datasetId;
   sourceDatasets[nodeId] = datasetId === initiateForm.value.datasetId ? "" : datasetId;
   delete dataSourceFiles[nodeId];
   store.commit("analysisModule/CLEAR_SELECTED_FILES");
@@ -1719,18 +1726,24 @@ function applySetupDefaults(definition) {
 
 const onSetupDatasetSearch = (query) => fetchDatasetOptions(query || "");
 
-// Inputs without a dataset of their own come from the run's, so files picked
-// from the one before go when it changes.
-watch(
-  () => initiateForm.value.datasetId,
-  (now, before) => {
-    if (!before || now === before || mode.value !== "configure") return;
-    const picked = Object.keys(dataSourceFiles).filter((k) => dataSourceFiles[k]?.length && !sourceDatasets[k]);
-    if (!picked.length) return;
-    picked.forEach((k) => delete dataSourceFiles[k]);
-    EventBus.$emit("toast", { detail: { type: "info", msg: "Inputs cleared: their files were from the previous dataset." } });
+// The request's datasetId: the first input's dataset (in the workflow's
+// order), else where pickers start, for a workflow with no inputs.
+const runDatasetId = computed(() => {
+  if (isMyWorkspace.value) return "";
+  const first = dataSourceNodes.value[0];
+  return (first && sourceDatasetOf(first.id)) || initiateForm.value.datasetId || "";
+});
+const workflowHasInputs = computed(() => dataSourceNodes.value.length > 0);
+// A dataset output with no dataset: none of its own and nothing to follow.
+const missingTargetDataset = computed(() => {
+  for (const d of configDefinition.value?.dag || []) {
+    if (d.type !== "data-target" || !targetWritesToDataset(d.targetType)) continue;
+    if (!nodeConfigs[d.id]?.datasetId && !runDatasetId.value) {
+      return labelForDagNode(d, availableApplications.value, targetTypes.value, configDefinition.value?.dag || []) || d.id;
+    }
   }
-);
+  return "";
+});
 
 const fetchDatasetOptions = async (query = "") => {
   datasetSearchLoading.value = true;
@@ -2475,7 +2488,8 @@ onUnmounted(() => {
                 >
                   <TargetDatasetField
                     v-model="nodeConfigs[selectedNode.id].datasetId"
-                    :run-dataset-id="initiateForm.datasetId"
+                    :run-dataset-id="runDatasetId"
+                    :follows-inputs="workflowHasInputs"
                     :datasets="datasetOptions"
                   />
                 </div>
@@ -2575,7 +2589,7 @@ onUnmounted(() => {
               <div class="info-card">
                 <div v-if="!isMyWorkspace" class="info-row">
                   <span class="info-label">From</span>
-                  <span class="info-value">{{ sourceDatasetOf(selectedNode.id) ? datasetName(sourceDatasetOf(selectedNode.id), datasetOptions) : "Not chosen yet" }}</span>
+                  <span class="info-value">{{ sourceDatasetOf(selectedNode.id) ? datasetName(sourceDatasetOf(selectedNode.id), datasetOptions) : "Chosen with its files" }}</span>
                 </div>
                 <div class="info-row">
                   <span class="info-label">Files</span>
@@ -2661,29 +2675,13 @@ onUnmounted(() => {
                   </el-select>
                   <span v-if="setupNodeUnfit.length" class="run-name-error">Can't run this workflow: {{ setupNodeUnfit.join(", ") }}</span>
                 </div>
-                <div v-if="!isMyWorkspace" class="info-row info-row-stacked">
-                  <label class="info-label" for="setup-dataset">Runs in dataset</label>
-                  <span class="info-label-hint">Where the run belongs and its results go, unless an output names its own. Inputs come from it unless you pick another dataset for one.</span>
-                  <el-select
-                    id="setup-dataset"
-                    v-model="initiateForm.datasetId"
-                    filterable
-                    remote
-                    :remote-method="onSetupDatasetSearch"
-                    :loading="datasetSearchLoading"
-                    placeholder="Search datasets"
-                    class="setup-select"
-                  >
-                    <el-option v-for="d in datasetOptions" :key="d.content?.id" :label="d.content?.name" :value="d.content?.id" />
-                  </el-select>
-                </div>
                 <div v-if="configLayers.length" class="info-row">
                   <span class="info-label">Reference data</span>
                   <span class="info-value">{{ configLayers.join(', ') }}</span>
                 </div>
               </div>
               <p class="configure-hint">
-                Choose where it runs, then click each <strong>input</strong> to choose its files,
+                Choose where it runs, then click each <strong>input</strong> to choose its dataset and files,
                 a <strong>step</strong> to set its parameters, and an <strong>output</strong> to override where it runs.
               </p>
             </template>
@@ -2998,7 +2996,7 @@ onUnmounted(() => {
           >
             <el-option v-for="d in datasetOptions" :key="d.content?.id" :label="d.content?.name" :value="d.content?.id" />
           </el-select>
-          <span v-if="sourceDatasets[filePickerNodeId]" class="file-picker-dataset-note">Not the run's dataset</span>
+          <span v-if="sourceDatasets[filePickerNodeId]" class="file-picker-dataset-note">Not the other inputs' dataset</span>
         </div>
         <div class="file-picker-header">
           <span class="selected-count">
