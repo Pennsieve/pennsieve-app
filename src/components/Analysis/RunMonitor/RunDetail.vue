@@ -74,7 +74,7 @@ import {
   runDisplayName,
   RUN_NAME_MAX_LENGTH,
 } from "./runHelpers";
-import { sourceLabel, sourceHints, hintLine, portsOfStep, missingFilesMessage, fileTypeMismatches } from "../WorkflowGraph/sourceInputs";
+import { sourceLabel, sourceHints, hintLine, portsOfStep, missingFilesMessage, fileTypeMismatches, linkHints } from "../WorkflowGraph/sourceInputs";
 import { portEdges, stepPoints } from "../WorkflowGraph/runPorts";
 import PortChips from "../WorkflowGraph/PortChips.vue";
 import LlmMark from "../WorkflowGraph/LlmMark.vue";
@@ -1229,18 +1229,63 @@ const fileCountForNode = (nodeId) => {
 };
 
 // Chosen files a source's inputs don't take (by extension, against what its
-// inputs' app.yml declares), while configuring: a warning on its card and in
-// its panel, not a block (an app may still read them). Folders aren't
-// checked: what's in them isn't known here.
-const sourceMismatch = (nodeId) => {
+// inputs' app.yml declares), while configuring: marked on the link to the
+// input that doesn't take them, as the builder marks a link that doesn't fit,
+// and explained in the source's panel. A warning, not a block (an app may
+// still read them). Folders aren't checked: what's in them isn't known here.
+const chosenFileNames = (nodeId) =>
+  (dataSourceFiles[nodeId] || []).filter((f) => f.content?.packageType !== "Collection").map((f) => f.content?.name || "");
+const configHints = (nodeId) => {
   const dag = configDefinition.value?.dag || [];
-  const names = (dataSourceFiles[nodeId] || [])
-    .filter((f) => f.content?.packageType !== "Collection")
-    .map((f) => f.content?.name || "");
+  return sourceHints(nodeId, dag, portsOfStep(dag, availableApplications.value));
+};
+const sourceMismatch = (nodeId, hints = configHints(nodeId)) => {
+  const names = chosenFileNames(nodeId);
   if (!names.length) return null;
-  const m = fileTypeMismatches(names, sourceHints(nodeId, dag, portsOfStep(dag, availableApplications.value)));
+  const m = fileTypeMismatches(names, hints);
   return m && { ...m, total: names.length };
 };
+
+// The links out of sources, marked where their files don't fit: red and
+// dashed, "⚠ needs JSON" (detailed) or a bare ✕ (compact), as the builder's.
+const SOURCE_EDGE_COLOR = nodeBorderColor("data-source", null);
+const MISMATCH_COLOR = "#E94B4B";
+const markSourceEdges = () => {
+  if (mode.value !== "configure") return;
+  const sources = new Set(nodes.value.filter((n) => n.type === "data-source").map((n) => n.id));
+  edges.value = edges.value.map((e) => {
+    if (!sources.has(e.source)) return e;
+    const m = sourceMismatch(e.source, linkHints(configHints(e.source), e.target, e.data?.input || ""));
+    if (!m) {
+      return e.label
+        ? { ...e, label: undefined, labelShowBg: undefined, labelBgStyle: undefined, labelStyle: undefined, style: { stroke: SOURCE_EDGE_COLOR } }
+        : e;
+    }
+    return {
+      ...e,
+      style: { stroke: MISMATCH_COLOR, strokeWidth: 2, strokeDasharray: "6 4" },
+      label: detailed.value ? `\u26A0 needs ${m.expected}` : "\u2715",
+      labelShowBg: detailed.value,
+      labelBgPadding: [6, 3],
+      labelBgBorderRadius: 2,
+      labelBgStyle: { fill: "#fdecec", stroke: MISMATCH_COLOR },
+      labelStyle: detailed.value
+        ? { fill: MISMATCH_COLOR, fontSize: 11, fontWeight: 600 }
+        : { fill: MISMATCH_COLOR, fontSize: 16, fontWeight: 700, stroke: "#f7f7f7", strokeWidth: 4, paintOrder: "stroke" },
+    };
+  });
+};
+watch(
+  () =>
+    [
+      mode.value,
+      detailed.value,
+      edges.value.length,
+      availableApplications.value.length,
+      ...nodes.value.filter((n) => n.type === "data-source").map((n) => chosenFileNames(n.id).join("|")),
+    ].join("/"),
+  markSourceEdges
+);
 const mismatchLine = (nodeId) => {
   const m = sourceMismatch(nodeId);
   if (!m) return "";
@@ -1915,7 +1960,7 @@ onUnmounted(() => {
                   :label="titleOf(id, data)"
                   :unmet="nodeUnmetCount(id, 'data-source')"
                   :detail="mode === 'configure'
-                    ? [`${fileCountForNode(id)} file${fileCountForNode(id) !== 1 ? 's' : ''} selected`, mismatchLine(id)].filter(Boolean).join(' · ')
+                    ? `${fileCountForNode(id)} file${fileCountForNode(id) !== 1 ? 's' : ''} selected`
                     : data.view
                     ? 'Public dataset'
                     : data.packageCount != null
@@ -1925,7 +1970,7 @@ onUnmounted(() => {
                 <div
                   v-else
                   class="custom-node data-source-node"
-                  :class="{ 'has-files': mode === 'configure' && fileCountForNode(id) > 0, 'has-mismatch': mode === 'configure' && !!mismatchLine(id) }"
+                  :class="{ 'has-files': mode === 'configure' && fileCountForNode(id) > 0 }"
                 >
                   <span v-if="nodeUnmetCount(id, 'data-source') > 0" class="node-unmet-badge">{{ nodeUnmetCount(id, 'data-source') }}</span>
                   <div class="node-header">
@@ -1944,7 +1989,6 @@ onUnmounted(() => {
                       </span>
                     </template>
                   </div>
-                  <div v-if="mode === 'configure' && mismatchLine(id)" class="node-mismatch">⚠ {{ mismatchLine(id) }}</div>
                   <div v-if="mode === 'configure'" class="node-config-hint">Click to select files</div>
                 </div>
                 <Handle id="source" type="source" :position="Position.Bottom" />
@@ -3587,14 +3631,6 @@ onUnmounted(() => {
   .node-import--importing { color: #0e7490; }
   .node-import--failed { color: theme.$status_red; font-weight: 600; }
 
-  // A source whose chosen files its inputs don't take (sourceMismatch).
-  .node-mismatch {
-    margin-top: 4px;
-    font-size: 11px;
-    font-weight: 600;
-    color: #b45309;
-  }
-
   .node-mark {
     flex-shrink: 0;
     font-size: 15px;
@@ -3722,7 +3758,6 @@ onUnmounted(() => {
     background: #eef2ff;
 
     &.has-files { border-color: theme.$status_green; }
-    &.has-mismatch { border-color: #d97706; }
     &.green-node { border-color: theme.$gray_3; }
     &.red-node { border-color: theme.$status_red; }
   }

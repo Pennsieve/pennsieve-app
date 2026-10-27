@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { inputsFedBy, sourceLabel, sourceHints, hintLine, portsOfStep, missingFilesMessage, fileShortType, fileTypeMismatches } from "./sourceInputs";
+import { inputsFedBy, sourceLabel, sourceHints, hintLine, portsOfStep, missingFilesMessage, fileShortType, fileTypeMismatches, linkHints } from "./sourceInputs";
 
 // Four sources into test-ports-processor: two linked to its inputs, two to
 // "all inputs".
@@ -92,5 +92,17 @@ describe("file types against an input", () => {
       { input: "b", types: ["JSON"], layout: "" },
     ];
     expect(fileTypeMismatches(["s.csv", "e.json", "x.edf"], two)).toEqual({ names: ["x.edf"], expected: "CSV or JSON" });
+  });
+});
+
+describe("linkHints", () => {
+  it("keeps the hints for one link", () => {
+    const hints = [
+      { step: "a", input: "signals", types: ["CSV"] },
+      { step: "a", input: "events", types: ["JSON"] },
+      { step: "b", input: "signals", types: ["CSV"] },
+    ];
+    expect(linkHints(hints, "a", "events").map((h) => h.types[0])).toEqual(["JSON"]);
+    expect(linkHints(hints, "a").length).toBe(2);
   });
 });

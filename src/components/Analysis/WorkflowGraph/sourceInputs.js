@@ -34,6 +34,7 @@ export function sourceHints(sourceId, steps, portsOf) {
       if (!port) return null;
       const layout = [].concat(port.conformsTo || []).filter(Boolean);
       return {
+        step,
         input,
         types: [...new Set((port.mediaTypes || []).map(shortMediaType))],
         layout: layout.length ? String(layout[layout.length - 1]).split("@")[0].toUpperCase() : "",
@@ -118,3 +119,9 @@ export function fileTypeMismatches(fileNames, hints) {
   const names = (fileNames || []).filter((n) => !accepted.has(fileShortType(n)));
   return names.length ? { names, expected: [...accepted].join(" or ") } : null;
 }
+
+// The hints for one link: what the input a source feeds through it takes
+// (step, and input when the link names one; else all that step's inputs it
+// feeds).
+export const linkHints = (hints, step, input = "") =>
+  (hints || []).filter((h) => h.step === step && (!input || h.input === input));
