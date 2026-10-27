@@ -99,9 +99,9 @@ export async function listEntries(viewId, version, options = {}) {
 }
 
 // A run's input from public files: the files and folders picked from one or
-// more published dataset versions, as one view kept only for the run
-// (lifecycle "run": hidden from the user's views, and removed after 30
-// days; the run keeps its crate with its provenance). Each pick is
+// more published dataset versions, as one view made for the run
+// (lifecycle "run": kept apart from the user's views; the run keeps its
+// crate with its provenance). Each pick is
 // { datasetId, version, path }; picks of one version become one source.
 export function runViewSources(picks) {
   const byVersion = new Map()
