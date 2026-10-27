@@ -30,6 +30,7 @@ import BfButton from "../../shared/bf-button/BfButton.vue";
 import MetricsDashboard from "../Metrics/MetricsDashboard.vue";
 import CompactFlowNode from "../WorkflowGraph/CompactFlowNode.vue";
 import LlmMark from "../WorkflowGraph/LlmMark.vue";
+import RunWizardDialog from "../RunMonitor/RunWizardDialog.vue";
 import RuntimeMark from "../WorkflowGraph/RuntimeMark.vue";
 import GraphDensityToggle from "../WorkflowGraph/GraphDensityToggle.vue";
 import { COMPACT_BOX, layoutBox, overlaps, recenter, useGraphDensity } from "../WorkflowGraph/graphDensity";
@@ -2216,8 +2217,9 @@ const duplicate = async () => {
   }
 };
 
-const runThis = () =>
-  router.push({ name: route.params.orgId ? "workflows" : "my-workflows", query: { run: selectedWorkflow.value?.uuid } });
+// The run dialog, here, on this workflow.
+const runDialog = ref(null);
+const runThis = () => runDialog.value?.open(selectedWorkflow.value?.uuid);
 
 /*
   Drafts: a new workflow not yet saved is kept in this browser and offered
@@ -3750,6 +3752,7 @@ const openNodeSettings = (id) => {
     >
       <pre class="app-yml">{{ appYml?.text }}</pre>
     </el-dialog>
+    <RunWizardDialog ref="runDialog" />
   </div>
 </template>
 

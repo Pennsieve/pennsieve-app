@@ -6,7 +6,7 @@
 // the canvas for a new workflow. The view is in the URL (?view=library,
 // ?view=builder), else the view last used in this browser, else, on a first
 // visit, Live when the workspace has runs and the Library when it has none.
-import { computed, nextTick, onMounted, ref, watch } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { useGetToken } from "@/composables/useGetToken";
@@ -16,6 +16,7 @@ import WorkflowBuilder from "../WorkflowBuilder/WorkflowBuilder.vue";
 import WorkflowsGrid from "./WorkflowsGrid.vue";
 import { workflowsView, WORKFLOW_VIEWS } from "./galleryFilter";
 import AnalysisViewBar from "../AnalysisViewBar.vue";
+import RunWizardDialog from "../RunMonitor/RunWizardDialog.vue";
 
 const route = useRoute();
 const router = useRouter();
@@ -74,40 +75,15 @@ const includeNotebooks = computed({
 
 const runsRef = ref(null);
 
-// A Library card's Run (?run=<workflow>) switches to Live with the wizard open
-// on it; the query goes, so a reload doesn't open it again. One navigation
-// for both (two replaces raced each other), then the wizard once Live's
-// RunsOverview is mounted: the view changes with the route, a tick or more
-// after the replace.
+// A link with ?run=<workflow> opens the run dialog on it, over whichever
+// view is showing; the query goes, so a reload doesn't open it again.
+const runDialog = ref(null);
 async function openRunFromQuery() {
   const id = route.query.run;
   if (!id) return;
   const { run, ...rest } = route.query;
-  try {
-    localStorage.setItem(VIEW_KEY, "live");
-  } catch {
-    // not remembered; the URL says it
-  }
-  await router.replace({ query: { ...rest, view: "live" } });
-  await nextTick();
-  const runs = runsRef.value || (await mounted(runsRef));
-  runs?.openWizardDialog(String(id));
-}
-
-// The ref's component once it's mounted (or null after a few seconds).
-function mounted(r) {
-  return new Promise((resolve) => {
-    const timer = setTimeout(() => {
-      stop();
-      resolve(null);
-    }, 5000);
-    const stop = watch(r, (c) => {
-      if (!c) return;
-      clearTimeout(timer);
-      stop();
-      resolve(c);
-    });
-  });
+  await router.replace({ query: rest });
+  runDialog.value?.open(String(id));
 }
 onMounted(openRunFromQuery);
 watch(() => route.query.run, openRunFromQuery);
@@ -141,6 +117,7 @@ watch(() => route.query.run, openRunFromQuery);
         <WorkflowBuilder toolbar-target="#wf-toolbar-builder" />
       </div>
     </div>
+    <RunWizardDialog ref="runDialog" />
   </div>
 </template>
 
