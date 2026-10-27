@@ -47,32 +47,121 @@ export async function endInteractiveSession(runId) {
   }
   const conn = await resp.json(); // { kernelUrl, token }
   const kernelBaseUrl = trimSlash(conn.kernelUrl);
-  // Closing shuts the kernel server down, which tears the whole task (sidecar
-  // included) down mid-response — so the POST very often fails with a network/
-  // CORS error and NO HTTP response. That's the success path: treat a thrown
-  // fetch error as closed (mirrors the in-session close()). Only an actual
-  // non-OK HTTP response means the sidecar reached us and refused (e.g. auth),
-  // i.e. the kernel is genuinely still running.
+  // See postSessionClose for how a close that tears the task down reads.
+  const result = await postSessionClose(kernelBaseUrl, conn.token);
+  if (!result.closed) {
+    throw new Error(`Could not end the session (${result.status}).`);
+  }
+}
+
+// POSTs the sidecar's close. Shutting the kernel server down tears the whole
+// task (sidecar included) down mid-response, so the request rarely ends
+// cleanly, and how it fails says whether the session ended:
+//   - no HTTP response (network/CORS error), or none within
+//     CLOSE_TIMEOUT_MS: the task went away, i.e. closed;
+//   - 502/503/504: the platform's interactive gateway (basic mode) or the
+//     ALB answering for a task that went away, i.e. closed;
+//   - any other non-OK status: the sidecar answered and refused (e.g. 401),
+//     so the kernel is still running.
+// Resolves to { closed: true } or { closed: false, status }.
+const CLOSE_TIMEOUT_MS = 15000;
+const UPSTREAM_GONE = [502, 503, 504];
+
+export async function postSessionClose(kernelBaseUrl, token, { fetchFn = globalThis.fetch, timeoutMs = CLOSE_TIMEOUT_MS } = {}) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const closeResp = await fetch(`${kernelBaseUrl}/pennsieve/close`, {
+    const resp = await fetchFn(`${kernelBaseUrl}/pennsieve/close`, {
       method: "POST",
       credentials: "include",
-      headers: { Authorization: `Bearer ${conn.token}` },
+      headers: { Authorization: `Bearer ${token}` },
+      signal: controller.signal,
     });
-    if (!closeResp.ok) {
-      throw new Error(`Could not end the session (${closeResp.status}).`);
-    }
+    if (resp.ok || UPSTREAM_GONE.includes(resp.status)) return { closed: true };
+    return { closed: false, status: resp.status };
   } catch (e) {
-    // Re-throw our own non-OK error; swallow a fetch/network failure (the task
-    // tore itself down, which is exactly what ending the session does).
-    if (e instanceof Error && /Could not end the session/.test(e.message)) {
-      throw e;
-    }
-    console.warn(
-      "[notebook] end-session close did not return cleanly (task likely torn down):",
-      e?.message || e
-    );
+    console.warn("[notebook] close request did not return cleanly (task likely torn down):", e?.message || e);
+    return { closed: true };
+  } finally {
+    clearTimeout(timer);
   }
+}
+
+// A view's files, downloaded into the session on request. The sidecar signs
+// them itself with the run's own credential; the browser only says which:
+//   POST {session}/pennsieve/inputs/fetch {"files": [{source, path}]} -> 202
+//   GET  {session}/pennsieve/inputs/fetch -> 200
+// Both answer with every file asked for so far:
+// { files: [{ source, path, state: queued|downloading|done|failed, size, bytes, error }] }.
+// source is the run's data-source node; path a crate path of its view.
+const INPUTS_PATH = "/pennsieve/inputs/fetch";
+// The sidecar takes at most this many files per request.
+const INPUTS_BATCH = 1000;
+
+async function inputsResponse(resp) {
+  if (!resp.ok) {
+    const text = await resp.text().catch(() => "");
+    throw new Error(text.trim() || `The session couldn't add the files (${resp.status}).`);
+  }
+  const body = await resp.json();
+  return body.files || [];
+}
+
+export async function postInputsFetch(kernelBaseUrl, token, files, { fetchFn = globalThis.fetch } = {}) {
+  let status = [];
+  for (let i = 0; i < files.length; i += INPUTS_BATCH) {
+    const resp = await fetchFn(`${kernelBaseUrl}${INPUTS_PATH}`, {
+      method: "POST",
+      credentials: "include",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ files: files.slice(i, i + INPUTS_BATCH) }),
+    });
+    status = await inputsResponse(resp);
+  }
+  return status;
+}
+
+export async function getInputsFetch(kernelBaseUrl, token, { fetchFn = globalThis.fetch } = {}) {
+  const resp = await fetchFn(`${kernelBaseUrl}${INPUTS_PATH}`, {
+    credentials: "include",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  return inputsResponse(resp);
+}
+
+// The session's environment, switched while it runs. The sidecar fetches the
+// version from environments-service with the run's own credential, unpacks
+// it and restarts the kernel; the browser only names it:
+//   POST   {session}/pennsieve/environments {environmentId, version} -> 202
+//   DELETE {session}/pennsieve/environments  (back to the image's packages) -> 202
+//   GET    {session}/pennsieve/environments -> 200
+// All answer { active: { environmentId, version, ... } | null,
+//   switch: { environmentId, version, state: resolving|downloading|restarting|done|failed,
+//             sizeBytes, bytes, error } | null }.
+// A session on a node from before environments answers 404.
+const ENVIRONMENTS_PATH = "/pennsieve/environments";
+
+export class SessionEnvironmentsUnavailable extends Error {}
+
+async function environmentsResponse(resp) {
+  if (resp.status === 404) throw new SessionEnvironmentsUnavailable("This session can't switch environments.");
+  if (!resp.ok) {
+    const text = await resp.text().catch(() => "");
+    throw new Error(text.trim() || `The session couldn't switch environments (${resp.status}).`);
+  }
+  return resp.json();
+}
+
+export async function sessionEnvironmentRequest(kernelBaseUrl, token, method = "GET", body, { fetchFn = globalThis.fetch } = {}) {
+  const headers = { Authorization: `Bearer ${token}` };
+  if (body !== undefined) headers["Content-Type"] = "application/json";
+  const resp = await fetchFn(`${kernelBaseUrl}${ENVIRONMENTS_PATH}`, {
+    method,
+    credentials: "include",
+    headers,
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  return environmentsResponse(resp);
 }
 
 // Default path for a brand-new notebook: under output/ (a symlink to OUTPUT_DIR,
@@ -83,6 +172,9 @@ export async function endInteractiveSession(runId) {
 // upload overwrites the original by name. The active path is per-session
 // (notebookPath inside the composable), not this module-level default.
 const DEFAULT_NOTEBOOK_PATH = "output/notebook.ipynb";
+
+// A dataset view's RO-Crate metadata, staged at the root of its input folder.
+export const CRATE_FILE = "ro-crate-metadata.json";
 
 let cellSeq = 0;
 const newId = () => `cell-${Date.now().toString(36)}-${cellSeq++}`;
@@ -130,12 +222,13 @@ function nbCellsToCells(nbCells) {
   }));
 }
 
-// Jupyter kernelspec name to start for a given session/kernel type. The R image
-// registers IRkernel as "ir"; everything else is Python ("python3").
-const KERNEL_BY_SESSION = { r: "ir", jupyter: "python3", python: "python3" };
+// Jupyter kernelspec name to start for a notebook's language (its app.yml's
+// runtime.kernel). The R image registers IRkernel as "ir"; Python is
+// "python3".
+const KERNELSPEC = { r: "ir", python: "python3" };
 
-// The /session/connect response doesn't include the session type, but the run
-// record does (its interactive node's sessionType). Resolve which Jupyter kernel
+// The /session/connect response doesn't include the language, but the run
+// record does (its interactive node's runtimeConfig.kernel). Resolve which Jupyter kernel
 // to start from it. Without this we'd start the server's DEFAULT kernel — which
 // is "python3" even in the R image (it also ships a Python kernel), so an R
 // session would wrongly open Python. Defaults to python3 on any failure.
@@ -151,15 +244,12 @@ async function resolveKernelName(runId) {
     if (!resp.ok) return "python3";
     const run = await resp.json();
     const nodes = run?.dag || run?.processors || [];
-    const node = nodes.find(
-      (n) =>
-        n?.runtimeConfig?.interactive ||
-        n?.interactive ||
-        n?.runtimeConfig?.sessionType ||
-        n?.sessionType
-    );
-    const st = node && (node.runtimeConfig?.sessionType || node.sessionType);
-    return KERNEL_BY_SESSION[st] || "python3";
+    const node = nodes.find((n) => n?.runtimeConfig?.interactive);
+    const rc = node?.runtimeConfig || {};
+    // Runs from before kernels were declared recorded the language as
+    // sessionType r.
+    const kernel = rc.kernel || (rc.sessionType === "r" ? "r" : "python");
+    return KERNELSPEC[kernel] || "python3";
   } catch (_) {
     return "python3";
   }
@@ -542,7 +632,8 @@ export function useJupyterSession() {
   // ---- file browser (Contents API) -----------------------------------------
 
   // List a directory on the kernel's filesystem (EFS). Returns entries sorted
-  // folders-first, then by name. path "" = the notebook root (execution dir).
+  // folders-first, then by name, with a dataset view's crate (the input's
+  // manifest, not data) last. path "" = the notebook root (execution dir).
   async function listDir(path = "") {
     if (!contents) return [];
     const model = await contents.get(path, { content: true });
@@ -560,29 +651,13 @@ export function useJupyterSession() {
         if ((a.type === "directory") !== (b.type === "directory")) {
           return a.type === "directory" ? -1 : 1;
         }
+        if ((a.name === CRATE_FILE) !== (b.name === CRATE_FILE)) {
+          return a.name === CRATE_FILE ? 1 : -1;
+        }
         return a.name.localeCompare(b.name);
       });
   }
 
-  // Fetch a file's bytes via the Contents API (base64 for binary) as a Blob the
-  // browser can download — used by the file browser's download action.
-  async function downloadFile(path) {
-    if (!contents) return null;
-    const model = await contents.get(path, { content: true });
-    if (model.format === "base64") {
-      const bin = atob(model.content);
-      const bytes = new Uint8Array(bin.length);
-      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-      return new Blob([bytes], {
-        type: model.mimetype || "application/octet-stream",
-      });
-    }
-    const text =
-      typeof model.content === "string"
-        ? model.content
-        : JSON.stringify(model.content, null, 2);
-    return new Blob([text], { type: model.mimetype || "text/plain" });
-  }
 
   // ---- cell mutations -------------------------------------------------------
 
@@ -849,6 +924,33 @@ export function useJupyterSession() {
   // nothing — the whole session's results (notebook + any generated files) are
   // thrown away, matching the user's explicit choice. (An involuntary
   // idle/timeout reclaim never runs this, so it still keeps the autosaved work.)
+  // Downloads of the run's view files into input/ (see postInputsFetch).
+  function fetchInputs(files) {
+    if (!kernelBaseUrl) throw new Error("The session isn't connected.");
+    return postInputsFetch(kernelBaseUrl, sessionToken, files);
+  }
+
+  function inputsStatus() {
+    if (!kernelBaseUrl) throw new Error("The session isn't connected.");
+    return getInputsFetch(kernelBaseUrl, sessionToken);
+  }
+
+  // The session's environment (see sessionEnvironmentRequest).
+  function environmentState() {
+    if (!kernelBaseUrl) throw new Error("The session isn't connected.");
+    return sessionEnvironmentRequest(kernelBaseUrl, sessionToken);
+  }
+
+  function switchEnvironment(environmentId, version) {
+    if (!kernelBaseUrl) throw new Error("The session isn't connected.");
+    return sessionEnvironmentRequest(kernelBaseUrl, sessionToken, "POST", { environmentId, version });
+  }
+
+  function clearEnvironment() {
+    if (!kernelBaseUrl) throw new Error("The session isn't connected.");
+    return sessionEnvironmentRequest(kernelBaseUrl, sessionToken, "DELETE");
+  }
+
   async function close({ discardOutput = false } = {}) {
     if (discardOutput) {
       // Stop autosave and mark clean so nothing re-creates output/notebook.ipynb
@@ -868,29 +970,13 @@ export function useJupyterSession() {
     // kernel down is what makes the container return the task token and resume
     // the workflow — so if this request fails, the session is NOT closed and we
     // must surface that rather than silently flip the UI to "closed".
-    try {
-      const resp = await fetch(`${kernelBaseUrl}/pennsieve/close`, {
-        method: "POST",
-        credentials: "include",
-        headers: { Authorization: `Bearer ${sessionToken}` },
-      });
-      if (!resp.ok) {
-        // The sidecar answered with an error status (e.g. auth) — the request
-        // reached it and it refused, so the kernel is genuinely still running.
-        error.value = `Could not end the session (${resp.status}). The kernel is still running — try again.`;
-        return;
-      }
-    } catch (e) {
-      // A network/CORS failure (no HTTP response) almost always means the close
-      // succeeded and the task tore itself down mid-response — shutting the
-      // kernel server down stops the whole task, including the sidecar serving
-      // this request. Treat it as closed rather than blocking the UI. (A genuine
-      // "couldn't reach it" failure resolves the same way the workflow does:
-      // heartbeat/idle timeout reclaims it.)
-      console.warn(
-        "[notebook] close request did not return cleanly (task likely torn down):",
-        e?.message || e
-      );
+    // See postSessionClose for how its failures read. (A genuine "couldn't
+    // reach it" resolves the way the workflow does: the heartbeat/idle timeout
+    // reclaims the task.)
+    const result = await postSessionClose(kernelBaseUrl, sessionToken);
+    if (!result.closed) {
+      error.value = `Could not end the session (${result.status}). The kernel is still running — try again.`;
+      return;
     }
     disconnect();
     kernelStatus.value = "dead";
@@ -920,7 +1006,12 @@ export function useJupyterSession() {
     findInputNotebooks,
     // files
     listDir,
-    downloadFile,
+    fetchInputs,
+    inputsStatus,
+    // environment
+    environmentState,
+    switchEnvironment,
+    clearEnvironment,
     // cells
     setSource,
     addCell,

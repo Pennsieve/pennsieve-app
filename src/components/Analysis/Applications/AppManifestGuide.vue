@@ -7,15 +7,26 @@ import { ref } from "vue";
   documents a field the reference does not declare. Kept as a string so it can
   be rendered as-is and copied to the clipboard in one click.
 */
-const exampleManifest = `schemaVersion: 1.0.0
+const exampleManifest = `# yaml-language-server: $schema=https://schemas.pennsieve.io/app-manifest/v1.json
+#
+# An example app.yml, kept at the root of an app's repository. Its schema:
+# https://schemas.pennsieve.io/app-manifest/v1.json. The version is the
+# release's tag, and the license is read from the repository's LICENSE file,
+# so neither is declared here.
+schemaVersion: "1.0"
 application:
-  name: test-private-repo-3
-  description: this is a test repo for development purposes
-  version: 1.0.1
+  name: Spike detector
+  description: Finds interictal spikes in EEG recordings.
+  type: processor
   maintainers:
-    - name: edmore
+    - name: Ada Lovelace
+      email: ada@example.org
+      orcid: 0000-0002-1825-0097
+  # Keywords; a known subject or task (eeg, spikes, visualization…) places the
+  # app in the Apps tab's colours and filters.
   tags:
-    - demo
+    - eeg
+    - spikes
 runtime:
   cpu: 1024
   memory: 2048
@@ -44,19 +55,34 @@ parameters:
     defaultValue: "false"
   - name: channel
     type: string
-    description: Channel to analyze (no default, treated as required).
+    description: Channel to analyze (no default, so a run must set it).
 inputs:
-  - name: package
-    description: Pipeline package file.
+  - name: recording
+    description: The EEG recording.
+    # Pennsieve media types (GET /packages/formats). The builder adds the
+    # format's EDAM id (https://edamontology.org/page) when EDAM has one.
     mediaTypes:
       - application/octet-stream
+    formats:
+      - format_3590
 outputs:
-  - name: package
-    description: Pipeline package file.
+  - name: spikes
+    description: The detected spikes.
     mediaTypes:
-      - application/octet-stream`;
+      - application/vnd.apache.parquet
+  # Without mediaTypes or formats, an input or output takes any file.
+
+# A live Jupyter notebook instead of a batch step declares, under runtime:
+#
+# runtime:
+#   interactive: true      # a session a person works in; the workflow waits
+#   sessionType: jupyter   # a Jupyter notebook
+#   kernel: python         # its language: python or r
+#   computeTypes: [standard]`;
 
 const EXAMPLE_URL = "https://app.pennsieve.io/static/schemas/app-manifest.v1.yml";
+// The JSON Schema app.yml follows; registration validates against it.
+const SCHEMA_URL = "https://schemas.pennsieve.io/app-manifest/v1.json";
 
 const copied = ref(false);
 
@@ -76,7 +102,7 @@ const copyExample = async () => {
   lock-step with it.
 */
 const topLevelFields = [
-  { name: "schemaVersion", type: "string", required: true, desc: "Manifest schema version. The reference declares 1.0.0." },
+  { name: "schemaVersion", type: "string", required: false, desc: "The manifest format version the file was written for, e.g. \"1.0\". Informational." },
   { name: "application", type: "object", required: true, desc: "Application metadata — see the table below." },
   { name: "runtime", type: "object", required: false, desc: "cpu (units), memory (MB), computeTypes, and timeoutSeconds." },
   { name: "parameters", type: "object[]", required: false, desc: "Run-time parameters and their defaults — see the table below." },
@@ -87,9 +113,9 @@ const topLevelFields = [
 const applicationFields = [
   { name: "name", type: "string", required: true, desc: "Human-readable application name." },
   { name: "description", type: "string", required: false, desc: "Short description of what the application does." },
-  { name: "version", type: "string", required: false, desc: "Version of the application this manifest describes." },
-  { name: "maintainers", type: "object[]", required: false, desc: "Who maintains the application. Each entry has a name." },
-  { name: "tags", type: "string[]", required: false, desc: "Free-form labels for search and filtering." },
+  { name: "version", type: "string", required: false, desc: "Informational: the version Pennsieve shows is the release's tag." },
+  { name: "maintainers", type: "object[]", required: false, desc: "Who maintains the application: a name, and optionally an email and an ORCID iD (0000-0002-1825-0097; the https://orcid.org/ form works too)." },
+  { name: "tags", type: "string[]", required: false, desc: "What the application is for, for search, filtering and its app card. A tag that names a domain (eeg, imaging, spike-sorting, genomics, visualization, conversion, statistics, …) colours the card; subjects (what it's about) come before tasks (what it does). The builder suggests them." },
 ];
 
 const runtimeFields = [
@@ -97,11 +123,14 @@ const runtimeFields = [
   { name: "memory", type: "number", required: false, desc: "Default memory reservation in MB." },
   { name: "computeTypes", type: "string[]", required: false, desc: "Compute environments the application supports. A GPU application lists gpu here — there is no separate gpu block." },
   { name: "timeoutSeconds", type: "number", required: false, desc: "How long a run may take before it is timed out." },
+  { name: "interactive", type: "boolean", required: false, desc: "A live session people work in, such as a Jupyter notebook, rather than a batch step. In a workflow it runs as an interactive step, and the workflow waits until the session ends. The only place an app declares this: an app without an app.yml is never interactive." },
+  { name: "sessionType", type: "string", required: false, desc: "The kind of live session. jupyter (the default) is a notebook, and makes workflows using this app notebooks; other kinds may come." },
+  { name: "kernel", type: "string", required: false, desc: "For a jupyter session, the notebook's language: python (the default) or r." },
 ];
 
 const parameterFields = [
   { name: "name", type: "string", required: true, desc: "Parameter name. Unique among parameters." },
-  { name: "type", type: "string", required: true, desc: "Value type: string, number, or boolean." },
+  { name: "type", type: "string", required: false, desc: "Value type: string (the default), number, integer, or boolean." },
   { name: "description", type: "string", required: false, desc: "What the parameter controls." },
   { name: "defaultValue", type: "string", required: false, desc: "Value used when the user does not supply one. Written as a string, including for number and boolean parameters. A parameter with no default is treated as required." },
   { name: "validValues", type: "string[]", required: false, desc: "Restricts the parameter to this set of values, rendered as a picker in the workflow builder." },
@@ -111,6 +140,7 @@ const inputOutputFields = [
   { name: "name", type: "string", required: true, desc: "Name. Unique among inputs (or outputs)." },
   { name: "description", type: "string", required: false, desc: "What flows through this input or output." },
   { name: "mediaTypes", type: "string[]", required: false, desc: "Media types accepted or produced, e.g. application/octet-stream." },
+  { name: "formats", type: "string[]", required: false, desc: "EDAM format ids (https://edamontology.org/page), e.g. format_3590 (HDF5). The builder fills this from the media type's format, where EDAM has an id; there's no separate control. With no mediaTypes or formats, any file." },
 ];
 </script>
 
@@ -154,6 +184,23 @@ const inputOutputFields = [
       <p class="guide-note">
         This example is also served as a file you can download and adapt:
         <a :href="EXAMPLE_URL" target="_blank" rel="noopener">{{ EXAMPLE_URL }}</a>.
+      </p>
+      <p class="guide-note">
+        app.yml follows a JSON Schema,
+        <a :href="SCHEMA_URL" target="_blank" rel="noopener">{{ SCHEMA_URL }}</a>.
+        With its first line,
+        <code># yaml-language-server: $schema={{ SCHEMA_URL }}</code>, editors such as
+        VS Code check the file and complete fields as you type. The version is the
+        release's tag, and the license is read from the repository's LICENSE file, so
+        app.yml declares neither.
+      </p>
+      <p class="guide-note">
+        Already have an app.yml?
+        <router-link :to="{ name: 'application-manifest-builder', query: { check: 1 } }">
+          Check it against the schema
+        </router-link>
+        in the manifest builder (Start from → Open an existing app.yml): paste it or drop the file, see
+        what to fix, and open it there to edit.
       </p>
     </section>
 

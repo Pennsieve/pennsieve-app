@@ -9,11 +9,7 @@
       <button class="title" type="button" :aria-expanded="!collapsed" @click="collapsed = !collapsed">
         {{ title }}
       </button>
-      <router-link
-        v-if="orgId"
-        class="all"
-        :to="{ name: 'workspace-downloads', params: { orgId } }"
-      >
+      <router-link class="all" :to="allDownloads">
         All downloads
       </router-link>
       <button class="close" type="button" aria-label="Close downloads" @click="store.panelOpen = false">
@@ -28,8 +24,9 @@
 </template>
 
 <script setup>
-import { computed, ref, watch } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useStore } from "vuex";
+import { useRoute } from "vue-router";
 import { pathOr } from "ramda";
 import { useDownloadsStore } from "@/stores/downloadsStore";
 import DownloadItem from "./DownloadItem.vue";
@@ -50,8 +47,43 @@ watch(
   { immediate: true }
 );
 
+// The user's run archives (download targets), from every workspace and
+// none: loaded once they're signed in, not per workspace.
+const userId = computed(() => pathOr(null, ["profile", "id"], vuex.state));
+watch(
+  userId,
+  (id) => {
+    if (id) store.loadRuns().catch(() => {});
+  },
+  { immediate: true }
+);
+
+// Run results are made on the node, not asked for from this tab, so nothing
+// here hears about a new one. Look again when the user comes back to the tab,
+// at most once a minute.
+const RUNS_REFRESH_MS = 60 * 1000;
+let runsLoadedAt = 0;
+function onVisible() {
+  if (document.visibilityState !== "visible" || !userId.value) return;
+  if (Date.now() - runsLoadedAt < RUNS_REFRESH_MS) return;
+  runsLoadedAt = Date.now();
+  store.loadRuns().catch(() => {});
+}
+onMounted(() => document.addEventListener("visibilitychange", onVisible));
+onBeforeUnmount(() => document.removeEventListener("visibilitychange", onVisible));
+
 const recent = computed(() => store.panelDownloads.slice(0, 5));
-const orgId = activeOrgId;
+
+// The workspace's downloads page, or My Workspace's (run results) outside a
+// workspace.
+const route = useRoute();
+const allDownloads = computed(() => {
+  const orgId = activeOrgId.value;
+  const inMyWorkspace = (route?.path || "").startsWith("/my-workspace");
+  return orgId && !inMyWorkspace
+    ? { name: "workspace-downloads", params: { orgId } }
+    : { name: "my-downloads" };
+});
 
 const title = computed(() => {
   const n = store.active.length;

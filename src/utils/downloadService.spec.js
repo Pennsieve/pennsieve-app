@@ -16,6 +16,10 @@ import {
   getPublicArchive,
   getPublicArchiveUrl,
   deletePublicArchive,
+  listRunArchives,
+  getRunArchive,
+  getRunArchiveUrl,
+  deleteRunArchive,
   agentDownloadCommand,
   agentFolderName,
 } from './downloadService'
@@ -135,6 +139,21 @@ describe('archives', () => {
       'GET https://api2.pennsieve.net/downloads/archives/d1/url?dataset_id=N%3Adataset%3A1',
       'DELETE https://api2.pennsieve.net/downloads/archives/d1?dataset_id=N%3Adataset%3A1',
     ])
+  })
+
+  it("reaches a run's results archives by id alone, with the user's token", async () => {
+    const fetchFn = respond(200, { downloads: [{ id: 'ra_1', scope: 'run' }], url: 'https://s3/zip' })
+    expect(await listRunArchives({ config, getToken, fetchFn })).toEqual([{ id: 'ra_1', scope: 'run' }])
+    await getRunArchive({ id: 'ra_1' }, { config, getToken, fetchFn })
+    await getRunArchiveUrl({ id: 'ra_1' }, { config, getToken, fetchFn })
+    await deleteRunArchive({ id: 'ra_1' }, { config, getToken, fetchFn })
+    expect(fetchFn.mock.calls.map(([url, init]) => `${init.method} ${url}`)).toEqual([
+      'GET https://api2.pennsieve.net/downloads/runs/archives',
+      'GET https://api2.pennsieve.net/downloads/runs/archives/ra_1',
+      'GET https://api2.pennsieve.net/downloads/runs/archives/ra_1/url',
+      'DELETE https://api2.pennsieve.net/downloads/runs/archives/ra_1',
+    ])
+    expect(fetchFn.mock.calls[0][1].headers.Authorization).toBe('Bearer tok')
   })
 
   it('treats an empty response (204) as done', async () => {

@@ -17,20 +17,45 @@ import IconArrowRight from "../../icons/IconArrowRight.vue";
 import IconControllerPlay from "../../icons/IconControllerPlay.vue";
 import IconXCircle from "../../icons/IconXCircle.vue";
 import { endInteractiveSession } from "@/composables/useJupyterSession";
+import { markSessionEnded, sessionEnded, endingPhase } from "./endedSessions";
 import AnalysisFilesTable from "../../FilesTable/AnalysisFilesTable.vue";
 import BreadcrumbNavigation from "../../datasets/files/BreadcrumbNavigation/BreadcrumbNavigation.vue";
 import { useGetToken } from "@/composables/useGetToken";
+import { getView, viewsServiceUrl, createRunView, viewDataSource } from "@/utils/viewsService";
+import CompactFlowNode from "../WorkflowGraph/CompactFlowNode.vue";
+import GraphDensityToggle from "../WorkflowGraph/GraphDensityToggle.vue";
+import { layoutBox, useGraphDensity } from "../WorkflowGraph/graphDensity";
+import { formatResources, formatRunTime, nodeDurationSec } from "../WorkflowGraph/nodeFacts";
 import { useSendXhr } from "@/mixins/request/request_composable";
 import toQueryParams from "@/utils/toQueryParams";
 import LayerNameSelector from "./LayerNameSelector.vue";
+import TargetDatasetField from "./TargetDatasetField.vue";
+import { targetWritesToDataset, targetParamFields, buildDataTargets, targetDatasetId, datasetName, shownTargetParams, datasetSummary, sortDatasets, isPathPrefixParam } from "./dataTargets";
+import DatasetOptionRow from "./DatasetOptionRow.vue";
+import PublicFilesPicker from "./PublicFilesPicker.vue";
+import { picksKey } from "./publicPicks";
+import IoPill from "../WorkflowGraph/IoPill.vue";
+import { withInterfaceNodes, destinationChoices, NO_DESTINATION } from "./workflowInterface";
+import { importStatusUrl, importSummary, importStillMoving, isDatasetImport } from "./runImports";
+import { nodeUnfit, rememberedSetup, rememberSetup, defaultNode, needsDataset } from "./runSetup";
+import DownloadItem from "@/components/downloads/DownloadItem.vue";
+import { useDownloadsStore } from "@/stores/downloadsStore";
 
 const ASSET_TYPE_OPTIONS = ["timeseries-zarr","ome-zarr", "thumb"];
+// The download target's notify param (download-service's notify).
+const DOWNLOAD_NOTIFY_OPTIONS = [
+  { value: "auto", label: "Email me unless I'm watching" },
+  { value: "email", label: "Always email me" },
+  { value: "none", label: "Don't email me" },
+];
 const ASSET_TYPE_CUSTOM = "__custom__";
 const customAssetTypeNodes = reactive(new Set());
 
 import {
   statusClass,
-  statusBorderColor,
+  graphStatusColor,
+  statusMarkOf,
+  inputProgressLine,
   nodeBorderColor,
   statusDotClass,
   statusLabel,
@@ -56,6 +81,20 @@ import {
   runDisplayName,
   RUN_NAME_MAX_LENGTH,
 } from "./runHelpers";
+import { sourceLabel, sourceHints, hintLine, portsOfStep, missingFilesMessage, fileTypeMismatches, acceptedFileTypes, linkHints } from "../WorkflowGraph/sourceInputs";
+import { portEdges, stepPoints } from "../WorkflowGraph/runPorts";
+import PortChips from "../WorkflowGraph/PortChips.vue";
+import LlmMark from "../WorkflowGraph/LlmMark.vue";
+import RuntimeMark from "../WorkflowGraph/RuntimeMark.vue";
+import { inputHandleId } from "../WorkflowBuilder/inputPorts";
+import { portHandleId, portOfHandle } from "../WorkflowBuilder/outputPorts";
+import { stepNames } from "../WorkflowBuilder/stepNames";
+
+// Shown in a workspace (/:orgId/analysis/runs/...) and in My Workspace
+// (/my-workspace/analysis/runs/...), where there's no organization and a run
+// has no dataset. Route names there carry a "my-" prefix.
+const isMyWorkspace = computed(() => !route.params.orgId);
+const scopedRoute = (name, params = {}) => ({ name: isMyWorkspace.value ? `my-${name}` : name, params });
 
 const props = defineProps({
   runId: { type: String, default: "" },
@@ -84,21 +123,72 @@ const initiateForm = ref({ workflowId: "", computeNodeId: "", datasetId: "", nam
 const runNameError = ref("");
 const configDefinition = ref(null);
 const dataSourceFiles = reactive({});
+// An input's files from public datasets (PublicFilesPicker's picks), where
+// views-service is deployed: the run takes them as a view kept for the run.
+// An input takes a workspace dataset's files or public files, not both.
+const publicInputs = !!viewsServiceUrl();
+const publicPicks = reactive({});
+// The file picker's side: a workspace dataset or public datasets.
+const pickerSide = ref("workspace");
+// What choosing on the picker's side would replace: the input's files from
+// the other side.
+const pickerReplaces = computed(() => {
+  const id = filePickerNodeId.value;
+  if (!id) return "";
+  const n = pickerSide.value === "public" ? (dataSourceFiles[id] || []).length : (publicPicks[id] || []).length;
+  if (!n) return "";
+  const from = pickerSide.value === "public" ? "the workspace dataset" : "public datasets";
+  return `Choosing here replaces the ${n} item${n === 1 ? "" : "s"} chosen from ${from}.`;
+});
+const setPublicPicks = (nodeId, picks) => {
+  if (!nodeId) return;
+  delete leftOutInputs[nodeId];
+  if (picks.length) {
+    publicPicks[nodeId] = picks;
+    delete dataSourceFiles[nodeId];
+    store.commit("analysisModule/CLEAR_SELECTED_FILES");
+  } else {
+    delete publicPicks[nodeId];
+  }
+};
+// Each input picks the dataset its files come from. initiateForm.datasetId
+// is only where a new input's picker starts (the dataset used last for this
+// workflow, a rerun's, or the one picked last); sourceDatasets holds an
+// input's own when it differs. A run has no dataset of its own: the request's
+// datasetId is the first input's (runDatasetId), for nodes and webhooks that
+// still read it.
+const sourceDatasets = reactive({});
+// Optional inputs this run leaves out (no files, no data source).
+const leftOutInputs = reactive({});
+const sourceDatasetOf = (nodeId) => sourceDatasets[nodeId] || initiateForm.value.datasetId;
 const nodeConfigs = reactive({});
 const isExecuting = ref(false);
 const errorBanner = ref("");
 const errorBannerNodeId = ref("");
 const rerunSource = ref(null);
-// Environment layers (python-env / r-env / data) attached to the run being
-// configured. Carried over from the source run on a rerun so the rebuilt
-// payload re-attaches them — otherwise "Rerun with configuration" silently
-// drops the layer.
+// The node's data layers the source run mounted (set through the API; the
+// app doesn't attach any itself). Carried over on a rerun so "Rerun with
+// configuration" doesn't silently drop them.
 const configLayers = ref([]);
 
 // File picker dialog state
 const filePickerVisible = ref(false);
+// The picker names the input its source feeds and what that input takes
+// (sourceInputs.js): "Select files for signals", "signals takes CSV files".
+const sourcePicker = computed(() => {
+  const id = filePickerNodeId.value;
+  const dag = configDefinition.value?.dag || [];
+  const name = id ? sourceLabel(id, dag, "") : "";
+  return {
+    name,
+    title: name ? `Select files for ${name}` : "Select Files",
+    hint: id ? hintLine(sourceHints(id, dag, portsOfStep(dag, availableApplications.value))) : "",
+  };
+});
 const filePickerNodeId = ref(null);
 const filePickerFiles = ref([]);
+// The picker's list is being fetched (a dataset's top level or a folder).
+const filePickerLoading = ref(false);
 const filePickerAncestorList = ref([]);
 const filePickerCurrentFile = ref({ content: { name: "" } });
 const clearSelectedValues = ref(false);
@@ -169,7 +259,8 @@ const getComputeTypesForTarget = (targetType) => {
   if (!targetType) return [];
   const tt = targetTypes.value.find((t) => t.targetType === targetType);
   const types = tt?.runtimeConfig?.computeTypes;
-  return types && types.length ? withGpu(types) : [];
+  // A target moves results, so it never runs on a GPU.
+  return (types || []).filter((t) => t !== "gpu");
 };
 
 const getComputeTypesForProcessor = (sourceUrl) => {
@@ -278,19 +369,102 @@ const interactiveProcessor = computed(() => {
   return dag.find((d) => d.runtimeConfig?.interactive || d.interactive) || null;
 });
 
+/*
+  Results download: a run whose DAG ends in a download target gets a zip of
+  its results from download-service, its creator's. The downloads store
+  follows the archive (polling it while it's prepared, which also tells the
+  service not to email).
+*/
+const downloads = useDownloadsStore();
+const downloadTarget = computed(() => {
+  const dag = selectedWorkflowActivity.value?.dag || [];
+  return dag.find((d) => d.type === "data-target" && d.targetType === "download") || null;
+});
+const runArchive = computed(() => {
+  const runId = selectedWorkflowActivity.value?.uuid;
+  return runId && downloadTarget.value ? downloads.forRun(runId) : null;
+});
+const resultsHint = computed(() => {
+  const status = selectedWorkflowActivity.value?.status;
+  if (isTerminalStatus(status) && status !== "SUCCEEDED") {
+    return "The run ended before its results were packaged.";
+  }
+  return "A zip of the results appears here when the run's download step finishes.";
+});
+// The archive exists once the download target has asked for it: look again
+// when the run or the target's status changes, until it's found.
+watch(
+  () => [selectedWorkflowActivity.value?.uuid, selectedWorkflowActivity.value?.status, downloadTarget.value?.status],
+  ([runId]) => {
+    if (runId && downloadTarget.value && !runArchive.value) downloads.loadRuns().catch(() => {});
+  },
+  { immediate: true }
+);
+
+// A results zip made just now (the run finished while, or just before, this
+// page was open) is announced: the downloads panel opens on it and a toast
+// says so. Older zips are only listed under Results. Once per zip per tab,
+// remembered in sessionStorage (a convenience: without it, at most once per
+// visit to the page).
+const ANNOUNCE_WITHIN_MS = 5 * 60 * 1000;
+const ANNOUNCED_KEY = "pennsieve.runArchivesAnnounced";
+const wasAnnounced = (id) => {
+  try {
+    return JSON.parse(sessionStorage.getItem(ANNOUNCED_KEY) || "[]").includes(id);
+  } catch {
+    return false;
+  }
+};
+const markAnnounced = (id) => {
+  try {
+    const ids = JSON.parse(sessionStorage.getItem(ANNOUNCED_KEY) || "[]");
+    sessionStorage.setItem(ANNOUNCED_KEY, JSON.stringify([...ids, id].slice(-50)));
+  } catch {
+    // not remembered
+  }
+};
+watch(runArchive, (archive, previous) => {
+  if (!archive || previous?.id === archive.id || wasAnnounced(archive.id)) return;
+  const age = Date.now() - Date.parse(archive.createdAt || 0);
+  if (!(age >= 0 && age < ANNOUNCE_WITHIN_MS)) return;
+  markAnnounced(archive.id);
+  downloads.panelOpen = true;
+  EventBus.$emit("toast", {
+    detail: { type: "success", msg: "The run's results are ready to download." },
+  });
+});
+
+// A session ended here or in the notebook: the run saves it and finishes
+// (endedSessions), so End and Open are no longer offered.
+const sessionEnding = computed(() => {
+  const activity = selectedWorkflowActivity.value;
+  if (!activity?.uuid || !interactiveProcessor.value) return null;
+  const step = nodes.value.find((n) => n.id === interactiveProcessor.value.id);
+  return endingPhase({
+    ended: sessionEnded(activity.uuid),
+    runStatus: activity.status,
+    sessionStepStatus: step?.data?.status,
+  });
+});
+const ENDING_MESSAGE = {
+  saving: "Session ended. Saving the notebook and its output files; the workflow continues once they're saved. This can take a few minutes.",
+  finishing: "Session ended and saved. Running the rest of the workflow…",
+};
+
 const interactiveSessionAvailable = computed(() => {
   const activity = selectedWorkflowActivity.value;
-  if (!activity?.uuid || !interactiveProcessor.value) return false;
+  if (!activity?.uuid || !interactiveProcessor.value || sessionEnding.value) return false;
   return !isTerminalStatus(activity.status);
 });
 
 const openNotebook = () => {
   const activity = selectedWorkflowActivity.value;
   if (!activity?.uuid) return;
-  router.push({
-    name: "run-notebook",
-    params: { orgId: route.params.orgId, runId: activity.uuid },
-  });
+  router.push(
+    isMyWorkspace.value
+      ? { name: "my-run-notebook", params: { runId: activity.uuid } }
+      : { name: "run-notebook", params: { orgId: route.params.orgId, runId: activity.uuid } }
+  );
 };
 
 // Terminate the interactive session without opening the notebook: ends it
@@ -309,6 +483,7 @@ const confirmEndSession = async () => {
   endingSession.value = true;
   try {
     await endInteractiveSession(activity.uuid);
+    markSessionEnded(activity.uuid);
     confirmEndOpen.value = false;
   } catch (e) {
     errorBanner.value = e?.message || "Could not end the interactive session.";
@@ -327,28 +502,156 @@ const dataSourceNodes = computed(() => {
 
 const allDataSourcesHaveFiles = computed(() => {
   if (dataSourceNodes.value.length === 0) return true;
-  return dataSourceNodes.value.every(
-    (d) => dataSourceFiles[d.id] && dataSourceFiles[d.id].length > 0
-  );
+  return dataSourceNodes.value.every((d) => fileCountForNode(d.id) > 0);
 });
 
 /*
   DAG Layout
 */
+// Compact (one line) or detailed nodes: the viewer's choice, shared with
+// the workflow builder. Laid out with the box of the current choice.
+const { detailed, setDetailed } = useGraphDensity();
+const DETAILED_BOX = { width: NODE_WIDTH, height: NODE_HEIGHT, nodesep: 120, ranksep: 150 };
+
+const PILL_BOX = { width: 200, height: 44 };
 const autoLayout = () => {
   if (nodes.value.length === 0) return;
+  const box = layoutBox(detailed.value, DETAILED_BOX);
   const g = new dagre.graphlib.Graph();
   g.setDefaultEdgeLabel(() => ({}));
-  g.setGraph({ rankdir: "TB", nodesep: 120, ranksep: 150 });
-  for (const node of nodes.value) g.setNode(node.id, { width: NODE_WIDTH, height: NODE_HEIGHT });
+  g.setGraph({ rankdir: "TB", nodesep: box.nodesep, ranksep: box.ranksep });
+  // Inputs and outputs are pills (IoPill), laid out at their size.
+  const sizeOf = (node) => (node.type === "data-source" || node.type === "data-target" ? PILL_BOX : box);
+  for (const node of nodes.value) g.setNode(node.id, { width: sizeOf(node).width, height: sizeOf(node).height });
   for (const edge of edges.value) g.setEdge(edge.source, edge.target);
   dagre.layout(g);
   nodes.value = nodes.value.map((node) => {
     const pos = g.node(node.id);
-    return { ...node, position: { x: pos.x - NODE_WIDTH / 2, y: pos.y - NODE_HEIGHT / 2 } };
+    const size = sizeOf(node);
+    return { ...node, position: { x: pos.x - size.width / 2, y: pos.y - size.height / 2 } };
   });
   setTimeout(() => fitView({ padding: 0.2, maxZoom: 1 }), 50);
 };
+
+// This page saves no positions, so a graph is laid out for its node size:
+// compact always gets a tight layout of its own; detailed keeps the
+// definition's saved positions, where it has them.
+const needsLayout = (result) => result.needsAutoLayout || !detailed.value;
+
+const changeDensity = (value) => {
+  if (value === detailed.value) return;
+  setDetailed(value);
+  redrawGraph();
+  autoLayout();
+};
+
+// The graph's nodes and edges again from what it shows (the run, or the
+// workflow being configured), keeping where the nodes are: on a change of
+// density (ports or not) and when the apps, with their ports, come in.
+const redrawGraph = () => {
+  const source = mode.value === "browse" ? selectedWorkflowActivity.value : configDefinition.value;
+  if (!source || !nodes.value.length) return;
+  const result = mode.value === "browse" ? runToNodesAndEdges(source) : definitionToNodesAndEdges(source);
+  const at = new Map(nodes.value.map((n) => [n.id, n.position]));
+  nodes.value = result.nodes.map((n) => ({ ...n, position: at.get(n.id) || n.position }));
+  edges.value = result.edges;
+};
+watch(() => availableApplications.value.length, redrawGraph);
+
+// What a step's app.yml declares, for its card: its ports (the detailed
+// card's connection points) and whether it calls language models.
+const stepManifest = (dag, id) => {
+  const m = portsOfStep(dag, availableApplications.value)(id);
+  return {
+    manifestPorts: m ? { inputs: m.inputs || [], outputs: m.outputs || [] } : null,
+    llm: !!m?.runtime?.llm,
+  };
+};
+
+// The edges: in the detailed view, each link on the ports it joins (two
+// links between the same steps are two lines); in compact, one line per
+// dependency.
+const graphEdges = (dag, resultNodes, stroke) => {
+  if (detailed.value) return portEdges(dag, resultNodes, (src) => ({ stroke: stroke(src) }));
+  const resultEdges = [];
+  for (const d of dag) {
+    for (const dep of d.dependsOn || []) {
+      resultEdges.push({ id: `e${dep}-${d.id}`, source: dep, target: d.id, animated: false, style: { stroke: stroke(dep) } });
+    }
+  }
+  return resultEdges;
+};
+
+// A detailed step's connection points on one side, and where each sits:
+// over (or under) its port's chip. 11px: the card's padding and border.
+const pointsOf = (id, data, side) => stepPoints(id, data.manifestPorts, edges.value, side);
+const hasPortChips = (id, data, side) => pointsOf(id, data, side).some((p) => p.port);
+const pointStyle = (points, p) =>
+  points.length > 1 ? { left: `calc(11px + (100% - 22px) * ${p.at}) !important` } : undefined;
+
+// Titles that tell steps apart, numbered top to bottom when two share a
+// name ("test-ports-processor (1)", "(2)"), as in the builder.
+const canvasTitles = computed(() =>
+  stepNames(
+    [...nodes.value].sort((a, b) => (a.position?.y ?? 0) - (b.position?.y ?? 0) || (a.position?.x ?? 0) - (b.position?.x ?? 0)),
+    (n) => (n.type === "data-target" ? n.data?.targetType || n.data?.label : n.data?.label)
+  )
+);
+const titleOf = (id, data) => canvasTitles.value.get(id) || data.targetType || data.label;
+
+// A step's status on its card, without changing the card's shape: a mark
+// in the title row once it has ended (✓ done, ✕ failed, – canceled); while
+// it runs, its type strip pulses (.blue-node); pending, nothing. The word is
+// the mark's title.
+const statusMark = (data) => (mode.value === "browse" && statusMarkOf(data.status)) || null;
+
+// A source with one file shows its name; with more, how many.
+// An input's and output's second line on the graph (IoPill): its files, or
+// where it goes and how that went.
+const sourceSubOf = (id, data) => {
+  if (mode.value === "configure") {
+    if (isLeftOut(id)) return "Left out";
+    const n = fileCountForNode(id);
+    if (!n) return "Choose files";
+    const picks = publicPicks[id] || [];
+    const noun = picks.some((p) => p.isFolder) ? "item" : "file";
+    return `${n} ${picks.length ? "public " : ""}${noun}${n === 1 ? "" : "s"}`;
+  }
+  if (inputStaging(data)) return data.progress ? inputProgressLine(data.progress) : "Preparing files…";
+  if (data.status === "FAILED") return "Couldn't get its files";
+  return data.view ? "Public dataset" : data.packageCount != null ? sourceDetail(data) : "";
+};
+// An input whose files are being prepared or downloaded: it says STARTED,
+// and the run is still pending (a run is marked running once its inputs are
+// on the node, so an input left STARTED, e.g. by a node that couldn't
+// report its end, isn't shown as still preparing).
+const inputStaging = (data) =>
+  mode.value === "browse" && data.status === "STARTED" && ["NOT_STARTED", "", undefined].includes(selectedWorkflowActivity.value?.status);
+const targetSubOf = (id, data) => {
+  if (mode.value === "configure") {
+    if (isUnsaved(id)) return "Not saved";
+    const t = nodeConfigs[id]?.targetType;
+    return t ? `to ${getTargetTypeLabel(t, targetTypes.value)}` : "";
+  }
+  return importLineOf(id)?.text || targetFacts(data).join(" · ") || getTargetTypeLabel(data.targetType, targetTypes.value);
+};
+
+const sourceDetail = (data) => {
+  if (data.packageCount === 1) {
+    const name = browseFileInfo.value[data.packageIds[0]]?.name;
+    if (name) return name;
+  }
+  return `${data.packageCount} file${data.packageCount !== 1 ? "s" : ""}`;
+};
+
+// A target's params on its card, without those at their default or the
+// path prefix a line from an output's port already shows.
+const targetParamsShown = (id, data) =>
+  shownTargetParams(
+    data.params,
+    getTargetTypeDefinition(data.targetType)?.params,
+    detailed.value && edges.value.some((e) => e.target === id && portOfHandle(e.sourceHandle))
+  );
 
 /*
   Convert a workflow definition's dag to VueFlow nodes/edges (for configure mode)
@@ -363,11 +666,13 @@ const definitionToNodesAndEdges = (definition) => {
       id: d.id,
       type: nodeType,
       data: {
-        label: labelForDagNode(d, availableApplications.value, targetTypes.value),
+        label: labelForDagNode(d, availableApplications.value, targetTypes.value, dag),
         nodeType: d.type,
         sourceUrl: d.sourceUrl,
         targetType: d.targetType || null,
         computeType: d.computeType || getComputeTypesForTarget(d.targetType)?.[0] || null,
+        ...(d.type === "processor" && stepManifest(dag, d.id)),
+        defaultParams: d.defaultParams || {},
       },
       position: hasSavedPositions && d.position && typeof d.position.x === "number"
         ? { x: d.position.x, y: d.position.y }
@@ -375,19 +680,7 @@ const definitionToNodesAndEdges = (definition) => {
     };
   });
   const dagMap = Object.fromEntries(dag.map((d) => [d.id, d]));
-  const resultEdges = [];
-  for (const d of dag) {
-    for (const dep of d.dependsOn || []) {
-      const srcNode = dagMap[dep];
-      resultEdges.push({
-        id: `e${dep}-${d.id}`,
-        source: dep,
-        target: d.id,
-        animated: false,
-        style: { stroke: nodeBorderColor(srcNode?.type, null) },
-      });
-    }
-  }
+  const resultEdges = graphEdges(dag, resultNodes, (src) => nodeBorderColor(dagMap[src]?.type, null));
   return { nodes: resultNodes, edges: resultEdges, needsAutoLayout: !hasSavedPositions };
 };
 
@@ -408,17 +701,27 @@ const runToNodesAndEdges = (run) => {
     const extra = {};
     if (d.type === "data-source") {
       const src = runDataSources[d.id];
-      extra.packageIds = src?.packageIds || [];
-      extra.packageCount = extra.packageIds.length;
+      if (src?.kind === "viewVersion") {
+        // A public dataset, taken in as a dataset view (viewsService).
+        extra.view = { viewId: src.viewId, viewVersion: src.viewVersion };
+      } else {
+        extra.packageIds = src?.packageIds || [];
+        extra.packageCount = extra.packageIds.length;
+      }
     } else if (d.type === "data-target") {
       extra.targetType = d.targetType || null;
       const cfg = runProcessorConfigs.find((c) => c.nodeId === d.id);
       extra.computeType = cfg?.executionTarget || d.computeType || null;
       const targetParams = runDataTargets[d.id]?.params || {};
       extra.params = Object.entries(targetParams).map(([key, value]) => ({ key, value: String(value) }));
+      extra.defaultParams = targetParams;
+      extra.datasetId = targetWritesToDataset(d.targetType) ? targetDatasetId(runDataTargets[d.id], run.datasetId) : "";
     } else {
       const cfg = runProcessorConfigs.find((c) => c.nodeId === d.id);
       extra.executionTarget = cfg?.executionTarget || null;
+      Object.assign(extra, stepManifest(dag, d.id));
+      extra.cpu = cfg?.cpu || null;
+      extra.memory = cfg?.memory || null;
       const nodeParams = runProcessorParams[d.id] || {};
       extra.params = Object.entries(nodeParams).map(([key, value]) => ({ key, value: String(value) }));
     }
@@ -426,13 +729,15 @@ const runToNodesAndEdges = (run) => {
       id: d.id,
       type: nodeType,
       data: {
-        label: labelForDagNode(d, availableApplications.value, targetTypes.value),
+        label: labelForDagNode(d, availableApplications.value, targetTypes.value, dag),
         status: d.status || "NOT_STARTED",
         processorType: d.type,
         sourceUrl: d.sourceUrl,
         version: d.tag || null,
         startedAt: d.startedAt,
         completedAt: d.completedAt,
+        progress: d.progress || null,
+        errorMessage: d.errorMessage || "",
         ...extra,
       },
       position: hasSavedPositions && d.position && typeof d.position.x === "number"
@@ -441,19 +746,7 @@ const runToNodesAndEdges = (run) => {
     };
   });
   const dagMap = Object.fromEntries(dag.map((d) => [d.id, d]));
-  const resultEdges = [];
-  for (const d of dag) {
-    for (const dep of d.dependsOn || []) {
-      const srcNode = dagMap[dep];
-      resultEdges.push({
-        id: `e${dep}-${d.id}`,
-        source: dep,
-        target: d.id,
-        animated: false,
-        style: { stroke: nodeBorderColor(srcNode?.type, srcNode?.status) },
-      });
-    }
-  }
+  const resultEdges = graphEdges(dag, resultNodes, (src) => nodeBorderColor(dagMap[src]?.type, dagMap[src]?.status));
   return { nodes: resultNodes, edges: resultEdges, needsAutoLayout: !hasSavedPositions };
 };
 
@@ -467,6 +760,45 @@ const parseEventData = (data) => {
   return data;
 };
 
+// Re-reads the shown run (its status and its steps') and redraws the graph,
+// keeping where the user placed the nodes.
+const refreshSelectedRun = async () => {
+  await store.dispatch("analysisModule/setSelectedWorkflowActivity", selectedWorkflowActivity.value);
+  const activity = selectedWorkflowActivity.value;
+  if (activity?.dag?.length > 0) {
+    const result = runToNodesAndEdges(activity);
+    const posMap = new Map();
+    nodes.value.forEach((n) => posMap.set(n.id, n.position));
+    nodes.value = result.nodes.map((n) => ({
+      ...n,
+      position: posMap.get(n.id) || n.position,
+    }));
+    if (result.edges.length > 0) edges.value = result.edges;
+  }
+};
+
+// A fallback for live updates: while the shown run isn't finished, check it
+// now and then. An update sent before the page subscribed, or lost on a
+// reconnect, would otherwise leave it looking stuck until a reload.
+const RUN_POLL_MS = 20000;
+let runPollTimer = null;
+const scheduleRunPoll = () => {
+  clearTimeout(runPollTimer);
+  runPollTimer = null;
+  const activity = selectedWorkflowActivity.value;
+  if (mode.value !== "browse" || !activity?.uuid || isTerminalStatus(activity.status)) return;
+  runPollTimer = setTimeout(async () => {
+    if (document.visibilityState === "visible") {
+      try {
+        await refreshSelectedRun();
+      } catch (err) {
+        console.warn("Run refresh failed:", err?.message || err);
+      }
+    }
+    scheduleRunPoll();
+  }, RUN_POLL_MS);
+};
+
 const onRunStatusUpdate = async (raw) => {
   const data = parseEventData(raw);
   store.commit("analysisModule/UPDATE_RUN_STATUS", { runId: data.runId, status: data.status });
@@ -478,18 +810,7 @@ const onRunStatusUpdate = async (raw) => {
         ...selectedWorkflowActivity.value,
         status: data.status,
       });
-      await store.dispatch("analysisModule/setSelectedWorkflowActivity", selectedWorkflowActivity.value);
-      const activity = selectedWorkflowActivity.value;
-      if (activity?.dag?.length > 0) {
-        const result = runToNodesAndEdges(activity);
-        const posMap = new Map();
-        nodes.value.forEach((n) => posMap.set(n.id, n.position));
-        nodes.value = result.nodes.map((n) => ({
-          ...n,
-          position: posMap.get(n.id) || n.position,
-        }));
-        if (result.edges.length > 0) edges.value = result.edges;
-      }
+      await refreshSelectedRun();
     } else {
       store.commit("analysisModule/SET_SELECTED_WORKFLOW_ACTIVITY", {
         ...selectedWorkflowActivity.value,
@@ -507,7 +828,7 @@ const onProcessorStatusUpdate = (raw) => {
   updateNodeData(data.nodeId, { status: data.status });
   edges.value = edges.value.map((edge) => {
     if (edge.source === data.nodeId) {
-      return { ...edge, style: { ...edge.style, stroke: statusBorderColor(data.status) } };
+      return { ...edge, style: { ...edge.style, stroke: graphStatusColor(data.status) } };
     }
     return edge;
   });
@@ -550,7 +871,11 @@ const loadRun = async (runId) => {
       const result = runToNodesAndEdges(activity);
       nodes.value = result.nodes;
       edges.value = result.edges;
-      if (result.needsAutoLayout) autoLayout();
+      // Single-file sources show the file's name on their cards.
+      for (const n of result.nodes) {
+        if (n.type === "data-source" && n.data.packageCount === 1) fetchPackageNames(n.data.packageIds);
+      }
+      if (needsLayout(result)) autoLayout();
       else setTimeout(() => fitView({ padding: 0.2, maxZoom: 1 }), 50);
     }
     if (activity?.datasetId) {
@@ -577,7 +902,7 @@ const copyRunId = async () => {
 
 const goBack = () => {
   store.dispatch("analysisModule/setSelectedWorkflowActivity", null);
-  router.push({ name: "runs" });
+  router.push(scopedRoute("runs"));
 };
 
 /*
@@ -590,7 +915,9 @@ onNodeClick(({ node }) => {
   selectedNode.value = node;
 
   if (mode.value === "configure") {
-    if (node.type === "data-source") {
+    // In My Workspace an input takes only public files, and where there are
+    // none (no views-service) its panel says so instead of an empty picker.
+    if (node.type === "data-source" && (!isMyWorkspace.value || publicInputs)) {
       openFilePicker(node.id);
       return;
     }
@@ -622,14 +949,19 @@ const initiateWorkflowFromConfig = async (pendingConfig) => {
   const { workflowId, computeNodeId, datasetId, rerunSource: source } = pendingConfig;
   initiateForm.value = { workflowId, computeNodeId, datasetId, name: "" };
   runNameError.value = "";
-  // Preserve any environment layers from the source run so the rerun re-attaches them.
+  // Preserve any data layers from the source run so the rerun re-attaches them.
   configLayers.value = Array.isArray(source?.layers) ? [...source.layers] : [];
 
   try {
-    const definition = await store.dispatch("analysisModule/fetchWorkflowDefinition", workflowId);
+    // A workflow's inputs and outputs shown as the source and target nodes a
+    // run of it has (workflowInterface.js); its DAG as is otherwise.
+    const definition = withInterfaceNodes(await store.dispatch("analysisModule/fetchWorkflowDefinition", workflowId));
     configDefinition.value = definition;
 
     Object.keys(dataSourceFiles).forEach((k) => delete dataSourceFiles[k]);
+    Object.keys(publicPicks).forEach((k) => delete publicPicks[k]);
+    Object.keys(sourceDatasets).forEach((k) => delete sourceDatasets[k]);
+    Object.keys(leftOutInputs).forEach((k) => delete leftOutInputs[k]);
     Object.keys(nodeConfigs).forEach((k) => delete nodeConfigs[k]);
 
     const dag = definition.dag || definition.processors || [];
@@ -640,21 +972,37 @@ const initiateWorkflowFromConfig = async (pendingConfig) => {
       const srcCfg = sourceConfigs.find((c) => c.nodeId === d.id);
       const srcParams = sourceParams[d.id] || {};
 
+      if (d.type === "data-source") {
+        // A rerun reads from the same datasets; its files are chosen again.
+        const own = source?.dataSources?.[d.id]?.datasetId;
+        if (own && own !== datasetId) sourceDatasets[d.id] = own;
+      }
       if (d.type === "data-target") {
-        const fallback = getComputeTypesForTarget(d.targetType)?.[0] || null;
+        // An output's destination is the run being rerun's (its target's
+        // type, none when it had no target), else the output's default.
+        const ranAs = d.output && source ? (source.dag || []).find((n) => n.id === d.id) : null;
+        let targetType = d.output && source ? ranAs?.targetType || NO_DESTINATION : d.targetType;
+        // In My Workspace an output starts where it can go there (a
+        // download, else not saved), not at a dataset default.
+        if (d.output && isMyWorkspace.value && (!targetType || targetWritesToDataset(targetType))) {
+          const choices = destinationChoices(d.output, { targetTypes: targetTypes.value, myWorkspace: true });
+          targetType = choices.find((t) => t !== NO_DESTINATION) || NO_DESTINATION;
+        }
+        const fallback = getComputeTypesForTarget(targetType)?.[0] || null;
         const srcTargetParams = source?.dataTargets?.[d.id]?.params || {};
-        const ttDef = getTargetTypeDefinition(d.targetType);
+        const ttDef = getTargetTypeDefinition(targetType);
         const paramDefs = ttDef?.params || [];
-        const targetParams = paramDefs.map((pd) => ({
-          name: pd.name,
-          type: pd.type || "string",
-          description: pd.description || "",
-          required: pd.defaultValue == null || pd.defaultValue === undefined,
-          value: srcTargetParams[pd.name] != null ? String(srcTargetParams[pd.name]) : (pd.defaultValue != null ? String(pd.defaultValue) : ""),
+        // Values: the run being rerun, then the definition's defaults on the
+        // node, then the registry's (workflow-service applies them in that order).
+        const targetParams = outputParams(d, targetParamFields(paramDefs, {
+          sourceParams: srcTargetParams,
+          definitionDefaults: targetType === d.targetType ? d.defaultParams || {} : {},
         }));
         nodeConfigs[d.id] = {
-          computeType: computeTypeForMode(srcCfg?.executionTarget || d.computeType || fallback),
-          targetType: d.targetType || null,
+          computeType: computeTypeForMode(srcCfg?.executionTarget || (targetType === d.targetType && d.computeType) || fallback),
+          targetType: targetType || null,
+          // The target's own dataset; "" means the run's.
+          datasetId: source?.dataTargets?.[d.id]?.datasetId || "",
           params: targetParams,
         };
       } else if (d.type !== "data-source") {
@@ -708,16 +1056,17 @@ const initiateWorkflowFromConfig = async (pendingConfig) => {
     const result = definitionToNodesAndEdges(definition);
     nodes.value = result.nodes;
     edges.value = result.edges;
-    if (result.needsAutoLayout) autoLayout();
+    if (needsLayout(result)) autoLayout();
     else setTimeout(() => fitView({ padding: 0.2, maxZoom: 1 }), 50);
 
+    applySetupDefaults(definition);
     mode.value = "configure";
     selectedNode.value = null;
     accordionActiveNames.value = ["information"];
   } catch (err) {
     console.error("Failed to load workflow definition:", err);
     EventBus.$emit("toast", { detail: { type: "error", msg: "Failed to load workflow definition." } });
-    router.push({ name: "runs" });
+    router.push(scopedRoute("runs"));
   }
 };
 
@@ -726,16 +1075,54 @@ const cancelConfigure = () => {
   configDefinition.value = null;
   configLayers.value = [];
   Object.keys(dataSourceFiles).forEach((k) => delete dataSourceFiles[k]);
+  Object.keys(publicPicks).forEach((k) => delete publicPicks[k]);
+  Object.keys(sourceDatasets).forEach((k) => delete sourceDatasets[k]);
   Object.keys(nodeConfigs).forEach((k) => delete nodeConfigs[k]);
   nodes.value = [];
   edges.value = [];
   selectedNode.value = null;
-  router.push({ name: "runs" });
+  router.push(scopedRoute("runs"));
 };
 
 /*
   Execute Workflow
 */
+// The run's name as given, for naming what the run makes before it exists.
+const trimmedRunName = () => (initiateForm.value.name || "").trim();
+
+// The views made for inputs' public files, by input: { key, view }. Execute
+// again with the same picks (after the run failed to start) uses them
+// again, rather than leaving a new set behind each time.
+const runViews = {};
+// views-service's longest view name.
+const VIEW_NAME_MAX = 255;
+
+// Makes a view of each input's public files (all at once) and returns them
+// as data sources, or null when one couldn't be made (it says why).
+const publicInputViews = async (dag) => {
+  const inputs = Object.entries(publicPicks).filter(([id, picks]) => picks?.length && !leftOutInputs[id]);
+  try {
+    const made = await Promise.all(
+      inputs.map(async ([id, picks]) => {
+        const key = picksKey(picks);
+        if (runViews[id]?.key !== key) {
+          const label = sourceLabel(id, dag, "input");
+          const name = `${trimmedRunName() || "Run"}: ${label}`.slice(0, VIEW_NAME_MAX);
+          runViews[id] = { key, view: await createRunView({ name, picks }) };
+        }
+        return [id, viewDataSource(runViews[id].view)];
+      })
+    );
+    return Object.fromEntries(made);
+  } catch (err) {
+    console.error("Failed to prepare public files:", err);
+    EventBus.$emit("toast", {
+      detail: { type: "error", msg: `Couldn't prepare the public files for this run: ${err?.message || "views-service failed"}` },
+    });
+    return null;
+  }
+};
+
 const executeWorkflow = async () => {
   const dag = configDefinition.value?.dag || [];
 
@@ -748,13 +1135,29 @@ const executeWorkflow = async () => {
     return;
   }
 
+  // Where it runs (the run setup panel, with nothing on the canvas selected).
+  const setupProblem = needsDatasetHere.value
+    ? "This workflow reads from or writes to a dataset, so it runs in a workspace, not in My Workspace."
+    : !initiateForm.value.computeNodeId
+    ? "Choose a compute node for the run."
+    : missingTargetDataset.value
+      ? `Choose the dataset ${missingTargetDataset.value} writes to.`
+      : setupNodeUnfit.value.length
+        ? `${computeNodeName(initiateForm.value.computeNodeId)} can't run this workflow: ${setupNodeUnfit.value.join(", ")}.`
+        : "";
+  if (setupProblem) {
+    selectedNode.value = null;
+    EventBus.$emit("toast", { detail: { type: "error", msg: setupProblem } });
+    return;
+  }
+
   // Validate data sources have files selected
   const missingSources = dataSourceNodes.value.filter(
-    (d) => !dataSourceFiles[d.id] || dataSourceFiles[d.id].length === 0
+    (d) => !leftOutInputs[d.id] && fileCountForNode(d.id) === 0
   );
   if (missingSources.length > 0) {
     EventBus.$emit("toast", {
-      detail: { type: "error", msg: `Select files for ${missingSources.length === 1 ? "data source" : `${missingSources.length} data sources`}` },
+      detail: { type: "error", msg: missingFilesMessage(missingSources.map((d) => d.id), configDefinition.value?.dag || []) },
     });
     return;
   }
@@ -764,7 +1167,7 @@ const executeWorkflow = async () => {
     if (!dagNode) continue;
 
     // Validate data-target required params
-    if (dagNode.type === "data-target") {
+    if (dagNode.type === "data-target" && cfg.targetType !== NO_DESTINATION) {
       const missing = (cfg.params || []).filter((p) => p.required && !p.value.trim());
       if (missing.length > 0) {
         const nodeLabel = dagNode.targetType || nodeId;
@@ -780,7 +1183,7 @@ const executeWorkflow = async () => {
     if (dagNode.type === "processor") {
       const missing = (cfg.schemaParams || []).filter((p) => p.required && !p.value?.trim());
       if (missing.length > 0) {
-        const nodeLabel = labelForDagNode(dagNode, availableApplications.value, targetTypes.value) || nodeId;
+        const nodeLabel = labelForDagNode(dagNode, availableApplications.value, targetTypes.value, dag) || nodeId;
         const names = missing.map((p) => p.name).join(", ");
         EventBus.$emit("toast", {
           detail: { type: "error", msg: `${nodeLabel}: missing required parameter${missing.length > 1 ? "s" : ""} ${names}` },
@@ -795,15 +1198,20 @@ const executeWorkflow = async () => {
     const dataSources = {};
     Object.entries(dataSourceFiles).forEach(([nodeId, files]) => {
       const ids = files.map((f) => f.content?.id).filter(Boolean);
-      dataSources[nodeId] = { packageIds: ids };
+      const own = sourceDatasetOf(nodeId);
+      dataSources[nodeId] = own && own !== runDatasetId.value ? { packageIds: ids, datasetId: own } : { packageIds: ids };
     });
+    // Public files: one view per input, kept for the run.
+    const views = await publicInputViews(dag);
+    if (!views) return;
+    Object.assign(dataSources, views);
 
     const processorConfigs = [];
     Object.entries(nodeConfigs).forEach(([nodeId, cfg]) => {
       const dagNode = dag.find((n) => n.id === nodeId);
       if (!dagNode) return;
       if (dagNode.type === "data-target") {
-        if (cfg.computeType) processorConfigs.push({ nodeId, executionTarget: cfg.computeType });
+        if (cfg.computeType && cfg.targetType !== NO_DESTINATION) processorConfigs.push({ nodeId, executionTarget: cfg.computeType });
       } else if (dagNode.type !== "data-source") {
         const entry = { nodeId };
         if (cfg.executionTarget) entry.executionTarget = cfg.executionTarget;
@@ -834,15 +1242,7 @@ const executeWorkflow = async () => {
       if (Object.keys(obj).length > 0) processorParams[nodeId] = obj;
     });
 
-    const dataTargets = {};
-    Object.entries(nodeConfigs).forEach(([nodeId, cfg]) => {
-      const dagNode = dag.find((n) => n.id === nodeId);
-      if (dagNode?.type === "data-target" && cfg.params && cfg.params.length > 0) {
-        const obj = {};
-        cfg.params.forEach((p) => { if (p.name && p.value) obj[p.name] = p.value; });
-        if (Object.keys(obj).length > 0) dataTargets[nodeId] = { params: obj };
-      }
-    });
+    const dataTargets = buildDataTargets(dag, nodeConfigs, runDatasetId.value);
 
     const trimmedName = nameResult.value;
     const payload = {
@@ -851,7 +1251,7 @@ const executeWorkflow = async () => {
         computeNodeId: initiateForm.value.computeNodeId,
         ...(processorConfigs.length > 0 && { processorConfigs }),
       },
-      datasetId: initiateForm.value.datasetId,
+      ...(runDatasetId.value && { datasetId: runDatasetId.value }),
       dataSources,
       ...(trimmedName && { name: trimmedName }),
       ...(Object.keys(dataTargets).length > 0 && { dataTargets }),
@@ -860,9 +1260,10 @@ const executeWorkflow = async () => {
     };
 
     await store.dispatch("analysisModule/createRun", payload);
+    rememberSetup(route.params.orgId || "", initiateForm.value.workflowId, { ...initiateForm.value, datasetId: runDatasetId.value });
     EventBus.$emit("toast", { detail: { type: "success", msg: "Workflow executed successfully." } });
 
-    router.push({ name: "runs" });
+    router.push(scopedRoute("runs"));
   } catch (err) {
     console.error("Failed to execute workflow:", err);
     const msg = err?.message || "Failed to execute workflow.";
@@ -878,6 +1279,7 @@ const executeWorkflow = async () => {
 */
 const openFilePicker = (nodeId) => {
   filePickerNodeId.value = nodeId;
+  pickerAllowOtherTypes.value = false;
   filePickerFiles.value = [];
   filePickerAncestorList.value = [];
   filePickerCurrentFile.value = { content: { name: "" } };
@@ -898,19 +1300,51 @@ const openFilePicker = (nodeId) => {
     }
   }
 
+  pickerSide.value = isMyWorkspace.value || publicPicks[nodeId]?.length ? "public" : "workspace";
   filePickerVisible.value = true;
-  fetchDatasetFiles();
+  if (!isMyWorkspace.value && sourceDatasetOf(nodeId)) fetchDatasetFiles();
+};
+
+// Another dataset for the source being picked: its files so far were from
+// the one before, so they go.
+const onPickerDatasetChange = (datasetId) => {
+  const nodeId = filePickerNodeId.value;
+  if (!nodeId) return;
+  // The dataset picked last is where the other inputs' pickers start. Inputs
+  // that already have files from the one before keep it as their own.
+  const before = initiateForm.value.datasetId;
+  if (datasetId && datasetId !== before) {
+    for (const k of Object.keys(dataSourceFiles)) {
+      if (k !== nodeId && dataSourceFiles[k]?.length && !sourceDatasets[k]) sourceDatasets[k] = before;
+    }
+    initiateForm.value.datasetId = datasetId;
+  }
+  sourceDatasets[nodeId] = datasetId === initiateForm.value.datasetId ? "" : datasetId;
+  // An input whose own dataset is now the one others start from follows it.
+  for (const k of Object.keys(sourceDatasets)) {
+    if (sourceDatasets[k] === initiateForm.value.datasetId) sourceDatasets[k] = "";
+  }
+  delete dataSourceFiles[nodeId];
+  store.commit("analysisModule/CLEAR_SELECTED_FILES");
+  filePickerFiles.value = [];
+  filePickerAncestorList.value = [];
+  filePickerCurrentFile.value = { content: { name: "" } };
+  ensureDatasetOption(datasetId);
+  if (datasetId) fetchDatasetFiles();
 };
 
 const fetchDatasetFiles = async () => {
+  filePickerLoading.value = true;
   try {
     const token = await useGetToken();
-    const datasetId = initiateForm.value.datasetId;
+    const datasetId = sourceDatasetOf(filePickerNodeId.value);
     const url = `${config.value.apiUrl}/datasets/${datasetId}?api_key=${token}&includeAncestors=true&limit=500&offset=0`;
     const response = await useSendXhr(url);
     filePickerFiles.value = [...(response.children || [])];
   } catch (err) {
     console.error("Failed to fetch files:", err);
+  } finally {
+    filePickerLoading.value = false;
   }
 };
 
@@ -943,7 +1377,7 @@ const handleNavigateBreadcrumb = async (id) => {
     const token = await useGetToken();
     let url;
     if (!id || id === "root") {
-      const datasetId = initiateForm.value.datasetId;
+      const datasetId = sourceDatasetOf(filePickerNodeId.value);
       url = `${config.value.apiUrl}/datasets/${datasetId}?api_key=${token}&includeAncestors=true&limit=500&offset=0`;
       filePickerAncestorList.value = [];
       filePickerCurrentFile.value = { content: { name: "" } };
@@ -970,6 +1404,7 @@ const handleNavigateBreadcrumb = async (id) => {
 const onFileSelect = (selectedFiles, parentId) => {
   const nodeId = filePickerNodeId.value;
   if (!nodeId) return;
+  delete leftOutInputs[nodeId];
 
   // Update the store so navigating folders preserves selections
   store.commit("analysisModule/SET_SELECTED_FILES", { selectedFiles, parentId: parentId || "root" });
@@ -981,6 +1416,7 @@ const onFileSelect = (selectedFiles, parentId) => {
     allFiles.push(...storeFiles[pid]);
   }
   dataSourceFiles[nodeId] = allFiles;
+  if (allFiles.length) delete publicPicks[nodeId];
 };
 
 const closeFilePicker = () => {
@@ -990,21 +1426,147 @@ const closeFilePicker = () => {
 };
 
 const fileCountForNode = (nodeId) => {
-  return (dataSourceFiles[nodeId] || []).length;
+  return (dataSourceFiles[nodeId] || []).length + (publicPicks[nodeId] || []).length;
+};
+
+// Chosen files a source's inputs don't take (by extension, against what its
+// inputs' app.yml declares), while configuring: marked on the link to the
+// input that doesn't take them, as the builder marks a link that doesn't fit,
+// and explained in the source's panel. A warning, not a block (an app may
+// still read them). A chosen folder counts with the files directly in it
+// (folderFiles, read when it's chosen; not its subfolders).
+const folderFiles = reactive({});
+const loadFolderFiles = async (folderId) => {
+  if (!folderId || folderFiles[folderId]) return;
+  folderFiles[folderId] = { names: [], loading: true };
+  try {
+    const token = await useGetToken();
+    const response = await useSendXhr(`${config.value.apiUrl}/packages/${folderId}?api_key=${token}&limit=500&offset=0`);
+    const children = response?.children || [];
+    const names = children.filter((c) => c.content?.packageType !== "Collection").map((c) => c.content?.name || "");
+    folderFiles[folderId] = {
+      names,
+      subfolders: children.length - names.length,
+      // A full page: there may be more than were read.
+      more: children.length >= 500,
+      loading: false,
+    };
+  } catch {
+    folderFiles[folderId] = { names: [], loading: false };
+  }
+};
+watch(
+  () => Object.values(dataSourceFiles).flat().filter((f) => f?.content?.packageType === "Collection").map((f) => f.content.id).join(","),
+  (ids) => ids && ids.split(",").forEach(loadFolderFiles)
+);
+const filesOf = (f) =>
+  f.content?.packageType === "Collection" ? folderFiles[f.content.id]?.names || [] : [f.content?.name || ""];
+// A public folder isn't looked into (its files aren't listed here), so only
+// its picked files are checked.
+const chosenFileNames = (nodeId) => [
+  ...(dataSourceFiles[nodeId] || []).flatMap(filesOf),
+  ...(publicPicks[nodeId] || []).filter((p) => !p.isFolder).map((p) => p.name),
+];
+const configHints = (nodeId) => {
+  const dag = configDefinition.value?.dag || [];
+  return sourceHints(nodeId, dag, portsOfStep(dag, availableApplications.value));
+};
+const sourceMismatch = (nodeId, hints = configHints(nodeId)) => {
+  const names = chosenFileNames(nodeId);
+  if (!names.length) return null;
+  const m = fileTypeMismatches(names, hints);
+  return m && { ...m, total: names.length };
+};
+
+// The links out of sources, marked where their files don't fit: red and
+// dashed, "⚠ needs JSON" (detailed) or a bare ✕ (compact), as the builder's.
+const SOURCE_EDGE_COLOR = nodeBorderColor("data-source", null);
+const MISMATCH_COLOR = "#E94B4B";
+const markSourceEdges = () => {
+  if (mode.value !== "configure") return;
+  const sources = new Set(nodes.value.filter((n) => n.type === "data-source").map((n) => n.id));
+  edges.value = edges.value.map((e) => {
+    if (!sources.has(e.source)) return e;
+    const m = sourceMismatch(e.source, linkHints(configHints(e.source), e.target, e.data?.input || ""));
+    if (!m) {
+      return e.label
+        ? { ...e, label: undefined, labelShowBg: undefined, labelBgStyle: undefined, labelStyle: undefined, style: { stroke: SOURCE_EDGE_COLOR } }
+        : e;
+    }
+    return {
+      ...e,
+      style: { stroke: MISMATCH_COLOR, strokeWidth: 2, strokeDasharray: "6 4" },
+      label: detailed.value ? `\u26A0 needs ${m.expected}` : "\u2715",
+      labelShowBg: detailed.value,
+      labelBgPadding: [6, 3],
+      labelBgBorderRadius: 2,
+      labelBgStyle: { fill: "#fdecec", stroke: MISMATCH_COLOR },
+      labelStyle: detailed.value
+        ? { fill: MISMATCH_COLOR, fontSize: 11, fontWeight: 600 }
+        : { fill: MISMATCH_COLOR, fontSize: 16, fontWeight: 700, stroke: "#f7f7f7", strokeWidth: 4, paintOrder: "stroke" },
+    };
+  });
+};
+watch(
+  () =>
+    [
+      mode.value,
+      detailed.value,
+      edges.value.length,
+      availableApplications.value.length,
+      ...nodes.value.filter((n) => n.type === "data-source").map((n) => chosenFileNames(n.id).join("|")),
+      Object.values(folderFiles).map((f) => (f.loading ? "…" : f.names.length)).join(","),
+    ].join("/"),
+  markSourceEdges
+);
+const mismatchLine = (nodeId) => {
+  const m = sourceMismatch(nodeId);
+  if (!m) return "";
+  const n = m.names.length;
+  return n === m.total
+    ? `${n === 1 ? "The file isn't" : `None of the ${n} files are`} ${m.expected}`
+    : `${n} of ${m.total} files ${n === 1 ? "isn't" : "aren't"} ${m.expected}`;
+};
+// Why a chosen folder's files weren't all checked (subfolders aren't read, nor
+// past the first 500), for its "?" mark; "" when they were, or for a file.
+const partlyChecked = (file) => {
+  if (file.content?.packageType !== "Collection") return "";
+  const f = folderFiles[file.content.id];
+  if (!f || f.loading || (!f.subfolders && !f.more)) return "";
+  const name = file.content?.name || "this folder";
+  const checked = `Checked the ${f.names.length}${f.more ? " first" : ""} file${f.names.length === 1 ? "" : "s"} directly in ${name}`;
+  return f.subfolders
+    ? `${checked}; its ${f.subfolders}${f.more ? "+" : ""} subfolder${f.subfolders === 1 ? "" : "s"} weren't checked.`
+    : `${checked}; the rest weren't checked.`;
+};
+
+// A chosen file that doesn't fit, or a folder with files directly in it that
+// don't.
+const mismatchedFile = (nodeId, file) => {
+  const names = sourceMismatch(nodeId)?.names || [];
+  return filesOf(file).some((n) => names.includes(n));
 };
 
 const nodeUnmetCount = (nodeId, nodeType) => {
   if (mode.value !== "configure") return 0;
   if (nodeType === "data-source") {
-    return fileCountForNode(nodeId) === 0 ? 1 : 0;
+    return fileCountForNode(nodeId) === 0 && !leftOutInputs[nodeId] ? 1 : 0;
   }
   const cfg = nodeConfigs[nodeId];
-  if (!cfg) return 0;
+  if (!cfg || cfg.targetType === NO_DESTINATION) return 0;
   if (nodeType === "data-target") {
     return (cfg.params || []).filter((p) => p.required && !p.value?.trim()).length;
   }
   // processor
   return (cfg.schemaParams || []).filter((p) => p.required && !p.value?.trim()).length;
+};
+
+const removePublicPick = (nodeId, pick) =>
+  setPublicPicks(nodeId, (publicPicks[nodeId] || []).filter((p) => p !== pick));
+// The public datasets an input's files come from, by name.
+const publicSourcesLine = (nodeId) => {
+  const names = [...new Set((publicPicks[nodeId] || []).map((p) => `${p.datasetName} (v${p.version})`))];
+  return names.length > 2 ? `${names.slice(0, 2).join(", ")} and ${names.length - 2} more` : names.join(", ");
 };
 
 const removeFileFromNode = (nodeId, index) => {
@@ -1042,8 +1604,49 @@ watch(
     if (node?.type === "data-source" && mode.value === "browse" && node.data?.packageIds?.length > 0) {
       fetchPackageNames(node.data.packageIds);
     }
+    if (node?.type === "data-source" && mode.value === "browse" && node.data?.view) {
+      fetchViewInfo(node.data.view);
+    }
   }
 );
+
+// Browse mode: a view source's dataset, by view id. The view summary names
+// its source dataset version: { name, version, doi, entryCount, totalSize }.
+const browseViewInfo = ref({});
+
+const fetchViewInfo = async ({ viewId }) => {
+  if (browseViewInfo.value[viewId]) return;
+  try {
+    const view = await getView(viewId);
+    const src = view.sources?.[0] || {};
+    browseViewInfo.value[viewId] = {
+      datasetId: src.datasetId,
+      name: src.name || view.name,
+      version: src.version,
+      doi: src.doi,
+      entryCount: view.entryCount,
+      totalSize: view.totalSize,
+    };
+  } catch (err) {
+    browseViewInfo.value[viewId] = { error: err?.message || "Could not read the dataset." };
+  }
+};
+
+// Public dataset sources name their dataset on the card.
+watch(
+  () => nodes.value.filter((n) => n.data?.view).map((n) => n.data.view.viewId).join(","),
+  () => {
+    for (const n of nodes.value) if (n.data?.view) fetchViewInfo(n.data.view);
+  },
+  { immediate: true }
+);
+
+const formatViewSize = (bytes) => {
+  if (!bytes) return "0 B";
+  const units = ["B", "KB", "MB", "GB", "TB"];
+  const i = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
+  return `${(bytes / 1024 ** i).toFixed(i ? 1 : 0)} ${units[i]}`;
+};
 
 /*
   Node params helpers (configure mode)
@@ -1172,7 +1775,80 @@ const nodeMetricLabel = (nodeId) => {
   const activity = selectedWorkflowActivity.value;
   if (!activity?.dag) return nodeId;
   const d = activity.dag.find((n) => n.id === nodeId);
-  return d ? labelForDagNode(d, availableApplications.value, targetTypes.value) : nodeId;
+  return d ? labelForDagNode(d, availableApplications.value, targetTypes.value, activity.dag) : nodeId;
+};
+
+// Detailed cards: how long a step ran (ticking while it runs) and its
+// resources. Costs are in the run's metrics, not on each card.
+const nowTick = ref(Date.now());
+let nowTimer = null;
+onMounted(() => {
+  nowTimer = setInterval(() => (nowTick.value = Date.now()), 15000);
+});
+onBeforeUnmount(() => clearInterval(nowTimer));
+
+/*
+  Dataset imports: how far each "Pennsieve Dataset" target's copies into its
+  dataset are (runImports.js). Asked for once a target has started, and
+  again every IMPORT_POLL_MS while files are still moving and the page is
+  visible. A run from before imports (404) shows nothing.
+*/
+const IMPORT_POLL_MS = 15000;
+const importStatus = reactive({}); // node id -> the endpoint's response, or null
+let importTimer = null;
+
+const datasetImportNodes = () =>
+  nodes.value.filter((n) => n.type === "data-target" && isDatasetImport(n.data) && ["STARTED", "SUCCEEDED", "FAILED"].includes(n.data.status));
+
+const fetchImportStatus = async (node, runId, token) => {
+  try {
+    const resp = await fetch(importStatusUrl(config.value.api2Url, node.data.datasetId, runId, node.id), {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (resp.status === 404 || resp.status === 403) {
+      importStatus[node.id] = null;
+      return;
+    }
+    if (resp.ok) importStatus[node.id] = await resp.json();
+  } catch (err) {
+    console.warn("Import status:", err?.message || err);
+  }
+};
+
+const refreshImports = async () => {
+  clearTimeout(importTimer);
+  importTimer = null;
+  const runId = selectedWorkflowActivity.value?.uuid;
+  const targets = mode.value === "browse" && runId ? datasetImportNodes() : [];
+  if (!targets.length) return;
+  if (document.visibilityState === "visible") {
+    const token = await useGetToken();
+    await Promise.all(targets.map((n) => fetchImportStatus(n, runId, token)));
+  }
+  const moving = targets.some((n) => importStatus[n.id] !== null && importStillMoving(importStatus[n.id], n.data.status));
+  if (moving) importTimer = setTimeout(refreshImports, IMPORT_POLL_MS);
+};
+watch(
+  () => datasetImportNodes().map((n) => `${n.id}:${n.data.status}`).join(","),
+  (now, before) => {
+    if (now && now !== before) refreshImports();
+  }
+);
+onBeforeUnmount(() => clearTimeout(importTimer));
+
+// A target card's import line, or null.
+const importLineOf = (id) => importSummary(importStatus[id]);
+
+const nodeRunTime = (data) => formatRunTime(nodeDurationSec(data, nowTick.value));
+const processorFacts = (id, data) =>
+  [data.version, formatResources(data.cpu, data.memory), nodeRunTime(data)].filter(Boolean);
+const targetFacts = (data) => [nodeRunTime(data)].filter(Boolean);
+const viewSourceLabel = (view) => {
+  const info = view && browseViewInfo.value[view.viewId];
+  if (!info || info.error) return "Public dataset";
+  return [info.name, info.version && `v${info.version}`, info.entryCount != null && `${info.entryCount} files`]
+    .filter(Boolean)
+    .join(" · ");
 };
 
 const selectedNodeMetrics = computed(() => {
@@ -1197,12 +1873,179 @@ const rerunFromRun = async () => {
     datasetId: activity.datasetId || "",
     rerunSource: activity,
   });
-  router.push({ name: "run-configure" });
+  router.push(scopedRoute("run-configure"));
 };
 
 /*
   Fetch dataset options for configure summary
 */
+/*
+  Run setup: the compute node and dataset, chosen on the configure page
+  (runSetup.js). Every node is offered; one that can't run this workflow is
+  greyed out with why. The run starts from what's asked for (a rerun's),
+  else what was used last for this workflow here, else the only node that
+  fits.
+*/
+const setupManifestOf = computed(() => portsOfStep(configDefinition.value?.dag || [], availableApplications.value));
+const setupComputeTypeOf = (stepId) => {
+  const dagNode = (configDefinition.value?.dag || []).find((n) => n.id === stepId);
+  return nodeConfigs[stepId]?.executionTarget || dagNode?.computeType || "";
+};
+const unfitReasons = (node) => nodeUnfit(node, configDefinition.value?.dag || [], setupManifestOf.value, setupComputeTypeOf);
+const setupNodeChoices = computed(() =>
+  computeNodes.value
+    .map((n) => ({ node: n, reasons: unfitReasons(n) }))
+    .sort((a, b) => (a.reasons.length > 0) - (b.reasons.length > 0) || String(a.node.name).localeCompare(String(b.node.name)))
+);
+// My Workspace runs have no dataset (see the run dialog's "Needs a dataset").
+const needsDatasetHere = computed(() => isMyWorkspace.value && needsDataset(configDefinition.value, { publicInputs }));
+const setupNodeUnfit = computed(() => {
+  const n = computeNodes.value.find((c) => c.uuid === initiateForm.value.computeNodeId);
+  return n ? unfitReasons(n) : [];
+});
+
+// A dataset not among the options loaded (a remembered or rerun one) is
+// fetched by id, so the selector can name it.
+const ensureDatasetOption = async (datasetId) => {
+  if (!datasetId || datasetOptions.value.some((d) => d.content?.id === datasetId)) return;
+  try {
+    const token = await useGetToken();
+    const ds = await useSendXhr(`${config.value.apiUrl}/datasets/${datasetId}?api_key=${token}`);
+    if (ds?.content?.id && !datasetOptions.value.some((d) => d.content?.id === ds.content.id)) {
+      datasetOptions.value = [ds, ...datasetOptions.value];
+    }
+  } catch {
+    // not reachable: the selector shows the id
+  }
+};
+
+function applySetupDefaults(definition) {
+  const remembered = rememberedSetup(route.params.orgId || "", definition?.uuid || initiateForm.value.workflowId);
+  if (!initiateForm.value.computeNodeId) {
+    initiateForm.value.computeNodeId = defaultNode("", remembered.computeNodeId, computeNodes.value, (n) => unfitReasons(n).length === 0);
+  }
+  if (!isMyWorkspace.value && !initiateForm.value.datasetId && remembered.datasetId) {
+    initiateForm.value.datasetId = remembered.datasetId;
+  }
+  ensureDatasetOption(initiateForm.value.datasetId);
+  Object.values(sourceDatasets).forEach(ensureDatasetOption);
+}
+
+const onSetupDatasetSearch = (query) => fetchDatasetOptions(query || "");
+
+// What the open picker's input takes (its app.yml types, "CSV or JSON"), when
+// it says; files that aren't those are dimmed and can't be chosen unless the
+// user allows other types (the check goes by extension, so it can be wrong).
+// A folder can always be chosen: what's in it isn't known here.
+const pickerAllowOtherTypes = ref(false);
+const pickerHints = computed(() => {
+  const id = filePickerNodeId.value;
+  const dag = configDefinition.value?.dag || [];
+  return id ? sourceHints(id, dag, portsOfStep(dag, availableApplications.value)) : [];
+});
+const pickerTypes = computed(() => [...(acceptedFileTypes(pickerHints.value) || [])].join(" or "));
+// What the input says it takes, in its app's words (app.yml descriptions).
+const pickerDescription = computed(() => [...new Set(pickerHints.value.map((h) => h.description).filter(Boolean))].join(" "));
+const pickerWhyNot = (row) => {
+  if (pickerAllowOtherTypes.value || !pickerTypes.value || row?.content?.packageType === "Collection") return "";
+  if (!fileTypeMismatches([row?.content?.name || ""], pickerHints.value)) return "";
+  return `${sourcePicker.value.name || "This input"} takes ${pickerTypes.value} files`;
+};
+
+// The dataset the open file picker shows, as its header describes it.
+const pickerDataset = computed(() => {
+  const id = filePickerVisible.value ? sourceDatasetOf(filePickerNodeId.value) : "";
+  const ds = id && datasetOptions.value.find((d) => d.content?.id === id);
+  return ds ? datasetSummary(ds) : null;
+});
+
+// The request's datasetId: the first input's dataset (in the workflow's
+// order), else where pickers start, for a workflow with no inputs.
+const runDatasetId = computed(() => {
+  if (isMyWorkspace.value) return "";
+  const inputs = dataSourceNodes.value.filter((d) => !publicPicks[d.id]?.length);
+  // Every input public: the run reads no workspace dataset, so it names
+  // none (an output that writes to one asks for its own).
+  if (dataSourceNodes.value.length && !inputs.length) return "";
+  return (inputs[0] && sourceDatasetOf(inputs[0].id)) || initiateForm.value.datasetId || "";
+});
+const workflowHasInputs = computed(() => dataSourceNodes.value.length > 0);
+// A dataset output with no dataset: none of its own and nothing to follow.
+// The selected node's output (a workflow output's target node), and the
+// destinations this run may bind it to here.
+const selectedOutput = computed(() =>
+  mode.value === "configure" && selectedNode.value
+    ? (configDefinition.value?.dag || []).find((d) => d.id === selectedNode.value.id)?.output || null
+    : null
+);
+const selectedDestinations = computed(() =>
+  selectedOutput.value ? destinationChoices(selectedOutput.value, { targetTypes: targetTypes.value, myWorkspace: isMyWorkspace.value }) : []
+);
+const destinationLabel = (t) =>
+  t === NO_DESTINATION ? "Don't save" : getTargetTypeLabel(t, targetTypes.value);
+
+// Another destination for an output: its params, runtime and dataset start
+// again from that target type's (and the output's default, when it's that).
+const onDestinationChange = (nodeId, targetType) => {
+  const cfg = nodeConfigs[nodeId];
+  const d = (configDefinition.value?.dag || []).find((n) => n.id === nodeId);
+  if (!cfg || !d?.output) return;
+  const isDefault = targetType === d.output.default?.targetType;
+  cfg.targetType = targetType;
+  cfg.datasetId = "";
+  cfg.params = targetType === NO_DESTINATION ? [] : outputParams(d, targetParamFields(getTargetTypeDefinition(targetType)?.params || [], {
+    definitionDefaults: isDefault ? d.output.default?.params || {} : {},
+  }));
+  cfg.computeType = targetType === NO_DESTINATION ? null : computeTypeForMode(getComputeTypesForTarget(targetType)?.[0] || null);
+  const n = nodes.value.find((x) => x.id === nodeId);
+  if (n) n.data = { ...n.data, targetType: targetType === NO_DESTINATION ? null : targetType, computeType: cfg.computeType };
+};
+
+// An output's params as a run sets them: not its path prefix, which
+// workflow-service sets from the step output it comes from.
+function outputParams(d, params) {
+  return d.output ? params.filter((p) => !isPathPrefixParam(p.name)) : params;
+}
+
+// Turning an output off for this run (it isn't saved) or an optional input
+// (left out), from its card: it stays on the graph, faded and dashed, and
+// the same button turns it back on.
+const dagNodeOf = (id) => (configDefinition.value?.dag || []).find((d) => d.id === id);
+const isUnsaved = (id) => mode.value === "configure" && !!dagNodeOf(id)?.output && nodeConfigs[id]?.targetType === NO_DESTINATION;
+const canSkipOutput = (id) => mode.value === "configure" && !!dagNodeOf(id)?.output && !dagNodeOf(id).output.required;
+const toggleSaved = (id) => {
+  const d = dagNodeOf(id);
+  if (!d?.output) return;
+  if (!isUnsaved(id)) return onDestinationChange(id, NO_DESTINATION);
+  const choices = destinationChoices(d.output, { targetTypes: targetTypes.value, myWorkspace: isMyWorkspace.value });
+  const back = choices.includes(d.output.default?.targetType) ? d.output.default.targetType : choices.find((t) => t !== NO_DESTINATION);
+  if (back) onDestinationChange(id, back);
+};
+const isLeftOut = (id) => mode.value === "configure" && !!leftOutInputs[id];
+const canLeaveOut = (id) => mode.value === "configure" && !!dagNodeOf(id)?.input?.optional;
+const toggleLeftOut = (id) => {
+  if (leftOutInputs[id]) {
+    delete leftOutInputs[id];
+    return;
+  }
+  leftOutInputs[id] = true;
+  delete dataSourceFiles[id];
+  delete publicPicks[id];
+};
+
+// A target's type for this run: an output's destination, else the node's.
+const runTargetType = (d) => (d.output ? nodeConfigs[d.id]?.targetType : d.targetType) || "";
+
+const missingTargetDataset = computed(() => {
+  for (const d of configDefinition.value?.dag || []) {
+    if (d.type !== "data-target" || !targetWritesToDataset(runTargetType(d)) || runTargetType(d) === NO_DESTINATION) continue;
+    if (!nodeConfigs[d.id]?.datasetId && !runDatasetId.value) {
+      return labelForDagNode(d, availableApplications.value, targetTypes.value, configDefinition.value?.dag || []) || d.id;
+    }
+  }
+  return "";
+});
+
 const fetchDatasetOptions = async (query = "") => {
   datasetSearchLoading.value = true;
   try {
@@ -1212,9 +2055,14 @@ const fetchDatasetOptions = async (query = "") => {
       orderBy: "IntId", orderDirection: "Desc",
       type: "research", api_key: token,
     });
-    const url = `${config.value.apiUrl}/datasets/paginated?${params}`;
+    const url = `${config.value.apiUrl}/datasets/paginated?${params}&includeBannerUrl=true`;
     const response = await useSendXhr(url);
-    datasetOptions.value = response?.datasets || response || [];
+    const found = sortDatasets(response?.datasets || response || []);
+    // The chosen datasets (the run's, the sources' own) stay, so their
+    // selectors keep naming them while another search is shown.
+    const chosen = new Set([initiateForm.value.datasetId, ...Object.values(sourceDatasets)].filter(Boolean));
+    const kept = datasetOptions.value.filter((d) => chosen.has(d.content?.id) && !found.some((f) => f.content?.id === d.content?.id));
+    datasetOptions.value = [...kept, ...found];
   } catch (err) {
     datasetOptions.value = [];
   } finally {
@@ -1226,8 +2074,23 @@ const fetchDatasetOptions = async (query = "") => {
   Lifecycle
 */
 onMounted(async () => {
+  // Live updates for every run in the workspace (or the user's own runs).
+  // Subscribed before anything loads, so an update sent while the page is
+  // loading isn't missed.
+  if (realtime) {
+    analyticsChannel = realtime.subscribe(
+      // The route's workspace, not activeOrganization: that stays set in My
+      // Workspace, where a personal run's events go to the user's channel.
+      runScopeChannel(route.params.orgId, store.state.profile?.id)
+    );
+    store.commit("analysisModule/SET_ANALYTICS_CHANNEL", analyticsChannel);
+    analyticsChannel.bind("workflow-run-status", onRunStatusUpdate);
+    analyticsChannel.bind("workflow-processor-status", onProcessorStatusUpdate);
+  }
+
   await Promise.all([
-    store.dispatch("analysisModule/fetchComputeNodes"),
+    // Forced in My Workspace: the cached list may be a workspace's nodes
+    store.dispatch("analysisModule/fetchComputeNodes", { force: isMyWorkspace.value }),
     store.dispatch("analysisModule/fetchTargetTypes"),
     store.dispatch("analysisModule/fetchApplications"),
   ]);
@@ -1236,39 +2099,31 @@ onMounted(async () => {
   const pendingConfig = store.state.analysisModule.pendingRunConfig;
   if (pendingConfig) {
     store.commit("analysisModule/CLEAR_PENDING_RUN_CONFIG");
-    fetchDatasetOptions();
+    if (!isMyWorkspace.value) fetchDatasetOptions();
     await initiateWorkflowFromConfig(pendingConfig);
   } else if (props.runId) {
     if (!store.getters["analysisModule/workflowInstances"]?.length) {
       await store.dispatch("analysisModule/fetchWorkflowInstances");
     }
     await loadRun(props.runId);
+    scheduleRunPoll();
   } else {
     // No pending config and no runId — nothing to show, redirect to runs
-    router.replace({ name: "runs" });
+    router.replace(scopedRoute("runs"));
     return;
   }
 
-  // Live updates for every run in the workspace (or the user's own runs)
-  if (realtime) {
-    analyticsChannel = realtime.subscribe(
-      runScopeChannel(store.state.activeOrganization?.organization?.id, store.state.profile?.id)
-    );
-    store.commit("analysisModule/SET_ANALYTICS_CHANNEL", analyticsChannel);
-    analyticsChannel.bind("workflow-run-status", onRunStatusUpdate);
-    analyticsChannel.bind("workflow-processor-status", onProcessorStatusUpdate);
-  }
 });
 
 // Handle same-component navigation (e.g. run-detail → run-configure)
 watch(
   () => route.name,
   async (newName) => {
-    if (newName === "run-configure") {
+    if (newName === "run-configure" || newName === "my-run-configure") {
       const pendingConfig = store.state.analysisModule.pendingRunConfig;
       if (pendingConfig) {
         store.commit("analysisModule/CLEAR_PENDING_RUN_CONFIG");
-        fetchDatasetOptions();
+        if (!isMyWorkspace.value) fetchDatasetOptions();
         await initiateWorkflowFromConfig(pendingConfig);
       }
     }
@@ -1276,6 +2131,7 @@ watch(
 );
 
 onBeforeUnmount(() => {
+  clearTimeout(runPollTimer);
   if (analyticsChannel) {
     analyticsChannel.unbind("workflow-run-status", onRunStatusUpdate);
     analyticsChannel.unbind(
@@ -1317,7 +2173,10 @@ onUnmounted(() => {
           <span v-if="runName && runTimeLabel" class="header-workflow-name">{{ runTimeLabel }}</span>
           <span v-if="runWorkflowName" class="header-workflow-name">{{ runWorkflowName }}</span>
         </span>
-        <div v-if="interactiveSessionAvailable" class="header-actions">
+        <div v-if="sessionEnding" class="header-actions">
+          <span class="session-ending-status"><span class="session-ending-spinner" />Ending session…</span>
+        </div>
+        <div v-else-if="interactiveSessionAvailable" class="header-actions">
           <bf-button class="secondary" :disabled="endingSession" @click="endSession">
             {{ endingSession ? 'Ending…' : 'End Session' }}
           </bf-button>
@@ -1351,12 +2210,15 @@ onUnmounted(() => {
     </el-dialog>
 
     <!-- Error Banner -->
+    <div v-if="mode === 'browse' && sessionEnding" class="info-banner" role="status">
+      {{ ENDING_MESSAGE[sessionEnding] }}
+    </div>
     <div v-if="errorBanner" class="error-banner">
       <span class="error-banner-msg">
         {{ errorBanner }}
         <router-link
           v-if="errorBannerNodeId"
-          :to="{ name: 'compute-node-management', params: { nodeId: errorBannerNodeId } }"
+          :to="scopedRoute('compute-node-management', { nodeId: errorBannerNodeId })"
           class="error-banner-link"
         >View allowed processors</router-link>
       </span>
@@ -1391,8 +2253,9 @@ onUnmounted(() => {
 
             <div v-if="nodes.length > 0" class="canvas-toolbar">
               <span v-if="mode === 'browse'" class="header-status-badge" :class="statusDotClass(selectedWorkflowActivity?.status)">
-                {{ statusLabel(selectedWorkflowActivity?.status) }}
+                {{ sessionEnding ? "Ending session" : statusLabel(selectedWorkflowActivity?.status) }}
               </span>
+              <GraphDensityToggle :detailed="detailed" @update:detailed="changeDensity" />
               <button class="auto-layout-btn" @click="autoLayout">
                 Auto Layout
               </button>
@@ -1400,9 +2263,50 @@ onUnmounted(() => {
 
             <!-- Processor node template -->
             <template #node-default="{ data, id }">
-              <div :style="{ '--node-border-color': mode === 'browse' ? statusBorderColor(data.status) : '#cccccc', '--handle-target-color': incomingEdgeColor(id) }">
-                <Handle type="target" :position="Position.Top" />
-                <div class="custom-node" :class="mode === 'browse' ? statusClass(data.status) : ''">
+              <div :style="{ '--node-border-color': mode === 'browse' ? graphStatusColor(data.status) : '#cccccc', '--handle-target-color': incomingEdgeColor(id) }">
+                <!-- Detailed: a connection point per input port (and the
+                     step's main one when a line uses it); compact: one. -->
+                <template v-if="detailed">
+                  <Handle
+                    v-for="p in pointsOf(id, data, 'in')"
+                    :id="p.port ? inputHandleId(p.name) : 'target'"
+                    :key="`in:${p.name}`"
+                    type="target"
+                    :position="Position.Top"
+                    :style="pointStyle(pointsOf(id, data, 'in'), p)"
+                  />
+                </template>
+                <Handle v-else id="target" type="target" :position="Position.Top" />
+                <CompactFlowNode
+                  v-if="!detailed"
+                  kind="processor"
+                  :label="titleOf(id, data)"
+                  :status="mode === 'browse' ? data.status : ''"
+                  :runtime="mode === 'browse' ? data.executionTarget : nodeConfigs[id]?.executionTarget"
+                  :unmet="nodeUnmetCount(id, 'processor')"
+                  :actions-on-hover="false"
+                >
+                  <LlmMark v-if="data.llm" compact />
+                  <template v-if="mode === 'browse' && interactiveSessionAvailable && id === interactiveProcessor?.id">
+                    <button
+                      class="node-action node-action--end"
+                      title="End session — resumes the workflow"
+                      :disabled="endingSession"
+                      @click="endSession"
+                    >
+                      <IconXCircle :width="14" :height="14" color="#c14d49" />
+                    </button>
+                    <button
+                      class="node-action node-action--play"
+                      :class="{ 'node-action--waiting': data.status === 'STARTED' }"
+                      title="Interactive notebook is waiting for you — open it"
+                      @click="openNotebook"
+                    >
+                      <IconControllerPlay :width="18" :height="11" color="#011f5b" />
+                    </button>
+                  </template>
+                </CompactFlowNode>
+                <div v-else class="custom-node app-step" :class="mode === 'browse' ? statusClass(data.status) : ''">
                   <span v-if="nodeUnmetCount(id, 'processor') > 0" class="node-unmet-badge">{{ nodeUnmetCount(id, 'processor') }}</span>
                   <div
                     v-if="mode === 'browse' && interactiveSessionAvailable && id === interactiveProcessor?.id"
@@ -1426,13 +2330,23 @@ onUnmounted(() => {
                       <IconControllerPlay :width="18" :height="11" color="#011f5b" />
                     </button>
                   </div>
+                  <PortChips v-if="hasPortChips(id, data, 'in')" :points="pointsOf(id, data, 'in')" side="in" />
                   <div class="node-header">
-                    <span class="node-title">{{ data.label }}</span>
+                    <span class="node-title" :title="titleOf(id, data)">{{ titleOf(id, data) }}</span>
+                    <RuntimeMark :runtime="mode === 'browse' ? data.executionTarget : nodeConfigs[id]?.executionTarget" />
+                    <LlmMark v-if="data.llm" />
+                    <span
+                      v-if="statusMark(data)"
+                      class="node-mark"
+                      :class="`node-mark--${statusMark(data).kind}`"
+                      :title="statusLabel(data.status)"
+                      :aria-label="statusLabel(data.status)"
+                    >{{ statusMark(data).glyph }}</span>
                   </div>
                   <div class="node-tags">
-                    <span v-if="mode === 'browse' && data.executionTarget" class="node-type-badge exec-badge">{{ data.executionTarget }}</span>
-                    <span v-if="mode === 'configure' && nodeConfigs[id]?.executionTarget" class="node-type-badge exec-badge">{{ nodeConfigs[id].executionTarget }}</span>
-                    <span v-if="mode === 'browse'" class="node-status-badge" :class="statusDotClass(data.status)">{{ statusLabel(data.status) }}</span>
+                  </div>
+                  <div v-if="mode === 'browse' && processorFacts(id, data).length" class="node-facts">
+                    {{ processorFacts(id, data).join(" · ") }}
                   </div>
                   <div v-if="(mode === 'browse' && data.params?.length > 0) || (mode === 'configure' && nodeConfigs[id])" class="node-config-summary">
                     <div v-if="mode === 'browse' && data.params?.length > 0" class="param-preview">
@@ -1453,72 +2367,56 @@ onUnmounted(() => {
                       <div class="node-config-hint">Click to configure</div>
                     </template>
                   </div>
+                  <PortChips v-if="hasPortChips(id, data, 'out')" :points="pointsOf(id, data, 'out')" side="out" />
                 </div>
-                <Handle type="source" :position="Position.Bottom" />
+                <template v-if="detailed">
+                  <Handle
+                    v-for="p in pointsOf(id, data, 'out')"
+                    :id="p.port ? portHandleId(p.name) : 'source'"
+                    :key="`out:${p.name}`"
+                    type="source"
+                    :position="Position.Bottom"
+                    :style="pointStyle(pointsOf(id, data, 'out'), p)"
+                  />
+                </template>
+                <Handle v-else id="source" type="source" :position="Position.Bottom" />
               </div>
             </template>
 
             <!-- Data-source node template -->
             <template #node-data-source="{ data, id }">
-              <div :style="{ '--node-border-color': mode === 'configure' && fileCountForNode(id) > 0 ? '#17BB62' : '#6366f1' }">
-                <div class="custom-node data-source-node" :class="{ 'has-files': mode === 'configure' && fileCountForNode(id) > 0 }">
-                  <span v-if="nodeUnmetCount(id, 'data-source') > 0" class="node-unmet-badge">{{ nodeUnmetCount(id, 'data-source') }}</span>
-                  <div class="node-header">
-                    <span class="node-title">{{ data.label }}</span>
-                  </div>
-                  <div class="node-tags">
-                    <span class="node-type-badge source-badge">Source</span>
-                    <span v-if="mode === 'browse' && data.packageCount != null" class="node-tag-info">
-                      {{ data.packageCount }} file{{ data.packageCount !== 1 ? 's' : '' }}
-                    </span>
-                    <template v-if="mode === 'configure'">
-                      <span class="node-tag-info">
-                        {{ fileCountForNode(id) }} file{{ fileCountForNode(id) !== 1 ? 's' : '' }} selected
-                      </span>
-                    </template>
-                  </div>
-                  <div v-if="mode === 'configure'" class="node-config-hint">Click to select files</div>
-                </div>
-                <Handle type="source" :position="Position.Bottom" />
+              <div :style="{ '--node-border-color': '#6366f1' }" :class="{ 'is-off': isLeftOut(id) }">
+                <IoPill
+                  kind="input"
+                  :name="titleOf(id, data)"
+                  :sub="sourceSubOf(id, data)"
+                  :unmet="nodeUnmetCount(id, 'data-source')"
+                  :off="isLeftOut(id)"
+                  :running="inputStaging(data)"
+                  :failed="mode === 'browse' && data.status === 'FAILED'"
+                />
+                <Handle id="source" type="source" :position="Position.Bottom" />
               </div>
             </template>
 
             <!-- Data-target node template -->
             <template #node-data-target="{ data, id }">
-              <div :style="{ '--node-border-color': mode === 'browse' ? (data.status && data.status !== 'NOT_STARTED' ? statusBorderColor(data.status) : '#64748b') : '#64748b', '--handle-target-color': incomingEdgeColor(id) }">
-                <Handle type="target" :position="Position.Top" />
-                <div class="custom-node data-target-node" :class="mode === 'browse' ? statusClass(data.status) : ''">
-                  <span v-if="nodeUnmetCount(id, 'data-target') > 0" class="node-unmet-badge">{{ nodeUnmetCount(id, 'data-target') }}</span>
-                  <div class="node-header">
-                    <span class="node-title">{{ data.targetType || data.label }}</span>
-                  </div>
-                  <div class="node-tags">
-                    <span class="node-type-badge target-badge">Target</span>
-                    <span v-if="nodeConfigs[id]?.computeType || data.computeType" class="node-type-badge exec-badge">
-                      {{ nodeConfigs[id]?.computeType || data.computeType }}
-                    </span>
-                    <span v-if="mode === 'browse'" class="node-status-badge" :class="statusDotClass(data.status)">{{ statusLabel(data.status) }}</span>
-                  </div>
-                  <div class="node-body">
-                    <div v-if="mode === 'browse' && data.params?.length > 0" class="param-preview">
-                      <div v-for="(p, i) in data.params.slice(0, 3)" :key="i" class="param-row">
-                        <span class="param-key">{{ p.key }}</span>
-                        <span v-if="p.value" class="param-val">{{ p.value }}</span>
-                      </div>
-                      <span v-if="data.params.length > 3" class="param-more">+{{ data.params.length - 3 }} more</span>
-                    </div>
-                    <template v-if="mode === 'configure'">
-                      <div v-if="nodeConfigs[id]?.params?.length > 0" class="param-preview">
-                        <div v-for="(p, i) in nodeConfigs[id].params.slice(0, 3)" :key="i" class="param-row">
-                          <span class="param-key">{{ p.name || p.key }}</span>
-                          <span v-if="p.value" class="param-val">{{ p.value }}</span>
-                        </div>
-                        <span v-if="nodeConfigs[id].params.length > 3" class="param-more">+{{ nodeConfigs[id].params.length - 3 }} more</span>
-                      </div>
-                      <div class="node-config-hint">Click to configure</div>
-                    </template>
-                  </div>
-                </div>
+              <div :style="{ '--node-border-color': mode === 'browse' ? (data.status && !['NOT_STARTED', 'SUCCEEDED'].includes(data.status) ? graphStatusColor(data.status) : '#64748b') : '#64748b', '--handle-target-color': incomingEdgeColor(id) }" :class="{ 'is-off': isUnsaved(id) }">
+                <Handle id="target" type="target" :position="Position.Top" />
+                <IoPill
+                  kind="output"
+                  :name="titleOf(id, data)"
+                  :sub="targetSubOf(id, data)"
+                  :mark="statusMark(data)"
+                  :mark-title="statusLabel(data.status)"
+                  :running="mode === 'browse' && data.status === 'STARTED'"
+                  :failed="mode === 'browse' && data.status === 'FAILED'"
+                  :unmet="nodeUnmetCount(id, 'data-target')"
+                  :off="isUnsaved(id)"
+                />
+                <button v-if="canSkipOutput(id)" type="button" class="node-off-toggle nodrag" @click.stop="toggleSaved(id)">
+                  {{ isUnsaved(id) ? "Save it" : "Don't save" }}
+                </button>
               </div>
             </template>
           </VueFlow>
@@ -1773,7 +2671,32 @@ onUnmounted(() => {
 
             <!-- CONFIGURE MODE: Selected data-target node -->
             <template v-else-if="mode === 'configure' && selectedNode && selectedNode.type === 'data-target' && nodeConfigs[selectedNode.id]">
-              <h4 class="sidebar-section-title">Data Target Configuration</h4>
+              <h4 class="sidebar-section-title">{{ selectedOutput ? `Output: ${selectedOutput.name}` : 'Data Target Configuration' }}</h4>
+              <!-- An output's destination, chosen for this run -->
+              <div v-if="selectedOutput" class="config-field">
+                <label for="output-destination">Destination</label>
+                <el-select
+                  id="output-destination"
+                  :model-value="nodeConfigs[selectedNode.id].targetType"
+                  size="small"
+                  style="width: 100%"
+                  @update:model-value="(t) => onDestinationChange(selectedNode.id, t)"
+                >
+                  <el-option
+                    v-for="t in selectedDestinations"
+                    :key="t"
+                    :label="destinationLabel(t)"
+                    :value="t"
+                  />
+                </el-select>
+              </div>
+              <p v-if="selectedOutput && nodeConfigs[selectedNode.id].targetType === NO_DESTINATION" class="configure-hint">
+                The run still makes {{ selectedOutput.name }}, but doesn't save it anywhere.
+              </p>
+              <template v-if="nodeConfigs[selectedNode.id].targetType !== NO_DESTINATION">
+              <div v-if="!getTargetTypeDefinition(selectedNode.data?.targetType)" class="target-type-missing">
+                Target type "{{ selectedNode.data?.targetType }}" is no longer available, so it has no parameters or runtimes here. Edit the workflow and choose a current target type.
+              </div>
               <div class="info-card">
                 <div class="info-row">
                   <span class="info-label">Target Type</span>
@@ -1813,6 +2736,19 @@ onUnmounted(() => {
                   </el-select>
                 </div>
 
+                <!-- Which dataset the target writes to (the run's, by default) -->
+                <div
+                  v-if="targetWritesToDataset(selectedNode.data?.targetType)"
+                  class="config-field"
+                >
+                  <TargetDatasetField
+                    v-model="nodeConfigs[selectedNode.id].datasetId"
+                    :run-dataset-id="runDatasetId"
+                    :follows-inputs="workflowHasInputs"
+                    :datasets="datasetOptions"
+                  />
+                </div>
+
                 <!-- Target type params -->
                 <div v-if="nodeConfigs[selectedNode.id].params.length > 0" class="config-field">
                   <label>Parameters</label>
@@ -1831,6 +2767,19 @@ onUnmounted(() => {
                       v-model="param.value"
                       :compute-node-id="initiateForm.computeNodeId"
                     />
+                    <el-select
+                      v-else-if="nodeConfigs[selectedNode.id].targetType === 'download' && param.name === 'notify'"
+                      v-model="param.value"
+                      size="small"
+                      style="width: 100%"
+                    >
+                      <el-option
+                        v-for="o in DOWNLOAD_NOTIFY_OPTIONS"
+                        :key="o.value"
+                        :label="o.label"
+                        :value="o.value"
+                      />
+                    </el-select>
                     <template v-else-if="param.name === 'ASSET_TYPE'">
                       <el-select
                         :model-value="
@@ -1883,6 +2832,7 @@ onUnmounted(() => {
                   </div>
                 </div>
               </div>
+              </template>
 
               <button class="text-link-btn" @click="selectedNode = null">
                 Clear selection
@@ -1893,22 +2843,54 @@ onUnmounted(() => {
             <template v-else-if="mode === 'configure' && selectedNode && selectedNode.type === 'data-source'">
               <h4 class="sidebar-section-title">Data Source</h4>
               <div class="info-card">
+                <div v-if="publicPicks[selectedNode.id]?.length" class="info-row">
+                  <span class="info-label">From</span>
+                  <span class="info-value">{{ publicSourcesLine(selectedNode.id) }}</span>
+                </div>
+                <div v-else-if="!isMyWorkspace" class="info-row">
+                  <span class="info-label">From</span>
+                  <span class="info-value">{{ sourceDatasetOf(selectedNode.id) ? datasetName(sourceDatasetOf(selectedNode.id), datasetOptions) : "Chosen with its files" }}</span>
+                </div>
                 <div class="info-row">
                   <span class="info-label">Files</span>
                   <span class="info-value">{{ fileCountForNode(selectedNode.id) }} selected</span>
                 </div>
               </div>
+              <p v-if="isMyWorkspace && !publicInputs" class="configure-hint">
+                In My Workspace a run can't take a dataset's files, and public datasets' files aren't available here yet.
+                {{ canLeaveOut(selectedNode.id) ? "Leave this input out, or run the workflow from a workspace." : "Run this workflow from a workspace." }}
+              </p>
+              <template v-else>
               <h4 class="sidebar-section-title">Source Files</h4>
+              <p v-if="mismatchLine(selectedNode.id)" class="files-mismatch">
+                ⚠ {{ mismatchLine(selectedNode.id) }}: {{ hintLine(sourceHints(selectedNode.id, configDefinition?.dag || [], portsOfStep(configDefinition?.dag || [], availableApplications))) }}.
+              </p>
               <div v-if="dataSourceFiles[selectedNode.id]?.length > 0" class="selected-files-list">
                 <div
                   v-for="(file, idx) in dataSourceFiles[selectedNode.id]"
                   :key="file.content?.id || idx"
                   class="selected-file-item"
+                  :class="{ 'is-mismatch': mismatchedFile(selectedNode.id, file) }"
+                  :title="mismatchedFile(selectedNode.id, file) ? (file.content?.packageType === 'Collection' ? 'Has files this input doesn\'t take' : 'Not a type this input takes') : undefined"
                 >
                   <IconCollection v-if="file.content?.packageType === 'Collection'" :width="14" :height="14" class="selected-file-icon collection" />
                   <IconFile v-else :width="14" :height="14" class="selected-file-icon" />
                   <span class="selected-file-name">{{ file.content?.name || 'Unnamed file' }}</span>
+                  <span v-if="partlyChecked(file)" class="selected-file-unchecked" :title="partlyChecked(file)">?</span>
                   <button class="selected-file-remove" @click="removeFileFromNode(selectedNode.id, idx)" title="Remove file">&times;</button>
+                </div>
+              </div>
+              <div v-else-if="publicPicks[selectedNode.id]?.length" class="selected-files-list">
+                <div
+                  v-for="pick in publicPicks[selectedNode.id]"
+                  :key="`${pick.datasetId}:${pick.version}:${pick.path}`"
+                  class="selected-file-item"
+                  :title="`${pick.datasetName}, version ${pick.version}: ${pick.path}`"
+                >
+                  <IconCollection v-if="pick.isFolder" :width="14" :height="14" class="selected-file-icon collection" />
+                  <IconFile v-else :width="14" :height="14" class="selected-file-icon" />
+                  <span class="selected-file-name">{{ pick.name }}</span>
+                  <button class="selected-file-remove" title="Remove" @click="removePublicPick(selectedNode.id, pick)">&times;</button>
                 </div>
               </div>
               <div v-else class="selected-files-empty">
@@ -1917,11 +2899,12 @@ onUnmounted(() => {
               <div class="info-actions">
                 <button class="text-link-btn" @click="openFilePicker(selectedNode.id)">{{ fileCountForNode(selectedNode.id) > 0 ? 'Change files' : 'Select files' }}</button>
               </div>
+              </template>
             </template>
 
             <!-- CONFIGURE MODE: no node selected — show summary -->
             <template v-else-if="mode === 'configure'">
-              <h4 class="sidebar-section-title">Configuration Summary</h4>
+              <h4 class="sidebar-section-title">Run setup</h4>
               <div class="info-card">
                 <div class="info-row info-row-stacked">
                   <label class="info-label" for="run-name-input">Run Name <span class="info-label-hint">(optional)</span></label>
@@ -1945,31 +2928,104 @@ onUnmounted(() => {
                   <span class="info-label">Workflow</span>
                   <span class="info-value">{{ configDefinition?.name || 'N/A' }}</span>
                 </div>
-                <div class="info-row">
-                  <span class="info-label">Compute Node</span>
-                  <span class="info-value">{{ computeNodeName(initiateForm.computeNodeId) }}</span>
-                </div>
-                <div class="info-row">
-                  <span class="info-label">Dataset</span>
-                  <span class="info-value">
-                    {{ datasetOptions.find(d => d.content?.id === initiateForm.datasetId)?.content?.name || initiateForm.datasetId }}
-                  </span>
+                <p v-if="needsDatasetHere" class="run-name-error">
+                  This workflow reads from or writes to a dataset, so it runs in a workspace, not in My Workspace.
+                </p>
+                <div class="info-row info-row-stacked">
+                  <label class="info-label" for="setup-node">Compute node</label>
+                  <el-select
+                    id="setup-node"
+                    v-model="initiateForm.computeNodeId"
+                    filterable
+                    placeholder="Choose a compute node"
+                    class="setup-select"
+                    fit-input-width
+                    popper-class="setup-node-popper"
+                  >
+                    <el-option
+                      v-for="c in setupNodeChoices"
+                      :key="c.node.uuid"
+                      :label="c.node.name"
+                      :value="c.node.uuid"
+                      :disabled="c.reasons.length > 0"
+                    >
+                      <span class="setup-option-name" :title="c.node.name">{{ c.node.name }}</span>
+                      <span v-if="c.reasons.length" class="setup-option-why">{{ c.reasons.join(" · ") }}</span>
+                    </el-option>
+                  </el-select>
+                  <span v-if="setupNodeUnfit.length" class="run-name-error">Can't run this workflow: {{ setupNodeUnfit.join(", ") }}</span>
                 </div>
                 <div v-if="configLayers.length" class="info-row">
-                  <span class="info-label">Environment</span>
+                  <span class="info-label">Reference data</span>
                   <span class="info-value">{{ configLayers.join(', ') }}</span>
                 </div>
               </div>
               <p class="configure-hint">
-                Click <strong>data-source</strong> nodes to select files,
-                <strong>processor</strong> nodes to set parameters,
-                and <strong>data-target</strong> nodes to override the runtime.
+                Choose where it runs, then click each <strong>input</strong> to choose its dataset and files,
+                a <strong>step</strong> to set its parameters, and an <strong>output</strong> to override where it runs.
               </p>
             </template>
 
             <!-- BROWSE MODE: Selected Data Source Node -->
             <template v-else-if="mode === 'browse' && selectedNode && selectedNode.type === 'data-source'">
               <h4 class="sidebar-section-title">Data Source</h4>
+              <!-- Its files while the run's inputs are staged, or why it
+                   couldn't get them -->
+              <div v-if="inputStaging(selectedNode.data)" class="info-card">
+                <div class="info-row">
+                  <span class="info-label">Files</span>
+                  <span class="info-value">{{ selectedNode.data.progress ? inputProgressLine(selectedNode.data.progress) : "Preparing…" }}</span>
+                </div>
+              </div>
+              <p v-else-if="selectedNode.data?.status === 'FAILED'" class="files-mismatch" role="alert">
+                Couldn't get this input's files{{ selectedNode.data.errorMessage ? `: ${selectedNode.data.errorMessage}` : "." }}
+              </p>
+              <template v-if="selectedNode.data?.view">
+                <div class="info-card">
+                  <div class="info-row">
+                    <span class="info-label">Name</span>
+                    <span class="info-value">{{ selectedNode.data?.label || 'Unnamed' }}</span>
+                  </div>
+                  <template v-for="info in [browseViewInfo[selectedNode.data.view.viewId]]" :key="selectedNode.data.view.viewId">
+                    <div v-if="!info" class="info-row">
+                      <span class="info-value">Loading…</span>
+                    </div>
+                    <div v-else-if="info.error" class="info-row">
+                      <span class="info-value">{{ info.error }}</span>
+                    </div>
+                    <template v-else>
+                      <div class="info-row">
+                        <span class="info-label">Public dataset</span>
+                        <span class="info-value">
+                          <router-link
+                            v-if="info.datasetId"
+                            :to="{ name: 'public-dataset', params: { datasetId: info.datasetId } }"
+                          >{{ info.name }}</router-link>
+                          <template v-else>{{ info.name }}</template>
+                        </span>
+                      </div>
+                      <div class="info-row">
+                        <span class="info-label">Version</span>
+                        <span class="info-value">{{ info.version }}</span>
+                      </div>
+                      <div v-if="info.doi" class="info-row">
+                        <span class="info-label">DOI</span>
+                        <span class="info-value">
+                          <a :href="`https://doi.org/${info.doi}`" target="_blank" rel="noopener">{{ info.doi }}</a>
+                        </span>
+                      </div>
+                      <div class="info-row">
+                        <span class="info-label">Files</span>
+                        <span class="info-value">{{ info.entryCount }} · {{ formatViewSize(info.totalSize) }}</span>
+                      </div>
+                    </template>
+                  </template>
+                </div>
+                <p class="configure-hint">
+                  The notebook downloads the files it needs from this dataset.
+                </p>
+              </template>
+              <template v-else>
               <div class="info-card">
                 <div class="info-row">
                   <span class="info-label">Name</span>
@@ -1992,6 +3048,7 @@ onUnmounted(() => {
                   <span class="selected-file-name">{{ browseFileInfo[pkgId]?.name || pkgId }}</span>
                 </div>
               </div>
+              </template>
               <div class="info-actions">
                 <button class="text-link-btn" @click="selectedNode = null">
                   Clear selection
@@ -2018,6 +3075,32 @@ onUnmounted(() => {
                   <span class="info-label">Version</span>
                   <span class="info-value">{{ selectedNode.data.version }}</span>
                 </div>
+                <div v-if="selectedNode.data?.datasetId" class="info-row">
+                  <span class="info-label">Writes to</span>
+                  <span class="info-value">{{ datasetName(selectedNode.data.datasetId, datasetOptions) }}</span>
+                </div>
+              </div>
+
+              <div v-if="importStatus[selectedNode.id]" class="info-card params-card">
+                <h5 class="params-title">Import into dataset</h5>
+                <div class="info-row">
+                  <span class="info-label">Imported</span>
+                  <span class="info-value">{{ importStatus[selectedNode.id].imported }} of {{ importStatus[selectedNode.id].total }}</span>
+                </div>
+                <div v-if="importStatus[selectedNode.id].inProgress" class="info-row">
+                  <span class="info-label">In progress</span>
+                  <span class="info-value">{{ importStatus[selectedNode.id].inProgress }}</span>
+                </div>
+                <div v-if="importStatus[selectedNode.id].failed" class="info-row">
+                  <span class="info-label">Failed</span>
+                  <span class="info-value import-failed">{{ importStatus[selectedNode.id].failed }}</span>
+                </div>
+                <ul v-if="importStatus[selectedNode.id].failures?.length" class="import-failures">
+                  <li v-for="f in importStatus[selectedNode.id].failures" :key="f.path">
+                    <span class="import-failure-path">{{ f.path }}</span>
+                    <span v-if="f.message" class="import-failure-message">{{ f.message }}</span>
+                  </li>
+                </ul>
               </div>
 
               <div v-if="selectedNode.data?.params?.length > 0" class="info-card params-card">
@@ -2071,7 +3154,7 @@ onUnmounted(() => {
                   <span class="info-value truncate-value">
                     <router-link
                       v-if="selectedWorkflowActivity.workflowUuid"
-                      :to="{ name: 'workflow-detail', params: { uuid: selectedWorkflowActivity.workflowUuid } }"
+                      :to="scopedRoute('workflow-detail', { uuid: selectedWorkflowActivity.workflowUuid })"
                       :title="runWorkflowName"
                       class="truncate-text"
                     >
@@ -2110,7 +3193,7 @@ onUnmounted(() => {
                   <span class="info-label">Compute Node</span>
                   <span class="info-value truncate-value">
                     <router-link
-                      :to="{ name: 'compute-node-management', params: { nodeId: selectedWorkflowActivity.computeNodeUuid } }"
+                      :to="scopedRoute('compute-node-management', { nodeId: selectedWorkflowActivity.computeNodeUuid })"
                       :title="computeNodeName(selectedWorkflowActivity.computeNodeUuid)"
                       class="truncate-text"
                     >
@@ -2135,6 +3218,13 @@ onUnmounted(() => {
                   <span class="info-value">{{ formatDuration(selectedWorkflowActivity.startedAt, selectedWorkflowActivity.completedAt) }}</span>
                 </div>
               </div>
+              <template v-if="downloadTarget">
+                <h4 class="sidebar-section-title">Results</h4>
+                <div class="info-card results-card">
+                  <DownloadItem v-if="runArchive" :download="runArchive" />
+                  <p v-else class="results-hint">{{ resultsHint }}</p>
+                </div>
+              </template>
               <!-- Metrics summary -->
               <template v-if="runMetrics">
                 <h4 class="sidebar-section-title">Metrics</h4>
@@ -2175,16 +3265,84 @@ onUnmounted(() => {
     <!-- File Picker Dialog -->
     <el-dialog
       v-model="filePickerVisible"
-      title="Select Files"
+      :title="sourcePicker.title"
       width="800px"
       :close-on-click-modal="false"
       @close="closeFilePicker"
     >
       <div class="file-picker-content">
+        <p v-if="sourcePicker.hint && !pickerTypes" class="file-picker-hint">{{ sourcePicker.hint }}</p>
+        <!-- Where the files come from: a workspace dataset, or published
+             datasets (one or several) -->
+        <el-radio-group v-if="publicInputs && !isMyWorkspace" v-model="pickerSide" size="small" class="file-picker-side">
+          <el-radio-button value="workspace">Workspace dataset</el-radio-button>
+          <el-radio-button value="public">Public datasets</el-radio-button>
+        </el-radio-group>
+        <p v-if="pickerReplaces" class="file-picker-hint">{{ pickerReplaces }}</p>
+        <template v-if="pickerSide === 'public'">
+          <div class="file-picker-header">
+            <span class="selected-count">
+              <strong>{{ fileCountForNode(filePickerNodeId) }}</strong>
+              {{ fileCountForNode(filePickerNodeId) !== 1 ? 'items' : 'item' }} selected
+            </span>
+            <span v-if="pickerTypes" class="file-picker-types">
+              <span class="file-picker-types-label">Show</span>
+              <el-radio-group v-model="pickerAllowOtherTypes" size="small">
+                <el-radio-button :value="false" :title="pickerDescription || sourcePicker.hint">{{ pickerTypes }} only</el-radio-button>
+                <el-radio-button :value="true" title="Choose any file; the app may not read it">Any file</el-radio-button>
+              </el-radio-group>
+            </span>
+          </div>
+          <PublicFilesPicker
+            :model-value="publicPicks[filePickerNodeId] || []"
+            :why-not="(name) => pickerWhyNot({ content: { name } })"
+            @update:model-value="(picks) => setPublicPicks(filePickerNodeId, picks)"
+          />
+        </template>
+        <template v-else>
+        <div v-if="!isMyWorkspace" class="file-picker-dataset">
+          <template v-if="!isMyWorkspace">
+          <label for="picker-dataset">Dataset</label>
+          <el-select
+            id="picker-dataset"
+            :model-value="sourceDatasetOf(filePickerNodeId)"
+            filterable
+            remote
+            :remote-method="onSetupDatasetSearch"
+            :loading="datasetSearchLoading"
+            placeholder="Search datasets"
+            class="file-picker-dataset-select"
+            popper-class="dataset-option-popper"
+            @update:model-value="onPickerDatasetChange"
+          >
+            <el-option v-for="d in datasetOptions" :key="d.content?.id" :label="d.content?.name" :value="d.content?.id">
+              <DatasetOptionRow :dataset="d" />
+            </el-option>
+          </el-select>
+          <span v-if="sourceDatasets[filePickerNodeId]" class="file-picker-dataset-note">Not the other inputs' dataset</span>
+          </template>
+        </div>
+        <div v-if="pickerDataset" class="file-picker-dataset-head">
+          <img :src="pickerDataset.banner || '/images/banner-placeholder.jpg'" alt="" />
+          <div>
+            <div class="file-picker-dataset-name">{{ pickerDataset.name }}</div>
+            <div v-if="pickerDataset.description" class="file-picker-dataset-desc">{{ pickerDataset.description }}</div>
+            <div class="file-picker-dataset-meta">{{ pickerDataset.meta }}</div>
+          </div>
+        </div>
         <div class="file-picker-header">
           <span class="selected-count">
             <strong>{{ fileCountForNode(filePickerNodeId) }}</strong>
             file{{ fileCountForNode(filePickerNodeId) !== 1 ? 's' : '' }} selected
+          </span>
+          <!-- Which files can be chosen: those the input takes, or any (the
+               check goes by file extension, so it can be wrong) -->
+          <span v-if="pickerTypes" class="file-picker-types">
+            <span class="file-picker-types-label">Show</span>
+            <el-radio-group v-model="pickerAllowOtherTypes" size="small">
+              <el-radio-button :value="false" :title="pickerDescription || sourcePicker.hint">{{ pickerTypes }} only</el-radio-button>
+              <el-radio-button :value="true" title="Choose any file; the app may not read it">Any file</el-radio-button>
+            </el-radio-group>
           </span>
         </div>
 
@@ -2198,15 +3356,25 @@ onUnmounted(() => {
               @navigate-breadcrumb="handleNavigateBreadcrumb"
             />
           </div>
-          <div class="files-table-container">
+          <p v-if="filePickerLoading" class="file-picker-empty">Loading files…</p>
+          <p v-else-if="!filePickerFiles.length" class="file-picker-empty">
+            {{ !sourceDatasetOf(filePickerNodeId)
+              ? "Choose a dataset to see its files."
+              : filePickerCurrentFile?.content?.id ? "This folder is empty." : `${datasetName(sourceDatasetOf(filePickerNodeId), datasetOptions)} has no files.` }}
+          </p>
+          <!-- Hidden, not removed, while there's nothing to list: the table
+               re-ticks chosen files when its list changes, so it stays mounted. -->
+          <div v-show="!filePickerLoading && filePickerFiles.length" class="files-table-container">
             <analysis-files-table
               :data="filePickerFiles"
+              :why-not="pickerWhyNot"
               :clear-selected-values="clearSelectedValues"
               @selection-change="onFileSelect"
               @click-file-label="onClickFileLabel"
             />
           </div>
         </div>
+        </template>
       </div>
       <template #footer>
         <bf-button class="secondary" @click="closeFilePicker">Done</bf-button>
@@ -2556,6 +3724,45 @@ onUnmounted(() => {
 </template>
 
 <style lang="scss">
+/* Dataset pickers' lists (appended to body, so not scoped): each dataset with
+   its banner and two lines under its name (DatasetOptionRow). */
+.dataset-option-popper {
+  min-width: 420px;
+  max-width: 560px;
+
+  .el-select-dropdown__item {
+    max-width: 560px;
+    overflow: hidden;
+    height: auto;
+    min-height: 34px;
+    line-height: normal;
+    padding: 2px 12px;
+  }
+}
+
+/* The run setup's compute node list (appended to body, so not scoped): as
+   wide as its field, each node's name with why it can't run this below it. */
+.setup-node-popper .el-select-dropdown__item {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  height: auto;
+  min-height: 34px;
+  padding: 6px 12px;
+  line-height: 1.3;
+  white-space: normal;
+
+  .setup-option-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .setup-option-why {
+    font-size: 11px;
+    font-weight: normal;
+    color: #999999; // theme.$gray_4
+  }
+}
 /* Unscoped styles for VueFlow handle rendering */
 @import "@vue-flow/core/dist/style.css";
 @import "@vue-flow/core/dist/theme-default.css";
@@ -2608,6 +3815,34 @@ onUnmounted(() => {
   overflow: hidden;
 }
 
+.info-banner {
+  padding: 10px 16px;
+  background: #EEF2FF;
+  border-bottom: 1px solid #C7D2FE;
+  color: #1E3A8A;
+  font-size: 13px;
+  line-height: 1.4;
+}
+.session-ending-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: #4B5563;
+}
+.session-ending-spinner {
+  width: 12px;
+  height: 12px;
+  border: 2px solid #C7D2FE;
+  border-top-color: #4F46E5;
+  border-radius: 50%;
+  animation: session-ending-spin 0.9s linear infinite;
+}
+@keyframes session-ending-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
 .error-banner {
   display: flex;
   align-items: center;
@@ -2873,22 +4108,27 @@ onUnmounted(() => {
   100% { box-shadow: 0 0 0 0 rgba(1, 31, 91, 0); }
 }
 
+/* The builder's cards: the strip on the left says what a step is (an app's
+   orange, a source's indigo, a target's slate; sources and targets have a
+   light tint too), the border how it's doing: grey, or cyan while it runs
+   and red when it failed. */
 .custom-node {
   position: relative;
   background: white;
   border: 1px solid theme.$gray_3;
-  border-radius: 2px;
-  padding: 14px;
-  min-width: 250px;
-  max-width: 350px;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+  border-radius: 4px;
+  padding: 8px 10px;
+  /* One size (NODE_WIDTH), as the layout places it, the same as the
+     builder's. */
+  box-sizing: border-box;
+  width: 280px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   transition: all 0.2s;
   cursor: pointer;
-  position: relative;
   text-align: left;
   z-index: 1;
 
-  &:hover { box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15); }
+  &:hover { box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15); }
 
   .node-header {
     display: flex;
@@ -2899,11 +4139,16 @@ onUnmounted(() => {
 
   .node-title {
     font-weight: 600;
-    font-size: 14px;
+    font-size: 15px;
     color: theme.$black;
     flex: 1;
+    min-width: 0;
     line-height: 1.3;
     text-align: left;
+    // One line; the full name on hover.
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .node-tags {
@@ -2911,13 +4156,68 @@ onUnmounted(() => {
     flex-wrap: wrap;
     align-items: center;
     gap: 4px;
-    margin-top: 6px;
+    margin-top: 4px;
+
+    &:empty {
+      display: none;
+    }
   }
+
+  // What a step is, as a strip on the left over the border (as on the
+  // compact cards); the border says its state (selected, a warning; on a
+  // run, running or failed). The kinds set --type-strip.
+  &::before {
+    content: "";
+    position: absolute;
+    top: -1px;
+    bottom: -1px;
+    left: -1px;
+    width: 5px;
+    border-radius: 4px 0 0 4px;
+    background: var(--type-strip, transparent);
+  }
+
+  &.app-step {
+    --type-strip: #{theme.$orange_2};
+  }
+
+  // Finished: a ✓ by the title, in place of a status badge.
+  // A dataset target's import, under its facts (runImports.js).
+  .node-import {
+    margin-top: 4px;
+    font-size: 11px;
+    color: theme.$gray_5;
+  }
+  .node-import--importing { color: #0e7490; }
+  .node-import--failed { color: theme.$status_red; font-weight: 600; }
+
+  .node-mark {
+    flex-shrink: 0;
+    font-size: 15px;
+    font-weight: 700;
+    line-height: 1;
+  }
+  .node-mark--done { color: theme.$status_green; }
+  .node-mark--failed { color: theme.$status_red; }
+  .node-mark--canceled { color: theme.$gray_4; }
 
   .node-tag-info {
     font-size: 10px;
     color: theme.$gray_4;
     white-space: nowrap;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  // Run time, resources and cost under a detailed card's badges.
+  .node-facts {
+    margin-top: 4px;
+    font-size: 11px;
+    color: theme.$gray_4;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .node-meta {
@@ -3007,28 +4307,26 @@ onUnmounted(() => {
   }
 
   &.gray-node { border-color: theme.$gray_4; }
-  &.blue-node { border-color: #06b6d4; }
-  &.blue-node.animate { animation: node-pulse 3s ease-in-out infinite; }
-  &.green-node { border-color: theme.$status_green; }
+  // Running: the type strip pulses; the card and its border stay still.
+  &.blue-node::before { animation: strip-pulse 1.6s ease-in-out infinite; }
+  // Succeeded: no colour, the ✓ by the title says it (graphStatusColor).
+  &.green-node { border-color: theme.$gray_3; }
   &.red-node { border-color: theme.$status_red; }
 
   &.data-source-node {
-    border-color: #6366f1;
+    --type-strip: #6366f1;
     background: #eef2ff;
 
-    &.has-files { border-color: theme.$status_green; }
-    &.green-node { border-color: theme.$status_green; }
+    &.green-node { border-color: theme.$gray_3; }
     &.red-node { border-color: theme.$status_red; }
-    &.blue-node { border-color: #06b6d4; }
   }
 
   &.data-target-node {
+    --type-strip: #64748b;
     background: #f1f5f9;
-    border-color: #64748b;
 
-    &.green-node { border-color: theme.$status_green; }
+    &.green-node { border-color: theme.$gray_3; }
     &.red-node { border-color: theme.$status_red; }
-    &.blue-node { border-color: #06b6d4; }
 
     .node-body {
       margin-top: 6px;
@@ -3056,17 +4354,66 @@ onUnmounted(() => {
     padding: 2px 8px;
     border-radius: 4px;
     flex-shrink: 0;
-
-    &.source-badge { background: #6366f1; color: white; }
-    &.target-badge { background: #64748b; color: white; }
-    &.exec-badge { background: rgba(5, 150, 105, 0.12); color: #047857; }
   }
 }
 
-@keyframes node-pulse {
-  0% { background: #f8faff; box-shadow: 0 0 6px rgba(6, 182, 212, 0.3); }
-  50% { background: #e0f7fa; box-shadow: 0 0 18px rgba(6, 182, 212, 0.5); }
-  100% { background: #f8faff; box-shadow: 0 0 6px rgba(6, 182, 212, 0.3); }
+@keyframes strip-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.25; }
+}
+
+/* Chosen files a source's inputs don't take, in its panel. */
+.files-mismatch {
+  margin: 0 0 8px;
+  padding: 8px 10px;
+  border-radius: 4px;
+  background: #fef3c7;
+  font-size: 12px;
+  line-height: 1.4;
+  color: #92400e;
+}
+.selected-file-unchecked {
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
+  margin-left: 4px;
+  border: 1px solid theme.$gray_3;
+  border-radius: 50%;
+  font-size: 11px;
+  line-height: 14px;
+  text-align: center;
+  color: theme.$gray_4;
+  cursor: help;
+}
+.selected-file-item.is-mismatch .selected-file-name {
+  color: #b45309;
+  font-weight: 600;
+}
+
+/* A dataset import's failed files, in the target's panel. */
+.import-failed {
+  color: theme.$status_red;
+  font-weight: 600;
+}
+.import-failures {
+  margin: 6px 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 12px;
+
+  li {
+    display: flex;
+    flex-direction: column;
+    padding: 4px 0;
+    border-top: 1px solid theme.$gray_2;
+  }
+}
+.import-failure-path {
+  color: theme.$gray_6;
+  word-break: break-all;
+}
+.import-failure-message {
+  color: theme.$gray_5;
 }
 
 /* Status dots */
@@ -3098,6 +4445,14 @@ onUnmounted(() => {
 
 .new-workflow-btn { width: 100%; }
 .sidebar-accordion { border-top: none; }
+
+.results-card {
+  .results-hint {
+    margin: 0;
+    font-size: 13px;
+    color: theme.$gray_4;
+  }
+}
 
 .sidebar-section-title {
   margin: 10px 0 6px 0;
@@ -3229,6 +4584,105 @@ onUnmounted(() => {
   &:hover { text-decoration: underline; }
 }
 
+.setup-select {
+  width: 100%;
+}
+
+.file-picker-dataset {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  font-size: 13px;
+
+  label {
+    font-weight: 500;
+    color: theme.$gray_6;
+  }
+}
+.file-picker-dataset-head {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 12px;
+  padding: 8px;
+  border: 1px solid theme.$gray_2;
+  border-radius: 4px;
+
+  img {
+    width: 64px;
+    height: 64px;
+    object-fit: cover;
+  }
+}
+.file-picker-dataset-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: theme.$gray_6;
+}
+.file-picker-dataset-desc {
+  font-size: 12px;
+  color: theme.$gray_5;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.file-picker-dataset-meta {
+  margin-top: 2px;
+  font-size: 11px;
+  color: theme.$gray_4;
+}
+/* An output this run doesn't save, or an optional input it leaves out: on
+   the graph still, faded and dashed. */
+.is-off {
+  :deep(.custom-node),
+  :deep(.cfn) {
+    opacity: 0.55;
+    border-style: dashed !important;
+  }
+}
+.node-off-toggle {
+  position: absolute;
+  right: 8px;
+  bottom: -22px;
+  padding: 1px 8px;
+  border: 1px solid theme.$gray_3;
+  border-radius: 3px;
+  background: theme.$white;
+  font: inherit;
+  font-size: 11px;
+  color: theme.$gray_5;
+  cursor: pointer;
+
+  &:hover {
+    border-color: theme.$purple_1;
+    color: theme.$purple_2;
+  }
+}
+.file-picker-types {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+.file-picker-types-label {
+  font-weight: 500;
+  color: theme.$gray_6;
+}
+.file-picker-empty {
+  margin: 16px 0;
+  font-size: 13px;
+  color: theme.$gray_4;
+}
+.file-picker-dataset-select {
+  width: 320px;
+}
+.file-picker-dataset-note {
+  font-size: 12px;
+  color: theme.$gray_4;
+}
+
 .configure-hint {
   font-size: 13px;
   color: theme.$gray_4;
@@ -3247,6 +4701,10 @@ onUnmounted(() => {
   color: theme.$gray_4;
   text-transform: none;
   letter-spacing: 0;
+}
+.info-row-stacked > .info-label-hint {
+  font-size: 12px;
+  line-height: 1.4;
 }
 
 .run-name-input {
@@ -3346,6 +4804,16 @@ onUnmounted(() => {
     line-height: 1;
     flex-shrink: 0;
   }
+}
+
+.target-type-missing {
+  margin: 0 0 12px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: #fef3c7;
+  color: #92400e;
+  font-size: 12px;
+  line-height: 1.4;
 }
 
 .target-param {
@@ -3597,7 +5065,7 @@ onUnmounted(() => {
   text-transform: uppercase;
   letter-spacing: 0.5px;
   padding: 2px 8px;
-  border-radius: 10px;
+  border-radius: 3px;
   white-space: nowrap;
 
   &.lambda {
@@ -3681,6 +5149,8 @@ onUnmounted(() => {
 }
 
 .file-picker-header {
+  display: flex;
+  align-items: center;
   margin-bottom: 12px;
 
   .selected-count {
@@ -3781,5 +5251,13 @@ onUnmounted(() => {
   display: flex;
   justify-content: flex-end;
   gap: 8px;
+}
+.file-picker-side {
+  margin-bottom: 12px;
+}
+.file-picker-hint {
+  margin: 0 0 8px;
+  font-size: 13px;
+  color: #6b7280;
 }
 </style>

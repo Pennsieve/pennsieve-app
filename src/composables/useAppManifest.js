@@ -60,7 +60,10 @@ export function useAppManifest() {
     let parsed = null;
     try {
       const detail = await store.dispatch("analysisModule/fetchApplication", uuid);
-      parsed = parseManifestText(getManifestAsset(detail?.assets));
+      const raw = getManifestAsset(detail?.assets);
+      parsed = parseManifestText(raw);
+      // The text itself, for showing app.yml as written.
+      if (parsed) parsed.raw = raw;
     } catch (err) {
       // A failed lookup is cached too — the caller falls back to defaults, and
       // retrying on every drop would just repeat the failure.

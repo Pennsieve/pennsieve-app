@@ -18,10 +18,13 @@ import {
   manifestToYaml,
   serializeManifestYaml,
   parseManifest,
+  mediaTypeMatches,
   createPort,
   MANIFEST_SHAPES,
   detectManifestShape,
+  isEarlierLayout,
 } from './applicationSchema'
+import { dump as dumpYaml, load as loadYaml } from 'js-yaml'
 
 describe('applicationSchema', () => {
   describe('parseParameters', () => {
@@ -89,12 +92,13 @@ describe('applicationSchema', () => {
       expect(explicit.required).toBe(false)
     })
 
-    it('reads the legacy `allowedValues` / `default` keys', () => {
+    it('reads only `validValues` / `defaultValue`, not the earlier `allowedValues` / `default` / `enum`', () => {
       const [p] = parseParameters({
-        paramSchema: [{ name: 'algo', allowedValues: ['a'], default: 'a' }],
+        paramSchema: [{ name: 'algo', type: 'enum', allowedValues: ['a'], default: 'a' }],
       })
-      expect(p.validValues).toEqual(['a'])
-      expect(p.defaultValue).toBe('a')
+      expect(p.validValues).toEqual([])
+      expect(p.defaultValue).toBeNull()
+      expect(p.type).toBe(PARAM_TYPES.STRING)
     })
   })
 
@@ -112,6 +116,7 @@ describe('applicationSchema', () => {
         tags: ['mri'],
         categories: ['Segmentation'],
       })
+      // Categories aren't part of the schema: tags say what an app is for.
       expect(schema.resources).toEqual({ cpu: 1024, memory: 2048 })
       // "ecs" is mapped to "standard", and a legacy gpu block becomes the
       // "gpu" compute type rather than a capability of its own.
@@ -120,7 +125,7 @@ describe('applicationSchema', () => {
       expect(schema.inputs[0]).toMatchObject({ name: 'in', dataType: 'file', required: true })
       expect(schema.outputs[0]).toMatchObject({ name: 'out', dataType: 'package' })
       expect(schema.tags).toEqual(['mri'])
-      expect(schema.categories).toEqual(['Segmentation'])
+      expect(schema).not.toHaveProperty('categories')
     })
 
     it('defaults gracefully for a bare application', () => {
@@ -170,7 +175,7 @@ describe('applicationSchema', () => {
       expect(payload.runtimeConfig).not.toHaveProperty('gpu')
     })
 
-    it('drops empty inputs/outputs/tags/categories', () => {
+    it('drops empty inputs/outputs/tags', () => {
       const payload = buildSchemaPayload(createApplicationSchema())
       expect(payload.inputs).toBeUndefined()
       expect(payload.tags).toBeUndefined()
@@ -470,13 +475,13 @@ describe('applicationSchema', () => {
   })
 
   describe('buildManifest', () => {
-    it('emits the version and metadata under `application`, with no $schema', () => {
+    it('emits the version and metadata under `application`, pointing at the published schema', () => {
       const m = buildManifest(createApplicationSchema(), {
         name: 'My App',
         description: 'Does things.',
         applicationType: 'processor',
       })
-      expect(m).not.toHaveProperty('$schema')
+      expect(m.$schema).toBe('https://schemas.pennsieve.io/app-manifest/v1.json')
       expect(m.schemaVersion).toBe('1.0')
       expect(m.application).toEqual({
         name: 'My App',
@@ -611,29 +616,47 @@ describe('applicationSchema', () => {
   })
 
   describe('parseManifest (round-trip)', () => {
-    it('parses YAML text back into meta + editable schema', () => {
+    it('reports an app.yml in the earlier flat layout and reads nothing from it', () => {
       const yaml = [
         'schemaVersion: "1.0"',
         'name: Spike Sorter',
         'description: Sorts spikes.',
-        'applicationType: preprocessor',
+        'applicationType: processor',
         'categories:',
         '  - Preprocessing',
-        'runtime:',
-        '  computeTypes:',
-        '    - standard',
-        '  gpu:',
-        '    enabled: true',
-        '    count: 2',
-        '    type: nvidia-t4',
         'resources:',
         '  cpu: 4096',
         '  memory: 16384',
         'parameters:',
         '  - name: threshold',
         '    type: number',
-        '    required: true',
         '    default: 5',
+      ].join('\n')
+
+      const { meta, schema } = parseManifest(yaml)
+      expect(meta).toMatchObject({ name: '', description: '', shape: MANIFEST_SHAPES.FLAT })
+      expect(isEarlierLayout(loadYaml(yaml))).toBe(true)
+      expect(schema).toEqual(createApplicationSchema())
+    })
+
+    it('reads a nested app.yml: metadata under application, cpu/memory and a legacy gpu block on runtime', () => {
+      const yaml = [
+        'application:',
+        '  name: Spike Sorter',
+        '  description: Sorts spikes.',
+        '  type: preprocessor',
+        'runtime:',
+        '  cpu: 4096',
+        '  memory: 16384',
+        '  computeTypes:',
+        '    - standard',
+        '  gpu:',
+        '    enabled: true',
+        'parameters:',
+        '  - name: threshold',
+        '    type: number',
+        '    required: true',
+        '    defaultValue: 5',
         '    min: 1',
         '    max: 20',
         'inputs:',
@@ -648,26 +671,13 @@ describe('applicationSchema', () => {
         description: 'Sorts spikes.',
         // `processor` is the only supported type, so any other value normalizes.
         applicationType: 'processor',
-        shape: MANIFEST_SHAPES.FLAT,
+        shape: MANIFEST_SHAPES.NESTED,
       })
       expect(schema.resources).toEqual({ cpu: 4096, memory: 16384 })
-      // The legacy gpu block folds into the compute types.
+      // The (deprecated, still allowed) gpu block folds into the compute types.
       expect(schema.runtime.computeTypes).toEqual(['standard', 'gpu'])
-      expect(schema.categories).toEqual(['Preprocessing'])
-      // Manifest `default` maps back onto the editable `defaultValue`.
-      expect(schema.parameters[0]).toMatchObject({
-        name: 'threshold',
-        type: 'number',
-        required: true,
-        defaultValue: 5,
-        min: 1,
-        max: 20,
-      })
-      expect(schema.inputs[0]).toMatchObject({
-        name: 'recording',
-        dataType: 'timeseries',
-        required: true,
-      })
+      expect(schema.parameters[0]).toMatchObject({ name: 'threshold', type: 'number', required: true, defaultValue: 5, min: 1, max: 20 })
+      expect(schema.inputs[0]).toMatchObject({ name: 'recording', dataType: 'timeseries', required: true })
     })
 
     it('round-trips serialize -> parse without loss of meaningful fields', () => {
@@ -685,7 +695,6 @@ describe('applicationSchema', () => {
         inputs: [createPort({ name: 'recording', dataType: 'timeseries', required: true })],
         outputs: [createPort({ name: 'units', dataType: 'package' })],
         tags: ['ephys'],
-        categories: ['Preprocessing'],
       })
       const meta = { name: 'Spike Sorter', description: 'Sorts spikes.', applicationType: 'processor' }
 
@@ -700,7 +709,7 @@ describe('applicationSchema', () => {
     })
 
     it('accepts an already-parsed object and falls back to defaults on partial input', () => {
-      const { meta, schema } = parseManifest({ name: 'Only A Name' })
+      const { meta, schema } = parseManifest({ application: { name: 'Only A Name' } })
       expect(meta).toMatchObject({
         name: 'Only A Name',
         description: '',
@@ -779,7 +788,7 @@ describe('applicationSchema', () => {
         timeoutSeconds: 300,
         shape: MANIFEST_SHAPES.NESTED,
       })
-      expect(meta.maintainers).toEqual([{ name: 'edmore', email: '' }])
+      expect(meta.maintainers).toEqual([{ name: 'edmore', email: '', orcid: '' }])
     })
 
     it('reads cpu/memory off `runtime` rather than `resources`', () => {
@@ -830,8 +839,8 @@ describe('applicationSchema', () => {
   */
   describe('canonical parameter form', () => {
     const CANONICAL = [
-      'schemaVersion: "1.0"',
-      'name: Demo',
+      'application:',
+      '  name: Demo',
       'parameters:',
       '  - name: threshold',
       '    type: number',
@@ -947,3 +956,83 @@ describe('applicationSchema', () => {
     })
   })
 })
+
+describe('live sessions (runtime.interactive / sessionType)', () => {
+  it('writes them only for a live session, with a session type', () => {
+    const batch = buildManifest(createApplicationSchema(), { name: 'a' })
+    expect(batch.runtime).not.toHaveProperty('interactive')
+    expect(batch.runtime).not.toHaveProperty('sessionType')
+
+    const live = createApplicationSchema()
+    live.runtime.interactive = true
+    expect(buildManifest(live, { name: 'a' }).runtime).toMatchObject({ interactive: true, sessionType: 'jupyter', kernel: 'python' })
+    live.runtime.kernel = 'r'
+    expect(buildManifest(live, { name: 'a' }).runtime).toMatchObject({ interactive: true, sessionType: 'jupyter', kernel: 'r' })
+  })
+
+  it('reads them back as written; an earlier sessionType r is not turned into jupyter + r', () => {
+    const read = (runtime) => parseManifest(dumpYaml({ application: { name: 'a' }, runtime })).schema.runtime
+    expect(read({ interactive: true })).toMatchObject({ interactive: true, sessionType: 'jupyter', kernel: 'python' })
+    expect(read({ interactive: true, sessionType: 'jupyter', kernel: 'r' })).toMatchObject({ sessionType: 'jupyter', kernel: 'r' })
+    expect(read({ sessionType: 'r' })).toMatchObject({ interactive: true, sessionType: 'r', kernel: '' })
+    expect(read({ computeTypes: ['standard'] })).toMatchObject({ interactive: false, sessionType: '', kernel: '' })
+  })
+})
+
+describe('whole-number parameters', () => {
+  it('reads and writes type: integer', () => {
+    const { schema } = parseManifest({
+      application: { name: 'n' },
+      parameters: [{ name: 'SIZE', type: 'integer', defaultValue: '256', min: 1, max: 4096 }],
+    })
+    expect(schema.parameters[0].type).toBe('integer')
+    const out = buildManifest(schema, { name: 'n' })
+    expect(out.parameters[0]).toMatchObject({ name: 'SIZE', type: 'integer', min: 1, max: 4096 })
+  })
+  it('rejects a fractional value', () => {
+    expect(validateParameterValue({ name: 'SIZE', type: 'integer' }, '2.5').valid).toBe(false)
+    expect(validateParameterValue({ name: 'SIZE', type: 'integer' }, '3').valid).toBe(true)
+  })
+})
+
+describe('media type options', () => {
+  const formats = [
+    { value: 'application/x-hdf5', label: 'application/x-hdf5', name: 'HDF5', extensions: ['.h5'] },
+    { value: 'application/x-hdf5', label: 'application/x-hdf5', name: 'NeuroData Without Borders', extensions: ['.nwb'] },
+    { value: 'application/vnd.pennsieve.edf', label: 'application/vnd.pennsieve.edf', name: 'EDF Timeseries', extensions: ['.edf'] },
+  ]
+  it('names every format that shares a media type, and finds them by name or extension', () => {
+    const opts = portDataTypeOptions(formats)
+    const hdf5 = opts.find((o) => o.value === 'application/x-hdf5')
+    expect(hdf5.formats).toEqual(['HDF5', 'NeuroData Without Borders'])
+    expect(opts.filter((o) => o.value === 'application/x-hdf5')).toHaveLength(1)
+    expect(mediaTypeMatches(hdf5, 'nwb')).toBe(true)
+    expect(mediaTypeMatches(hdf5, '.h5')).toBe(true)
+    expect(mediaTypeMatches(opts.find((o) => o.value.endsWith('edf')), 'nwb')).toBe(false)
+  })
+})
+
+describe('EDAM from the media type', () => {
+  it("gives an option the formats' EDAM id only when all formats sharing it agree", () => {
+    const opts = portDataTypeOptions([
+      { value: 'text/csv', label: 'text/csv', name: 'CSV', edam: 'format_3752' },
+      { value: 'application/x-hdf5', label: 'application/x-hdf5', name: 'HDF5', edam: 'format_3590' },
+      { value: 'application/x-hdf5', label: 'application/x-hdf5', name: 'NeuroData Without Borders' },
+      { value: 'application/vnd.pennsieve.edf', label: 'application/vnd.pennsieve.edf', name: 'EDF Timeseries' },
+    ])
+    const by = (v) => opts.find((o) => o.value === v)
+    expect(by('text/csv').edam).toBe('format_3752')
+    expect(by('application/x-hdf5').edam).toBeUndefined()
+    expect(by('application/vnd.pennsieve.edf').edam).toBeUndefined()
+    expect(mediaTypeMatches(by('text/csv'), 'format_3752')).toBe(true)
+  })
+  it('keeps formats an app.yml declares through a round trip', () => {
+    const { schema } = parseManifest({
+      application: { name: 'n' },
+      inputs: [{ name: 'table', mediaTypes: ['text/csv'], formats: ['format_3752', 'format_3475'] }],
+    })
+    const out = buildManifest(schema, { name: 'n' })
+    expect(out.inputs[0].formats).toEqual(['format_3752', 'format_3475'])
+  })
+})
+

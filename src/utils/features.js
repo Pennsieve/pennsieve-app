@@ -10,6 +10,10 @@ export const FEATURE_DEFAULTS = Object.freeze({
   // "Open with Office 365": Microsoft's public Office viewer fetches the file
   // from a signed link. Off where files may hold ePHI (POAM-074).
   office365Viewer: true,
+  // The workflow builder saves inputs and outputs (a workflow's interface)
+  // instead of data-source and data-target nodes. On only where
+  // workflow-service supports them (Pennsieve/workflow-service#103).
+  workflowInterface: false,
 })
 
 export function resolveFeatures(features = {}) {

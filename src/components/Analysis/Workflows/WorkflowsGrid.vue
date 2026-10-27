@@ -1,18 +1,55 @@
 <script setup>
 import { computed, ref, watch, onMounted } from "vue";
+import { interfaceDag } from "../RunMonitor/workflowInterface";
 import { useStore } from "vuex";
-import { useRouter } from "vue-router";
+import { useRouter, useRoute } from "vue-router";
 
 import BfButton from "../../shared/bf-button/BfButton.vue";
 import IconAnalysis from "../../icons/IconAnalysis.vue";
 import IconPennsieveMark from "../../icons/IconPennsieveMark.vue";
+import WorkflowThumbnail from "../WorkflowGraph/WorkflowThumbnail.vue";
+import RunWizardDialog from "../RunMonitor/RunWizardDialog.vue";
+import { ioSummary, appNames, usageLine, cardText } from "./workflowSummary";
+import { applyFilters, libraryWorkflows, outputOptions, sortWorkflows, SORTS } from "./galleryFilter";
+
+defineProps({
+  // Inside the Workflows tab's Library, whose bar has the New Workflow button.
+  embedded: { type: Boolean, default: false },
+});
 
 const store = useStore();
 const router = useRouter();
+const route = useRoute();
+
+// Shown in a workspace (/:orgId/analysis/workflows) and in My Workspace
+// (/my-workspace/analysis/workflows), where "mine" is the user's own workflows
+// made outside any workspace.
+const isMyWorkspace = computed(() => !route.params.orgId);
 
 const searchQuery = ref("");
 const statusFilter = ref("active");
-const scopeFilter = ref("workspace"); // "workspace" | "public"
+const scopeFilter = ref("workspace"); // "workspace" | "public" | "pennsieve" (public, official only)
+const inputFilter = ref("any"); // "any" | "dataset" | "none"
+const outputFilter = ref("any"); // "any" | a target type
+
+// The sort is the viewer's, kept in this browser.
+const SORT_KEY = "pennsieve.gallery.workflowSort";
+const storedSort = () => {
+  try {
+    const v = localStorage.getItem(SORT_KEY);
+    return SORTS.some((o) => o.value === v) ? v : "recommended";
+  } catch {
+    return "recommended";
+  }
+};
+const sortBy = ref(storedSort());
+watch(sortBy, (v) => {
+  try {
+    localStorage.setItem(SORT_KEY, v);
+  } catch {
+    // not remembered; it still applies now
+  }
+});
 const pageSize = ref(10);
 const currentPage = ref(1);
 const isLoadingAll = ref(false);
@@ -20,6 +57,9 @@ const isLoadingAll = ref(false);
 const workflows = computed(
   () => store.state.analysisModule.workflows || []
 );
+// What the cards name: target types (outputs) and applications (steps).
+const targetTypes = computed(() => store.getters["analysisModule/targetTypes"] || []);
+const applications = computed(() => store.getters["analysisModule/applications"] || []);
 const nextCursor = computed(
   () => store.state.analysisModule.workflowsNextCursor || ""
 );
@@ -30,27 +70,39 @@ const filterOptions = [
   { label: "All", value: "all" },
 ];
 
-const scopeOptions = [
-  { label: "This workspace", value: "workspace" },
+const scopeOptions = computed(() => [
+  { label: isMyWorkspace.value ? "My workflows" : "This workspace", value: "workspace" },
   { label: "Public", value: "public" },
-];
+  { label: "Pennsieve", value: "pennsieve" },
+]);
 
-const isPublicScope = computed(() => scopeFilter.value === "public");
+// Pennsieve's are the public ones it has reviewed (official).
+const isPublicScope = computed(() => scopeFilter.value !== "workspace");
 
-const filteredWorkflows = computed(() => {
-  let list = [...workflows.value];
-  const q = searchQuery.value.trim().toLowerCase();
-  if (q) {
-    list = list.filter((wf) => {
-      const name = (wf.name || "").toLowerCase();
-      const desc = (wf.description || "").toLowerCase();
-      return name.includes(q) || desc.includes(q);
-    });
-  }
-  return list.sort(
-    (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
-  );
-});
+const outputChoices = computed(() => outputOptions(workflows.value, targetTypes.value));
+const filtersSet = computed(
+  () => !!searchQuery.value.trim() || inputFilter.value !== "any" || outputFilter.value !== "any"
+);
+function clearFilters() {
+  searchQuery.value = "";
+  inputFilter.value = "any";
+  outputFilter.value = "any";
+}
+
+const filteredWorkflows = computed(() =>
+  sortWorkflows(
+    applyFilters(libraryWorkflows(workflows.value), {
+      query: searchQuery.value,
+      input: inputFilter.value,
+      output: outputFilter.value,
+      officialOnly: scopeFilter.value === "pennsieve",
+      applications: applications.value,
+      targetTypes: targetTypes.value,
+    }),
+    sortBy.value,
+    { applications: applications.value }
+  )
+);
 
 const paginatedWorkflows = computed(() => {
   const start = (currentPage.value - 1) * pageSize.value;
@@ -65,26 +117,8 @@ watch(filteredWorkflows, () => {
   currentPage.value = 1;
 });
 
-const getWorkflowMetrics = (wf) => {
-  const m = wf.metrics;
-  if (!m || !m.totalRuns) return null;
-  return m;
-};
 
-const formatDuration = (v) => {
-  if (v == null) return "--";
-  if (v < 1) return `${(v * 1000).toFixed(0)}ms`;
-  if (v < 60) return `${v.toFixed(1)}s`;
-  if (v < 3600) return `${(v / 60).toFixed(1)}m`;
-  return `${(v / 3600).toFixed(1)}h`;
-};
 
-const formatCost = (v) => {
-  if (v == null) return "--";
-  if (v < 0.01) return `$${v.toFixed(4)}`;
-  if (v < 1) return `$${v.toFixed(3)}`;
-  return `$${v.toFixed(2)}`;
-};
 
 const formatRelativeTime = (dateString) => {
   if (!dateString) return null;
@@ -140,11 +174,16 @@ const lastRunStatusKey = (status, successRate) => {
 };
 
 const goToCreate = () => {
-  router.push({ name: "workflow-create" });
+  // The Workflows tab's Builder view.
+  router.push({ name: isMyWorkspace.value ? "my-workflows" : "workflows", query: { view: "builder" } });
 };
+defineExpose({ goToCreate });
 
 const goToDetail = (wf) => {
-  router.push({ name: "workflow-detail", params: { uuid: wf.uuid } });
+  router.push({
+    name: isMyWorkspace.value ? "my-workflow-detail" : "workflow-detail",
+    params: { uuid: wf.uuid },
+  });
 };
 
 const getStatusParam = () => {
@@ -182,21 +221,29 @@ const fetchAllWorkflows = async () => {
   }
 };
 
+
+// Run from a card: the run dialog, here, on this workflow (notebooks aren't
+// listed; they start on the Notebooks tab).
+const runDialog = ref(null);
+const runWorkflow = (wf) => runDialog.value?.open(wf.uuid);
+
 // Re-fetch all when the status or scope filter changes
-watch([statusFilter, scopeFilter], () => {
+watch([statusFilter, isPublicScope], () => {
   currentPage.value = 1;
   fetchAllWorkflows();
 });
 
 onMounted(async () => {
+  store.dispatch("analysisModule/fetchTargetTypes").catch(() => {});
+  store.dispatch("analysisModule/fetchApplications").catch(() => {});
   await fetchAllWorkflows();
 });
 </script>
 
 <template>
   <div class="workflows-container">
-    <!-- Info Section -->
-    <div class="info-section">
+    <!-- Info Section (the Workflows tab has its own toolbar) -->
+    <div v-if="!embedded" class="info-section">
       <div class="info-card">
         <h3>Compute Workflows</h3>
         <p>
@@ -212,141 +259,109 @@ onMounted(async () => {
 
     <!-- Workflows Section -->
     <div class="workflows-section">
-      <div class="workflows-section-header">
-        <h3>Workflows</h3>
+      <!-- Search over the filters, as wide as them; sort and status on the right -->
+      <div class="list-toolbar">
         <el-input
-          v-if="workflows.length > 0"
           v-model="searchQuery"
-          placeholder="Search workflows..."
-          size="default"
+          placeholder="Search by name, app, input or output…"
           clearable
-          class="workflows-search-input"
+          class="workflows-search-input toolbar-search"
         />
-      </div>
+        <label class="sort-control toolbar-sort">
+          Sort
+          <el-select v-model="sortBy" size="small" class="sort-select">
+            <el-option v-for="o in SORTS" :key="o.value" :label="o.label" :value="o.value" />
+          </el-select>
+        </label>
 
-      <div class="filter-row">
-        <div class="status-buttons scope-buttons">
-          <button
-            v-for="option in scopeOptions"
-            :key="option.value"
-            class="filter-btn"
-            :class="{ active: scopeFilter === option.value }"
-            @click="scopeFilter = option.value"
-          >
-            {{ option.label }}
-          </button>
+        <div class="filter-row toolbar-filters">
+          <div class="status-buttons scope-buttons">
+            <button
+              v-for="option in scopeOptions"
+              :key="option.value"
+              class="filter-btn"
+              :class="{ active: scopeFilter === option.value }"
+              @click="scopeFilter = option.value"
+            >
+              {{ option.label }}
+            </button>
+          </div>
+
+          <el-select v-model="inputFilter" size="small" class="io-select" aria-label="Input">
+            <el-option label="Any input" value="any" />
+            <el-option label="Takes a dataset" value="dataset" />
+            <el-option label="No input" value="none" />
+          </el-select>
+          <el-select v-model="outputFilter" size="small" class="io-select" aria-label="Output">
+            <el-option label="Any output" value="any" />
+            <el-option v-for="o in outputChoices" :key="o.value" :label="o.label" :value="o.value" />
+          </el-select>
         </div>
 
-        <div class="status-buttons">
-          <button
-            v-for="option in filterOptions"
-            :key="option.value"
-            class="filter-btn"
-            :class="{ active: statusFilter === option.value }"
-            @click="statusFilter = option.value"
-          >
-            {{ option.label }}
-          </button>
-        </div>
+        <el-select v-model="statusFilter" size="small" class="status-select toolbar-status" aria-label="Status">
+          <el-option v-for="option in filterOptions" :key="option.value" :label="option.label" :value="option.value" />
+        </el-select>
       </div>
 
-      <p v-if="isPublicScope" class="scope-hint">
+      <p v-if="scopeFilter === 'pennsieve'" class="scope-hint">
+        Workflows Pennsieve has reviewed and validated. They can be run from any workspace.
+      </p>
+      <p v-else-if="isPublicScope" class="scope-hint">
         Public workflows published across all workspaces. They can be run from
         any workspace; only the creator can edit or unpublish them.
       </p>
 
       <div v-if="filteredWorkflows.length > 0" class="workflows-grid">
+        <!-- A card: the graph on the left; what it is, does and runs on the
+             right; Open and Run. -->
         <div
           v-for="wf in paginatedWorkflows"
           :key="wf.uuid"
           class="wf-card"
+          :class="{ 'is-inactive': !wf.isActive }"
+          role="link"
+          tabindex="0"
           @click="goToDetail(wf)"
+          @keydown.enter="goToDetail(wf)"
         >
-          <div class="wf-header">
-            <div class="wf-info">
-              <h3>
-                <button
-                  type="button"
-                  class="wf-name-link"
-                  @click.stop="goToDetail(wf)"
-                >
-                  {{ wf.name }}
-                </button>
-              </h3>
-              <div class="wf-subtitle">Workflow</div>
-              <div v-if="wf.description" class="wf-description">
-                {{ wf.description }}
-              </div>
-              <div class="wf-tags">
-                <span
-                  class="tag"
-                  :class="wf.isActive ? 'active' : 'inactive'"
-                >
-                  {{ wf.isActive ? 'Active' : 'Inactive' }}
-                </span>
-                <span class="tag nodes">
-                  {{ (wf.dag || []).length }} nodes
-                </span>
-                <span class="tag created">
-                  {{ new Date(wf.createdAt).toLocaleDateString() }}
-                </span>
-                <span v-if="wf.visibility === 'public'" class="tag public">
-                  Public
-                </span>
-                <el-tooltip
-                  v-if="wf.official"
-                  content="This workflow has been reviewed and validated by Pennsieve."
-                  placement="top"
-                >
-                  <span class="official-mark" @click.stop>
-                    <IconPennsieveMark :width="14" :height="14" color="currentColor" />
-                  </span>
-                </el-tooltip>
-              </div>
-            </div>
-
-            <div
-              class="last-run-pill"
-              :class="lastRunInfo(wf).statusKey"
-            >
-              <span class="last-run-dot" />
-              {{ lastRunInfo(wf).label }}
-            </div>
+          <div class="wf-thumb">
+            <WorkflowThumbnail :dag="interfaceDag(wf)" :aspect="1" />
           </div>
-
-          <div class="wf-card-actions">
-            <div v-if="getWorkflowMetrics(wf)" class="wf-metrics">
-              <span class="metric-item">
-                <span class="metric-value">
-                  {{ getWorkflowMetrics(wf).totalRuns }}
+          <div class="wf-body">
+            <div class="wf-title">
+              <span class="wf-name">{{ wf.name }}</span>
+              <el-tooltip
+                v-if="wf.official"
+                content="Reviewed and validated by Pennsieve."
+                placement="top"
+              >
+                <span class="official-mark" @click.stop>
+                  <IconPennsieveMark :width="14" :height="14" color="currentColor" />
                 </span>
-                <span class="metric-label">runs</span>
-              </span>
-              <span class="metric-divider" />
-              <span class="metric-item">
-                <span class="metric-value">
-                  {{ Math.round(getWorkflowMetrics(wf).successRate) }}%
-                </span>
-                <span class="metric-label">success</span>
-              </span>
-              <span class="metric-divider" />
-              <span class="metric-item">
-                <span class="metric-value">
-                  {{ formatDuration(getWorkflowMetrics(wf).avgDurationSec) }}
-                </span>
-                <span class="metric-label">avg duration</span>
+              </el-tooltip>
+              <span v-if="!wf.isActive" class="wf-badge">Inactive</span>
+              <span v-else-if="wf.visibility === 'public' && !wf.official" class="wf-badge">Public</span>
+            </div>
+            <p class="wf-description">{{ cardText(wf) || "No description." }}</p>
+            <div class="wf-io">{{ ioSummary(wf, targetTypes) }}</div>
+            <div v-if="appNames(wf, applications).length" class="wf-apps">
+              <span v-for="name in appNames(wf, applications).slice(0, 3)" :key="name" class="wf-app">{{ name }}</span>
+              <span v-if="appNames(wf, applications).length > 3" class="wf-app wf-app--more">
+                +{{ appNames(wf, applications).length - 3 }}
               </span>
             </div>
-            <span v-else class="empty-footer-text">No runs to report</span>
-
-            <button
-              type="button"
-              class="card-action-link"
-              @click.stop="goToDetail(wf)"
-            >
-              <span>View details</span>
-              <span class="arrow">&rarr;</span>
-            </button>
+            <div class="wf-foot">
+              <span class="wf-usage">
+                <span class="last-run-dot" :class="lastRunInfo(wf).statusKey" />
+                <span class="wf-usage-text">{{ usageLine(wf, formatRelativeTime) }}</span>
+              </span>
+              <span class="wf-actions" @click.stop>
+                <button type="button" class="wf-action" @click="goToDetail(wf)">Open</button>
+                <button v-if="wf.isActive" type="button" class="wf-action wf-action--run" @click="runWorkflow(wf)">
+                  ▶ Run
+                </button>
+              </span>
+            </div>
           </div>
         </div>
       </div>
@@ -354,12 +369,16 @@ onMounted(async () => {
       <div v-else class="empty-state">
         <IconAnalysis :width="48" :height="48" color="#9ca3af" />
         <span v-if="isLoadingAll">Loading workflows...</span>
-        <span v-else-if="workflows.length === 0">No workflows yet</span>
+        <template v-else-if="workflows.length === 0">
+          <span>No workflows yet</span>
+          <button type="button" class="clear-filters" @click="router.replace({ query: { ...route.query, view: 'builder' } })">Build one in the Builder</button>
+        </template>
         <span v-else-if="searchQuery">
           No workflows match
           <strong>"{{ searchQuery }}"</strong>
         </span>
         <span v-else>No workflows match your filters</span>
+        <button v-if="filtersSet" type="button" class="clear-filters" @click="clearFilters">Clear search and filters</button>
       </div>
 
       <el-pagination
@@ -373,6 +392,7 @@ onMounted(async () => {
         @current-change="onPageChange"
       />
     </div>
+    <RunWizardDialog ref="runDialog" />
   </div>
 </template>
 
@@ -380,10 +400,9 @@ onMounted(async () => {
 @use "../../../styles/theme";
 @use "../../../styles/element/input";
 
+/* Lined up with the toolbar above and the Analysis tabs (32px). */
 .workflows-container {
-  max-width: 1000px;
-  margin: 0;
-  padding: 16px 24px;
+  padding: 20px 32px;
 }
 
 .info-section {
@@ -420,7 +439,8 @@ onMounted(async () => {
 
 .workflows-section-header {
   display: flex;
-  align-items: center;
+  /* The sort lines up with the bottom of the (taller) search box. */
+  align-items: flex-end;
   justify-content: space-between;
   gap: 16px;
   margin-bottom: 16px;
@@ -434,25 +454,109 @@ onMounted(async () => {
 }
 
 .workflows-search-input {
-  max-width: 320px;
+  /* The row's width up to the sort, so it lines up with the cards below. */
+  flex: 1;
+}
+/* Search over the filters and as wide as them (the left column is sized by
+   the filters); sort and status on the right, each on its row. */
+.list-toolbar {
+  display: grid;
+  grid-template-columns: max-content 1fr auto;
+  grid-template-areas:
+    "search . sort"
+    "filters . status";
+  align-items: end;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+.toolbar-search {
+  grid-area: search;
+  width: 100%;
+}
+.toolbar-sort {
+  grid-area: sort;
+  justify-self: end;
+}
+.list-toolbar .toolbar-filters {
+  grid-area: filters;
+  margin-bottom: 0;
+}
+.list-toolbar .toolbar-status {
+  grid-area: status;
+  justify-self: end;
+  margin-left: 0;
+}
+/* Narrower: the input and output filters go, and the search fills its row
+   next to Sort; the scope buttons sit next to Status. */
+@media (max-width: 1100px) {
+  .list-toolbar {
+    grid-template-columns: 1fr auto;
+    grid-template-areas:
+      "search sort"
+      "filters status";
+  }
+  .list-toolbar .io-select {
+    display: none;
+  }
+  .list-toolbar .scope-buttons {
+    border-right: none;
+  }
+}
+/* Narrowest: the select alone says what it sorts by. */
+@media (max-width: 640px) {
+  .toolbar-sort {
+    font-size: 0;
+  }
+}
+.sort-control {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: theme.$gray_5;
+}
+.sort-select {
+  width: 160px;
+}
+.io-select {
+  width: 150px;
+}
+.status-select {
+  width: 110px;
+  margin-left: auto;
+}
+.clear-filters {
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  font-size: 13px;
+  color: theme.$link-color;
+  cursor: pointer;
+
+  &:hover {
+    color: theme.$link-color-hover;
+  }
 }
 
+/* One row: scope chips | input, output | status at the end, all 24px tall
+   and centred on one line. */
 .filter-row {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 12px;
   flex-wrap: wrap;
+  margin-bottom: 16px;
 }
 
 .status-buttons {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-bottom: 16px;
+  gap: 6px;
 }
 
 .scope-buttons {
-  padding-right: 16px;
+  padding-right: 12px;
   border-right: 1px solid theme.$gray_2;
 }
 
@@ -463,8 +567,10 @@ onMounted(async () => {
   line-height: 1.4;
 }
 
+/* As tall as the small selects beside them (24px). */
 .filter-btn {
-  padding: 4px 16px;
+  height: 24px;
+  padding: 0 12px;
   border: 1px solid theme.$gray_2;
   border-radius: 4px;
   background: white;
@@ -473,7 +579,7 @@ onMounted(async () => {
   font-weight: 500;
   cursor: pointer;
   transition: all 0.2s;
-  line-height: 1.4;
+  line-height: 22px;
 
   &:hover {
     border-color: theme.$purple_1;
@@ -487,233 +593,219 @@ onMounted(async () => {
   }
 }
 
+$card-height: 172px;
+
+/* Wide cards, two to a row where they fit, of one height with a square
+   graph, as the apps' (ApplicationsGrid): the rows line up. */
 .workflows-grid {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
   gap: 16px;
 }
 
 .wf-card {
-  background: white;
+  display: flex;
+  height: $card-height;
+  min-width: 0;
   border: 1px solid theme.$gray_2;
-  padding: 20px;
-  transition: border-color 0.2s ease;
+  background: theme.$white;
+  overflow: hidden;
   cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 
-  &:hover {
-    border-color: theme.$gray_3;
+  &:hover,
+  &:focus-visible {
+    border-color: theme.$purple_1;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+    outline: none;
+  }
+  &:hover .wf-actions,
+  &:focus-within .wf-actions {
+    opacity: 1;
+  }
+  &.is-inactive {
+    opacity: 0.7;
   }
 }
-
-.wf-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 16px;
+/* The graph, on the builder's dotted canvas. */
+.wf-thumb {
+  flex: 0 0 $card-height;
+  box-sizing: border-box;
+  padding: 8px;
+  border-right: 1px solid theme.$gray_2;
+  background-color: theme.$gray_1;
+  background-image: radial-gradient(theme.$gray_3 1px, transparent 1px);
+  background-size: 12px 12px;
 }
-
-.wf-info {
+.wf-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
   flex: 1;
   min-width: 0;
-
-  h3 {
-    font-size: 16px;
-    font-weight: 500;
-    color: theme.$gray_6;
-    margin: 0 0 8px 0;
-  }
+  padding: 14px 16px 12px;
 }
-
-.wf-name-link {
-  background: none;
-  border: none;
-  padding: 0;
+.wf-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.wf-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 15px;
+  font-weight: 600;
+  color: theme.$gray_6;
+}
+/* What the card is (public, archived…), in its top-right corner: the
+   badges line up down the grid. */
+.wf-badge {
+  flex-shrink: 0;
+  margin-left: auto;
+  padding: 0 6px;
+  border-radius: 3px;
+  background: theme.$gray_0;
+  color: theme.$gray_5;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+.wf-description {
+  display: -webkit-box;
+  margin: 0;
+  overflow: hidden;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  font-size: 13px;
+  line-height: 1.4;
+  color: theme.$gray_5;
+}
+.wf-io {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  color: theme.$gray_6;
+}
+/* One line: the first apps, then +n. */
+.wf-apps {
+  display: flex;
+  gap: 4px;
+  overflow: hidden;
+}
+.wf-app {
+  flex-shrink: 0;
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 1px 7px;
+  border-radius: 3px;
+  background: rgba(224, 145, 42, 0.12);
+  color: #9a5c0f;
+  font-size: 11px;
+  font-weight: 500;
+}
+.wf-app--more {
+  background: theme.$gray_0;
+  color: theme.$gray_5;
+}
+.wf-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: auto;
+  padding-top: 6px;
+}
+/* One line each: the usage gives way (…) to the buttons, which never wrap. */
+.wf-usage {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  font-size: 12px;
+  color: theme.$gray_4;
+}
+.wf-usage-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.wf-actions {
+  display: flex;
+  flex-shrink: 0;
+  gap: 6px;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+.wf-action {
+  white-space: nowrap;
+  padding: 3px 10px;
+  border: 1px solid theme.$gray_3;
+  border-radius: 4px;
+  background: theme.$white;
   font: inherit;
+  font-size: 12px;
   color: theme.$gray_6;
   cursor: pointer;
-  text-align: left;
-  text-decoration: none;
-  transition: color 0.2s ease;
 
   &:hover {
-    color: theme.$purple_2;
-    text-decoration: underline;
+    border-color: theme.$purple_1;
+    color: theme.$purple_3;
   }
 }
+.wf-action--run {
+  border-color: theme.$purple_3;
+  background: theme.$purple_3;
+  color: theme.$white;
 
-.wf-subtitle {
-  font-size: 13px;
-  color: theme.$gray_5;
-  margin-bottom: 6px;
-  font-weight: 400;
+  &:hover {
+    background: theme.$purple_2;
+    color: theme.$white;
+  }
+}
+@media (hover: none) {
+  .wf-actions {
+    opacity: 1;
+  }
 }
 
 .wf-description {
+  /* Two whole lines: the card has a fixed height, and shrinking the
+     description to fit cut its second line in half. */
+  flex-shrink: 0;
   font-size: 13px;
   color: theme.$gray_5;
-  margin: 4px 0 8px 0;
+  margin: 2px 0 4px 0;
   line-height: 1.4;
   word-break: break-word;
 }
 
-.last-run-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
+/* A card's last run, as a dot by its usage line. */
+.last-run-dot {
+  width: 8px;
+  height: 8px;
   flex-shrink: 0;
-  padding: 4px 12px;
-  border-radius: 999px;
-  font-size: 12px;
-  font-weight: 500;
-  white-space: nowrap;
+  border-radius: 50%;
+  background: theme.$gray_4;
 
-  .last-run-dot {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    flex-shrink: 0;
-  }
-
-  &.gray {
-    background: theme.$gray_2;
-    color: theme.$gray_5;
-    .last-run-dot { background: theme.$gray_4; }
-  }
-
-  &.enabled {
-    background: rgba(theme.$status_green, 0.12);
-    color: theme.$status_green;
-    .last-run-dot { background: theme.$status_green; }
-  }
-
-  &.pending {
-    background: rgba(#F59E0B, 0.12);
-    color: #B45309;
-    .last-run-dot { background: #F59E0B; }
-  }
-
-  &.failed {
-    background: rgba(#EF4444, 0.12);
-    color: #DC2626;
-    .last-run-dot { background: #DC2626; }
-  }
+  &.enabled { background: theme.$status_green; }
+  &.pending { background: #f59e0b; }
+  &.failed { background: theme.$status_red; }
 }
-
-.wf-tags {
-  display: flex;
-  gap: 6px;
-  margin-top: 8px;
-  flex-wrap: wrap;
-
-  .tag {
-    display: inline-block;
-    padding: 2px 8px;
-    border-radius: 3px;
-    font-size: 11px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-
-    &.active {
-      background: rgba(theme.$status_green, 0.12);
-      color: theme.$status_green;
-    }
-
-    &.inactive {
-      background: theme.$gray_2;
-      color: theme.$gray_5;
-    }
-
-    &.nodes,
-    &.created {
-      background: theme.$gray_1;
-      color: theme.$gray_5;
-    }
-
-    &.public {
-      background: theme.$green_tint;
-      color: theme.$status_green;
-    }
-  }
-}
-
+/* Pennsieve's mark sits where the other badges do, in the top-right corner. */
 .official-mark {
   display: inline-flex;
+  flex-shrink: 0;
   align-items: center;
+  margin-left: auto;
   color: theme.$purple_3;
 }
-
-.wf-card-actions {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 18px;
-  margin-top: 14px;
-  padding-top: 14px;
-  border-top: 1px solid theme.$gray_2;
-  flex-wrap: wrap;
-}
-
-.wf-metrics {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.metric-item {
-  display: flex;
-  align-items: baseline;
-  gap: 3px;
-}
-
-.metric-value {
-  font-size: 14px;
-  font-weight: 700;
-  color: theme.$black;
-}
-
-.metric-label {
-  font-size: 10px;
-  color: theme.$gray_4;
-}
-
-.metric-divider {
-  width: 1px;
-  height: 14px;
-  background: theme.$gray_3;
-}
-
-.empty-footer-text {
-  font-size: 12px;
-  color: theme.$gray_4;
-  font-style: italic;
-}
-
-.card-action-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  background: none;
-  border: none;
-  padding: 0;
-  font: inherit;
-  font-size: 13px;
-  font-weight: 500;
-  color: theme.$purple_3;
-  text-decoration: none;
-  cursor: pointer;
-
-  &:hover {
-    text-decoration: underline;
-  }
-
-  .arrow {
-    transition: transform 0.15s ease;
-  }
-
-  &:hover .arrow {
-    transform: translateX(2px);
-  }
+.official-mark + .wf-badge {
+  margin-left: 0;
 }
 
 .workflows-pagination {
