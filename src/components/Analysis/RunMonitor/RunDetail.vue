@@ -150,6 +150,8 @@ const sourcePicker = computed(() => {
 });
 const filePickerNodeId = ref(null);
 const filePickerFiles = ref([]);
+// The picker's list is being fetched (a dataset's top level or a folder).
+const filePickerLoading = ref(false);
 const filePickerAncestorList = ref([]);
 const filePickerCurrentFile = ref({ content: { name: "" } });
 const clearSelectedValues = ref(false);
@@ -1190,6 +1192,7 @@ const onPickerDatasetChange = (datasetId) => {
 };
 
 const fetchDatasetFiles = async () => {
+  filePickerLoading.value = true;
   try {
     const token = await useGetToken();
     const datasetId = sourceDatasetOf(filePickerNodeId.value);
@@ -1198,6 +1201,8 @@ const fetchDatasetFiles = async () => {
     filePickerFiles.value = [...(response.children || [])];
   } catch (err) {
     console.error("Failed to fetch files:", err);
+  } finally {
+    filePickerLoading.value = false;
   }
 };
 
@@ -3015,7 +3020,13 @@ onUnmounted(() => {
               @navigate-breadcrumb="handleNavigateBreadcrumb"
             />
           </div>
-          <div class="files-table-container">
+          <p v-if="filePickerLoading" class="file-picker-empty">Loading files…</p>
+          <p v-else-if="!filePickerFiles.length" class="file-picker-empty">
+            {{ !sourceDatasetOf(filePickerNodeId)
+              ? "Choose a dataset to see its files."
+              : filePickerCurrentFile?.content?.id ? "This folder is empty." : `${datasetName(sourceDatasetOf(filePickerNodeId), datasetOptions)} has no files.` }}
+          </p>
+          <div v-else class="files-table-container">
             <analysis-files-table
               :data="filePickerFiles"
               :clear-selected-values="clearSelectedValues"
@@ -4217,6 +4228,11 @@ onUnmounted(() => {
     font-weight: 500;
     color: theme.$gray_6;
   }
+}
+.file-picker-empty {
+  margin: 16px 0;
+  font-size: 13px;
+  color: theme.$gray_4;
 }
 .file-picker-dataset-select {
   width: 320px;
