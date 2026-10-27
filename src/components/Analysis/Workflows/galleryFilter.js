@@ -4,6 +4,7 @@ import { appNames, ioSummary, outputLabel } from "./workflowSummary";
 import { normalizeUrl } from "../RunMonitor/runHelpers";
 import { versionManifest } from "../WorkflowBuilder/appManifestInfo";
 import { isNotebookWorkflow } from "../RunMonitor/notebookHelpers";
+import { interfaceDag } from "../RunMonitor/workflowInterface";
 
 // Whether a workflow matches a search: its name, description, the apps it
 // runs, or what goes in and comes out ("spike" finds the one running
@@ -19,11 +20,11 @@ export function matchesSearch(wf, query, { applications = [], targetTypes = [] }
 }
 
 // What a workflow takes in: "dataset" with a data source, "none" without.
-export const inputKind = (wf) => ((wf?.dag || []).some((n) => n.type === "data-source") ? "dataset" : "none");
+export const inputKind = (wf) => (interfaceDag(wf).some((n) => n.type === "data-source") ? "dataset" : "none");
 
 // The target types a workflow writes to.
 export const outputTypes = (wf) => [
-  ...new Set((wf?.dag || []).filter((n) => n.type === "data-target" && n.targetType).map((n) => n.targetType)),
+  ...new Set(interfaceDag(wf).filter((n) => n.type === "data-target" && n.targetType).map((n) => n.targetType)),
 ];
 
 // The output choices for a list: each target type some workflow writes to,
@@ -62,7 +63,7 @@ export const SORTS = [
 // Whether every app step's app has an app.yml (a workflow of no apps does).
 function appsDeclared(wf, applications) {
   const byUrl = new Map((applications || []).map((a) => [normalizeUrl(a.sourceUrl), a]));
-  return (wf?.dag || [])
+  return interfaceDag(wf)
     .filter((n) => n.sourceUrl)
     .every((n) => versionManifest(byUrl.get(normalizeUrl(n.sourceUrl))));
 }

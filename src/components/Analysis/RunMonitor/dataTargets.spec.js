@@ -146,3 +146,20 @@ describe("datasetSummary / sortDatasets", () => {
     expect(sortDatasets([ds("e", {}), ds("f", { CSV: 1 }), ds("g", { CSV: 2 })]).map((d) => d.content.id)).toEqual(["f", "g", "e"]);
   });
 });
+
+describe("buildDataTargets for a workflow's outputs", () => {
+  const dag = [
+    { id: "results", type: "data-target", targetType: "download", output: { id: "results" } },
+    { id: "skip", type: "data-target", targetType: "download", output: { id: "skip" } },
+  ];
+  it("names each output's destination, and nothing else for none", () => {
+    const configs = {
+      results: { targetType: "Pennsieve Dataset", datasetId: "N:dataset:2", params: [{ name: "TARGET_FOLDER", value: "out" }] },
+      skip: { targetType: "none", params: [{ name: "name", value: "x" }] },
+    };
+    expect(buildDataTargets(dag, configs, "N:dataset:1")).toEqual({
+      results: { targetType: "Pennsieve Dataset", datasetId: "N:dataset:2", params: { TARGET_FOLDER: "out" } },
+      skip: { targetType: "none" },
+    });
+  });
+});

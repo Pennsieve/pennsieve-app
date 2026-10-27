@@ -30,8 +30,9 @@ import { useSendXhr } from "@/mixins/request/request_composable";
 import toQueryParams from "@/utils/toQueryParams";
 import LayerNameSelector from "./LayerNameSelector.vue";
 import TargetDatasetField from "./TargetDatasetField.vue";
-import { targetWritesToDataset, targetParamFields, buildDataTargets, targetDatasetId, datasetName, shownTargetParams, datasetSummary, sortDatasets } from "./dataTargets";
+import { targetWritesToDataset, targetParamFields, buildDataTargets, targetDatasetId, datasetName, shownTargetParams, datasetSummary, sortDatasets, isPathPrefixParam } from "./dataTargets";
 import DatasetOptionRow from "./DatasetOptionRow.vue";
+import { withInterfaceNodes, destinationChoices, NO_DESTINATION } from "./workflowInterface";
 import { importStatusUrl, importSummary, importStillMoving, isDatasetImport } from "./runImports";
 import { nodeUnfit, rememberedSetup, rememberSetup, defaultNode, needsDataset } from "./runSetup";
 import DownloadItem from "@/components/downloads/DownloadItem.vue";
@@ -880,7 +881,9 @@ const initiateWorkflowFromConfig = async (pendingConfig) => {
   configLayers.value = Array.isArray(source?.layers) ? [...source.layers] : [];
 
   try {
-    const definition = await store.dispatch("analysisModule/fetchWorkflowDefinition", workflowId);
+    // A workflow's inputs and outputs shown as the source and target nodes a
+    // run of it has (workflowInterface.js); its DAG as is otherwise.
+    const definition = withInterfaceNodes(await store.dispatch("analysisModule/fetchWorkflowDefinition", workflowId));
     configDefinition.value = definition;
 
     Object.keys(dataSourceFiles).forEach((k) => delete dataSourceFiles[k]);
@@ -901,19 +904,23 @@ const initiateWorkflowFromConfig = async (pendingConfig) => {
         if (own && own !== datasetId) sourceDatasets[d.id] = own;
       }
       if (d.type === "data-target") {
-        const fallback = getComputeTypesForTarget(d.targetType)?.[0] || null;
+        // An output's destination is the run being rerun's (its target's
+        // type, none when it had no target), else the output's default.
+        const ranAs = d.output && source ? (source.dag || []).find((n) => n.id === d.id) : null;
+        const targetType = d.output && source ? ranAs?.targetType || NO_DESTINATION : d.targetType;
+        const fallback = getComputeTypesForTarget(targetType)?.[0] || null;
         const srcTargetParams = source?.dataTargets?.[d.id]?.params || {};
-        const ttDef = getTargetTypeDefinition(d.targetType);
+        const ttDef = getTargetTypeDefinition(targetType);
         const paramDefs = ttDef?.params || [];
         // Values: the run being rerun, then the definition's defaults on the
         // node, then the registry's (workflow-service applies them in that order).
-        const targetParams = targetParamFields(paramDefs, {
+        const targetParams = outputParams(d, targetParamFields(paramDefs, {
           sourceParams: srcTargetParams,
-          definitionDefaults: d.defaultParams || {},
-        });
+          definitionDefaults: targetType === d.targetType ? d.defaultParams || {} : {},
+        }));
         nodeConfigs[d.id] = {
-          computeType: computeTypeForMode(srcCfg?.executionTarget || d.computeType || fallback),
-          targetType: d.targetType || null,
+          computeType: computeTypeForMode(srcCfg?.executionTarget || (targetType === d.targetType && d.computeType) || fallback),
+          targetType: targetType || null,
           // The target's own dataset; "" means the run's.
           datasetId: source?.dataTargets?.[d.id]?.datasetId || "",
           params: targetParams,
@@ -1043,7 +1050,7 @@ const executeWorkflow = async () => {
     if (!dagNode) continue;
 
     // Validate data-target required params
-    if (dagNode.type === "data-target") {
+    if (dagNode.type === "data-target" && cfg.targetType !== NO_DESTINATION) {
       const missing = (cfg.params || []).filter((p) => p.required && !p.value.trim());
       if (missing.length > 0) {
         const nodeLabel = dagNode.targetType || nodeId;
@@ -1083,7 +1090,7 @@ const executeWorkflow = async () => {
       const dagNode = dag.find((n) => n.id === nodeId);
       if (!dagNode) return;
       if (dagNode.type === "data-target") {
-        if (cfg.computeType) processorConfigs.push({ nodeId, executionTarget: cfg.computeType });
+        if (cfg.computeType && cfg.targetType !== NO_DESTINATION) processorConfigs.push({ nodeId, executionTarget: cfg.computeType });
       } else if (dagNode.type !== "data-source") {
         const entry = { nodeId };
         if (cfg.executionTarget) entry.executionTarget = cfg.executionTarget;
@@ -1759,9 +1766,48 @@ const runDatasetId = computed(() => {
 });
 const workflowHasInputs = computed(() => dataSourceNodes.value.length > 0);
 // A dataset output with no dataset: none of its own and nothing to follow.
+// The selected node's output (a workflow output's target node), and the
+// destinations this run may bind it to here.
+const selectedOutput = computed(() =>
+  mode.value === "configure" && selectedNode.value
+    ? (configDefinition.value?.dag || []).find((d) => d.id === selectedNode.value.id)?.output || null
+    : null
+);
+const selectedDestinations = computed(() =>
+  selectedOutput.value ? destinationChoices(selectedOutput.value, { targetTypes: targetTypes.value, myWorkspace: isMyWorkspace.value }) : []
+);
+const destinationLabel = (t) =>
+  t === NO_DESTINATION ? "No destination (kept with the run's logs)" : getTargetTypeLabel(t, targetTypes.value);
+
+// Another destination for an output: its params, runtime and dataset start
+// again from that target type's (and the output's default, when it's that).
+const onDestinationChange = (nodeId, targetType) => {
+  const cfg = nodeConfigs[nodeId];
+  const d = (configDefinition.value?.dag || []).find((n) => n.id === nodeId);
+  if (!cfg || !d?.output) return;
+  const isDefault = targetType === d.output.default?.targetType;
+  cfg.targetType = targetType;
+  cfg.datasetId = "";
+  cfg.params = targetType === NO_DESTINATION ? [] : outputParams(d, targetParamFields(getTargetTypeDefinition(targetType)?.params || [], {
+    definitionDefaults: isDefault ? d.output.default?.params || {} : {},
+  }));
+  cfg.computeType = targetType === NO_DESTINATION ? null : computeTypeForMode(getComputeTypesForTarget(targetType)?.[0] || null);
+  const n = nodes.value.find((x) => x.id === nodeId);
+  if (n) n.data = { ...n.data, targetType: targetType === NO_DESTINATION ? null : targetType, computeType: cfg.computeType };
+};
+
+// An output's params as a run sets them: not its path prefix, which
+// workflow-service sets from the step output it comes from.
+function outputParams(d, params) {
+  return d.output ? params.filter((p) => !isPathPrefixParam(p.name)) : params;
+}
+
+// A target's type for this run: an output's destination, else the node's.
+const runTargetType = (d) => (d.output ? nodeConfigs[d.id]?.targetType : d.targetType) || "";
+
 const missingTargetDataset = computed(() => {
   for (const d of configDefinition.value?.dag || []) {
-    if (d.type !== "data-target" || !targetWritesToDataset(d.targetType)) continue;
+    if (d.type !== "data-target" || !targetWritesToDataset(runTargetType(d)) || runTargetType(d) === NO_DESTINATION) continue;
     if (!nodeConfigs[d.id]?.datasetId && !runDatasetId.value) {
       return labelForDagNode(d, availableApplications.value, targetTypes.value, configDefinition.value?.dag || []) || d.id;
     }
@@ -2462,7 +2508,29 @@ onUnmounted(() => {
 
             <!-- CONFIGURE MODE: Selected data-target node -->
             <template v-else-if="mode === 'configure' && selectedNode && selectedNode.type === 'data-target' && nodeConfigs[selectedNode.id]">
-              <h4 class="sidebar-section-title">Data Target Configuration</h4>
+              <h4 class="sidebar-section-title">{{ selectedOutput ? `Output: ${selectedOutput.name}` : 'Data Target Configuration' }}</h4>
+              <!-- An output's destination, chosen for this run -->
+              <div v-if="selectedOutput" class="config-field">
+                <label for="output-destination">Destination</label>
+                <el-select
+                  id="output-destination"
+                  :model-value="nodeConfigs[selectedNode.id].targetType"
+                  size="small"
+                  style="width: 100%"
+                  @update:model-value="(t) => onDestinationChange(selectedNode.id, t)"
+                >
+                  <el-option
+                    v-for="t in selectedDestinations"
+                    :key="t"
+                    :label="destinationLabel(t)"
+                    :value="t"
+                  />
+                </el-select>
+              </div>
+              <p v-if="selectedOutput && nodeConfigs[selectedNode.id].targetType === NO_DESTINATION" class="configure-hint">
+                This run won't send {{ selectedOutput.name }} anywhere; its results stay with the run's logs.
+              </p>
+              <template v-if="nodeConfigs[selectedNode.id].targetType !== NO_DESTINATION">
               <div v-if="!getTargetTypeDefinition(selectedNode.data?.targetType)" class="target-type-missing">
                 Target type "{{ selectedNode.data?.targetType }}" is no longer available, so it has no parameters or runtimes here. Edit the workflow and choose a current target type.
               </div>
@@ -2601,6 +2669,7 @@ onUnmounted(() => {
                   </div>
                 </div>
               </div>
+              </template>
 
               <button class="text-link-btn" @click="selectedNode = null">
                 Clear selection

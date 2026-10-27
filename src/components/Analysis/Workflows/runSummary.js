@@ -4,6 +4,7 @@
 // workflow's definition and its steps' app.yml (portsOfStep).
 import { appNames, outputLabel } from "./workflowSummary";
 import { sourceLabel, sourceHints, portsOfStep } from "../WorkflowGraph/sourceInputs";
+import { interfaceDag } from "../RunMonitor/workflowInterface";
 
 // What an input takes, without its name (it's beside it): "CSV files", "a
 // BIDS folder", "CSV, JSON files"; "" when its app has no app.yml.
@@ -22,7 +23,7 @@ function outputWhere(node) {
 }
 
 export function runSummary(wf, applications = [], targetTypes = []) {
-  const dag = wf?.dag || [];
+  const dag = interfaceDag(wf);
   const portsOf = portsOfStep(dag, applications);
   const steps = dag.filter((n) => n.type !== "data-source" && n.type !== "data-target");
   return {

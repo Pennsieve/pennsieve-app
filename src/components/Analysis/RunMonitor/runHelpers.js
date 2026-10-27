@@ -125,6 +125,8 @@ export const getTargetTypeLabel = (targetType, targetTypes = []) =>
 // A data source is named after the app inputs its links feed ("signals"),
 // given the run's or workflow's DAG; else "Data Source".
 export const labelForDagNode = (d, applications, targetTypes = [], dag = []) => {
+  // A workflow input's or output's own name (workflowInterface.js).
+  if (d.name && (d.type === "data-source" || d.type === "data-target")) return d.name;
   if (d.type === "data-source") return sourceLabel(d.id, dag, "Data Source");
   if (d.type === "data-target") return getTargetTypeLabel(d.targetType, targetTypes);
   const matchedApp = findAppByUrl(d.sourceUrl, applications);

@@ -1,5 +1,6 @@
 <script setup>
 import { computed, ref, watch, onMounted } from "vue";
+import { interfaceDag } from "../RunMonitor/workflowInterface";
 import { useStore } from "vuex";
 import { useRouter, useRoute } from "vue-router";
 
@@ -324,7 +325,7 @@ onMounted(async () => {
           @keydown.enter="goToDetail(wf)"
         >
           <div class="wf-thumb">
-            <WorkflowThumbnail :dag="wf.dag || []" :aspect="1" />
+            <WorkflowThumbnail :dag="interfaceDag(wf)" :aspect="1" />
           </div>
           <div class="wf-body">
             <div class="wf-title">

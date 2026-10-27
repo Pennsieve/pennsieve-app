@@ -52,5 +52,14 @@ describe("needsDataset", () => {
     expect(needsDataset({ dag: [{ type: "data-target", targetType: "pennsieve-dataset" }] })).toBe(true);
     expect(needsDataset({ dag: [{ type: "processor" }, { type: "data-target", targetType: "persistent-layer" }] })).toBe(false);
     expect(needsDataset(null)).toBe(false);
+    expect(needsDataset({ dag: [{ type: "processor" }, { type: "data-target", targetType: "download" }] })).toBe(false);
+  });
+
+  it("of a workflow with inputs and outputs: inputs, or an output that must go to a dataset", () => {
+    const out = (o) => ({ id: "o", name: "o", from: { step: "s" }, ...o });
+    expect(needsDataset({ inputs: [{ id: "i", name: "i" }], dag: [] })).toBe(true);
+    expect(needsDataset({ outputs: [out({ accepts: ["download", "Pennsieve Dataset"], required: true })], dag: [] })).toBe(false);
+    expect(needsDataset({ outputs: [out({ accepts: ["Pennsieve Dataset"], required: true })], dag: [] })).toBe(true);
+    expect(needsDataset({ outputs: [out({ accepts: ["Pennsieve Dataset"] })], dag: [] })).toBe(false);
   });
 });
