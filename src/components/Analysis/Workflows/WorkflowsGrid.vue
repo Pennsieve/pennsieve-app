@@ -7,6 +7,7 @@ import BfButton from "../../shared/bf-button/BfButton.vue";
 import IconAnalysis from "../../icons/IconAnalysis.vue";
 import IconPennsieveMark from "../../icons/IconPennsieveMark.vue";
 import WorkflowThumbnail from "../WorkflowGraph/WorkflowThumbnail.vue";
+import RunWizardDialog from "../RunMonitor/RunWizardDialog.vue";
 import { ioSummary, appNames, usageLine, cardText } from "./workflowSummary";
 import { applyFilters, libraryWorkflows, outputOptions, sortWorkflows, SORTS } from "./galleryFilter";
 
@@ -220,11 +221,10 @@ const fetchAllWorkflows = async () => {
 };
 
 
-// Run from a card: the tab's Live view, with the run wizard open on this
-// workflow (notebooks aren't listed; they start on the Notebooks tab).
-const runWorkflow = (wf) => {
-  router.push({ name: isMyWorkspace.value ? "my-workflows" : "workflows", query: { run: wf.uuid } });
-};
+// Run from a card: the run dialog, here, on this workflow (notebooks aren't
+// listed; they start on the Notebooks tab).
+const runDialog = ref(null);
+const runWorkflow = (wf) => runDialog.value?.open(wf.uuid);
 
 // Re-fetch all when the status or scope filter changes
 watch([statusFilter, isPublicScope], () => {
@@ -368,7 +368,10 @@ onMounted(async () => {
       <div v-else class="empty-state">
         <IconAnalysis :width="48" :height="48" color="#9ca3af" />
         <span v-if="isLoadingAll">Loading workflows...</span>
-        <span v-else-if="workflows.length === 0">No workflows yet</span>
+        <template v-else-if="workflows.length === 0">
+          <span>No workflows yet</span>
+          <button type="button" class="clear-filters" @click="router.replace({ query: { ...route.query, view: 'builder' } })">Build one in the Builder</button>
+        </template>
         <span v-else-if="searchQuery">
           No workflows match
           <strong>"{{ searchQuery }}"</strong>
@@ -388,6 +391,7 @@ onMounted(async () => {
         @current-change="onPageChange"
       />
     </div>
+    <RunWizardDialog ref="runDialog" />
   </div>
 </template>
 

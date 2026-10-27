@@ -1,7 +1,7 @@
 <script setup>
 /*
-  Which dataset a data target writes to: the run's (the default) or another
-  one the user picks. The platform refuses the run when the user can't write
+  Which dataset a data target writes to: the inputs' (the default, when the
+  workflow has inputs) or another one the user picks. The platform refuses the run when the user can't write
   to the chosen dataset, so no filtering happens here.
 */
 import { ref, computed, watch } from "vue";
@@ -12,9 +12,12 @@ import toQueryParams from "@/utils/toQueryParams";
 import { searchDatasets, datasetName } from "./dataTargets";
 
 const props = defineProps({
-  // The target's own dataset id, or "" for the run's.
+  // The target's own dataset id, or "" for the inputs'.
   modelValue: { type: String, default: "" },
+  // The inputs' dataset (the first input's), which "" follows.
   runDatasetId: { type: String, default: "" },
+  // Without inputs there is nothing to follow: the target names its own.
+  followsInputs: { type: Boolean, default: true },
   // Dataset records already loaded, for names.
   datasets: { type: Array, default: () => [] },
 });
@@ -23,7 +26,7 @@ const emit = defineEmits(["update:modelValue"]);
 const store = useStore();
 const apiUrl = computed(() => store.state.config?.apiUrl);
 
-const other = ref(!!props.modelValue && props.modelValue !== props.runDatasetId);
+const other = ref(!props.followsInputs || (!!props.modelValue && props.modelValue !== props.runDatasetId));
 const results = ref([]);
 const loading = ref(false);
 let timer = null;
@@ -98,11 +101,11 @@ if (other.value) {
     <label class="tdf-label">Dataset</label>
     <div class="tdf-choice">
       <el-radio-group :model-value="other ? 'other' : 'run'" size="small">
-        <el-radio-button value="run" @click="chooseRun">The run's dataset</el-radio-button>
+        <el-radio-button value="run" :disabled="!followsInputs" @click="followsInputs && chooseRun()">Same as the inputs</el-radio-button>
         <el-radio-button value="other" @click="chooseOther">Another dataset</el-radio-button>
       </el-radio-group>
     </div>
-    <div v-if="!other" class="tdf-run">{{ runDatasetLabel || "Chosen when the run starts" }}</div>
+    <div v-if="!other" class="tdf-run">{{ runDatasetLabel || "The first input's dataset, once its files are chosen" }}</div>
     <el-select
       v-else
       :model-value="modelValue || ''"
