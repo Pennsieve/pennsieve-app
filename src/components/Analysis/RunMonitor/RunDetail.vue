@@ -136,7 +136,7 @@ const sourcePicker = computed(() => {
   const dag = configDefinition.value?.dag || [];
   const name = id ? sourceLabel(id, dag, "") : "";
   return {
-    title: name ? `Select files for ${name}` : "Select Files",
+    title: `Select files${name ? ` for ${name}` : ""} from ${datasetName(initiateForm.value.datasetId, datasetOptions.value)}`,
     hint: id ? hintLine(sourceHints(id, dag, portsOfStep(dag, availableApplications.value))) : "",
   };
 });
@@ -1131,6 +1131,12 @@ const executeWorkflow = async () => {
   File Picker
 */
 const openFilePicker = (nodeId) => {
+  // Inputs are chosen from the run's dataset.
+  if (!initiateForm.value.datasetId) {
+    selectedNode.value = null;
+    EventBus.$emit("toast", { detail: { type: "error", msg: "Choose the dataset the run runs in first; its inputs are chosen from it." } });
+    return;
+  }
   filePickerNodeId.value = nodeId;
   filePickerFiles.value = [];
   filePickerAncestorList.value = [];
@@ -1691,6 +1697,19 @@ function applySetupDefaults(definition) {
 }
 
 const onSetupDatasetSearch = (query) => fetchDatasetOptions(query || "");
+
+// Inputs are chosen from the run's dataset, so files picked from another one
+// go when it changes.
+watch(
+  () => initiateForm.value.datasetId,
+  (now, before) => {
+    if (!before || now === before || mode.value !== "configure") return;
+    const picked = Object.keys(dataSourceFiles).filter((k) => dataSourceFiles[k]?.length);
+    if (!picked.length) return;
+    picked.forEach((k) => delete dataSourceFiles[k]);
+    EventBus.$emit("toast", { detail: { type: "info", msg: "Inputs cleared: their files were from the previous dataset." } });
+  }
+);
 
 const fetchDatasetOptions = async (query = "") => {
   datasetSearchLoading.value = true;
@@ -2528,6 +2547,10 @@ onUnmounted(() => {
             <template v-else-if="mode === 'configure' && selectedNode && selectedNode.type === 'data-source'">
               <h4 class="sidebar-section-title">Data Source</h4>
               <div class="info-card">
+                <div v-if="!isMyWorkspace" class="info-row">
+                  <span class="info-label">From</span>
+                  <span class="info-value">{{ initiateForm.datasetId ? datasetName(initiateForm.datasetId, datasetOptions) : "The run's dataset (not chosen yet)" }}</span>
+                </div>
                 <div class="info-row">
                   <span class="info-label">Files</span>
                   <span class="info-value">{{ fileCountForNode(selectedNode.id) }} selected</span>
@@ -2613,7 +2636,8 @@ onUnmounted(() => {
                   <span v-if="setupNodeUnfit.length" class="run-name-error">Can't run this workflow: {{ setupNodeUnfit.join(", ") }}</span>
                 </div>
                 <div v-if="!isMyWorkspace" class="info-row info-row-stacked">
-                  <label class="info-label" for="setup-dataset">Dataset</label>
+                  <label class="info-label" for="setup-dataset">Runs in dataset</label>
+                  <span class="info-label-hint">Where the run belongs and its results go, unless an output names its own. Inputs are chosen from it.</span>
                   <el-select
                     id="setup-dataset"
                     v-model="initiateForm.datasetId"
@@ -4159,6 +4183,10 @@ onUnmounted(() => {
   color: theme.$gray_4;
   text-transform: none;
   letter-spacing: 0;
+}
+.info-row-stacked > .info-label-hint {
+  font-size: 12px;
+  line-height: 1.4;
 }
 
 .run-name-input {
