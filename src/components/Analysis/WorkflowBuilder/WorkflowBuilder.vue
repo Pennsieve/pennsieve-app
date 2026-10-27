@@ -4592,6 +4592,8 @@ kbd {
 .io-node {
   --io-color: #6366f1;
   position: relative;
+  /* Over its connection point, as a step card is: half of it shows. */
+  z-index: 1;
   display: flex;
   align-items: center;
   gap: 8px;
