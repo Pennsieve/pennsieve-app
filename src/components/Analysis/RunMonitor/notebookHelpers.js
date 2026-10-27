@@ -46,10 +46,16 @@ export function kernelLabel(kernel) {
 // kernel's runs still count as notebooks, but it can't start new ones), and
 // outside a workspace (My Workspace), where a run has no dataset to write
 // to, not those whose results go to one.
+// A kernel with a notebook workflow that declares its input and output (whose
+// input and results each session binds) is offered as that one only: the
+// copies that differ only in where data comes from or goes are left out.
 export function launchableKernels(workflows = [], { personal = false } = {}) {
-  return workflows.filter(
+  const usable = workflows.filter(
     (wf) => isNotebookWorkflow(wf) && wf.isActive !== false && !(personal && !wf.notebook.worksWithoutDataset)
   );
+  const declares = (wf) => (wf.inputs?.length || 0) + (wf.outputs?.length || 0) > 0;
+  const bound = new Set(usable.filter(declares).map(notebookKernel));
+  return usable.filter((wf) => declares(wf) || !bound.has(notebookKernel(wf)));
 }
 
 // Where a notebook's results go, in a few words, to tell same-language
