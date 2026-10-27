@@ -1320,8 +1320,15 @@ const loadFolderFiles = async (folderId) => {
   try {
     const token = await useGetToken();
     const response = await useSendXhr(`${config.value.apiUrl}/packages/${folderId}?api_key=${token}&limit=500&offset=0`);
-    const names = (response?.children || []).filter((c) => c.content?.packageType !== "Collection").map((c) => c.content?.name || "");
-    folderFiles[folderId] = { names, loading: false };
+    const children = response?.children || [];
+    const names = children.filter((c) => c.content?.packageType !== "Collection").map((c) => c.content?.name || "");
+    folderFiles[folderId] = {
+      names,
+      subfolders: children.length - names.length,
+      // A full page: there may be more than were read.
+      more: children.length >= 500,
+      loading: false,
+    };
   } catch {
     folderFiles[folderId] = { names: [], loading: false };
   }
@@ -1393,6 +1400,19 @@ const mismatchLine = (nodeId) => {
     ? `${n === 1 ? "The file isn't" : `None of the ${n} files are`} ${m.expected}`
     : `${n} of ${m.total} files ${n === 1 ? "isn't" : "aren't"} ${m.expected}`;
 };
+// Why a chosen folder's files weren't all checked (subfolders aren't read, nor
+// past the first 500), for its "?" mark; "" when they were, or for a file.
+const partlyChecked = (file) => {
+  if (file.content?.packageType !== "Collection") return "";
+  const f = folderFiles[file.content.id];
+  if (!f || f.loading || (!f.subfolders && !f.more)) return "";
+  const name = file.content?.name || "this folder";
+  const checked = `Checked the ${f.names.length}${f.more ? " first" : ""} file${f.names.length === 1 ? "" : "s"} directly in ${name}`;
+  return f.subfolders
+    ? `${checked}; its ${f.subfolders}${f.more ? "+" : ""} subfolder${f.subfolders === 1 ? "" : "s"} weren't checked.`
+    : `${checked}; the rest weren't checked.`;
+};
+
 // A chosen file that doesn't fit, or a folder with files directly in it that
 // don't.
 const mismatchedFile = (nodeId, file) => {
@@ -2749,6 +2769,7 @@ onUnmounted(() => {
                   <IconCollection v-if="file.content?.packageType === 'Collection'" :width="14" :height="14" class="selected-file-icon collection" />
                   <IconFile v-else :width="14" :height="14" class="selected-file-icon" />
                   <span class="selected-file-name">{{ file.content?.name || 'Unnamed file' }}</span>
+                  <span v-if="partlyChecked(file)" class="selected-file-unchecked" :title="partlyChecked(file)">?</span>
                   <button class="selected-file-remove" @click="removeFileFromNode(selectedNode.id, idx)" title="Remove file">&times;</button>
                 </div>
               </div>
@@ -4184,6 +4205,19 @@ onUnmounted(() => {
   font-size: 12px;
   line-height: 1.4;
   color: #92400e;
+}
+.selected-file-unchecked {
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
+  margin-left: 4px;
+  border: 1px solid theme.$gray_3;
+  border-radius: 50%;
+  font-size: 11px;
+  line-height: 14px;
+  text-align: center;
+  color: theme.$gray_4;
+  cursor: help;
 }
 .selected-file-item.is-mismatch .selected-file-name {
   color: #b45309;
