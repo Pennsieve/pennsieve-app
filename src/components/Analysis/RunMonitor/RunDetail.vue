@@ -74,7 +74,7 @@ import {
   runDisplayName,
   RUN_NAME_MAX_LENGTH,
 } from "./runHelpers";
-import { sourceLabel, sourceHints, hintLine, portsOfStep, missingFilesMessage } from "../WorkflowGraph/sourceInputs";
+import { sourceLabel, sourceHints, hintLine, portsOfStep, missingFilesMessage, fileTypeMismatches } from "../WorkflowGraph/sourceInputs";
 import { portEdges, stepPoints } from "../WorkflowGraph/runPorts";
 import PortChips from "../WorkflowGraph/PortChips.vue";
 import LlmMark from "../WorkflowGraph/LlmMark.vue";
@@ -1228,6 +1228,29 @@ const fileCountForNode = (nodeId) => {
   return (dataSourceFiles[nodeId] || []).length;
 };
 
+// Chosen files a source's inputs don't take (by extension, against what its
+// inputs' app.yml declares), while configuring: a warning on its card and in
+// its panel, not a block (an app may still read them). Folders aren't
+// checked: what's in them isn't known here.
+const sourceMismatch = (nodeId) => {
+  const dag = configDefinition.value?.dag || [];
+  const names = (dataSourceFiles[nodeId] || [])
+    .filter((f) => f.content?.packageType !== "Collection")
+    .map((f) => f.content?.name || "");
+  if (!names.length) return null;
+  const m = fileTypeMismatches(names, sourceHints(nodeId, dag, portsOfStep(dag, availableApplications.value)));
+  return m && { ...m, total: names.length };
+};
+const mismatchLine = (nodeId) => {
+  const m = sourceMismatch(nodeId);
+  if (!m) return "";
+  const n = m.names.length;
+  return n === m.total
+    ? `${n === 1 ? "The file isn't" : `None of the ${n} files are`} ${m.expected}`
+    : `${n} of ${m.total} files ${n === 1 ? "isn't" : "aren't"} ${m.expected}`;
+};
+const mismatchedFile = (nodeId, file) => !!sourceMismatch(nodeId)?.names.includes(file.content?.name || "");
+
 const nodeUnmetCount = (nodeId, nodeType) => {
   if (mode.value !== "configure") return 0;
   if (nodeType === "data-source") {
@@ -1892,14 +1915,18 @@ onUnmounted(() => {
                   :label="titleOf(id, data)"
                   :unmet="nodeUnmetCount(id, 'data-source')"
                   :detail="mode === 'configure'
-                    ? `${fileCountForNode(id)} file${fileCountForNode(id) !== 1 ? 's' : ''} selected`
+                    ? [`${fileCountForNode(id)} file${fileCountForNode(id) !== 1 ? 's' : ''} selected`, mismatchLine(id)].filter(Boolean).join(' · ')
                     : data.view
                     ? 'Public dataset'
                     : data.packageCount != null
                     ? sourceDetail(data)
                     : ''"
                 />
-                <div v-else class="custom-node data-source-node" :class="{ 'has-files': mode === 'configure' && fileCountForNode(id) > 0 }">
+                <div
+                  v-else
+                  class="custom-node data-source-node"
+                  :class="{ 'has-files': mode === 'configure' && fileCountForNode(id) > 0, 'has-mismatch': mode === 'configure' && !!mismatchLine(id) }"
+                >
                   <span v-if="nodeUnmetCount(id, 'data-source') > 0" class="node-unmet-badge">{{ nodeUnmetCount(id, 'data-source') }}</span>
                   <div class="node-header">
                     <span class="node-title" :title="titleOf(id, data)">{{ titleOf(id, data) }}</span>
@@ -1917,6 +1944,7 @@ onUnmounted(() => {
                       </span>
                     </template>
                   </div>
+                  <div v-if="mode === 'configure' && mismatchLine(id)" class="node-mismatch">⚠ {{ mismatchLine(id) }}</div>
                   <div v-if="mode === 'configure'" class="node-config-hint">Click to select files</div>
                 </div>
                 <Handle id="source" type="source" :position="Position.Bottom" />
@@ -2390,11 +2418,16 @@ onUnmounted(() => {
                 </div>
               </div>
               <h4 class="sidebar-section-title">Source Files</h4>
+              <p v-if="mismatchLine(selectedNode.id)" class="files-mismatch">
+                ⚠ {{ mismatchLine(selectedNode.id) }}: {{ hintLine(sourceHints(selectedNode.id, configDefinition?.dag || [], portsOfStep(configDefinition?.dag || [], availableApplications))) }}.
+              </p>
               <div v-if="dataSourceFiles[selectedNode.id]?.length > 0" class="selected-files-list">
                 <div
                   v-for="(file, idx) in dataSourceFiles[selectedNode.id]"
                   :key="file.content?.id || idx"
                   class="selected-file-item"
+                  :class="{ 'is-mismatch': mismatchedFile(selectedNode.id, file) }"
+                  :title="mismatchedFile(selectedNode.id, file) ? 'Not a type this input takes' : undefined"
                 >
                   <IconCollection v-if="file.content?.packageType === 'Collection'" :width="14" :height="14" class="selected-file-icon collection" />
                   <IconFile v-else :width="14" :height="14" class="selected-file-icon" />
@@ -3554,6 +3587,14 @@ onUnmounted(() => {
   .node-import--importing { color: #0e7490; }
   .node-import--failed { color: theme.$status_red; font-weight: 600; }
 
+  // A source whose chosen files its inputs don't take (sourceMismatch).
+  .node-mismatch {
+    margin-top: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    color: #b45309;
+  }
+
   .node-mark {
     flex-shrink: 0;
     font-size: 15px;
@@ -3681,6 +3722,7 @@ onUnmounted(() => {
     background: #eef2ff;
 
     &.has-files { border-color: theme.$status_green; }
+    &.has-mismatch { border-color: #d97706; }
     &.green-node { border-color: theme.$gray_3; }
     &.red-node { border-color: theme.$status_red; }
   }
@@ -3724,6 +3766,21 @@ onUnmounted(() => {
 @keyframes strip-pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.25; }
+}
+
+/* Chosen files a source's inputs don't take, in its panel. */
+.files-mismatch {
+  margin: 0 0 8px;
+  padding: 8px 10px;
+  border-radius: 4px;
+  background: #fef3c7;
+  font-size: 12px;
+  line-height: 1.4;
+  color: #92400e;
+}
+.selected-file-item.is-mismatch .selected-file-name {
+  color: #b45309;
+  font-weight: 600;
 }
 
 /* A dataset import's failed files, in the target's panel. */

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { inputsFedBy, sourceLabel, sourceHints, hintLine, portsOfStep, missingFilesMessage } from "./sourceInputs";
+import { inputsFedBy, sourceLabel, sourceHints, hintLine, portsOfStep, missingFilesMessage, fileShortType, fileTypeMismatches } from "./sourceInputs";
 
 // Four sources into test-ports-processor: two linked to its inputs, two to
 // "all inputs".
@@ -62,5 +62,35 @@ describe("data sources named after their inputs", () => {
     expect(missingFilesMessage(["s1"], steps)).toBe("Select files for signals");
     expect(missingFilesMessage(["s3"], steps)).toBe("Select files for data source");
     expect(missingFilesMessage(["s1", "s3"], steps)).toBe("Select files for 2 data sources");
+  });
+});
+
+
+describe("file types against an input", () => {
+  it("names a file's type by its extension", () => {
+    expect(fileShortType("a.csv")).toBe("CSV");
+    expect(fileShortType("scan.nii.gz")).toBe("NIFTI");
+    expect(fileShortType("x.JSON")).toBe("JSON");
+    expect(fileShortType("README")).toBe("");
+  });
+
+  it("finds the files an input doesn't take", () => {
+    const json = [{ input: "events", types: ["JSON"], layout: "" }];
+    expect(fileTypeMismatches(["e.json", "s.csv"], json)).toEqual({ names: ["s.csv"], expected: "JSON" });
+    expect(fileTypeMismatches(["e.json"], json)).toBeNull();
+  });
+
+  it("has nothing to say when an input takes any file, a folder, or declares nothing", () => {
+    expect(fileTypeMismatches(["s.csv"], [{ input: "x", types: ["Any"], layout: "" }])).toBeNull();
+    expect(fileTypeMismatches(["s.csv"], [{ input: "x", types: [], layout: "BIDS" }])).toBeNull();
+    expect(fileTypeMismatches(["s.csv"], [])).toBeNull();
+  });
+
+  it("takes what any of the inputs it feeds takes", () => {
+    const two = [
+      { input: "a", types: ["CSV"], layout: "" },
+      { input: "b", types: ["JSON"], layout: "" },
+    ];
+    expect(fileTypeMismatches(["s.csv", "e.json", "x.edf"], two)).toEqual({ names: ["x.edf"], expected: "CSV or JSON" });
   });
 });

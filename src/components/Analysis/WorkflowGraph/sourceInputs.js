@@ -76,3 +76,45 @@ export function missingFilesMessage(missingIds, dag) {
   const n = (missingIds || []).length;
   return `Select files for ${n === 1 ? "data source" : `${n} data sources`}`;
 }
+
+// A file's type as the input hints name types ("CSV", "JSON", "NIFTI"), from
+// its extension; a few extensions differ from their media type's name.
+const EXTENSION_TYPES = {
+  nii: "NIFTI",
+  "nii.gz": "NIFTI",
+  tif: "TIFF",
+  jpg: "JPEG",
+  yml: "YAML",
+  h5: "HDF5",
+  hdf: "HDF5",
+  txt: "PLAIN",
+  tsv: "TAB-SEPARATED-VALUES",
+  htm: "HTML",
+};
+export function fileShortType(name) {
+  const lower = String(name || "").toLowerCase();
+  const parts = lower.split(".");
+  if (parts.length < 2) return "";
+  const two = parts.slice(-2).join(".");
+  if (EXTENSION_TYPES[two]) return EXTENSION_TYPES[two];
+  const ext = parts[parts.length - 1];
+  return EXTENSION_TYPES[ext] || ext.toUpperCase();
+}
+
+// The chosen files a source's inputs don't take, by what they take (its
+// hints): { names, expected: "JSON" }, or null when they all fit, when an
+// input takes any file or a folder layout, or when its app declares no types
+// (nothing to compare).
+export function fileTypeMismatches(fileNames, hints) {
+  const accepted = new Set();
+  for (const h of hints || []) {
+    if (h.layout || !h.types.length) return null;
+    for (const t of h.types) {
+      if (t === "Any" || t === "File") return null;
+      accepted.add(t);
+    }
+  }
+  if (!accepted.size) return null;
+  const names = (fileNames || []).filter((n) => !accepted.has(fileShortType(n)));
+  return names.length ? { names, expected: [...accepted].join(" or ") } : null;
+}
