@@ -2587,7 +2587,7 @@ const openNodeSettings = (id) => {
     <div class="builder-content">
       <!-- Left: what can be added (create and edit) -->
       <button
-        v-if="!isReadOnly && !panels.palette"
+        v-if="!isReadOnly && !panels.palette && !landing"
         type="button"
         class="panel-rail"
         title="Show the steps you can add"
@@ -2598,7 +2598,7 @@ const openNodeSettings = (id) => {
         <span class="panel-rail-label">Add steps</span>
       </button>
       <BuilderPalette
-        v-if="!isReadOnly && panels.palette"
+        v-if="!isReadOnly && panels.palette && !landing"
         :applications="availableApplications"
         :app-name="appDisplayName"
         :step-ports="selectedNode?.type === 'default' ? selectedNode.data?.manifestPorts || null : null"
@@ -2664,7 +2664,7 @@ const openNodeSettings = (id) => {
                 :mask-stroke-width="2"
               />
 
-              <div class="canvas-toolbar">
+              <div v-if="!landing" class="canvas-toolbar">
                 <GraphDensityToggle
                   v-if="nodes.length > 0"
                   :detailed="detailed"
@@ -3053,7 +3053,7 @@ const openNodeSettings = (id) => {
 
       <!-- Sidebar (Right) -->
       <button
-        v-if="!panels.inspector"
+        v-if="!panels.inspector && !landing"
         type="button"
         class="panel-rail panel-rail--right"
         title="Show details"
@@ -3063,7 +3063,8 @@ const openNodeSettings = (id) => {
         <el-icon><ArrowLeft /></el-icon>
         <span class="panel-rail-label">Details</span>
       </button>
-      <div v-else ref="sidebarRef" class="applications-sidebar">
+      <!-- The start screen shows on its own: no panels, no toolbar -->
+      <div v-else-if="!landing" ref="sidebarRef" class="applications-sidebar">
         <div class="insp-top">
           <span>Details</span>
           <button type="button" class="insp-fold" title="Fold the details" aria-label="Fold the details" @click="togglePanel('inspector')">
