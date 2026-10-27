@@ -3045,25 +3045,6 @@ const openNodeSettings = (id) => {
                     <span class="info-label">Optional</span>
                     <el-checkbox v-model="selectedNode.data.optional">A run may leave it out</el-checkbox>
                   </div>
-                  <template v-if="selectedNode.type === 'data-target'">
-                    <div class="info-row">
-                      <label class="info-label" for="io-accepts">Can go to</label>
-                      <el-select
-                        id="io-accepts"
-                        v-model="selectedNode.data.accepts"
-                        multiple
-                        size="small"
-                        placeholder="Anywhere"
-                        class="info-inline-select"
-                      >
-                        <el-option v-for="tt in targetTypes" :key="tt.targetType" :label="targetTypeName(tt.targetType, targetTypes)" :value="tt.targetType" />
-                      </el-select>
-                    </div>
-                    <div class="info-row">
-                      <span class="info-label">Required</span>
-                      <el-checkbox v-model="selectedNode.data.required">Every run must send it somewhere</el-checkbox>
-                    </div>
-                  </template>
                 </template>
                 <div v-if="selectedNode.type === 'data-source' && sourceFeeds(selectedNode.id)" class="info-row">
                   <span class="info-label">Feeds</span>
@@ -3089,7 +3070,7 @@ const openNodeSettings = (id) => {
                 </template>
                 <template v-if="selectedNode.type === 'data-target'">
                   <div class="info-row">
-                    <span class="info-label">{{ interfaceOn ? "By default to" : "Target Type" }}</span>
+                    <span class="info-label">{{ interfaceOn ? "Default destination" : "Target Type" }}</span>
                     <span class="info-value" v-if="isReadOnly">{{
                       getTargetTypeLabel(selectedNode.data.targetType)
                     }}</span>
@@ -3097,7 +3078,7 @@ const openNodeSettings = (id) => {
                       v-else
                       v-model="selectedNode.data.targetType"
                       size="small"
-                      placeholder="Select target type"
+                      :placeholder="interfaceOn ? 'None: each run chooses' : 'Select target type'"
                       class="info-inline-select"
                       @change="onTargetTypeChange(selectedNode.data)"
                     >
@@ -3109,6 +3090,30 @@ const openNodeSettings = (id) => {
                       />
                     </el-select>
                   </div>
+                  <!-- Where else a run may send it, chosen per run -->
+                  <template v-if="interfaceOn">
+                    <p class="io-default-note">Each run can send it somewhere else; this is where it goes unless the run chooses.</p>
+                    <div class="info-row">
+                      <label class="info-label" for="io-accepts">Can go to</label>
+                      <span class="info-value" v-if="isReadOnly">{{ (selectedNode.data.accepts || []).map((t) => getTargetTypeLabel(t)).join(", ") || "Anywhere" }}</span>
+                      <el-select
+                        v-else
+                        id="io-accepts"
+                        v-model="selectedNode.data.accepts"
+                        multiple
+                        size="small"
+                        placeholder="Anywhere"
+                        class="info-inline-select"
+                      >
+                        <el-option v-for="tt in targetTypes" :key="tt.targetType" :label="targetTypeName(tt.targetType, targetTypes)" :value="tt.targetType" />
+                      </el-select>
+                    </div>
+                    <div class="info-row">
+                      <span class="info-label">Required</span>
+                      <span class="info-value" v-if="isReadOnly">{{ selectedNode.data.required ? "Yes" : "No" }}</span>
+                      <el-checkbox v-else v-model="selectedNode.data.required">Every run must send it somewhere</el-checkbox>
+                    </div>
+                  </template>
                 </template>
                 <template v-if="selectedNode.data?.computeType && isReadOnly">
                   <div class="info-row">
@@ -4645,6 +4650,12 @@ kbd {
   font-size: 13px;
   font-weight: 600;
   color: theme.$gray_6;
+}
+.io-default-note {
+  margin: 4px 0 8px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: theme.$gray_4;
 }
 .io-node__sub {
   font-size: 11px;
