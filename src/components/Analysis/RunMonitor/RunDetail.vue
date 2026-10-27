@@ -873,7 +873,9 @@ onNodeClick(({ node }) => {
   selectedNode.value = node;
 
   if (mode.value === "configure") {
-    if (node.type === "data-source") {
+    // In My Workspace an input can't take a dataset's files: its panel says
+    // so instead of an empty picker.
+    if (node.type === "data-source" && !isMyWorkspace.value) {
       openFilePicker(node.id);
       return;
     }
@@ -936,7 +938,13 @@ const initiateWorkflowFromConfig = async (pendingConfig) => {
         // An output's destination is the run being rerun's (its target's
         // type, none when it had no target), else the output's default.
         const ranAs = d.output && source ? (source.dag || []).find((n) => n.id === d.id) : null;
-        const targetType = d.output && source ? ranAs?.targetType || NO_DESTINATION : d.targetType;
+        let targetType = d.output && source ? ranAs?.targetType || NO_DESTINATION : d.targetType;
+        // In My Workspace an output starts where it can go there (a
+        // download, else not saved), not at a dataset default.
+        if (d.output && isMyWorkspace.value && (!targetType || targetWritesToDataset(targetType))) {
+          const choices = destinationChoices(d.output, { targetTypes: targetTypes.value, myWorkspace: true });
+          targetType = choices.find((t) => t !== NO_DESTINATION) || NO_DESTINATION;
+        }
         const fallback = getComputeTypesForTarget(targetType)?.[0] || null;
         const srcTargetParams = source?.dataTargets?.[d.id]?.params || {};
         const ttDef = getTargetTypeDefinition(targetType);
@@ -2739,6 +2747,11 @@ onUnmounted(() => {
                   <span class="info-value">{{ fileCountForNode(selectedNode.id) }} selected</span>
                 </div>
               </div>
+              <p v-if="isMyWorkspace" class="configure-hint">
+                In My Workspace a run can't take a dataset's files, and batch runs can't take a public dataset yet.
+                {{ canLeaveOut(selectedNode.id) ? "Leave this input out, or run the workflow from a workspace." : "Run this workflow from a workspace." }}
+              </p>
+              <template v-else>
               <h4 class="sidebar-section-title">Source Files</h4>
               <p v-if="mismatchLine(selectedNode.id)" class="files-mismatch">
                 ⚠ {{ mismatchLine(selectedNode.id) }}: {{ hintLine(sourceHints(selectedNode.id, configDefinition?.dag || [], portsOfStep(configDefinition?.dag || [], availableApplications))) }}.
@@ -2764,6 +2777,7 @@ onUnmounted(() => {
               <div class="info-actions">
                 <button class="text-link-btn" @click="openFilePicker(selectedNode.id)">{{ fileCountForNode(selectedNode.id) > 0 ? 'Change files' : 'Select files' }}</button>
               </div>
+              </template>
             </template>
 
             <!-- CONFIGURE MODE: no node selected — show summary -->
