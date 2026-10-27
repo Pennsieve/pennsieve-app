@@ -824,7 +824,7 @@ async function execute() {
   <el-dialog
     v-model="visible"
     :title="stepTitles[step]"
-    :width="(step === 4 && (!personal || iface)) || (iface && (step === 3 || step === 5)) ? '840px' : '560px'"
+    width="840px"
     :close-on-click-modal="false"
   >
     <div class="wizard-body">
