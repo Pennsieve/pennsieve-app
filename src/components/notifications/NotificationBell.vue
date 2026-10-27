@@ -34,6 +34,7 @@
 <script>
 import { mapState, mapGetters } from 'vuex'
 import IconNotifications from '../icons/IconNotifications.vue'
+import { userNotificationsChannel } from '@/realtime/channels'
 
 export default {
   name: 'NotificationBell',
@@ -43,7 +44,7 @@ export default {
   data() {
     return {
       open: false,
-      pusherChannel: null,
+      realtimeChannel: null,
       loadingMore: false,
       lastSeenSnapshot: null,
     }
@@ -107,11 +108,15 @@ export default {
       }
     },
 
-    subscribeToPusher() {
-      if (!this.profile.intId) return
-      const channelName = `user-${this.profile.intId}-notifications`
-      this.pusherChannel = this.$pusher.subscribe(channelName)
-      this.pusherChannel.bind('notification-event', this.onPushNotification.bind(this))
+    subscribeToNotifications(intId) {
+      this.unsubscribeFromNotifications()
+      this.realtimeChannel = this.$realtime.subscribe(userNotificationsChannel(intId))
+      this.realtimeChannel.bind('notification-event', this.onPushNotification)
+    },
+
+    unsubscribeFromNotifications() {
+      this.realtimeChannel?.unsubscribe()
+      this.realtimeChannel = null
     },
 
     onPushNotification(data) {
@@ -140,9 +145,12 @@ export default {
     'profile.intId': {
       immediate: true,
       handler(intId) {
-        if (!intId) return
+        if (!intId) {
+          this.unsubscribeFromNotifications()
+          return
+        }
         this.loadInitialNotifications()
-        this.subscribeToPusher()
+        this.subscribeToNotifications(intId)
       },
     },
   },
@@ -153,10 +161,7 @@ export default {
 
   beforeUnmount() {
     document.removeEventListener('mousedown', this.onClickOutside)
-    if (this.pusherChannel) {
-      this.pusherChannel.unbind('notification-event')
-      this.$pusher.unsubscribe(this.pusherChannel.name)
-    }
+    this.unsubscribeFromNotifications()
   },
 }
 </script>

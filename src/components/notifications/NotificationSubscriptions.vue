@@ -24,8 +24,8 @@
           </el-col>
           <el-col :span="4" class="col-toggle">
             <el-switch
-              :model-value="isSubscribed(topic.topic_id, 'email')"
-              @change="(val) => handleToggle(topic.topic_id, 'email', val)"
+              :model-value="isSubscribed(topic)"
+              @change="(val) => handleToggle(topic, val)"
             />
           </el-col>
         </el-row>
@@ -43,7 +43,7 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
-import { useRoute } from 'vue-router'
+import { useStore } from 'vuex'
 import { ElMessage } from 'element-plus'
 import {
   fetchTopics,
@@ -60,42 +60,65 @@ const props = defineProps({
   },
 })
 
-const route = useRoute()
+const store = useStore()
 
 const loading = ref(false)
 const topics = ref([])
 const subscriptions = ref([])
 
-function isSubscribed(topicId, channel) {
-  return subscriptions.value.some(
-    (s) => s.topic_id === topicId && s.context?.channel === channel && s.enabled !== false
-  )
+// v1 is email only.
+const EMAIL_ONLY = { email: true, push: false, sms: false }
+
+// The BE validates the context against the topic's schema: only the fields
+// the topic requires, all numeric IDs (not node IDs), nothing else.
+function contextValue(field) {
+  switch (field) {
+    case 'organizationId':
+      return store.state.activeOrganization?.organization?.intId
+    case 'datasetId':
+      return store.getters.datasetIntId
+    case 'subjectUserId':
+      return store.state.profile?.intId
+  }
 }
 
-function findSubscription(topicId, channel) {
-  return subscriptions.value.find(
-    (s) => s.topic_id === topicId && s.context?.channel === channel
-  )
-}
-
-function buildContext(channel) {
-  const ctx = { channel, organizationId: route.params.orgId }
-  if (props.scope === 'dataset') {
-    ctx.datasetId = route.params.datasetId
+function buildContext(topic) {
+  const ctx = {}
+  for (const field of topic.context?.required ?? []) {
+    ctx[field] = contextValue(field)
   }
   return ctx
 }
 
-async function handleToggle(topicId, channel, enabled) {
-  const context = buildContext(channel)
+function findSubscription(topic) {
+  const ctx = buildContext(topic)
+  return subscriptions.value.find(
+    (s) =>
+      s.topic_id === topic.topic_id &&
+      Object.entries(ctx).every(([k, v]) => Number(s.context?.[k]) === v)
+  )
+}
+
+function isSubscribed(topic) {
+  const sub = findSubscription(topic)
+  return !!sub && sub.enabled !== false
+}
+
+async function handleToggle(topic, enabled) {
+  const topicId = topic.topic_id
+  const context = buildContext(topic)
 
   if (enabled) {
-    // POST upserts — creates or re-enables
+    // POST upserts — creates or re-enables. notification_channels sits beside
+    // the context fields and must name all three channels.
     const tempSub = { id: `temp-${Date.now()}`, topic_id: topicId, enabled: true, context }
     subscriptions.value.push(tempSub)
 
     try {
-      const created = await subscribe(topicId, context)
+      const created = await subscribe(topicId, {
+        ...context,
+        notification_channels: EMAIL_ONLY,
+      })
       const idx = subscriptions.value.indexOf(tempSub)
       if (idx !== -1) {
         subscriptions.value.splice(idx, 1, created)
@@ -106,7 +129,7 @@ async function handleToggle(topicId, channel, enabled) {
       ElMessage.error('Failed to subscribe. Please try again.')
     }
   } else {
-    const existing = findSubscription(topicId, channel)
+    const existing = findSubscription(topic)
     if (!existing) return
 
     existing.enabled = false

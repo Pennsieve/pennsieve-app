@@ -3,6 +3,7 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { useGetToken } from '@/composables/useGetToken'
 import * as siteConfig from '@/site-config/site.json'
+import { cappedVersion, capNodeVersion } from '@/utils/provisionerVersionCap'
 
 export const useComputeResourcesStore = defineStore('computeResources', () => {
   // Scoped compute nodes cache - tracks different contexts
@@ -74,15 +75,15 @@ export const useComputeResourcesStore = defineStore('computeResources', () => {
   // to the per-node annotation on any fetched node. Null when unknown.
   const getLatestProvisionerVersion = computed(() => (image = DEFAULT_PROVISIONER_IMAGE) => {
     if (image === DEFAULT_PROVISIONER_IMAGE && latestProvisionerVersion.value) {
-      return latestProvisionerVersion.value
+      return cappedVersion(latestProvisionerVersion.value)
     }
     for (const nodes of scopedComputeNodes.value.values()) {
       const match = nodes.find(node =>
         node.latestVersion && (node.provisionerImage || DEFAULT_PROVISIONER_IMAGE) === image
       )
-      if (match) return match.latestVersion
+      if (match) return cappedVersion(match.latestVersion)
     }
-    return null
+    return image === DEFAULT_PROVISIONER_IMAGE ? cappedVersion(null) : null
   })
 
   const getNodePermissions = computed(() => (nodeId) => {
@@ -1022,7 +1023,8 @@ export const useComputeResourcesStore = defineStore('computeResources', () => {
       if (response.ok) {
         const payload = await response.json()
         // Response is { nodes, latestVersion }; tolerate the legacy bare array
-        const data = Array.isArray(payload) ? payload : (payload?.nodes || [])
+        // Offered versions capped to what this environment supports
+        const data = (Array.isArray(payload) ? payload : (payload?.nodes || [])).map(n => capNodeVersion(n))
         if (payload?.latestVersion) {
           latestProvisionerVersion.value = payload.latestVersion
         }

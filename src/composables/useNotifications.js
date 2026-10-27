@@ -3,13 +3,16 @@
 // BE endpoints (api2):
 //   GET    /notification/topics
 //   GET    /notification/subscriptions
-//   POST   /notification/topic/{topicId}/subscription  — body: { context: { channel, organizationId } }
+//   POST   /notification/topic/{topicId}/subscription  — body: the context, flat
+//          (e.g. { organizationId, datasetId }), plus optional notification_channels
 //   PATCH  /notification/subscription/{subscriptionId} — body: { enabled: boolean }
 //   GET    /notification/messages                      — all notifications for the user
 //
 // Subscriptions are disabled rather than deleted (history is kept).
-// Subscriptions returned from the BE nest channel info under `context`:
-//   { subscription_id, topic_id, context: { channel: "email" | "in-app", organizationId } }
+// Context fields come from the topic's schema (topic.context.required) and are
+// numeric IDs: organizationId, plus datasetId or subjectUserId by topic scope.
+// Unknown fields are rejected. notification_channels, if sent, must be exactly
+// { email, push, sms } booleans; omitted, the user's preferences apply.
 
 import * as siteConfig from '@/site-config/site.json'
 import { useGetToken } from '@/composables/useGetToken'

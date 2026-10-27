@@ -23,6 +23,7 @@ import ComputeNodePipelineBudget from './ComputeNodePipelineBudget.vue'
 import AnalysisViewBar from '../AnalysisViewBar.vue'
 import BfButton from '@/components/shared/bf-button/BfButton.vue'
 import { NODE_TABS, nodeTab, nodeStatus, canToggleStatus } from './computeNodeHelpers'
+import { capNodeVersion } from '@/utils/provisionerVersionCap'
 
 const route = useRoute()
 const router = useRouter()
@@ -106,7 +107,7 @@ async function fetchComputeNode() {
       }
     })
     if (response.ok) {
-      computeNode.value = await response.json()
+      computeNode.value = capNodeVersion(await response.json())
       loadError.value = ''
     } else {
       loadError.value = [403, 404].includes(response.status) ? 'not-found' : 'error'
