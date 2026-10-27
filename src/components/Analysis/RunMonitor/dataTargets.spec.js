@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { targetWritesToDataset, prefixParamName, targetParamFields, buildDataTargets, targetDatasetId, datasetName, searchDatasets, isPathPrefixParam, targetParamLabel, defaultsToRunName, canWriteDataset, shownTargetParams } from "./dataTargets";
+import { targetWritesToDataset, prefixParamName, targetParamFields, buildDataTargets, targetDatasetId, datasetName, searchDatasets, isPathPrefixParam, targetParamLabel, defaultsToRunName, canWriteDataset, shownTargetParams, datasetSummary, sortDatasets } from "./dataTargets";
 
 describe("targetWritesToDataset / prefixParamName", () => {
   it("built-ins write no dataset and take pathPrefix", () => {
@@ -117,5 +117,32 @@ describe("shownTargetParams", () => {
   it("keeps a changed default and params without a definition", () => {
     const shown = shownTargetParams([{ key: "notify", value: "never" }, { key: "extra", value: "x" }], defs);
     expect(shown.map((p) => p.key)).toEqual(["notify", "extra"]);
+  });
+});
+
+describe("datasetSummary / sortDatasets", () => {
+  const now = new Date("2026-10-27T12:00:00Z");
+  const ds = (id, counts, extra = {}) => ({
+    content: { id, name: `ds ${id}`, description: " A study ", updatedAt: "2026-10-24T10:00:00Z" },
+    packageTypeCounts: counts,
+    storage: 2300000000,
+    role: "editor",
+    ...extra,
+  });
+
+  it("says files, size, when it was updated and the user's role", () => {
+    const s = datasetSummary(ds("a", { CSV: 120, Unsupported: 8 }, { bannerPresignedUrl: "https://b" }), now);
+    expect(s).toMatchObject({ id: "a", name: "ds a", description: "A study", banner: "https://b", empty: false });
+    expect(s.meta).toBe("128 files · 2.3 GB · updated Oct 24 · Editor");
+  });
+
+  it("calls out a dataset with no files", () => {
+    const s = datasetSummary(ds("b", {}, { content: { id: "b", name: "b", updatedAt: "2025-01-02T12:00:00Z" } }), now);
+    expect(s.empty).toBe(true);
+    expect(s.meta).toBe("No files · updated Jan 2, 2025 · Editor");
+  });
+
+  it("lists datasets with files first", () => {
+    expect(sortDatasets([ds("e", {}), ds("f", { CSV: 1 }), ds("g", { CSV: 2 })]).map((d) => d.content.id)).toEqual(["f", "g", "e"]);
   });
 });

@@ -10,6 +10,7 @@ import { useGetToken } from "@/composables/useGetToken";
 import { useSendXhr } from "@/mixins/request/request_composable";
 import toQueryParams from "@/utils/toQueryParams";
 import { searchDatasets, datasetName } from "./dataTargets";
+import DatasetOptionRow from "./DatasetOptionRow.vue";
 
 const props = defineProps({
   // The target's own dataset id, or "" for the inputs'.
@@ -116,6 +117,7 @@ if (other.value) {
       placeholder="Search datasets you can edit…"
       size="small"
       class="tdf-select"
+      popper-class="dataset-option-popper"
       @update:model-value="choose"
     >
       <el-option
@@ -123,7 +125,9 @@ if (other.value) {
         :key="ds.content?.id"
         :label="ds.content?.name"
         :value="ds.content?.id"
-      />
+      >
+        <DatasetOptionRow :dataset="ds" />
+      </el-option>
     </el-select>
     <p class="tdf-help">You need the Editor role on the dataset this target writes to.</p>
   </div>

@@ -43,6 +43,8 @@ export function nodeStatus(node) {
       return "Destroying";
     case "failed":
       return "Failed";
+    case "updating":
+      return "Updating";
     default:
       return "Pending";
   }

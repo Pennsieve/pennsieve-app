@@ -30,7 +30,8 @@ import { useSendXhr } from "@/mixins/request/request_composable";
 import toQueryParams from "@/utils/toQueryParams";
 import LayerNameSelector from "./LayerNameSelector.vue";
 import TargetDatasetField from "./TargetDatasetField.vue";
-import { targetWritesToDataset, targetParamFields, buildDataTargets, targetDatasetId, datasetName, shownTargetParams } from "./dataTargets";
+import { targetWritesToDataset, targetParamFields, buildDataTargets, targetDatasetId, datasetName, shownTargetParams, datasetSummary, sortDatasets } from "./dataTargets";
+import DatasetOptionRow from "./DatasetOptionRow.vue";
 import { importStatusUrl, importSummary, importStillMoving, isDatasetImport } from "./runImports";
 import { nodeUnfit, rememberedSetup, rememberSetup, defaultNode, needsDataset } from "./runSetup";
 import DownloadItem from "@/components/downloads/DownloadItem.vue";
@@ -119,7 +120,7 @@ const configDefinition = ref(null);
 const dataSourceFiles = reactive({});
 // Each input picks the dataset its files come from. initiateForm.datasetId
 // is only where a new input's picker starts (the dataset used last for this
-// workflow, a rerun's, or the first one picked); sourceDatasets holds an
+// workflow, a rerun's, or the one picked last); sourceDatasets holds an
 // input's own when it differs. A run has no dataset of its own: the request's
 // datasetId is the first input's (runDatasetId), for nodes and webhooks that
 // still read it.
@@ -150,6 +151,8 @@ const sourcePicker = computed(() => {
 });
 const filePickerNodeId = ref(null);
 const filePickerFiles = ref([]);
+// The picker's list is being fetched (a dataset's top level or a folder).
+const filePickerLoading = ref(false);
 const filePickerAncestorList = ref([]);
 const filePickerCurrentFile = ref({ content: { name: "" } });
 const clearSelectedValues = ref(false);
@@ -1177,9 +1180,20 @@ const openFilePicker = (nodeId) => {
 const onPickerDatasetChange = (datasetId) => {
   const nodeId = filePickerNodeId.value;
   if (!nodeId) return;
-  // The first dataset picked is where the other inputs' pickers start.
-  if (!initiateForm.value.datasetId) initiateForm.value.datasetId = datasetId;
+  // The dataset picked last is where the other inputs' pickers start. Inputs
+  // that already have files from the one before keep it as their own.
+  const before = initiateForm.value.datasetId;
+  if (datasetId && datasetId !== before) {
+    for (const k of Object.keys(dataSourceFiles)) {
+      if (k !== nodeId && dataSourceFiles[k]?.length && !sourceDatasets[k]) sourceDatasets[k] = before;
+    }
+    initiateForm.value.datasetId = datasetId;
+  }
   sourceDatasets[nodeId] = datasetId === initiateForm.value.datasetId ? "" : datasetId;
+  // An input whose own dataset is now the one others start from follows it.
+  for (const k of Object.keys(sourceDatasets)) {
+    if (sourceDatasets[k] === initiateForm.value.datasetId) sourceDatasets[k] = "";
+  }
   delete dataSourceFiles[nodeId];
   store.commit("analysisModule/CLEAR_SELECTED_FILES");
   filePickerFiles.value = [];
@@ -1190,6 +1204,7 @@ const onPickerDatasetChange = (datasetId) => {
 };
 
 const fetchDatasetFiles = async () => {
+  filePickerLoading.value = true;
   try {
     const token = await useGetToken();
     const datasetId = sourceDatasetOf(filePickerNodeId.value);
@@ -1198,6 +1213,8 @@ const fetchDatasetFiles = async () => {
     filePickerFiles.value = [...(response.children || [])];
   } catch (err) {
     console.error("Failed to fetch files:", err);
+  } finally {
+    filePickerLoading.value = false;
   }
 };
 
@@ -1726,6 +1743,13 @@ function applySetupDefaults(definition) {
 
 const onSetupDatasetSearch = (query) => fetchDatasetOptions(query || "");
 
+// The dataset the open file picker shows, as its header describes it.
+const pickerDataset = computed(() => {
+  const id = filePickerVisible.value ? sourceDatasetOf(filePickerNodeId.value) : "";
+  const ds = id && datasetOptions.value.find((d) => d.content?.id === id);
+  return ds ? datasetSummary(ds) : null;
+});
+
 // The request's datasetId: the first input's dataset (in the workflow's
 // order), else where pickers start, for a workflow with no inputs.
 const runDatasetId = computed(() => {
@@ -1754,9 +1778,9 @@ const fetchDatasetOptions = async (query = "") => {
       orderBy: "IntId", orderDirection: "Desc",
       type: "research", api_key: token,
     });
-    const url = `${config.value.apiUrl}/datasets/paginated?${params}`;
+    const url = `${config.value.apiUrl}/datasets/paginated?${params}&includeBannerUrl=true`;
     const response = await useSendXhr(url);
-    const found = response?.datasets || response || [];
+    const found = sortDatasets(response?.datasets || response || []);
     // The chosen datasets (the run's, the sources' own) stay, so their
     // selectors keep naming them while another search is shown.
     const chosen = new Set([initiateForm.value.datasetId, ...Object.values(sourceDatasets)].filter(Boolean));
@@ -2992,11 +3016,22 @@ onUnmounted(() => {
             :loading="datasetSearchLoading"
             placeholder="Search datasets"
             class="file-picker-dataset-select"
+            popper-class="dataset-option-popper"
             @update:model-value="onPickerDatasetChange"
           >
-            <el-option v-for="d in datasetOptions" :key="d.content?.id" :label="d.content?.name" :value="d.content?.id" />
+            <el-option v-for="d in datasetOptions" :key="d.content?.id" :label="d.content?.name" :value="d.content?.id">
+              <DatasetOptionRow :dataset="d" />
+            </el-option>
           </el-select>
           <span v-if="sourceDatasets[filePickerNodeId]" class="file-picker-dataset-note">Not the other inputs' dataset</span>
+        </div>
+        <div v-if="pickerDataset" class="file-picker-dataset-head">
+          <img :src="pickerDataset.banner || '/images/banner-placeholder.jpg'" alt="" />
+          <div>
+            <div class="file-picker-dataset-name">{{ pickerDataset.name }}</div>
+            <div v-if="pickerDataset.description" class="file-picker-dataset-desc">{{ pickerDataset.description }}</div>
+            <div class="file-picker-dataset-meta">{{ pickerDataset.meta }}</div>
+          </div>
         </div>
         <div class="file-picker-header">
           <span class="selected-count">
@@ -3015,7 +3050,13 @@ onUnmounted(() => {
               @navigate-breadcrumb="handleNavigateBreadcrumb"
             />
           </div>
-          <div class="files-table-container">
+          <p v-if="filePickerLoading" class="file-picker-empty">Loading files…</p>
+          <p v-else-if="!filePickerFiles.length" class="file-picker-empty">
+            {{ !sourceDatasetOf(filePickerNodeId)
+              ? "Choose a dataset to see its files."
+              : filePickerCurrentFile?.content?.id ? "This folder is empty." : `${datasetName(sourceDatasetOf(filePickerNodeId), datasetOptions)} has no files.` }}
+          </p>
+          <div v-else class="files-table-container">
             <analysis-files-table
               :data="filePickerFiles"
               :clear-selected-values="clearSelectedValues"
@@ -3373,6 +3414,22 @@ onUnmounted(() => {
 </template>
 
 <style lang="scss">
+/* Dataset pickers' lists (appended to body, so not scoped): each dataset with
+   its banner and two lines under its name (DatasetOptionRow). */
+.dataset-option-popper {
+  min-width: 420px;
+  max-width: 560px;
+
+  .el-select-dropdown__item {
+    max-width: 560px;
+    overflow: hidden;
+    height: auto;
+    min-height: 34px;
+    line-height: normal;
+    padding: 2px 12px;
+  }
+}
+
 /* The run setup's compute node list (appended to body, so not scoped): as
    wide as its field, each node's name with why it can't run this below it. */
 .setup-node-popper .el-select-dropdown__item {
@@ -4217,6 +4274,44 @@ onUnmounted(() => {
     font-weight: 500;
     color: theme.$gray_6;
   }
+}
+.file-picker-dataset-head {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 12px;
+  padding: 8px;
+  border: 1px solid theme.$gray_2;
+  border-radius: 4px;
+
+  img {
+    width: 64px;
+    height: 64px;
+    object-fit: cover;
+  }
+}
+.file-picker-dataset-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: theme.$gray_6;
+}
+.file-picker-dataset-desc {
+  font-size: 12px;
+  color: theme.$gray_5;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.file-picker-dataset-meta {
+  margin-top: 2px;
+  font-size: 11px;
+  color: theme.$gray_4;
+}
+.file-picker-empty {
+  margin: 16px 0;
+  font-size: 13px;
+  color: theme.$gray_4;
 }
 .file-picker-dataset-select {
   width: 320px;
