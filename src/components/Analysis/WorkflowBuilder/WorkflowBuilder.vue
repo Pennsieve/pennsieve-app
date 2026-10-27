@@ -661,6 +661,8 @@ Mode Management
 const isReadOnly = computed(() => mode.value === "browse");
 // The builder saves inputs and outputs (features.workflowInterface).
 const interfaceOn = isFeatureEnabled("workflowInterface");
+// Where a new output can go, to start with.
+const DEFAULT_ACCEPTS = ["Pennsieve Dataset", "download"];
 
 const enterCreateMode = () => {
   mode.value = "create";
@@ -1142,6 +1144,11 @@ const makeNode = (type, app, position) => {
         label: "Output",
         targetType: only ? only.targetType : null,
         computeType: only?.runtimeConfig?.computeTypes?.[0] || null,
+        // A new output can go to a dataset or a download unless the author
+        // says otherwise (those the registry has).
+        ...(interfaceOn && {
+          accepts: DEFAULT_ACCEPTS.filter((t) => targetTypes.value.some((tt) => tt.targetType === t)),
+        }),
       },
       position,
     };
