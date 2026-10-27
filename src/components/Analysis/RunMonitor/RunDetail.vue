@@ -1311,28 +1311,9 @@ const fileCountForNode = (nodeId) => {
 // inputs' app.yml declares), while configuring: marked on the link to the
 // input that doesn't take them, as the builder marks a link that doesn't fit,
 // and explained in the source's panel. A warning, not a block (an app may
-// still read them). A chosen folder counts with the files directly in it
-// (folderFiles, read when it's chosen; not its subfolders).
-const folderFiles = reactive({});
-const loadFolderFiles = async (folderId) => {
-  if (!folderId || folderFiles[folderId]) return;
-  folderFiles[folderId] = { names: [], loading: true };
-  try {
-    const token = await useGetToken();
-    const response = await useSendXhr(`${config.value.apiUrl}/packages/${folderId}?api_key=${token}&limit=500&offset=0`);
-    const names = (response?.children || []).filter((c) => c.content?.packageType !== "Collection").map((c) => c.content?.name || "");
-    folderFiles[folderId] = { names, loading: false };
-  } catch {
-    folderFiles[folderId] = { names: [], loading: false };
-  }
-};
-watch(
-  () => Object.values(dataSourceFiles).flat().filter((f) => f?.content?.packageType === "Collection").map((f) => f.content.id).join(","),
-  (ids) => ids && ids.split(",").forEach(loadFolderFiles)
-);
-const filesOf = (f) =>
-  f.content?.packageType === "Collection" ? folderFiles[f.content.id]?.names || [] : [f.content?.name || ""];
-const chosenFileNames = (nodeId) => (dataSourceFiles[nodeId] || []).flatMap(filesOf);
+// still read them). Folders aren't checked: what's in them isn't known here.
+const chosenFileNames = (nodeId) =>
+  (dataSourceFiles[nodeId] || []).filter((f) => f.content?.packageType !== "Collection").map((f) => f.content?.name || "");
 const configHints = (nodeId) => {
   const dag = configDefinition.value?.dag || [];
   return sourceHints(nodeId, dag, portsOfStep(dag, availableApplications.value));
@@ -1381,7 +1362,6 @@ watch(
       edges.value.length,
       availableApplications.value.length,
       ...nodes.value.filter((n) => n.type === "data-source").map((n) => chosenFileNames(n.id).join("|")),
-      Object.values(folderFiles).map((f) => (f.loading ? "…" : f.names.length)).join(","),
     ].join("/"),
   markSourceEdges
 );
@@ -1393,12 +1373,7 @@ const mismatchLine = (nodeId) => {
     ? `${n === 1 ? "The file isn't" : `None of the ${n} files are`} ${m.expected}`
     : `${n} of ${m.total} files ${n === 1 ? "isn't" : "aren't"} ${m.expected}`;
 };
-// A chosen file that doesn't fit, or a folder with files directly in it that
-// don't.
-const mismatchedFile = (nodeId, file) => {
-  const names = sourceMismatch(nodeId)?.names || [];
-  return filesOf(file).some((n) => names.includes(n));
-};
+const mismatchedFile = (nodeId, file) => !!sourceMismatch(nodeId)?.names.includes(file.content?.name || "");
 
 const nodeUnmetCount = (nodeId, nodeType) => {
   if (mode.value !== "configure") return 0;
@@ -2744,7 +2719,7 @@ onUnmounted(() => {
                   :key="file.content?.id || idx"
                   class="selected-file-item"
                   :class="{ 'is-mismatch': mismatchedFile(selectedNode.id, file) }"
-                  :title="mismatchedFile(selectedNode.id, file) ? (file.content?.packageType === 'Collection' ? 'Has files this input doesn\'t take' : 'Not a type this input takes') : undefined"
+                  :title="mismatchedFile(selectedNode.id, file) ? 'Not a type this input takes' : undefined"
                 >
                   <IconCollection v-if="file.content?.packageType === 'Collection'" :width="14" :height="14" class="selected-file-icon collection" />
                   <IconFile v-else :width="14" :height="14" class="selected-file-icon" />
