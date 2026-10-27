@@ -6,6 +6,11 @@ import BfButton from "@/components/shared/bf-button/BfButton.vue";
 import IconCheck from "@/components/icons/IconCheck.vue";
 import IconKitchenTimer from "@/components/icons/IconKitchenTimer.vue";
 import BfDialogHeader from "@/components/shared/bf-dialog-header/BfDialogHeader.vue";
+import {
+  PROPOSAL_NAME_MAX_LENGTH,
+  isValidProposalName,
+  hasText,
+} from "@/utils/proposalValidation";
 
 const props = defineProps({
   dialogVisible: {
@@ -182,22 +187,30 @@ const hasSubmissionSummary = computed(
     )
 );
 
+const isNameValid = computed(() => isValidProposalName(proposal.value.name));
+const isDescriptionFilled = computed(() => hasText(proposal.value.description));
+
+// Copied or older proposals can carry a name the input's maxlength won't trim
+const isNameTooLong = computed(
+  () => (proposal.value.name || "").trim().length > PROPOSAL_NAME_MAX_LENGTH
+);
+
 const readyToSave = computed(() => {
-  if (!hasRepositorySelected.value) return false;
+  if (!hasRepositorySelected.value || isNameTooLong.value) return false;
   // For updating existing proposals, allow saving even if incomplete
   if (props.proposal) {
     return true;
   }
   // For new proposals, require name and description
-  return proposal.value.name && proposal.value.description;
+  return isNameValid.value && isDescriptionFilled.value;
 });
 
 const readyToSubmit = computed(() => {
   // Require all fields including all questions for submission
   return (
     hasRepositorySelected.value &&
-    proposal.value.name &&
-    proposal.value.description &&
+    isNameValid.value &&
+    isDescriptionFilled.value &&
     allRepoQuestionsAnswered.value
   );
 });
@@ -217,8 +230,8 @@ const allRepoQuestionsAnswered = computed(() => {
 
 const completedFieldsCount = computed(() => {
   let count = 0;
-  if (proposal.value.name) count++;
-  if (proposal.value.description) count++;
+  if (isNameValid.value) count++;
+  if (isDescriptionFilled.value) count++;
 
   const answeredQuestions = repositoryQuestions.value.filter((question) => {
     return (
@@ -383,7 +396,7 @@ function saveProposal() {
     .filter((response) => response.response.trim());
 
   const proposalData = {
-    name: proposal.value.name,
+    name: proposal.value.name.trim(),
     description: proposal.value.description,
     organizationNodeId: currentRepository.value.organizationNodeId,
     status: "DRAFT",
@@ -433,7 +446,7 @@ function submitProposal() {
     .filter((response) => response.response.trim());
 
   const proposalData = {
-    name: proposal.value.name,
+    name: proposal.value.name.trim(),
     description: proposal.value.description,
     organizationNodeId: currentRepository.value.organizationNodeId,
     status: "DRAFT",
@@ -640,9 +653,15 @@ function submitProposal() {
                 v-model="proposal.name"
                 placeholder="e.g., Neural Activity in Visual Cortex During Object Recognition"
                 size="large"
-                :class="{ 'field-completed': proposal.name }"
+                :maxlength="PROPOSAL_NAME_MAX_LENGTH"
+                :show-word-limit="!readOnly"
+                :class="{ 'field-completed': isNameValid }"
                 :readonly="readOnly"
               />
+              <p v-if="isNameTooLong && !readOnly" class="field-error">
+                Dataset names can be at most {{ PROPOSAL_NAME_MAX_LENGTH }}
+                characters.
+              </p>
             </div>
           </div>
 
@@ -1315,6 +1334,12 @@ function submitProposal() {
   gap: 8px;
   padding: 0 0 24px 0;
   margin-top: 24px;
+}
+
+.field-error {
+  margin: 8px 0 0;
+  color: theme.$red_2;
+  font-size: 13px;
 }
 
 .copied-from-notice {

@@ -96,7 +96,8 @@ export const useProposalStore = defineStore('proposalStore', () => {
       
       const response = await fetch(url, { headers: myHeaders })
       if (response.ok) {
-        const responseJson = await response.json()
+        // The Go backend encodes an empty list as null
+        const responseJson = (await response.json()) ?? []
         let count = 0
         publishingInfo.value = responseJson.map(r => ({
           id: ++count,
@@ -126,7 +127,8 @@ export const useProposalStore = defineStore('proposalStore', () => {
       
       const response = await fetch(url, { headers: myHeaders })
       if (response.ok) {
-        const responseJson = await response.json()
+        // The Go backend encodes an empty list as null
+        const responseJson = (await response.json()) ?? []
         let count = 0
         const processedRepositories = responseJson.map(r => ({
           id: ++count,
@@ -161,9 +163,10 @@ export const useProposalStore = defineStore('proposalStore', () => {
       
       const response = await fetch(url, { headers: myHeaders })
       if (response.ok) {
-        const responseJson = await response.json()
+        // The Go backend encodes an empty list as null (user has no proposals yet)
+        const responseJson = (await response.json()) ?? []
         let count = 0
-        datasetProposals.value = responseJson.map(p => 
+        datasetProposals.value = responseJson.map(p =>
           transformProposalIn(p, ++count)
         )
       } else {

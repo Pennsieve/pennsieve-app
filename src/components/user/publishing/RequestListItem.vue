@@ -114,6 +114,7 @@
 import { computed } from "vue";
 import { useProposalStore } from "@/stores/proposalStore";
 import { DatasetProposalAction } from "@/utils/constants";
+import { isValidProposalName, hasText } from "@/utils/proposalValidation";
 
 // Props
 const props = defineProps({
@@ -226,12 +227,11 @@ const surveyComplete = computed(() => {
 });
 
 const readyToSubmit = computed(() => {
-  const validName =
-    props.datasetRequest.name !== null && props.datasetRequest.name !== "";
-  const validDescription =
-    props.datasetRequest.description !== null &&
-    props.datasetRequest.description !== "";
-  return validName && validDescription && surveyComplete.value;
+  return (
+    isValidProposalName(props.datasetRequest.name) &&
+    hasText(props.datasetRequest.description) &&
+    surveyComplete.value
+  );
 });
 
 // Methods
