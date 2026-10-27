@@ -17,6 +17,8 @@ const props = defineProps({
   saveLabel: { type: String, default: "Save" },
   // Editing a saved workflow: a Cancel button, and no Start over.
   editing: { type: Boolean, default: false },
+  // Building has started: before, the bar doesn't list what's missing.
+  started: { type: Boolean, default: true },
 });
 // select(item): show what an item is about (its node); start-over; cancel
 const emit = defineEmits(["update:name", "update:description", "save", "start-over", "select", "cancel"]);
@@ -64,7 +66,7 @@ defineExpose({ focusName: () => nameRef.value?.focus() });
       />
     </div>
 
-    <el-popover v-model:visible="showList" placement="bottom-end" :width="340" trigger="click">
+    <el-popover v-if="started" v-model:visible="showList" placement="bottom-end" :width="340" trigger="click">
       <template #reference>
         <button type="button" class="bb-ready" :class="`is-${state}`" :aria-expanded="showList">
           <span class="bb-dot" />
