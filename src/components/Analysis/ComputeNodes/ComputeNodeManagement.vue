@@ -14,6 +14,7 @@ import ComputeNodeSecrets from './ComputeNodeSecrets.vue'
 import ComputeNodeLayers from './ComputeNodeLayers.vue'
 import ComputeNodeQuotas from './ComputeNodeQuotas.vue'
 import ComputeNodeLLMBudget from './ComputeNodeLLMBudget.vue'
+import { capNodeVersion } from '@/utils/provisionerVersionCap'
 
 const route = useRoute()
 const router = useRouter()
@@ -205,7 +206,7 @@ async function fetchComputeNode() {
       }
     })
     if (response.ok) {
-      computeNode.value = await response.json()
+      computeNode.value = capNodeVersion(await response.json())
     } else {
       ElMessage.error('Failed to load compute node details')
       router.push({ name: 'compute-nodes', params: { orgId: orgId.value } })
