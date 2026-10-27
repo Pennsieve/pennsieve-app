@@ -31,6 +31,7 @@ import toQueryParams from "@/utils/toQueryParams";
 import LayerNameSelector from "./LayerNameSelector.vue";
 import TargetDatasetField from "./TargetDatasetField.vue";
 import { targetWritesToDataset, targetParamFields, buildDataTargets, targetDatasetId, datasetName, shownTargetParams } from "./dataTargets";
+import { importStatusUrl, importSummary, importStillMoving, isDatasetImport } from "./runImports";
 import DownloadItem from "@/components/downloads/DownloadItem.vue";
 import { useDownloadsStore } from "@/stores/downloadsStore";
 
@@ -1459,6 +1460,58 @@ onMounted(() => {
 });
 onBeforeUnmount(() => clearInterval(nowTimer));
 
+/*
+  Dataset imports: how far each "Pennsieve Dataset" target's copies into its
+  dataset are (runImports.js). Asked for once a target has started, and
+  again every IMPORT_POLL_MS while files are still moving and the page is
+  visible. A run from before imports (404) shows nothing.
+*/
+const IMPORT_POLL_MS = 15000;
+const importStatus = reactive({}); // node id -> the endpoint's response, or null
+let importTimer = null;
+
+const datasetImportNodes = () =>
+  nodes.value.filter((n) => n.type === "data-target" && isDatasetImport(n.data) && ["STARTED", "SUCCEEDED", "FAILED"].includes(n.data.status));
+
+const fetchImportStatus = async (node, runId, token) => {
+  try {
+    const resp = await fetch(importStatusUrl(config.value.api2Url, node.data.datasetId, runId, node.id), {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (resp.status === 404 || resp.status === 403) {
+      importStatus[node.id] = null;
+      return;
+    }
+    if (resp.ok) importStatus[node.id] = await resp.json();
+  } catch (err) {
+    console.warn("Import status:", err?.message || err);
+  }
+};
+
+const refreshImports = async () => {
+  clearTimeout(importTimer);
+  importTimer = null;
+  const runId = selectedWorkflowActivity.value?.uuid;
+  const targets = mode.value === "browse" && runId ? datasetImportNodes() : [];
+  if (!targets.length) return;
+  if (document.visibilityState === "visible") {
+    const token = await useGetToken();
+    await Promise.all(targets.map((n) => fetchImportStatus(n, runId, token)));
+  }
+  const moving = targets.some((n) => importStatus[n.id] !== null && importStillMoving(importStatus[n.id], n.data.status));
+  if (moving) importTimer = setTimeout(refreshImports, IMPORT_POLL_MS);
+};
+watch(
+  () => datasetImportNodes().map((n) => `${n.id}:${n.data.status}`).join(","),
+  (now, before) => {
+    if (now && now !== before) refreshImports();
+  }
+);
+onBeforeUnmount(() => clearTimeout(importTimer));
+
+// A target card's import line, or null.
+const importLineOf = (id) => importSummary(importStatus[id]);
+
 const nodeRunTime = (data) => formatRunTime(nodeDurationSec(data, nowTick.value));
 const processorFacts = (id, data) =>
   [data.version, formatResources(data.cpu, data.memory), nodeRunTime(data)].filter(Boolean);
@@ -1881,6 +1934,7 @@ onUnmounted(() => {
                   :status="mode === 'browse' ? data.status : ''"
                   :runtime="nodeConfigs[id]?.computeType || data.computeType"
                   :unmet="nodeUnmetCount(id, 'data-target')"
+                  :detail="importLineOf(id)?.text || ''"
                 />
                 <div v-else class="custom-node data-target-node" :class="mode === 'browse' ? statusClass(data.status) : ''">
                   <span v-if="nodeUnmetCount(id, 'data-target') > 0" class="node-unmet-badge">{{ nodeUnmetCount(id, 'data-target') }}</span>
@@ -1899,6 +1953,14 @@ onUnmounted(() => {
                   </div>
                   <div v-if="mode === 'browse' && targetFacts(data).length" class="node-facts">
                     {{ targetFacts(data).join(" · ") }}
+                  </div>
+                  <div
+                    v-if="mode === 'browse' && importLineOf(id)"
+                    class="node-import"
+                    :class="`node-import--${importLineOf(id).state}`"
+                    title="The files' copies into the dataset (select the target for details)"
+                  >
+                    {{ importLineOf(id).text }}
                   </div>
                   <div class="node-body">
                     <div v-if="mode === 'browse' && targetParamsShown(id, data).length > 0" class="param-preview">
@@ -2498,6 +2560,28 @@ onUnmounted(() => {
                   <span class="info-label">Writes to</span>
                   <span class="info-value">{{ datasetName(selectedNode.data.datasetId, datasetOptions) }}</span>
                 </div>
+              </div>
+
+              <div v-if="importStatus[selectedNode.id]" class="info-card params-card">
+                <h5 class="params-title">Import into dataset</h5>
+                <div class="info-row">
+                  <span class="info-label">Imported</span>
+                  <span class="info-value">{{ importStatus[selectedNode.id].imported }} of {{ importStatus[selectedNode.id].total }}</span>
+                </div>
+                <div v-if="importStatus[selectedNode.id].inProgress" class="info-row">
+                  <span class="info-label">In progress</span>
+                  <span class="info-value">{{ importStatus[selectedNode.id].inProgress }}</span>
+                </div>
+                <div v-if="importStatus[selectedNode.id].failed" class="info-row">
+                  <span class="info-label">Failed</span>
+                  <span class="info-value import-failed">{{ importStatus[selectedNode.id].failed }}</span>
+                </div>
+                <ul v-if="importStatus[selectedNode.id].failures?.length" class="import-failures">
+                  <li v-for="f in importStatus[selectedNode.id].failures" :key="f.path">
+                    <span class="import-failure-path">{{ f.path }}</span>
+                    <span v-if="f.message" class="import-failure-message">{{ f.message }}</span>
+                  </li>
+                </ul>
               </div>
 
               <div v-if="selectedNode.data?.params?.length > 0" class="info-card params-card">
@@ -3461,6 +3545,15 @@ onUnmounted(() => {
   }
 
   // Finished: a ✓ by the title, in place of a status badge.
+  // A dataset target's import, under its facts (runImports.js).
+  .node-import {
+    margin-top: 4px;
+    font-size: 11px;
+    color: theme.$gray_5;
+  }
+  .node-import--importing { color: #0e7490; }
+  .node-import--failed { color: theme.$status_red; font-weight: 600; }
+
   .node-mark {
     flex-shrink: 0;
     font-size: 15px;
@@ -3631,6 +3724,32 @@ onUnmounted(() => {
 @keyframes strip-pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.25; }
+}
+
+/* A dataset import's failed files, in the target's panel. */
+.import-failed {
+  color: theme.$status_red;
+  font-weight: 600;
+}
+.import-failures {
+  margin: 6px 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 12px;
+
+  li {
+    display: flex;
+    flex-direction: column;
+    padding: 4px 0;
+    border-top: 1px solid theme.$gray_2;
+  }
+}
+.import-failure-path {
+  color: theme.$gray_6;
+  word-break: break-all;
+}
+.import-failure-message {
+  color: theme.$gray_5;
 }
 
 /* Status dots */
