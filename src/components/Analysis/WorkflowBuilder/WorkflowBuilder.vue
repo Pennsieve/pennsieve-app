@@ -5071,8 +5071,10 @@ kbd {
   border: 1px solid theme.$gray_3;
   border-radius: 4px;
   padding: 8px 10px;
-  min-width: 250px;
-  max-width: 350px;
+  /* One size (NODE_WIDTH), so auto-arrange centres it; a long name is cut
+     short, in full on hover. */
+  box-sizing: border-box;
+  width: 280px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   transition: all 0.2s;
   position: relative;
