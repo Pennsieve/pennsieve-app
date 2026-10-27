@@ -51,7 +51,11 @@ onMounted(async () => {
   }
 });
 const view = computed({
-  get: () => (hasRuns.value === null ? null : workflowsView(route.query.view, lastView(), hasRuns.value)),
+  // A view the URL names needs no wait for whether there are runs.
+  get: () =>
+    hasRuns.value === null && !VIEWS.some((v) => v.key === route.query.view)
+      ? null
+      : workflowsView(route.query.view, lastView(), hasRuns.value ?? false),
   set: (v) => {
     try {
       localStorage.setItem(VIEW_KEY, v);
@@ -71,15 +75,39 @@ const includeNotebooks = computed({
 const runsRef = ref(null);
 
 // A Library card's Run (?run=<workflow>) switches to Live with the wizard open
-// on it; the query goes, so a reload doesn't open it again.
+// on it; the query goes, so a reload doesn't open it again. One navigation
+// for both (two replaces raced each other), then the wizard once Live's
+// RunsOverview is mounted: the view changes with the route, a tick or more
+// after the replace.
 async function openRunFromQuery() {
   const id = route.query.run;
   if (!id) return;
-  if (view.value !== "live") view.value = "live";
-  await nextTick();
-  runsRef.value?.openWizardDialog(String(id));
   const { run, ...rest } = route.query;
-  router.replace({ query: rest });
+  try {
+    localStorage.setItem(VIEW_KEY, "live");
+  } catch {
+    // not remembered; the URL says it
+  }
+  await router.replace({ query: { ...rest, view: "live" } });
+  await nextTick();
+  const runs = runsRef.value || (await mounted(runsRef));
+  runs?.openWizardDialog(String(id));
+}
+
+// The ref's component once it's mounted (or null after a few seconds).
+function mounted(r) {
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => {
+      stop();
+      resolve(null);
+    }, 5000);
+    const stop = watch(r, (c) => {
+      if (!c) return;
+      clearTimeout(timer);
+      stop();
+      resolve(c);
+    });
+  });
 }
 onMounted(openRunFromQuery);
 watch(() => route.query.run, openRunFromQuery);
