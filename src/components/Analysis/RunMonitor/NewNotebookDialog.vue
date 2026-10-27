@@ -853,7 +853,9 @@ async function execute() {
             @click="form.workflowId = wf.uuid"
           >
             <span class="kernel-name">{{ kernelLabel(notebookKernel(wf)) }}</span>
-            <span class="kernel-sub">{{ kernelOutput(wf) || wf.name }}</span>
+            <!-- Where results go tells kernels apart only when it's fixed: a
+                 notebook with an input and output chooses it later -->
+            <span class="kernel-sub">{{ hasInterface(wf) ? wf.summary || "You choose its input and results next" : kernelOutput(wf) || wf.name }}</span>
           </button>
         </div>
       </div>
