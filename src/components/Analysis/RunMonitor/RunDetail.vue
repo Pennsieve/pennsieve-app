@@ -77,7 +77,7 @@ import {
   runDisplayName,
   RUN_NAME_MAX_LENGTH,
 } from "./runHelpers";
-import { sourceLabel, sourceHints, hintLine, portsOfStep, missingFilesMessage, fileTypeMismatches, linkHints } from "../WorkflowGraph/sourceInputs";
+import { sourceLabel, sourceHints, hintLine, portsOfStep, missingFilesMessage, fileTypeMismatches, acceptedFileTypes, linkHints } from "../WorkflowGraph/sourceInputs";
 import { portEdges, stepPoints } from "../WorkflowGraph/runPorts";
 import PortChips from "../WorkflowGraph/PortChips.vue";
 import LlmMark from "../WorkflowGraph/LlmMark.vue";
@@ -146,6 +146,7 @@ const sourcePicker = computed(() => {
   const dag = configDefinition.value?.dag || [];
   const name = id ? sourceLabel(id, dag, "") : "";
   return {
+    name,
     title: name ? `Select files for ${name}` : "Select Files",
     hint: id ? hintLine(sourceHints(id, dag, portsOfStep(dag, availableApplications.value))) : "",
   };
@@ -1159,6 +1160,7 @@ const executeWorkflow = async () => {
 */
 const openFilePicker = (nodeId) => {
   filePickerNodeId.value = nodeId;
+  pickerAllowOtherTypes.value = false;
   filePickerFiles.value = [];
   filePickerAncestorList.value = [];
   filePickerCurrentFile.value = { content: { name: "" } };
@@ -1750,6 +1752,23 @@ function applySetupDefaults(definition) {
 }
 
 const onSetupDatasetSearch = (query) => fetchDatasetOptions(query || "");
+
+// What the open picker's input takes (its app.yml types, "CSV or JSON"), when
+// it says; files that aren't those are dimmed and can't be chosen unless the
+// user allows other types (the check goes by extension, so it can be wrong).
+// A folder can always be chosen: what's in it isn't known here.
+const pickerAllowOtherTypes = ref(false);
+const pickerHints = computed(() => {
+  const id = filePickerNodeId.value;
+  const dag = configDefinition.value?.dag || [];
+  return id ? sourceHints(id, dag, portsOfStep(dag, availableApplications.value)) : [];
+});
+const pickerTypes = computed(() => [...(acceptedFileTypes(pickerHints.value) || [])].join(" or "));
+const pickerWhyNot = (row) => {
+  if (pickerAllowOtherTypes.value || !pickerTypes.value || row?.content?.packageType === "Collection") return "";
+  if (!fileTypeMismatches([row?.content?.name || ""], pickerHints.value)) return "";
+  return `${sourcePicker.value.name || "This input"} takes ${pickerTypes.value} files`;
+};
 
 // The dataset the open file picker shows, as its header describes it.
 const pickerDataset = computed(() => {
@@ -3075,6 +3094,12 @@ onUnmounted(() => {
     >
       <div class="file-picker-content">
         <p v-if="sourcePicker.hint" class="file-picker-hint">{{ sourcePicker.hint }}</p>
+        <el-switch
+          v-if="pickerTypes"
+          v-model="pickerAllowOtherTypes"
+          class="file-picker-types"
+          :active-text="`Allow files other than ${pickerTypes}`"
+        />
         <div v-if="!isMyWorkspace" class="file-picker-dataset">
           <label for="picker-dataset">Dataset</label>
           <el-select
@@ -3131,6 +3156,7 @@ onUnmounted(() => {
           <div v-show="!filePickerLoading && filePickerFiles.length" class="files-table-container">
             <analysis-files-table
               :data="filePickerFiles"
+              :why-not="pickerWhyNot"
               :clear-selected-values="clearSelectedValues"
               @selection-change="onFileSelect"
               @click-file-label="onClickFileLabel"
@@ -4381,6 +4407,9 @@ onUnmounted(() => {
   margin-top: 2px;
   font-size: 11px;
   color: theme.$gray_4;
+}
+.file-picker-types {
+  margin-bottom: 10px;
 }
 .file-picker-empty {
   margin: 16px 0;

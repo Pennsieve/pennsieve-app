@@ -107,6 +107,16 @@ export function fileShortType(name) {
 // input takes any file or a folder layout, or when its app declares no types
 // (nothing to compare).
 export function fileTypeMismatches(fileNames, hints) {
+  const accepted = acceptedFileTypes(hints);
+  if (!accepted) return null;
+  const names = (fileNames || []).filter((n) => !accepted.has(fileShortType(n)));
+  return names.length ? { names, expected: [...accepted].join(" or ") } : null;
+}
+
+// The file types a source's inputs take (a Set of short types), or null when
+// any file will do: an input takes any file or a folder layout, or its app
+// declares no types.
+export function acceptedFileTypes(hints) {
   const accepted = new Set();
   for (const h of hints || []) {
     if (h.layout || !h.types.length) return null;
@@ -115,9 +125,7 @@ export function fileTypeMismatches(fileNames, hints) {
       accepted.add(t);
     }
   }
-  if (!accepted.size) return null;
-  const names = (fileNames || []).filter((n) => !accepted.has(fileShortType(n)));
-  return names.length ? { names, expected: [...accepted].join(" or ") } : null;
+  return accepted.size ? accepted : null;
 }
 
 // The hints for one link: what the input a source feeds through it takes

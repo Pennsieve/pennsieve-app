@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { inputsFedBy, sourceLabel, sourceHints, hintLine, portsOfStep, missingFilesMessage, fileShortType, fileTypeMismatches, linkHints } from "./sourceInputs";
+import { inputsFedBy, sourceLabel, sourceHints, hintLine, portsOfStep, missingFilesMessage, fileShortType, fileTypeMismatches, acceptedFileTypes, linkHints } from "./sourceInputs";
 
 // Four sources into test-ports-processor: two linked to its inputs, two to
 // "all inputs".
@@ -104,5 +104,15 @@ describe("linkHints", () => {
     ];
     expect(linkHints(hints, "a", "events").map((h) => h.types[0])).toEqual(["JSON"]);
     expect(linkHints(hints, "a").length).toBe(2);
+  });
+});
+
+describe("acceptedFileTypes", () => {
+  it("is what a source's inputs take, or null when any file will do", () => {
+    expect([...acceptedFileTypes([{ types: ["CSV"] }, { types: ["JSON", "CSV"] }])]).toEqual(["CSV", "JSON"]);
+    expect(acceptedFileTypes([{ types: ["CSV"] }, { types: [] }])).toBeNull();
+    expect(acceptedFileTypes([{ types: ["CSV"], layout: "BIDS" }])).toBeNull();
+    expect(acceptedFileTypes([{ types: ["Any"] }])).toBeNull();
+    expect(acceptedFileTypes([])).toBeNull();
   });
 });
