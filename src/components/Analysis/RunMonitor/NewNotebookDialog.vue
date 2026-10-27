@@ -824,7 +824,7 @@ async function execute() {
   <el-dialog
     v-model="visible"
     :title="stepTitles[step]"
-    :width="step === 4 && (!personal || iface) ? '840px' : '560px'"
+    :width="(step === 4 && (!personal || iface)) || (iface && (step === 3 || step === 5)) ? '840px' : '560px'"
     :close-on-click-modal="false"
   >
     <div class="wizard-body">
@@ -942,7 +942,10 @@ async function execute() {
       </div>
 
       <!-- Step 3: Input (a notebook with an input: what it starts with) -->
-      <div v-if="step === 3 && iface" class="io-choices">
+      <div v-if="step === 3" :class="{ 'io-split': iface }">
+      <div v-if="iface" class="io-side">
+      <div class="io-choices-label">Start with</div>
+      <div class="io-choices">
         <button
           v-for="c in inputChoices"
           :key="c"
@@ -955,11 +958,14 @@ async function execute() {
           <span class="io-choice__desc">{{ INPUT_CHOICES[c].desc }}</span>
         </button>
       </div>
+      </div>
+      <div class="io-main">
       <div v-if="step === 3 && iface && inputChoice === 'none'" class="wizard-step">
         <p class="wizard-step-desc">The notebook starts with an empty <code>input/</code> folder.</p>
       </div>
       <!-- Step 3: Dataset -->
       <div v-else-if="step === 3 && showPublicInput" class="wizard-step">
+        <h4 v-if="iface" class="io-section-title">Choose a public dataset</h4>
         <p class="wizard-step-desc">
           Optionally choose a public dataset to work with. You pick which of
           its files to download from the notebook. Skip this step to start
@@ -1058,7 +1064,8 @@ async function execute() {
         <el-input placeholder="Search datasets..." disabled class="wizard-search" />
       </div>
       <div v-else-if="step === 3 && showDatasetInput" class="wizard-step">
-        <p class="wizard-step-desc">Select the dataset to work with.</p>
+        <h4 v-if="iface" class="io-section-title">Choose a dataset</h4>
+        <p v-else class="wizard-step-desc">Select the dataset to work with.</p>
         <div v-if="selectedDataset" class="wizard-selection">
           <div class="wizard-selection-header">
             <span class="wizard-selection-name">{{ selectedDataset.content?.name }}</span>
@@ -1120,6 +1127,9 @@ async function execute() {
         </template>
       </div>
 
+      </div>
+      </div>
+
       <!-- Step 4: Input files -->
       <div v-if="step === 4 && (!personal || iface)" class="wizard-step">
         <div v-if="definitionLoading" class="wizard-cards-loading">
@@ -1177,7 +1187,10 @@ async function execute() {
         <p class="wizard-step-desc">
           {{ iface ? "Where the notebook's results (its output/ folder) go when the session ends." : "Configure where the notebook's results are saved." }}
         </p>
-        <div v-if="iface" class="io-choices">
+        <div :class="{ 'io-split': iface }">
+        <div v-if="iface" class="io-side">
+        <div class="io-choices-label">Results go to</div>
+        <div class="io-choices">
           <button
             v-for="t in outputChoices"
             :key="t"
@@ -1190,7 +1203,13 @@ async function execute() {
             <span class="io-choice__desc">{{ outputDesc(t) }}</span>
           </button>
         </div>
+        </div>
+        <div class="io-main">
+        <p v-if="iface && outputChoice === NO_DESTINATION" class="wizard-step-desc">
+          The session's <code>output/</code> folder isn't saved anywhere when it ends.
+        </p>
         <template v-if="!iface || outputChoice !== NO_DESTINATION">
+        <h4 v-if="iface" class="io-section-title">{{ outputWritesDataset ? "Dataset and folder" : "Download" }}</h4>
         <div v-if="chooseResultsDataset" class="target-block">
           <div class="target-block-title">Save results to</div>
           <div class="target-param-desc">
@@ -1270,6 +1289,8 @@ async function execute() {
           </div>
         </template>
         </template>
+        </div>
+        </div>
       </div>
 
       <!-- Step 6: Review -->
@@ -1378,17 +1399,50 @@ async function execute() {
 @use "../../../styles/theme";
 
 /* A choice of what a notebook starts with, or where its results go */
+.io-choices-label {
+  margin-bottom: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: theme.$gray_4;
+}
+/* Two columns: the choices on the left, what the chosen one needs on the
+   right, apart by a rule */
+.io-split {
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr);
+  gap: 20px;
+  min-height: 320px;
+}
+.io-side {
+  padding-right: 20px;
+  border-right: 1px solid theme.$gray_2;
+}
+.io-main {
+  min-width: 0;
+
+  > .wizard-step {
+    padding-top: 0;
+  }
+}
 .io-choices {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  margin-bottom: 12px;
+}
+.io-section-title {
+  margin: 0 0 10px;
+  font-size: 14px;
+  font-weight: 600;
+  color: theme.$gray_6;
 }
 .io-choice {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  padding: 10px 12px;
+  min-width: 0;
+  padding: 8px 10px;
   border: 1px solid theme.$gray_2;
   border-radius: 4px;
   background: theme.$white;
@@ -1401,6 +1455,7 @@ async function execute() {
   }
   &.is-picked {
     border-color: theme.$purple_1;
+    background: #f5f3ff;
     box-shadow: inset 3px 0 0 theme.$purple_1;
   }
 }
@@ -1410,7 +1465,8 @@ async function execute() {
   color: theme.$gray_6;
 }
 .io-choice__desc {
-  font-size: 12px;
+  font-size: 11px;
+  line-height: 1.35;
   color: theme.$gray_4;
 }
 
