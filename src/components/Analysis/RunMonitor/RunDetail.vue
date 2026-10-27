@@ -30,7 +30,7 @@ import { useSendXhr } from "@/mixins/request/request_composable";
 import toQueryParams from "@/utils/toQueryParams";
 import LayerNameSelector from "./LayerNameSelector.vue";
 import TargetDatasetField from "./TargetDatasetField.vue";
-import { targetWritesToDataset, targetParamFields, buildDataTargets, targetDatasetId, datasetName } from "./dataTargets";
+import { targetWritesToDataset, targetParamFields, buildDataTargets, targetDatasetId, datasetName, shownTargetParams } from "./dataTargets";
 import DownloadItem from "@/components/downloads/DownloadItem.vue";
 import { useDownloadsStore } from "@/stores/downloadsStore";
 
@@ -46,7 +46,8 @@ const customAssetTypeNodes = reactive(new Set());
 
 import {
   statusClass,
-  statusBorderColor,
+  graphStatusColor,
+  statusMarkOf,
   nodeBorderColor,
   statusDotClass,
   statusLabel,
@@ -73,6 +74,13 @@ import {
   RUN_NAME_MAX_LENGTH,
 } from "./runHelpers";
 import { sourceLabel, sourceHints, hintLine, portsOfStep, missingFilesMessage } from "../WorkflowGraph/sourceInputs";
+import { portEdges, stepPoints } from "../WorkflowGraph/runPorts";
+import PortChips from "../WorkflowGraph/PortChips.vue";
+import LlmMark from "../WorkflowGraph/LlmMark.vue";
+import RuntimeMark from "../WorkflowGraph/RuntimeMark.vue";
+import { inputHandleId } from "../WorkflowBuilder/inputPorts";
+import { portHandleId, portOfHandle } from "../WorkflowBuilder/outputPorts";
+import { stepNames } from "../WorkflowBuilder/stepNames";
 
 // Shown in a workspace (/:orgId/analysis/runs/...) and in My Workspace
 // (/my-workspace/analysis/runs/...), where there's no organization and a run
@@ -481,8 +489,87 @@ const needsLayout = (result) => result.needsAutoLayout || !detailed.value;
 const changeDensity = (value) => {
   if (value === detailed.value) return;
   setDetailed(value);
+  redrawGraph();
   autoLayout();
 };
+
+// The graph's nodes and edges again from what it shows (the run, or the
+// workflow being configured), keeping where the nodes are: on a change of
+// density (ports or not) and when the apps, with their ports, come in.
+const redrawGraph = () => {
+  const source = mode.value === "browse" ? selectedWorkflowActivity.value : configDefinition.value;
+  if (!source || !nodes.value.length) return;
+  const result = mode.value === "browse" ? runToNodesAndEdges(source) : definitionToNodesAndEdges(source);
+  const at = new Map(nodes.value.map((n) => [n.id, n.position]));
+  nodes.value = result.nodes.map((n) => ({ ...n, position: at.get(n.id) || n.position }));
+  edges.value = result.edges;
+};
+watch(() => availableApplications.value.length, redrawGraph);
+
+// What a step's app.yml declares, for its card: its ports (the detailed
+// card's connection points) and whether it calls language models.
+const stepManifest = (dag, id) => {
+  const m = portsOfStep(dag, availableApplications.value)(id);
+  return {
+    manifestPorts: m ? { inputs: m.inputs || [], outputs: m.outputs || [] } : null,
+    llm: !!m?.runtime?.llm,
+  };
+};
+
+// The edges: in the detailed view, each link on the ports it joins (two
+// links between the same steps are two lines); in compact, one line per
+// dependency.
+const graphEdges = (dag, resultNodes, stroke) => {
+  if (detailed.value) return portEdges(dag, resultNodes, (src) => ({ stroke: stroke(src) }));
+  const resultEdges = [];
+  for (const d of dag) {
+    for (const dep of d.dependsOn || []) {
+      resultEdges.push({ id: `e${dep}-${d.id}`, source: dep, target: d.id, animated: false, style: { stroke: stroke(dep) } });
+    }
+  }
+  return resultEdges;
+};
+
+// A detailed step's connection points on one side, and where each sits:
+// over (or under) its port's chip. 11px: the card's padding and border.
+const pointsOf = (id, data, side) => stepPoints(id, data.manifestPorts, edges.value, side);
+const hasPortChips = (id, data, side) => pointsOf(id, data, side).some((p) => p.port);
+const pointStyle = (points, p) =>
+  points.length > 1 ? { left: `calc(11px + (100% - 22px) * ${p.at}) !important` } : undefined;
+
+// Titles that tell steps apart, numbered top to bottom when two share a
+// name ("test-ports-processor (1)", "(2)"), as in the builder.
+const canvasTitles = computed(() =>
+  stepNames(
+    [...nodes.value].sort((a, b) => (a.position?.y ?? 0) - (b.position?.y ?? 0) || (a.position?.x ?? 0) - (b.position?.x ?? 0)),
+    (n) => (n.type === "data-target" ? n.data?.targetType || n.data?.label : n.data?.label)
+  )
+);
+const titleOf = (id, data) => canvasTitles.value.get(id) || data.targetType || data.label;
+
+// A step's status on its card, without changing the card's shape: a mark
+// in the title row once it has ended (✓ done, ✕ failed, – canceled); while
+// it runs, its type strip pulses (.blue-node); pending, nothing. The word is
+// the mark's title.
+const statusMark = (data) => (mode.value === "browse" && statusMarkOf(data.status)) || null;
+
+// A source with one file shows its name; with more, how many.
+const sourceDetail = (data) => {
+  if (data.packageCount === 1) {
+    const name = browseFileInfo.value[data.packageIds[0]]?.name;
+    if (name) return name;
+  }
+  return `${data.packageCount} file${data.packageCount !== 1 ? "s" : ""}`;
+};
+
+// A target's params on its card, without those at their default or the
+// path prefix a line from an output's port already shows.
+const targetParamsShown = (id, data) =>
+  shownTargetParams(
+    data.params,
+    getTargetTypeDefinition(data.targetType)?.params,
+    detailed.value && edges.value.some((e) => e.target === id && portOfHandle(e.sourceHandle))
+  );
 
 /*
   Convert a workflow definition's dag to VueFlow nodes/edges (for configure mode)
@@ -502,6 +589,8 @@ const definitionToNodesAndEdges = (definition) => {
         sourceUrl: d.sourceUrl,
         targetType: d.targetType || null,
         computeType: d.computeType || getComputeTypesForTarget(d.targetType)?.[0] || null,
+        ...(d.type === "processor" && stepManifest(dag, d.id)),
+        defaultParams: d.defaultParams || {},
       },
       position: hasSavedPositions && d.position && typeof d.position.x === "number"
         ? { x: d.position.x, y: d.position.y }
@@ -509,19 +598,7 @@ const definitionToNodesAndEdges = (definition) => {
     };
   });
   const dagMap = Object.fromEntries(dag.map((d) => [d.id, d]));
-  const resultEdges = [];
-  for (const d of dag) {
-    for (const dep of d.dependsOn || []) {
-      const srcNode = dagMap[dep];
-      resultEdges.push({
-        id: `e${dep}-${d.id}`,
-        source: dep,
-        target: d.id,
-        animated: false,
-        style: { stroke: nodeBorderColor(srcNode?.type, null) },
-      });
-    }
-  }
+  const resultEdges = graphEdges(dag, resultNodes, (src) => nodeBorderColor(dagMap[src]?.type, null));
   return { nodes: resultNodes, edges: resultEdges, needsAutoLayout: !hasSavedPositions };
 };
 
@@ -555,10 +632,12 @@ const runToNodesAndEdges = (run) => {
       extra.computeType = cfg?.executionTarget || d.computeType || null;
       const targetParams = runDataTargets[d.id]?.params || {};
       extra.params = Object.entries(targetParams).map(([key, value]) => ({ key, value: String(value) }));
+      extra.defaultParams = targetParams;
       extra.datasetId = targetWritesToDataset(d.targetType) ? targetDatasetId(runDataTargets[d.id], run.datasetId) : "";
     } else {
       const cfg = runProcessorConfigs.find((c) => c.nodeId === d.id);
       extra.executionTarget = cfg?.executionTarget || null;
+      Object.assign(extra, stepManifest(dag, d.id));
       extra.cpu = cfg?.cpu || null;
       extra.memory = cfg?.memory || null;
       const nodeParams = runProcessorParams[d.id] || {};
@@ -583,19 +662,7 @@ const runToNodesAndEdges = (run) => {
     };
   });
   const dagMap = Object.fromEntries(dag.map((d) => [d.id, d]));
-  const resultEdges = [];
-  for (const d of dag) {
-    for (const dep of d.dependsOn || []) {
-      const srcNode = dagMap[dep];
-      resultEdges.push({
-        id: `e${dep}-${d.id}`,
-        source: dep,
-        target: d.id,
-        animated: false,
-        style: { stroke: nodeBorderColor(srcNode?.type, srcNode?.status) },
-      });
-    }
-  }
+  const resultEdges = graphEdges(dag, resultNodes, (src) => nodeBorderColor(dagMap[src]?.type, dagMap[src]?.status));
   return { nodes: resultNodes, edges: resultEdges, needsAutoLayout: !hasSavedPositions };
 };
 
@@ -677,7 +744,7 @@ const onProcessorStatusUpdate = (raw) => {
   updateNodeData(data.nodeId, { status: data.status });
   edges.value = edges.value.map((edge) => {
     if (edge.source === data.nodeId) {
-      return { ...edge, style: { ...edge.style, stroke: statusBorderColor(data.status) } };
+      return { ...edge, style: { ...edge.style, stroke: graphStatusColor(data.status) } };
     }
     return edge;
   });
@@ -720,6 +787,10 @@ const loadRun = async (runId) => {
       const result = runToNodesAndEdges(activity);
       nodes.value = result.nodes;
       edges.value = result.edges;
+      // Single-file sources show the file's name on their cards.
+      for (const n of result.nodes) {
+        if (n.type === "data-source" && n.data.packageCount === 1) fetchPackageNames(n.data.packageIds);
+      }
       if (needsLayout(result)) autoLayout();
       else setTimeout(() => fitView({ padding: 0.2, maxZoom: 1 }), 50);
     }
@@ -1379,8 +1450,8 @@ const nodeMetricLabel = (nodeId) => {
   return d ? labelForDagNode(d, availableApplications.value, targetTypes.value, activity.dag) : nodeId;
 };
 
-// Detailed cards: how long a step ran (ticking while it runs), its resources
-// and, once the run's metrics are in, its cost.
+// Detailed cards: how long a step ran (ticking while it runs) and its
+// resources. Costs are in the run's metrics, not on each card.
 const nowTick = ref(Date.now());
 let nowTimer = null;
 onMounted(() => {
@@ -1388,14 +1459,9 @@ onMounted(() => {
 });
 onBeforeUnmount(() => clearInterval(nowTimer));
 
-const nodeCostLabel = (nodeId) => {
-  const nm = runMetrics.value?.nodeMetrics?.find((m) => m.nodeId === nodeId);
-  const cost = Number(nm?.estimatedCost);
-  return nm && cost > 0 ? formatCost(cost) : "";
-};
 const nodeRunTime = (data) => formatRunTime(nodeDurationSec(data, nowTick.value));
 const processorFacts = (id, data) =>
-  [data.version, formatResources(data.cpu, data.memory), nodeRunTime(data), nodeCostLabel(id)].filter(Boolean);
+  [data.version, formatResources(data.cpu, data.memory), nodeRunTime(data)].filter(Boolean);
 const targetFacts = (data) => [nodeRunTime(data)].filter(Boolean);
 const viewSourceLabel = (view) => {
   const info = view && browseViewInfo.value[view.viewId];
@@ -1644,17 +1710,30 @@ onUnmounted(() => {
 
             <!-- Processor node template -->
             <template #node-default="{ data, id }">
-              <div :style="{ '--node-border-color': mode === 'browse' ? statusBorderColor(data.status) : '#cccccc', '--handle-target-color': incomingEdgeColor(id) }">
-                <Handle type="target" :position="Position.Top" />
+              <div :style="{ '--node-border-color': mode === 'browse' ? graphStatusColor(data.status) : '#cccccc', '--handle-target-color': incomingEdgeColor(id) }">
+                <!-- Detailed: a connection point per input port (and the
+                     step's main one when a line uses it); compact: one. -->
+                <template v-if="detailed">
+                  <Handle
+                    v-for="p in pointsOf(id, data, 'in')"
+                    :id="p.port ? inputHandleId(p.name) : 'target'"
+                    :key="`in:${p.name}`"
+                    type="target"
+                    :position="Position.Top"
+                    :style="pointStyle(pointsOf(id, data, 'in'), p)"
+                  />
+                </template>
+                <Handle v-else id="target" type="target" :position="Position.Top" />
                 <CompactFlowNode
                   v-if="!detailed"
                   kind="processor"
-                  :label="data.label"
+                  :label="titleOf(id, data)"
                   :status="mode === 'browse' ? data.status : ''"
                   :runtime="mode === 'browse' ? data.executionTarget : nodeConfigs[id]?.executionTarget"
                   :unmet="nodeUnmetCount(id, 'processor')"
                   :actions-on-hover="false"
                 >
+                  <LlmMark v-if="data.llm" compact />
                   <template v-if="mode === 'browse' && interactiveSessionAvailable && id === interactiveProcessor?.id">
                     <button
                       class="node-action node-action--end"
@@ -1674,7 +1753,7 @@ onUnmounted(() => {
                     </button>
                   </template>
                 </CompactFlowNode>
-                <div v-else class="custom-node" :class="mode === 'browse' ? statusClass(data.status) : ''">
+                <div v-else class="custom-node app-step" :class="mode === 'browse' ? statusClass(data.status) : ''">
                   <span v-if="nodeUnmetCount(id, 'processor') > 0" class="node-unmet-badge">{{ nodeUnmetCount(id, 'processor') }}</span>
                   <div
                     v-if="mode === 'browse' && interactiveSessionAvailable && id === interactiveProcessor?.id"
@@ -1698,14 +1777,20 @@ onUnmounted(() => {
                       <IconControllerPlay :width="18" :height="11" color="#011f5b" />
                     </button>
                   </div>
+                  <PortChips v-if="hasPortChips(id, data, 'in')" :points="pointsOf(id, data, 'in')" side="in" />
                   <div class="node-header">
-                    <span class="node-title">{{ data.label }}</span>
+                    <span class="node-title" :title="titleOf(id, data)">{{ titleOf(id, data) }}</span>
+                    <RuntimeMark :runtime="mode === 'browse' ? data.executionTarget : nodeConfigs[id]?.executionTarget" />
+                    <LlmMark v-if="data.llm" />
+                    <span
+                      v-if="statusMark(data)"
+                      class="node-mark"
+                      :class="`node-mark--${statusMark(data).kind}`"
+                      :title="statusLabel(data.status)"
+                      :aria-label="statusLabel(data.status)"
+                    >{{ statusMark(data).glyph }}</span>
                   </div>
                   <div class="node-tags">
-                    <span class="node-type-badge processor-badge">Processor</span>
-                    <span v-if="mode === 'browse' && data.executionTarget" class="node-type-badge exec-badge">{{ data.executionTarget }}</span>
-                    <span v-if="mode === 'configure' && nodeConfigs[id]?.executionTarget" class="node-type-badge exec-badge">{{ nodeConfigs[id].executionTarget }}</span>
-                    <span v-if="mode === 'browse'" class="node-status-badge" :class="statusDotClass(data.status)">{{ statusLabel(data.status) }}</span>
                   </div>
                   <div v-if="mode === 'browse' && processorFacts(id, data).length" class="node-facts">
                     {{ processorFacts(id, data).join(" · ") }}
@@ -1729,8 +1814,19 @@ onUnmounted(() => {
                       <div class="node-config-hint">Click to configure</div>
                     </template>
                   </div>
+                  <PortChips v-if="hasPortChips(id, data, 'out')" :points="pointsOf(id, data, 'out')" side="out" />
                 </div>
-                <Handle type="source" :position="Position.Bottom" />
+                <template v-if="detailed">
+                  <Handle
+                    v-for="p in pointsOf(id, data, 'out')"
+                    :id="p.port ? portHandleId(p.name) : 'source'"
+                    :key="`out:${p.name}`"
+                    type="source"
+                    :position="Position.Bottom"
+                    :style="pointStyle(pointsOf(id, data, 'out'), p)"
+                  />
+                </template>
+                <Handle v-else id="source" type="source" :position="Position.Bottom" />
               </div>
             </template>
 
@@ -1740,28 +1836,27 @@ onUnmounted(() => {
                 <CompactFlowNode
                   v-if="!detailed"
                   kind="source"
-                  :label="data.label"
+                  :label="titleOf(id, data)"
                   :unmet="nodeUnmetCount(id, 'data-source')"
                   :detail="mode === 'configure'
                     ? `${fileCountForNode(id)} file${fileCountForNode(id) !== 1 ? 's' : ''} selected`
                     : data.view
                     ? 'Public dataset'
                     : data.packageCount != null
-                    ? `${data.packageCount} file${data.packageCount !== 1 ? 's' : ''}`
+                    ? sourceDetail(data)
                     : ''"
                 />
                 <div v-else class="custom-node data-source-node" :class="{ 'has-files': mode === 'configure' && fileCountForNode(id) > 0 }">
                   <span v-if="nodeUnmetCount(id, 'data-source') > 0" class="node-unmet-badge">{{ nodeUnmetCount(id, 'data-source') }}</span>
                   <div class="node-header">
-                    <span class="node-title">{{ data.label }}</span>
+                    <span class="node-title" :title="titleOf(id, data)">{{ titleOf(id, data) }}</span>
                   </div>
                   <div class="node-tags">
-                    <span class="node-type-badge source-badge">Source</span>
                     <span v-if="mode === 'browse' && data.view" class="node-tag-info" :title="viewSourceLabel(data.view)">
                       {{ viewSourceLabel(data.view) }}
                     </span>
-                    <span v-else-if="mode === 'browse' && data.packageCount != null" class="node-tag-info">
-                      {{ data.packageCount }} file{{ data.packageCount !== 1 ? 's' : '' }}
+                    <span v-else-if="mode === 'browse' && data.packageCount != null" class="node-tag-info" :title="sourceDetail(data)">
+                      {{ sourceDetail(data) }}
                     </span>
                     <template v-if="mode === 'configure'">
                       <span class="node-tag-info">
@@ -1771,18 +1866,18 @@ onUnmounted(() => {
                   </div>
                   <div v-if="mode === 'configure'" class="node-config-hint">Click to select files</div>
                 </div>
-                <Handle type="source" :position="Position.Bottom" />
+                <Handle id="source" type="source" :position="Position.Bottom" />
               </div>
             </template>
 
             <!-- Data-target node template -->
             <template #node-data-target="{ data, id }">
-              <div :style="{ '--node-border-color': mode === 'browse' ? (data.status && data.status !== 'NOT_STARTED' ? statusBorderColor(data.status) : '#64748b') : '#64748b', '--handle-target-color': incomingEdgeColor(id) }">
-                <Handle type="target" :position="Position.Top" />
+              <div :style="{ '--node-border-color': mode === 'browse' ? (data.status && !['NOT_STARTED', 'SUCCEEDED'].includes(data.status) ? graphStatusColor(data.status) : '#64748b') : '#64748b', '--handle-target-color': incomingEdgeColor(id) }">
+                <Handle id="target" type="target" :position="Position.Top" />
                 <CompactFlowNode
                   v-if="!detailed"
                   kind="target"
-                  :label="data.targetType || data.label"
+                  :label="titleOf(id, data)"
                   :status="mode === 'browse' ? data.status : ''"
                   :runtime="nodeConfigs[id]?.computeType || data.computeType"
                   :unmet="nodeUnmetCount(id, 'data-target')"
@@ -1790,25 +1885,28 @@ onUnmounted(() => {
                 <div v-else class="custom-node data-target-node" :class="mode === 'browse' ? statusClass(data.status) : ''">
                   <span v-if="nodeUnmetCount(id, 'data-target') > 0" class="node-unmet-badge">{{ nodeUnmetCount(id, 'data-target') }}</span>
                   <div class="node-header">
-                    <span class="node-title">{{ data.targetType || data.label }}</span>
+                    <span class="node-title" :title="titleOf(id, data)">{{ titleOf(id, data) }}</span>
+                    <RuntimeMark :runtime="nodeConfigs[id]?.computeType || data.computeType" />
+                    <span
+                      v-if="statusMark(data)"
+                      class="node-mark"
+                      :class="`node-mark--${statusMark(data).kind}`"
+                      :title="statusLabel(data.status)"
+                      :aria-label="statusLabel(data.status)"
+                    >{{ statusMark(data).glyph }}</span>
                   </div>
                   <div class="node-tags">
-                    <span class="node-type-badge target-badge">Target</span>
-                    <span v-if="nodeConfigs[id]?.computeType || data.computeType" class="node-type-badge exec-badge">
-                      {{ nodeConfigs[id]?.computeType || data.computeType }}
-                    </span>
-                    <span v-if="mode === 'browse'" class="node-status-badge" :class="statusDotClass(data.status)">{{ statusLabel(data.status) }}</span>
                   </div>
                   <div v-if="mode === 'browse' && targetFacts(data).length" class="node-facts">
                     {{ targetFacts(data).join(" · ") }}
                   </div>
                   <div class="node-body">
-                    <div v-if="mode === 'browse' && data.params?.length > 0" class="param-preview">
-                      <div v-for="(p, i) in data.params.slice(0, 3)" :key="i" class="param-row">
+                    <div v-if="mode === 'browse' && targetParamsShown(id, data).length > 0" class="param-preview">
+                      <div v-for="(p, i) in targetParamsShown(id, data).slice(0, 3)" :key="i" class="param-row">
                         <span class="param-key">{{ p.key }}</span>
                         <span v-if="p.value" class="param-val">{{ p.value }}</span>
                       </div>
-                      <span v-if="data.params.length > 3" class="param-more">+{{ data.params.length - 3 }} more</span>
+                      <span v-if="targetParamsShown(id, data).length > 3" class="param-more">+{{ targetParamsShown(id, data).length - 3 }} more</span>
                     </div>
                     <template v-if="mode === 'configure'">
                       <div v-if="nodeConfigs[id]?.params?.length > 0" class="param-preview">
@@ -3291,22 +3389,25 @@ onUnmounted(() => {
   100% { box-shadow: 0 0 0 0 rgba(1, 31, 91, 0); }
 }
 
+/* The builder's cards: the strip on the left says what a step is (an app's
+   orange, a source's indigo, a target's slate; sources and targets have a
+   light tint too), the border how it's doing: grey, or cyan while it runs
+   and red when it failed. */
 .custom-node {
   position: relative;
   background: white;
   border: 1px solid theme.$gray_3;
-  border-radius: 2px;
-  padding: 14px;
+  border-radius: 4px;
+  padding: 8px 10px;
   min-width: 250px;
   max-width: 350px;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   transition: all 0.2s;
   cursor: pointer;
-  position: relative;
   text-align: left;
   z-index: 1;
 
-  &:hover { box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15); }
+  &:hover { box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15); }
 
   .node-header {
     display: flex;
@@ -3317,11 +3418,16 @@ onUnmounted(() => {
 
   .node-title {
     font-weight: 600;
-    font-size: 14px;
+    font-size: 15px;
     color: theme.$black;
     flex: 1;
+    min-width: 0;
     line-height: 1.3;
     text-align: left;
+    // One line; the full name on hover.
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .node-tags {
@@ -3329,8 +3435,41 @@ onUnmounted(() => {
     flex-wrap: wrap;
     align-items: center;
     gap: 4px;
-    margin-top: 6px;
+    margin-top: 4px;
+
+    &:empty {
+      display: none;
+    }
   }
+
+  // What a step is, as a strip on the left over the border (as on the
+  // compact cards); the border says its state (selected, a warning; on a
+  // run, running or failed). The kinds set --type-strip.
+  &::before {
+    content: "";
+    position: absolute;
+    top: -1px;
+    bottom: -1px;
+    left: -1px;
+    width: 5px;
+    border-radius: 4px 0 0 4px;
+    background: var(--type-strip, transparent);
+  }
+
+  &.app-step {
+    --type-strip: #{theme.$orange_2};
+  }
+
+  // Finished: a ✓ by the title, in place of a status badge.
+  .node-mark {
+    flex-shrink: 0;
+    font-size: 15px;
+    font-weight: 700;
+    line-height: 1;
+  }
+  .node-mark--done { color: theme.$status_green; }
+  .node-mark--failed { color: theme.$status_red; }
+  .node-mark--canceled { color: theme.$gray_4; }
 
   .node-tag-info {
     font-size: 10px;
@@ -3343,7 +3482,7 @@ onUnmounted(() => {
 
   // Run time, resources and cost under a detailed card's badges.
   .node-facts {
-    margin-top: 6px;
+    margin-top: 4px;
     font-size: 11px;
     color: theme.$gray_4;
     white-space: nowrap;
@@ -3438,28 +3577,27 @@ onUnmounted(() => {
   }
 
   &.gray-node { border-color: theme.$gray_4; }
-  &.blue-node { border-color: #06b6d4; }
-  &.blue-node.animate { animation: node-pulse 3s ease-in-out infinite; }
-  &.green-node { border-color: theme.$status_green; }
+  // Running: the type strip pulses; the card and its border stay still.
+  &.blue-node::before { animation: strip-pulse 1.6s ease-in-out infinite; }
+  // Succeeded: no colour, the ✓ by the title says it (graphStatusColor).
+  &.green-node { border-color: theme.$gray_3; }
   &.red-node { border-color: theme.$status_red; }
 
   &.data-source-node {
-    border-color: #6366f1;
+    --type-strip: #6366f1;
     background: #eef2ff;
 
     &.has-files { border-color: theme.$status_green; }
-    &.green-node { border-color: theme.$status_green; }
+    &.green-node { border-color: theme.$gray_3; }
     &.red-node { border-color: theme.$status_red; }
-    &.blue-node { border-color: #06b6d4; }
   }
 
   &.data-target-node {
+    --type-strip: #64748b;
     background: #f1f5f9;
-    border-color: #64748b;
 
-    &.green-node { border-color: theme.$status_green; }
+    &.green-node { border-color: theme.$gray_3; }
     &.red-node { border-color: theme.$status_red; }
-    &.blue-node { border-color: #06b6d4; }
 
     .node-body {
       margin-top: 6px;
@@ -3487,18 +3625,12 @@ onUnmounted(() => {
     padding: 2px 8px;
     border-radius: 4px;
     flex-shrink: 0;
-
-    &.source-badge { background: #6366f1; color: white; }
-    &.processor-badge { background: theme.$orange_2; color: white; }
-    &.target-badge { background: #64748b; color: white; }
-    &.exec-badge { background: rgba(5, 150, 105, 0.12); color: #047857; }
   }
 }
 
-@keyframes node-pulse {
-  0% { background: #f8faff; box-shadow: 0 0 6px rgba(6, 182, 212, 0.3); }
-  50% { background: #e0f7fa; box-shadow: 0 0 18px rgba(6, 182, 212, 0.5); }
-  100% { background: #f8faff; box-shadow: 0 0 6px rgba(6, 182, 212, 0.3); }
+@keyframes strip-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.25; }
 }
 
 /* Status dots */

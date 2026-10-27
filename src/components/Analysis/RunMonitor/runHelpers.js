@@ -35,8 +35,22 @@ export const statusBorderColor = (status) => {
   }
 };
 
+// A step's status on a run's graph card, which keeps its shape: a mark once
+// it has ended (✓ done, ✕ failed, – canceled), none while pending or
+// running (its type strip pulses then). kind: done | failed | canceled.
+const STATUS_MARKS = {
+  SUCCEEDED: { glyph: "✓", kind: "done" },
+  FAILED: { glyph: "✕", kind: "failed" },
+  CANCELED: { glyph: "–", kind: "canceled" },
+};
+export const statusMarkOf = (status) => STATUS_MARKS[status] || null;
+
+// On a run's graph, colour marks what needs a look (running, failed): a
+// step that succeeded is as quiet as one yet to start, its ✓ says it's done.
+export const graphStatusColor = (status) => statusBorderColor(status === "SUCCEEDED" ? "NOT_STARTED" : status);
+
 export const nodeBorderColor = (type, status) => {
-  if (status) return statusBorderColor(status);
+  if (status) return graphStatusColor(status);
   if (type === "data-source") return "#6366f1";
   if (type === "data-target") return "#64748b";
   return "#cccccc";
@@ -177,6 +191,8 @@ export const formatDuration = (start, end) => {
 export const formatCost = (cost) => {
   if (cost == null) return "N/A";
   if (cost === 0) return "$0.00";
+  // Not "$0.0000": a cost too small for four decimals isn't none.
+  if (cost < 0.0001) return "< $0.0001";
   if (cost < 0.01) return `$${cost.toFixed(4)}`;
   return `$${cost.toFixed(2)}`;
 };

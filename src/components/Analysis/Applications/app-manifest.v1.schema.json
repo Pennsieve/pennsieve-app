@@ -128,6 +128,10 @@
           "minimum": 1,
           "description": "How long a run may take before it's stopped."
         },
+        "llm": {
+          "type": "boolean",
+          "description": "The app calls language models through Pennsieve (the LLM governor): its runs get the LLM proxy (ANTHROPIC_BASE_URL) and LLM_GOVERNOR_FUNCTION_NAME, with usage metered against the workspace's budget. Apps that don't declare it run without them. Default: false."
+        },
         "interactive": {
           "type": "boolean",
           "description": "A live session a person works in, rather than a batch step: the workflow waits while it runs. Default: false."

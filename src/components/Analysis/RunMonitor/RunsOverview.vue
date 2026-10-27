@@ -17,6 +17,8 @@ import toQueryParams from "@/utils/toQueryParams";
 import { isNotebookWorkflow } from "./notebookHelpers";
 import RunHistory from "./RunHistory.vue";
 
+// In the Workflows tab: no runs yet points to the Library, to start one.
+const emit = defineEmits(["open-library"]);
 const props = defineProps({
   // Inside the Workflows tab (WorkflowsOverview), which has the toolbar and
   // its Run Workflow button: no header of its own.
@@ -661,7 +663,8 @@ onBeforeUnmount(() => {
             </div>
           </div>
           <div v-else class="dashboard-empty-range">
-            No runs in this time range
+            No runs in this time range<template v-if="embedded">
+              · <button type="button" class="link-button" @click="emit('open-library')">Start one from the Library</button></template>
           </div>
         </div>
 
@@ -1089,6 +1092,15 @@ onBeforeUnmount(() => {
   &:hover {
     color: theme.$link-color-hover;
   }
+}
+.link-button {
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  color: theme.$purple_3;
+  text-decoration: underline;
+  cursor: pointer;
 }
 .dashboard-empty-range {
   font-size: 13px;

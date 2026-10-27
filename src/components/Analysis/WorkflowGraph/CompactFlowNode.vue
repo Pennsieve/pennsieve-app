@@ -1,11 +1,13 @@
 <script setup>
 // A workflow graph node in its compact state: one line, the same size for
 // every node. The type shows as the strip on the left (the same colours as
-// the detailed cards), the status as the dot on the right, and a runtime
-// other than standard as a small tag. The page's actions for the node (end
+// the detailed cards), which pulses while the step runs; an ended step has
+// its mark on the right (✓, ✕, –) as on the detailed cards; a runtime other
+// than standard has its mark or a small tag. The page's actions for the node (end
 // a session, configure, remove) go in the default slot, shown on hover.
+import RuntimeMark from "./RuntimeMark.vue";
 import { computed } from "vue";
-import { statusBorderColor, statusLabel } from "../RunMonitor/runHelpers";
+import { statusLabel, statusMarkOf } from "../RunMonitor/runHelpers";
 import { COMPACT_BOX } from "./graphDensity";
 
 const props = defineProps({
@@ -37,6 +39,9 @@ const KIND_LABEL = { source: "Source", processor: "Processor", target: "Target" 
 
 const stripColor = computed(() => props.accent || KIND_COLOR[props.kind] || KIND_COLOR.processor);
 const showRuntime = computed(() => props.runtime && props.runtime !== "standard");
+// Lambda and GPU have a mark (RuntimeMark); others (interactive) a word.
+const hasMark = computed(() => ["lambda", "gpu"].includes(props.runtime));
+const mark = computed(() => statusMarkOf(props.status));
 const tooltip = computed(() =>
   [
     `${KIND_LABEL[props.kind] || "Node"}: ${props.label}`,
@@ -52,10 +57,9 @@ const tooltip = computed(() =>
 <template>
   <div
     class="cfn"
-    :class="[`cfn--${kind}`, { 'cfn--running': status === 'STARTED', 'cfn--actions-shown': !actionsOnHover }]"
+    :class="[`cfn--${kind}`, { 'cfn--running': status === 'STARTED', 'cfn--failed': status === 'FAILED', 'cfn--actions-shown': !actionsOnHover }]"
     :style="{
       '--cfn-strip': stripColor,
-      '--cfn-status': status ? statusBorderColor(status) : 'transparent',
       width: `${COMPACT_BOX.width}px`,
       height: `${COMPACT_BOX.height}px`,
     }"
@@ -63,11 +67,17 @@ const tooltip = computed(() =>
   >
     <span v-if="unmet > 0" class="cfn__unmet">{{ unmet }}</span>
     <span class="cfn__label">{{ label }}</span>
-    <span v-if="showRuntime" class="cfn__runtime">{{ runtime }}</span>
+    <RuntimeMark v-if="hasMark" :runtime="runtime" compact />
+    <span v-else-if="showRuntime" class="cfn__runtime">{{ runtime }}</span>
     <span class="cfn__actions" @click.stop>
       <slot />
     </span>
-    <span v-if="status" class="cfn__dot" :aria-label="statusLabel(status)" />
+    <span
+      v-if="mark"
+      class="cfn__mark"
+      :class="`cfn__mark--${mark.kind}`"
+      :aria-label="statusLabel(status)"
+    >{{ mark.glyph }}</span>
   </div>
 </template>
 
@@ -140,16 +150,22 @@ const tooltip = computed(() =>
     }
   }
 }
-.cfn__dot {
+// Running: the strip pulses; failed: a red border too (as detailed).
+.cfn--running::before {
+  animation: cfn-pulse 1.6s ease-in-out infinite;
+}
+.cfn--failed {
+  border-color: theme.$status_red;
+}
+.cfn__mark {
   flex-shrink: 0;
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background: var(--cfn-status);
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1;
 }
-.cfn--running .cfn__dot {
-  animation: cfn-pulse 1.4s ease-in-out infinite;
-}
+.cfn__mark--done { color: theme.$status_green; }
+.cfn__mark--failed { color: theme.$status_red; }
+.cfn__mark--canceled { color: theme.$gray_4; }
 .cfn__unmet {
   position: absolute;
   top: 2px;
@@ -170,7 +186,7 @@ const tooltip = computed(() =>
     opacity: 1;
   }
   50% {
-    opacity: 0.35;
+    opacity: 0.25;
   }
 }
 </style>

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { targetWritesToDataset, prefixParamName, targetParamFields, buildDataTargets, targetDatasetId, datasetName, searchDatasets, isPathPrefixParam, targetParamLabel, defaultsToRunName, canWriteDataset } from "./dataTargets";
+import { targetWritesToDataset, prefixParamName, targetParamFields, buildDataTargets, targetDatasetId, datasetName, searchDatasets, isPathPrefixParam, targetParamLabel, defaultsToRunName, canWriteDataset, shownTargetParams } from "./dataTargets";
 
 describe("targetWritesToDataset / prefixParamName", () => {
   it("built-ins write no dataset and take pathPrefix", () => {
@@ -97,5 +97,25 @@ describe("the notebook launcher's target params", () => {
   it("writes only to datasets where the role is Editor or above", () => {
     expect(["owner", "manager", "editor", "Editor"].every(canWriteDataset)).toBe(true);
     expect(["viewer", "", undefined, null].some(canWriteDataset)).toBe(false);
+  });
+});
+
+describe("shownTargetParams", () => {
+  const params = [
+    { key: "name", value: "e2e-ports-b-summary" },
+    { key: "notify", value: "auto" },
+    { key: "pathPrefix", value: "summary" },
+  ];
+  const defs = [{ name: "name" }, { name: "notify", defaultValue: "auto" }, { name: "pathPrefix", defaultValue: "" }];
+
+  it("leaves out defaults and the prefix a port line shows", () => {
+    expect(shownTargetParams(params, defs, true).map((p) => p.key)).toEqual(["name"]);
+  });
+  it("keeps the prefix when no port line shows it", () => {
+    expect(shownTargetParams(params, defs, false).map((p) => p.key)).toEqual(["name", "pathPrefix"]);
+  });
+  it("keeps a changed default and params without a definition", () => {
+    const shown = shownTargetParams([{ key: "notify", value: "never" }, { key: "extra", value: "x" }], defs);
+    expect(shown.map((p) => p.key)).toEqual(["notify", "extra"]);
   });
 });

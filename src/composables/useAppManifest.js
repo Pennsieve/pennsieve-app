@@ -15,7 +15,6 @@
  * "this application has no usable manifest" and is cached as such.
  */
 import { useStore } from "vuex";
-import { getManifestDraft, clearManifestDraft, draftOutdatedBy } from "../components/Analysis/Applications/manifestDrafts";
 import { load as loadYaml } from "js-yaml";
 
 import { parseManifest } from "@/components/Analysis/Applications/applicationSchema";
@@ -56,24 +55,6 @@ export function useAppManifest() {
    */
   const loadManifest = async (uuid) => {
     if (!uuid) return null;
-    // A draft saved from the app.yml builder, in this browser only, stands in
-    // for the released app.yml until it's cleared, or until a release made
-    // after it was saved, which then wins.
-    const draft = getManifestDraft(uuid);
-    if (draft) {
-      let detail = null;
-      try {
-        detail = await store.dispatch("analysisModule/fetchApplication", uuid);
-      } catch (err) {
-        detail = null;
-      }
-      if (draftOutdatedBy(draft, detail?.versions)) {
-        clearManifestDraft(uuid);
-      } else {
-        const parsedDraft = parseManifestText(draft.yaml);
-        if (parsedDraft) return { ...parsedDraft, raw: draft.yaml, draft: { savedAt: draft.savedAt } };
-      }
-    }
     if (manifestCache.has(uuid)) return manifestCache.get(uuid);
 
     let parsed = null;

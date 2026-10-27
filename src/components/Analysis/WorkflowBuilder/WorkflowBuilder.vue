@@ -29,6 +29,8 @@ import {
 import BfButton from "../../shared/bf-button/BfButton.vue";
 import MetricsDashboard from "../Metrics/MetricsDashboard.vue";
 import CompactFlowNode from "../WorkflowGraph/CompactFlowNode.vue";
+import LlmMark from "../WorkflowGraph/LlmMark.vue";
+import RuntimeMark from "../WorkflowGraph/RuntimeMark.vue";
 import GraphDensityToggle from "../WorkflowGraph/GraphDensityToggle.vue";
 import { COMPACT_BOX, layoutBox, overlaps, recenter, useGraphDensity } from "../WorkflowGraph/graphDensity";
 import {
@@ -41,8 +43,7 @@ import BuilderBar from "./BuilderBar.vue";
 import BuilderPalette from "./BuilderPalette.vue";
 import ParamField from "./ParamField.vue";
 import { ioLine, sessionTypeOf, versionManifest, shortMediaType } from "./appManifestInfo";
-import { appColors, domainOfTag, domainColors } from "../Applications/appDomains";
-import { clearManifestDraft } from "../Applications/manifestDrafts";
+import { domainOfTag, domainColors } from "../Applications/appDomains";
 import { diffLines, manifestDiff, versionWarnings } from "./manifestDiff";
 import { builderReadiness, readinessLabel } from "./builderReadiness";
 import { stepNames } from "./stepNames";
@@ -287,9 +288,8 @@ const manifestsKnown = computed(() =>
 const ioTypes = (port) => ioLine({ inputs: [port], outputs: [] }).replace(/ → .*$/, "");
 
 /*
-  The app step's panel: what the app is (its app.yml as the step loaded it,
-  a draft when one is in use), and where each input comes from and each
-  output goes on the canvas.
+  The app step's panel: what the app is (its app.yml as the step loaded
+  it), and where each input comes from and each output goes on the canvas.
 */
 const stepAbout = computed(() => {
   const node = selectedNode.value;
@@ -333,20 +333,6 @@ const stepPorts = computed(() => {
     allTo: out.filter((e) => !portName(e)).map((e) => nodeLabel(e.target)),
   };
 });
-const clearStepDraft = async (node) => {
-  const uuid = node?.data?.application?.uuid;
-  if (!uuid) return;
-  clearManifestDraft(uuid);
-  // Every step of that app goes back to its released app.yml.
-  await Promise.all(
-    nodes.value
-      .filter((n) => n.data?.application?.uuid === uuid)
-      .map(async (n) => {
-        const parsed = await loadManifest(uuid);
-        if (parsed) setManifestPorts(n, parsed);
-      })
-  );
-};
 const showAdvanced = ref(false);
 // An app step's panel: Settings (what you set) or About (what the app is).
 // Settings when the workflow can be edited, About when it can't.
@@ -575,16 +561,13 @@ const setManifestPorts = (node, parsed) => {
     inputs: parsed.schema.inputs || [],
     outputs: parsed.schema.outputs || [],
   };
-  // What the step's panel says about the app, from the same app.yml (a draft
-  // when one is in use).
+  // What the step's panel says about the app, from the same app.yml.
   node.data.manifestAbout = {
     description: parsed.meta?.description || "",
     maintainers: parsed.meta?.maintainers || [],
     tags: parsed.schema?.tags || [],
   };
   node.data.hasManifest = true;
-  // Ports from a draft app.yml (saved in this browser, not released).
-  node.data.draftManifest = parsed.draft || null;
   // A reopened workflow's links into data targets leave from the output
   // ports their prefixes name, once the ports are known.
   edges.value = attachInputPorts(attachPorts(edges.value, nodes.value), nodes.value);
@@ -1129,8 +1112,9 @@ const onDrop = (event) => {
 // An app step's domain colour (its pinned version's app.yml tags), for its
 // strip on the canvas; none for an app without a domain, which keeps the
 // processor's own.
-const stepAccent = (data) => (data?.application ? appColors(data.application, data.tag)?.accent || "" : "");
-
+// Whether a step's app calls language models through Pennsieve: its version's
+// app.yml declares runtime.llm (LLM access is opt-in). Shown as an icon.
+const usesLLM = (data) => !!versionManifest(data?.application, data?.tag)?.runtime?.llm;
 const makeNode = (type, app, position) => {
   const id = generateNodeId();
   if (type === "data-source") {
@@ -1459,6 +1443,29 @@ const portMediaTypes = (ports) => {
   edges, ports already in memory) and idempotent, so it can be called from
   anywhere the graph changes rather than trying to patch single edges.
 */
+// A link's label in a box (detailed view).
+const labelBox = (fill, border, text) => ({
+  labelShowBg: true,
+  labelBgPadding: [6, 3],
+  labelBgBorderRadius: 2,
+  labelBgStyle: { fill, stroke: border },
+  labelStyle: { fill: text, fontSize: 11, fontWeight: 600 },
+});
+
+// The compact view's lone ✓ or ✕: no box, just a halo in the canvas colour so
+// the line doesn't run through it.
+const bareMark = (color) => ({
+  labelShowBg: false,
+  labelStyle: {
+    fill: color,
+    fontSize: 16,
+    fontWeight: 700,
+    stroke: "#f7f7f7",
+    strokeWidth: 4,
+    paintOrder: "stroke",
+  },
+});
+
 const revalidateEdges = () => {
   const issues = [];
   let unchecked = 0;
@@ -1500,17 +1507,17 @@ const revalidateEdges = () => {
           strokeWidth: 2,
           strokeDasharray: "6 4",
         },
-        label:
-          result.reason === "no-overlap"
+        // Compact: the verdict only (the issues list has the detail).
+        label: !detailed.value
+          ? "\u2715"
+          : result.reason === "no-overlap"
             ? "\u26A0 media type mismatch"
             : mediaTypes.length
               ? `\u26A0 needs ${shortTypes(mediaTypes)}`
               : "\u26A0 incompatible",
-        labelShowBg: true,
-        labelBgPadding: [6, 3],
-        labelBgBorderRadius: 2,
-        labelBgStyle: { fill: "#fdecec", stroke: INVALID_EDGE_COLOR },
-        labelStyle: { fill: INVALID_EDGE_COLOR, fontSize: 11, fontWeight: 600 },
+        ...(detailed.value
+          ? labelBox("#fdecec", INVALID_EDGE_COLOR, INVALID_EDGE_COLOR)
+          : bareMark(INVALID_EDGE_COLOR)),
       };
     }
 
@@ -1519,18 +1526,29 @@ const revalidateEdges = () => {
       return { ...next, style: { stroke, strokeDasharray: "2 4" } };
     }
 
+    // Input data into an app, or an app into a target: nothing to check,
+    // but say what flows there, in grey.
+    const flows = detailed.value ? flowTypes(edge) : "";
+    if (result.state === "skip" && flows) {
+      return {
+        ...next,
+        label: flows,
+        ...labelBox("#f3f4f6", "#d1d5db", "#4b5563"),
+      };
+    }
+
     if (result.state === "ok") {
       validated += 1;
       const mediaTypes = portMediaTypes(result.metInputs);
       return {
         ...next,
-        style: { stroke: VALID_EDGE_COLOR, strokeWidth: 2 },
-        label: mediaTypes.length ? `\u2713 ${shortTypes(mediaTypes)}` : "\u2713",
-        labelShowBg: true,
-        labelBgPadding: [6, 3],
-        labelBgBorderRadius: 2,
-        labelBgStyle: { fill: "#eaf9ef", stroke: VALID_EDGE_COLOR },
-        labelStyle: { fill: "#0f7a3f", fontSize: 11, fontWeight: 600 },
+        // The usual weight: a link that fits needs no attention; the ✓ says
+        // it. A link that doesn't fit stays heavier (dashed, red).
+        style: { stroke: VALID_EDGE_COLOR },
+        label: mediaTypes.length && detailed.value ? `\u2713 ${shortTypes(mediaTypes)}` : "\u2713",
+        ...(detailed.value
+          ? labelBox("#eaf9ef", VALID_EDGE_COLOR, "#0f7a3f")
+          : bareMark("#0f7a3f")),
       };
     }
 
@@ -1540,6 +1558,30 @@ const revalidateEdges = () => {
   edgeIssues.value = [...issues, ...stepInputIssues()];
   validEdgeCount.value = validated;
   uncheckedEdgeCount.value = unchecked;
+};
+
+// What flows over a link that isn't checked: into an app, the types its
+// linked input takes (all its inputs' on "all inputs"); into a target, the
+// types of the output feeding it (all outputs' from "all outputs"). "" when
+// the app.yml says nothing about them.
+const flowTypes = (edge) => {
+  const src = nodes.value.find((n) => n.id === edge.source);
+  const tgt = nodes.value.find((n) => n.id === edge.target);
+  let ports = [];
+  if (src?.type === "data-source" && isAppNode(tgt)) {
+    const inputs = tgt.data?.manifestPorts?.inputs || [];
+    const link = edgeLink(edge, tgt, edges.value);
+    ports = link ? inputs.filter((p) => p.name === link.input) : inputs;
+  } else if (isAppNode(src) && tgt?.type === "data-target") {
+    const outputs = src.data?.manifestPorts?.outputs || [];
+    const port = portOfHandle(edge.sourceHandle);
+    ports = port ? outputs.filter((p) => p.name === port) : outputs;
+  } else {
+    return "";
+  }
+  const layouts = ports.flatMap((p) => [].concat(p.conformsTo || []).slice(-1)).map((c) => String(c).split("@")[0].toUpperCase());
+  const types = ports.flatMap((p) => p.mediaTypes || []);
+  return [...new Set([...layouts, ...types.map(shortMediaType)])].join(", ");
 };
 
 const reportConnectionCheck = (srcNode, tgtNode, edge) => {
@@ -1598,14 +1640,13 @@ const reportConnectionCheck = (srcNode, tgtNode, edge) => {
   });
 };
 
-// A step's one-line summary: version, CPU and memory, and where it runs
-// when that isn't the default ("v1.3.6 · 1 vCPU · 2 GB").
+// A step's one-line summary: version, CPU and memory ("v1.3.6 · 1 vCPU ·
+// 2 GB"). Where it runs, when not the default, is a mark (RuntimeMark).
 const stepMeta = (data) => {
   const version = data.tag || latestVersion(data.application)?.version || "";
   const cpu = data.computeType !== "lambda" && data.cpu ? `${+(Number(data.cpu) / 1024).toFixed(2)} vCPU` : "";
   const memory = data.memory ? formatResourceLabel(data.memory) : "";
-  const where = data.computeType && data.computeType !== "standard" ? computeTypeName(data.computeType) : "";
-  return [version, cpu, memory, where].filter(Boolean).join(" · ");
+  return [version, cpu, memory].filter(Boolean).join(" · ");
 };
 // The folded resources line: "1 vCPU · 2 GB · Standard".
 const resourcesSummary = (data) => {
@@ -1681,6 +1722,8 @@ const changeDensity = (value) => {
   const to = layoutBox(value, DETAILED_BOX);
   setDetailed(value);
   nodes.value = recenter(nodes.value, from, to);
+  // Labels say more in detail: the types; compact shows only ✓ or ✕.
+  revalidateEdges();
   if (value && overlaps(nodes.value, to)) autoLayout();
   else setTimeout(() => fitView({ padding: 0.2, maxZoom: 1 }), 50);
 };
@@ -2601,14 +2644,9 @@ const openNodeSettings = (id) => {
                   kind="processor"
                   :label="nodeName({ id, type: 'default', data })"
                   :runtime="data.interactive ? 'interactive' : data.computeType"
-                  :accent="stepAccent(data)"
                   :class="connectClass(id)"
                 >
-                    <span
-                      v-if="data.draftManifest"
-                      class="draft-badge draft-badge--compact"
-                      title="Using a draft app.yml saved in this browser, not the released one. Switch to the detailed view to see its inputs and outputs."
-                    >Draft</span>
+                    <LlmMark v-if="usesLLM(data)" compact />
                     <span v-if="stepWarning(id)" class="step-warn" :title="stepWarning(id)" />
                     <button
                       v-if="!isReadOnly"
@@ -2623,7 +2661,6 @@ const openNodeSettings = (id) => {
                   class="custom-node processor-node"
                   :class="connectClass(id)"
                   :style="{
-                    ...(stepAccent(data) && { boxShadow: `inset 4px 0 0 ${stepAccent(data)}` }),
                     // Room for each port's column (about 90px), up to the card's max.
                     ...((routedOutputs(data.manifestPorts).length || routedInputs(data.manifestPorts).length) && {
                       minWidth: `${Math.min(350, 90 * (Math.max(routedOutputs(data.manifestPorts).length, routedInputs(data.manifestPorts).length) + 1) + 30)}px`,
@@ -2655,11 +2692,8 @@ const openNodeSettings = (id) => {
                   <div class="node-header">
                     <span v-if="data.interactive" class="node-type-badge processor-badge">Interactive</span>
                     <span class="node-title" :title="nodeName({ id, type: 'default', data })">{{ nodeName({ id, type: 'default', data }) }}</span>
-                    <span
-                      v-if="data.draftManifest"
-                      class="draft-badge"
-                      title="Using a draft app.yml saved in this browser, not the released one. A release must declare the same outputs for its links to work. Clear the draft in the app.yml builder."
-                    >Draft</span>
+                    <RuntimeMark :runtime="data.computeType" />
+                    <LlmMark v-if="usesLLM(data)" />
                     <span v-if="stepWarning(id)" class="step-warn" :title="stepWarning(id)" />
                     <button
                       v-if="!isReadOnly"
@@ -2914,6 +2948,7 @@ const openNodeSettings = (id) => {
                     <span class="node-title">{{
                       data.targetType ? nodeName({ id, type: 'data-target', data }) : getTargetTypeLabel(data.targetType)
                     }}</span>
+                    <RuntimeMark :runtime="data.computeType" />
                     <button
                       v-if="!isReadOnly"
                       class="remove-btn"
@@ -2921,11 +2956,6 @@ const openNodeSettings = (id) => {
                     >
                       &times;
                     </button>
-                  </div>
-                  <div class="node-body">
-                    <span v-if="data.computeType" class="runtime-tag">{{
-                      data.computeType
-                    }}</span>
                   </div>
                 </div>
               </template>
@@ -3051,10 +3081,6 @@ const openNodeSettings = (id) => {
                 <div class="step-head">
                   <h3 class="step-name" :title="selectedNode.data?.label">{{ selectedNode.data?.label || "Step" }}</h3>
                 </div>
-                <p v-if="selectedNode.data.draftManifest" class="step-draft">
-                  Using a draft app.yml saved in this browser.
-                  <button type="button" class="text-link-btn" @click="clearStepDraft(selectedNode)">Use the released one</button>
-                </p>
                 <!-- What you set for this step, or what the app is -->
                 <el-radio-group v-model="stepTab" size="small" class="step-tabs" aria-label="Step details">
                   <el-radio-button value="settings">Settings</el-radio-button>
@@ -4497,18 +4523,6 @@ kbd {
 :deep(.vue-flow__node:not(.selected):not(:hover)) .node-action {
   opacity: 0;
 }
-.draft-badge {
-  padding: 0 5px;
-  border: 1px dashed theme.$orange_1;
-  border-radius: 3px;
-  font-size: 10px;
-  font-weight: 600;
-  color: theme.$orange_1;
-  white-space: nowrap;
-}
-.draft-badge--compact {
-  margin-right: 4px;
-}
 .port-prefix-note {
   margin: -4px 0 10px;
   font-size: 12px;
@@ -4751,14 +4765,6 @@ kbd {
   font-size: 12px;
   color: theme.$gray_4;
 }
-.step-draft {
-  margin: 0 0 8px;
-  padding: 6px 8px;
-  border: 1px dashed theme.$orange_1;
-  border-radius: 4px;
-  font-size: 12px;
-  color: theme.$gray_5;
-}
 .step-desc {
   margin: 4px 0 8px;
   font-size: 13px;
@@ -4951,10 +4957,6 @@ kbd {
       border-color: theme.$gray_4;
       box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.15);
     }
-    &.selected .custom-node.processor-node {
-      border-color: theme.$orange_2;
-      box-shadow: 0 0 0 2px rgba(224, 145, 42, 0.35);
-    }
   }
 }
 
@@ -4969,6 +4971,20 @@ kbd {
   transition: all 0.2s;
   position: relative;
   z-index: 1;
+
+  // What a step is, as a strip on the left over the border (as on the
+  // compact cards); the border says its state (selected, a warning; on a
+  // run, running or failed). The kinds set --type-strip.
+  &::before {
+    content: "";
+    position: absolute;
+    top: -1px;
+    bottom: -1px;
+    left: -1px;
+    width: 5px;
+    border-radius: 4px 0 0 4px;
+    background: var(--type-strip, transparent);
+  }
 
   &:hover {
     border-color: theme.$black;
@@ -5091,19 +5107,6 @@ kbd {
     gap: 8px;
   }
 
-  .runtime-tag {
-    font-size: 10px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    padding: 2px 8px;
-    border-radius: 2px;
-    background: rgba(5, 150, 105, 0.12);
-    color: #047857;
-    white-space: nowrap;
-    margin-left: auto;
-  }
-
   .node-badge {
     margin-top: 8px;
     margin-bottom: 8px;
@@ -5133,25 +5136,15 @@ kbd {
     }
   }
 
-  /* An app step: the processor orange (as the compact step's strip), like
-     Input data's indigo and a target's slate. A domain app keeps its
-     domain's strip on the left (stepAccent). */
+  /* An app step: white, with the processor orange as its strip. Input
+     data and targets keep a light tint of their colour, so data in and out
+     reads apart from the work between. */
   &.processor-node {
-    border-color: theme.$orange_2;
-    background: theme.$orange_tint;
-
-    &:hover {
-      border-color: theme.$orange_2;
-      box-shadow: 0 2px 8px rgba(224, 145, 42, 0.3);
-    }
-
-    .node-port {
-      background: theme.$white;
-    }
+    --type-strip: #{theme.$orange_2};
   }
 
   &.data-source-node {
-    border-color: #6366f1;
+    --type-strip: #6366f1;
     background: #eef2ff;
 
     .node-header {
@@ -5161,7 +5154,7 @@ kbd {
   }
 
   &.data-target-node {
-    border-color: #64748b;
+    --type-strip: #64748b;
     background: #f1f5f9;
 
     .node-body {
@@ -5184,19 +5177,6 @@ kbd {
         color: #64748b;
         background: rgba(100, 116, 139, 0.1);
       }
-    }
-
-    .runtime-tag {
-      font-size: 10px;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      padding: 2px 8px;
-      border-radius: 2px;
-      background: rgba(5, 150, 105, 0.12);
-      color: #047857;
-      white-space: nowrap;
-      display: inline-block;
     }
 
     .target-edit {
@@ -5568,4 +5548,5 @@ kbd {
   white-space: nowrap;
   margin-left: 6px;
 }
+/* A step whose app calls language models (runtime.llm): a small sparkle. */
 </style>

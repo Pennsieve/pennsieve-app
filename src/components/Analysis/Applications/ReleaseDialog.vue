@@ -27,7 +27,10 @@ const visible = computed({
   set: (v) => emit("update:modelValue", v),
 });
 
-const latest = computed(() => latestVersion(props.knownTags));
+// The latest release: of the versions known (the repository's, the app
+// store's) and the one the release check found (status.latestTag), which
+// the repository list doesn't always have.
+const latest = computed(() => latestVersion([...props.knownTags, props.status?.latestTag].filter(Boolean)));
 const suggestions = computed(() => nextVersions(latest.value));
 const BUMPS = [
   { key: "patch", label: "Patch", hint: "fixes" },
@@ -42,13 +45,14 @@ const notes = ref("");
 const sending = ref(false);
 const outcome = ref(null);
 
-// Fresh each time it opens: the next patch version, the default branch.
+// Fresh each time it opens: the next patch version (v0.1.0 for an app's
+// first release), the default branch.
 watch(
   () => props.modelValue,
   (open) => {
     if (!open) return;
-    bump.value = "patch";
-    tag.value = suggestions.value.patch;
+    bump.value = latest.value ? "patch" : "minor";
+    tag.value = suggestions.value[bump.value];
     target.value = props.defaultBranch || "";
     notes.value = "";
     outcome.value = null;
