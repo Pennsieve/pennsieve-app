@@ -1813,6 +1813,8 @@ const pickerHints = computed(() => {
   return id ? sourceHints(id, dag, portsOfStep(dag, availableApplications.value)) : [];
 });
 const pickerTypes = computed(() => [...(acceptedFileTypes(pickerHints.value) || [])].join(" or "));
+// What the input says it takes, in its app's words (app.yml descriptions).
+const pickerDescription = computed(() => [...new Set(pickerHints.value.map((h) => h.description).filter(Boolean))].join(" "));
 const pickerWhyNot = (row) => {
   if (pickerAllowOtherTypes.value || !pickerTypes.value || row?.content?.packageType === "Collection") return "";
   if (!fileTypeMismatches([row?.content?.name || ""], pickerHints.value)) return "";
@@ -3177,8 +3179,8 @@ onUnmounted(() => {
       @close="closeFilePicker"
     >
       <div class="file-picker-content">
-        <p v-if="sourcePicker.hint" class="file-picker-hint">{{ sourcePicker.hint }}</p>
-        <div v-if="!isMyWorkspace || pickerTypes" class="file-picker-dataset">
+        <p v-if="sourcePicker.hint && !pickerTypes" class="file-picker-hint">{{ sourcePicker.hint }}</p>
+        <div v-if="!isMyWorkspace" class="file-picker-dataset">
           <template v-if="!isMyWorkspace">
           <label for="picker-dataset">Dataset</label>
           <el-select
@@ -3199,14 +3201,6 @@ onUnmounted(() => {
           </el-select>
           <span v-if="sourceDatasets[filePickerNodeId]" class="file-picker-dataset-note">Not the other inputs' dataset</span>
           </template>
-          <el-switch
-            v-if="pickerTypes"
-            v-model="pickerAllowOtherTypes"
-            size="small"
-            class="file-picker-types"
-            active-text="Allow other file types"
-            :title="`Also let files that aren't ${pickerTypes} be chosen (the check goes by file extension)`"
-          />
         </div>
         <div v-if="pickerDataset" class="file-picker-dataset-head">
           <img :src="pickerDataset.banner || '/images/banner-placeholder.jpg'" alt="" />
@@ -3253,7 +3247,18 @@ onUnmounted(() => {
         </div>
       </div>
       <template #footer>
-        <bf-button class="secondary" @click="closeFilePicker">Done</bf-button>
+        <div class="file-picker-footer">
+            <!-- Which files can be chosen: those the input takes, or any (the
+                 check goes by file extension, so it can be wrong) -->
+            <span v-if="pickerTypes" class="file-picker-types">
+              <span class="file-picker-types-label">Files</span>
+              <el-radio-group v-model="pickerAllowOtherTypes" size="small">
+                <el-radio-button :value="false" :title="pickerDescription || sourcePicker.hint">{{ pickerTypes }} only</el-radio-button>
+                <el-radio-button :value="true" title="Choose any file; the app may not read it">Any file</el-radio-button>
+              </el-radio-group>
+            </span>
+          <bf-button class="secondary" @click="closeFilePicker">Done</bf-button>
+        </div>
       </template>
     </el-dialog>
 
@@ -4536,8 +4541,21 @@ onUnmounted(() => {
     color: theme.$purple_2;
   }
 }
+.file-picker-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+}
 .file-picker-types {
-  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-right: auto;
+}
+.file-picker-types-label {
+  font-weight: 500;
+  color: theme.$gray_6;
 }
 .file-picker-empty {
   margin: 16px 0;
