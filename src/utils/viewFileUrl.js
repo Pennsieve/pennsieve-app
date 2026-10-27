@@ -20,26 +20,30 @@ export function isSourceFile(file) {
   return String(file?.content?.objectType || '').toLowerCase() === 'source'
 }
 
-// file is one entry of pennsieve-api's /view or /sources response.
-export async function viewFileUrl({ datasetId, packageId, file }, {
+// file is one entry of pennsieve-api's /view or /sources response. short
+// asks for a short link in place of the presigned one, for Microsoft's
+// Office viewer, which caps the URL it opens: download-service's redirecting
+// link, or pennsieve-api's shortened one.
+export async function viewFileUrl({ datasetId, packageId, file, short = false }, {
   config = siteConfig,
   getToken = useGetToken,
   fetchFn = globalThis.fetch,
 } = {}) {
   if (downloadServiceUrl(config) && datasetId && isSourceFile(file)) {
     const { url } = await getFileUrl(
-      { datasetId, packageId, purpose: 'view' },
+      { datasetId, packageId, purpose: 'view', short },
       { config, getToken, fetchFn },
     )
     return url
   }
-  return legacyFileUrl({ packageId, fileId: file?.content?.id }, { config, getToken, fetchFn })
+  return legacyFileUrl({ packageId, fileId: file?.content?.id, short }, { config, getToken, fetchFn })
 }
 
-// pennsieve-api's presigned link to one file of a package.
-async function legacyFileUrl({ packageId, fileId }, { config, getToken, fetchFn }) {
+// pennsieve-api's presigned link to one file of a package (shortened through
+// its URL shortener when short).
+async function legacyFileUrl({ packageId, fileId, short }, { config, getToken, fetchFn }) {
   const token = await getToken()
-  const url = `${config.apiUrl}/packages/${packageId}/files/${fileId}?api_key=${token}`
+  const url = `${config.apiUrl}/packages/${packageId}/files/${fileId}?api_key=${token}${short ? '&short=true' : ''}`
   const resp = await fetchFn(url, {
     method: 'GET',
     headers: { 'Content-Type': 'application/json' },

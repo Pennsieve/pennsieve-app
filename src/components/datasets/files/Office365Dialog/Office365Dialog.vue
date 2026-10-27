@@ -57,6 +57,7 @@ import {
   useSendXhr,
   useHandleXhrError,
 } from "@/mixins/request/request_composable";
+import { viewFileUrl } from "@/utils/viewFileUrl";
 
 export default {
   name: "Office365Dialog",
@@ -106,21 +107,6 @@ export default {
   methods: {
     ...mapActions("filesModule", ["closeOffice365Dialog"]),
 
-    /**
-     * Computed property to generate endpoint url to retreive
-     * package file information
-     * @returns {String}
-     */
-    packageFilesUrl: function () {
-      const url = propOr("", "apiUrl", this.config);
-      const packageId = pathOr("", ["content", "nodeId"], this.officeFile);
-      const fileId = pathOr("", ["content", "id"], head(this.sourceFile));
-
-      return useGetToken().then((token) => {
-        return `${url}/packages/${packageId}/files/${fileId}?api_key=${token}&short=true`;
-      });
-    },
-
     sourceFilesUrl: function () {
       const url = propOr("", "apiUrl", this.config);
       const packageId = pathOr("", ["content", "nodeId"], this.officeFile);
@@ -130,18 +116,25 @@ export default {
       });
     },
     /**
-     * Get package files endpoint call to get url to open in MS Office Viewer
+     * A view link to the package's file, opened in Microsoft's Office
+     * viewer. The viewer caps the URL it opens, which a presigned link is
+     * over, so the link is a short one: download-service's redirecting link
+     * for a source file (viewFileUrl), pennsieve-api's shortened link
+     * otherwise.
      */
     getPackageFiles: function () {
-      return this.packageFilesUrl().then((url) => {
-        return useSendXhr(url)
-          .then((response) => {
-            this.awsURL = response.url;
-            const finalURL = `https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(this.awsURL)}`;
-            window.open(finalURL, "_blank");
-          })
-          .catch((err) => useHandleXhrError(err));
-      });
+      const packageId = pathOr("", ["content", "nodeId"], this.officeFile);
+      const datasetId = pathOr("", ["content", "datasetNodeId"], this.officeFile);
+      return viewFileUrl(
+        { datasetId, packageId, file: head(this.sourceFile), short: true },
+        { config: this.config }
+      )
+        .then((url) => {
+          this.awsURL = url;
+          const finalURL = `https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(this.awsURL)}`;
+          window.open(finalURL, "_blank");
+        })
+        .catch((err) => useHandleXhrError(err));
     },
 
     /**
