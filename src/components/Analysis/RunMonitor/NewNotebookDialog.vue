@@ -9,6 +9,7 @@
 // Diverged enough from the standard run config that it lives on its own; opened
 // via v-model and emits `created` with the new run.
 import { isPathPrefixParam, targetParamLabel, defaultsToRunName, targetWritesToDataset, canWriteDataset, searchDatasets } from "./dataTargets";
+import { hasInterface, withInterfaceNodes, destinationChoices, NO_DESTINATION } from "./workflowInterface";
 import { computed, reactive, ref, watch } from "vue";
 import { useStore } from "vuex";
 import BfButton from "../../shared/bf-button/BfButton.vue";
@@ -20,7 +21,7 @@ import { useSendXhr } from "@/mixins/request/request_composable";
 import toQueryParams from "@/utils/toQueryParams";
 import EventBus from "@/utils/event-bus";
 import { notebookKernel, kernelLabel, interactiveCapable, launchableKernels, kernelOutput, nonSavingAlternative } from "./notebookHelpers";
-import { STANDARD_CPU_OPTIONS, getStandardMemoryOptions } from "./runHelpers";
+import { STANDARD_CPU_OPTIONS, getStandardMemoryOptions, getTargetTypeLabel } from "./runHelpers";
 import { sourceLabel } from "../WorkflowGraph/sourceInputs";
 import * as siteConfig from "@/site-config/site.json";
 import { viewsServiceUrl, viewForDataset, viewDataSource } from "@/utils/viewsService";
@@ -73,15 +74,15 @@ const datasetSearchQuery = ref("");
 let datasetSearchTimer = null;
 const executing = ref(false);
 
-const stepTitles = [
+const stepTitles = computed(() => [
   "Select Kernel",
   "Select Compute Node",
   "Compute Resources",
-  "Select Dataset",
+  iface.value ? "Input" : "Select Dataset",
   "Select Input Files",
-  "Output Destination",
+  iface.value ? "Results" : "Output Destination",
   "Review & Start",
-];
+]);
 
 /* ------------------------------------------------------ compute resources --- */
 // Fargate CPU/memory for the notebook task. Lowest tier is 1 vCPU (1024). Memory
@@ -174,15 +175,85 @@ const selectedDataset = computed(
   () => datasetOptions.value.find((d) => d.content?.id === form.value.datasetId) || null
 );
 
+/* ------------------------------------------- inputs and outputs (interface) - */
+// A notebook workflow that declares its input and output (workflow-service:
+// one per kernel) has them bound here, for this session: its input to a
+// dataset's files, a public dataset or nothing, and its results to a
+// download, a dataset or nowhere, as it accepts. In My Workspace there's no
+// dataset to read from or write to. A notebook workflow with source and
+// target nodes is launched as before.
+const iface = computed(() => hasInterface(selectedWorkflow.value));
+const ifaceInput = computed(() => selectedWorkflow.value?.inputs?.[0] || null);
+const ifaceOutput = computed(() => selectedWorkflow.value?.outputs?.[0] || null);
+const INPUT_CHOICES = {
+  dataset: { label: "Files from a dataset", desc: "Choose a dataset in this workspace, then the files to start with" },
+  public: { label: "A public dataset", desc: "A published dataset; you pick its files from the notebook" },
+  none: { label: "No input", desc: "Start with an empty input/ folder" },
+};
+const inputChoices = computed(() => {
+  const c = [];
+  if (!props.personal && ifaceInput.value) c.push("dataset");
+  if (publicInputs && ifaceInput.value) c.push("public");
+  if (!ifaceInput.value || ifaceInput.value.optional) c.push("none");
+  return c;
+});
+const inputChoice = ref("");
+const outputChoices = computed(() =>
+  ifaceOutput.value ? destinationChoices(ifaceOutput.value, { targetTypes: targetTypes.value, myWorkspace: props.personal }) : []
+);
+const outputChoice = ref("");
+const outputLabel = (t) =>
+  t === NO_DESTINATION ? "Don't save" : t === "download" ? "Download" : targetWritesToDataset(t) ? "Save to a dataset" : getTargetTypeLabel(t, targetTypes.value);
+const outputDesc = (t) =>
+  t === NO_DESTINATION
+    ? "The session's output/ folder isn't saved when it ends"
+    : t === "download"
+    ? "An archive of output/ to download when the session ends"
+    : targetWritesToDataset(t)
+    ? "output/ copied into a dataset folder when the session ends"
+    : "";
+// Choices start from what the workflow suggests: a dataset's files in a
+// workspace (else a public dataset), and the output's default.
+watch(
+  () => [form.value.workflowId, iface.value],
+  () => {
+    if (!iface.value) return;
+    const inputs = inputChoices.value;
+    inputChoice.value = inputs.includes(props.personal ? "public" : "dataset") ? (props.personal ? "public" : "dataset") : inputs[0] || "";
+    const outs = outputChoices.value;
+    const preferred = ifaceOutput.value?.default?.targetType;
+    outputChoice.value = outs.includes(preferred) ? preferred : outs.find((t) => t !== NO_DESTINATION) || outs[0] || "";
+  }
+);
+// The output's settings follow its destination.
+watch(outputChoice, (t) => {
+  const node = dataTargetNodes.value[0];
+  if (!iface.value || !node || !t) return;
+  dataTargetConfigs[node.id] = t === NO_DESTINATION ? { params: [] } : targetConfigFor(node, t);
+});
+// A public dataset as a workspace notebook's input: its search starts once
+// it's chosen.
+watch(inputChoice, (c) => {
+  if (c === "public" && publicInputs && !publicResults.value.length && !publicLoading.value) searchPublicDatasets();
+});
+const showPublicInput = computed(() => (iface.value ? inputChoice.value === "public" && publicInputs : props.personal && publicInputs));
+const showDatasetInput = computed(() => (iface.value ? inputChoice.value === "dataset" : !props.personal));
+const outputWritesDataset = computed(() => iface.value && !!outputChoice.value && outputChoice.value !== NO_DESTINATION && targetWritesToDataset(outputChoice.value));
+
 /* ------------------------------------------------ view-only datasets ------- */
 // A notebook whose results are saved to a dataset saves them to the chosen
 // one, and workflow-service refuses a run whose creator can't write there
 // (below Editor). On a dataset they can only view, they either start the same
 // kernel's notebook that doesn't save to a dataset, or save the results to
 // another dataset they can edit (each target's own datasetId).
-const savesToDataset = computed(() => selectedWorkflow.value?.notebook?.savesTo === "dataset");
+const savesToDataset = computed(() => (iface.value ? outputWritesDataset.value : selectedWorkflow.value?.notebook?.savesTo === "dataset"));
 const isViewOnly = (ds) => savesToDataset.value && !canWriteDataset(ds?.role);
 const viewOnly = computed(() => !props.personal && !!selectedDataset.value && isViewOnly(selectedDataset.value));
+// The dataset the results are saved to is chosen for them: on a view-only
+// dataset, or (interface) when the input isn't a dataset's files.
+const chooseResultsDataset = computed(() =>
+  iface.value ? outputWritesDataset.value && (inputChoice.value !== "dataset" || viewOnly.value) : viewOnly.value
+);
 const alternativeKernel = computed(() => nonSavingAlternative(kernelChoices.value, selectedWorkflow.value));
 
 const resultsDatasetId = ref("");
@@ -271,11 +342,19 @@ const canNext = computed(() => {
     case 2:
       return true; // resources always have a valid default (1 vCPU)
     case 3:
+      if (iface.value) {
+        return inputChoice.value === "dataset"
+          ? !!form.value.datasetId
+          : inputChoice.value === "public"
+          ? !!publicDataset.value
+          : inputChoice.value === "none";
+      }
       return props.personal || !!form.value.datasetId;
     case 4:
-      return props.personal || dataSourcesComplete.value;
+      return (props.personal && !iface.value) || dataSourcesComplete.value;
     case 5:
-      return dataTargetsComplete.value && (!viewOnly.value || !!resultsDatasetId.value);
+      if (iface.value && outputChoice.value === NO_DESTINATION) return true;
+      return dataTargetsComplete.value && (!chooseResultsDataset.value || !!resultsDatasetId.value);
     default:
       return true;
   }
@@ -415,7 +494,9 @@ async function loadDefinition() {
       "analysisModule/fetchWorkflowDefinition",
       form.value.workflowId
     );
-    configDefinition.value = def;
+    // A workflow's input and output as the source and target nodes a run of
+    // it has (workflowInterface.js).
+    configDefinition.value = withInterfaceNodes(def);
     console.log(
       "[Notebook] definition dag nodes:",
       (def?.dag || def?.processors || []).map((d) => ({ id: d.id, type: d.type }))
@@ -423,31 +504,8 @@ async function loadDefinition() {
     Object.keys(dataSourceFiles).forEach((k) => delete dataSourceFiles[k]);
     Object.keys(dataTargetConfigs).forEach((k) => delete dataTargetConfigs[k]);
     for (const node of dataTargetNodes.value) {
-      const tt = targetTypes.value.find((t) => t.targetType === node.targetType);
-      const paramDefs = tt?.params || [];
-      dataTargetConfigs[node.id] = {
-        params: paramDefs.map((pd) => {
-          const followsRunName = pd.defaultValue == null && defaultsToRunName(node.targetType, pd.name);
-          return {
-            name: pd.name,
-            type: pd.type || "string",
-            description: pd.description || "",
-            required: pd.defaultValue == null && !isPathPrefixParam(pd.name),
-            // Kept equal to the run's name until the user edits it.
-            followsRunName,
-            value:
-              pd.defaultValue != null
-                ? String(pd.defaultValue)
-                : followsRunName
-                ? runName.value
-                : isPathPrefixParam(pd.name)
-                ? ""
-                : isOutputFolderParam(pd.name)
-                ? "/"
-                : "",
-          };
-        }),
-      };
+      const t = iface.value && outputChoice.value ? outputChoice.value : node.targetType;
+      dataTargetConfigs[node.id] = t === NO_DESTINATION ? { params: [] } : targetConfigFor(node, t);
     }
     if (dataSourceNodes.value.length > 0) {
       selectSourceNode(dataSourceNodes.value[0].id);
@@ -460,6 +518,40 @@ async function loadDefinition() {
   } finally {
     definitionLoading.value = false;
   }
+}
+
+// A target's settings in the launcher, for its target type: the registry's
+// params, a download's archive named after the run, output folders at the
+// dataset's root; an interface output's default params where it's that type.
+function targetConfigFor(node, targetType) {
+  const tt = targetTypes.value.find((t) => t.targetType === targetType);
+  const paramDefs = tt?.params || [];
+  const defaults = targetType === node.targetType ? node.defaultParams || {} : {};
+  return {
+        params: paramDefs.map((pd) => {
+          const followsRunName = pd.defaultValue == null && defaultsToRunName(targetType, pd.name);
+          return {
+            name: pd.name,
+            type: pd.type || "string",
+            description: pd.description || "",
+            required: pd.defaultValue == null && !isPathPrefixParam(pd.name),
+            // Kept equal to the run's name until the user edits it.
+            followsRunName,
+            value:
+              defaults[pd.name] != null && defaults[pd.name] !== ""
+                ? String(defaults[pd.name])
+                : pd.defaultValue != null
+                ? String(pd.defaultValue)
+                : followsRunName
+                ? runName.value
+                : isPathPrefixParam(pd.name)
+                ? ""
+                : isOutputFolderParam(pd.name)
+                ? "/"
+                : "",
+          };
+        }),
+  };
 }
 
 /* ----------------------------------------------------------- file picker ---- */
@@ -581,6 +673,8 @@ function reset() {
   configDefinition.value = null;
   resultsDatasetId.value = "";
   resultsQuery.value = "";
+  inputChoice.value = "";
+  outputChoice.value = "";
   Object.keys(dataSourceFiles).forEach((k) => delete dataSourceFiles[k]);
   Object.keys(dataTargetConfigs).forEach((k) => delete dataTargetConfigs[k]);
   store.commit("analysisModule/CLEAR_SELECTED_FILES");
@@ -608,19 +702,68 @@ watch(visible, (open) => {
 // Outside a workspace there are no input files to pick: the user downloads a
 // public dataset's files from the notebook itself.
 const INPUT_FILES_STEP = 4;
-const skipsStep = (i) => props.personal && i === INPUT_FILES_STEP;
+const skipsStep = (i) => i === INPUT_FILES_STEP && (iface.value ? inputChoice.value !== "dataset" : props.personal);
 
 const next = async () => {
   if (step.value === 3) await loadDefinition(); // leaving Dataset → load inputs
   let n = step.value + 1;
   while (skipsStep(n)) n++;
-  if (n < stepTitles.length) step.value = n;
+  if (n < stepTitles.value.length) step.value = n;
 };
 const back = () => {
   let n = step.value - 1;
   while (n > 0 && skipsStep(n)) n--;
   if (n >= 0) step.value = n;
 };
+
+/* ------------------------------------------------------- info column ------ */
+// Input and Results show their own choices on the left (io-split); every
+// other step, what it's for and what's chosen so far.
+const stepHasChoices = computed(() => iface.value && (step.value === 3 || step.value === 5));
+const STEP_ABOUT = [
+  "A notebook is a live Jupyter session on a compute node. Choose its language.",
+  "The compute node the session runs on. Only nodes with notebook sessions are offered.",
+  "The CPU and memory the session gets. Memory follows the CPU unless you set it.",
+  "The dataset the notebook works with.",
+  "The files copied into the notebook's input/ folder before it starts.",
+  "Where the notebook's results go when the session ends.",
+  "Check the session, name it, and start it.",
+];
+const stepAbout = computed(() => STEP_ABOUT[step.value] || "");
+const soFar = computed(() => {
+  const rows = [];
+  if (step.value > 0 && selectedWorkflow.value) rows.push({ label: "Kernel", value: kernelLabel(notebookKernel(selectedWorkflow.value)) });
+  if (step.value > 1 && selectedComputeNode.value) rows.push({ label: "Compute node", value: selectedComputeNode.value.name });
+  if (step.value > 2) {
+    rows.push({ label: "Resources", value: `${cpuLabel(resourceCpu.value)} · ${isAutoMemory.value ? memoryLabel(autoMemoryForCpu(resourceCpu.value)) : memoryLabel(resourceMemory.value)}` });
+  }
+  if (step.value > 3) {
+    const input = iface.value
+      ? inputChoice.value === "public"
+        ? publicDataset.value?.name || "A public dataset"
+        : inputChoice.value === "dataset"
+        ? selectedDataset.value?.content?.name || "A dataset"
+        : "No input"
+      : props.personal
+      ? publicDataset.value?.name || "None"
+      : selectedDataset.value?.content?.name;
+    if (input) rows.push({ label: "Input", value: input });
+  }
+  if (step.value > 4 && iface.value && inputChoice.value === "dataset") {
+    rows.push({ label: "Files", value: String(dataSourceNodes.value.reduce((n, d) => n + fileCountForNode(d.id), 0)) });
+  }
+  if (step.value > 5 && iface.value) rows.push({ label: "Results", value: outputLabel(outputChoice.value) });
+  return rows;
+});
+
+// The run's dataset: the input's (its files' dataset), else the one chosen for
+// the results; none in My Workspace.
+const runDatasetId = computed(() => {
+  if (props.personal) return "";
+  if (!iface.value) return form.value.datasetId;
+  if (inputChoice.value === "dataset") return form.value.datasetId;
+  return outputWritesDataset.value ? resultsDatasetId.value : "";
+});
 
 async function execute() {
   if (executing.value) return;
@@ -629,21 +772,30 @@ async function execute() {
     const dag = configDefinition.value?.dag || [];
 
     const dataSources = {};
-    for (const [nodeId, files] of Object.entries(dataSourceFiles)) {
-      const ids = files.map((f) => f.content?.id).filter(Boolean);
-      if (ids.length) dataSources[nodeId] = { packageIds: ids };
+    if (!iface.value || inputChoice.value === "dataset") {
+      for (const [nodeId, files] of Object.entries(dataSourceFiles)) {
+        const ids = files.map((f) => f.content?.id).filter(Boolean);
+        if (ids.length) dataSources[nodeId] = { packageIds: ids };
+      }
     }
 
     const dataTargets = {};
     for (const node of dataTargetNodes.value) {
+      // An interface output names its destination for this session.
+      if (iface.value && outputChoice.value === NO_DESTINATION) {
+        dataTargets[node.id] = { targetType: NO_DESTINATION };
+        continue;
+      }
       const obj = {};
       (dataTargetConfigs[node.id]?.params || []).forEach((p) => {
         if (p.value?.trim()) obj[p.name] = p.value;
       });
       const entry = {};
+      const targetType = iface.value ? outputChoice.value : node.targetType;
+      if (iface.value) entry.targetType = targetType;
       if (Object.keys(obj).length) entry.params = obj;
-      // On a view-only dataset, the results go to the one chosen for them.
-      if (viewOnly.value && targetWritesToDataset(node.targetType)) entry.datasetId = resultsDatasetId.value;
+      // The results go to the dataset chosen for them, where there is one.
+      if (chooseResultsDataset.value && targetWritesToDataset(targetType)) entry.datasetId = resultsDatasetId.value;
       if (Object.keys(entry).length) dataTargets[node.id] = entry;
     }
 
@@ -662,7 +814,8 @@ async function execute() {
     // Outside a workspace, the public dataset is the first data source's view.
     // It's a source's only input: the session downloads its files into it.
     const personalSources = {};
-    if (props.personal && publicDataset.value && dataSourceNodes.value.length) {
+    const usesPublic = iface.value ? inputChoice.value === "public" : props.personal;
+    if (usesPublic && publicDataset.value && dataSourceNodes.value.length) {
       const view = await viewForDataset({
         datasetId: publicDataset.value.id,
         version: publicVersion.value,
@@ -678,8 +831,8 @@ async function execute() {
         computeNodeId: form.value.computeNodeId,
         ...(processorConfigs.length > 0 && { processorConfigs }),
       },
-      ...(!props.personal && { datasetId: form.value.datasetId }),
-      dataSources: props.personal ? personalSources : dataSources,
+      ...(runDatasetId.value && { datasetId: runDatasetId.value }),
+      dataSources: usesPublic ? personalSources : dataSources,
       ...(name && { name }),
       ...(Object.keys(dataTargets).length > 0 && { dataTargets }),
     };
@@ -711,7 +864,7 @@ async function execute() {
   <el-dialog
     v-model="visible"
     :title="stepTitles[step]"
-    :width="step === 4 && !personal ? '840px' : '560px'"
+    width="min(840px, 96vw)"
     :close-on-click-modal="false"
   >
     <div class="wizard-body">
@@ -724,6 +877,24 @@ async function execute() {
           :class="{ active: step === i, done: step > i }"
         />
       </div>
+
+      <!-- Two columns on every step: what it's for and what's chosen so far on
+           the left (on Input and Results, the step's own choices are), the
+           step on the right. On a narrow screen, the step alone. -->
+      <div class="nb-layout" :class="{ 'has-info': !stepHasChoices }">
+      <aside v-if="!stepHasChoices" class="nb-info">
+        <p class="nb-info__about">{{ stepAbout }}</p>
+        <template v-if="soFar.length">
+          <h4 class="nb-info__title">This session</h4>
+          <dl class="nb-info__list">
+            <template v-for="row in soFar" :key="row.label">
+              <dt>{{ row.label }}</dt>
+              <dd>{{ row.value }}</dd>
+            </template>
+          </dl>
+        </template>
+      </aside>
+      <div class="nb-content">
 
       <!-- Step 0: Kernel -->
       <div v-if="step === 0" class="wizard-step">
@@ -740,7 +911,9 @@ async function execute() {
             @click="form.workflowId = wf.uuid"
           >
             <span class="kernel-name">{{ kernelLabel(notebookKernel(wf)) }}</span>
-            <span class="kernel-sub">{{ kernelOutput(wf) || wf.name }}</span>
+            <!-- Where results go tells kernels apart only when it's fixed: a
+                 notebook with an input and output chooses it later -->
+            <span class="kernel-sub">{{ hasInterface(wf) ? wf.summary || "You choose its input and results next" : kernelOutput(wf) || wf.name }}</span>
           </button>
         </div>
       </div>
@@ -826,8 +999,31 @@ async function execute() {
         </p>
       </div>
 
+      <!-- Step 3: Input (a notebook with an input: what it starts with) -->
+      <div v-if="step === 3" :class="{ 'io-split': iface }">
+      <div v-if="iface" class="io-side">
+      <div class="io-choices-label">Start with</div>
+      <div class="io-choices">
+        <button
+          v-for="c in inputChoices"
+          :key="c"
+          type="button"
+          class="io-choice"
+          :class="{ 'is-picked': inputChoice === c }"
+          @click="inputChoice = c"
+        >
+          <span class="io-choice__name">{{ INPUT_CHOICES[c].label }}</span>
+          <span class="io-choice__desc">{{ INPUT_CHOICES[c].desc }}</span>
+        </button>
+      </div>
+      </div>
+      <div class="io-main">
+      <div v-if="step === 3 && iface && inputChoice === 'none'" class="wizard-step">
+        <p class="wizard-step-desc">The notebook starts with an empty <code>input/</code> folder.</p>
+      </div>
       <!-- Step 3: Dataset -->
-      <div v-if="step === 3 && personal && publicInputs" class="wizard-step">
+      <div v-else-if="step === 3 && showPublicInput" class="wizard-step">
+        <h4 v-if="iface" class="io-section-title">Choose a public dataset</h4>
         <p class="wizard-step-desc">
           Optionally choose a public dataset to work with. You pick which of
           its files to download from the notebook. Skip this step to start
@@ -917,7 +1113,7 @@ async function execute() {
           </div>
         </template>
       </div>
-      <div v-else-if="step === 3 && personal" class="wizard-step wizard-step--disabled">
+      <div v-else-if="step === 3 && personal && !iface" class="wizard-step wizard-step--disabled">
         <p class="wizard-step-desc">
           Selecting a dataset isn't available outside a workspace yet. Public
           datasets, and datasets from your workspaces, will be selectable here.
@@ -925,8 +1121,9 @@ async function execute() {
         </p>
         <el-input placeholder="Search datasets..." disabled class="wizard-search" />
       </div>
-      <div v-else-if="step === 3" class="wizard-step">
-        <p class="wizard-step-desc">Select the dataset to work with.</p>
+      <div v-else-if="step === 3 && showDatasetInput" class="wizard-step">
+        <h4 v-if="iface" class="io-section-title">Choose a dataset</h4>
+        <p v-else class="wizard-step-desc">Select the dataset to work with.</p>
         <div v-if="selectedDataset" class="wizard-selection">
           <div class="wizard-selection-header">
             <span class="wizard-selection-name">{{ selectedDataset.content?.name }}</span>
@@ -988,8 +1185,11 @@ async function execute() {
         </template>
       </div>
 
+      </div>
+      </div>
+
       <!-- Step 4: Input files -->
-      <div v-if="step === 4 && !personal" class="wizard-step">
+      <div v-if="step === 4 && (!personal || iface)" class="wizard-step">
         <div v-if="definitionLoading" class="wizard-cards-loading">
           Loading notebook inputs...
         </div>
@@ -1043,12 +1243,35 @@ async function execute() {
       <!-- Step 5: Output destination -->
       <div v-if="step === 5" class="wizard-step">
         <p class="wizard-step-desc">
-          Configure where the notebook's results are saved.
+          {{ iface ? "Where the notebook's results (its output/ folder) go when the session ends." : "Configure where the notebook's results are saved." }}
         </p>
-        <div v-if="viewOnly" class="target-block">
+        <div :class="{ 'io-split': iface }">
+        <div v-if="iface" class="io-side">
+        <div class="io-choices-label">Results go to</div>
+        <div class="io-choices">
+          <button
+            v-for="t in outputChoices"
+            :key="t"
+            type="button"
+            class="io-choice"
+            :class="{ 'is-picked': outputChoice === t }"
+            @click="outputChoice = t"
+          >
+            <span class="io-choice__name">{{ outputLabel(t) }}</span>
+            <span class="io-choice__desc">{{ outputDesc(t) }}</span>
+          </button>
+        </div>
+        </div>
+        <div class="io-main">
+        <p v-if="iface && outputChoice === NO_DESTINATION" class="wizard-step-desc">
+          The session's <code>output/</code> folder isn't saved anywhere when it ends.
+        </p>
+        <template v-if="!iface || outputChoice !== NO_DESTINATION">
+        <h4 v-if="iface" class="io-section-title">{{ outputWritesDataset ? "Dataset and folder" : "Download" }}</h4>
+        <div v-if="chooseResultsDataset" class="target-block">
           <div class="target-block-title">Save results to</div>
           <div class="target-param-desc">
-            You can only view {{ selectedDataset?.content?.name }}: choose a dataset you can edit.
+            {{ viewOnly ? `You can only view ${selectedDataset?.content?.name}: choose a dataset you can edit.` : "Choose the dataset to save the results to." }}
           </div>
           <div v-if="resultsDataset" class="wizard-selection">
             <div class="wizard-selection-header">
@@ -1081,7 +1304,7 @@ async function execute() {
           </template>
         </div>
         <div
-          v-if="!viewOnly && (dataTargetNodes.length === 0 || !hasVisibleTargetParams)"
+          v-if="!chooseResultsDataset && (dataTargetNodes.length === 0 || !hasVisibleTargetParams)"
           class="wizard-cards-loading"
         >
           This notebook saves results to its output folder automatically — no
@@ -1098,7 +1321,7 @@ async function execute() {
                 <!-- Notify: one checkbox. "auto" emails unless you're on the
                      archive's page, which is what "email me" should mean. -->
                 <el-checkbox
-                  v-if="node.targetType === 'download' && p.name === 'notify'"
+                  v-if="(iface ? outputChoice : node.targetType) === 'download' && p.name === 'notify'"
                   :model-value="p.value !== 'none'"
                   @update:model-value="(on) => (dataTargetConfigs[node.id].params[i].value = on ? 'auto' : 'none')"
                 >
@@ -1123,6 +1346,9 @@ async function execute() {
             </template>
           </div>
         </template>
+        </template>
+        </div>
+        </div>
       </div>
 
       <!-- Step 6: Review -->
@@ -1146,21 +1372,39 @@ async function execute() {
               {{ isAutoMemory ? `${memoryLabel(autoMemoryForCpu(resourceCpu))} (auto)` : memoryLabel(resourceMemory) }}
             </span>
           </div>
-          <div v-if="personal" class="wizard-summary-row">
+          <div v-if="iface" class="wizard-summary-row">
+            <span class="wizard-summary-label">Input</span>
+            <span class="wizard-summary-value">{{
+              inputChoice === "public"
+                ? `${publicDataset?.name} (version ${publicVersion})`
+                : inputChoice === "dataset"
+                ? `${dataSourceNodes.reduce((n, d) => n + fileCountForNode(d.id), 0)} files from ${selectedDataset?.content?.name}`
+                : "None"
+            }}</span>
+          </div>
+          <div v-if="iface" class="wizard-summary-row">
+            <span class="wizard-summary-label">Results</span>
+            <span class="wizard-summary-value">{{
+              outputWritesDataset
+                ? `Saved to ${chooseResultsDataset ? resultsDataset?.content?.name : selectedDataset?.content?.name}`
+                : outputLabel(outputChoice)
+            }}</span>
+          </div>
+          <div v-if="personal && !iface" class="wizard-summary-row">
             <span class="wizard-summary-label">Public dataset</span>
             <span class="wizard-summary-value">{{
               publicDataset ? `${publicDataset.name} (version ${publicVersion})` : "None"
             }}</span>
           </div>
-          <div v-if="!personal" class="wizard-summary-row">
+          <div v-if="!personal && !iface" class="wizard-summary-row">
             <span class="wizard-summary-label">Dataset</span>
             <span class="wizard-summary-value">{{ selectedDataset?.content?.name }}</span>
           </div>
-          <div v-if="viewOnly" class="wizard-summary-row">
+          <div v-if="viewOnly && !iface" class="wizard-summary-row">
             <span class="wizard-summary-label">Results saved to</span>
             <span class="wizard-summary-value">{{ resultsDataset?.content?.name }}</span>
           </div>
-          <div v-if="!personal" class="wizard-summary-row">
+          <div v-if="!personal && !iface" class="wizard-summary-row">
             <span class="wizard-summary-label">Input files</span>
             <span class="wizard-summary-value">
               {{ dataSourceNodes.reduce((n, d) => n + fileCountForNode(d.id), 0) }}
@@ -1168,11 +1412,11 @@ async function execute() {
             </span>
           </div>
         </div>
-        <p v-if="personal && publicDataset && !dataSourceNodes.length" class="public-warning">
+        <p v-if="showPublicInput && publicDataset && !dataSourceNodes.length" class="public-warning">
           This notebook has no input to attach {{ publicDataset.name }} to, so
           it would start without it.
         </p>
-        <p v-else-if="personal && publicDataset" class="resource-hint">
+        <p v-else-if="showPublicInput && publicDataset" class="resource-hint">
           The notebook starts with the dataset's file list in
           <code>input/</code>. Choose which files to download from its
           <strong>Inputs</strong> panel.
@@ -1185,6 +1429,8 @@ async function execute() {
           maxlength="64"
           @input="nameTouched = true"
         />
+      </div>
+      </div>
       </div>
     </div>
 
@@ -1212,8 +1458,139 @@ async function execute() {
 <style scoped lang="scss">
 @use "../../../styles/theme";
 
+/* A choice of what a notebook starts with, or where its results go */
+.io-choices-label {
+  margin-bottom: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: theme.$gray_4;
+}
+/* Two columns: the choices on the left, what the chosen one needs on the
+   right, apart by a rule */
+.io-split {
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr);
+  gap: 20px;
+  min-height: 320px;
+}
+.io-side {
+  padding-right: 20px;
+  border-right: 1px solid theme.$gray_2;
+}
+.io-main {
+  min-width: 0;
+
+  > .wizard-step {
+    padding-top: 0;
+  }
+}
+.io-choices {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.io-section-title {
+  margin: 0 0 10px;
+  font-size: 14px;
+  font-weight: 600;
+  color: theme.$gray_6;
+}
+.io-choice {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px solid theme.$gray_2;
+  border-radius: 4px;
+  background: theme.$white;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+
+  &:hover {
+    border-color: theme.$purple_1;
+  }
+  &.is-picked {
+    border-color: theme.$purple_1;
+    background: #f5f3ff;
+    box-shadow: inset 3px 0 0 theme.$purple_1;
+  }
+}
+.io-choice__name {
+  font-size: 14px;
+  font-weight: 600;
+  color: theme.$gray_6;
+}
+.io-choice__desc {
+  font-size: 11px;
+  line-height: 1.35;
+  color: theme.$gray_4;
+}
+
 .wizard-body {
   min-height: 300px;
+}
+.nb-layout.has-info {
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr);
+  gap: 20px;
+  min-height: 320px;
+}
+.nb-info {
+  padding-right: 20px;
+  border-right: 1px solid theme.$gray_2;
+  font-size: 13px;
+  color: theme.$gray_5;
+}
+.nb-info__about {
+  margin: 0 0 16px;
+  line-height: 1.5;
+}
+.nb-info__title {
+  margin: 0 0 6px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: theme.$gray_4;
+}
+.nb-info__list {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 4px 10px;
+  margin: 0;
+
+  dt {
+    color: theme.$gray_4;
+  }
+  dd {
+    margin: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: theme.$gray_6;
+  }
+}
+.nb-content {
+  min-width: 0;
+}
+/* A narrow screen: the step alone */
+@media (max-width: 900px) {
+  .nb-layout.has-info,
+  .io-split {
+    display: block;
+  }
+  .nb-info {
+    display: none;
+  }
+  .io-side {
+    margin-bottom: 16px;
+    padding-right: 0;
+    border-right: none;
+  }
 }
 .wizard-progress {
   display: flex;

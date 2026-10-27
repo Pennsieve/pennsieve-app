@@ -30,6 +30,7 @@ import BfButton from "../../shared/bf-button/BfButton.vue";
 import MetricsDashboard from "../Metrics/MetricsDashboard.vue";
 import CompactFlowNode from "../WorkflowGraph/CompactFlowNode.vue";
 import LlmMark from "../WorkflowGraph/LlmMark.vue";
+import RunWizardDialog from "../RunMonitor/RunWizardDialog.vue";
 import RuntimeMark from "../WorkflowGraph/RuntimeMark.vue";
 import GraphDensityToggle from "../WorkflowGraph/GraphDensityToggle.vue";
 import { COMPACT_BOX, layoutBox, overlaps, recenter, useGraphDensity } from "../WorkflowGraph/graphDensity";
@@ -50,6 +51,9 @@ import { stepNames } from "./stepNames";
 import StepPicker from "./StepPicker.vue";
 import LinkEdge from "./LinkEdge.vue";
 import { sourceLabel, sourceHints, hintLine } from "../WorkflowGraph/sourceInputs";
+import { canvasDefinition, toInterfaceDefinition } from "./builderInterface";
+import IoPill from "../WorkflowGraph/IoPill.vue";
+import { isFeatureEnabled } from "@/utils/features";
 import { useGraphHistory, snapshot } from "./graphHistory";
 import { canConnect, neighbourInDirection } from "./graphEditing";
 import {
@@ -501,7 +505,9 @@ const getComputeTypesForTarget = (targetType) => {
   // TODO: use API-driven computeTypes once target types return them reliably
   // return tt?.runtimeConfig?.computeTypes || DEFAULT_COMPUTE_TYPES;
   const types = tt?.runtimeConfig?.computeTypes;
-  return types && types.length ? withGpu(types) : DEFAULT_COMPUTE_TYPES;
+  // A target moves results, so it never runs on a GPU.
+  const noGpu = (list) => list.filter((t) => t !== "gpu");
+  return noGpu(types && types.length ? types : DEFAULT_COMPUTE_TYPES);
 };
 
 const getComputeTypesForApplication = (application) => {
@@ -654,6 +660,10 @@ Filtered Workflow List
 Mode Management
 */
 const isReadOnly = computed(() => mode.value === "browse");
+// The builder saves inputs and outputs (features.workflowInterface).
+const interfaceOn = isFeatureEnabled("workflowInterface");
+// Where a new output can go, to start with.
+const DEFAULT_ACCEPTS = ["Pennsieve Dataset", "download"];
 
 const enterCreateMode = () => {
   mode.value = "create";
@@ -777,7 +787,8 @@ const nodeTypeColor = (type) => {
 };
 
 const definitionToNodesAndEdges = (workflow, applications) => {
-  const raw = workflow.dag || [];
+  // A workflow's inputs and outputs drawn as its source and target nodes.
+  const raw = canvasDefinition(workflow).dag || [];
   if (raw.length === 0) return { nodes: [], edges: [], needsAutoLayout: false };
 
   // Normalize IDs
@@ -844,6 +855,11 @@ const definitionToNodesAndEdges = (workflow, applications) => {
         paramSchema: p.paramSchema || [],
         resolvedParams: p.resolvedParams || {},
         tag: p.tag || latestVersion(matchedApplication)?.version || "",
+        // An input's or output's own name and settings (its panel).
+        ...(p.name && { name: p.name }),
+        ...(p.input?.optional && { optional: true }),
+        ...(p.output?.accepts?.length && { accepts: [...p.output.accepts] }),
+        ...(p.output?.required && { required: true }),
       },
       position:
         hasSavedPositions && p.position
@@ -1045,7 +1061,57 @@ const selectWorkflow = (workflow) => {
   } else {
     setTimeout(() => fitView({ padding: 0.2, maxZoom: 1 }), 50);
   }
+  markLayoutSaved();
   history.reset();
+};
+
+/*
+  Layout of a saved workflow: its owner can move steps, inputs and outputs
+  (or Tidy up) while viewing it, and save where they are, in place on the
+  latest version: positions never change what runs, so no new version.
+*/
+const layoutOf = () =>
+  Object.fromEntries(
+    nodes.value.map((n) => {
+      const p = positionToSave(n);
+      return [n.id, { x: Math.round(p.x), y: Math.round(p.y) }];
+    })
+  );
+const savedLayout = ref({});
+const markLayoutSaved = () => {
+  savedLayout.value = layoutOf();
+};
+const canSaveLayout = computed(() => mode.value === "browse" && isWorkflowCreator.value && !viewingVersion.value);
+const layoutChanged = computed(() => {
+  if (!canSaveLayout.value) return false;
+  const saved = savedLayout.value;
+  return nodes.value.some((n) => {
+    const p = positionToSave(n);
+    const was = saved[n.id];
+    return !was || Math.abs(Math.round(p.x) - was.x) > 0 || Math.abs(Math.round(p.y) - was.y) > 0;
+  });
+});
+const savingLayout = ref(false);
+const saveLayout = async () => {
+  const wf = selectedWorkflow.value;
+  if (!wf?.uuid || !layoutChanged.value) return;
+  savingLayout.value = true;
+  try {
+    const positions = layoutOf();
+    await store.dispatch("analysisModule/updateWorkflow", { uuid: wf.uuid, payload: { positions } });
+    markLayoutSaved();
+    EventBus.$emit("toast", { detail: { type: "success", msg: "Layout saved." } });
+  } catch (err) {
+    console.error(err);
+    EventBus.$emit("toast", { detail: { type: "error", msg: "Could not save the layout." } });
+  } finally {
+    savingLayout.value = false;
+  }
+};
+const undoMoves = () => {
+  const saved = savedLayout.value;
+  const back = detailed.value ? (p) => p : (p) => recenter([{ position: p }], DETAILED_BOX, COMPACT_BOX)[0].position;
+  nodes.value = nodes.value.map((n) => (saved[n.id] ? { ...n, position: back({ ...saved[n.id] }) } : n));
 };
 
 /*
@@ -1129,6 +1195,11 @@ const makeNode = (type, app, position) => {
         label: "Output",
         targetType: only ? only.targetType : null,
         computeType: only?.runtimeConfig?.computeTypes?.[0] || null,
+        // A new output can go to a dataset or a download unless the author
+        // says otherwise (those the registry has).
+        ...(interfaceOn && {
+          accepts: DEFAULT_ACCEPTS.filter((t) => targetTypes.value.some((tt) => tt.targetType === t)),
+        }),
       },
       position,
     };
@@ -1728,6 +1799,12 @@ const changeDensity = (value) => {
   else setTimeout(() => fitView({ padding: 0.2, maxZoom: 1 }), 50);
 };
 
+// An input or output is a pill, smaller than a step's card: laid out at its
+// own size, so the gaps around it are the steps' gaps.
+const PILL_BOX = { width: 200, height: 44 };
+const layoutSizeOf = (node, box) =>
+  node.type === "data-source" || node.type === "data-target" ? PILL_BOX : box;
+
 const autoLayout = () => {
   if (nodes.value.length === 0) return;
   const box = layoutBox(detailed.value, DETAILED_BOX);
@@ -1737,7 +1814,8 @@ const autoLayout = () => {
   g.setGraph({ rankdir: "TB", nodesep: box.nodesep, ranksep: box.ranksep });
 
   for (const node of nodes.value) {
-    g.setNode(node.id, { width: box.width, height: box.height });
+    const size = layoutSizeOf(node, box);
+    g.setNode(node.id, { width: size.width, height: size.height });
   }
   for (const edge of edges.value) {
     g.setEdge(edge.source, edge.target);
@@ -1747,11 +1825,12 @@ const autoLayout = () => {
 
   nodes.value = nodes.value.map((node) => {
     const pos = g.node(node.id);
+    const size = layoutSizeOf(node, box);
     return {
       ...node,
       position: {
-        x: pos.x - box.width / 2,
-        y: pos.y - box.height / 2,
+        x: pos.x - size.width / 2,
+        y: pos.y - size.height / 2,
       },
     };
   });
@@ -1951,12 +2030,10 @@ const saveWorkflow = async () => {
     return;
   }
 
-  const processors = serializeProcessors();
-
   const workflowData = {
     name: workflowName.value,
     description: workflowDescription.value,
-    processors: processors,
+    ...definitionPayload(),
   };
 
   saving.value = true;
@@ -1997,6 +2074,24 @@ const workflowPage = (uuid, query) => ({
   params: { ...(route.params.orgId && { orgId: route.params.orgId }), uuid },
   ...(query && { query }),
 });
+
+// What saving sends for the canvas: its inputs, outputs and steps where
+// workflow-service takes a workflow's interface (and the canvas can be one),
+// else its processors, source and target nodes included.
+const definitionPayload = () => {
+  const processors = serializeProcessors();
+  if (!isFeatureEnabled("workflowInterface")) return { processors };
+  const byId = new Map(nodes.value.map((n) => [n.id, n]));
+  const iface = toInterfaceDefinition(processors, {
+    nameOf: (id) => nodeName(byId.get(id)),
+    routedPortsOf: (id) => routedOutputs(byId.get(id)?.data?.manifestPorts).map((p) => p.name),
+    extrasOf: (id) => {
+      const d = byId.get(id)?.data || {};
+      return { optional: !!d.optional, accepts: d.accepts || [], required: !!d.required };
+    },
+  });
+  return iface || { processors };
+};
 
 // The canvas as workflow-service takes it: one processor per node, with
 // what it depends on from the incoming edges.
@@ -2128,7 +2223,7 @@ const cancelEdit = async () => {
 // Whether the canvas has the saved workflow's steps and connections (only
 // settings changed): what can still be saved where versions aren't served.
 const sameShape = () => {
-  const dag = selectedWorkflow.value?.dag || [];
+  const dag = canvasDefinition(selectedWorkflow.value || {}).dag || [];
   const ids = (list) => list.map((x) => x).sort().join(",");
   return (
     ids(dag.map((p) => p.id)) === ids(nodes.value.map((n) => n.id)) &&
@@ -2157,7 +2252,7 @@ const saveEdit = async () => {
       payload: {
         name: workflowName.value,
         description: workflowDescription.value,
-        processors: serializeProcessors(),
+        ...definitionPayload(),
         ...(note && { note }),
       },
     });
@@ -2216,8 +2311,9 @@ const duplicate = async () => {
   }
 };
 
-const runThis = () =>
-  router.push({ name: route.params.orgId ? "workflows" : "my-workflows", query: { run: selectedWorkflow.value?.uuid } });
+// The run dialog, here, on this workflow.
+const runDialog = ref(null);
+const runThis = () => runDialog.value?.open(selectedWorkflow.value?.uuid);
 
 /*
   Drafts: a new workflow not yet saved is kept in this browser and offered
@@ -2257,24 +2353,16 @@ watch(
   { deep: true },
 );
 
-const offerDraft = async () => {
-  let draft = null;
+const readDraft = () => {
   try {
-    draft = JSON.parse(localStorage.getItem(DRAFT_KEY.value) || "null");
+    const draft = JSON.parse(localStorage.getItem(DRAFT_KEY.value) || "null");
+    return draft?.nodes?.length ? draft : null;
   } catch {
-    draft = null;
+    return null;
   }
-  if (!draft?.nodes?.length) return;
-  try {
-    await ElMessageBox.confirm(
-      `You have an unsaved workflow${draft.name ? `, "${draft.name}"` : ""}. Resume it?`,
-      "Resume your draft?",
-      { confirmButtonText: "Resume", cancelButtonText: "Start new", type: "info" },
-    );
-  } catch {
-    clearDraft();
-    return;
-  }
+};
+
+const applyDraft = (draft) => {
   const byUuid = (uuid) => availableApplications.value.find((a) => a.uuid === uuid) || { uuid };
   draft.nodes.forEach((n) => {
     if (n.data.application) n.data.application = byUuid(n.data.application.uuid);
@@ -2288,6 +2376,47 @@ const offerDraft = async () => {
   history.reset();
   nextTick(() => setTimeout(() => fitView({ padding: 0.2, maxZoom: 1 }), 50));
 };
+
+/*
+  The builder's landing: what opening it offers before anything is built
+  (a new workflow from scratch, the draft kept in this browser, one from the
+  Library, or one of the user's own), so it doesn't open on a list of what
+  an empty workflow lacks. Readiness shows once building has started.
+*/
+const landing = ref(false);
+const landingDraft = ref(null);
+const started = computed(
+  () => mode.value !== "create" || (!landing.value && (!!workflowName.value.trim() || nodes.value.length > 1 || edges.value.length > 0))
+);
+const myWorkflows = computed(() => {
+  const me = store.state.profile?.id;
+  return (store.state.analysisModule.workflows || [])
+    .filter((w) => w.createdBy === me && w.isActive !== false)
+    .sort((a, b) => String(b.updatedAt || b.createdAt || "").localeCompare(String(a.updatedAt || a.createdAt || "")))
+    .slice(0, 5);
+});
+const draftAge = (draft) => {
+  const mins = Math.round((Date.now() - (draft?.savedAt || Date.now())) / 60000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins} min ago`;
+  const hours = Math.round(mins / 60);
+  return hours < 24 ? `${hours} h ago` : `${Math.round(hours / 24)} d ago`;
+};
+const startFromScratch = () => {
+  clearDraft();
+  landing.value = false;
+};
+const resumeDraft = () => {
+  applyDraft(landingDraft.value);
+  landing.value = false;
+};
+// Adding a step (an app clicked or dragged in) starts too.
+watch(
+  () => nodes.value.length,
+  (n) => {
+    if (landing.value && n > 1) landing.value = false;
+  }
+);
 
 /*
 Fetch Initial Data
@@ -2313,7 +2442,11 @@ onMounted(async () => {
       }
     } else {
       enterCreateMode();
-      await offerDraft();
+      landingDraft.value = readDraft();
+      landing.value = true;
+      if (!(store.state.analysisModule.workflows || []).length) {
+        store.dispatch("analysisModule/fetchWorkflows").catch(() => {});
+      }
     }
   } catch (err) {
     console.error(err);
@@ -2364,6 +2497,7 @@ const linkedSteps = computed(() =>
 // A step's own name: input data after the inputs it feeds, an output after
 // what it is, an app by its label.
 const baseName = (n) => {
+  if ((n?.type === "data-source" || n?.type === "data-target") && n.data?.name) return n.data.name;
   if (n?.type === "data-source") return sourceLabel(n.id, linkedSteps.value);
   if (n?.type === "data-target") return n.data?.targetType ? getTargetTypeLabel(n.data.targetType) : "Output";
   return n?.data?.label || "";
@@ -2423,6 +2557,7 @@ const openNodeSettings = (id) => {
           v-model:name="workflowName"
           v-model:description="workflowDescription"
           :readiness="readiness"
+          :started="started"
           :saving="saving"
           @save="saveWorkflow"
           @start-over="startOver"
@@ -2503,7 +2638,7 @@ const openNodeSettings = (id) => {
     <div class="builder-content">
       <!-- Left: what can be added (create and edit) -->
       <button
-        v-if="!isReadOnly && !panels.palette"
+        v-if="!isReadOnly && !panels.palette && !landing"
         type="button"
         class="panel-rail"
         title="Show the steps you can add"
@@ -2514,7 +2649,7 @@ const openNodeSettings = (id) => {
         <span class="panel-rail-label">Add steps</span>
       </button>
       <BuilderPalette
-        v-if="!isReadOnly && panels.palette"
+        v-if="!isReadOnly && panels.palette && !landing"
         :applications="availableApplications"
         :app-name="appDisplayName"
         :step-ports="selectedNode?.type === 'default' ? selectedNode.data?.manifestPorts || null : null"
@@ -2580,7 +2715,7 @@ const openNodeSettings = (id) => {
                 :mask-stroke-width="2"
               />
 
-              <div class="canvas-toolbar">
+              <div v-if="!landing" class="canvas-toolbar">
                 <GraphDensityToggle
                   v-if="nodes.length > 0"
                   :detailed="detailed"
@@ -2589,10 +2724,18 @@ const openNodeSettings = (id) => {
                 <button
                   v-if="nodes.length > 0"
                   class="auto-layout-btn"
+                  title="Arrange the steps, inputs and outputs automatically"
                   @click="autoLayout"
                 >
-                  Auto Layout
+                  Tidy up
                 </button>
+                <!-- A saved workflow's owner, having moved things: keep them there -->
+                <template v-if="layoutChanged">
+                  <button class="auto-layout-btn is-primary" :disabled="savingLayout" title="Keep the steps where they are now (no new version)" @click="saveLayout">
+                    {{ savingLayout ? "Saving…" : "Save layout" }}
+                  </button>
+                  <button class="auto-layout-btn" title="Put them back where they were saved" @click="undoMoves">Undo moves</button>
+                </template>
                 <template v-if="!isReadOnly">
                   <button
                     v-if="edges.some((e) => e.selected)"
@@ -2611,8 +2754,35 @@ const openNodeSettings = (id) => {
                 </template>
               </div>
 
+              <!-- Landing: how to start, before anything is built -->
+              <div v-if="landing && mode === 'create'" class="builder-landing">
+                <h3 class="builder-landing__title">Build a workflow</h3>
+                <div class="builder-landing__options">
+                  <button v-if="landingDraft" type="button" class="builder-landing__option is-primary" @click="resumeDraft">
+                    <span class="builder-landing__name">Resume your draft{{ landingDraft.name ? `: ${landingDraft.name}` : "" }}</span>
+                    <span class="builder-landing__desc">{{ Math.max(0, (landingDraft.nodes?.length || 1) - 1) }} step{{ (landingDraft.nodes?.length || 1) - 1 === 1 ? "" : "s" }}, kept in this browser {{ draftAge(landingDraft) }}</span>
+                  </button>
+                  <button type="button" class="builder-landing__option" :class="{ 'is-primary': !landingDraft }" @click="startFromScratch">
+                    <span class="builder-landing__name">Start from scratch</span>
+                    <span class="builder-landing__desc">An input, then the apps you add{{ landingDraft ? "; the draft is discarded" : "" }}</span>
+                  </button>
+                  <router-link :to="workflowsRoute" class="builder-landing__option">
+                    <span class="builder-landing__name">Start from a workflow in the Library</span>
+                    <span class="builder-landing__desc">Open one, then duplicate it to make it yours</span>
+                  </router-link>
+                </div>
+                <template v-if="myWorkflows.length">
+                  <h4 class="builder-landing__sub">Or edit one of yours</h4>
+                  <ul class="builder-landing__list">
+                    <li v-for="w in myWorkflows" :key="w.uuid">
+                      <router-link :to="workflowPage(w.uuid)" class="builder-landing__item">{{ w.name }}</router-link>
+                    </li>
+                  </ul>
+                </template>
+              </div>
+
               <!-- The first step: a hint while only the input is there. -->
-              <div v-if="!isReadOnly && nodes.length === 1 && nodes[0].type === 'data-source'" class="first-step-hint">
+              <div v-if="!isReadOnly && !landing && nodes.length === 1 && nodes[0].type === 'data-source'" class="first-step-hint">
                 Add the first step with the <strong>+</strong> under Input data, or click an app in the list.
                 Or start from a workflow in the
                 <router-link :to="workflowsRoute" class="first-step-link">Library</router-link>
@@ -2885,34 +3055,17 @@ const openNodeSettings = (id) => {
               </template>
 
               <!-- Data Source Node: output only (feeds into processors) -->
+              <!-- Input: a circle where data enters the workflow -->
               <template #node-data-source="{ data, id }">
-                <CompactFlowNode
-                  v-if="!detailed"
-                  kind="source"
+                <IoPill
+                  kind="input"
+                  class="data-source-node"
                   :class="connectClass(id)"
-                  :label="nodeName({ id, type: 'data-source' })"
+                  :name="nodeName({ id, type: 'data-source', data })"
+                  :title="sourceFeeds(id) || undefined"
                 >
-                    <button
-                      v-if="!isReadOnly"
-                      class="remove-btn"
-                      @click.stop="removeNode(id)"
-                    >
-                      &times;
-                    </button>
-                </CompactFlowNode>
-                <div v-else class="custom-node data-source-node" :class="connectClass(id)">
-                  <div class="node-header">
-                    <span class="node-type-badge source-badge">Source</span>
-                    <span class="node-title" :title="sourceFeeds(id) || undefined">{{ nodeName({ id, type: 'data-source' }) }}</span>
-                    <button
-                      v-if="!isReadOnly"
-                      class="remove-btn"
-                      @click.stop="removeNode(id)"
-                    >
-                      &times;
-                    </button>
-                  </div>
-                </div>
+                  <button v-if="!isReadOnly" class="remove-btn io-node__remove" title="Remove" @click.stop="removeNode(id)">&times;</button>
+                </IoPill>
                 <Handle id="source" type="source" :position="Position.Bottom" />
                 <button
                   v-if="!isReadOnly"
@@ -2924,40 +3077,18 @@ const openNodeSettings = (id) => {
                 >+</button>
               </template>
 
-              <!-- Data Target Node: input only (receives from processors) -->
+              <!-- Output: a circle where results leave the workflow -->
               <template #node-data-target="{ data, id }">
                 <Handle id="target" type="target" :position="Position.Top" />
-                <CompactFlowNode
-                  v-if="!detailed"
-                  kind="target"
+                <IoPill
+                  kind="output"
+                  class="data-target-node"
                   :class="connectClass(id)"
-                  :label="data.targetType ? nodeName({ id, type: 'data-target', data }) : getTargetTypeLabel(data.targetType)"
-                  :runtime="data.computeType"
+                  :name="data.name || data.targetType ? nodeName({ id, type: 'data-target', data }) : 'Output: choose a destination'"
+                  :sub="interfaceOn && data.targetType ? `by default ${getTargetTypeLabel(data.targetType)}` : ''"
                 >
-                    <button
-                      v-if="!isReadOnly"
-                      class="remove-btn"
-                      @click.stop="removeNode(id)"
-                    >
-                      &times;
-                    </button>
-                </CompactFlowNode>
-                <div v-else class="custom-node data-target-node" :class="connectClass(id)">
-                  <div class="node-header">
-                    <span class="node-type-badge target-badge">Target</span>
-                    <span class="node-title">{{
-                      data.targetType ? nodeName({ id, type: 'data-target', data }) : getTargetTypeLabel(data.targetType)
-                    }}</span>
-                    <RuntimeMark :runtime="data.computeType" />
-                    <button
-                      v-if="!isReadOnly"
-                      class="remove-btn"
-                      @click.stop="removeNode(id)"
-                    >
-                      &times;
-                    </button>
-                  </div>
-                </div>
+                  <button v-if="!isReadOnly" class="remove-btn io-node__remove" title="Remove" @click.stop="removeNode(id)">&times;</button>
+                </IoPill>
               </template>
             </VueFlow>
           </div>
@@ -2966,7 +3097,7 @@ const openNodeSettings = (id) => {
 
       <!-- Sidebar (Right) -->
       <button
-        v-if="!panels.inspector"
+        v-if="!panels.inspector && !landing"
         type="button"
         class="panel-rail panel-rail--right"
         title="Show details"
@@ -2976,7 +3107,8 @@ const openNodeSettings = (id) => {
         <el-icon><ArrowLeft /></el-icon>
         <span class="panel-rail-label">Details</span>
       </button>
-      <div v-else ref="sidebarRef" class="applications-sidebar">
+      <!-- The start screen shows on its own: no panels, no toolbar -->
+      <div v-else-if="!landing" ref="sidebarRef" class="applications-sidebar">
         <div class="insp-top">
           <span>Details</span>
           <button type="button" class="insp-fold" title="Fold the details" aria-label="Fold the details" @click="togglePanel('inspector')">
@@ -3021,6 +3153,18 @@ const openNodeSettings = (id) => {
                     { "data-source": "Input data", "data-target": "Output", default: "App" }[selectedNode.type] || selectedNode.type
                   }}</span>
                 </div>
+                <!-- An input's and output's own name and settings, saved with
+                     the workflow's interface -->
+                <template v-if="interfaceOn && !isReadOnly && (selectedNode.type === 'data-source' || selectedNode.type === 'data-target')">
+                  <div class="info-row">
+                    <label class="info-label" for="io-name">Called</label>
+                    <el-input id="io-name" v-model="selectedNode.data.name" size="small" class="info-inline-select" :placeholder="baseName({ ...selectedNode, data: { ...selectedNode.data, name: '' } })" />
+                  </div>
+                  <div v-if="selectedNode.type === 'data-source'" class="info-row">
+                    <span class="info-label">Optional</span>
+                    <el-checkbox v-model="selectedNode.data.optional">A run may leave it out</el-checkbox>
+                  </div>
+                </template>
                 <div v-if="selectedNode.type === 'data-source' && sourceFeeds(selectedNode.id)" class="info-row">
                   <span class="info-label">Feeds</span>
                   <span class="info-value">{{ sourceFeeds(selectedNode.id) }}</span>
@@ -3045,7 +3189,7 @@ const openNodeSettings = (id) => {
                 </template>
                 <template v-if="selectedNode.type === 'data-target'">
                   <div class="info-row">
-                    <span class="info-label">Target Type</span>
+                    <span class="info-label">{{ interfaceOn ? "Default destination" : "Target Type" }}</span>
                     <span class="info-value" v-if="isReadOnly">{{
                       getTargetTypeLabel(selectedNode.data.targetType)
                     }}</span>
@@ -3053,7 +3197,7 @@ const openNodeSettings = (id) => {
                       v-else
                       v-model="selectedNode.data.targetType"
                       size="small"
-                      placeholder="Select target type"
+                      :placeholder="interfaceOn ? 'None: each run chooses' : 'Select target type'"
                       class="info-inline-select"
                       @change="onTargetTypeChange(selectedNode.data)"
                     >
@@ -3065,6 +3209,30 @@ const openNodeSettings = (id) => {
                       />
                     </el-select>
                   </div>
+                  <!-- Where else a run may send it, chosen per run -->
+                  <template v-if="interfaceOn">
+                    <p class="io-default-note">Each run can send it somewhere else; this is where it goes unless the run chooses.</p>
+                    <div class="info-row">
+                      <label class="info-label" for="io-accepts">Can go to</label>
+                      <span class="info-value" v-if="isReadOnly">{{ (selectedNode.data.accepts || []).map((t) => getTargetTypeLabel(t)).join(", ") || "Anywhere" }}</span>
+                      <el-select
+                        v-else
+                        id="io-accepts"
+                        v-model="selectedNode.data.accepts"
+                        multiple
+                        size="small"
+                        placeholder="Anywhere"
+                        class="info-inline-select"
+                      >
+                        <el-option v-for="tt in targetTypes" :key="tt.targetType" :label="targetTypeName(tt.targetType, targetTypes)" :value="tt.targetType" />
+                      </el-select>
+                    </div>
+                    <div class="info-row">
+                      <span class="info-label">Required</span>
+                      <span class="info-value" v-if="isReadOnly">{{ selectedNode.data.required ? "Yes" : "No" }}</span>
+                      <el-checkbox v-else v-model="selectedNode.data.required">Every run must send it somewhere</el-checkbox>
+                    </div>
+                  </template>
                 </template>
                 <template v-if="selectedNode.data?.computeType && isReadOnly">
                   <div class="info-row">
@@ -3489,7 +3657,13 @@ const openNodeSettings = (id) => {
             </template>
 
             <!-- Building, nothing selected: what's left, and how -->
-            <template v-if="!selectedNode && mode !== 'browse'">
+            <template v-if="!selectedNode && mode !== 'browse' && !started">
+              <h4 class="sidebar-section-title">Getting started</h4>
+              <p class="checklist-intro">
+                {{ landing ? "Choose how to start." : "Add the first step with the + under Input data, or click an app in the list. What's left to do shows here as you build." }}
+              </p>
+            </template>
+            <template v-if="!selectedNode && mode !== 'browse' && started">
               <h4 class="sidebar-section-title">Checklist</h4>
               <!-- Where it stands, then what to do: each item goes to its step or link -->
               <p
@@ -3750,6 +3924,7 @@ const openNodeSettings = (id) => {
     >
       <pre class="app-yml">{{ appYml?.text }}</pre>
     </el-dialog>
+    <RunWizardDialog ref="runDialog" />
   </div>
 </template>
 
@@ -4549,6 +4724,18 @@ kbd {
 }
 
 /* The + under a step: what comes next. Shown on hover and selection. */
+.io-default-note {
+  margin: 4px 0 8px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: theme.$gray_4;
+}
+.io-node__remove {
+  position: absolute;
+  /* Clear of the pill's rounded end */
+  top: -13px;
+  right: -10px;
+}
 .add-next {
   position: absolute;
   left: 50%;
@@ -4578,6 +4765,91 @@ kbd {
 .vue-flow__node:hover .add-next,
 .vue-flow__node.selected .add-next {
   opacity: 1;
+}
+.builder-landing {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 24px;
+  background: rgba(247, 247, 247, 0.96);
+}
+.builder-landing__title {
+  margin: 0 0 4px;
+  font-size: 18px;
+  font-weight: 600;
+  color: theme.$gray_6;
+}
+.builder-landing__options {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: min(420px, 100%);
+}
+.builder-landing__option {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 12px 14px;
+  border: 1px solid theme.$gray_2;
+  border-radius: 4px;
+  background: theme.$white;
+  font: inherit;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+
+  &:hover {
+    border-color: theme.$purple_1;
+  }
+  &.is-primary {
+    border-color: theme.$purple_1;
+    box-shadow: inset 3px 0 0 theme.$purple_1;
+  }
+}
+.builder-landing__name {
+  font-size: 14px;
+  font-weight: 600;
+  color: theme.$gray_6;
+}
+.builder-landing__desc {
+  font-size: 12px;
+  color: theme.$gray_4;
+}
+.builder-landing__sub {
+  margin: 8px 0 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: theme.$gray_4;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.builder-landing__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  width: min(420px, 100%);
+}
+.builder-landing__item {
+  display: block;
+  padding: 6px 2px;
+  font-size: 13px;
+  color: theme.$purple_2;
+  text-decoration: none;
+
+  &:hover {
+    text-decoration: underline;
+  }
+}
+.checklist-intro {
+  margin: 0 0 12px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: theme.$gray_5;
 }
 .first-step-hint {
   position: absolute;
@@ -4939,6 +5211,22 @@ kbd {
     color: theme.$purple_1;
     background: theme.$white;
   }
+
+  /* Save layout: the one thing to do after moving */
+  &.is-primary {
+    border-color: theme.$purple_2;
+    background: theme.$purple_2;
+    color: theme.$white;
+
+    &:hover {
+      background: theme.$purple_1;
+      color: theme.$white;
+    }
+    &:disabled {
+      opacity: 0.6;
+      cursor: default;
+    }
+  }
 }
 
 .workflow-builder-flow {
@@ -4965,8 +5253,10 @@ kbd {
   border: 1px solid theme.$gray_3;
   border-radius: 4px;
   padding: 8px 10px;
-  min-width: 250px;
-  max-width: 350px;
+  /* One size (NODE_WIDTH), so auto-arrange centres it; a long name is cut
+     short, in full on hover. */
+  box-sizing: border-box;
+  width: 280px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   transition: all 0.2s;
   position: relative;
@@ -5143,7 +5433,7 @@ kbd {
     --type-strip: #{theme.$orange_2};
   }
 
-  &.data-source-node {
+  &.data-source-node:not(.io-node) {
     --type-strip: #6366f1;
     background: #eef2ff;
 
@@ -5153,7 +5443,7 @@ kbd {
     }
   }
 
-  &.data-target-node {
+  &.data-target-node:not(.io-node) {
     --type-strip: #64748b;
     background: #f1f5f9;
 

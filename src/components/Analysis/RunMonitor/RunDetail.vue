@@ -30,7 +30,12 @@ import { useSendXhr } from "@/mixins/request/request_composable";
 import toQueryParams from "@/utils/toQueryParams";
 import LayerNameSelector from "./LayerNameSelector.vue";
 import TargetDatasetField from "./TargetDatasetField.vue";
-import { targetWritesToDataset, targetParamFields, buildDataTargets, targetDatasetId, datasetName, shownTargetParams } from "./dataTargets";
+import { targetWritesToDataset, targetParamFields, buildDataTargets, targetDatasetId, datasetName, shownTargetParams, datasetSummary, sortDatasets, isPathPrefixParam } from "./dataTargets";
+import DatasetOptionRow from "./DatasetOptionRow.vue";
+import IoPill from "../WorkflowGraph/IoPill.vue";
+import { withInterfaceNodes, destinationChoices, NO_DESTINATION } from "./workflowInterface";
+import { importStatusUrl, importSummary, importStillMoving, isDatasetImport } from "./runImports";
+import { nodeUnfit, rememberedSetup, rememberSetup, defaultNode, needsDataset } from "./runSetup";
 import DownloadItem from "@/components/downloads/DownloadItem.vue";
 import { useDownloadsStore } from "@/stores/downloadsStore";
 
@@ -73,7 +78,7 @@ import {
   runDisplayName,
   RUN_NAME_MAX_LENGTH,
 } from "./runHelpers";
-import { sourceLabel, sourceHints, hintLine, portsOfStep, missingFilesMessage } from "../WorkflowGraph/sourceInputs";
+import { sourceLabel, sourceHints, hintLine, portsOfStep, missingFilesMessage, fileTypeMismatches, acceptedFileTypes, linkHints } from "../WorkflowGraph/sourceInputs";
 import { portEdges, stepPoints } from "../WorkflowGraph/runPorts";
 import PortChips from "../WorkflowGraph/PortChips.vue";
 import LlmMark from "../WorkflowGraph/LlmMark.vue";
@@ -115,6 +120,16 @@ const initiateForm = ref({ workflowId: "", computeNodeId: "", datasetId: "", nam
 const runNameError = ref("");
 const configDefinition = ref(null);
 const dataSourceFiles = reactive({});
+// Each input picks the dataset its files come from. initiateForm.datasetId
+// is only where a new input's picker starts (the dataset used last for this
+// workflow, a rerun's, or the one picked last); sourceDatasets holds an
+// input's own when it differs. A run has no dataset of its own: the request's
+// datasetId is the first input's (runDatasetId), for nodes and webhooks that
+// still read it.
+const sourceDatasets = reactive({});
+// Optional inputs this run leaves out (no files, no data source).
+const leftOutInputs = reactive({});
+const sourceDatasetOf = (nodeId) => sourceDatasets[nodeId] || initiateForm.value.datasetId;
 const nodeConfigs = reactive({});
 const isExecuting = ref(false);
 const errorBanner = ref("");
@@ -134,12 +149,15 @@ const sourcePicker = computed(() => {
   const dag = configDefinition.value?.dag || [];
   const name = id ? sourceLabel(id, dag, "") : "";
   return {
+    name,
     title: name ? `Select files for ${name}` : "Select Files",
     hint: id ? hintLine(sourceHints(id, dag, portsOfStep(dag, availableApplications.value))) : "",
   };
 });
 const filePickerNodeId = ref(null);
 const filePickerFiles = ref([]);
+// The picker's list is being fetched (a dataset's top level or a folder).
+const filePickerLoading = ref(false);
 const filePickerAncestorList = ref([]);
 const filePickerCurrentFile = ref({ content: { name: "" } });
 const clearSelectedValues = ref(false);
@@ -210,7 +228,8 @@ const getComputeTypesForTarget = (targetType) => {
   if (!targetType) return [];
   const tt = targetTypes.value.find((t) => t.targetType === targetType);
   const types = tt?.runtimeConfig?.computeTypes;
-  return types && types.length ? withGpu(types) : [];
+  // A target moves results, so it never runs on a GPU.
+  return (types || []).filter((t) => t !== "gpu");
 };
 
 const getComputeTypesForProcessor = (sourceUrl) => {
@@ -465,18 +484,22 @@ const allDataSourcesHaveFiles = computed(() => {
 const { detailed, setDetailed } = useGraphDensity();
 const DETAILED_BOX = { width: NODE_WIDTH, height: NODE_HEIGHT, nodesep: 120, ranksep: 150 };
 
+const PILL_BOX = { width: 200, height: 44 };
 const autoLayout = () => {
   if (nodes.value.length === 0) return;
   const box = layoutBox(detailed.value, DETAILED_BOX);
   const g = new dagre.graphlib.Graph();
   g.setDefaultEdgeLabel(() => ({}));
   g.setGraph({ rankdir: "TB", nodesep: box.nodesep, ranksep: box.ranksep });
-  for (const node of nodes.value) g.setNode(node.id, { width: box.width, height: box.height });
+  // Inputs and outputs are pills (IoPill), laid out at their size.
+  const sizeOf = (node) => (node.type === "data-source" || node.type === "data-target" ? PILL_BOX : box);
+  for (const node of nodes.value) g.setNode(node.id, { width: sizeOf(node).width, height: sizeOf(node).height });
   for (const edge of edges.value) g.setEdge(edge.source, edge.target);
   dagre.layout(g);
   nodes.value = nodes.value.map((node) => {
     const pos = g.node(node.id);
-    return { ...node, position: { x: pos.x - box.width / 2, y: pos.y - box.height / 2 } };
+    const size = sizeOf(node);
+    return { ...node, position: { x: pos.x - size.width / 2, y: pos.y - size.height / 2 } };
   });
   setTimeout(() => fitView({ padding: 0.2, maxZoom: 1 }), 50);
 };
@@ -554,6 +577,25 @@ const titleOf = (id, data) => canvasTitles.value.get(id) || data.targetType || d
 const statusMark = (data) => (mode.value === "browse" && statusMarkOf(data.status)) || null;
 
 // A source with one file shows its name; with more, how many.
+// An input's and output's second line on the graph (IoPill): its files, or
+// where it goes and how that went.
+const sourceSubOf = (id, data) => {
+  if (mode.value === "configure") {
+    if (isLeftOut(id)) return "Left out";
+    const n = fileCountForNode(id);
+    return n ? `${n} file${n === 1 ? "" : "s"}` : "Choose files";
+  }
+  return data.view ? "Public dataset" : data.packageCount != null ? sourceDetail(data) : "";
+};
+const targetSubOf = (id, data) => {
+  if (mode.value === "configure") {
+    if (isUnsaved(id)) return "Not saved";
+    const t = nodeConfigs[id]?.targetType;
+    return t ? `to ${getTargetTypeLabel(t, targetTypes.value)}` : "";
+  }
+  return importLineOf(id)?.text || targetFacts(data).join(" · ") || getTargetTypeLabel(data.targetType, targetTypes.value);
+};
+
 const sourceDetail = (data) => {
   if (data.packageCount === 1) {
     const name = browseFileInfo.value[data.packageIds[0]]?.name;
@@ -867,10 +909,14 @@ const initiateWorkflowFromConfig = async (pendingConfig) => {
   configLayers.value = Array.isArray(source?.layers) ? [...source.layers] : [];
 
   try {
-    const definition = await store.dispatch("analysisModule/fetchWorkflowDefinition", workflowId);
+    // A workflow's inputs and outputs shown as the source and target nodes a
+    // run of it has (workflowInterface.js); its DAG as is otherwise.
+    const definition = withInterfaceNodes(await store.dispatch("analysisModule/fetchWorkflowDefinition", workflowId));
     configDefinition.value = definition;
 
     Object.keys(dataSourceFiles).forEach((k) => delete dataSourceFiles[k]);
+    Object.keys(sourceDatasets).forEach((k) => delete sourceDatasets[k]);
+    Object.keys(leftOutInputs).forEach((k) => delete leftOutInputs[k]);
     Object.keys(nodeConfigs).forEach((k) => delete nodeConfigs[k]);
 
     const dag = definition.dag || definition.processors || [];
@@ -881,20 +927,29 @@ const initiateWorkflowFromConfig = async (pendingConfig) => {
       const srcCfg = sourceConfigs.find((c) => c.nodeId === d.id);
       const srcParams = sourceParams[d.id] || {};
 
+      if (d.type === "data-source") {
+        // A rerun reads from the same datasets; its files are chosen again.
+        const own = source?.dataSources?.[d.id]?.datasetId;
+        if (own && own !== datasetId) sourceDatasets[d.id] = own;
+      }
       if (d.type === "data-target") {
-        const fallback = getComputeTypesForTarget(d.targetType)?.[0] || null;
+        // An output's destination is the run being rerun's (its target's
+        // type, none when it had no target), else the output's default.
+        const ranAs = d.output && source ? (source.dag || []).find((n) => n.id === d.id) : null;
+        const targetType = d.output && source ? ranAs?.targetType || NO_DESTINATION : d.targetType;
+        const fallback = getComputeTypesForTarget(targetType)?.[0] || null;
         const srcTargetParams = source?.dataTargets?.[d.id]?.params || {};
-        const ttDef = getTargetTypeDefinition(d.targetType);
+        const ttDef = getTargetTypeDefinition(targetType);
         const paramDefs = ttDef?.params || [];
         // Values: the run being rerun, then the definition's defaults on the
         // node, then the registry's (workflow-service applies them in that order).
-        const targetParams = targetParamFields(paramDefs, {
+        const targetParams = outputParams(d, targetParamFields(paramDefs, {
           sourceParams: srcTargetParams,
-          definitionDefaults: d.defaultParams || {},
-        });
+          definitionDefaults: targetType === d.targetType ? d.defaultParams || {} : {},
+        }));
         nodeConfigs[d.id] = {
-          computeType: computeTypeForMode(srcCfg?.executionTarget || d.computeType || fallback),
-          targetType: d.targetType || null,
+          computeType: computeTypeForMode(srcCfg?.executionTarget || (targetType === d.targetType && d.computeType) || fallback),
+          targetType: targetType || null,
           // The target's own dataset; "" means the run's.
           datasetId: source?.dataTargets?.[d.id]?.datasetId || "",
           params: targetParams,
@@ -953,6 +1008,7 @@ const initiateWorkflowFromConfig = async (pendingConfig) => {
     if (needsLayout(result)) autoLayout();
     else setTimeout(() => fitView({ padding: 0.2, maxZoom: 1 }), 50);
 
+    applySetupDefaults(definition);
     mode.value = "configure";
     selectedNode.value = null;
     accordionActiveNames.value = ["information"];
@@ -968,6 +1024,7 @@ const cancelConfigure = () => {
   configDefinition.value = null;
   configLayers.value = [];
   Object.keys(dataSourceFiles).forEach((k) => delete dataSourceFiles[k]);
+  Object.keys(sourceDatasets).forEach((k) => delete sourceDatasets[k]);
   Object.keys(nodeConfigs).forEach((k) => delete nodeConfigs[k]);
   nodes.value = [];
   edges.value = [];
@@ -990,9 +1047,25 @@ const executeWorkflow = async () => {
     return;
   }
 
+  // Where it runs (the run setup panel, with nothing on the canvas selected).
+  const setupProblem = needsDatasetHere.value
+    ? "This workflow reads from or writes to a dataset, so it runs in a workspace, not in My Workspace."
+    : !initiateForm.value.computeNodeId
+    ? "Choose a compute node for the run."
+    : missingTargetDataset.value
+      ? `Choose the dataset ${missingTargetDataset.value} writes to.`
+      : setupNodeUnfit.value.length
+        ? `${computeNodeName(initiateForm.value.computeNodeId)} can't run this workflow: ${setupNodeUnfit.value.join(", ")}.`
+        : "";
+  if (setupProblem) {
+    selectedNode.value = null;
+    EventBus.$emit("toast", { detail: { type: "error", msg: setupProblem } });
+    return;
+  }
+
   // Validate data sources have files selected
   const missingSources = dataSourceNodes.value.filter(
-    (d) => !dataSourceFiles[d.id] || dataSourceFiles[d.id].length === 0
+    (d) => !leftOutInputs[d.id] && (!dataSourceFiles[d.id] || dataSourceFiles[d.id].length === 0)
   );
   if (missingSources.length > 0) {
     EventBus.$emit("toast", {
@@ -1006,7 +1079,7 @@ const executeWorkflow = async () => {
     if (!dagNode) continue;
 
     // Validate data-target required params
-    if (dagNode.type === "data-target") {
+    if (dagNode.type === "data-target" && cfg.targetType !== NO_DESTINATION) {
       const missing = (cfg.params || []).filter((p) => p.required && !p.value.trim());
       if (missing.length > 0) {
         const nodeLabel = dagNode.targetType || nodeId;
@@ -1037,7 +1110,8 @@ const executeWorkflow = async () => {
     const dataSources = {};
     Object.entries(dataSourceFiles).forEach(([nodeId, files]) => {
       const ids = files.map((f) => f.content?.id).filter(Boolean);
-      dataSources[nodeId] = { packageIds: ids };
+      const own = sourceDatasetOf(nodeId);
+      dataSources[nodeId] = own && own !== runDatasetId.value ? { packageIds: ids, datasetId: own } : { packageIds: ids };
     });
 
     const processorConfigs = [];
@@ -1045,7 +1119,7 @@ const executeWorkflow = async () => {
       const dagNode = dag.find((n) => n.id === nodeId);
       if (!dagNode) return;
       if (dagNode.type === "data-target") {
-        if (cfg.computeType) processorConfigs.push({ nodeId, executionTarget: cfg.computeType });
+        if (cfg.computeType && cfg.targetType !== NO_DESTINATION) processorConfigs.push({ nodeId, executionTarget: cfg.computeType });
       } else if (dagNode.type !== "data-source") {
         const entry = { nodeId };
         if (cfg.executionTarget) entry.executionTarget = cfg.executionTarget;
@@ -1076,7 +1150,7 @@ const executeWorkflow = async () => {
       if (Object.keys(obj).length > 0) processorParams[nodeId] = obj;
     });
 
-    const dataTargets = buildDataTargets(dag, nodeConfigs, initiateForm.value.datasetId);
+    const dataTargets = buildDataTargets(dag, nodeConfigs, runDatasetId.value);
 
     const trimmedName = nameResult.value;
     const payload = {
@@ -1085,7 +1159,7 @@ const executeWorkflow = async () => {
         computeNodeId: initiateForm.value.computeNodeId,
         ...(processorConfigs.length > 0 && { processorConfigs }),
       },
-      datasetId: initiateForm.value.datasetId,
+      ...(runDatasetId.value && { datasetId: runDatasetId.value }),
       dataSources,
       ...(trimmedName && { name: trimmedName }),
       ...(Object.keys(dataTargets).length > 0 && { dataTargets }),
@@ -1094,6 +1168,7 @@ const executeWorkflow = async () => {
     };
 
     await store.dispatch("analysisModule/createRun", payload);
+    rememberSetup(route.params.orgId || "", initiateForm.value.workflowId, { ...initiateForm.value, datasetId: runDatasetId.value });
     EventBus.$emit("toast", { detail: { type: "success", msg: "Workflow executed successfully." } });
 
     router.push(scopedRoute("runs"));
@@ -1112,6 +1187,7 @@ const executeWorkflow = async () => {
 */
 const openFilePicker = (nodeId) => {
   filePickerNodeId.value = nodeId;
+  pickerAllowOtherTypes.value = false;
   filePickerFiles.value = [];
   filePickerAncestorList.value = [];
   filePickerCurrentFile.value = { content: { name: "" } };
@@ -1133,18 +1209,49 @@ const openFilePicker = (nodeId) => {
   }
 
   filePickerVisible.value = true;
-  fetchDatasetFiles();
+  if (sourceDatasetOf(nodeId)) fetchDatasetFiles();
+};
+
+// Another dataset for the source being picked: its files so far were from
+// the one before, so they go.
+const onPickerDatasetChange = (datasetId) => {
+  const nodeId = filePickerNodeId.value;
+  if (!nodeId) return;
+  // The dataset picked last is where the other inputs' pickers start. Inputs
+  // that already have files from the one before keep it as their own.
+  const before = initiateForm.value.datasetId;
+  if (datasetId && datasetId !== before) {
+    for (const k of Object.keys(dataSourceFiles)) {
+      if (k !== nodeId && dataSourceFiles[k]?.length && !sourceDatasets[k]) sourceDatasets[k] = before;
+    }
+    initiateForm.value.datasetId = datasetId;
+  }
+  sourceDatasets[nodeId] = datasetId === initiateForm.value.datasetId ? "" : datasetId;
+  // An input whose own dataset is now the one others start from follows it.
+  for (const k of Object.keys(sourceDatasets)) {
+    if (sourceDatasets[k] === initiateForm.value.datasetId) sourceDatasets[k] = "";
+  }
+  delete dataSourceFiles[nodeId];
+  store.commit("analysisModule/CLEAR_SELECTED_FILES");
+  filePickerFiles.value = [];
+  filePickerAncestorList.value = [];
+  filePickerCurrentFile.value = { content: { name: "" } };
+  ensureDatasetOption(datasetId);
+  if (datasetId) fetchDatasetFiles();
 };
 
 const fetchDatasetFiles = async () => {
+  filePickerLoading.value = true;
   try {
     const token = await useGetToken();
-    const datasetId = initiateForm.value.datasetId;
+    const datasetId = sourceDatasetOf(filePickerNodeId.value);
     const url = `${config.value.apiUrl}/datasets/${datasetId}?api_key=${token}&includeAncestors=true&limit=500&offset=0`;
     const response = await useSendXhr(url);
     filePickerFiles.value = [...(response.children || [])];
   } catch (err) {
     console.error("Failed to fetch files:", err);
+  } finally {
+    filePickerLoading.value = false;
   }
 };
 
@@ -1177,7 +1284,7 @@ const handleNavigateBreadcrumb = async (id) => {
     const token = await useGetToken();
     let url;
     if (!id || id === "root") {
-      const datasetId = initiateForm.value.datasetId;
+      const datasetId = sourceDatasetOf(filePickerNodeId.value);
       url = `${config.value.apiUrl}/datasets/${datasetId}?api_key=${token}&includeAncestors=true&limit=500&offset=0`;
       filePickerAncestorList.value = [];
       filePickerCurrentFile.value = { content: { name: "" } };
@@ -1204,6 +1311,7 @@ const handleNavigateBreadcrumb = async (id) => {
 const onFileSelect = (selectedFiles, parentId) => {
   const nodeId = filePickerNodeId.value;
   if (!nodeId) return;
+  delete leftOutInputs[nodeId];
 
   // Update the store so navigating folders preserves selections
   store.commit("analysisModule/SET_SELECTED_FILES", { selectedFiles, parentId: parentId || "root" });
@@ -1227,13 +1335,126 @@ const fileCountForNode = (nodeId) => {
   return (dataSourceFiles[nodeId] || []).length;
 };
 
+// Chosen files a source's inputs don't take (by extension, against what its
+// inputs' app.yml declares), while configuring: marked on the link to the
+// input that doesn't take them, as the builder marks a link that doesn't fit,
+// and explained in the source's panel. A warning, not a block (an app may
+// still read them). A chosen folder counts with the files directly in it
+// (folderFiles, read when it's chosen; not its subfolders).
+const folderFiles = reactive({});
+const loadFolderFiles = async (folderId) => {
+  if (!folderId || folderFiles[folderId]) return;
+  folderFiles[folderId] = { names: [], loading: true };
+  try {
+    const token = await useGetToken();
+    const response = await useSendXhr(`${config.value.apiUrl}/packages/${folderId}?api_key=${token}&limit=500&offset=0`);
+    const children = response?.children || [];
+    const names = children.filter((c) => c.content?.packageType !== "Collection").map((c) => c.content?.name || "");
+    folderFiles[folderId] = {
+      names,
+      subfolders: children.length - names.length,
+      // A full page: there may be more than were read.
+      more: children.length >= 500,
+      loading: false,
+    };
+  } catch {
+    folderFiles[folderId] = { names: [], loading: false };
+  }
+};
+watch(
+  () => Object.values(dataSourceFiles).flat().filter((f) => f?.content?.packageType === "Collection").map((f) => f.content.id).join(","),
+  (ids) => ids && ids.split(",").forEach(loadFolderFiles)
+);
+const filesOf = (f) =>
+  f.content?.packageType === "Collection" ? folderFiles[f.content.id]?.names || [] : [f.content?.name || ""];
+const chosenFileNames = (nodeId) => (dataSourceFiles[nodeId] || []).flatMap(filesOf);
+const configHints = (nodeId) => {
+  const dag = configDefinition.value?.dag || [];
+  return sourceHints(nodeId, dag, portsOfStep(dag, availableApplications.value));
+};
+const sourceMismatch = (nodeId, hints = configHints(nodeId)) => {
+  const names = chosenFileNames(nodeId);
+  if (!names.length) return null;
+  const m = fileTypeMismatches(names, hints);
+  return m && { ...m, total: names.length };
+};
+
+// The links out of sources, marked where their files don't fit: red and
+// dashed, "⚠ needs JSON" (detailed) or a bare ✕ (compact), as the builder's.
+const SOURCE_EDGE_COLOR = nodeBorderColor("data-source", null);
+const MISMATCH_COLOR = "#E94B4B";
+const markSourceEdges = () => {
+  if (mode.value !== "configure") return;
+  const sources = new Set(nodes.value.filter((n) => n.type === "data-source").map((n) => n.id));
+  edges.value = edges.value.map((e) => {
+    if (!sources.has(e.source)) return e;
+    const m = sourceMismatch(e.source, linkHints(configHints(e.source), e.target, e.data?.input || ""));
+    if (!m) {
+      return e.label
+        ? { ...e, label: undefined, labelShowBg: undefined, labelBgStyle: undefined, labelStyle: undefined, style: { stroke: SOURCE_EDGE_COLOR } }
+        : e;
+    }
+    return {
+      ...e,
+      style: { stroke: MISMATCH_COLOR, strokeWidth: 2, strokeDasharray: "6 4" },
+      label: detailed.value ? `\u26A0 needs ${m.expected}` : "\u2715",
+      labelShowBg: detailed.value,
+      labelBgPadding: [6, 3],
+      labelBgBorderRadius: 2,
+      labelBgStyle: { fill: "#fdecec", stroke: MISMATCH_COLOR },
+      labelStyle: detailed.value
+        ? { fill: MISMATCH_COLOR, fontSize: 11, fontWeight: 600 }
+        : { fill: MISMATCH_COLOR, fontSize: 16, fontWeight: 700, stroke: "#f7f7f7", strokeWidth: 4, paintOrder: "stroke" },
+    };
+  });
+};
+watch(
+  () =>
+    [
+      mode.value,
+      detailed.value,
+      edges.value.length,
+      availableApplications.value.length,
+      ...nodes.value.filter((n) => n.type === "data-source").map((n) => chosenFileNames(n.id).join("|")),
+      Object.values(folderFiles).map((f) => (f.loading ? "…" : f.names.length)).join(","),
+    ].join("/"),
+  markSourceEdges
+);
+const mismatchLine = (nodeId) => {
+  const m = sourceMismatch(nodeId);
+  if (!m) return "";
+  const n = m.names.length;
+  return n === m.total
+    ? `${n === 1 ? "The file isn't" : `None of the ${n} files are`} ${m.expected}`
+    : `${n} of ${m.total} files ${n === 1 ? "isn't" : "aren't"} ${m.expected}`;
+};
+// Why a chosen folder's files weren't all checked (subfolders aren't read, nor
+// past the first 500), for its "?" mark; "" when they were, or for a file.
+const partlyChecked = (file) => {
+  if (file.content?.packageType !== "Collection") return "";
+  const f = folderFiles[file.content.id];
+  if (!f || f.loading || (!f.subfolders && !f.more)) return "";
+  const name = file.content?.name || "this folder";
+  const checked = `Checked the ${f.names.length}${f.more ? " first" : ""} file${f.names.length === 1 ? "" : "s"} directly in ${name}`;
+  return f.subfolders
+    ? `${checked}; its ${f.subfolders}${f.more ? "+" : ""} subfolder${f.subfolders === 1 ? "" : "s"} weren't checked.`
+    : `${checked}; the rest weren't checked.`;
+};
+
+// A chosen file that doesn't fit, or a folder with files directly in it that
+// don't.
+const mismatchedFile = (nodeId, file) => {
+  const names = sourceMismatch(nodeId)?.names || [];
+  return filesOf(file).some((n) => names.includes(n));
+};
+
 const nodeUnmetCount = (nodeId, nodeType) => {
   if (mode.value !== "configure") return 0;
   if (nodeType === "data-source") {
-    return fileCountForNode(nodeId) === 0 ? 1 : 0;
+    return fileCountForNode(nodeId) === 0 && !leftOutInputs[nodeId] ? 1 : 0;
   }
   const cfg = nodeConfigs[nodeId];
-  if (!cfg) return 0;
+  if (!cfg || cfg.targetType === NO_DESTINATION) return 0;
   if (nodeType === "data-target") {
     return (cfg.params || []).filter((p) => p.required && !p.value?.trim()).length;
   }
@@ -1459,6 +1680,58 @@ onMounted(() => {
 });
 onBeforeUnmount(() => clearInterval(nowTimer));
 
+/*
+  Dataset imports: how far each "Pennsieve Dataset" target's copies into its
+  dataset are (runImports.js). Asked for once a target has started, and
+  again every IMPORT_POLL_MS while files are still moving and the page is
+  visible. A run from before imports (404) shows nothing.
+*/
+const IMPORT_POLL_MS = 15000;
+const importStatus = reactive({}); // node id -> the endpoint's response, or null
+let importTimer = null;
+
+const datasetImportNodes = () =>
+  nodes.value.filter((n) => n.type === "data-target" && isDatasetImport(n.data) && ["STARTED", "SUCCEEDED", "FAILED"].includes(n.data.status));
+
+const fetchImportStatus = async (node, runId, token) => {
+  try {
+    const resp = await fetch(importStatusUrl(config.value.api2Url, node.data.datasetId, runId, node.id), {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (resp.status === 404 || resp.status === 403) {
+      importStatus[node.id] = null;
+      return;
+    }
+    if (resp.ok) importStatus[node.id] = await resp.json();
+  } catch (err) {
+    console.warn("Import status:", err?.message || err);
+  }
+};
+
+const refreshImports = async () => {
+  clearTimeout(importTimer);
+  importTimer = null;
+  const runId = selectedWorkflowActivity.value?.uuid;
+  const targets = mode.value === "browse" && runId ? datasetImportNodes() : [];
+  if (!targets.length) return;
+  if (document.visibilityState === "visible") {
+    const token = await useGetToken();
+    await Promise.all(targets.map((n) => fetchImportStatus(n, runId, token)));
+  }
+  const moving = targets.some((n) => importStatus[n.id] !== null && importStillMoving(importStatus[n.id], n.data.status));
+  if (moving) importTimer = setTimeout(refreshImports, IMPORT_POLL_MS);
+};
+watch(
+  () => datasetImportNodes().map((n) => `${n.id}:${n.data.status}`).join(","),
+  (now, before) => {
+    if (now && now !== before) refreshImports();
+  }
+);
+onBeforeUnmount(() => clearTimeout(importTimer));
+
+// A target card's import line, or null.
+const importLineOf = (id) => importSummary(importStatus[id]);
+
 const nodeRunTime = (data) => formatRunTime(nodeDurationSec(data, nowTick.value));
 const processorFacts = (id, data) =>
   [data.version, formatResources(data.cpu, data.memory), nodeRunTime(data)].filter(Boolean);
@@ -1499,6 +1772,169 @@ const rerunFromRun = async () => {
 /*
   Fetch dataset options for configure summary
 */
+/*
+  Run setup: the compute node and dataset, chosen on the configure page
+  (runSetup.js). Every node is offered; one that can't run this workflow is
+  greyed out with why. The run starts from what's asked for (a rerun's),
+  else what was used last for this workflow here, else the only node that
+  fits.
+*/
+const setupManifestOf = computed(() => portsOfStep(configDefinition.value?.dag || [], availableApplications.value));
+const setupComputeTypeOf = (stepId) => {
+  const dagNode = (configDefinition.value?.dag || []).find((n) => n.id === stepId);
+  return nodeConfigs[stepId]?.executionTarget || dagNode?.computeType || "";
+};
+const unfitReasons = (node) => nodeUnfit(node, configDefinition.value?.dag || [], setupManifestOf.value, setupComputeTypeOf);
+const setupNodeChoices = computed(() =>
+  computeNodes.value
+    .map((n) => ({ node: n, reasons: unfitReasons(n) }))
+    .sort((a, b) => (a.reasons.length > 0) - (b.reasons.length > 0) || String(a.node.name).localeCompare(String(b.node.name)))
+);
+// My Workspace runs have no dataset (see the run dialog's "Needs a dataset").
+const needsDatasetHere = computed(() => isMyWorkspace.value && needsDataset(configDefinition.value));
+const setupNodeUnfit = computed(() => {
+  const n = computeNodes.value.find((c) => c.uuid === initiateForm.value.computeNodeId);
+  return n ? unfitReasons(n) : [];
+});
+
+// A dataset not among the options loaded (a remembered or rerun one) is
+// fetched by id, so the selector can name it.
+const ensureDatasetOption = async (datasetId) => {
+  if (!datasetId || datasetOptions.value.some((d) => d.content?.id === datasetId)) return;
+  try {
+    const token = await useGetToken();
+    const ds = await useSendXhr(`${config.value.apiUrl}/datasets/${datasetId}?api_key=${token}`);
+    if (ds?.content?.id && !datasetOptions.value.some((d) => d.content?.id === ds.content.id)) {
+      datasetOptions.value = [ds, ...datasetOptions.value];
+    }
+  } catch {
+    // not reachable: the selector shows the id
+  }
+};
+
+function applySetupDefaults(definition) {
+  const remembered = rememberedSetup(route.params.orgId || "", definition?.uuid || initiateForm.value.workflowId);
+  if (!initiateForm.value.computeNodeId) {
+    initiateForm.value.computeNodeId = defaultNode("", remembered.computeNodeId, computeNodes.value, (n) => unfitReasons(n).length === 0);
+  }
+  if (!isMyWorkspace.value && !initiateForm.value.datasetId && remembered.datasetId) {
+    initiateForm.value.datasetId = remembered.datasetId;
+  }
+  ensureDatasetOption(initiateForm.value.datasetId);
+  Object.values(sourceDatasets).forEach(ensureDatasetOption);
+}
+
+const onSetupDatasetSearch = (query) => fetchDatasetOptions(query || "");
+
+// What the open picker's input takes (its app.yml types, "CSV or JSON"), when
+// it says; files that aren't those are dimmed and can't be chosen unless the
+// user allows other types (the check goes by extension, so it can be wrong).
+// A folder can always be chosen: what's in it isn't known here.
+const pickerAllowOtherTypes = ref(false);
+const pickerHints = computed(() => {
+  const id = filePickerNodeId.value;
+  const dag = configDefinition.value?.dag || [];
+  return id ? sourceHints(id, dag, portsOfStep(dag, availableApplications.value)) : [];
+});
+const pickerTypes = computed(() => [...(acceptedFileTypes(pickerHints.value) || [])].join(" or "));
+// What the input says it takes, in its app's words (app.yml descriptions).
+const pickerDescription = computed(() => [...new Set(pickerHints.value.map((h) => h.description).filter(Boolean))].join(" "));
+const pickerWhyNot = (row) => {
+  if (pickerAllowOtherTypes.value || !pickerTypes.value || row?.content?.packageType === "Collection") return "";
+  if (!fileTypeMismatches([row?.content?.name || ""], pickerHints.value)) return "";
+  return `${sourcePicker.value.name || "This input"} takes ${pickerTypes.value} files`;
+};
+
+// The dataset the open file picker shows, as its header describes it.
+const pickerDataset = computed(() => {
+  const id = filePickerVisible.value ? sourceDatasetOf(filePickerNodeId.value) : "";
+  const ds = id && datasetOptions.value.find((d) => d.content?.id === id);
+  return ds ? datasetSummary(ds) : null;
+});
+
+// The request's datasetId: the first input's dataset (in the workflow's
+// order), else where pickers start, for a workflow with no inputs.
+const runDatasetId = computed(() => {
+  if (isMyWorkspace.value) return "";
+  const first = dataSourceNodes.value[0];
+  return (first && sourceDatasetOf(first.id)) || initiateForm.value.datasetId || "";
+});
+const workflowHasInputs = computed(() => dataSourceNodes.value.length > 0);
+// A dataset output with no dataset: none of its own and nothing to follow.
+// The selected node's output (a workflow output's target node), and the
+// destinations this run may bind it to here.
+const selectedOutput = computed(() =>
+  mode.value === "configure" && selectedNode.value
+    ? (configDefinition.value?.dag || []).find((d) => d.id === selectedNode.value.id)?.output || null
+    : null
+);
+const selectedDestinations = computed(() =>
+  selectedOutput.value ? destinationChoices(selectedOutput.value, { targetTypes: targetTypes.value, myWorkspace: isMyWorkspace.value }) : []
+);
+const destinationLabel = (t) =>
+  t === NO_DESTINATION ? "Don't save" : getTargetTypeLabel(t, targetTypes.value);
+
+// Another destination for an output: its params, runtime and dataset start
+// again from that target type's (and the output's default, when it's that).
+const onDestinationChange = (nodeId, targetType) => {
+  const cfg = nodeConfigs[nodeId];
+  const d = (configDefinition.value?.dag || []).find((n) => n.id === nodeId);
+  if (!cfg || !d?.output) return;
+  const isDefault = targetType === d.output.default?.targetType;
+  cfg.targetType = targetType;
+  cfg.datasetId = "";
+  cfg.params = targetType === NO_DESTINATION ? [] : outputParams(d, targetParamFields(getTargetTypeDefinition(targetType)?.params || [], {
+    definitionDefaults: isDefault ? d.output.default?.params || {} : {},
+  }));
+  cfg.computeType = targetType === NO_DESTINATION ? null : computeTypeForMode(getComputeTypesForTarget(targetType)?.[0] || null);
+  const n = nodes.value.find((x) => x.id === nodeId);
+  if (n) n.data = { ...n.data, targetType: targetType === NO_DESTINATION ? null : targetType, computeType: cfg.computeType };
+};
+
+// An output's params as a run sets them: not its path prefix, which
+// workflow-service sets from the step output it comes from.
+function outputParams(d, params) {
+  return d.output ? params.filter((p) => !isPathPrefixParam(p.name)) : params;
+}
+
+// Turning an output off for this run (it isn't saved) or an optional input
+// (left out), from its card: it stays on the graph, faded and dashed, and
+// the same button turns it back on.
+const dagNodeOf = (id) => (configDefinition.value?.dag || []).find((d) => d.id === id);
+const isUnsaved = (id) => mode.value === "configure" && !!dagNodeOf(id)?.output && nodeConfigs[id]?.targetType === NO_DESTINATION;
+const canSkipOutput = (id) => mode.value === "configure" && !!dagNodeOf(id)?.output && !dagNodeOf(id).output.required;
+const toggleSaved = (id) => {
+  const d = dagNodeOf(id);
+  if (!d?.output) return;
+  if (!isUnsaved(id)) return onDestinationChange(id, NO_DESTINATION);
+  const choices = destinationChoices(d.output, { targetTypes: targetTypes.value, myWorkspace: isMyWorkspace.value });
+  const back = choices.includes(d.output.default?.targetType) ? d.output.default.targetType : choices.find((t) => t !== NO_DESTINATION);
+  if (back) onDestinationChange(id, back);
+};
+const isLeftOut = (id) => mode.value === "configure" && !!leftOutInputs[id];
+const canLeaveOut = (id) => mode.value === "configure" && !!dagNodeOf(id)?.input?.optional;
+const toggleLeftOut = (id) => {
+  if (leftOutInputs[id]) {
+    delete leftOutInputs[id];
+    return;
+  }
+  leftOutInputs[id] = true;
+  delete dataSourceFiles[id];
+};
+
+// A target's type for this run: an output's destination, else the node's.
+const runTargetType = (d) => (d.output ? nodeConfigs[d.id]?.targetType : d.targetType) || "";
+
+const missingTargetDataset = computed(() => {
+  for (const d of configDefinition.value?.dag || []) {
+    if (d.type !== "data-target" || !targetWritesToDataset(runTargetType(d)) || runTargetType(d) === NO_DESTINATION) continue;
+    if (!nodeConfigs[d.id]?.datasetId && !runDatasetId.value) {
+      return labelForDagNode(d, availableApplications.value, targetTypes.value, configDefinition.value?.dag || []) || d.id;
+    }
+  }
+  return "";
+});
+
 const fetchDatasetOptions = async (query = "") => {
   datasetSearchLoading.value = true;
   try {
@@ -1508,9 +1944,14 @@ const fetchDatasetOptions = async (query = "") => {
       orderBy: "IntId", orderDirection: "Desc",
       type: "research", api_key: token,
     });
-    const url = `${config.value.apiUrl}/datasets/paginated?${params}`;
+    const url = `${config.value.apiUrl}/datasets/paginated?${params}&includeBannerUrl=true`;
     const response = await useSendXhr(url);
-    datasetOptions.value = response?.datasets || response || [];
+    const found = sortDatasets(response?.datasets || response || []);
+    // The chosen datasets (the run's, the sources' own) stay, so their
+    // selectors keep naming them while another search is shown.
+    const chosen = new Set([initiateForm.value.datasetId, ...Object.values(sourceDatasets)].filter(Boolean));
+    const kept = datasetOptions.value.filter((d) => chosen.has(d.content?.id) && !found.some((f) => f.content?.id === d.content?.id));
+    datasetOptions.value = [...kept, ...found];
   } catch (err) {
     datasetOptions.value = [];
   } finally {
@@ -1537,7 +1978,8 @@ onMounted(async () => {
   }
 
   await Promise.all([
-    store.dispatch("analysisModule/fetchComputeNodes"),
+    // Forced in My Workspace: the cached list may be a workspace's nodes
+    store.dispatch("analysisModule/fetchComputeNodes", { force: isMyWorkspace.value }),
     store.dispatch("analysisModule/fetchTargetTypes"),
     store.dispatch("analysisModule/fetchApplications"),
   ]);
@@ -1832,94 +2274,36 @@ onUnmounted(() => {
 
             <!-- Data-source node template -->
             <template #node-data-source="{ data, id }">
-              <div :style="{ '--node-border-color': mode === 'configure' && fileCountForNode(id) > 0 ? '#17BB62' : '#6366f1' }">
-                <CompactFlowNode
-                  v-if="!detailed"
-                  kind="source"
-                  :label="titleOf(id, data)"
+              <div :style="{ '--node-border-color': '#6366f1' }" :class="{ 'is-off': isLeftOut(id) }">
+                <IoPill
+                  kind="input"
+                  :name="titleOf(id, data)"
+                  :sub="sourceSubOf(id, data)"
                   :unmet="nodeUnmetCount(id, 'data-source')"
-                  :detail="mode === 'configure'
-                    ? `${fileCountForNode(id)} file${fileCountForNode(id) !== 1 ? 's' : ''} selected`
-                    : data.view
-                    ? 'Public dataset'
-                    : data.packageCount != null
-                    ? sourceDetail(data)
-                    : ''"
+                  :off="isLeftOut(id)"
                 />
-                <div v-else class="custom-node data-source-node" :class="{ 'has-files': mode === 'configure' && fileCountForNode(id) > 0 }">
-                  <span v-if="nodeUnmetCount(id, 'data-source') > 0" class="node-unmet-badge">{{ nodeUnmetCount(id, 'data-source') }}</span>
-                  <div class="node-header">
-                    <span class="node-title" :title="titleOf(id, data)">{{ titleOf(id, data) }}</span>
-                  </div>
-                  <div class="node-tags">
-                    <span v-if="mode === 'browse' && data.view" class="node-tag-info" :title="viewSourceLabel(data.view)">
-                      {{ viewSourceLabel(data.view) }}
-                    </span>
-                    <span v-else-if="mode === 'browse' && data.packageCount != null" class="node-tag-info" :title="sourceDetail(data)">
-                      {{ sourceDetail(data) }}
-                    </span>
-                    <template v-if="mode === 'configure'">
-                      <span class="node-tag-info">
-                        {{ fileCountForNode(id) }} file{{ fileCountForNode(id) !== 1 ? 's' : '' }} selected
-                      </span>
-                    </template>
-                  </div>
-                  <div v-if="mode === 'configure'" class="node-config-hint">Click to select files</div>
-                </div>
                 <Handle id="source" type="source" :position="Position.Bottom" />
               </div>
             </template>
 
             <!-- Data-target node template -->
             <template #node-data-target="{ data, id }">
-              <div :style="{ '--node-border-color': mode === 'browse' ? (data.status && !['NOT_STARTED', 'SUCCEEDED'].includes(data.status) ? graphStatusColor(data.status) : '#64748b') : '#64748b', '--handle-target-color': incomingEdgeColor(id) }">
+              <div :style="{ '--node-border-color': mode === 'browse' ? (data.status && !['NOT_STARTED', 'SUCCEEDED'].includes(data.status) ? graphStatusColor(data.status) : '#64748b') : '#64748b', '--handle-target-color': incomingEdgeColor(id) }" :class="{ 'is-off': isUnsaved(id) }">
                 <Handle id="target" type="target" :position="Position.Top" />
-                <CompactFlowNode
-                  v-if="!detailed"
-                  kind="target"
-                  :label="titleOf(id, data)"
-                  :status="mode === 'browse' ? data.status : ''"
-                  :runtime="nodeConfigs[id]?.computeType || data.computeType"
+                <IoPill
+                  kind="output"
+                  :name="titleOf(id, data)"
+                  :sub="targetSubOf(id, data)"
+                  :mark="statusMark(data)"
+                  :mark-title="statusLabel(data.status)"
+                  :running="mode === 'browse' && data.status === 'STARTED'"
+                  :failed="mode === 'browse' && data.status === 'FAILED'"
                   :unmet="nodeUnmetCount(id, 'data-target')"
+                  :off="isUnsaved(id)"
                 />
-                <div v-else class="custom-node data-target-node" :class="mode === 'browse' ? statusClass(data.status) : ''">
-                  <span v-if="nodeUnmetCount(id, 'data-target') > 0" class="node-unmet-badge">{{ nodeUnmetCount(id, 'data-target') }}</span>
-                  <div class="node-header">
-                    <span class="node-title" :title="titleOf(id, data)">{{ titleOf(id, data) }}</span>
-                    <RuntimeMark :runtime="nodeConfigs[id]?.computeType || data.computeType" />
-                    <span
-                      v-if="statusMark(data)"
-                      class="node-mark"
-                      :class="`node-mark--${statusMark(data).kind}`"
-                      :title="statusLabel(data.status)"
-                      :aria-label="statusLabel(data.status)"
-                    >{{ statusMark(data).glyph }}</span>
-                  </div>
-                  <div class="node-tags">
-                  </div>
-                  <div v-if="mode === 'browse' && targetFacts(data).length" class="node-facts">
-                    {{ targetFacts(data).join(" · ") }}
-                  </div>
-                  <div class="node-body">
-                    <div v-if="mode === 'browse' && targetParamsShown(id, data).length > 0" class="param-preview">
-                      <div v-for="(p, i) in targetParamsShown(id, data).slice(0, 3)" :key="i" class="param-row">
-                        <span class="param-key">{{ p.key }}</span>
-                        <span v-if="p.value" class="param-val">{{ p.value }}</span>
-                      </div>
-                      <span v-if="targetParamsShown(id, data).length > 3" class="param-more">+{{ targetParamsShown(id, data).length - 3 }} more</span>
-                    </div>
-                    <template v-if="mode === 'configure'">
-                      <div v-if="nodeConfigs[id]?.params?.length > 0" class="param-preview">
-                        <div v-for="(p, i) in nodeConfigs[id].params.slice(0, 3)" :key="i" class="param-row">
-                          <span class="param-key">{{ p.name || p.key }}</span>
-                          <span v-if="p.value" class="param-val">{{ p.value }}</span>
-                        </div>
-                        <span v-if="nodeConfigs[id].params.length > 3" class="param-more">+{{ nodeConfigs[id].params.length - 3 }} more</span>
-                      </div>
-                      <div class="node-config-hint">Click to configure</div>
-                    </template>
-                  </div>
-                </div>
+                <button v-if="canSkipOutput(id)" type="button" class="node-off-toggle nodrag" @click.stop="toggleSaved(id)">
+                  {{ isUnsaved(id) ? "Save it" : "Don't save" }}
+                </button>
               </div>
             </template>
           </VueFlow>
@@ -2174,7 +2558,29 @@ onUnmounted(() => {
 
             <!-- CONFIGURE MODE: Selected data-target node -->
             <template v-else-if="mode === 'configure' && selectedNode && selectedNode.type === 'data-target' && nodeConfigs[selectedNode.id]">
-              <h4 class="sidebar-section-title">Data Target Configuration</h4>
+              <h4 class="sidebar-section-title">{{ selectedOutput ? `Output: ${selectedOutput.name}` : 'Data Target Configuration' }}</h4>
+              <!-- An output's destination, chosen for this run -->
+              <div v-if="selectedOutput" class="config-field">
+                <label for="output-destination">Destination</label>
+                <el-select
+                  id="output-destination"
+                  :model-value="nodeConfigs[selectedNode.id].targetType"
+                  size="small"
+                  style="width: 100%"
+                  @update:model-value="(t) => onDestinationChange(selectedNode.id, t)"
+                >
+                  <el-option
+                    v-for="t in selectedDestinations"
+                    :key="t"
+                    :label="destinationLabel(t)"
+                    :value="t"
+                  />
+                </el-select>
+              </div>
+              <p v-if="selectedOutput && nodeConfigs[selectedNode.id].targetType === NO_DESTINATION" class="configure-hint">
+                The run still makes {{ selectedOutput.name }}, but doesn't save it anywhere.
+              </p>
+              <template v-if="nodeConfigs[selectedNode.id].targetType !== NO_DESTINATION">
               <div v-if="!getTargetTypeDefinition(selectedNode.data?.targetType)" class="target-type-missing">
                 Target type "{{ selectedNode.data?.targetType }}" is no longer available, so it has no parameters or runtimes here. Edit the workflow and choose a current target type.
               </div>
@@ -2224,7 +2630,8 @@ onUnmounted(() => {
                 >
                   <TargetDatasetField
                     v-model="nodeConfigs[selectedNode.id].datasetId"
-                    :run-dataset-id="initiateForm.datasetId"
+                    :run-dataset-id="runDatasetId"
+                    :follows-inputs="workflowHasInputs"
                     :datasets="datasetOptions"
                   />
                 </div>
@@ -2312,6 +2719,7 @@ onUnmounted(() => {
                   </div>
                 </div>
               </div>
+              </template>
 
               <button class="text-link-btn" @click="selectedNode = null">
                 Clear selection
@@ -2322,21 +2730,31 @@ onUnmounted(() => {
             <template v-else-if="mode === 'configure' && selectedNode && selectedNode.type === 'data-source'">
               <h4 class="sidebar-section-title">Data Source</h4>
               <div class="info-card">
+                <div v-if="!isMyWorkspace" class="info-row">
+                  <span class="info-label">From</span>
+                  <span class="info-value">{{ sourceDatasetOf(selectedNode.id) ? datasetName(sourceDatasetOf(selectedNode.id), datasetOptions) : "Chosen with its files" }}</span>
+                </div>
                 <div class="info-row">
                   <span class="info-label">Files</span>
                   <span class="info-value">{{ fileCountForNode(selectedNode.id) }} selected</span>
                 </div>
               </div>
               <h4 class="sidebar-section-title">Source Files</h4>
+              <p v-if="mismatchLine(selectedNode.id)" class="files-mismatch">
+                ⚠ {{ mismatchLine(selectedNode.id) }}: {{ hintLine(sourceHints(selectedNode.id, configDefinition?.dag || [], portsOfStep(configDefinition?.dag || [], availableApplications))) }}.
+              </p>
               <div v-if="dataSourceFiles[selectedNode.id]?.length > 0" class="selected-files-list">
                 <div
                   v-for="(file, idx) in dataSourceFiles[selectedNode.id]"
                   :key="file.content?.id || idx"
                   class="selected-file-item"
+                  :class="{ 'is-mismatch': mismatchedFile(selectedNode.id, file) }"
+                  :title="mismatchedFile(selectedNode.id, file) ? (file.content?.packageType === 'Collection' ? 'Has files this input doesn\'t take' : 'Not a type this input takes') : undefined"
                 >
                   <IconCollection v-if="file.content?.packageType === 'Collection'" :width="14" :height="14" class="selected-file-icon collection" />
                   <IconFile v-else :width="14" :height="14" class="selected-file-icon" />
                   <span class="selected-file-name">{{ file.content?.name || 'Unnamed file' }}</span>
+                  <span v-if="partlyChecked(file)" class="selected-file-unchecked" :title="partlyChecked(file)">?</span>
                   <button class="selected-file-remove" @click="removeFileFromNode(selectedNode.id, idx)" title="Remove file">&times;</button>
                 </div>
               </div>
@@ -2350,7 +2768,7 @@ onUnmounted(() => {
 
             <!-- CONFIGURE MODE: no node selected — show summary -->
             <template v-else-if="mode === 'configure'">
-              <h4 class="sidebar-section-title">Configuration Summary</h4>
+              <h4 class="sidebar-section-title">Run setup</h4>
               <div class="info-card">
                 <div class="info-row info-row-stacked">
                   <label class="info-label" for="run-name-input">Run Name <span class="info-label-hint">(optional)</span></label>
@@ -2374,15 +2792,32 @@ onUnmounted(() => {
                   <span class="info-label">Workflow</span>
                   <span class="info-value">{{ configDefinition?.name || 'N/A' }}</span>
                 </div>
-                <div class="info-row">
-                  <span class="info-label">Compute Node</span>
-                  <span class="info-value">{{ computeNodeName(initiateForm.computeNodeId) }}</span>
-                </div>
-                <div v-if="!isMyWorkspace" class="info-row">
-                  <span class="info-label">Dataset</span>
-                  <span class="info-value">
-                    {{ datasetOptions.find(d => d.content?.id === initiateForm.datasetId)?.content?.name || initiateForm.datasetId }}
-                  </span>
+                <p v-if="needsDatasetHere" class="run-name-error">
+                  This workflow reads from or writes to a dataset, so it runs in a workspace, not in My Workspace.
+                </p>
+                <div class="info-row info-row-stacked">
+                  <label class="info-label" for="setup-node">Compute node</label>
+                  <el-select
+                    id="setup-node"
+                    v-model="initiateForm.computeNodeId"
+                    filterable
+                    placeholder="Choose a compute node"
+                    class="setup-select"
+                    fit-input-width
+                    popper-class="setup-node-popper"
+                  >
+                    <el-option
+                      v-for="c in setupNodeChoices"
+                      :key="c.node.uuid"
+                      :label="c.node.name"
+                      :value="c.node.uuid"
+                      :disabled="c.reasons.length > 0"
+                    >
+                      <span class="setup-option-name" :title="c.node.name">{{ c.node.name }}</span>
+                      <span v-if="c.reasons.length" class="setup-option-why">{{ c.reasons.join(" · ") }}</span>
+                    </el-option>
+                  </el-select>
+                  <span v-if="setupNodeUnfit.length" class="run-name-error">Can't run this workflow: {{ setupNodeUnfit.join(", ") }}</span>
                 </div>
                 <div v-if="configLayers.length" class="info-row">
                   <span class="info-label">Reference data</span>
@@ -2390,9 +2825,8 @@ onUnmounted(() => {
                 </div>
               </div>
               <p class="configure-hint">
-                Click <strong>data-source</strong> nodes to select files,
-                <strong>processor</strong> nodes to set parameters,
-                and <strong>data-target</strong> nodes to override the runtime.
+                Choose where it runs, then click each <strong>input</strong> to choose its dataset and files,
+                a <strong>step</strong> to set its parameters, and an <strong>output</strong> to override where it runs.
               </p>
             </template>
 
@@ -2498,6 +2932,28 @@ onUnmounted(() => {
                   <span class="info-label">Writes to</span>
                   <span class="info-value">{{ datasetName(selectedNode.data.datasetId, datasetOptions) }}</span>
                 </div>
+              </div>
+
+              <div v-if="importStatus[selectedNode.id]" class="info-card params-card">
+                <h5 class="params-title">Import into dataset</h5>
+                <div class="info-row">
+                  <span class="info-label">Imported</span>
+                  <span class="info-value">{{ importStatus[selectedNode.id].imported }} of {{ importStatus[selectedNode.id].total }}</span>
+                </div>
+                <div v-if="importStatus[selectedNode.id].inProgress" class="info-row">
+                  <span class="info-label">In progress</span>
+                  <span class="info-value">{{ importStatus[selectedNode.id].inProgress }}</span>
+                </div>
+                <div v-if="importStatus[selectedNode.id].failed" class="info-row">
+                  <span class="info-label">Failed</span>
+                  <span class="info-value import-failed">{{ importStatus[selectedNode.id].failed }}</span>
+                </div>
+                <ul v-if="importStatus[selectedNode.id].failures?.length" class="import-failures">
+                  <li v-for="f in importStatus[selectedNode.id].failures" :key="f.path">
+                    <span class="import-failure-path">{{ f.path }}</span>
+                    <span v-if="f.message" class="import-failure-message">{{ f.message }}</span>
+                  </li>
+                </ul>
               </div>
 
               <div v-if="selectedNode.data?.params?.length > 0" class="info-card params-card">
@@ -2668,11 +3124,50 @@ onUnmounted(() => {
       @close="closeFilePicker"
     >
       <div class="file-picker-content">
-        <p v-if="sourcePicker.hint" class="file-picker-hint">{{ sourcePicker.hint }}</p>
+        <p v-if="sourcePicker.hint && !pickerTypes" class="file-picker-hint">{{ sourcePicker.hint }}</p>
+        <div v-if="!isMyWorkspace" class="file-picker-dataset">
+          <template v-if="!isMyWorkspace">
+          <label for="picker-dataset">Dataset</label>
+          <el-select
+            id="picker-dataset"
+            :model-value="sourceDatasetOf(filePickerNodeId)"
+            filterable
+            remote
+            :remote-method="onSetupDatasetSearch"
+            :loading="datasetSearchLoading"
+            placeholder="Search datasets"
+            class="file-picker-dataset-select"
+            popper-class="dataset-option-popper"
+            @update:model-value="onPickerDatasetChange"
+          >
+            <el-option v-for="d in datasetOptions" :key="d.content?.id" :label="d.content?.name" :value="d.content?.id">
+              <DatasetOptionRow :dataset="d" />
+            </el-option>
+          </el-select>
+          <span v-if="sourceDatasets[filePickerNodeId]" class="file-picker-dataset-note">Not the other inputs' dataset</span>
+          </template>
+        </div>
+        <div v-if="pickerDataset" class="file-picker-dataset-head">
+          <img :src="pickerDataset.banner || '/images/banner-placeholder.jpg'" alt="" />
+          <div>
+            <div class="file-picker-dataset-name">{{ pickerDataset.name }}</div>
+            <div v-if="pickerDataset.description" class="file-picker-dataset-desc">{{ pickerDataset.description }}</div>
+            <div class="file-picker-dataset-meta">{{ pickerDataset.meta }}</div>
+          </div>
+        </div>
         <div class="file-picker-header">
           <span class="selected-count">
             <strong>{{ fileCountForNode(filePickerNodeId) }}</strong>
             file{{ fileCountForNode(filePickerNodeId) !== 1 ? 's' : '' }} selected
+          </span>
+          <!-- Which files can be chosen: those the input takes, or any (the
+               check goes by file extension, so it can be wrong) -->
+          <span v-if="pickerTypes" class="file-picker-types">
+            <span class="file-picker-types-label">Show</span>
+            <el-radio-group v-model="pickerAllowOtherTypes" size="small">
+              <el-radio-button :value="false" :title="pickerDescription || sourcePicker.hint">{{ pickerTypes }} only</el-radio-button>
+              <el-radio-button :value="true" title="Choose any file; the app may not read it">Any file</el-radio-button>
+            </el-radio-group>
           </span>
         </div>
 
@@ -2686,9 +3181,18 @@ onUnmounted(() => {
               @navigate-breadcrumb="handleNavigateBreadcrumb"
             />
           </div>
-          <div class="files-table-container">
+          <p v-if="filePickerLoading" class="file-picker-empty">Loading files…</p>
+          <p v-else-if="!filePickerFiles.length" class="file-picker-empty">
+            {{ !sourceDatasetOf(filePickerNodeId)
+              ? "Choose a dataset to see its files."
+              : filePickerCurrentFile?.content?.id ? "This folder is empty." : `${datasetName(sourceDatasetOf(filePickerNodeId), datasetOptions)} has no files.` }}
+          </p>
+          <!-- Hidden, not removed, while there's nothing to list: the table
+               re-ticks chosen files when its list changes, so it stays mounted. -->
+          <div v-show="!filePickerLoading && filePickerFiles.length" class="files-table-container">
             <analysis-files-table
               :data="filePickerFiles"
+              :why-not="pickerWhyNot"
               :clear-selected-values="clearSelectedValues"
               @selection-change="onFileSelect"
               @click-file-label="onClickFileLabel"
@@ -3044,6 +3548,45 @@ onUnmounted(() => {
 </template>
 
 <style lang="scss">
+/* Dataset pickers' lists (appended to body, so not scoped): each dataset with
+   its banner and two lines under its name (DatasetOptionRow). */
+.dataset-option-popper {
+  min-width: 420px;
+  max-width: 560px;
+
+  .el-select-dropdown__item {
+    max-width: 560px;
+    overflow: hidden;
+    height: auto;
+    min-height: 34px;
+    line-height: normal;
+    padding: 2px 12px;
+  }
+}
+
+/* The run setup's compute node list (appended to body, so not scoped): as
+   wide as its field, each node's name with why it can't run this below it. */
+.setup-node-popper .el-select-dropdown__item {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  height: auto;
+  min-height: 34px;
+  padding: 6px 12px;
+  line-height: 1.3;
+  white-space: normal;
+
+  .setup-option-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .setup-option-why {
+    font-size: 11px;
+    font-weight: normal;
+    color: #999999; // theme.$gray_4
+  }
+}
 /* Unscoped styles for VueFlow handle rendering */
 @import "@vue-flow/core/dist/style.css";
 @import "@vue-flow/core/dist/theme-default.css";
@@ -3399,8 +3942,10 @@ onUnmounted(() => {
   border: 1px solid theme.$gray_3;
   border-radius: 4px;
   padding: 8px 10px;
-  min-width: 250px;
-  max-width: 350px;
+  /* One size (NODE_WIDTH), as the layout places it, the same as the
+     builder's. */
+  box-sizing: border-box;
+  width: 280px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   transition: all 0.2s;
   cursor: pointer;
@@ -3461,6 +4006,15 @@ onUnmounted(() => {
   }
 
   // Finished: a ✓ by the title, in place of a status badge.
+  // A dataset target's import, under its facts (runImports.js).
+  .node-import {
+    margin-top: 4px;
+    font-size: 11px;
+    color: theme.$gray_5;
+  }
+  .node-import--importing { color: #0e7490; }
+  .node-import--failed { color: theme.$status_red; font-weight: 600; }
+
   .node-mark {
     flex-shrink: 0;
     font-size: 15px;
@@ -3587,7 +4141,6 @@ onUnmounted(() => {
     --type-strip: #6366f1;
     background: #eef2ff;
 
-    &.has-files { border-color: theme.$status_green; }
     &.green-node { border-color: theme.$gray_3; }
     &.red-node { border-color: theme.$status_red; }
   }
@@ -3631,6 +4184,60 @@ onUnmounted(() => {
 @keyframes strip-pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.25; }
+}
+
+/* Chosen files a source's inputs don't take, in its panel. */
+.files-mismatch {
+  margin: 0 0 8px;
+  padding: 8px 10px;
+  border-radius: 4px;
+  background: #fef3c7;
+  font-size: 12px;
+  line-height: 1.4;
+  color: #92400e;
+}
+.selected-file-unchecked {
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
+  margin-left: 4px;
+  border: 1px solid theme.$gray_3;
+  border-radius: 50%;
+  font-size: 11px;
+  line-height: 14px;
+  text-align: center;
+  color: theme.$gray_4;
+  cursor: help;
+}
+.selected-file-item.is-mismatch .selected-file-name {
+  color: #b45309;
+  font-weight: 600;
+}
+
+/* A dataset import's failed files, in the target's panel. */
+.import-failed {
+  color: theme.$status_red;
+  font-weight: 600;
+}
+.import-failures {
+  margin: 6px 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 12px;
+
+  li {
+    display: flex;
+    flex-direction: column;
+    padding: 4px 0;
+    border-top: 1px solid theme.$gray_2;
+  }
+}
+.import-failure-path {
+  color: theme.$gray_6;
+  word-break: break-all;
+}
+.import-failure-message {
+  color: theme.$gray_5;
 }
 
 /* Status dots */
@@ -3801,6 +4408,105 @@ onUnmounted(() => {
   &:hover { text-decoration: underline; }
 }
 
+.setup-select {
+  width: 100%;
+}
+
+.file-picker-dataset {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  font-size: 13px;
+
+  label {
+    font-weight: 500;
+    color: theme.$gray_6;
+  }
+}
+.file-picker-dataset-head {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 12px;
+  padding: 8px;
+  border: 1px solid theme.$gray_2;
+  border-radius: 4px;
+
+  img {
+    width: 64px;
+    height: 64px;
+    object-fit: cover;
+  }
+}
+.file-picker-dataset-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: theme.$gray_6;
+}
+.file-picker-dataset-desc {
+  font-size: 12px;
+  color: theme.$gray_5;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.file-picker-dataset-meta {
+  margin-top: 2px;
+  font-size: 11px;
+  color: theme.$gray_4;
+}
+/* An output this run doesn't save, or an optional input it leaves out: on
+   the graph still, faded and dashed. */
+.is-off {
+  :deep(.custom-node),
+  :deep(.cfn) {
+    opacity: 0.55;
+    border-style: dashed !important;
+  }
+}
+.node-off-toggle {
+  position: absolute;
+  right: 8px;
+  bottom: -22px;
+  padding: 1px 8px;
+  border: 1px solid theme.$gray_3;
+  border-radius: 3px;
+  background: theme.$white;
+  font: inherit;
+  font-size: 11px;
+  color: theme.$gray_5;
+  cursor: pointer;
+
+  &:hover {
+    border-color: theme.$purple_1;
+    color: theme.$purple_2;
+  }
+}
+.file-picker-types {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+.file-picker-types-label {
+  font-weight: 500;
+  color: theme.$gray_6;
+}
+.file-picker-empty {
+  margin: 16px 0;
+  font-size: 13px;
+  color: theme.$gray_4;
+}
+.file-picker-dataset-select {
+  width: 320px;
+}
+.file-picker-dataset-note {
+  font-size: 12px;
+  color: theme.$gray_4;
+}
+
 .configure-hint {
   font-size: 13px;
   color: theme.$gray_4;
@@ -3819,6 +4525,10 @@ onUnmounted(() => {
   color: theme.$gray_4;
   text-transform: none;
   letter-spacing: 0;
+}
+.info-row-stacked > .info-label-hint {
+  font-size: 12px;
+  line-height: 1.4;
 }
 
 .run-name-input {
@@ -4263,6 +4973,8 @@ onUnmounted(() => {
 }
 
 .file-picker-header {
+  display: flex;
+  align-items: center;
   margin-bottom: 12px;
 
   .selected-count {

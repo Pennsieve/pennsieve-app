@@ -6,7 +6,7 @@
 // the canvas for a new workflow. The view is in the URL (?view=library,
 // ?view=builder), else the view last used in this browser, else, on a first
 // visit, Live when the workspace has runs and the Library when it has none.
-import { computed, nextTick, onMounted, ref, watch } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { useGetToken } from "@/composables/useGetToken";
@@ -16,6 +16,7 @@ import WorkflowBuilder from "../WorkflowBuilder/WorkflowBuilder.vue";
 import WorkflowsGrid from "./WorkflowsGrid.vue";
 import { workflowsView, WORKFLOW_VIEWS } from "./galleryFilter";
 import AnalysisViewBar from "../AnalysisViewBar.vue";
+import RunWizardDialog from "../RunMonitor/RunWizardDialog.vue";
 
 const route = useRoute();
 const router = useRouter();
@@ -51,7 +52,11 @@ onMounted(async () => {
   }
 });
 const view = computed({
-  get: () => (hasRuns.value === null ? null : workflowsView(route.query.view, lastView(), hasRuns.value)),
+  // A view the URL names needs no wait for whether there are runs.
+  get: () =>
+    hasRuns.value === null && !VIEWS.some((v) => v.key === route.query.view)
+      ? null
+      : workflowsView(route.query.view, lastView(), hasRuns.value ?? false),
   set: (v) => {
     try {
       localStorage.setItem(VIEW_KEY, v);
@@ -61,7 +66,6 @@ const view = computed({
     router.replace({ query: { ...route.query, view: v } });
   },
 });
-const newWorkflow = () => (view.value = "builder");
 
 const includeNotebooks = computed({
   get: () => route.query.notebooks === "1",
@@ -70,16 +74,15 @@ const includeNotebooks = computed({
 
 const runsRef = ref(null);
 
-// A Library card's Run (?run=<workflow>) switches to Live with the wizard open
-// on it; the query goes, so a reload doesn't open it again.
+// A link with ?run=<workflow> opens the run dialog on it, over whichever
+// view is showing; the query goes, so a reload doesn't open it again.
+const runDialog = ref(null);
 async function openRunFromQuery() {
   const id = route.query.run;
   if (!id) return;
-  if (view.value !== "live") view.value = "live";
-  await nextTick();
-  runsRef.value?.openWizardDialog(String(id));
   const { run, ...rest } = route.query;
-  router.replace({ query: rest });
+  await router.replace({ query: rest });
+  runDialog.value?.open(String(id));
 }
 onMounted(openRunFromQuery);
 watch(() => route.query.run, openRunFromQuery);
@@ -88,14 +91,16 @@ watch(() => route.query.run, openRunFromQuery);
 <template>
   <div class="wf-page">
     <AnalysisViewBar v-model="view" :views="VIEWS" :class="{ 'wf-toolbar--builder': view === 'builder' }">
-      <bf-button v-if="view === 'library'" @click="newWorkflow">+ New Workflow</bf-button>
-      <div v-else-if="view === 'live'" class="wf-actions">
+      <!-- Live's one action is running a workflow; the Library's cards each
+           have their own Run, and building one is the Builder tab's (a
+           "+ New Workflow" here was taken for running one). -->
+      <div v-if="view === 'live'" class="wf-actions">
         <el-checkbox v-model="includeNotebooks" size="small">Include notebooks</el-checkbox>
         <bf-button @click="runsRef?.openWizardDialog()">+ Run Workflow</bf-button>
       </div>
       <!-- The builder's bar (name, readiness, Save) goes here, so the canvas
            starts right below one bar. -->
-      <div v-else id="wf-toolbar-builder" class="wf-builder-bar" />
+      <div v-else-if="view === 'builder'" id="wf-toolbar-builder" class="wf-builder-bar" />
     </AnalysisViewBar>
     <!-- Nothing until a first visit knows whether to open on Live -->
     <div v-if="view" class="wf-body">
@@ -113,6 +118,7 @@ watch(() => route.query.run, openRunFromQuery);
         <WorkflowBuilder toolbar-target="#wf-toolbar-builder" />
       </div>
     </div>
+    <RunWizardDialog ref="runDialog" />
   </div>
 </template>
 

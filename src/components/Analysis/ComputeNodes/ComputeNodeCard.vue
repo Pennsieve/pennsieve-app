@@ -53,7 +53,7 @@
         </div>
       </div>
       <div class="node-header-actions">
-        <div class="node-status-badge" @click.stop v-if="canManagePermissions && getStatusForNode(node) !== 'Pending' && getStatusForNode(node) !== 'Destroying' && getStatusForNode(node) !== 'Failed'">
+        <div class="node-status-badge" @click.stop v-if="canManagePermissions && !['Pending', 'Updating', 'Destroying', 'Failed'].includes(getStatusForNode(node))">
           <el-select
             :model-value="getStatusForNode(node)"
             @change="(value) => updateStatus(value)"
@@ -70,7 +70,7 @@
           <span
             :class="['node-status-badge', getStatusForNode(node).toLowerCase()]"
           >
-            {{ getStatusForNode(node) }}
+            {{ getStatusForNode(node) }}{{ getStatusForNode(node) === 'Updating' && node.pendingProvisionerImageTag ? ` to ${node.pendingProvisionerImageTag}` : '' }}
           </span>
         </div>
       </div>
@@ -193,6 +193,7 @@ function getStatusForNode(node) {
     case 'paused': case 'stopped': case 'disabled': return 'Paused'
     case 'destroying': return 'Destroying'
     case 'failed': return 'Failed'
+    case 'updating': return 'Updating'
     default: return 'Pending'
   }
 }
@@ -357,7 +358,7 @@ async function updateNode() {
   text-transform: uppercase;
   letter-spacing: 0.5px;
 
-  &.pending {
+  &.pending, &.updating {
     background: rgba(theme.$gray_4, 0.1);
     color: theme.$gray_4;
     border: 1px solid rgba(theme.$gray_4, 0.2);

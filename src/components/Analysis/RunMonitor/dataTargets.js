@@ -65,7 +65,18 @@ export const buildDataTargets = (dag, nodeConfigs, runDatasetId = "") => {
       if (p.name && p.value) params[p.name] = p.value;
     }
     const entry = {};
-    const datasetId = targetWritesToDataset(d.targetType) ? cfg.datasetId || "" : "";
+    // A workflow output names the destination this run binds it to; with
+    // none it takes nothing else.
+    const targetType = d.output ? cfg.targetType || "" : d.targetType;
+    if (d.output) {
+      if (!targetType) continue;
+      entry.targetType = targetType;
+      if (targetType === "none") {
+        dataTargets[d.id] = entry;
+        continue;
+      }
+    }
+    const datasetId = targetWritesToDataset(targetType) ? cfg.datasetId || "" : "";
     if (datasetId && datasetId !== runDatasetId) entry.datasetId = datasetId;
     if (Object.keys(params).length > 0) entry.params = params;
     if (Object.keys(entry).length > 0) dataTargets[d.id] = entry;
@@ -86,9 +97,57 @@ export const searchDatasets = async (apiUrl, query, { getToken, sendXhr, toQuery
   const params = toQueryParams({
     limit, offset: 0, query, orderBy: "IntId", orderDirection: "Desc", type: "research", api_key: token,
   });
-  const response = await sendXhr(`${apiUrl}/datasets/paginated?${params}`);
-  return response?.datasets || response || [];
+  const response = await sendXhr(`${apiUrl}/datasets/paginated?${params}&includeBannerUrl=true`);
+  return sortDatasets(response?.datasets || response || []);
 };
+
+// How many files a dataset record says it has (its package counts).
+const fileCount = (ds) => Object.values(ds?.packageTypeCounts || {}).reduce((n, c) => n + (Number(c) || 0), 0);
+
+const formatBytes = (bytes) => {
+  if (!bytes || bytes <= 0) return "";
+  const units = ["B", "KB", "MB", "GB", "TB"];
+  let i = 0;
+  let v = bytes;
+  while (v >= 1000 && i < units.length - 1) {
+    v /= 1000;
+    i++;
+  }
+  return `${v >= 10 || i === 0 ? Math.round(v) : v.toFixed(1)} ${units[i]}`;
+};
+
+const formatUpdated = (iso, now = new Date()) => {
+  const d = iso ? new Date(iso) : null;
+  if (!d || isNaN(d)) return "";
+  const opts = d.getFullYear() === now.getFullYear() ? { month: "short", day: "numeric" } : { month: "short", day: "numeric", year: "numeric" };
+  return `updated ${d.toLocaleDateString("en-US", opts)}`;
+};
+
+// What a dataset picker shows for a dataset record (GET /datasets/paginated):
+// its name, description and banner, and a line of facts that tell datasets
+// apart. empty is a dataset with no files.
+export const datasetSummary = (ds, now = new Date()) => {
+  const files = fileCount(ds);
+  const role = ds?.role ? ds.role.charAt(0).toUpperCase() + ds.role.slice(1) : "";
+  const meta = [
+    files ? `${files.toLocaleString("en-US")} file${files === 1 ? "" : "s"}` : "No files",
+    files ? formatBytes(ds?.storage) : "",
+    formatUpdated(ds?.content?.updatedAt, now),
+    role,
+  ].filter(Boolean).join(" · ");
+  return {
+    id: ds?.content?.id || "",
+    name: ds?.content?.name || "",
+    description: (ds?.content?.description || "").trim(),
+    banner: ds?.bannerPresignedUrl || "",
+    meta,
+    empty: files === 0,
+  };
+};
+
+// Datasets with files first, keeping the search's order otherwise.
+export const sortDatasets = (datasets) =>
+  [...(datasets || [])].sort((a, b) => (fileCount(a) === 0) - (fileCount(b) === 0));
 
 // The notebook launcher's view of a target's params. A path prefix splits a
 // run's input between targets; a notebook hands over its whole output folder,

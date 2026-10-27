@@ -26,6 +26,16 @@ describe("launchableKernels", () => {
     expect(launchableKernels([py, { ...pyDownload, isActive: false }])).toEqual([py]);
     expect(launchableKernels([{ uuid: "x", name: "Jupyter Notebook" }])).toEqual([]);
   });
+  it("offers a kernel's notebook with an input and output as that kernel's only one", () => {
+    const pyBound = {
+      uuid: "pyb",
+      notebook: { kernel: "python", savesTo: "download", worksWithoutDataset: true },
+      inputs: [{ id: "data", name: "Data", optional: true }],
+      outputs: [{ id: "results", name: "Results", from: { step: "nb" } }],
+    };
+    expect(launchableKernels([py, pyDownload, pyBound, r])).toEqual([pyBound, r]);
+    expect(launchableKernels([py, pyDownload, pyBound, r], { personal: true })).toEqual([pyBound, r]);
+  });
   it("names where results go", () => {
     expect(kernelOutput(pyDownload)).toBe("Results as a download");
     expect(kernelOutput(py)).toBe("Results saved to a dataset");

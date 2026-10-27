@@ -25,7 +25,7 @@ describe('site configs', () => {
   })
 
   it('clin logs in on the app, has publishing off and no Office 365 viewer', () => {
-    expect(clin.features).toEqual({ inAppLogin: true, publishing: false, office365Viewer: false })
+    expect(clin.features).toEqual({ workflowInterface: false, inAppLogin: true, publishing: false, office365Viewer: false })
   })
 
   it('only clin turns off the Office 365 viewer', () => {
