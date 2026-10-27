@@ -1060,7 +1060,57 @@ const selectWorkflow = (workflow) => {
   } else {
     setTimeout(() => fitView({ padding: 0.2, maxZoom: 1 }), 50);
   }
+  markLayoutSaved();
   history.reset();
+};
+
+/*
+  Layout of a saved workflow: its owner can move steps, inputs and outputs
+  (or Tidy up) while viewing it, and save where they are, in place on the
+  latest version: positions never change what runs, so no new version.
+*/
+const layoutOf = () =>
+  Object.fromEntries(
+    nodes.value.map((n) => {
+      const p = positionToSave(n);
+      return [n.id, { x: Math.round(p.x), y: Math.round(p.y) }];
+    })
+  );
+const savedLayout = ref({});
+const markLayoutSaved = () => {
+  savedLayout.value = layoutOf();
+};
+const canSaveLayout = computed(() => mode.value === "browse" && isWorkflowCreator.value && !viewingVersion.value);
+const layoutChanged = computed(() => {
+  if (!canSaveLayout.value) return false;
+  const saved = savedLayout.value;
+  return nodes.value.some((n) => {
+    const p = positionToSave(n);
+    const was = saved[n.id];
+    return !was || Math.abs(Math.round(p.x) - was.x) > 0 || Math.abs(Math.round(p.y) - was.y) > 0;
+  });
+});
+const savingLayout = ref(false);
+const saveLayout = async () => {
+  const wf = selectedWorkflow.value;
+  if (!wf?.uuid || !layoutChanged.value) return;
+  savingLayout.value = true;
+  try {
+    const positions = layoutOf();
+    await store.dispatch("analysisModule/updateWorkflow", { uuid: wf.uuid, payload: { positions } });
+    markLayoutSaved();
+    EventBus.$emit("toast", { detail: { type: "success", msg: "Layout saved." } });
+  } catch (err) {
+    console.error(err);
+    EventBus.$emit("toast", { detail: { type: "error", msg: "Could not save the layout." } });
+  } finally {
+    savingLayout.value = false;
+  }
+};
+const undoMoves = () => {
+  const saved = savedLayout.value;
+  const back = detailed.value ? (p) => p : (p) => recenter([{ position: p }], DETAILED_BOX, COMPACT_BOX)[0].position;
+  nodes.value = nodes.value.map((n) => (saved[n.id] ? { ...n, position: back({ ...saved[n.id] }) } : n));
 };
 
 /*
@@ -2673,10 +2723,18 @@ const openNodeSettings = (id) => {
                 <button
                   v-if="nodes.length > 0"
                   class="auto-layout-btn"
+                  title="Arrange the steps, inputs and outputs automatically"
                   @click="autoLayout"
                 >
-                  Auto Layout
+                  Tidy up
                 </button>
+                <!-- A saved workflow's owner, having moved things: keep them there -->
+                <template v-if="layoutChanged">
+                  <button class="auto-layout-btn is-primary" :disabled="savingLayout" title="Keep the steps where they are now (no new version)" @click="saveLayout">
+                    {{ savingLayout ? "Saving…" : "Save layout" }}
+                  </button>
+                  <button class="auto-layout-btn" title="Put them back where they were saved" @click="undoMoves">Undo moves</button>
+                </template>
                 <template v-if="!isReadOnly">
                   <button
                     v-if="edges.some((e) => e.selected)"
@@ -5222,6 +5280,22 @@ kbd {
     border-color: theme.$purple_1;
     color: theme.$purple_1;
     background: theme.$white;
+  }
+
+  /* Save layout: the one thing to do after moving */
+  &.is-primary {
+    border-color: theme.$purple_2;
+    background: theme.$purple_2;
+    color: theme.$white;
+
+    &:hover {
+      background: theme.$purple_1;
+      color: theme.$white;
+    }
+    &:disabled {
+      opacity: 0.6;
+      cursor: default;
+    }
   }
 }
 
