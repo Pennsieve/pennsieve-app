@@ -32,6 +32,7 @@ import LayerNameSelector from "./LayerNameSelector.vue";
 import TargetDatasetField from "./TargetDatasetField.vue";
 import { targetWritesToDataset, targetParamFields, buildDataTargets, targetDatasetId, datasetName, shownTargetParams } from "./dataTargets";
 import { importStatusUrl, importSummary, importStillMoving, isDatasetImport } from "./runImports";
+import { nodeUnfit, rememberedSetup, rememberSetup, defaultNode, needsDataset } from "./runSetup";
 import DownloadItem from "@/components/downloads/DownloadItem.vue";
 import { useDownloadsStore } from "@/stores/downloadsStore";
 
@@ -954,6 +955,7 @@ const initiateWorkflowFromConfig = async (pendingConfig) => {
     if (needsLayout(result)) autoLayout();
     else setTimeout(() => fitView({ padding: 0.2, maxZoom: 1 }), 50);
 
+    applySetupDefaults(definition);
     mode.value = "configure";
     selectedNode.value = null;
     accordionActiveNames.value = ["information"];
@@ -988,6 +990,22 @@ const executeWorkflow = async () => {
     EventBus.$emit("toast", {
       detail: { type: "error", msg: nameResult.error },
     });
+    return;
+  }
+
+  // Where it runs (the run setup panel, with nothing on the canvas selected).
+  const setupProblem = needsDatasetHere.value
+    ? "This workflow reads from or writes to a dataset, so it runs in a workspace, not in My Workspace."
+    : !initiateForm.value.computeNodeId
+    ? "Choose a compute node for the run."
+    : !isMyWorkspace.value && !initiateForm.value.datasetId
+      ? "Choose a dataset for the run."
+      : setupNodeUnfit.value.length
+        ? `${computeNodeName(initiateForm.value.computeNodeId)} can't run this workflow: ${setupNodeUnfit.value.join(", ")}.`
+        : "";
+  if (setupProblem) {
+    selectedNode.value = null;
+    EventBus.$emit("toast", { detail: { type: "error", msg: setupProblem } });
     return;
   }
 
@@ -1095,6 +1113,7 @@ const executeWorkflow = async () => {
     };
 
     await store.dispatch("analysisModule/createRun", payload);
+    rememberSetup(route.params.orgId || "", initiateForm.value.workflowId, initiateForm.value);
     EventBus.$emit("toast", { detail: { type: "success", msg: "Workflow executed successfully." } });
 
     router.push(scopedRoute("runs"));
@@ -1620,6 +1639,59 @@ const rerunFromRun = async () => {
 /*
   Fetch dataset options for configure summary
 */
+/*
+  Run setup: the compute node and dataset, chosen on the configure page
+  (runSetup.js). Every node is offered; one that can't run this workflow is
+  greyed out with why. The run starts from what's asked for (a rerun's),
+  else what was used last for this workflow here, else the only node that
+  fits.
+*/
+const setupManifestOf = computed(() => portsOfStep(configDefinition.value?.dag || [], availableApplications.value));
+const setupComputeTypeOf = (stepId) => {
+  const dagNode = (configDefinition.value?.dag || []).find((n) => n.id === stepId);
+  return nodeConfigs[stepId]?.executionTarget || dagNode?.computeType || "";
+};
+const unfitReasons = (node) => nodeUnfit(node, configDefinition.value?.dag || [], setupManifestOf.value, setupComputeTypeOf);
+const setupNodeChoices = computed(() =>
+  computeNodes.value
+    .map((n) => ({ node: n, reasons: unfitReasons(n) }))
+    .sort((a, b) => (a.reasons.length > 0) - (b.reasons.length > 0) || String(a.node.name).localeCompare(String(b.node.name)))
+);
+// My Workspace runs have no dataset (see the run dialog's "Needs a dataset").
+const needsDatasetHere = computed(() => isMyWorkspace.value && needsDataset(configDefinition.value));
+const setupNodeUnfit = computed(() => {
+  const n = computeNodes.value.find((c) => c.uuid === initiateForm.value.computeNodeId);
+  return n ? unfitReasons(n) : [];
+});
+
+// A dataset not among the options loaded (a remembered or rerun one) is
+// fetched by id, so the selector can name it.
+const ensureDatasetOption = async (datasetId) => {
+  if (!datasetId || datasetOptions.value.some((d) => d.content?.id === datasetId)) return;
+  try {
+    const token = await useGetToken();
+    const ds = await useSendXhr(`${config.value.apiUrl}/datasets/${datasetId}?api_key=${token}`);
+    if (ds?.content?.id && !datasetOptions.value.some((d) => d.content?.id === ds.content.id)) {
+      datasetOptions.value = [ds, ...datasetOptions.value];
+    }
+  } catch {
+    // not reachable: the selector shows the id
+  }
+};
+
+function applySetupDefaults(definition) {
+  const remembered = rememberedSetup(route.params.orgId || "", definition?.uuid || initiateForm.value.workflowId);
+  if (!initiateForm.value.computeNodeId) {
+    initiateForm.value.computeNodeId = defaultNode("", remembered.computeNodeId, computeNodes.value, (n) => unfitReasons(n).length === 0);
+  }
+  if (!isMyWorkspace.value && !initiateForm.value.datasetId && remembered.datasetId) {
+    initiateForm.value.datasetId = remembered.datasetId;
+  }
+  ensureDatasetOption(initiateForm.value.datasetId);
+}
+
+const onSetupDatasetSearch = (query) => fetchDatasetOptions(query || "");
+
 const fetchDatasetOptions = async (query = "") => {
   datasetSearchLoading.value = true;
   try {
@@ -1658,7 +1730,8 @@ onMounted(async () => {
   }
 
   await Promise.all([
-    store.dispatch("analysisModule/fetchComputeNodes"),
+    // Forced in My Workspace: the cached list may be a workspace's nodes
+    store.dispatch("analysisModule/fetchComputeNodes", { force: isMyWorkspace.value }),
     store.dispatch("analysisModule/fetchTargetTypes"),
     store.dispatch("analysisModule/fetchApplications"),
   ]);
@@ -2488,7 +2561,7 @@ onUnmounted(() => {
 
             <!-- CONFIGURE MODE: no node selected — show summary -->
             <template v-else-if="mode === 'configure'">
-              <h4 class="sidebar-section-title">Configuration Summary</h4>
+              <h4 class="sidebar-section-title">Run setup</h4>
               <div class="info-card">
                 <div class="info-row info-row-stacked">
                   <label class="info-label" for="run-name-input">Run Name <span class="info-label-hint">(optional)</span></label>
@@ -2512,15 +2585,45 @@ onUnmounted(() => {
                   <span class="info-label">Workflow</span>
                   <span class="info-value">{{ configDefinition?.name || 'N/A' }}</span>
                 </div>
-                <div class="info-row">
-                  <span class="info-label">Compute Node</span>
-                  <span class="info-value">{{ computeNodeName(initiateForm.computeNodeId) }}</span>
+                <p v-if="needsDatasetHere" class="run-name-error">
+                  This workflow reads from or writes to a dataset, so it runs in a workspace, not in My Workspace.
+                </p>
+                <div class="info-row info-row-stacked">
+                  <label class="info-label" for="setup-node">Compute node</label>
+                  <el-select
+                    id="setup-node"
+                    v-model="initiateForm.computeNodeId"
+                    filterable
+                    placeholder="Choose a compute node"
+                    class="setup-select"
+                  >
+                    <el-option
+                      v-for="c in setupNodeChoices"
+                      :key="c.node.uuid"
+                      :label="c.node.name"
+                      :value="c.node.uuid"
+                      :disabled="c.reasons.length > 0"
+                    >
+                      <span class="setup-option-name">{{ c.node.name }}</span>
+                      <span v-if="c.reasons.length" class="setup-option-why">{{ c.reasons.join(" · ") }}</span>
+                    </el-option>
+                  </el-select>
+                  <span v-if="setupNodeUnfit.length" class="run-name-error">Can't run this workflow: {{ setupNodeUnfit.join(", ") }}</span>
                 </div>
-                <div v-if="!isMyWorkspace" class="info-row">
-                  <span class="info-label">Dataset</span>
-                  <span class="info-value">
-                    {{ datasetOptions.find(d => d.content?.id === initiateForm.datasetId)?.content?.name || initiateForm.datasetId }}
-                  </span>
+                <div v-if="!isMyWorkspace" class="info-row info-row-stacked">
+                  <label class="info-label" for="setup-dataset">Dataset</label>
+                  <el-select
+                    id="setup-dataset"
+                    v-model="initiateForm.datasetId"
+                    filterable
+                    remote
+                    :remote-method="onSetupDatasetSearch"
+                    :loading="datasetSearchLoading"
+                    placeholder="Search datasets"
+                    class="setup-select"
+                  >
+                    <el-option v-for="d in datasetOptions" :key="d.content?.id" :label="d.content?.name" :value="d.content?.id" />
+                  </el-select>
                 </div>
                 <div v-if="configLayers.length" class="info-row">
                   <span class="info-label">Reference data</span>
@@ -2528,9 +2631,8 @@ onUnmounted(() => {
                 </div>
               </div>
               <p class="configure-hint">
-                Click <strong>data-source</strong> nodes to select files,
-                <strong>processor</strong> nodes to set parameters,
-                and <strong>data-target</strong> nodes to override the runtime.
+                Choose where it runs, then click each <strong>input</strong> to choose its files,
+                a <strong>step</strong> to set its parameters, and an <strong>output</strong> to override where it runs.
               </p>
             </template>
 
@@ -4008,6 +4110,18 @@ onUnmounted(() => {
   text-align: left;
 
   &:hover { text-decoration: underline; }
+}
+
+.setup-select {
+  width: 100%;
+}
+.setup-option-name {
+  margin-right: 8px;
+}
+.setup-option-why {
+  float: right;
+  font-size: 11px;
+  color: theme.$gray_4;
 }
 
 .configure-hint {
