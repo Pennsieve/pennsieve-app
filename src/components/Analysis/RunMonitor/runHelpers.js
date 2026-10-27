@@ -358,3 +358,15 @@ export const getUserName = (userId, profile, orgMembers) => {
   }
   return String(userId).includes(":") ? String(userId).split(":").pop() : String(userId);
 };
+
+// An input's download while a run's inputs are staged (workflow-service's
+// progress: files and bytes done of the totals), as its pill's second line:
+// "38% · 1,204 of 3,400 files". The share goes by bytes, else files.
+export const inputProgressLine = (progress) => {
+  if (!progress) return "";
+  const { files = 0, filesTotal = 0, bytes = 0, bytesTotal = 0 } = progress;
+  const share = bytesTotal > 0 ? bytes / bytesTotal : filesTotal > 0 ? files / filesTotal : 0;
+  const pct = Math.min(100, Math.floor(share * 100));
+  const count = `${files.toLocaleString("en-US")} of ${filesTotal.toLocaleString("en-US")} file${filesTotal === 1 ? "" : "s"}`;
+  return `${pct}% · ${count}`;
+};

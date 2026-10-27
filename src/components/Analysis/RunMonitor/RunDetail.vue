@@ -21,7 +21,7 @@ import { markSessionEnded, sessionEnded, endingPhase } from "./endedSessions";
 import AnalysisFilesTable from "../../FilesTable/AnalysisFilesTable.vue";
 import BreadcrumbNavigation from "../../datasets/files/BreadcrumbNavigation/BreadcrumbNavigation.vue";
 import { useGetToken } from "@/composables/useGetToken";
-import { getView } from "@/utils/viewsService";
+import { getView, viewsServiceUrl, createRunView, viewDataSource } from "@/utils/viewsService";
 import CompactFlowNode from "../WorkflowGraph/CompactFlowNode.vue";
 import GraphDensityToggle from "../WorkflowGraph/GraphDensityToggle.vue";
 import { layoutBox, useGraphDensity } from "../WorkflowGraph/graphDensity";
@@ -32,6 +32,8 @@ import LayerNameSelector from "./LayerNameSelector.vue";
 import TargetDatasetField from "./TargetDatasetField.vue";
 import { targetWritesToDataset, targetParamFields, buildDataTargets, targetDatasetId, datasetName, shownTargetParams, datasetSummary, sortDatasets, isPathPrefixParam } from "./dataTargets";
 import DatasetOptionRow from "./DatasetOptionRow.vue";
+import PublicFilesPicker from "./PublicFilesPicker.vue";
+import { picksKey } from "./publicPicks";
 import IoPill from "../WorkflowGraph/IoPill.vue";
 import { withInterfaceNodes, destinationChoices, NO_DESTINATION } from "./workflowInterface";
 import { importStatusUrl, importSummary, importStillMoving, isDatasetImport } from "./runImports";
@@ -53,6 +55,7 @@ import {
   statusClass,
   graphStatusColor,
   statusMarkOf,
+  inputProgressLine,
   nodeBorderColor,
   statusDotClass,
   statusLabel,
@@ -120,6 +123,34 @@ const initiateForm = ref({ workflowId: "", computeNodeId: "", datasetId: "", nam
 const runNameError = ref("");
 const configDefinition = ref(null);
 const dataSourceFiles = reactive({});
+// An input's files from public datasets (PublicFilesPicker's picks), where
+// views-service is deployed: the run takes them as a view kept for the run.
+// An input takes a workspace dataset's files or public files, not both.
+const publicInputs = !!viewsServiceUrl();
+const publicPicks = reactive({});
+// The file picker's side: a workspace dataset or public datasets.
+const pickerSide = ref("workspace");
+// What choosing on the picker's side would replace: the input's files from
+// the other side.
+const pickerReplaces = computed(() => {
+  const id = filePickerNodeId.value;
+  if (!id) return "";
+  const n = pickerSide.value === "public" ? (dataSourceFiles[id] || []).length : (publicPicks[id] || []).length;
+  if (!n) return "";
+  const from = pickerSide.value === "public" ? "the workspace dataset" : "public datasets";
+  return `Choosing here replaces the ${n} item${n === 1 ? "" : "s"} chosen from ${from}.`;
+});
+const setPublicPicks = (nodeId, picks) => {
+  if (!nodeId) return;
+  delete leftOutInputs[nodeId];
+  if (picks.length) {
+    publicPicks[nodeId] = picks;
+    delete dataSourceFiles[nodeId];
+    store.commit("analysisModule/CLEAR_SELECTED_FILES");
+  } else {
+    delete publicPicks[nodeId];
+  }
+};
 // Each input picks the dataset its files come from. initiateForm.datasetId
 // is only where a new input's picker starts (the dataset used last for this
 // workflow, a rerun's, or the one picked last); sourceDatasets holds an
@@ -471,9 +502,7 @@ const dataSourceNodes = computed(() => {
 
 const allDataSourcesHaveFiles = computed(() => {
   if (dataSourceNodes.value.length === 0) return true;
-  return dataSourceNodes.value.every(
-    (d) => dataSourceFiles[d.id] && dataSourceFiles[d.id].length > 0
-  );
+  return dataSourceNodes.value.every((d) => fileCountForNode(d.id) > 0);
 });
 
 /*
@@ -583,10 +612,21 @@ const sourceSubOf = (id, data) => {
   if (mode.value === "configure") {
     if (isLeftOut(id)) return "Left out";
     const n = fileCountForNode(id);
-    return n ? `${n} file${n === 1 ? "" : "s"}` : "Choose files";
+    if (!n) return "Choose files";
+    const picks = publicPicks[id] || [];
+    const noun = picks.some((p) => p.isFolder) ? "item" : "file";
+    return `${n} ${picks.length ? "public " : ""}${noun}${n === 1 ? "" : "s"}`;
   }
+  if (inputStaging(data)) return data.progress ? inputProgressLine(data.progress) : "Preparing files…";
+  if (data.status === "FAILED") return "Couldn't get its files";
   return data.view ? "Public dataset" : data.packageCount != null ? sourceDetail(data) : "";
 };
+// An input whose files are being prepared or downloaded: it says STARTED,
+// and the run is still pending (a run is marked running once its inputs are
+// on the node, so an input left STARTED, e.g. by a node that couldn't
+// report its end, isn't shown as still preparing).
+const inputStaging = (data) =>
+  mode.value === "browse" && data.status === "STARTED" && ["NOT_STARTED", "", undefined].includes(selectedWorkflowActivity.value?.status);
 const targetSubOf = (id, data) => {
   if (mode.value === "configure") {
     if (isUnsaved(id)) return "Not saved";
@@ -696,6 +736,8 @@ const runToNodesAndEdges = (run) => {
         version: d.tag || null,
         startedAt: d.startedAt,
         completedAt: d.completedAt,
+        progress: d.progress || null,
+        errorMessage: d.errorMessage || "",
         ...extra,
       },
       position: hasSavedPositions && d.position && typeof d.position.x === "number"
@@ -873,7 +915,9 @@ onNodeClick(({ node }) => {
   selectedNode.value = node;
 
   if (mode.value === "configure") {
-    if (node.type === "data-source") {
+    // In My Workspace an input takes only public files, and where there are
+    // none (no views-service) its panel says so instead of an empty picker.
+    if (node.type === "data-source" && (!isMyWorkspace.value || publicInputs)) {
       openFilePicker(node.id);
       return;
     }
@@ -915,6 +959,7 @@ const initiateWorkflowFromConfig = async (pendingConfig) => {
     configDefinition.value = definition;
 
     Object.keys(dataSourceFiles).forEach((k) => delete dataSourceFiles[k]);
+    Object.keys(publicPicks).forEach((k) => delete publicPicks[k]);
     Object.keys(sourceDatasets).forEach((k) => delete sourceDatasets[k]);
     Object.keys(leftOutInputs).forEach((k) => delete leftOutInputs[k]);
     Object.keys(nodeConfigs).forEach((k) => delete nodeConfigs[k]);
@@ -936,7 +981,13 @@ const initiateWorkflowFromConfig = async (pendingConfig) => {
         // An output's destination is the run being rerun's (its target's
         // type, none when it had no target), else the output's default.
         const ranAs = d.output && source ? (source.dag || []).find((n) => n.id === d.id) : null;
-        const targetType = d.output && source ? ranAs?.targetType || NO_DESTINATION : d.targetType;
+        let targetType = d.output && source ? ranAs?.targetType || NO_DESTINATION : d.targetType;
+        // In My Workspace an output starts where it can go there (a
+        // download, else not saved), not at a dataset default.
+        if (d.output && isMyWorkspace.value && (!targetType || targetWritesToDataset(targetType))) {
+          const choices = destinationChoices(d.output, { targetTypes: targetTypes.value, myWorkspace: true });
+          targetType = choices.find((t) => t !== NO_DESTINATION) || NO_DESTINATION;
+        }
         const fallback = getComputeTypesForTarget(targetType)?.[0] || null;
         const srcTargetParams = source?.dataTargets?.[d.id]?.params || {};
         const ttDef = getTargetTypeDefinition(targetType);
@@ -1024,6 +1075,7 @@ const cancelConfigure = () => {
   configDefinition.value = null;
   configLayers.value = [];
   Object.keys(dataSourceFiles).forEach((k) => delete dataSourceFiles[k]);
+  Object.keys(publicPicks).forEach((k) => delete publicPicks[k]);
   Object.keys(sourceDatasets).forEach((k) => delete sourceDatasets[k]);
   Object.keys(nodeConfigs).forEach((k) => delete nodeConfigs[k]);
   nodes.value = [];
@@ -1035,6 +1087,42 @@ const cancelConfigure = () => {
 /*
   Execute Workflow
 */
+// The run's name as given, for naming what the run makes before it exists.
+const trimmedRunName = () => (initiateForm.value.name || "").trim();
+
+// The views made for inputs' public files, by input: { key, view }. Execute
+// again with the same picks (after the run failed to start) uses them
+// again, rather than leaving a new set behind each time.
+const runViews = {};
+// views-service's longest view name.
+const VIEW_NAME_MAX = 255;
+
+// Makes a view of each input's public files (all at once) and returns them
+// as data sources, or null when one couldn't be made (it says why).
+const publicInputViews = async (dag) => {
+  const inputs = Object.entries(publicPicks).filter(([id, picks]) => picks?.length && !leftOutInputs[id]);
+  try {
+    const made = await Promise.all(
+      inputs.map(async ([id, picks]) => {
+        const key = picksKey(picks);
+        if (runViews[id]?.key !== key) {
+          const label = sourceLabel(id, dag, "input");
+          const name = `${trimmedRunName() || "Run"}: ${label}`.slice(0, VIEW_NAME_MAX);
+          runViews[id] = { key, view: await createRunView({ name, picks }) };
+        }
+        return [id, viewDataSource(runViews[id].view)];
+      })
+    );
+    return Object.fromEntries(made);
+  } catch (err) {
+    console.error("Failed to prepare public files:", err);
+    EventBus.$emit("toast", {
+      detail: { type: "error", msg: `Couldn't prepare the public files for this run: ${err?.message || "views-service failed"}` },
+    });
+    return null;
+  }
+};
+
 const executeWorkflow = async () => {
   const dag = configDefinition.value?.dag || [];
 
@@ -1065,7 +1153,7 @@ const executeWorkflow = async () => {
 
   // Validate data sources have files selected
   const missingSources = dataSourceNodes.value.filter(
-    (d) => !leftOutInputs[d.id] && (!dataSourceFiles[d.id] || dataSourceFiles[d.id].length === 0)
+    (d) => !leftOutInputs[d.id] && fileCountForNode(d.id) === 0
   );
   if (missingSources.length > 0) {
     EventBus.$emit("toast", {
@@ -1113,6 +1201,10 @@ const executeWorkflow = async () => {
       const own = sourceDatasetOf(nodeId);
       dataSources[nodeId] = own && own !== runDatasetId.value ? { packageIds: ids, datasetId: own } : { packageIds: ids };
     });
+    // Public files: one view per input, kept for the run.
+    const views = await publicInputViews(dag);
+    if (!views) return;
+    Object.assign(dataSources, views);
 
     const processorConfigs = [];
     Object.entries(nodeConfigs).forEach(([nodeId, cfg]) => {
@@ -1208,8 +1300,9 @@ const openFilePicker = (nodeId) => {
     }
   }
 
+  pickerSide.value = isMyWorkspace.value || publicPicks[nodeId]?.length ? "public" : "workspace";
   filePickerVisible.value = true;
-  if (sourceDatasetOf(nodeId)) fetchDatasetFiles();
+  if (!isMyWorkspace.value && sourceDatasetOf(nodeId)) fetchDatasetFiles();
 };
 
 // Another dataset for the source being picked: its files so far were from
@@ -1323,6 +1416,7 @@ const onFileSelect = (selectedFiles, parentId) => {
     allFiles.push(...storeFiles[pid]);
   }
   dataSourceFiles[nodeId] = allFiles;
+  if (allFiles.length) delete publicPicks[nodeId];
 };
 
 const closeFilePicker = () => {
@@ -1332,7 +1426,7 @@ const closeFilePicker = () => {
 };
 
 const fileCountForNode = (nodeId) => {
-  return (dataSourceFiles[nodeId] || []).length;
+  return (dataSourceFiles[nodeId] || []).length + (publicPicks[nodeId] || []).length;
 };
 
 // Chosen files a source's inputs don't take (by extension, against what its
@@ -1367,7 +1461,12 @@ watch(
 );
 const filesOf = (f) =>
   f.content?.packageType === "Collection" ? folderFiles[f.content.id]?.names || [] : [f.content?.name || ""];
-const chosenFileNames = (nodeId) => (dataSourceFiles[nodeId] || []).flatMap(filesOf);
+// A public folder isn't looked into (its files aren't listed here), so only
+// its picked files are checked.
+const chosenFileNames = (nodeId) => [
+  ...(dataSourceFiles[nodeId] || []).flatMap(filesOf),
+  ...(publicPicks[nodeId] || []).filter((p) => !p.isFolder).map((p) => p.name),
+];
 const configHints = (nodeId) => {
   const dag = configDefinition.value?.dag || [];
   return sourceHints(nodeId, dag, portsOfStep(dag, availableApplications.value));
@@ -1460,6 +1559,14 @@ const nodeUnmetCount = (nodeId, nodeType) => {
   }
   // processor
   return (cfg.schemaParams || []).filter((p) => p.required && !p.value?.trim()).length;
+};
+
+const removePublicPick = (nodeId, pick) =>
+  setPublicPicks(nodeId, (publicPicks[nodeId] || []).filter((p) => p !== pick));
+// The public datasets an input's files come from, by name.
+const publicSourcesLine = (nodeId) => {
+  const names = [...new Set((publicPicks[nodeId] || []).map((p) => `${p.datasetName} (v${p.version})`))];
+  return names.length > 2 ? `${names.slice(0, 2).join(", ")} and ${names.length - 2} more` : names.join(", ");
 };
 
 const removeFileFromNode = (nodeId, index) => {
@@ -1791,7 +1898,7 @@ const setupNodeChoices = computed(() =>
     .sort((a, b) => (a.reasons.length > 0) - (b.reasons.length > 0) || String(a.node.name).localeCompare(String(b.node.name)))
 );
 // My Workspace runs have no dataset (see the run dialog's "Needs a dataset").
-const needsDatasetHere = computed(() => isMyWorkspace.value && needsDataset(configDefinition.value));
+const needsDatasetHere = computed(() => isMyWorkspace.value && needsDataset(configDefinition.value, { publicInputs }));
 const setupNodeUnfit = computed(() => {
   const n = computeNodes.value.find((c) => c.uuid === initiateForm.value.computeNodeId);
   return n ? unfitReasons(n) : [];
@@ -1856,8 +1963,11 @@ const pickerDataset = computed(() => {
 // order), else where pickers start, for a workflow with no inputs.
 const runDatasetId = computed(() => {
   if (isMyWorkspace.value) return "";
-  const first = dataSourceNodes.value[0];
-  return (first && sourceDatasetOf(first.id)) || initiateForm.value.datasetId || "";
+  const inputs = dataSourceNodes.value.filter((d) => !publicPicks[d.id]?.length);
+  // Every input public: the run reads no workspace dataset, so it names
+  // none (an output that writes to one asks for its own).
+  if (dataSourceNodes.value.length && !inputs.length) return "";
+  return (inputs[0] && sourceDatasetOf(inputs[0].id)) || initiateForm.value.datasetId || "";
 });
 const workflowHasInputs = computed(() => dataSourceNodes.value.length > 0);
 // A dataset output with no dataset: none of its own and nothing to follow.
@@ -1920,6 +2030,7 @@ const toggleLeftOut = (id) => {
   }
   leftOutInputs[id] = true;
   delete dataSourceFiles[id];
+  delete publicPicks[id];
 };
 
 // A target's type for this run: an output's destination, else the node's.
@@ -2281,6 +2392,8 @@ onUnmounted(() => {
                   :sub="sourceSubOf(id, data)"
                   :unmet="nodeUnmetCount(id, 'data-source')"
                   :off="isLeftOut(id)"
+                  :running="inputStaging(data)"
+                  :failed="mode === 'browse' && data.status === 'FAILED'"
                 />
                 <Handle id="source" type="source" :position="Position.Bottom" />
               </div>
@@ -2730,7 +2843,11 @@ onUnmounted(() => {
             <template v-else-if="mode === 'configure' && selectedNode && selectedNode.type === 'data-source'">
               <h4 class="sidebar-section-title">Data Source</h4>
               <div class="info-card">
-                <div v-if="!isMyWorkspace" class="info-row">
+                <div v-if="publicPicks[selectedNode.id]?.length" class="info-row">
+                  <span class="info-label">From</span>
+                  <span class="info-value">{{ publicSourcesLine(selectedNode.id) }}</span>
+                </div>
+                <div v-else-if="!isMyWorkspace" class="info-row">
                   <span class="info-label">From</span>
                   <span class="info-value">{{ sourceDatasetOf(selectedNode.id) ? datasetName(sourceDatasetOf(selectedNode.id), datasetOptions) : "Chosen with its files" }}</span>
                 </div>
@@ -2739,6 +2856,11 @@ onUnmounted(() => {
                   <span class="info-value">{{ fileCountForNode(selectedNode.id) }} selected</span>
                 </div>
               </div>
+              <p v-if="isMyWorkspace && !publicInputs" class="configure-hint">
+                In My Workspace a run can't take a dataset's files, and public datasets' files aren't available here yet.
+                {{ canLeaveOut(selectedNode.id) ? "Leave this input out, or run the workflow from a workspace." : "Run this workflow from a workspace." }}
+              </p>
+              <template v-else>
               <h4 class="sidebar-section-title">Source Files</h4>
               <p v-if="mismatchLine(selectedNode.id)" class="files-mismatch">
                 ⚠ {{ mismatchLine(selectedNode.id) }}: {{ hintLine(sourceHints(selectedNode.id, configDefinition?.dag || [], portsOfStep(configDefinition?.dag || [], availableApplications))) }}.
@@ -2758,12 +2880,26 @@ onUnmounted(() => {
                   <button class="selected-file-remove" @click="removeFileFromNode(selectedNode.id, idx)" title="Remove file">&times;</button>
                 </div>
               </div>
+              <div v-else-if="publicPicks[selectedNode.id]?.length" class="selected-files-list">
+                <div
+                  v-for="pick in publicPicks[selectedNode.id]"
+                  :key="`${pick.datasetId}:${pick.version}:${pick.path}`"
+                  class="selected-file-item"
+                  :title="`${pick.datasetName}, version ${pick.version}: ${pick.path}`"
+                >
+                  <IconCollection v-if="pick.isFolder" :width="14" :height="14" class="selected-file-icon collection" />
+                  <IconFile v-else :width="14" :height="14" class="selected-file-icon" />
+                  <span class="selected-file-name">{{ pick.name }}</span>
+                  <button class="selected-file-remove" title="Remove" @click="removePublicPick(selectedNode.id, pick)">&times;</button>
+                </div>
+              </div>
               <div v-else class="selected-files-empty">
                 No files selected yet.
               </div>
               <div class="info-actions">
                 <button class="text-link-btn" @click="openFilePicker(selectedNode.id)">{{ fileCountForNode(selectedNode.id) > 0 ? 'Change files' : 'Select files' }}</button>
               </div>
+              </template>
             </template>
 
             <!-- CONFIGURE MODE: no node selected — show summary -->
@@ -2833,6 +2969,17 @@ onUnmounted(() => {
             <!-- BROWSE MODE: Selected Data Source Node -->
             <template v-else-if="mode === 'browse' && selectedNode && selectedNode.type === 'data-source'">
               <h4 class="sidebar-section-title">Data Source</h4>
+              <!-- Its files while the run's inputs are staged, or why it
+                   couldn't get them -->
+              <div v-if="inputStaging(selectedNode.data)" class="info-card">
+                <div class="info-row">
+                  <span class="info-label">Files</span>
+                  <span class="info-value">{{ selectedNode.data.progress ? inputProgressLine(selectedNode.data.progress) : "Preparing…" }}</span>
+                </div>
+              </div>
+              <p v-else-if="selectedNode.data?.status === 'FAILED'" class="files-mismatch" role="alert">
+                Couldn't get this input's files{{ selectedNode.data.errorMessage ? `: ${selectedNode.data.errorMessage}` : "." }}
+              </p>
               <template v-if="selectedNode.data?.view">
                 <div class="info-card">
                   <div class="info-row">
@@ -3125,6 +3272,34 @@ onUnmounted(() => {
     >
       <div class="file-picker-content">
         <p v-if="sourcePicker.hint && !pickerTypes" class="file-picker-hint">{{ sourcePicker.hint }}</p>
+        <!-- Where the files come from: a workspace dataset, or published
+             datasets (one or several) -->
+        <el-radio-group v-if="publicInputs && !isMyWorkspace" v-model="pickerSide" size="small" class="file-picker-side">
+          <el-radio-button value="workspace">Workspace dataset</el-radio-button>
+          <el-radio-button value="public">Public datasets</el-radio-button>
+        </el-radio-group>
+        <p v-if="pickerReplaces" class="file-picker-hint">{{ pickerReplaces }}</p>
+        <template v-if="pickerSide === 'public'">
+          <div class="file-picker-header">
+            <span class="selected-count">
+              <strong>{{ fileCountForNode(filePickerNodeId) }}</strong>
+              {{ fileCountForNode(filePickerNodeId) !== 1 ? 'items' : 'item' }} selected
+            </span>
+            <span v-if="pickerTypes" class="file-picker-types">
+              <span class="file-picker-types-label">Show</span>
+              <el-radio-group v-model="pickerAllowOtherTypes" size="small">
+                <el-radio-button :value="false" :title="pickerDescription || sourcePicker.hint">{{ pickerTypes }} only</el-radio-button>
+                <el-radio-button :value="true" title="Choose any file; the app may not read it">Any file</el-radio-button>
+              </el-radio-group>
+            </span>
+          </div>
+          <PublicFilesPicker
+            :model-value="publicPicks[filePickerNodeId] || []"
+            :why-not="(name) => pickerWhyNot({ content: { name } })"
+            @update:model-value="(picks) => setPublicPicks(filePickerNodeId, picks)"
+          />
+        </template>
+        <template v-else>
         <div v-if="!isMyWorkspace" class="file-picker-dataset">
           <template v-if="!isMyWorkspace">
           <label for="picker-dataset">Dataset</label>
@@ -3199,6 +3374,7 @@ onUnmounted(() => {
             />
           </div>
         </div>
+        </template>
       </div>
       <template #footer>
         <bf-button class="secondary" @click="closeFilePicker">Done</bf-button>
@@ -5075,6 +5251,9 @@ onUnmounted(() => {
   display: flex;
   justify-content: flex-end;
   gap: 8px;
+}
+.file-picker-side {
+  margin-bottom: 12px;
 }
 .file-picker-hint {
   margin: 0 0 8px;

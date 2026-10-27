@@ -25,6 +25,7 @@ import { STANDARD_CPU_OPTIONS, getStandardMemoryOptions, getTargetTypeLabel } fr
 import { sourceLabel } from "../WorkflowGraph/sourceInputs";
 import * as siteConfig from "@/site-config/site.json";
 import { viewsServiceUrl, viewForDataset, viewDataSource } from "@/utils/viewsService";
+import { searchPublicDatasets as findPublicDatasets } from "@/utils/publicDatasets";
 
 const props = defineProps({
   modelValue: { type: Boolean, default: false },
@@ -402,41 +403,10 @@ const publicVersions = ref([]);
 const publicVersion = ref(null);
 let publicSearchTimer = null;
 
-// The first two contributors, then "et al.": enough to tell datasets apart.
-const authorsLine = (contributors = []) => {
-  const names = (contributors || [])
-    .map((c) => [c.firstName, c.lastName].filter(Boolean).join(" "))
-    .filter(Boolean);
-  if (names.length <= 2) return names.join(", ");
-  return `${names.slice(0, 2).join(", ")}, et al.`;
-};
-
-const toPublicDataset = (d) => ({
-  id: d.id,
-  name: d.name,
-  version: d.version,
-  doi: d.doi,
-  fileCount: d.fileCount || 0,
-  size: d.size || 0,
-  description: d.description || "",
-  banner: d.banner || "",
-  organizationName: d.organizationName || "",
-  authors: authorsLine(d.contributors),
-  embargo: !!d.embargo,
-});
-
 async function searchPublicDatasets(query = "") {
   publicLoading.value = true;
   try {
-    const base = siteConfig.discoverUrl;
-    const url = query
-      ? `${base}/search/datasets?limit=25&offset=0&query=${encodeURIComponent(query)}`
-      : `${base}/datasets?limit=25&offset=0&datasetType=research&embargo=false`;
-    const response = await useSendXhr(url, { method: "GET" });
-    // Views take only openly published versions.
-    publicResults.value = (response?.datasets || [])
-      .map(toPublicDataset)
-      .filter((d) => !d.embargo);
+    publicResults.value = await findPublicDatasets(query);
   } catch (err) {
     console.error("Failed to search public datasets:", err);
     publicResults.value = [];

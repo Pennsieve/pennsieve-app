@@ -83,3 +83,38 @@ describe("getView", () => {
     expect(await getView("v1", { config, getToken, fetchFn })).toEqual({ id: "v1", name: "Study" });
   });
 });
+
+describe("run views", () => {
+  const picks = [
+    { datasetId: 7, version: 2, path: "files/a.csv" },
+    { datasetId: 9, version: 1, path: "files/sub" },
+    { datasetId: 7, version: 2, path: "files/b.csv" },
+    { datasetId: 7, version: 2, path: "files/a.csv" },
+  ];
+
+  it("groups picks by dataset version, once each", async () => {
+    const { runViewSources } = await import("./viewsService");
+    expect(runViewSources(picks)).toEqual([
+      { datasetId: 7, version: 2, paths: ["files/a.csv", "files/b.csv"] },
+      { datasetId: 9, version: 1, paths: ["files/sub"] },
+    ]);
+    expect(runViewSources([])).toEqual([]);
+  });
+
+  it("creates a view kept only for the run", async () => {
+    const { createRunView } = await import("./viewsService");
+    const fetchFn = respond([201, { id: "v1", version: 1 }]);
+    expect(await createRunView({ name: "Run inputs", picks }, { config, getToken, fetchFn })).toEqual({ id: "v1", version: 1 });
+    const [url, init] = fetchFn.mock.calls[0];
+    expect(url).toBe("https://api2.pennsieve.net/views/me");
+    expect(init.method).toBe("POST");
+    expect(JSON.parse(init.body)).toEqual({
+      name: "Run inputs",
+      lifecycle: "run",
+      sources: [
+        { datasetId: 7, version: 2, paths: ["files/a.csv", "files/b.csv"] },
+        { datasetId: 9, version: 1, paths: ["files/sub"] },
+      ],
+    });
+  });
+});

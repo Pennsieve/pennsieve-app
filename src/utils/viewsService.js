@@ -97,3 +97,27 @@ export async function listEntries(viewId, version, options = {}) {
     if (!page.entries?.length || entries.length >= page.totalCount) return entries
   }
 }
+
+// A run's input from public files: the files and folders picked from one or
+// more published dataset versions, as one view made for the run
+// (lifecycle "run": kept apart from the user's views; the run keeps its
+// crate with its provenance). Each pick is
+// { datasetId, version, path }; picks of one version become one source.
+export function runViewSources(picks) {
+  const byVersion = new Map()
+  for (const p of picks || []) {
+    const key = `${p.datasetId}:${p.version}`
+    if (!byVersion.has(key)) byVersion.set(key, { datasetId: p.datasetId, version: p.version, paths: [] })
+    const paths = byVersion.get(key).paths
+    if (!paths.includes(p.path)) paths.push(p.path)
+  }
+  return [...byVersion.values()]
+}
+
+export async function createRunView({ name, picks }, options = {}) {
+  return viewsRequest('/me', {
+    ...options,
+    method: 'POST',
+    body: { name, sources: runViewSources(picks), lifecycle: 'run' },
+  })
+}
