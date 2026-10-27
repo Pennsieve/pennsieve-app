@@ -104,7 +104,7 @@ export const searchDatasets = async (apiUrl, query, { getToken, sendXhr, toQuery
 // How many files a dataset record says it has (its package counts).
 const fileCount = (ds) => Object.values(ds?.packageTypeCounts || {}).reduce((n, c) => n + (Number(c) || 0), 0);
 
-const formatBytes = (bytes) => {
+export const formatBytes = (bytes) => {
   if (!bytes || bytes <= 0) return "";
   const units = ["B", "KB", "MB", "GB", "TB"];
   let i = 0;

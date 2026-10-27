@@ -62,4 +62,13 @@ describe("needsDataset", () => {
     expect(needsDataset({ outputs: [out({ accepts: ["Pennsieve Dataset"], required: true })], dag: [] })).toBe(true);
     expect(needsDataset({ outputs: [out({ accepts: ["Pennsieve Dataset"] })], dag: [] })).toBe(false);
   });
+
+  it("where inputs can take public files, only for an output that must go to a dataset", () => {
+    const out = (o) => ({ id: "o", name: "o", from: { step: "s" }, ...o });
+    const publicInputs = { publicInputs: true };
+    expect(needsDataset({ inputs: [{ id: "i", name: "i" }], dag: [] }, publicInputs)).toBe(false);
+    expect(needsDataset({ inputs: [{ id: "i", name: "i" }], outputs: [out({ accepts: ["Pennsieve Dataset"], required: true })], dag: [] }, publicInputs)).toBe(true);
+    expect(needsDataset({ dag: [{ type: "data-source" }] }, publicInputs)).toBe(false);
+    expect(needsDataset({ dag: [{ type: "data-source" }, { type: "data-target", targetType: "pennsieve-dataset" }] }, publicInputs)).toBe(true);
+  });
 });
