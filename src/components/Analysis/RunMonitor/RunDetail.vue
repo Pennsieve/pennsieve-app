@@ -126,6 +126,8 @@ const dataSourceFiles = reactive({});
 // datasetId is the first input's (runDatasetId), for nodes and webhooks that
 // still read it.
 const sourceDatasets = reactive({});
+// Optional inputs this run leaves out (no files, no data source).
+const leftOutInputs = reactive({});
 const sourceDatasetOf = (nodeId) => sourceDatasets[nodeId] || initiateForm.value.datasetId;
 const nodeConfigs = reactive({});
 const isExecuting = ref(false);
@@ -890,6 +892,7 @@ const initiateWorkflowFromConfig = async (pendingConfig) => {
 
     Object.keys(dataSourceFiles).forEach((k) => delete dataSourceFiles[k]);
     Object.keys(sourceDatasets).forEach((k) => delete sourceDatasets[k]);
+    Object.keys(leftOutInputs).forEach((k) => delete leftOutInputs[k]);
     Object.keys(nodeConfigs).forEach((k) => delete nodeConfigs[k]);
 
     const dag = definition.dag || definition.processors || [];
@@ -1038,7 +1041,7 @@ const executeWorkflow = async () => {
 
   // Validate data sources have files selected
   const missingSources = dataSourceNodes.value.filter(
-    (d) => !dataSourceFiles[d.id] || dataSourceFiles[d.id].length === 0
+    (d) => !leftOutInputs[d.id] && (!dataSourceFiles[d.id] || dataSourceFiles[d.id].length === 0)
   );
   if (missingSources.length > 0) {
     EventBus.$emit("toast", {
@@ -1284,6 +1287,7 @@ const handleNavigateBreadcrumb = async (id) => {
 const onFileSelect = (selectedFiles, parentId) => {
   const nodeId = filePickerNodeId.value;
   if (!nodeId) return;
+  delete leftOutInputs[nodeId];
 
   // Update the store so navigating folders preserves selections
   store.commit("analysisModule/SET_SELECTED_FILES", { selectedFiles, parentId: parentId || "root" });
@@ -1423,10 +1427,10 @@ const mismatchedFile = (nodeId, file) => {
 const nodeUnmetCount = (nodeId, nodeType) => {
   if (mode.value !== "configure") return 0;
   if (nodeType === "data-source") {
-    return fileCountForNode(nodeId) === 0 ? 1 : 0;
+    return fileCountForNode(nodeId) === 0 && !leftOutInputs[nodeId] ? 1 : 0;
   }
   const cfg = nodeConfigs[nodeId];
-  if (!cfg) return 0;
+  if (!cfg || cfg.targetType === NO_DESTINATION) return 0;
   if (nodeType === "data-target") {
     return (cfg.params || []).filter((p) => p.required && !p.value?.trim()).length;
   }
@@ -1867,6 +1871,31 @@ function outputParams(d, params) {
   return d.output ? params.filter((p) => !isPathPrefixParam(p.name)) : params;
 }
 
+// Turning an output off for this run (it isn't saved) or an optional input
+// (left out), from its card: it stays on the graph, faded and dashed, and
+// the same button turns it back on.
+const dagNodeOf = (id) => (configDefinition.value?.dag || []).find((d) => d.id === id);
+const isUnsaved = (id) => mode.value === "configure" && !!dagNodeOf(id)?.output && nodeConfigs[id]?.targetType === NO_DESTINATION;
+const canSkipOutput = (id) => mode.value === "configure" && !!dagNodeOf(id)?.output && !dagNodeOf(id).output.required;
+const toggleSaved = (id) => {
+  const d = dagNodeOf(id);
+  if (!d?.output) return;
+  if (!isUnsaved(id)) return onDestinationChange(id, NO_DESTINATION);
+  const choices = destinationChoices(d.output, { targetTypes: targetTypes.value, myWorkspace: isMyWorkspace.value });
+  const back = choices.includes(d.output.default?.targetType) ? d.output.default.targetType : choices.find((t) => t !== NO_DESTINATION);
+  if (back) onDestinationChange(id, back);
+};
+const isLeftOut = (id) => mode.value === "configure" && !!leftOutInputs[id];
+const canLeaveOut = (id) => mode.value === "configure" && !!dagNodeOf(id)?.input?.optional;
+const toggleLeftOut = (id) => {
+  if (leftOutInputs[id]) {
+    delete leftOutInputs[id];
+    return;
+  }
+  leftOutInputs[id] = true;
+  delete dataSourceFiles[id];
+};
+
 // A target's type for this run: an output's destination, else the node's.
 const runTargetType = (d) => (d.output ? nodeConfigs[d.id]?.targetType : d.targetType) || "";
 
@@ -2219,13 +2248,15 @@ onUnmounted(() => {
 
             <!-- Data-source node template -->
             <template #node-data-source="{ data, id }">
-              <div :style="{ '--node-border-color': '#6366f1' }">
+              <div :style="{ '--node-border-color': '#6366f1' }" :class="{ 'is-off': isLeftOut(id) }">
                 <CompactFlowNode
                   v-if="!detailed"
                   kind="source"
                   :label="titleOf(id, data)"
                   :unmet="nodeUnmetCount(id, 'data-source')"
-                  :detail="mode === 'configure'
+                  :detail="isLeftOut(id)
+                    ? 'Left out'
+                    : mode === 'configure'
                     ? `${fileCountForNode(id)} file${fileCountForNode(id) !== 1 ? 's' : ''} selected`
                     : data.view
                     ? 'Public dataset'
@@ -2250,19 +2281,22 @@ onUnmounted(() => {
                     </span>
                     <template v-if="mode === 'configure'">
                       <span class="node-tag-info">
-                        {{ fileCountForNode(id) }} file{{ fileCountForNode(id) !== 1 ? 's' : '' }} selected
+                        {{ isLeftOut(id) ? "Left out" : `${fileCountForNode(id)} file${fileCountForNode(id) !== 1 ? 's' : ''} selected` }}
                       </span>
                     </template>
                   </div>
-                  <div v-if="mode === 'configure'" class="node-config-hint">Click to select files</div>
+                  <div v-if="mode === 'configure'" class="node-config-hint">{{ isLeftOut(id) ? "This run doesn't use it" : "Click to select files" }}</div>
                 </div>
+                <button v-if="canLeaveOut(id)" type="button" class="node-off-toggle nodrag" @click.stop="toggleLeftOut(id)">
+                  {{ isLeftOut(id) ? "Use it" : "Leave out" }}
+                </button>
                 <Handle id="source" type="source" :position="Position.Bottom" />
               </div>
             </template>
 
             <!-- Data-target node template -->
             <template #node-data-target="{ data, id }">
-              <div :style="{ '--node-border-color': mode === 'browse' ? (data.status && !['NOT_STARTED', 'SUCCEEDED'].includes(data.status) ? graphStatusColor(data.status) : '#64748b') : '#64748b', '--handle-target-color': incomingEdgeColor(id) }">
+              <div :style="{ '--node-border-color': mode === 'browse' ? (data.status && !['NOT_STARTED', 'SUCCEEDED'].includes(data.status) ? graphStatusColor(data.status) : '#64748b') : '#64748b', '--handle-target-color': incomingEdgeColor(id) }" :class="{ 'is-off': isUnsaved(id) }">
                 <Handle id="target" type="target" :position="Position.Top" />
                 <CompactFlowNode
                   v-if="!detailed"
@@ -2271,7 +2305,7 @@ onUnmounted(() => {
                   :status="mode === 'browse' ? data.status : ''"
                   :runtime="nodeConfigs[id]?.computeType || data.computeType"
                   :unmet="nodeUnmetCount(id, 'data-target')"
-                  :detail="importLineOf(id)?.text || ''"
+                  :detail="isUnsaved(id) ? 'Not saved' : importLineOf(id)?.text || ''"
                 />
                 <div v-else class="custom-node data-target-node" :class="mode === 'browse' ? statusClass(data.status) : ''">
                   <span v-if="nodeUnmetCount(id, 'data-target') > 0" class="node-unmet-badge">{{ nodeUnmetCount(id, 'data-target') }}</span>
@@ -2307,7 +2341,8 @@ onUnmounted(() => {
                       </div>
                       <span v-if="targetParamsShown(id, data).length > 3" class="param-more">+{{ targetParamsShown(id, data).length - 3 }} more</span>
                     </div>
-                    <template v-if="mode === 'configure'">
+                    <div v-if="isUnsaved(id)" class="node-config-hint">Not saved: the run still makes it</div>
+                    <template v-else-if="mode === 'configure'">
                       <div v-if="nodeConfigs[id]?.params?.length > 0" class="param-preview">
                         <div v-for="(p, i) in nodeConfigs[id].params.slice(0, 3)" :key="i" class="param-row">
                           <span class="param-key">{{ p.name || p.key }}</span>
@@ -2319,6 +2354,9 @@ onUnmounted(() => {
                     </template>
                   </div>
                 </div>
+                <button v-if="canSkipOutput(id)" type="button" class="node-off-toggle nodrag" @click.stop="toggleSaved(id)">
+                  {{ isUnsaved(id) ? "Save it" : "Don't save" }}
+                </button>
               </div>
             </template>
           </VueFlow>
@@ -4466,6 +4504,33 @@ onUnmounted(() => {
   margin-top: 2px;
   font-size: 11px;
   color: theme.$gray_4;
+}
+/* An output this run doesn't save, or an optional input it leaves out: on
+   the graph still, faded and dashed. */
+.is-off {
+  :deep(.custom-node),
+  :deep(.cfn) {
+    opacity: 0.55;
+    border-style: dashed !important;
+  }
+}
+.node-off-toggle {
+  position: absolute;
+  right: 8px;
+  bottom: -22px;
+  padding: 1px 8px;
+  border: 1px solid theme.$gray_3;
+  border-radius: 3px;
+  background: theme.$white;
+  font: inherit;
+  font-size: 11px;
+  color: theme.$gray_5;
+  cursor: pointer;
+
+  &:hover {
+    border-color: theme.$purple_1;
+    color: theme.$purple_2;
+  }
 }
 .file-picker-types {
   margin-bottom: 10px;
