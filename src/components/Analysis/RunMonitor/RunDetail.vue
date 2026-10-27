@@ -3215,6 +3215,15 @@ onUnmounted(() => {
             <strong>{{ fileCountForNode(filePickerNodeId) }}</strong>
             file{{ fileCountForNode(filePickerNodeId) !== 1 ? 's' : '' }} selected
           </span>
+          <!-- Which files can be chosen: those the input takes, or any (the
+               check goes by file extension, so it can be wrong) -->
+          <span v-if="pickerTypes" class="file-picker-types">
+            <span class="file-picker-types-label">Show</span>
+            <el-radio-group v-model="pickerAllowOtherTypes" size="small">
+              <el-radio-button :value="false" :title="pickerDescription || sourcePicker.hint">{{ pickerTypes }} only</el-radio-button>
+              <el-radio-button :value="true" title="Choose any file; the app may not read it">Any file</el-radio-button>
+            </el-radio-group>
+          </span>
         </div>
 
         <div class="file-browser">
@@ -3247,18 +3256,7 @@ onUnmounted(() => {
         </div>
       </div>
       <template #footer>
-        <div class="file-picker-footer">
-            <!-- Which files can be chosen: those the input takes, or any (the
-                 check goes by file extension, so it can be wrong) -->
-            <span v-if="pickerTypes" class="file-picker-types">
-              <span class="file-picker-types-label">Files</span>
-              <el-radio-group v-model="pickerAllowOtherTypes" size="small">
-                <el-radio-button :value="false" :title="pickerDescription || sourcePicker.hint">{{ pickerTypes }} only</el-radio-button>
-                <el-radio-button :value="true" title="Choose any file; the app may not read it">Any file</el-radio-button>
-              </el-radio-group>
-            </span>
-          <bf-button class="secondary" @click="closeFilePicker">Done</bf-button>
-        </div>
+        <bf-button class="secondary" @click="closeFilePicker">Done</bf-button>
       </template>
     </el-dialog>
 
@@ -4541,17 +4539,11 @@ onUnmounted(() => {
     color: theme.$purple_2;
   }
 }
-.file-picker-footer {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 12px;
-}
 .file-picker-types {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  margin-right: auto;
+  margin-left: auto;
 }
 .file-picker-types-label {
   font-weight: 500;
@@ -5036,6 +5028,8 @@ onUnmounted(() => {
 }
 
 .file-picker-header {
+  display: flex;
+  align-items: center;
   margin-bottom: 12px;
 
   .selected-count {
