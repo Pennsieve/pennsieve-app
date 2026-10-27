@@ -117,6 +117,9 @@ const initiateForm = ref({ workflowId: "", computeNodeId: "", datasetId: "", nam
 const runNameError = ref("");
 const configDefinition = ref(null);
 const dataSourceFiles = reactive({});
+// A data source's own dataset, when its files aren't from the run's ("").
+const sourceDatasets = reactive({});
+const sourceDatasetOf = (nodeId) => sourceDatasets[nodeId] || initiateForm.value.datasetId;
 const nodeConfigs = reactive({});
 const isExecuting = ref(false);
 const errorBanner = ref("");
@@ -136,7 +139,7 @@ const sourcePicker = computed(() => {
   const dag = configDefinition.value?.dag || [];
   const name = id ? sourceLabel(id, dag, "") : "";
   return {
-    title: `Select files${name ? ` for ${name}` : ""} from ${datasetName(initiateForm.value.datasetId, datasetOptions.value)}`,
+    title: name ? `Select files for ${name}` : "Select Files",
     hint: id ? hintLine(sourceHints(id, dag, portsOfStep(dag, availableApplications.value))) : "",
   };
 });
@@ -873,6 +876,7 @@ const initiateWorkflowFromConfig = async (pendingConfig) => {
     configDefinition.value = definition;
 
     Object.keys(dataSourceFiles).forEach((k) => delete dataSourceFiles[k]);
+    Object.keys(sourceDatasets).forEach((k) => delete sourceDatasets[k]);
     Object.keys(nodeConfigs).forEach((k) => delete nodeConfigs[k]);
 
     const dag = definition.dag || definition.processors || [];
@@ -883,6 +887,11 @@ const initiateWorkflowFromConfig = async (pendingConfig) => {
       const srcCfg = sourceConfigs.find((c) => c.nodeId === d.id);
       const srcParams = sourceParams[d.id] || {};
 
+      if (d.type === "data-source") {
+        // A rerun reads from the same datasets; its files are chosen again.
+        const own = source?.dataSources?.[d.id]?.datasetId;
+        if (own && own !== datasetId) sourceDatasets[d.id] = own;
+      }
       if (d.type === "data-target") {
         const fallback = getComputeTypesForTarget(d.targetType)?.[0] || null;
         const srcTargetParams = source?.dataTargets?.[d.id]?.params || {};
@@ -971,6 +980,7 @@ const cancelConfigure = () => {
   configDefinition.value = null;
   configLayers.value = [];
   Object.keys(dataSourceFiles).forEach((k) => delete dataSourceFiles[k]);
+  Object.keys(sourceDatasets).forEach((k) => delete sourceDatasets[k]);
   Object.keys(nodeConfigs).forEach((k) => delete nodeConfigs[k]);
   nodes.value = [];
   edges.value = [];
@@ -1056,7 +1066,8 @@ const executeWorkflow = async () => {
     const dataSources = {};
     Object.entries(dataSourceFiles).forEach(([nodeId, files]) => {
       const ids = files.map((f) => f.content?.id).filter(Boolean);
-      dataSources[nodeId] = { packageIds: ids };
+      const own = sourceDatasets[nodeId];
+      dataSources[nodeId] = own && own !== initiateForm.value.datasetId ? { packageIds: ids, datasetId: own } : { packageIds: ids };
     });
 
     const processorConfigs = [];
@@ -1131,12 +1142,6 @@ const executeWorkflow = async () => {
   File Picker
 */
 const openFilePicker = (nodeId) => {
-  // Inputs are chosen from the run's dataset.
-  if (!initiateForm.value.datasetId) {
-    selectedNode.value = null;
-    EventBus.$emit("toast", { detail: { type: "error", msg: "Choose the dataset the run runs in first; its inputs are chosen from it." } });
-    return;
-  }
   filePickerNodeId.value = nodeId;
   filePickerFiles.value = [];
   filePickerAncestorList.value = [];
@@ -1159,13 +1164,28 @@ const openFilePicker = (nodeId) => {
   }
 
   filePickerVisible.value = true;
-  fetchDatasetFiles();
+  if (sourceDatasetOf(nodeId)) fetchDatasetFiles();
+};
+
+// Another dataset for the source being picked: its files so far were from
+// the one before, so they go.
+const onPickerDatasetChange = (datasetId) => {
+  const nodeId = filePickerNodeId.value;
+  if (!nodeId) return;
+  sourceDatasets[nodeId] = datasetId === initiateForm.value.datasetId ? "" : datasetId;
+  delete dataSourceFiles[nodeId];
+  store.commit("analysisModule/CLEAR_SELECTED_FILES");
+  filePickerFiles.value = [];
+  filePickerAncestorList.value = [];
+  filePickerCurrentFile.value = { content: { name: "" } };
+  ensureDatasetOption(datasetId);
+  if (datasetId) fetchDatasetFiles();
 };
 
 const fetchDatasetFiles = async () => {
   try {
     const token = await useGetToken();
-    const datasetId = initiateForm.value.datasetId;
+    const datasetId = sourceDatasetOf(filePickerNodeId.value);
     const url = `${config.value.apiUrl}/datasets/${datasetId}?api_key=${token}&includeAncestors=true&limit=500&offset=0`;
     const response = await useSendXhr(url);
     filePickerFiles.value = [...(response.children || [])];
@@ -1203,7 +1223,7 @@ const handleNavigateBreadcrumb = async (id) => {
     const token = await useGetToken();
     let url;
     if (!id || id === "root") {
-      const datasetId = initiateForm.value.datasetId;
+      const datasetId = sourceDatasetOf(filePickerNodeId.value);
       url = `${config.value.apiUrl}/datasets/${datasetId}?api_key=${token}&includeAncestors=true&limit=500&offset=0`;
       filePickerAncestorList.value = [];
       filePickerCurrentFile.value = { content: { name: "" } };
@@ -1694,17 +1714,18 @@ function applySetupDefaults(definition) {
     initiateForm.value.datasetId = remembered.datasetId;
   }
   ensureDatasetOption(initiateForm.value.datasetId);
+  Object.values(sourceDatasets).forEach(ensureDatasetOption);
 }
 
 const onSetupDatasetSearch = (query) => fetchDatasetOptions(query || "");
 
-// Inputs are chosen from the run's dataset, so files picked from another one
-// go when it changes.
+// Inputs without a dataset of their own come from the run's, so files picked
+// from the one before go when it changes.
 watch(
   () => initiateForm.value.datasetId,
   (now, before) => {
     if (!before || now === before || mode.value !== "configure") return;
-    const picked = Object.keys(dataSourceFiles).filter((k) => dataSourceFiles[k]?.length);
+    const picked = Object.keys(dataSourceFiles).filter((k) => dataSourceFiles[k]?.length && !sourceDatasets[k]);
     if (!picked.length) return;
     picked.forEach((k) => delete dataSourceFiles[k]);
     EventBus.$emit("toast", { detail: { type: "info", msg: "Inputs cleared: their files were from the previous dataset." } });
@@ -1722,7 +1743,12 @@ const fetchDatasetOptions = async (query = "") => {
     });
     const url = `${config.value.apiUrl}/datasets/paginated?${params}`;
     const response = await useSendXhr(url);
-    datasetOptions.value = response?.datasets || response || [];
+    const found = response?.datasets || response || [];
+    // The chosen datasets (the run's, the sources' own) stay, so their
+    // selectors keep naming them while another search is shown.
+    const chosen = new Set([initiateForm.value.datasetId, ...Object.values(sourceDatasets)].filter(Boolean));
+    const kept = datasetOptions.value.filter((d) => chosen.has(d.content?.id) && !found.some((f) => f.content?.id === d.content?.id));
+    datasetOptions.value = [...kept, ...found];
   } catch (err) {
     datasetOptions.value = [];
   } finally {
@@ -2549,7 +2575,7 @@ onUnmounted(() => {
               <div class="info-card">
                 <div v-if="!isMyWorkspace" class="info-row">
                   <span class="info-label">From</span>
-                  <span class="info-value">{{ initiateForm.datasetId ? datasetName(initiateForm.datasetId, datasetOptions) : "The run's dataset (not chosen yet)" }}</span>
+                  <span class="info-value">{{ sourceDatasetOf(selectedNode.id) ? datasetName(sourceDatasetOf(selectedNode.id), datasetOptions) : "Not chosen yet" }}</span>
                 </div>
                 <div class="info-row">
                   <span class="info-label">Files</span>
@@ -2637,7 +2663,7 @@ onUnmounted(() => {
                 </div>
                 <div v-if="!isMyWorkspace" class="info-row info-row-stacked">
                   <label class="info-label" for="setup-dataset">Runs in dataset</label>
-                  <span class="info-label-hint">Where the run belongs and its results go, unless an output names its own. Inputs are chosen from it.</span>
+                  <span class="info-label-hint">Where the run belongs and its results go, unless an output names its own. Inputs come from it unless you pick another dataset for one.</span>
                   <el-select
                     id="setup-dataset"
                     v-model="initiateForm.datasetId"
@@ -2957,6 +2983,23 @@ onUnmounted(() => {
     >
       <div class="file-picker-content">
         <p v-if="sourcePicker.hint" class="file-picker-hint">{{ sourcePicker.hint }}</p>
+        <div v-if="!isMyWorkspace" class="file-picker-dataset">
+          <label for="picker-dataset">Dataset</label>
+          <el-select
+            id="picker-dataset"
+            :model-value="sourceDatasetOf(filePickerNodeId)"
+            filterable
+            remote
+            :remote-method="onSetupDatasetSearch"
+            :loading="datasetSearchLoading"
+            placeholder="Search datasets"
+            class="file-picker-dataset-select"
+            @update:model-value="onPickerDatasetChange"
+          >
+            <el-option v-for="d in datasetOptions" :key="d.content?.id" :label="d.content?.name" :value="d.content?.id" />
+          </el-select>
+          <span v-if="sourceDatasets[filePickerNodeId]" class="file-picker-dataset-note">Not the run's dataset</span>
+        </div>
         <div class="file-picker-header">
           <span class="selected-count">
             <strong>{{ fileCountForNode(filePickerNodeId) }}</strong>
@@ -4163,6 +4206,26 @@ onUnmounted(() => {
 
 .setup-select {
   width: 100%;
+}
+
+.file-picker-dataset {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  font-size: 13px;
+
+  label {
+    font-weight: 500;
+    color: theme.$gray_6;
+  }
+}
+.file-picker-dataset-select {
+  width: 320px;
+}
+.file-picker-dataset-note {
+  font-size: 12px;
+  color: theme.$gray_4;
 }
 
 .configure-hint {
