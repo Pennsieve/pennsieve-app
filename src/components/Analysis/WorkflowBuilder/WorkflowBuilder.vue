@@ -52,6 +52,7 @@ import StepPicker from "./StepPicker.vue";
 import LinkEdge from "./LinkEdge.vue";
 import { sourceLabel, sourceHints, hintLine } from "../WorkflowGraph/sourceInputs";
 import { canvasDefinition, toInterfaceDefinition } from "./builderInterface";
+import IoPill from "../WorkflowGraph/IoPill.vue";
 import { isFeatureEnabled } from "@/utils/features";
 import { useGraphHistory, snapshot } from "./graphHistory";
 import { canConnect, neighbourInDirection } from "./graphEditing";
@@ -3056,22 +3057,15 @@ const openNodeSettings = (id) => {
               <!-- Data Source Node: output only (feeds into processors) -->
               <!-- Input: a circle where data enters the workflow -->
               <template #node-data-source="{ data, id }">
-                <div class="io-node data-source-node" :class="connectClass(id)" :title="sourceFeeds(id) || undefined">
-                  <span class="io-node__circle" aria-hidden="true">
-                    <svg viewBox="0 0 24 24" width="14" height="14"><path d="M12 4v12m0 0l-5-5m5 5l5-5M5 20h14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /></svg>
-                  </span>
-                  <span class="io-node__text">
-                    <span class="io-node__name" :title="nodeName({ id, type: 'data-source', data })">{{ nodeName({ id, type: 'data-source', data }) }}</span>
-                  </span>
-                  <button
-                    v-if="!isReadOnly"
-                    class="remove-btn io-node__remove"
-                    title="Remove"
-                    @click.stop="removeNode(id)"
-                  >
-                    &times;
-                  </button>
-                </div>
+                <IoPill
+                  kind="input"
+                  class="data-source-node"
+                  :class="connectClass(id)"
+                  :name="nodeName({ id, type: 'data-source', data })"
+                  :title="sourceFeeds(id) || undefined"
+                >
+                  <button v-if="!isReadOnly" class="remove-btn io-node__remove" title="Remove" @click.stop="removeNode(id)">&times;</button>
+                </IoPill>
                 <Handle id="source" type="source" :position="Position.Bottom" />
                 <button
                   v-if="!isReadOnly"
@@ -3086,23 +3080,15 @@ const openNodeSettings = (id) => {
               <!-- Output: a circle where results leave the workflow -->
               <template #node-data-target="{ data, id }">
                 <Handle id="target" type="target" :position="Position.Top" />
-                <div class="io-node data-target-node" :class="connectClass(id)">
-                  <span class="io-node__circle" aria-hidden="true">
-                    <svg viewBox="0 0 24 24" width="14" height="14"><path d="M12 20V8m0 0l-5 5m5-5l5 5M5 4h14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /></svg>
-                  </span>
-                  <span class="io-node__text">
-                    <span class="io-node__name">{{ data.name || data.targetType ? nodeName({ id, type: 'data-target', data }) : "Output: choose a destination" }}</span>
-                    <span v-if="interfaceOn && data.targetType" class="io-node__sub">by default {{ getTargetTypeLabel(data.targetType) }}</span>
-                  </span>
-                  <button
-                    v-if="!isReadOnly"
-                    class="remove-btn io-node__remove"
-                    title="Remove"
-                    @click.stop="removeNode(id)"
-                  >
-                    &times;
-                  </button>
-                </div>
+                <IoPill
+                  kind="output"
+                  class="data-target-node"
+                  :class="connectClass(id)"
+                  :name="data.name || data.targetType ? nodeName({ id, type: 'data-target', data }) : 'Output: choose a destination'"
+                  :sub="interfaceOn && data.targetType ? `by default ${getTargetTypeLabel(data.targetType)}` : ''"
+                >
+                  <button v-if="!isReadOnly" class="remove-btn io-node__remove" title="Remove" @click.stop="removeNode(id)">&times;</button>
+                </IoPill>
               </template>
             </VueFlow>
           </div>
@@ -4738,66 +4724,10 @@ kbd {
 }
 
 /* The + under a step: what comes next. Shown on hover and selection. */
-/* Inputs and outputs: pills (rounded ends), where data enters and results
-   leave, so they read apart from the steps between; as tall as a compact
-   step, with their connection points on their edges. */
-.io-node {
-  --io-color: #6366f1;
-  position: relative;
-  /* Over its connection point, as a step card is: half of it shows. */
-  z-index: 1;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  /* One size (PILL_BOX), so the layout centres it. */
-  box-sizing: border-box;
-  width: 200px;
-  min-height: 44px;
-  padding: 6px 16px 6px 8px;
-  border: 2px solid var(--io-color);
-  border-radius: 999px;
-  /* The light tint of its colour that input data and outputs have always
-     had, so data in and out reads apart from the white steps. */
-  background: #eef2ff;
-
-  &.data-target-node {
-    --io-color: #64748b;
-    background: #f1f5f9;
-  }
-}
-.io-node__circle {
-  flex: 0 0 auto;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 26px;
-  height: 26px;
-  border-radius: 50%;
-  background: theme.$white;
-  color: var(--io-color);
-}
-.io-node__text {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  line-height: 1.25;
-}
-.io-node__name {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 13px;
-  font-weight: 600;
-  color: theme.$gray_6;
-}
 .io-default-note {
   margin: 4px 0 8px;
   font-size: 12px;
   line-height: 1.4;
-  color: theme.$gray_4;
-}
-.io-node__sub {
-  font-size: 11px;
   color: theme.$gray_4;
 }
 .io-node__remove {
