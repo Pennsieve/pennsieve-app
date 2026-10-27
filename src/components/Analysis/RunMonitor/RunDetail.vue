@@ -1953,7 +1953,7 @@ onUnmounted(() => {
 
             <!-- Data-source node template -->
             <template #node-data-source="{ data, id }">
-              <div :style="{ '--node-border-color': mode === 'configure' && fileCountForNode(id) > 0 ? '#17BB62' : '#6366f1' }">
+              <div :style="{ '--node-border-color': '#6366f1' }">
                 <CompactFlowNode
                   v-if="!detailed"
                   kind="source"
@@ -1970,7 +1970,6 @@ onUnmounted(() => {
                 <div
                   v-else
                   class="custom-node data-source-node"
-                  :class="{ 'has-files': mode === 'configure' && fileCountForNode(id) > 0 }"
                 >
                   <span v-if="nodeUnmetCount(id, 'data-source') > 0" class="node-unmet-badge">{{ nodeUnmetCount(id, 'data-source') }}</span>
                   <div class="node-header">
@@ -3757,7 +3756,6 @@ onUnmounted(() => {
     --type-strip: #6366f1;
     background: #eef2ff;
 
-    &.has-files { border-color: theme.$status_green; }
     &.green-node { border-color: theme.$gray_3; }
     &.red-node { border-color: theme.$status_red; }
   }
