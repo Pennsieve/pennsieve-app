@@ -1739,6 +1739,12 @@ const changeDensity = (value) => {
   else setTimeout(() => fitView({ padding: 0.2, maxZoom: 1 }), 50);
 };
 
+// An input or output is a pill, smaller than a step's card: laid out at its
+// own size, so the gaps around it are the steps' gaps.
+const PILL_BOX = { width: 200, height: 44 };
+const layoutSizeOf = (node, box) =>
+  node.type === "data-source" || node.type === "data-target" ? PILL_BOX : box;
+
 const autoLayout = () => {
   if (nodes.value.length === 0) return;
   const box = layoutBox(detailed.value, DETAILED_BOX);
@@ -1748,7 +1754,8 @@ const autoLayout = () => {
   g.setGraph({ rankdir: "TB", nodesep: box.nodesep, ranksep: box.ranksep });
 
   for (const node of nodes.value) {
-    g.setNode(node.id, { width: box.width, height: box.height });
+    const size = layoutSizeOf(node, box);
+    g.setNode(node.id, { width: size.width, height: size.height });
   }
   for (const edge of edges.value) {
     g.setEdge(edge.source, edge.target);
@@ -1758,11 +1765,12 @@ const autoLayout = () => {
 
   nodes.value = nodes.value.map((node) => {
     const pos = g.node(node.id);
+    const size = layoutSizeOf(node, box);
     return {
       ...node,
       position: {
-        x: pos.x - box.width / 2,
-        y: pos.y - box.height / 2,
+        x: pos.x - size.width / 2,
+        y: pos.y - size.height / 2,
       },
     };
   });
@@ -2921,7 +2929,7 @@ const openNodeSettings = (id) => {
                     <svg viewBox="0 0 24 24" width="14" height="14"><path d="M12 4v12m0 0l-5-5m5 5l5-5M5 20h14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /></svg>
                   </span>
                   <span class="io-node__text">
-                    <span class="io-node__name">{{ nodeName({ id, type: 'data-source', data }) }}</span>
+                    <span class="io-node__name" :title="nodeName({ id, type: 'data-source', data })">{{ nodeName({ id, type: 'data-source', data }) }}</span>
                   </span>
                   <button
                     v-if="!isReadOnly"
@@ -4597,9 +4605,10 @@ kbd {
   display: flex;
   align-items: center;
   gap: 8px;
-  min-width: 150px;
-  max-width: 240px;
-  min-height: 40px;
+  /* One size (PILL_BOX), so the layout centres it. */
+  box-sizing: border-box;
+  width: 200px;
+  min-height: 44px;
   padding: 6px 16px 6px 8px;
   border: 2px solid var(--io-color);
   border-radius: 999px;
