@@ -8,7 +8,7 @@
 */
 import { targetWritesToDataset } from "./dataTargets";
 
-// No destination: an output's results stay in the run's logs.
+// No destination: the run still makes the output, but doesn't save it.
 export const NO_DESTINATION = "none";
 
 export const hasInterface = (wf) => (wf?.inputs?.length || 0) + (wf?.outputs?.length || 0) > 0;
@@ -24,6 +24,7 @@ export const withInterfaceNodes = (wf) => {
     type: "data-source",
     name: input.name,
     dependsOn: [],
+    ...(input.position && { position: input.position }),
     input,
   }));
   const targets = (wf.outputs || []).map((output) => ({
@@ -33,6 +34,7 @@ export const withInterfaceNodes = (wf) => {
     targetType: output.default?.targetType || output.accepts?.[0] || "",
     dependsOn: [output.from?.step].filter(Boolean),
     defaultParams: output.default?.params || {},
+    ...(output.position && { position: output.position }),
     output,
   }));
   return { ...wf, dag: [...sources, ...steps, ...targets] };

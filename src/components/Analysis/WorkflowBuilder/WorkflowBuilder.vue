@@ -51,6 +51,8 @@ import { stepNames } from "./stepNames";
 import StepPicker from "./StepPicker.vue";
 import LinkEdge from "./LinkEdge.vue";
 import { sourceLabel, sourceHints, hintLine } from "../WorkflowGraph/sourceInputs";
+import { canvasDefinition, toInterfaceDefinition } from "./builderInterface";
+import { isFeatureEnabled } from "@/utils/features";
 import { useGraphHistory, snapshot } from "./graphHistory";
 import { canConnect, neighbourInDirection } from "./graphEditing";
 import {
@@ -502,7 +504,9 @@ const getComputeTypesForTarget = (targetType) => {
   // TODO: use API-driven computeTypes once target types return them reliably
   // return tt?.runtimeConfig?.computeTypes || DEFAULT_COMPUTE_TYPES;
   const types = tt?.runtimeConfig?.computeTypes;
-  return types && types.length ? withGpu(types) : DEFAULT_COMPUTE_TYPES;
+  // A target moves results, so it never runs on a GPU.
+  const noGpu = (list) => list.filter((t) => t !== "gpu");
+  return noGpu(types && types.length ? types : DEFAULT_COMPUTE_TYPES);
 };
 
 const getComputeTypesForApplication = (application) => {
@@ -655,6 +659,10 @@ Filtered Workflow List
 Mode Management
 */
 const isReadOnly = computed(() => mode.value === "browse");
+// The builder saves inputs and outputs (features.workflowInterface).
+const interfaceOn = isFeatureEnabled("workflowInterface");
+// Where a new output can go, to start with.
+const DEFAULT_ACCEPTS = ["Pennsieve Dataset", "download"];
 
 const enterCreateMode = () => {
   mode.value = "create";
@@ -778,7 +786,8 @@ const nodeTypeColor = (type) => {
 };
 
 const definitionToNodesAndEdges = (workflow, applications) => {
-  const raw = workflow.dag || [];
+  // A workflow's inputs and outputs drawn as its source and target nodes.
+  const raw = canvasDefinition(workflow).dag || [];
   if (raw.length === 0) return { nodes: [], edges: [], needsAutoLayout: false };
 
   // Normalize IDs
@@ -845,6 +854,11 @@ const definitionToNodesAndEdges = (workflow, applications) => {
         paramSchema: p.paramSchema || [],
         resolvedParams: p.resolvedParams || {},
         tag: p.tag || latestVersion(matchedApplication)?.version || "",
+        // An input's or output's own name and settings (its panel).
+        ...(p.name && { name: p.name }),
+        ...(p.input?.optional && { optional: true }),
+        ...(p.output?.accepts?.length && { accepts: [...p.output.accepts] }),
+        ...(p.output?.required && { required: true }),
       },
       position:
         hasSavedPositions && p.position
@@ -1130,6 +1144,11 @@ const makeNode = (type, app, position) => {
         label: "Output",
         targetType: only ? only.targetType : null,
         computeType: only?.runtimeConfig?.computeTypes?.[0] || null,
+        // A new output can go to a dataset or a download unless the author
+        // says otherwise (those the registry has).
+        ...(interfaceOn && {
+          accepts: DEFAULT_ACCEPTS.filter((t) => targetTypes.value.some((tt) => tt.targetType === t)),
+        }),
       },
       position,
     };
@@ -1729,6 +1748,12 @@ const changeDensity = (value) => {
   else setTimeout(() => fitView({ padding: 0.2, maxZoom: 1 }), 50);
 };
 
+// An input or output is a pill, smaller than a step's card: laid out at its
+// own size, so the gaps around it are the steps' gaps.
+const PILL_BOX = { width: 200, height: 44 };
+const layoutSizeOf = (node, box) =>
+  node.type === "data-source" || node.type === "data-target" ? PILL_BOX : box;
+
 const autoLayout = () => {
   if (nodes.value.length === 0) return;
   const box = layoutBox(detailed.value, DETAILED_BOX);
@@ -1738,7 +1763,8 @@ const autoLayout = () => {
   g.setGraph({ rankdir: "TB", nodesep: box.nodesep, ranksep: box.ranksep });
 
   for (const node of nodes.value) {
-    g.setNode(node.id, { width: box.width, height: box.height });
+    const size = layoutSizeOf(node, box);
+    g.setNode(node.id, { width: size.width, height: size.height });
   }
   for (const edge of edges.value) {
     g.setEdge(edge.source, edge.target);
@@ -1748,11 +1774,12 @@ const autoLayout = () => {
 
   nodes.value = nodes.value.map((node) => {
     const pos = g.node(node.id);
+    const size = layoutSizeOf(node, box);
     return {
       ...node,
       position: {
-        x: pos.x - box.width / 2,
-        y: pos.y - box.height / 2,
+        x: pos.x - size.width / 2,
+        y: pos.y - size.height / 2,
       },
     };
   });
@@ -1952,12 +1979,10 @@ const saveWorkflow = async () => {
     return;
   }
 
-  const processors = serializeProcessors();
-
   const workflowData = {
     name: workflowName.value,
     description: workflowDescription.value,
-    processors: processors,
+    ...definitionPayload(),
   };
 
   saving.value = true;
@@ -1998,6 +2023,24 @@ const workflowPage = (uuid, query) => ({
   params: { ...(route.params.orgId && { orgId: route.params.orgId }), uuid },
   ...(query && { query }),
 });
+
+// What saving sends for the canvas: its inputs, outputs and steps where
+// workflow-service takes a workflow's interface (and the canvas can be one),
+// else its processors, source and target nodes included.
+const definitionPayload = () => {
+  const processors = serializeProcessors();
+  if (!isFeatureEnabled("workflowInterface")) return { processors };
+  const byId = new Map(nodes.value.map((n) => [n.id, n]));
+  const iface = toInterfaceDefinition(processors, {
+    nameOf: (id) => nodeName(byId.get(id)),
+    routedPortsOf: (id) => routedOutputs(byId.get(id)?.data?.manifestPorts).map((p) => p.name),
+    extrasOf: (id) => {
+      const d = byId.get(id)?.data || {};
+      return { optional: !!d.optional, accepts: d.accepts || [], required: !!d.required };
+    },
+  });
+  return iface || { processors };
+};
 
 // The canvas as workflow-service takes it: one processor per node, with
 // what it depends on from the incoming edges.
@@ -2129,7 +2172,7 @@ const cancelEdit = async () => {
 // Whether the canvas has the saved workflow's steps and connections (only
 // settings changed): what can still be saved where versions aren't served.
 const sameShape = () => {
-  const dag = selectedWorkflow.value?.dag || [];
+  const dag = canvasDefinition(selectedWorkflow.value || {}).dag || [];
   const ids = (list) => list.map((x) => x).sort().join(",");
   return (
     ids(dag.map((p) => p.id)) === ids(nodes.value.map((n) => n.id)) &&
@@ -2158,7 +2201,7 @@ const saveEdit = async () => {
       payload: {
         name: workflowName.value,
         description: workflowDescription.value,
-        processors: serializeProcessors(),
+        ...definitionPayload(),
         ...(note && { note }),
       },
     });
@@ -2366,6 +2409,7 @@ const linkedSteps = computed(() =>
 // A step's own name: input data after the inputs it feeds, an output after
 // what it is, an app by its label.
 const baseName = (n) => {
+  if ((n?.type === "data-source" || n?.type === "data-target") && n.data?.name) return n.data.name;
   if (n?.type === "data-source") return sourceLabel(n.id, linkedSteps.value);
   if (n?.type === "data-target") return n.data?.targetType ? getTargetTypeLabel(n.data.targetType) : "Output";
   return n?.data?.label || "";
@@ -2887,33 +2931,23 @@ const openNodeSettings = (id) => {
               </template>
 
               <!-- Data Source Node: output only (feeds into processors) -->
+              <!-- Input: a circle where data enters the workflow -->
               <template #node-data-source="{ data, id }">
-                <CompactFlowNode
-                  v-if="!detailed"
-                  kind="source"
-                  :class="connectClass(id)"
-                  :label="nodeName({ id, type: 'data-source' })"
-                >
-                    <button
-                      v-if="!isReadOnly"
-                      class="remove-btn"
-                      @click.stop="removeNode(id)"
-                    >
-                      &times;
-                    </button>
-                </CompactFlowNode>
-                <div v-else class="custom-node data-source-node" :class="connectClass(id)">
-                  <div class="node-header">
-                    <span class="node-type-badge source-badge">Source</span>
-                    <span class="node-title" :title="sourceFeeds(id) || undefined">{{ nodeName({ id, type: 'data-source' }) }}</span>
-                    <button
-                      v-if="!isReadOnly"
-                      class="remove-btn"
-                      @click.stop="removeNode(id)"
-                    >
-                      &times;
-                    </button>
-                  </div>
+                <div class="io-node data-source-node" :class="connectClass(id)" :title="sourceFeeds(id) || undefined">
+                  <span class="io-node__circle" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" width="14" height="14"><path d="M12 4v12m0 0l-5-5m5 5l5-5M5 20h14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /></svg>
+                  </span>
+                  <span class="io-node__text">
+                    <span class="io-node__name" :title="nodeName({ id, type: 'data-source', data })">{{ nodeName({ id, type: 'data-source', data }) }}</span>
+                  </span>
+                  <button
+                    v-if="!isReadOnly"
+                    class="remove-btn io-node__remove"
+                    title="Remove"
+                    @click.stop="removeNode(id)"
+                  >
+                    &times;
+                  </button>
                 </div>
                 <Handle id="source" type="source" :position="Position.Bottom" />
                 <button
@@ -2926,39 +2960,25 @@ const openNodeSettings = (id) => {
                 >+</button>
               </template>
 
-              <!-- Data Target Node: input only (receives from processors) -->
+              <!-- Output: a circle where results leave the workflow -->
               <template #node-data-target="{ data, id }">
                 <Handle id="target" type="target" :position="Position.Top" />
-                <CompactFlowNode
-                  v-if="!detailed"
-                  kind="target"
-                  :class="connectClass(id)"
-                  :label="data.targetType ? nodeName({ id, type: 'data-target', data }) : getTargetTypeLabel(data.targetType)"
-                  :runtime="data.computeType"
-                >
-                    <button
-                      v-if="!isReadOnly"
-                      class="remove-btn"
-                      @click.stop="removeNode(id)"
-                    >
-                      &times;
-                    </button>
-                </CompactFlowNode>
-                <div v-else class="custom-node data-target-node" :class="connectClass(id)">
-                  <div class="node-header">
-                    <span class="node-type-badge target-badge">Target</span>
-                    <span class="node-title">{{
-                      data.targetType ? nodeName({ id, type: 'data-target', data }) : getTargetTypeLabel(data.targetType)
-                    }}</span>
-                    <RuntimeMark :runtime="data.computeType" />
-                    <button
-                      v-if="!isReadOnly"
-                      class="remove-btn"
-                      @click.stop="removeNode(id)"
-                    >
-                      &times;
-                    </button>
-                  </div>
+                <div class="io-node data-target-node" :class="connectClass(id)">
+                  <span class="io-node__circle" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" width="14" height="14"><path d="M12 20V8m0 0l-5 5m5-5l5 5M5 4h14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /></svg>
+                  </span>
+                  <span class="io-node__text">
+                    <span class="io-node__name">{{ data.name || data.targetType ? nodeName({ id, type: 'data-target', data }) : "Output: choose a destination" }}</span>
+                    <span v-if="interfaceOn && data.targetType" class="io-node__sub">by default {{ getTargetTypeLabel(data.targetType) }}</span>
+                  </span>
+                  <button
+                    v-if="!isReadOnly"
+                    class="remove-btn io-node__remove"
+                    title="Remove"
+                    @click.stop="removeNode(id)"
+                  >
+                    &times;
+                  </button>
                 </div>
               </template>
             </VueFlow>
@@ -3023,6 +3043,18 @@ const openNodeSettings = (id) => {
                     { "data-source": "Input data", "data-target": "Output", default: "App" }[selectedNode.type] || selectedNode.type
                   }}</span>
                 </div>
+                <!-- An input's and output's own name and settings, saved with
+                     the workflow's interface -->
+                <template v-if="interfaceOn && !isReadOnly && (selectedNode.type === 'data-source' || selectedNode.type === 'data-target')">
+                  <div class="info-row">
+                    <label class="info-label" for="io-name">Called</label>
+                    <el-input id="io-name" v-model="selectedNode.data.name" size="small" class="info-inline-select" :placeholder="baseName({ ...selectedNode, data: { ...selectedNode.data, name: '' } })" />
+                  </div>
+                  <div v-if="selectedNode.type === 'data-source'" class="info-row">
+                    <span class="info-label">Optional</span>
+                    <el-checkbox v-model="selectedNode.data.optional">A run may leave it out</el-checkbox>
+                  </div>
+                </template>
                 <div v-if="selectedNode.type === 'data-source' && sourceFeeds(selectedNode.id)" class="info-row">
                   <span class="info-label">Feeds</span>
                   <span class="info-value">{{ sourceFeeds(selectedNode.id) }}</span>
@@ -3047,7 +3079,7 @@ const openNodeSettings = (id) => {
                 </template>
                 <template v-if="selectedNode.type === 'data-target'">
                   <div class="info-row">
-                    <span class="info-label">Target Type</span>
+                    <span class="info-label">{{ interfaceOn ? "Default destination" : "Target Type" }}</span>
                     <span class="info-value" v-if="isReadOnly">{{
                       getTargetTypeLabel(selectedNode.data.targetType)
                     }}</span>
@@ -3055,7 +3087,7 @@ const openNodeSettings = (id) => {
                       v-else
                       v-model="selectedNode.data.targetType"
                       size="small"
-                      placeholder="Select target type"
+                      :placeholder="interfaceOn ? 'None: each run chooses' : 'Select target type'"
                       class="info-inline-select"
                       @change="onTargetTypeChange(selectedNode.data)"
                     >
@@ -3067,6 +3099,30 @@ const openNodeSettings = (id) => {
                       />
                     </el-select>
                   </div>
+                  <!-- Where else a run may send it, chosen per run -->
+                  <template v-if="interfaceOn">
+                    <p class="io-default-note">Each run can send it somewhere else; this is where it goes unless the run chooses.</p>
+                    <div class="info-row">
+                      <label class="info-label" for="io-accepts">Can go to</label>
+                      <span class="info-value" v-if="isReadOnly">{{ (selectedNode.data.accepts || []).map((t) => getTargetTypeLabel(t)).join(", ") || "Anywhere" }}</span>
+                      <el-select
+                        v-else
+                        id="io-accepts"
+                        v-model="selectedNode.data.accepts"
+                        multiple
+                        size="small"
+                        placeholder="Anywhere"
+                        class="info-inline-select"
+                      >
+                        <el-option v-for="tt in targetTypes" :key="tt.targetType" :label="targetTypeName(tt.targetType, targetTypes)" :value="tt.targetType" />
+                      </el-select>
+                    </div>
+                    <div class="info-row">
+                      <span class="info-label">Required</span>
+                      <span class="info-value" v-if="isReadOnly">{{ selectedNode.data.required ? "Yes" : "No" }}</span>
+                      <el-checkbox v-else v-model="selectedNode.data.required">Every run must send it somewhere</el-checkbox>
+                    </div>
+                  </template>
                 </template>
                 <template v-if="selectedNode.data?.computeType && isReadOnly">
                   <div class="info-row">
@@ -4552,6 +4608,74 @@ kbd {
 }
 
 /* The + under a step: what comes next. Shown on hover and selection. */
+/* Inputs and outputs: pills (rounded ends), where data enters and results
+   leave, so they read apart from the steps between; as tall as a compact
+   step, with their connection points on their edges. */
+.io-node {
+  --io-color: #6366f1;
+  position: relative;
+  /* Over its connection point, as a step card is: half of it shows. */
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  /* One size (PILL_BOX), so the layout centres it. */
+  box-sizing: border-box;
+  width: 200px;
+  min-height: 44px;
+  padding: 6px 16px 6px 8px;
+  border: 2px solid var(--io-color);
+  border-radius: 999px;
+  /* The light tint of its colour that input data and outputs have always
+     had, so data in and out reads apart from the white steps. */
+  background: #eef2ff;
+
+  &.data-target-node {
+    --io-color: #64748b;
+    background: #f1f5f9;
+  }
+}
+.io-node__circle {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: theme.$white;
+  color: var(--io-color);
+}
+.io-node__text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.25;
+}
+.io-node__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  font-weight: 600;
+  color: theme.$gray_6;
+}
+.io-default-note {
+  margin: 4px 0 8px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: theme.$gray_4;
+}
+.io-node__sub {
+  font-size: 11px;
+  color: theme.$gray_4;
+}
+.io-node__remove {
+  position: absolute;
+  /* Clear of the pill's rounded end */
+  top: -13px;
+  right: -10px;
+}
 .add-next {
   position: absolute;
   left: 50%;
@@ -4968,8 +5092,10 @@ kbd {
   border: 1px solid theme.$gray_3;
   border-radius: 4px;
   padding: 8px 10px;
-  min-width: 250px;
-  max-width: 350px;
+  /* One size (NODE_WIDTH), so auto-arrange centres it; a long name is cut
+     short, in full on hover. */
+  box-sizing: border-box;
+  width: 280px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   transition: all 0.2s;
   position: relative;
@@ -5146,7 +5272,7 @@ kbd {
     --type-strip: #{theme.$orange_2};
   }
 
-  &.data-source-node {
+  &.data-source-node:not(.io-node) {
     --type-strip: #6366f1;
     background: #eef2ff;
 
@@ -5156,7 +5282,7 @@ kbd {
     }
   }
 
-  &.data-target-node {
+  &.data-target-node:not(.io-node) {
     --type-strip: #64748b;
     background: #f1f5f9;
 
