@@ -12,7 +12,12 @@
         <span v-else class="breadcrumb-link">{{ crumb.name }}</span>
       </template>
     </div>
-    <h1 class="page-title">{{ currentTitle }}</h1>
+    <div class="page-title-row">
+      <h1 class="page-title">{{ currentTitle }}</h1>
+      <!-- A page can put something next to its title here (a compute node's
+           status), with <Teleport defer to="#page-title-extra">. -->
+      <span id="page-title-extra" class="page-title-extra" />
+    </div>
   </div>
 </template>
 
@@ -129,6 +134,17 @@ export default {
   }
 }
 
+.page-title-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.page-title-extra {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
 .page-title {
   margin: 0;
   font-size: 20px;

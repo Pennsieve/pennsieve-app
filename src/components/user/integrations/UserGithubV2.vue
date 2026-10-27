@@ -18,6 +18,27 @@
     <div v-if="loading" class="loading">Loading...</div>
 
     <template v-else>
+      <!-- The GitHub app's permissions were updated: installations made
+           before need an owner to accept them on GitHub. -->
+      <div v-if="hasGithubProfile && review.count" class="review-banner" role="status">
+        <span>
+          Pennsieve's GitHub app was updated —
+          {{ review.count }} installation{{ review.count === 1 ? "" : "s" }} need{{ review.count === 1 ? "s" : "" }} your approval.
+        </span>
+        <!-- One review link per installation (named when there are several). -->
+        <span class="review-actions">
+          <a
+            v-for="inst in review.pending"
+            :key="inst.id"
+            :href="inst.review_url"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="review-btn"
+            >{{ review.single ? "Review on GitHub" : `Review ${inst.name}` }}</a
+          >
+        </span>
+      </div>
+
       <!-- Connection Status -->
       <div class="management-section">
         <div class="section-header">
@@ -109,6 +130,31 @@
             Update Integration
           </el-button>
         </div>
+        <!-- Installations that haven't accepted the updated permissions -->
+        <ul v-if="review.count" class="review-list">
+          <li v-for="inst in review.pending" :key="inst.id" class="review-item">
+            <div class="review-copy">
+              <span class="review-name">
+                <img v-if="inst.avatar_url" :src="inst.avatar_url" alt="" class="review-avatar" />
+                {{ inst.name }}
+              </span>
+              <p>
+                Pennsieve's GitHub permissions were updated. Approve them to let
+                Pennsieve open pull requests, such as adding an app.yml.
+              </p>
+              <p v-if="isOrganization(inst)" class="review-note">
+                Only owners of {{ inst.name }} can approve.
+              </p>
+            </div>
+            <a
+              :href="inst.review_url"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="review-btn"
+              >Review on GitHub</a
+            >
+          </li>
+        </ul>
       </div>
 
       <!-- What this enables -->
@@ -185,7 +231,7 @@
 </template>
 
 <script setup>
-import { computed, ref, onMounted, getCurrentInstance } from "vue";
+import { computed, ref, onMounted, onBeforeUnmount, getCurrentInstance } from "vue";
 import { useStore } from "vuex";
 import { useGetToken } from "@/composables/useGetToken";
 import { useSendXhr } from "@/mixins/request/request_composable";
@@ -193,6 +239,7 @@ import { useGithubOAuth } from "@/composables/useGithubOAuth";
 import * as siteConfig from "@/site-config/site.json";
 import IconGitHub from "@/components/icons/IconGitHub.vue";
 import IconArrowLeft from "@/components/icons/IconArrowLeft.vue";
+import { reviewSummary, isOrganization } from "./githubInstallations";
 
 const store = useStore();
 const instance = getCurrentInstance();
@@ -214,10 +261,39 @@ const {
 });
 const openGitHub = updateGithubIntegration;
 
+// The Pennsieve app's installations, and which still have to accept its
+// updated permissions on GitHub (github-service's needs_review).
+const installations = ref([]);
+const review = computed(() => reviewSummary(installations.value));
+async function fetchInstallations() {
+  if (!hasGithubProfile.value) return;
+  try {
+    const token = await useGetToken();
+    const res = await useSendXhr(`${siteConfig.api2Url}/github/installations`, {
+      header: { Authorization: `Bearer ${token}`, Accept: "application/json" },
+    });
+    installations.value = res?.installations || [];
+  } catch (error) {
+    // The notice is extra: without the list, the card works as before.
+    installations.value = [];
+  }
+}
+// Back from GitHub (approved in another tab): check again, so the notice clears.
+function onVisible() {
+  if (document.visibilityState === "visible") fetchInstallations();
+}
+
 onMounted(async () => {
   loading.value = true;
   await fetchGithubProfile();
   loading.value = false;
+  fetchInstallations();
+  document.addEventListener("visibilitychange", onVisible);
+  window.addEventListener("focus", fetchInstallations);
+});
+onBeforeUnmount(() => {
+  document.removeEventListener("visibilitychange", onVisible);
+  window.removeEventListener("focus", fetchInstallations);
 });
 
 async function confirmDelete() {
@@ -298,6 +374,80 @@ async function confirmDelete() {
     margin: 0;
     line-height: 1.5;
     max-width: 700px;
+  }
+}
+
+/* The GitHub app was updated: installations to approve. */
+.review-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 24px;
+  padding: 12px 16px;
+  border: 1px solid theme.$orange_1;
+  border-radius: 3px;
+  background: theme.$orange_tint;
+  font-size: 14px;
+  color: theme.$gray_6;
+}
+.review-actions {
+  display: flex;
+  flex-wrap: wrap;
+  flex-shrink: 0;
+  gap: 8px;
+}
+.review-list {
+  margin: 20px 0 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid theme.$gray_2;
+}
+.review-item {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 0;
+  border-bottom: 1px solid theme.$gray_2;
+
+  p {
+    margin: 4px 0 0;
+    font-size: 13px;
+    line-height: 1.5;
+    color: theme.$gray_5;
+  }
+}
+.review-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  color: theme.$gray_6;
+}
+.review-avatar {
+  width: 20px;
+  height: 20px;
+  border-radius: 3px;
+}
+.review-note {
+  color: theme.$gray_4 !important;
+}
+.review-btn {
+  flex-shrink: 0;
+  padding: 4px 12px;
+  border: 1px solid theme.$gray_3;
+  border-radius: 3px;
+  background: theme.$white;
+  font-size: 13px;
+  white-space: nowrap;
+  color: theme.$gray_6;
+  text-decoration: none;
+
+  &:hover {
+    border-color: theme.$purple_1;
+    color: theme.$purple_3;
   }
 }
 

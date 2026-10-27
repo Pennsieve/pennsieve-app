@@ -1,52 +1,32 @@
-// Shared helpers for the Notebooks tab + launcher. A "notebook" is a published
-// workflow that hosts an interactive kernel; the kernel (python/r) is derived
-// from the workflow. Kept tiny + isolated so the matching rule is easy to adjust
-// as more notebook environments are published.
+// Shared helpers for the Notebooks tab + launcher. A notebook is a workflow
+// whose step's app declares, in its app.yml, a live Jupyter session;
+// workflow-service says so as the workflow's \`notebook\` field ({kernel,
+// savesTo, worksWithoutDataset}). Nothing here guesses from names.
 
-// Returns the kernel/session type for a workflow, or null if it isn't a
-// notebook. The authoritative signal is an interactive node's declared
-// sessionType (e.g. "r"); we fall back to the workflow name when the listing
-// doesn't expose nodes. Definitions may carry either `dag` or `processors`.
+// A notebook workflow's language ("python", "r"), or null if it isn't one.
 export function notebookKernel(wf) {
-  const nodes = wf?.dag || wf?.processors || [];
-  const node = nodes.find(
-    (n) =>
-      n?.runtimeConfig?.interactive ||
-      n?.interactive ||
-      n?.runtimeConfig?.sessionType ||
-      n?.sessionType
-  );
-  const sessionType = node && (node.runtimeConfig?.sessionType || node.sessionType);
-  if (sessionType) return sessionType === "python" ? "jupyter" : sessionType;
-
-  // Name fallback (separators normalized so "r-notebook", "R Session", and
-  // "Pennsieve R Session" all match).
-  const name = (wf?.name || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
-  // Environment builders (e.g. "Pennsieve - Build Python Environment") carry a
-  // language in their name but are NOT notebooks — exclude them explicitly.
-  if (name.includes("build") || name.includes("environment")) return null;
-  if (name.includes("jupyter")) return "jupyter";
-  // Standardized notebook names are "Pennsieve - <Language> Notebook - <version>";
-  // require the notebook/session qualifier so a workflow that merely mentions a
-  // language isn't mistaken for a kernel (mirrors the R branch).
-  if (name.includes("python") && (name.includes("notebook") || name.includes("session"))) {
-    return "jupyter";
-  }
-  if (/\br\b/.test(name) && (name.includes("notebook") || name.includes("session"))) {
-    return "r";
-  }
-  // An interactive node with no explicit sessionType defaults to Python/Jupyter.
-  if (node) return "jupyter";
-  return null;
+  return wf?.notebook?.kernel || null;
 }
 
 export function isNotebookWorkflow(wf) {
-  return !!notebookKernel(wf);
+  return !!wf?.notebook;
 }
 
-// A compute node can host notebooks/environments only if it has interactive
-// sessions enabled. Non-interactive nodes can't run a notebook and have no use
-// for env layers, so they're excluded from the Notebooks-page node pickers.
+// Whether a run page (run-detail) belongs under the Notebooks tab rather than
+// Workflows: the tab it was opened from (?from=notebooks|workflows), else
+// whether it's a live session's run among those loaded (a link from
+// elsewhere); workflow-service flags those runs interactive.
+export function runPageIsNotebook(route, runs = []) {
+  if (route?.query?.from === "notebooks") return true;
+  if (route?.query?.from === "workflows") return false;
+  const runId = route?.params?.runId;
+  const run = runId && (runs || []).find((r) => r.uuid === runId);
+  return !!run?.interactive;
+}
+
+// A compute node can host notebooks only if it has interactive sessions
+// enabled, so non-interactive nodes are left out of the Notebooks-page node
+// pickers.
 export function interactiveCapable(cn) {
   return (
     (cn?.maxInteractiveSessions || 0) > 0 ||
@@ -55,11 +35,40 @@ export function interactiveCapable(cn) {
   );
 }
 
-// Human label for a kernel/session type ("jupyter" == Python today).
-export function kernelLabel(sessionType) {
-  if (!sessionType || sessionType === "jupyter" || sessionType === "python") {
-    return "Python";
-  }
-  if (sessionType === "r") return "R";
-  return sessionType;
+// A notebook's language for people.
+export function kernelLabel(kernel) {
+  if (kernel === "python") return "Python";
+  if (kernel === "r") return "R";
+  return kernel || "";
+}
+
+// The kernels a notebook can start with here: active ones (an archived
+// kernel's runs still count as notebooks, but it can't start new ones), and
+// outside a workspace (My Workspace), where a run has no dataset to write
+// to, not those whose results go to one.
+export function launchableKernels(workflows = [], { personal = false } = {}) {
+  return workflows.filter(
+    (wf) => isNotebookWorkflow(wf) && wf.isActive !== false && !(personal && !wf.notebook.worksWithoutDataset)
+  );
+}
+
+// Where a notebook's results go, in a few words, to tell same-language
+// kernels apart.
+const SAVES_TO = {
+  download: "Results as a download",
+  dataset: "Results saved to a dataset",
+  none: "Results stay in the session",
+};
+export function kernelOutput(wf) {
+  return SAVES_TO[wf?.notebook?.savesTo] || "";
+}
+
+// For a notebook that saves results to a dataset, the same-language kernel
+// that doesn't (results as a download, or kept in the session): what someone
+// who can only view the dataset can start instead. Null if there's none.
+export function nonSavingAlternative(kernels = [], wf) {
+  if (wf?.notebook?.savesTo !== "dataset") return null;
+  const kernel = notebookKernel(wf);
+  const others = kernels.filter((k) => k.uuid !== wf.uuid && notebookKernel(k) === kernel);
+  return others.find((k) => k.notebook?.savesTo === "download") || others.find((k) => k.notebook?.savesTo === "none") || null;
 }

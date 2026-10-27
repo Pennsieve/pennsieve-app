@@ -1,3 +1,4 @@
+import { sourceLabel } from "../WorkflowGraph/sourceInputs";
 /**
  * Shared pure utility functions for RunsOverview and RunDetail.
  */
@@ -34,8 +35,22 @@ export const statusBorderColor = (status) => {
   }
 };
 
+// A step's status on a run's graph card, which keeps its shape: a mark once
+// it has ended (✓ done, ✕ failed, – canceled), none while pending or
+// running (its type strip pulses then). kind: done | failed | canceled.
+const STATUS_MARKS = {
+  SUCCEEDED: { glyph: "✓", kind: "done" },
+  FAILED: { glyph: "✕", kind: "failed" },
+  CANCELED: { glyph: "–", kind: "canceled" },
+};
+export const statusMarkOf = (status) => STATUS_MARKS[status] || null;
+
+// On a run's graph, colour marks what needs a look (running, failed): a
+// step that succeeded is as quiet as one yet to start, its ✓ says it's done.
+export const graphStatusColor = (status) => statusBorderColor(status === "SUCCEEDED" ? "NOT_STARTED" : status);
+
 export const nodeBorderColor = (type, status) => {
-  if (status) return statusBorderColor(status);
+  if (status) return graphStatusColor(status);
   if (type === "data-source") return "#6366f1";
   if (type === "data-target") return "#64748b";
   return "#cccccc";
@@ -92,14 +107,25 @@ export const findAppByUrl = (sourceUrl, applications) => {
   );
 };
 
-export const getTargetTypeLabel = (targetType, targetTypes = []) => {
-  if (!targetType) return "Data Target";
+// What the app calls a target type where the registry's label is out of date:
+// node layers are shown as reference data, never as "layers".
+const TARGET_TYPE_NAMES = { "persistent-layer": "Reference data" };
+
+// A target type's name for people: ours, else the registry's label, else the
+// type itself.
+export const targetTypeName = (targetType, targetTypes = []) => {
+  if (TARGET_TYPE_NAMES[targetType]) return TARGET_TYPE_NAMES[targetType];
   const tt = targetTypes.find((t) => t.targetType === targetType);
   return tt?.label || targetType;
 };
 
-export const labelForDagNode = (d, applications, targetTypes = []) => {
-  if (d.type === "data-source") return "Data Source";
+export const getTargetTypeLabel = (targetType, targetTypes = []) =>
+  targetType ? targetTypeName(targetType, targetTypes) : "Data Target";
+
+// A data source is named after the app inputs its links feed ("signals"),
+// given the run's or workflow's DAG; else "Data Source".
+export const labelForDagNode = (d, applications, targetTypes = [], dag = []) => {
+  if (d.type === "data-source") return sourceLabel(d.id, dag, "Data Source");
   if (d.type === "data-target") return getTargetTypeLabel(d.targetType, targetTypes);
   const matchedApp = findAppByUrl(d.sourceUrl, applications);
   return matchedApp ? matchedApp.name : extractRepoName(d.sourceUrl) || d.type || d.id;
@@ -165,6 +191,8 @@ export const formatDuration = (start, end) => {
 export const formatCost = (cost) => {
   if (cost == null) return "N/A";
   if (cost === 0) return "$0.00";
+  // Not "$0.0000": a cost too small for four decimals isn't none.
+  if (cost < 0.0001) return "< $0.0001";
   if (cost < 0.01) return `$${cost.toFixed(4)}`;
   return `$${cost.toFixed(2)}`;
 };

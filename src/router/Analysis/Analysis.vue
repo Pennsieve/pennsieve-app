@@ -2,7 +2,7 @@
   <bf-page>
     <bf-rafter slot="heading" class="primary" :org-id="orgId">
       <template #breadcrumb>
-        <org-breadcrumb page-name="Analysis" :crumbs="breadcrumbCrumbs" :page-route="{ name: 'runs' }" />
+        <org-breadcrumb page-name="Analysis" :crumbs="breadcrumbCrumbs" :page-route="{ name: 'workflows' }" />
       </template>
     </bf-rafter>
     <div class="content-tabs">
@@ -22,6 +22,7 @@ import OrgBreadcrumb from "../../components/shared/OrgBreadcrumb/OrgBreadcrumb.v
 import { useComputeResourcesStore } from "@/stores/computeResourcesStore";
 import { useGetToken } from "@/composables/useGetToken";
 import EventBus from "@/utils/event-bus";
+import { runPageIsNotebook } from "@/components/Analysis/RunMonitor/notebookHelpers";
 
 export default {
   name: "IntegrationView",
@@ -53,15 +54,37 @@ export default {
       const node = nodes.find(n => n.uuid === nodeId);
       return node?.name || '';
     },
+    // Whether the run on a run page is a notebook's (Notebooks tab) rather than
+    // a workflow's, from the runs already loaded.
+    runIsNotebook() {
+      return runPageIsNotebook(this.$route, this.$store.getters["analysisModule/workflowInstances"]);
+    },
+    // A run's page sits under no tab's path: it lights up Notebooks for a
+    // notebook's run, else Workflows (as do configuring a run, a new workflow
+    // and a workflow's page). An app's pages are under the Apps tab's path.
+    tabs() {
+      const runPage = (route) => route.name === "run-detail";
+      return [
+        {
+          name: "Workflows",
+          to: "workflows",
+          activeWhen: (route) =>
+            (runPage(route) && !this.runIsNotebook) ||
+            ["run-configure", "workflow-create", "workflow-detail"].includes(route.name),
+        },
+        { name: "Notebooks", to: "notebooks", activeWhen: (route) => runPage(route) && this.runIsNotebook },
+        { name: "Apps", to: "apps" },
+        { name: "Compute Nodes", to: "compute-nodes" },
+      ];
+    },
     breadcrumbCrumbs() {
       const routeName = this.$route.name;
 
       // Top-level tabs: just one crumb (the tab name, as current)
       const topLevelTabs = {
-        'runs': 'Runs',
         'notebooks': 'Notebooks',
         'workflows': 'Workflows',
-        'applications': 'Applications',
+        'apps': 'Apps',
         'compute-nodes': 'Compute Nodes',
       };
       if (topLevelTabs[routeName]) {
@@ -70,13 +93,16 @@ export default {
 
       // Sub-pages: parent tab as link + detail name as current
       const subPages = {
-        'run-detail': { parent: 'Runs', parentRoute: { name: 'runs' } },
-        'run-configure': { parent: 'Runs', parentRoute: { name: 'runs' } },
-        'workflow-detail': { parent: 'Workflows', parentRoute: { name: 'workflows' } },
-        'workflow-create': { parent: 'Workflows', parentRoute: { name: 'workflows' } },
-        'application-detail': { parent: 'Applications', parentRoute: { name: 'applications' } },
-        'application-manifest-guide': { parent: 'Applications', parentRoute: { name: 'applications' } },
-        'application-manifest-builder': { parent: 'Applications', parentRoute: { name: 'applications' } },
+        // A notebook's run belongs to Notebooks, any other to Workflows' Live.
+        'run-detail': this.runIsNotebook
+          ? { parent: 'Notebooks', parentRoute: { name: 'notebooks' } }
+          : { parent: 'Workflows', parentRoute: { name: 'workflows' } },
+        'run-configure': { parent: 'Workflows', parentRoute: { name: 'workflows' } },
+        'workflow-detail': { parent: 'Workflows', parentRoute: { name: 'workflows', query: { view: 'library' } } },
+        'workflow-create': { parent: 'Workflows', parentRoute: { name: 'workflows', query: { view: 'builder' } } },
+        'application-detail': { parent: 'Apps', parentRoute: { name: 'apps' } },
+        'application-manifest-guide': { parent: 'Apps', parentRoute: { name: 'apps' } },
+        'application-manifest-builder': { parent: 'Apps', parentRoute: { name: 'apps' } },
         'compute-node-management': { parent: 'Compute Nodes', parentRoute: { name: 'compute-nodes' } },
       };
       const sub = subPages[routeName];
@@ -140,28 +166,6 @@ export default {
 
   data() {
     return {
-      tabs: [
-        {
-          name: "Runs",
-          to: "runs",
-        },
-        {
-          name: "Notebooks",
-          to: "notebooks",
-        },
-        {
-          name: "Workflows",
-          to: "workflows",
-        },
-        {
-          name: "Applications",
-          to: "applications",
-        },
-        {
-          name: "Compute Nodes",
-          to: "compute-nodes",
-        },
-      ],
     };
   },
 };

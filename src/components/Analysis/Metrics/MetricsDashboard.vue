@@ -114,7 +114,10 @@ const formatCost = (v) => {
       <!-- Duration histogram (from parquet/DuckDB — loads in background) -->
       <div class="metrics-panel chart-panel">
         <div v-if="histogramLoading" class="histogram-loading">Loading distribution...</div>
-        <div v-else-if="histogramError" class="histogram-error">{{ histogramError }}</div>
+        <div v-else-if="histogramError" class="histogram-error">
+          <span>Chart unavailable</span>
+          <button type="button" class="metrics-retry" @click="refresh">Retry</button>
+        </div>
         <SparkHistogram
           v-else
           :bins="durationBins"
@@ -129,7 +132,10 @@ const formatCost = (v) => {
       <!-- Cost histogram -->
       <div class="metrics-panel chart-panel">
         <div v-if="histogramLoading" class="histogram-loading">Loading distribution...</div>
-        <div v-else-if="histogramError" class="histogram-error">{{ histogramError }}</div>
+        <div v-else-if="histogramError" class="histogram-error">
+          <span>Chart unavailable</span>
+          <button type="button" class="metrics-retry" @click="refresh">Retry</button>
+        </div>
         <SparkHistogram
           v-else
           :bins="costBins"
@@ -296,7 +302,8 @@ const formatCost = (v) => {
   color: theme.$gray_4;
 }
 
+// Quiet: the summary still shows, and the cause is in the console.
 .histogram-error {
-  color: theme.$status_red;
+  gap: 8px;
 }
 </style>

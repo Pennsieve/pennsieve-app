@@ -78,19 +78,43 @@
         <IconGitHub :width="14" :height="14" color="currentColor" />
         <span>View on GitHub</span>
       </a>
+      <button
+        v-if="releaseRepo"
+        type="button"
+        class="card-action-link card-action-button"
+        :disabled="releaseLoading"
+        :title="releaseTitle"
+        @click="openRelease"
+      >
+        {{ releaseLoading ? 'Checking…' : 'Release a version' }}
+      </button>
       <span
         v-if="repo.publishing_to_appstore && !matchedAppRaw && !hasReleases"
         class="card-action-hint"
       >
-        Create Github release to add to app store
+        Release a version to add it to the App Store
       </span>
     </div>
+    <ReleaseDialog
+      v-if="releaseRepo && releaseOpen"
+      v-model="releaseOpen"
+      :api2-url="api2Url"
+      :repo="releaseRepo"
+      :known-tags="knownTags"
+      :status="releaseStatus"
+      :default-branch="releaseStatus?.target || ''"
+      @released="onReleased"
+    />
   </div>
 </template>
 
 <script>
 import IconGitHub from "@/components/icons/IconGitHub.vue";
 import IconSettings from "@/components/icons/IconSettings.vue";
+import { ElMessage } from "element-plus";
+import ReleaseDialog from "@/components/Analysis/Applications/ReleaseDialog.vue";
+import { fetchReleaseStatus } from "@/components/Analysis/Applications/release";
+import { useGetToken } from "@/composables/useGetToken";
 
 export default {
   name: 'CodeRepoListItem',
@@ -98,6 +122,22 @@ export default {
   components: {
     IconGitHub,
     IconSettings,
+    ReleaseDialog,
+  },
+
+  data() {
+    return {
+      // Release from here, as on an app's page: an app's first release is
+      // what adds it to the App Store, so it can't start from the app page.
+      releaseOpen: false,
+      releaseLoading: false,
+      releaseStatus: null,
+      releaseTimers: [],
+    }
+  },
+
+  beforeUnmount() {
+    this.releaseTimers.forEach(clearTimeout)
   },
 
   props: {
@@ -159,9 +199,65 @@ export default {
     hasReleases() {
       return (this.repo?.content?.releases?.length || 0) > 0
     },
+    api2Url() {
+      return this.$store.state.config?.api2Url || ''
+    },
+    // { owner, repo } from the repository's full name or its URL.
+    releaseRepo() {
+      const full = this.repo.full_name ||
+        (this.repo.html_url || this.repo.url || '').replace(/^https?:\/\/github\.com\//, '').replace(/\.git$/, '')
+      const [owner, name] = (full || '').split('/')
+      return owner && name ? { owner, repo: name } : null
+    },
+    // Versions already released, so the dialog suggests the next one.
+    knownTags() {
+      return (this.repo?.content?.releases || [])
+        .map((r) => r.label || r.tag_name || r.name)
+        .filter(Boolean)
+    },
+    releaseTitle() {
+      return this.repo.publishing_to_appstore
+        ? 'Publish a GitHub release; the App Store adds the version'
+        : 'Publish a GitHub release (turn on App Store tracking to add it to the App Store)'
+    },
   },
 
   methods: {
+    async openRelease() {
+      this.releaseLoading = true
+      try {
+        const token = await useGetToken()
+        this.releaseStatus = await fetchReleaseStatus(this.api2Url, this.releaseRepo, token)
+        if (this.releaseStatus?.canRelease === false) {
+          ElMessage({
+            type: 'info',
+            showClose: true,
+            message: `Nothing new to release: the ${this.releaseStatus.target} branch is at ${this.releaseStatus.latestTag}.`,
+          })
+          return
+        }
+        this.releaseOpen = true
+      } finally {
+        this.releaseLoading = false
+      }
+    },
+    // The App Store adds the version from the release webhook (and the app,
+    // on a first release): look again after a minute or two.
+    onReleased({ tag }) {
+      ElMessage({
+        type: 'success',
+        showClose: true,
+        message: this.repo.publishing_to_appstore
+          ? `Released ${tag}. The App Store adds it in a minute or two.`
+          : `Released ${tag}.`,
+      })
+      if (!this.repo.publishing_to_appstore) return
+      for (const delay of [60000, 150000]) {
+        this.releaseTimers.push(setTimeout(() => {
+          this.$store.dispatch('analysisModule/fetchApplications', { force: true }).catch(() => {})
+        }, delay))
+      }
+    },
     handleManageSettings() {
       this.$emit('manage-settings', this.repo)
     },
@@ -380,6 +476,10 @@ export default {
   flex-wrap: wrap;
 }
 
+.card-action-button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
 .card-action-link {
   display: inline-flex;
   align-items: center;

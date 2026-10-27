@@ -6,7 +6,7 @@ import { useComputeResourcesStore } from "@/stores/computeResourcesStore";
 const props = defineProps({
   modelValue: { type: String, default: "" },
   computeNodeId: { type: String, default: "" },
-  placeholder: { type: String, default: "Select or create a layer" },
+  placeholder: { type: String, default: "Select or create a reference" },
 });
 
 const emit = defineEmits(["update:modelValue"]);
@@ -56,7 +56,7 @@ function cancelCreate() {
 
 async function createAndSelect() {
   if (!newLayerName.value || !LAYER_NAME_PATTERN.test(newLayerName.value)) {
-    ElMessage.error("Layer name must be lowercase with dashes (e.g., hg38-reference)");
+    ElMessage.error("Names are lowercase letters, numbers and dashes (e.g., hg38-reference)");
     return;
   }
   isSaving.value = true;
@@ -66,12 +66,12 @@ async function createAndSelect() {
       description: newLayerDescription.value || undefined,
     });
     emit("update:modelValue", newLayerName.value);
-    ElMessage.success(`Layer "${newLayerName.value}" created`);
+    ElMessage.success(`Reference "${newLayerName.value}" created`);
     isCreating.value = false;
     newLayerName.value = "";
     newLayerDescription.value = "";
   } catch (err) {
-    ElMessage.error(err.message || "Failed to create layer");
+    ElMessage.error(err.message || "Failed to create the reference");
   } finally {
     isSaving.value = false;
   }
@@ -85,7 +85,7 @@ async function createAndSelect() {
       <div class="create-inline">
         <input
           v-model="newLayerName"
-          placeholder="layer-name"
+          placeholder="reference-name"
           class="layer-input"
           :class="{ invalid: newLayerName && !LAYER_NAME_PATTERN.test(newLayerName) }"
         />
@@ -130,12 +130,12 @@ async function createAndSelect() {
         <el-option
           v-else-if="emptyLayers.length === 0 && !isLoading"
           disabled
-          label="No empty layers available"
+          label="No empty references on this node"
           value=""
         />
         <el-option
           key="__create__"
-          label="+ Create new layer"
+          label="+ New reference"
           value="__create__"
           class="create-option"
         />

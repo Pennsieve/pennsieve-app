@@ -10,9 +10,21 @@ import IconControllerPlay from "../../icons/IconControllerPlay.vue";
 import IconXCircle from "../../icons/IconXCircle.vue";
 import { endInteractiveSession } from "@/composables/useJupyterSession";
 import { useGetToken } from "@/composables/useGetToken";
-import { useSendXhr } from "@/mixins/request/request_composable";
 import { useMetricsCounters } from "@/composables/useMetricsCounters";
-import toQueryParams from "@/utils/toQueryParams";
+import { isNotebookWorkflow } from "./notebookHelpers";
+import RunHistory from "./RunHistory.vue";
+import RunWizardDialog from "./RunWizardDialog.vue";
+
+// In the Workflows tab: no runs yet points to the Library, to start one.
+const emit = defineEmits(["open-library"]);
+const props = defineProps({
+  // Inside the Workflows tab (WorkflowsOverview), which has the toolbar and
+  // its Run Workflow button: no header of its own.
+  embedded: { type: Boolean, default: false },
+  // Leave out standalone notebook sessions (they're on the Notebooks tab); a
+  // workflow with a notebook step is a workflow run and stays.
+  excludeNotebooks: { type: Boolean, default: false },
+});
 import {
   statusDotClass,
   statusLabel,
@@ -41,9 +53,45 @@ const hasMoreRuns = computed(
 const computeNodes = computed(
   () => store.getters["analysisModule/computeNodes"] || []
 );
-const workflows = computed(
-  () => store.state.analysisModule.workflows || []
-);
+// Shown in a workspace (/:orgId/analysis/runs) and in My Workspace
+// (/my-workspace/analysis/runs), where there's no organization: runs, nodes and
+// workflows are the user's own outside any workspace, and a run can't use a
+// dataset yet.
+const isMyWorkspace = computed(() => !route.params.orgId);
+// A run's page from here says it came from Workflows, so that tab stays
+// highlighted there even for a notebook's run (with notebooks included).
+const runRoute = (name, runId) => ({
+  ...(isMyWorkspace.value
+    ? { name: `my-${name}`, params: runId ? { runId } : {} }
+    : { name, params: runId ? { runId } : {} }),
+  ...(runId && props.embedded && { query: { from: "workflows" } }),
+});
+
+// My Workspace offers the user's own workflows (the store's list there) and
+// public ones, as its Workflow Library does.
+const publicWorkflows = ref([]);
+const fetchPublicWorkflows = async () => {
+  try {
+    const token = await useGetToken();
+    const resp = await fetch(`${config.value.api2Url}/compute/workflows/definitions?visibility=public`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const result = await resp.json();
+    publicWorkflows.value = Array.isArray(result) ? result : result.workflows || [];
+  } catch (err) {
+    console.error("Failed to fetch public workflows:", err);
+    publicWorkflows.value = [];
+  }
+};
+const workflows = computed(() => {
+  const own = store.state.analysisModule.workflows || [];
+  if (!isMyWorkspace.value) return own;
+  const byId = new Map(own.map((w) => [w.uuid, w]));
+  for (const w of publicWorkflows.value) if (w?.uuid && !byId.has(w.uuid)) byId.set(w.uuid, w);
+  return [...byId.values()];
+});
+
 const profile = computed(() => store.state.profile);
 const orgMembers = computed(() => store.state.orgMembers || []);
 const config = computed(() => store.state.config);
@@ -56,7 +104,6 @@ const workflowFilter = ref("all");
 const computeNodeFilter = ref("all");
 const isLoading = ref(false);
 const isLoadingMore = ref(false);
-const accordionActiveNames = ref(["runs"]);
 let analyticsChannel = null;
 
 /*
@@ -76,42 +123,68 @@ const { counters: orgCounters, isLoading: countersLoading, fetchCounters: fetchO
 /*
   Dashboard computed
 */
-const dashboardRuns = computed(() => workflowInstances.value);
+// A run of a notebook workflow itself (Jupyter, R), by its definition or,
+// for a public one not in the list, its name.
+const workflowsById = computed(() => new Map(workflows.value.map((w) => [w.uuid, w])));
+// A notebook's run: its workflow is a notebook, or workflow-service flagged
+// the run a live session (for public notebooks this list doesn't hold).
+const isNotebookRun = (r) => !!r.interactive || isNotebookWorkflow(workflowsById.value.get(r.workflowUuid));
+const shownRuns = computed(() =>
+  props.excludeNotebooks ? workflowInstances.value.filter((r) => !isNotebookRun(r)) : workflowInstances.value
+);
 
 const activeRuns = computed(() =>
-  workflowInstances.value.filter((r) => r.status === "NOT_STARTED" || r.status === "STARTED" || r.status === "FINALIZING")
+  shownRuns.value.filter((r) => r.status === "NOT_STARTED" || r.status === "STARTED" || r.status === "FINALIZING")
 );
 
-const recentCompletedRuns = computed(() =>
-  dashboardRuns.value
-    .filter((r) => isTerminalStatus(r.status))
-    .sort((a, b) => new Date(b.completedAt || b.startedAt) - new Date(a.completedAt || a.startedAt))
-    .slice(0, 5)
-);
 
-const dashboardStats = computed(() => {
-  const data = orgCounters.value;
-  if (!data) return null;
-
-  const bucket = data.allTime || data;
-  if (!bucket || !bucket.totalRuns) return null;
-
-  const total = bucket.totalRuns;
-  const succeeded = bucket.succeeded || 0;
-  const failed = bucket.failed || 0;
-  const canceled = bucket.canceled || 0;
-  const successRate = (succeeded + failed) > 0
-    ? Math.round((succeeded / (succeeded + failed)) * 100)
-    : 0;
-
-  return { total, succeeded, failed, canceled, successRate };
+const statsOf = (total, succeeded, failed, canceled) => ({
+  total,
+  succeeded,
+  failed,
+  canceled,
+  successRate: succeeded + failed > 0 ? Math.round((succeeded / (succeeded + failed)) * 100) : 0,
 });
+
+// The counters of the workspace (or, in My Workspace, of your own runs),
+// counted as each run finishes. With notebooks hidden, their share
+// (counters.interactive) is taken out, so the overview matches the list.
+const dashboardStats = computed(() => {
+  const all = orgCounters.value?.allTime;
+  if (!all?.totalRuns) return null;
+  const nb = props.excludeNotebooks ? orgCounters.value.interactive?.allTime || {} : {};
+  const less = (k) => Math.max(0, (all[k] || 0) - (nb[k] || 0));
+  const total = less("totalRuns");
+  if (!total) return null;
+  return statsOf(total, less("succeeded"), less("failed"), less("canceled"));
+});
+
+// Nothing has run at all (not just nothing in a range or filter): one
+// welcome in place of an empty overview and list. Notebook sessions may
+// have run while they're hidden.
+const filtersDefault = computed(
+  () => statusFilter.value === "all" && workflowFilter.value === "all" && dashboardRange.value === "allTime"
+);
+const nothingRun = computed(
+  () => !isLoading.value && filtersDefault.value && !shownRuns.value.length && !dashboardStats.value
+);
+const onlyNotebooks = computed(() => props.excludeNotebooks && workflowInstances.value.length > 0);
+const toBuilder = () => router.replace({ query: { ...route.query, view: "builder" } });
+const libraryRoute = computed(() => ({ name: isMyWorkspace.value ? "my-workflows" : "workflows", query: { view: "library" } }));
 
 /*
   Filtered Runs
 */
+// The runs below the active ones: all that match the filters, less the
+// active ones above (unless the status filter asks for those).
+const earlierRuns = computed(() =>
+  statusFilter.value === "all"
+    ? filteredRuns.value.filter((r) => !["NOT_STARTED", "STARTED", "FINALIZING"].includes(r.status))
+    : filteredRuns.value
+);
+
 const filteredRuns = computed(() => {
-  let runs = workflowInstances.value;
+  let runs = shownRuns.value;
   if (computeNodeFilter.value !== "all") {
     runs = runs.filter((r) => r.computeNodeUuid === computeNodeFilter.value);
   }
@@ -182,13 +255,17 @@ watch(dashboardRange, () => {
   Navigation
 */
 const selectRun = (run) => {
-  router.push({ name: "run-detail", params: { runId: run.uuid } });
+  router.push(runRoute("run-detail", run.uuid));
 };
 
 // Open the interactive notebook for a run waiting on a user session. run-notebook
 // is a top-level route, so orgId must be passed explicitly (route param, with a
 // store fallback).
 const openNotebook = (run) => {
+  if (isMyWorkspace.value) {
+    router.push({ name: "my-run-notebook", params: { runId: run.uuid } });
+    return;
+  }
   const orgId =
     route.params.orgId || store.state.activeOrganization?.organization?.id;
   router.push({ name: "run-notebook", params: { orgId, runId: run.uuid } });
@@ -220,132 +297,14 @@ const confirmEndSession = async () => {
 };
 
 /*
-  Wizard state
+  The run dialog (RunWizardDialog): "+ Run Workflow", a Library card's Run
+  (openWizardDialog with its workflow, from the Workflows tab), a run's
+  "Rerun".
 */
-const wizardVisible = ref(false);
-const wizardStep = ref(0);
-const wizardForm = ref({ workflowId: "", computeNodeId: "", datasetId: "" });
-const rerunSource = ref(null);
-const workflowSearch = ref("");
-const computeNodeSearch = ref("");
-const datasetOptions = ref([]);
-const datasetSearchLoading = ref(false);
-const datasetSearchQuery = ref("");
-let datasetSearchTimer = null;
-const wizardStepTitles = ["Select Workflow", "Select Compute Node", "Select Dataset", "Ready to Configure"];
-
-const filteredWizardWorkflows = computed(() => {
-  const q = workflowSearch.value.toLowerCase().trim();
-  if (!q) return workflows.value;
-  return workflows.value.filter(w =>
-    w.name?.toLowerCase().includes(q) || w.description?.toLowerCase().includes(q)
-  );
-});
-
-const filteredWizardComputeNodes = computed(() => {
-  const q = computeNodeSearch.value.toLowerCase().trim();
-  if (!q) return computeNodes.value;
-  return computeNodes.value.filter(cn =>
-    cn.name?.toLowerCase().includes(q) || cn.description?.toLowerCase().includes(q)
-  );
-});
-
-const wizardSelectedWorkflow = computed(() =>
-  workflows.value.find(w => w.uuid === wizardForm.value.workflowId) || null
-);
-const wizardSelectedComputeNode = computed(() =>
-  computeNodes.value.find(cn => cn.uuid === wizardForm.value.computeNodeId) || null
-);
-const wizardSelectedDataset = computed(() =>
-  datasetOptions.value.find(d => d.content?.id === wizardForm.value.datasetId) || null
-);
-
-const wizardCanNext = computed(() => {
-  if (wizardStep.value === 0) return !!wizardForm.value.workflowId;
-  if (wizardStep.value === 1) return !!wizardForm.value.computeNodeId;
-  if (wizardStep.value === 2) return !!wizardForm.value.datasetId;
-  return true;
-});
-
-const fetchDatasetOptions = async (query = "") => {
-  datasetSearchLoading.value = true;
-  try {
-    const token = await useGetToken();
-    const params = toQueryParams({
-      limit: 25,
-      offset: 0,
-      query,
-      orderBy: "IntId",
-      orderDirection: "Desc",
-      type: "research",
-      api_key: token,
-    });
-    const url = `${config.value.apiUrl}/datasets/paginated?${params}`;
-    const response = await useSendXhr(url);
-    datasetOptions.value = response?.datasets || response || [];
-  } catch (err) {
-    console.error("Failed to fetch datasets:", err);
-    datasetOptions.value = [];
-  } finally {
-    datasetSearchLoading.value = false;
-  }
-};
-
-const onDatasetSearch = (query) => {
-  clearTimeout(datasetSearchTimer);
-  datasetSearchTimer = setTimeout(() => fetchDatasetOptions(query), 300);
-};
-
-const openWizardDialog = () => {
-  wizardForm.value = { workflowId: "", computeNodeId: "", datasetId: "" };
-  workflowSearch.value = "";
-  computeNodeSearch.value = "";
-  datasetSearchQuery.value = "";
-  wizardStep.value = 0;
-  rerunSource.value = null;
-  wizardVisible.value = true;
-  fetchDatasetOptions();
-};
-
-const rerunFromRun = async (run) => {
-  try {
-    await store.dispatch("analysisModule/setSelectedWorkflowActivity", run);
-    const fullRun = store.getters["analysisModule/selectedWorkflowActivity"];
-    rerunSource.value = fullRun || run;
-  } catch {
-    rerunSource.value = run;
-  }
-
-  wizardForm.value = {
-    workflowId: run.workflowUuid || "",
-    computeNodeId: run.computeNodeUuid || "",
-    datasetId: run.datasetId || "",
-  };
-  workflowSearch.value = "";
-  computeNodeSearch.value = "";
-  wizardStep.value = 3;
-  wizardVisible.value = true;
-  fetchDatasetOptions();
-};
-
-const wizardNext = () => {
-  if (wizardStep.value < 3) wizardStep.value++;
-};
-
-const wizardBack = () => {
-  if (wizardStep.value > 0) wizardStep.value--;
-};
-
-const wizardConfirm = () => {
-  store.commit("analysisModule/SET_PENDING_RUN_CONFIG", {
-    workflowId: wizardForm.value.workflowId,
-    computeNodeId: wizardForm.value.computeNodeId,
-    datasetId: wizardForm.value.datasetId,
-    rerunSource: rerunSource.value,
-  });
-  wizardVisible.value = false;
-  router.push({ name: "run-configure" });
-};
+const wizardRef = ref(null);
+const openWizardDialog = (workflowId) => wizardRef.value?.open(typeof workflowId === "string" ? workflowId : undefined);
+const rerunFromRun = (run) => wizardRef.value?.rerun(run);
+defineExpose({ openWizardDialog });
 
 /*
   Live-update event handlers (run-level only)
@@ -376,6 +335,7 @@ onMounted(async () => {
       store.dispatch("analysisModule/fetchComputeNodes"),
       store.dispatch("analysisModule/fetchWorkflows"),
       fetchOrgCounters(),
+      ...(isMyWorkspace.value ? [fetchPublicWorkflows()] : []),
     ]);
   } catch (err) {
     console.error("Failed to load data:", err);
@@ -402,11 +362,11 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="runs-overview">
+  <div class="runs-overview" :class="{ 'is-embedded': embedded }">
     <!-- Header -->
-    <div class="builder-header">
+    <div v-if="!embedded" class="builder-header">
       <div class="header-actions">
-        <bf-button @click="openWizardDialog">Initiate Workflow</bf-button>
+        <bf-button @click="openWizardDialog">+ Run Workflow</bf-button>
       </div>
     </div>
 
@@ -458,12 +418,32 @@ onBeforeUnmount(() => {
           </div>
         </div>
 
+        <!-- Nothing has run yet: a welcome, with where to start -->
+        <div v-if="nothingRun && !activeRuns.length" class="runs-welcome">
+          <IconControllerPlay :width="40" :height="40" color="currentColor" class="runs-welcome-icon" />
+          <h3>No workflow runs yet</h3>
+          <p v-if="onlyNotebooks">
+            Only notebook sessions so far. Tick <strong>Include notebooks</strong> to see them here.
+          </p>
+          <p v-else>
+            When you run a workflow, it shows here: live while it runs, then with its status, logs and cost.
+          </p>
+          <div class="runs-welcome-actions">
+            <bf-button @click="openWizardDialog">Run a workflow</bf-button>
+            <template v-if="embedded">
+              <bf-button class="secondary" @click="toBuilder">Build a workflow</bf-button>
+              <router-link :to="libraryRoute" class="runs-welcome-link">Browse workflows</router-link>
+            </template>
+          </div>
+        </div>
+
+        <template v-else>
         <!-- Aggregate Stats -->
         <div class="dashboard-section">
           <div class="dashboard-section-header">
             <h3 class="dashboard-section-title">
               Overview
-              <el-tooltip content="Metrics update approximately every 15 minutes" placement="top">
+              <el-tooltip content="Counted as each run finishes" placement="top">
                 <IconInfoSmall :width="24" :height="24" color="#9ca3af" class="dashboard-info-icon" />
               </el-tooltip>
             </h3>
@@ -501,122 +481,49 @@ onBeforeUnmount(() => {
             </div>
           </div>
           <div v-else class="dashboard-empty-range">
-            No runs in this time range
+            No runs in this time range<template v-if="embedded">
+              · <button type="button" class="link-button" @click="emit('open-library')">Start one from the Library</button></template>
           </div>
         </div>
 
-        <!-- Recent Completions -->
-        <div v-if="recentCompletedRuns.length > 0" class="dashboard-section">
-          <h3 class="dashboard-section-title">Recent Completions</h3>
-          <div class="recent-runs-list">
-            <div
-              v-for="run in recentCompletedRuns"
-              :key="run.uuid"
-              class="recent-run-row"
-              @click="selectRun(run)"
-            >
-              <span class="run-status-dot" :class="statusDotClass(run.status)" />
-              <span class="recent-run-name">{{ runDisplayName(run) || 'Unnamed' }}</span>
-              <span class="recent-run-status">{{ statusLabel(run.status) }}</span>
-              <span class="recent-run-time">{{ formatTime(run.completedAt || run.startedAt) }}</span>
-            </div>
-          </div>
-        </div>
-
-        <!-- Empty fallback -->
-        <div v-if="!dashboardStats && activeRuns.length === 0" class="empty-canvas">
-          <h3>No runs yet</h3>
-          <p>Initiate a workflow to see run activity here</p>
-        </div>
+        <!-- Earlier runs: the same list as the Notebooks tab's, with the
+             filters above it -->
+        <run-history
+          :from="embedded ? 'workflows' : ''"
+          :title="activeRuns.length ? 'Earlier runs' : 'Runs'"
+          :runs="earlierRuns"
+          :loading="isLoading"
+          :has-more="hasMoreRuns"
+          :loading-more="isLoadingMore"
+          empty-text="No runs match these filters."
+          search-placeholder="Search runs…"
+          show-workflow
+          :node-name="computeNodeName"
+          :user-name="getUserName"
+          @load-more="loadMoreRuns"
+        >
+          <template #filters>
+            <el-select v-model="statusFilter" size="small" class="run-filter-select">
+              <el-option v-for="opt in runStatusOptions" :key="opt.value" :label="opt.label" :value="opt.value" />
+            </el-select>
+            <el-select v-model="workflowFilter" size="small" class="run-filter-select" filterable>
+              <el-option label="All workflows" value="all" />
+              <el-option v-for="wf in workflows" :key="wf.uuid" :label="wf.name" :value="wf.uuid" />
+            </el-select>
+            <el-select v-if="computeNodes.length > 1" v-model="computeNodeFilter" size="small" class="run-filter-select">
+              <el-option label="All compute nodes" value="all" />
+              <el-option v-for="cn in computeNodes" :key="cn.uuid" :label="cn.name" :value="cn.uuid" />
+            </el-select>
+          </template>
+          <template #actions="{ run }">
+            <button class="rerun-btn" title="Rerun with this configuration" @click="rerunFromRun(run)">
+              <IconRotateRight :width="16" :height="16" />
+            </button>
+          </template>
+        </run-history>
+        </template>
       </div>
 
-      <!-- Sidebar: Runs list -->
-      <div class="applications-sidebar">
-        <el-collapse v-model="accordionActiveNames" class="sidebar-accordion">
-          <el-collapse-item title="Runs" name="runs">
-            <div class="filter-bar">
-              <el-select
-                v-model="statusFilter"
-                placeholder="Filter by status"
-                size="small"
-                class="run-filter-select"
-              >
-                <el-option
-                  v-for="opt in runStatusOptions"
-                  :key="opt.value"
-                  :label="opt.label"
-                  :value="opt.value"
-                />
-              </el-select>
-              <el-select
-                v-model="workflowFilter"
-                placeholder="Filter by workflow"
-                size="small"
-                class="run-filter-select"
-              >
-                <el-option label="All Workflows" value="all" />
-                <el-option
-                  v-for="wf in workflows"
-                  :key="wf.uuid"
-                  :label="wf.name"
-                  :value="wf.uuid"
-                />
-              </el-select>
-              <el-select
-                v-model="computeNodeFilter"
-                placeholder="Filter by compute node"
-                size="small"
-                class="run-filter-select"
-              >
-                <el-option label="All Compute Nodes" value="all" />
-                <el-option
-                  v-for="cn in computeNodes"
-                  :key="cn.uuid"
-                  :label="cn.name"
-                  :value="cn.uuid"
-                />
-              </el-select>
-            </div>
-
-            <div v-if="isLoading" class="loading">Loading runs...</div>
-            <div v-else class="workflow-list">
-              <div
-                v-for="run in filteredRuns"
-                :key="run.uuid"
-                class="workflow-list-item"
-                @click="selectRun(run)"
-              >
-                <span class="run-status-dot" :class="statusDotClass(run.status)"></span>
-                <div class="wf-item-info">
-                  <div class="wf-item-name">{{ runDisplayName(run) || formatTime(run.startedAt) }}</div>
-                  <div v-if="run.name" class="wf-item-meta">{{ run.workflowName || 'Unnamed workflow' }}</div>
-                  <div class="wf-item-meta">{{ formatTime(run.startedAt) }}</div>
-                  <div class="wf-item-meta">{{ computeNodeName(run.computeNodeUuid) }}</div>
-                  <div class="wf-item-meta">{{ getUserName(run.createdBy) }}</div>
-                </div>
-                <button
-                  class="rerun-btn"
-                  title="Rerun with this configuration"
-                  @click.stop="rerunFromRun(run)"
-                >
-                  <IconRotateRight :width="16" :height="16" />
-                </button>
-              </div>
-              <div v-if="filteredRuns.length === 0" class="workflow-list-empty">
-                No runs found
-              </div>
-              <button
-                v-if="hasMoreRuns"
-                class="load-more-btn"
-                :disabled="isLoadingMore"
-                @click="loadMoreRuns"
-              >
-                {{ isLoadingMore ? 'Loading...' : 'Load more runs' }}
-              </button>
-            </div>
-          </el-collapse-item>
-        </el-collapse>
-      </div>
     </div>
 
     <!-- End-session confirmation (Pennsieve dialog, not the browser prompt) -->
@@ -647,165 +554,7 @@ onBeforeUnmount(() => {
       </template>
     </el-dialog>
 
-    <!-- Wizard Dialog -->
-    <el-dialog
-      v-model="wizardVisible"
-      :title="wizardStepTitles[wizardStep]"
-      width="560px"
-      :close-on-click-modal="false"
-    >
-      <div class="wizard-body">
-        <!-- Progress dots -->
-        <div class="wizard-progress">
-          <span
-            v-for="(title, i) in wizardStepTitles"
-            :key="i"
-            class="wizard-dot"
-            :class="{ active: wizardStep === i, done: wizardStep > i }"
-          ></span>
-        </div>
-
-        <!-- Step 0: Workflow -->
-        <div v-if="wizardStep === 0" class="wizard-step">
-          <p class="wizard-step-desc">Choose a workflow definition to run.</p>
-          <div v-if="wizardSelectedWorkflow" class="wizard-selection">
-            <div class="wizard-selection-header">
-              <span class="wizard-selection-name">{{ wizardSelectedWorkflow.name }}</span>
-              <button class="wizard-selection-clear" @click="wizardForm.workflowId = ''">&times;</button>
-            </div>
-            <div v-if="wizardSelectedWorkflow.description" class="wizard-selection-desc">{{ wizardSelectedWorkflow.description }}</div>
-            <div class="wizard-selection-meta">{{ (wizardSelectedWorkflow.dag || []).length }} processors</div>
-          </div>
-          <template v-else>
-            <el-input
-              v-model="workflowSearch"
-              placeholder="Filter workflows..."
-              clearable
-              class="wizard-search"
-            />
-            <div class="wizard-cards">
-              <div
-                v-for="wf in filteredWizardWorkflows"
-                :key="wf.uuid"
-                class="wizard-card"
-                :class="{ disabled: !wf.isActive }"
-                @click="wf.isActive && (wizardForm.workflowId = wf.uuid, workflowSearch = '')"
-              >
-                <div class="wizard-card-name">{{ wf.name }}</div>
-                <div v-if="wf.description" class="wizard-card-desc">{{ wf.description }}</div>
-                <div class="wizard-card-meta">
-                  {{ (wf.dag || []).length }} processors
-                  <span v-if="!wf.isActive" class="wizard-card-badge">Archived</span>
-                </div>
-              </div>
-              <div v-if="filteredWizardWorkflows.length === 0" class="wizard-cards-loading">No workflows found</div>
-            </div>
-          </template>
-        </div>
-
-        <!-- Step 1: Compute Node -->
-        <div v-if="wizardStep === 1" class="wizard-step">
-          <p class="wizard-step-desc">Select the compute node to execute the workflow on.</p>
-          <div v-if="wizardSelectedComputeNode" class="wizard-selection">
-            <div class="wizard-selection-header">
-              <span class="wizard-selection-name">{{ wizardSelectedComputeNode.name }}</span>
-              <button class="wizard-selection-clear" @click="wizardForm.computeNodeId = ''">&times;</button>
-            </div>
-            <div v-if="wizardSelectedComputeNode.description" class="wizard-selection-desc">{{ wizardSelectedComputeNode.description }}</div>
-          </div>
-          <template v-else>
-            <el-input
-              v-model="computeNodeSearch"
-              placeholder="Filter compute nodes..."
-              clearable
-              class="wizard-search"
-            />
-            <div class="wizard-cards">
-              <div
-                v-for="cn in filteredWizardComputeNodes"
-                :key="cn.uuid"
-                class="wizard-card"
-                @click="wizardForm.computeNodeId = cn.uuid"
-              >
-                <div class="wizard-card-name">{{ cn.name }}</div>
-                <div v-if="cn.description" class="wizard-card-desc">{{ cn.description }}</div>
-              </div>
-              <div v-if="filteredWizardComputeNodes.length === 0" class="wizard-cards-loading">No compute nodes found</div>
-            </div>
-          </template>
-        </div>
-
-        <!-- Step 2: Dataset -->
-        <div v-if="wizardStep === 2" class="wizard-step">
-          <p class="wizard-step-desc">Search and select the dataset to process.</p>
-          <div v-if="wizardSelectedDataset" class="wizard-selection">
-            <div class="wizard-selection-header">
-              <span class="wizard-selection-name">{{ wizardSelectedDataset.content?.name }}</span>
-              <button class="wizard-selection-clear" @click="wizardForm.datasetId = ''">&times;</button>
-            </div>
-            <div v-if="wizardSelectedDataset.content?.description" class="wizard-selection-desc">{{ wizardSelectedDataset.content.description }}</div>
-          </div>
-          <template v-else>
-            <el-input
-              v-model="datasetSearchQuery"
-              placeholder="Search datasets..."
-              clearable
-              class="wizard-search"
-              @input="onDatasetSearch"
-            />
-            <div class="wizard-cards">
-              <div v-if="datasetSearchLoading" class="wizard-cards-loading">Searching...</div>
-              <div
-                v-for="ds in datasetOptions"
-                :key="ds.content?.id"
-                class="wizard-card"
-                @click="wizardForm.datasetId = ds.content?.id"
-              >
-                <div class="wizard-card-name">{{ ds.content?.name }}</div>
-                <div v-if="ds.content?.description" class="wizard-card-desc">{{ ds.content.description }}</div>
-              </div>
-              <div v-if="!datasetSearchLoading && datasetOptions.length === 0" class="wizard-cards-loading">No datasets found</div>
-            </div>
-          </template>
-        </div>
-
-        <!-- Step 3: Confirm -->
-        <div v-if="wizardStep === 3" class="wizard-step">
-          <p class="wizard-step-desc">Review your selections before proceeding.</p>
-          <div class="wizard-summary">
-            <div class="wizard-summary-row">
-              <span class="wizard-summary-label">Workflow</span>
-              <span class="wizard-summary-value">{{ wizardSelectedWorkflow?.name || wizardForm.workflowId }}</span>
-            </div>
-            <div class="wizard-summary-row">
-              <span class="wizard-summary-label">Compute Node</span>
-              <span class="wizard-summary-value">{{ wizardSelectedComputeNode?.name || wizardForm.computeNodeId }}</span>
-            </div>
-            <div class="wizard-summary-row">
-              <span class="wizard-summary-label">Dataset</span>
-              <span class="wizard-summary-value">{{ wizardSelectedDataset?.content?.name || wizardForm.datasetId }}</span>
-            </div>
-          </div>
-          <div v-if="rerunSource" class="wizard-hint">
-            All processor parameters and execution targets will be copied from the previous run. You will still need to configure <strong>data source</strong> nodes to select files before executing.
-          </div>
-          <div v-else class="wizard-hint">
-            After clicking <strong>Configure</strong>, you will be able to click on <strong>data source</strong> nodes to select files, and on <strong>processor</strong> nodes to adjust settings before executing the run.
-          </div>
-        </div>
-      </div>
-
-      <template #footer>
-        <div class="run-dialog-footer">
-          <bf-button class="secondary" @click="wizardVisible = false">Cancel</bf-button>
-          <div class="wizard-footer-right">
-            <bf-button v-if="wizardStep > 0" class="secondary" @click="wizardBack">Back</bf-button>
-            <bf-button v-if="wizardStep < 3" :disabled="!wizardCanNext" @click="wizardNext">Next</bf-button>
-            <bf-button v-else @click="wizardConfirm">Configure</bf-button>
-          </div>
-        </div>
-      </template>
-    </el-dialog>
+    <RunWizardDialog ref="wizardRef" />
   </div>
 </template>
 
@@ -818,6 +567,10 @@ onBeforeUnmount(() => {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+}
+/* In the Workflows tab, which sizes it below its toolbar. */
+.runs-overview.is-embedded {
+  height: 100%;
 }
 
 .builder-header {
@@ -859,21 +612,14 @@ onBeforeUnmount(() => {
   overflow: hidden;
 }
 
+/* White, with its sections as wide as the Notebooks tab's. */
 .runs-main {
   flex: 1;
   overflow-y: auto;
-  padding: 24px 32px;
-  background: theme.$gray_1;
+  padding: 20px 32px;
+  background: theme.$white;
 }
-
-.empty-canvas {
-  text-align: center;
-  color: theme.$gray_4;
-  padding: 60px 20px;
-
-  h3 { margin: 0 0 10px 0; }
-  p { margin: 0; font-size: 14px; }
-}
+.runs-main > .dashboard-section,
 
 /* Dashboard */
 .dashboard-section {
@@ -946,6 +692,56 @@ onBeforeUnmount(() => {
   50% { opacity: 0.8; box-shadow: 0 0 0 6px rgba(6, 182, 212, 0); }
 }
 
+.runs-welcome {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 72px 20px;
+  border: 1px dashed theme.$gray_3;
+  text-align: center;
+
+  h3 {
+    margin: 4px 0 0;
+    font-size: 16px;
+    font-weight: 600;
+    color: theme.$gray_6;
+  }
+  p {
+    max-width: 420px;
+    margin: 0;
+    font-size: 14px;
+    line-height: 1.5;
+    color: theme.$gray_5;
+  }
+}
+.runs-welcome-icon {
+  color: theme.$purple_1;
+}
+.runs-welcome-actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-top: 12px;
+}
+.runs-welcome-link {
+  font-size: 14px;
+  color: theme.$link-color;
+  text-decoration: none;
+
+  &:hover {
+    color: theme.$link-color-hover;
+  }
+}
+.link-button {
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  color: theme.$purple_3;
+  text-decoration: underline;
+  cursor: pointer;
+}
 .dashboard-empty-range {
   font-size: 13px;
   color: theme.$gray_4;
@@ -1074,48 +870,10 @@ onBeforeUnmount(() => {
   margin-top: 4px;
 }
 
-.recent-runs-list {
-  background: theme.$white;
-  border: 1px solid theme.$gray_3;
-  border-radius: 4px;
-  overflow: hidden;
-}
 
-.recent-run-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 16px;
-  cursor: pointer;
-  font-size: 13px;
-  border-bottom: 1px solid theme.$gray_2;
-  transition: background 0.15s;
 
-  &:last-child { border-bottom: none; }
-  &:hover { background: theme.$gray_1; }
-}
 
-.recent-run-name {
-  font-weight: 500;
-  color: theme.$black;
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
 
-.recent-run-status {
-  font-size: 12px;
-  color: theme.$gray_4;
-  white-space: nowrap;
-}
-
-.recent-run-time {
-  font-size: 12px;
-  color: theme.$gray_4;
-  white-space: nowrap;
-}
 
 /* Status dots */
 .run-status-dot {
@@ -1132,131 +890,29 @@ onBeforeUnmount(() => {
   &.dot-red { background-color: theme.$status_red; }
 }
 
-/* Sidebar */
-.applications-sidebar {
-  width: 350px;
-  background-color: theme.$white;
-  border-left: 1px solid theme.$gray_2;
-  overflow-y: auto;
-  padding: 16px;
+/* Rerun, at the end of a row of the earlier runs. */
+.rerun-btn {
   display: flex;
-  flex-direction: column;
-  gap: 12px;
-
-  .loading {
-    text-align: center;
-    padding: 20px;
-    color: theme.$gray_4;
-  }
-}
-
-.sidebar-accordion { border-top: none; }
-
-.filter-bar {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  margin-bottom: 10px;
-}
-.run-filter-select { width: 100%; }
-
-.workflow-list {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  overflow-y: auto;
-}
-
-.workflow-list-item {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  padding: 10px 12px;
-  background-color: theme.$gray_1;
-  border: 1px solid theme.$gray_2;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  border: none;
+  border-radius: 4px;
+  background: none;
+  color: theme.$gray_4;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: color 0.15s, background 0.15s;
 
   &:hover {
-    border-color: theme.$purple_1;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  }
-
-  .wf-item-info {
-    flex: 1;
-    min-width: 0;
-  }
-
-  .rerun-btn {
-    background: none;
-    border: none;
-    color: theme.$gray_4;
-    cursor: pointer;
-    padding: 4px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 4px;
-    opacity: 0;
-    transition: opacity 0.15s, color 0.15s, background 0.15s;
-    flex-shrink: 0;
-    align-self: center;
-
-    &:hover {
-      color: theme.$purple_1;
-      background: rgba(0, 0, 0, 0.05);
-    }
-  }
-
-  &:hover .rerun-btn {
-    opacity: 1;
-  }
-
-  .wf-item-name {
-    font-weight: 600;
-    font-size: 13px;
-    color: theme.$black;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-
-  .wf-item-meta {
-    font-size: 11px;
-    color: theme.$gray_4;
-    margin-top: 2px;
+    color: theme.$purple_1;
+    background: rgba(0, 0, 0, 0.05);
   }
 }
 
-.workflow-list-empty {
-  padding: 16px;
-  text-align: center;
-  font-size: 13px;
-  color: theme.$gray_4;
+.run-filter-select {
+  width: 160px;
 }
 
-.load-more-btn {
-  display: block;
-  width: 100%;
-  padding: 10px;
-  border: none;
-  background: none;
-  color: theme.$purple_1;
-  font-size: 13px;
-  cursor: pointer;
-  border-top: 1px solid theme.$gray_2;
-
-  &:hover:not(:disabled) {
-    background: theme.$gray_1;
-  }
-
-  &:disabled {
-    color: theme.$gray_4;
-    cursor: default;
-  }
-}
-
-/* Dialogs */
 .run-dialog-footer {
   display: flex;
   justify-content: space-between;
@@ -1270,207 +926,4 @@ onBeforeUnmount(() => {
   gap: 8px;
 }
 
-/* Wizard dialog */
-.wizard-body {
-  min-height: 320px;
-  display: flex;
-  flex-direction: column;
-}
-
-.wizard-progress {
-  display: flex;
-  justify-content: center;
-  gap: 8px;
-  margin-bottom: 20px;
-}
-
-.wizard-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: theme.$gray_2;
-  transition: background 0.2s;
-
-  &.active {
-    background: theme.$purple_1;
-  }
-
-  &.done {
-    background: theme.$green_1;
-  }
-}
-
-.wizard-step {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-}
-
-.wizard-step-desc {
-  font-size: 13px;
-  color: theme.$gray_4;
-  margin: 0 0 16px 0;
-}
-
-.wizard-selection {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding: 12px 16px;
-  background: theme.$purple_tint;
-  border: 1px solid theme.$purple_1;
-  margin-bottom: 8px;
-}
-
-.wizard-selection-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.wizard-selection-name {
-  font-size: 14px;
-  font-weight: 600;
-  color: theme.$black;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  flex: 1;
-}
-
-.wizard-selection-desc {
-  font-size: 12px;
-  color: theme.$gray_5;
-  line-height: 1.4;
-}
-
-.wizard-selection-meta {
-  font-size: 11px;
-  color: theme.$gray_4;
-  margin-top: 2px;
-}
-
-.wizard-selection-clear {
-  background: none;
-  border: none;
-  font-size: 16px;
-  color: theme.$gray_4;
-  cursor: pointer;
-  padding: 0 2px;
-  line-height: 1;
-  flex-shrink: 0;
-
-  &:hover {
-    color: theme.$black;
-  }
-}
-
-.wizard-search {
-  margin-bottom: 12px;
-}
-
-.wizard-cards {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  max-height: 280px;
-  overflow-y: auto;
-}
-
-.wizard-cards-loading {
-  padding: 20px;
-  text-align: center;
-  font-size: 13px;
-  color: theme.$gray_4;
-}
-
-.wizard-card {
-  padding: 12px 14px;
-  border: 1px solid theme.$gray_2;
-  cursor: pointer;
-  transition: border-color 0.15s, background 0.15s;
-
-  &:hover:not(.disabled) {
-    border-color: theme.$gray_3;
-    background: theme.$gray_1;
-  }
-
-  &.disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-  }
-}
-
-.wizard-card-name {
-  font-size: 14px;
-  font-weight: 600;
-  color: theme.$black;
-  margin-bottom: 2px;
-}
-
-.wizard-card-desc {
-  font-size: 12px;
-  color: theme.$gray_4;
-  line-height: 1.4;
-  margin-bottom: 4px;
-}
-
-.wizard-card-meta {
-  font-size: 11px;
-  color: theme.$gray_4;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.wizard-card-badge {
-  font-size: 10px;
-  padding: 1px 6px;
-  border-radius: 3px;
-  background: theme.$gray_2;
-  color: theme.$gray_5;
-}
-
-.wizard-summary {
-  display: flex;
-  flex-direction: column;
-  gap: 0;
-  border: 1px solid theme.$gray_2;
-  overflow: hidden;
-  margin-bottom: 16px;
-}
-
-.wizard-summary-row {
-  display: flex;
-  justify-content: space-between;
-  padding: 10px 14px;
-  font-size: 13px;
-
-  &:not(:last-child) {
-    border-bottom: 1px solid theme.$gray_2;
-  }
-}
-
-.wizard-summary-label {
-  color: theme.$gray_4;
-  font-weight: 500;
-}
-
-.wizard-summary-value {
-  color: theme.$black;
-  font-weight: 600;
-}
-
-.wizard-hint {
-  padding: 12px 14px;
-  background: theme.$yellow_tint;
-  font-size: 13px;
-  line-height: 1.5;
-  color: theme.$gray_5;
-}
-
-.wizard-footer-right {
-  display: flex;
-  gap: 8px;
-}
 </style>

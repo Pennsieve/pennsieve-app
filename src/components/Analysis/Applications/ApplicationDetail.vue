@@ -1,14 +1,21 @@
 <script setup>
-import { computed, ref, watch } from "vue";
+import { computed, onBeforeUnmount, ref, watch } from "vue";
 import { useStore } from "vuex";
+import { useRoute, useRouter } from "vue-router";
 import { marked } from "marked";
 import DOMPurify from "dompurify";
 import { load as loadYaml } from "js-yaml";
 
 import IconInfoSmall from "../../icons/IconInfoSmall.vue";
 import MetricsDashboard from "../Metrics/MetricsDashboard.vue";
-import { parseManifest } from "./applicationSchema";
-import AppPermissions from "../../user/code/AppPermissions.vue";
+import { parseManifest, MANIFEST_SHAPES, PARAM_TYPE_OPTIONS, conformsToList } from "./applicationSchema";
+import BfButton from "../../shared/bf-button/BfButton.vue";
+import { fetchRepository, canUpdateManifest } from "./githubRepository";
+import ReleaseDialog from "./ReleaseDialog.vue";
+import ShareAppDialog from "./ShareAppDialog.vue";
+import { accessEntries, accessSummary, makeNamer } from "./appSharing";
+import { useWorkspaceMembers } from "./useWorkspaceMembers";
+import { fetchReleaseStatus, releaseNudge } from "./release";
 import AppArchiveToggle from "../../user/code/AppArchiveToggle.vue";
 import { useGetToken } from "@/composables/useGetToken";
 import { useSendXhr } from "@/mixins/request/request_composable";
@@ -37,6 +44,13 @@ const versionsPage = ref(1);
   Store computed
 */
 const store = useStore();
+const route = useRoute();
+// Shown in a workspace and in My Workspace (My Analysis), where there's no
+// organization in the route and route names carry a "my-" prefix.
+const isMyWorkspace = computed(() => !route.params.orgId);
+const scopedRoute = (name, params = {}) => ({ name: isMyWorkspace.value ? `my-${name}` : name, params });
+// An app's page leads back to the Apps tab.
+const appsRoute = computed(() => scopedRoute("apps"));
 
 const profile = computed(() => store.state.profile);
 const orgMembers = computed(() => store.state.orgMembers || []);
@@ -60,12 +74,6 @@ const repoName = computed(
   () => parseGitHubDisplay(detail.value?.sourceUrl) || "Unknown repo"
 );
 
-const visibilityLabel = computed(() => {
-  const visibility = detail.value?.visibility;
-  if (visibility !== "public" && visibility !== "private") return null;
-  return visibility === "private" ? "Private" : "Public";
-});
-
 const githubRepoUrl = computed(() => {
   const info = parseGitHubRepo(detail.value?.sourceUrl);
   return info ? `https://github.com/${info.owner}/${info.repo}` : null;
@@ -78,23 +86,122 @@ const isAppOwner = computed(() => {
   return !!ownerId && (ownerId === id || ownerId === intId);
 });
 
-// Permissions only apply to private applications.
-const isPublic = computed(() => detail.value?.isPrivate === false);
+// The manifest builder, opened for this app. Anyone signed in may open it:
+// the owner as the page's main action, others to propose a file to the repo.
+const builderForApp = computed(() => ({ ...scopedRoute("application-manifest-builder"), query: { app: props.uuid } }));
+const builderLabel = computed(() => (hasManifest.value ? "Update app.yml" : "Create app.yml"));
+// The owner, or anyone who can push to the repository (github-service's
+// viewerCanPush), gets the main action and the owner's wording.
+const repository = ref(null);
+watch(
+  () => detail.value?.sourceUrl,
+  async (url) => {
+    repository.value = null;
+    const repo = parseGitHubRepo(url);
+    if (repo) repository.value = await fetchRepository(store.state.config?.api2Url, repo);
+  },
+  { immediate: true }
+);
+const canUpdate = computed(() => canUpdateManifest(isAppOwner.value, repository.value));
+const router = useRouter();
+const openBuilder = () => router.push(builderForApp.value);
 
-// Private GitHub repos return 401 from raw.githubusercontent.com, so we can't
-// render their README (or its images) in the browser. Show a link instead.
+/*
+  Release: anyone who can push publishes a release from here, as themselves.
+  The app store adds the version from the release webhook; the page checks
+  back until it's there. Releasing on GitHub keeps working too.
+*/
+const releaseOpen = ref(false);
+const releaseRepo = computed(() => parseGitHubRepo(detail.value?.sourceUrl));
+const canRelease = computed(() => !!releaseRepo.value && canUpdate.value);
+// Versions already out: the repository's releases and the app store's.
+const knownTags = computed(() => [
+  ...(repository.value?.releases || []).map((r) => r.label),
+  ...(detail.value?.versions || []).map((v) => v.version),
+].filter(Boolean));
+// Where the default branch stands against the latest release: Release is
+// offered when there's something new, with a nudge saying how much.
+const releaseStatus = ref(null);
+const loadReleaseStatus = async () => {
+  releaseStatus.value = null;
+  if (!canRelease.value) return;
+  const token = await useGetToken();
+  releaseStatus.value = await fetchReleaseStatus(store.state.config?.api2Url, releaseRepo.value, token);
+};
+watch(canRelease, loadReleaseStatus, { immediate: true });
+const nothingToRelease = computed(() => releaseStatus.value?.canRelease === false);
+const nudge = computed(() => releaseNudge(releaseStatus.value));
+let releaseWatch = null;
+const stopReleaseWatch = () => {
+  if (releaseWatch) clearTimeout(releaseWatch);
+  releaseWatch = null;
+};
+const onReleased = ({ tag }) => {
+  stopReleaseWatch();
+  loadReleaseStatus();
+  const bare = (s) => String(s || "").replace(/^v/, "");
+  let tries = 0;
+  // Every 20 s for up to 10 minutes, until the app store has the version.
+  const check = async () => {
+    tries += 1;
+    await loadDetail(props.uuid);
+    const there = (detail.value?.versions || []).some((v) => bare(v.version) === bare(tag));
+    if (!there && tries < 30) releaseWatch = setTimeout(check, 20000);
+    else releaseWatch = null;
+  };
+  releaseWatch = setTimeout(check, 20000);
+};
+onBeforeUnmount(stopReleaseWatch);
+
+// Permissions only apply to private applications.
+const isPublic = computed(() => detail.value?.visibility === "public" || detail.value?.isPrivate === false);
+
+// Private GitHub repos return 401 from raw.githubusercontent.com, so their
+// README's own images can't load in the browser; the README text comes with
+// the app's details (app-deploy-service reads it at release) and is shown.
 const isPrivateRepo = computed(
   () => detail.value?.visibility === "private" || detail.value?.isPrivate === true
 );
 
-// Anyone can open a public repo on GitHub. A private repo is only viewable by
-// the owner (others must request permission from the repo owner).
-const canViewOnGitHub = computed(() => !isPrivateRepo.value || isAppOwner.value);
+// Anyone can open a public repo on GitHub. A private repo: its owner and
+// anyone who can push to it (others must request permission from its owner).
+const canViewOnGitHub = computed(() => !isPrivateRepo.value || canUpdate.value);
 
 // Keep the local detail in sync when the archive toggle changes status.
 const onArchiveChange = (status) => {
   if (detail.value) detail.value = { ...detail.value, status };
 };
+
+/*
+  Who can use this app: visibility, and who a private app is shared with,
+  summarized at the top of the side panel; the owner shares from the header
+  (ShareAppDialog). Visibility and access change together, so the page reloads.
+*/
+const permissions = ref([]);
+const shareOpen = ref(false);
+// People shared with may come from any of the caller's workspaces: name them.
+const { allMembers, load: loadAllMembers } = useWorkspaceMembers();
+watch(permissions, (perms) => {
+  if ((perms || []).some((p) => p?.entityType === "user" || p?.userId)) loadAllMembers();
+});
+const viewingOrgId = computed(() => store.state.activeOrganization?.organization?.id || null);
+const accessList = computed(() =>
+  accessEntries(
+    permissions.value,
+    makeNamer({
+      profile: profile.value,
+      members: [...(store.state.orgMembers || []), ...allMembers.value],
+      teams: store.state.teams || [],
+      organizations: store.state.organizations || [],
+    }),
+    viewingOrgId.value
+  )
+);
+const accessLine = computed(() => accessSummary(accessList.value, detail.value?.ownerId));
+// Chips: who else has access, the first few.
+const accessChips = computed(() =>
+  accessList.value.filter((e) => !(e.type === "user" && String(e.id) === String(detail.value?.ownerId)))
+);
 
 // Visibility may change via the permissions editor — reload to reflect it.
 const reloadAfterPermissions = () => loadDetail(props.uuid);
@@ -107,6 +214,20 @@ const sortedVersions = computed(() => {
     return bTime - aTime;
   });
 });
+
+// The newest version's license: read by app-deploy-service from the
+// repository's LICENSE file at that release (an SPDX id), not from app.yml.
+const latestLicense = computed(() => sortedVersions.value.find((v) => v.license)?.license || "");
+
+// How the newest version's app.yml doesn't follow the schema, as
+// app-deploy-service found at registration (in warn mode it registers anyway):
+// "path: reason" strings, shown as field and reason.
+const manifestProblems = computed(() =>
+  (sortedVersions.value[0]?.manifestProblems || []).map((line) => {
+    const i = String(line).indexOf(": ");
+    return i > 0 ? { path: line.slice(0, i), message: line.slice(i + 2) } : { path: "Root", message: String(line) };
+  })
+);
 
 const versionsPageCount = computed(() =>
   Math.max(1, Math.ceil(sortedVersions.value.length / versionsPageSize))
@@ -129,8 +250,13 @@ const getUserName = (userId) => {
   if (member) {
     return `${member.firstName} ${member.lastName}`.trim() || "Unknown User";
   }
-  return String(userId).includes(":") ? String(userId).split(":").pop() : String(userId);
+  // Not someone this page knows (another workspace, or outside one): say so
+  // rather than show an id.
+  return "Another Pennsieve user";
 };
+// A parameter's type as the builder names it: Text, Number, Whole number,
+// True / False, or Choice (a value from a list).
+const paramTypeLabel = (type) => PARAM_TYPE_OPTIONS.find((o) => o.value === type)?.label || type;
 
 const formatDate = (dateString) => {
   if (!dateString) return "N/A";
@@ -212,9 +338,21 @@ const renderReadme = (markdown) => {
   const rawHtml = marked.parse(markdown);
   const doc = new DOMParser().parseFromString(rawHtml, "text/html");
   const sourceUrl = detail.value?.sourceUrl;
+  const repo = parseGitHubRepo(sourceUrl);
+  const ownRaw = repo ? `https://raw.githubusercontent.com/${repo.owner}/${repo.repo}/`.toLowerCase() : "";
   doc.querySelectorAll("img").forEach((img) => {
     const src = img.getAttribute("src");
-    if (src) img.setAttribute("src", resolveAssetUrl(src, sourceUrl));
+    if (!src) return;
+    const resolved = resolveAssetUrl(src, sourceUrl);
+    // A private repo's own images need GitHub sign-in: a note, not a broken image.
+    if (isPrivateRepo.value && ownRaw && resolved.toLowerCase().startsWith(ownRaw)) {
+      const note = doc.createElement("span");
+      note.className = "readme-image-private";
+      note.textContent = `Image not shown (private repository)${img.getAttribute("alt") ? `: ${img.getAttribute("alt")}` : ""}`;
+      img.replaceWith(note);
+      return;
+    }
+    img.setAttribute("src", resolved);
   });
   readmeHtml.value = DOMPurify.sanitize(doc.body.innerHTML);
 };
@@ -227,8 +365,9 @@ const renderReadme = (markdown) => {
   manifest is optional: most applications don't have one, so every branch here
   has to tolerate its absence.
 
-  Parsing goes through applicationSchema's parseManifest(), which reads both the
-  nested shape the backend serves and the flat shape the manifest builder emits.
+  Parsing goes through applicationSchema's parseManifest(), which reads the
+  nested layout only, as the backend does; a file in the earlier flat layout
+  is reported (manifestParsed.earlier), not read.
 */
 const getManifestContent = (assets) => {
   if (!assets) return "";
@@ -255,6 +394,9 @@ const manifestParsed = computed(() => {
       return { ...empty, error: "Manifest is empty or not a YAML mapping" };
     }
     const { meta, schema } = parseManifest(doc);
+    // The earlier flat layout: nothing in it is read (the platform doesn't
+    // either), so it isn't "read successfully".
+    if (meta.shape === MANIFEST_SHAPES.FLAT) return { ...empty, earlier: true };
     return { ok: true, meta, schema, error: "" };
   } catch (err) {
     return {
@@ -290,7 +432,15 @@ const manifestSummary = computed(() => {
 
 /** Human-readable port descriptor: media types if present, else the dataType. */
 const portTypeLabel = (port) => {
-  if (port?.mediaTypes?.length) return port.mediaTypes.join(", ");
+  const structures = conformsToList(port?.conformsTo);
+  if (structures.length) {
+    const holds = port?.mediaTypes?.length ? `, holding ${port.mediaTypes.join(", ")}` : "";
+    return `${structures.join(" › ")} folder${holds}`;
+  }
+  if (port?.mediaTypes?.length) {
+    const types = port.mediaTypes.join(", ");
+    return port.container === "directory" ? `${types} (as a folder)` : types;
+  }
   return port?.dataType || "any";
 };
 
@@ -312,6 +462,12 @@ const manifestTooltip = computed(() => {
       "declares the application's runtime, compute resources, run parameters, " +
       "and input/output ports. Pennsieve read it from the repository and is " +
       "using it to configure this application."
+    );
+  }
+  if (manifestParsed.value.earlier) {
+    return (
+      "This repository's app.yml uses an earlier layout that Pennsieve no longer " +
+      "reads, so the application runs on defaults. Update it in the manifest builder."
     );
   }
   if (hasManifest.value) {
@@ -338,19 +494,15 @@ const manifestTooltip = computed(() => {
 const activeTab = ref("readme");
 const showRawManifest = ref(false);
 
-watch(hasManifest, (has) => {
-  if (!has && activeTab.value === "manifest") activeTab.value = "readme";
-});
+// The app.yml tab is always there: without a file it offers to create one.
 
 
 // Members and teams power friendly-name resolution for the owner badge.
 // They are not always preloaded when navigating directly to this page;
 // fall back to fetching them here.
 const ensureOrgData = async () => {
-  const orgId =
-    store.state.activeOrganization?.organization?.id ||
-    store.state.profile?.preferredOrganization ||
-    store.state.organizations?.[0]?.organization?.id;
+  // Only the workspace being viewed; outside one there are no members to load.
+  const orgId = store.state.activeOrganization?.organization?.id;
   if (!orgId) return;
   const needsMembers = !store.state.orgMembers?.length;
   const needsTeams = !store.state.teams?.length;
@@ -386,22 +538,19 @@ const loadDetail = async (uuid) => {
   if (!uuid) return;
   detailLoading.value = true;
   try {
-    const [detailResult] = await Promise.allSettled([
+    const [detailResult, permissionsResult] = await Promise.allSettled([
       store.dispatch("analysisModule/fetchApplication", uuid),
       store.dispatch("analysisModule/fetchApplicationPermissions", uuid),
       ensureOrgData(),
     ]);
 
+    const perms = permissionsResult?.status === "fulfilled" ? permissionsResult.value : null;
+    permissions.value = Array.isArray(perms) ? perms : perms?.access || perms?.permissions || [];
     if (detailResult.status === "fulfilled") {
       detail.value = detailResult.value;
-      // Only render the README for public repos. Private repo assets aren't
-      // reachable from the browser, so we surface a GitHub link instead.
-      const detailIsPrivate =
-        detailResult.value?.visibility === "private" ||
-        detailResult.value?.isPrivate === true;
-      if (!detailIsPrivate) {
-        renderReadme(getReadmeContent(detailResult.value?.assets));
-      }
+      // The README comes with the details, also for private repos; only
+      // their own images are left out (renderReadme).
+      renderReadme(getReadmeContent(detailResult.value?.assets));
     } else {
       console.error(detailResult.reason);
       detailError.value = "Failed to load application";
@@ -423,12 +572,28 @@ watch(
     <!-- Header -->
     <div class="builder-header">
       <span class="header-title">
-        <router-link :to="{ name: 'applications' }" class="header-back-link">Applications</router-link>
+        <router-link :to="appsRoute" class="header-back-link">Apps</router-link>
         <template v-if="detail">
           <span class="header-breadcrumb-sep">/</span>
           <span class="header-detail-name">{{ repoName }}</span>
         </template>
       </span>
+      <!-- The page's main action: publish a release (the app store follows) -->
+      <div v-if="detail && (canRelease || isAppOwner)" class="header-actions">
+        <bf-button v-if="isAppOwner" class="compact flex secondary" @click="shareOpen = true">Share</bf-button>
+        <template v-if="canRelease">
+        <span v-if="nudge" class="release-nudge">{{ nudge }}</span>
+        <el-tooltip
+          :disabled="!nothingToRelease"
+          :content="`Nothing new since ${releaseStatus?.latestTag}: the ${releaseStatus?.target} branch is at that release.`"
+          placement="bottom"
+        >
+          <span>
+            <bf-button class="compact flex" :disabled="nothingToRelease" @click="releaseOpen = true">Release a version</bf-button>
+          </span>
+        </el-tooltip>
+        </template>
+      </div>
     </div>
 
     <!-- Loading -->
@@ -439,8 +604,8 @@ watch(
     <!-- Error / Not Found -->
     <div v-else-if="detailError || !detail" class="app-not-found">
       <p>{{ detailError || "Application not found." }}</p>
-      <router-link :to="{ name: 'applications' }" class="back-link">
-        &larr; Back to Applications
+      <router-link :to="appsRoute" class="back-link">
+        &larr; Back to Apps
       </router-link>
     </div>
 
@@ -475,7 +640,6 @@ watch(
                 README
               </button>
               <button
-                v-if="hasManifest"
                 type="button"
                 role="tab"
                 class="detail-tab"
@@ -486,6 +650,9 @@ watch(
                 app.yml
               </button>
             </div>
+            <div class="readme-header-actions">
+              <bf-button v-if="activeTab === 'manifest' && canUpdate" class="compact flex" @click="openBuilder">{{ builderLabel }}</bf-button>
+              <button v-else-if="activeTab === 'manifest'" type="button" class="app-yml-btn" @click="openBuilder">{{ builderLabel }}</button>
             <el-tooltip
               v-if="githubRepoUrl"
               :content="canViewOnGitHub ? '' : 'This repo is private. Request permission from repo owner to view on Github.'"
@@ -511,34 +678,74 @@ watch(
                 </span>
               </span>
             </el-tooltip>
+            </div>
           </div>
           <!-- README tab -->
           <template v-if="activeTab === 'readme'">
-            <div v-if="isPrivateRepo" class="readme-empty readme-private">
-              <p>README preview isn't available for private repositories.</p>
-              <a
-                v-if="githubRepoUrl"
-                :href="githubRepoUrl"
-                target="_blank"
-                rel="noopener noreferrer"
-                class="readme-github-link"
-              >
-                View README on GitHub
-              </a>
-            </div>
-            <div v-else-if="!readmeHtml" class="readme-empty">
+            <div v-if="readmeHtml" class="readme-content" v-html="readmeHtml" />
+            <div v-else class="readme-empty">
               No README available
             </div>
-            <div v-else class="readme-content" v-html="readmeHtml" />
           </template>
 
           <!-- app.yml tab -->
           <template v-else>
-            <div v-if="!manifestParsed.ok" class="readme-empty">
+            <div v-if="!hasManifest" class="readme-empty app-yml-empty">
+              <p>
+                This app has no app.yml yet. It tells Pennsieve the app's inputs,
+                outputs, parameters and resources.
+              </p>
+              <bf-button v-if="canUpdate" class="compact flex" @click="openBuilder">{{ builderLabel }}</bf-button>
+              <button v-else type="button" class="app-yml-btn" @click="openBuilder">{{ builderLabel }}</button>
+            </div>
+            <div v-else-if="manifestParsed.earlier" class="manifest-detail">
+              <section class="manifest-block app-yml-earlier">
+                <p>
+                  This app.yml uses an earlier layout that Pennsieve no longer reads, so the
+                  app runs on defaults.
+                  {{ canUpdate ? "Update it in the builder." : "Its owner can update it in the builder." }}
+                </p>
+                <bf-button v-if="canUpdate" class="compact flex" @click="openBuilder">{{ builderLabel }}</bf-button>
+                <button v-else type="button" class="app-yml-btn" @click="openBuilder">{{ builderLabel }}</button>
+              </section>
+              <section v-if="manifestProblems.length" class="manifest-block manifest-problems">
+                <div class="validation-list">
+                  <div v-for="(p, i) in manifestProblems" :key="i" class="validation-item">
+                    <div class="field-name">{{ p.path }}</div>
+                    <div class="error-message">{{ p.message }}</div>
+                  </div>
+                </div>
+              </section>
+              <section class="manifest-block">
+                <h4 class="manifest-block-title">app.yml</h4>
+                <pre class="manifest-raw"><code>{{ manifestRaw }}</code></pre>
+              </section>
+            </div>
+            <div v-else-if="!manifestParsed.ok" class="readme-empty">
               <p>This app.yml could not be read.</p>
               <p class="manifest-error-detail">{{ manifestParsed.error }}</p>
             </div>
             <div v-else class="manifest-detail">
+              <!-- The newest version's schema problems, if registration found any -->
+              <section v-if="manifestProblems.length" class="manifest-block manifest-problems">
+                <h4 class="manifest-block-title">
+                  This version's app.yml has {{ manifestProblems.length }}
+                  {{ manifestProblems.length === 1 ? "problem" : "problems" }}
+                </h4>
+                <div class="validation-list">
+                  <div v-for="(p, i) in manifestProblems" :key="i" class="validation-item">
+                    <div class="field-name">{{ p.path }}</div>
+                    <div class="error-message">{{ p.message }}</div>
+                  </div>
+                </div>
+                <router-link
+                  :to="{ ...scopedRoute('application-manifest-builder'), query: { check: 1 } }"
+                  class="manifest-cta-secondary"
+                >
+                  Check an app.yml in the manifest builder
+                </router-link>
+              </section>
+
               <!-- Overview -->
               <section class="manifest-block">
                 <h4 class="manifest-block-title">Overview</h4>
@@ -620,8 +827,24 @@ watch(
                     >
                       {{ person.email }}
                     </a>
+                    <a
+                      v-if="person.orcid"
+                      :href="`https://orcid.org/${person.orcid}`"
+                      target="_blank"
+                      rel="noopener"
+                      class="manifest-link"
+                    >
+                      ORCID {{ person.orcid }}
+                    </a>
                   </li>
                 </ul>
+              </section>
+
+              <!-- License: the repository's, not app.yml's -->
+              <section v-if="latestLicense" class="manifest-block">
+                <h4 class="manifest-block-title">License</h4>
+                <span class="manifest-field-value">{{ latestLicense }}</span>
+                <span class="manifest-license-note">From the repository's LICENSE file.</span>
               </section>
 
               <!-- Parameters -->
@@ -643,7 +866,7 @@ watch(
                     <tbody>
                       <tr v-for="param in manifestSchema.parameters" :key="param.name">
                         <td class="manifest-mono">{{ param.name }}</td>
-                        <td>{{ param.type }}</td>
+                        <td>{{ paramTypeLabel(param.type) }}</td>
                         <td class="manifest-mono">
                           {{ formatDefaultValue(param.defaultValue) }}
                         </td>
@@ -743,6 +966,25 @@ watch(
 
       <!-- Right: Sidebar -->
       <div class="applications-sidebar">
+        <!-- Who can use this app: the first thing in the side panel -->
+        <div class="sidebar-access">
+          <h4 class="sidebar-access-title">Who can use this app</h4>
+          <p class="access-visibility">
+            <strong>{{ isPublic ? "Public" : "Private" }}</strong>
+            <template v-if="detail.ownerId"> · owned by {{ getUserName(detail.ownerId) }}</template>
+          </p>
+          <p class="access-line">
+            <template v-if="isPublic">Anyone on Pennsieve can find it and use it in workflows.</template>
+            <template v-else>{{ accessLine || "Only its owner, so far." }}</template>
+          </p>
+          <div v-if="!isPublic && accessChips.length" class="access-chips">
+            <span v-for="e in accessChips.slice(0, 4)" :key="`${e.type}:${e.id}`" class="access-chip" :title="e.type">{{ e.name }}</span>
+            <span v-if="accessChips.length > 4" class="access-chip access-chip--more">+{{ accessChips.length - 4 }}</span>
+          </div>
+          <a v-if="isAppOwner" href="#" class="access-manage" @click.prevent="shareOpen = true">Manage access ›</a>
+          <p v-else-if="!isPublic" class="access-ask">To get access, ask {{ getUserName(detail.ownerId) }}.</p>
+        </div>
+
         <el-collapse v-model="accordionActiveNames" class="sidebar-accordion">
           <el-collapse-item title="Information" name="information">
             <div class="info-card">
@@ -754,17 +996,13 @@ watch(
                 <span class="info-label">Source</span>
                 <span class="info-value">{{ detail.sourceType }}</span>
               </div>
-              <div v-if="visibilityLabel" class="info-row">
-                <span class="info-label">Visibility</span>
-                <span class="info-value">{{ visibilityLabel }}</span>
-              </div>
               <div v-if="detail.createdAt" class="info-row">
                 <span class="info-label">Created</span>
                 <span class="info-value">{{ formatDate(detail.createdAt) }}</span>
               </div>
               <div v-if="detail.ownerId" class="info-row">
                 <span class="info-label">Owner</span>
-                <span class="info-value">{{ getUserName(detail.ownerId) }}</span>
+                <span class="info-value info-value--name" :title="detail.ownerId">{{ getUserName(detail.ownerId) }}</span>
               </div>
               <div v-if="detail.sourceUrl" class="info-row">
                 <span class="info-label">URL</span>
@@ -826,6 +1064,17 @@ watch(
                     </span>
                   </div>
                 </div>
+                <router-link :to="builderForApp" class="manifest-builder-link">Update in builder ›</router-link>
+              </template>
+
+              <!-- In the earlier layout: not read -->
+              <template v-else-if="manifestParsed.earlier">
+                <div class="manifest-status manifest-status-error">
+                  <span class="manifest-dot" />
+                  <span class="manifest-filename">app.yml</span>
+                  <span class="manifest-status-text">Earlier layout, not read</span>
+                </div>
+                <router-link :to="builderForApp" class="manifest-builder-link">Update in builder ›</router-link>
               </template>
 
               <!-- Present but malformed -->
@@ -836,12 +1085,6 @@ watch(
                   <span class="manifest-status-text">Could not be read</span>
                 </div>
                 <p class="manifest-error-detail">{{ manifestParsed.error }}</p>
-                <router-link
-                  :to="{ name: 'application-manifest-builder' }"
-                  class="manifest-cta"
-                >
-                  Rebuild with the manifest builder
-                </router-link>
               </template>
 
               <!-- Absent -->
@@ -855,14 +1098,9 @@ watch(
                   <code>app.yml</code> to declare its runtime, resources,
                   parameters, and inputs/outputs.
                 </p>
+                <router-link :to="builderForApp" class="manifest-builder-link">Create in builder ›</router-link>
                 <router-link
-                  :to="{ name: 'application-manifest-builder' }"
-                  class="manifest-cta manifest-cta-primary"
-                >
-                  Generate an app.yml
-                </router-link>
-                <router-link
-                  :to="{ name: 'application-manifest-guide' }"
+                  :to="scopedRoute('application-manifest-guide')"
                   class="manifest-cta-secondary"
                 >
                   Read the manifest guide
@@ -870,14 +1108,12 @@ watch(
               </template>
             </div>
 
+            <!-- Read only here; archiving is in the danger zone -->
             <div class="info-actions archive-actions">
               <span class="info-label">Status</span>
-              <app-archive-toggle
-                :uuid="detail.uuid"
-                :owner-id="detail.ownerId"
-                :status="detail.status"
-                @change="onArchiveChange"
-              />
+              <span class="status-tag" :class="{ 'status-tag--archived': detail.status === 'archived' }">
+                {{ detail.status === "archived" ? "Archived" : "Active" }}
+              </span>
             </div>
 
           </el-collapse-item>
@@ -945,17 +1181,40 @@ watch(
           </el-collapse-item>
         </el-collapse>
 
-        <div class="sidebar-permissions">
-          <app-permissions
+        <!-- Archiving: the owner only, out of the way of everyday settings -->
+        <div v-if="isAppOwner" class="sidebar-danger">
+          <h4 class="sidebar-danger-title">Danger zone</h4>
+          <app-archive-toggle
+            variant="button"
             :uuid="detail.uuid"
             :owner-id="detail.ownerId"
-            :is-public="isPublic"
-            :organization-id="detail.organizationId"
-            @updated="reloadAfterPermissions"
+            :status="detail.status"
+            @change="onArchiveChange"
           />
         </div>
       </div>
     </div>
+    <ShareAppDialog
+      v-if="detail && isAppOwner"
+      v-model="shareOpen"
+      :uuid="detail.uuid"
+      :app-name="repoName"
+      :is-public="isPublic"
+      :owner-id="detail.ownerId"
+      :organization-id="viewingOrgId"
+      :entries="accessList"
+      @saved="reloadAfterPermissions"
+    />
+    <ReleaseDialog
+      v-if="canRelease"
+      v-model="releaseOpen"
+      :api2-url="store.state.config?.api2Url || ''"
+      :repo="releaseRepo"
+      :known-tags="knownTags"
+      :status="releaseStatus"
+      :default-branch="releaseStatus?.target || ''"
+      @released="onReleased"
+    />
   </div>
 </template>
 
@@ -1007,6 +1266,19 @@ watch(
     font-weight: 600;
     font-size: 14px;
     color: theme.$black;
+  }
+
+  .header-actions {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  // "3 new commits since v1.3.6": a release is due.
+  .release-nudge {
+    font-size: 12px;
+    color: theme.$orange_2;
   }
 }
 
@@ -1087,6 +1359,45 @@ watch(
   padding: 12px 16px;
   border-bottom: 1px solid theme.$gray_3;
 }
+.readme-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+/* Create/Update app.yml for someone who isn't the owner: an outline button. */
+.app-yml-btn {
+  padding: 6px 12px;
+  border: 1px solid theme.$gray_3;
+  border-radius: 3px;
+  background: theme.$white;
+  font: inherit;
+  font-size: 13px;
+  color: theme.$gray_6;
+  cursor: pointer;
+  white-space: nowrap;
+
+  &:hover {
+    border-color: theme.$purple_1;
+    color: theme.$purple_3;
+  }
+}
+.app-yml-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+.app-yml-earlier {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  border-left: 3px solid theme.$orange_1;
+
+  p {
+    margin: 0;
+  }
+}
 
 .readme-title {
   font-weight: 600;
@@ -1122,6 +1433,15 @@ watch(
   font-size: 14px;
 }
 
+// A private repository's own image, which needs GitHub sign-in to load.
+.readme-content :deep(.readme-image-private) {
+  display: inline-block;
+  padding: 2px 6px;
+  border: 1px dashed theme.$gray_3;
+  border-radius: 3px;
+  font-size: 12px;
+  color: theme.$gray_4;
+}
 .readme-private {
   display: flex;
   flex-direction: column;
@@ -1625,6 +1945,22 @@ watch(
   flex-shrink: 0;
 }
 
+/* Names aren't capitalised word by word (info-value's text-transform). */
+.info-value--name {
+  text-transform: none;
+}
+.manifest-builder-link {
+  display: inline-block;
+  margin-top: 12px;
+  font-size: 12px;
+  color: theme.$purple_3;
+  text-decoration: none;
+
+  &:hover {
+    text-decoration: underline;
+  }
+}
+
 .manifest-summary-value {
   font-size: 11px;
   color: theme.$black;
@@ -1708,6 +2044,77 @@ watch(
   margin-top: 12px;
 }
 
+.sidebar-access {
+  background: theme.$white;
+  border: 1px solid theme.$gray_3;
+  padding: 14px 16px;
+  margin-bottom: 12px;
+  p {
+    margin: 0 0 6px;
+    font-size: 13px;
+    line-height: 1.45;
+    color: theme.$gray_5;
+  }
+}
+.sidebar-access-title {
+  margin: 0 0 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: theme.$gray_6;
+}
+.access-visibility strong {
+  color: theme.$gray_6;
+}
+.access-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 2px 0 8px;
+}
+.access-chip {
+  padding: 1px 7px;
+  border-radius: 3px;
+  background: theme.$gray_1;
+  font-size: 12px;
+  color: theme.$gray_5;
+  &--more {
+    color: theme.$gray_4;
+  }
+}
+.access-manage {
+  font-size: 13px;
+  font-weight: 500;
+  color: theme.$purple_3;
+}
+p.access-ask {
+  margin: 0;
+  font-size: 12px;
+  color: theme.$gray_4;
+}
+.sidebar-danger {
+  background: theme.$white;
+  border: 1px solid theme.$gray_3;
+  padding: 16px;
+  margin-top: 12px;
+}
+.sidebar-danger-title {
+  margin: 0 0 10px;
+  font-size: 13px;
+  font-weight: 600;
+  color: theme.$gray_6;
+}
+.status-tag {
+  padding: 1px 8px;
+  border-radius: 3px;
+  background: theme.$green_tint;
+  color: theme.$green_2;
+  font-size: 12px;
+  font-weight: 600;
+  &--archived {
+    background: theme.$gray_1;
+    color: theme.$gray_5;
+  }
+}
 .sidebar-permissions {
   background: theme.$white;
   border: 1px solid theme.$gray_3;
@@ -1824,6 +2231,42 @@ watch(
   justify-content: center;
   margin-top: 12px;
   --el-pagination-hover-color: #{theme.$purple_3};
+}
+
+/* A version's app.yml problems, as the metadata record generator lists them. */
+.manifest-problems {
+  padding: 12px 14px;
+  border: 1px solid theme.$gray_2;
+  background: theme.$gray_1;
+}
+.validation-list {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 8px;
+}
+.validation-item {
+  padding: 8px 0;
+  border-bottom: 1px solid theme.$gray_2;
+
+  &:last-child {
+    border-bottom: none;
+  }
+  .field-name {
+    margin-bottom: 2px;
+    font-size: 13px;
+    font-weight: 500;
+    color: theme.$gray_6;
+  }
+  .error-message {
+    font-size: 12px;
+    line-height: 1.4;
+    color: theme.$gray_5;
+  }
+}
+.manifest-license-note {
+  margin-left: 8px;
+  font-size: 12px;
+  color: theme.$gray_4;
 }
 </style>
 
