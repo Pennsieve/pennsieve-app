@@ -2302,24 +2302,16 @@ watch(
   { deep: true },
 );
 
-const offerDraft = async () => {
-  let draft = null;
+const readDraft = () => {
   try {
-    draft = JSON.parse(localStorage.getItem(DRAFT_KEY.value) || "null");
+    const draft = JSON.parse(localStorage.getItem(DRAFT_KEY.value) || "null");
+    return draft?.nodes?.length ? draft : null;
   } catch {
-    draft = null;
+    return null;
   }
-  if (!draft?.nodes?.length) return;
-  try {
-    await ElMessageBox.confirm(
-      `You have an unsaved workflow${draft.name ? `, "${draft.name}"` : ""}. Resume it?`,
-      "Resume your draft?",
-      { confirmButtonText: "Resume", cancelButtonText: "Start new", type: "info" },
-    );
-  } catch {
-    clearDraft();
-    return;
-  }
+};
+
+const applyDraft = (draft) => {
   const byUuid = (uuid) => availableApplications.value.find((a) => a.uuid === uuid) || { uuid };
   draft.nodes.forEach((n) => {
     if (n.data.application) n.data.application = byUuid(n.data.application.uuid);
@@ -2333,6 +2325,47 @@ const offerDraft = async () => {
   history.reset();
   nextTick(() => setTimeout(() => fitView({ padding: 0.2, maxZoom: 1 }), 50));
 };
+
+/*
+  The builder's landing: what opening it offers before anything is built
+  (a new workflow from scratch, the draft kept in this browser, one from the
+  Library, or one of the user's own), so it doesn't open on a list of what
+  an empty workflow lacks. Readiness shows once building has started.
+*/
+const landing = ref(false);
+const landingDraft = ref(null);
+const started = computed(
+  () => mode.value !== "create" || (!landing.value && (!!workflowName.value.trim() || nodes.value.length > 1 || edges.value.length > 0))
+);
+const myWorkflows = computed(() => {
+  const me = store.state.profile?.id;
+  return (store.state.analysisModule.workflows || [])
+    .filter((w) => w.createdBy === me && w.isActive !== false)
+    .sort((a, b) => String(b.updatedAt || b.createdAt || "").localeCompare(String(a.updatedAt || a.createdAt || "")))
+    .slice(0, 5);
+});
+const draftAge = (draft) => {
+  const mins = Math.round((Date.now() - (draft?.savedAt || Date.now())) / 60000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins} min ago`;
+  const hours = Math.round(mins / 60);
+  return hours < 24 ? `${hours} h ago` : `${Math.round(hours / 24)} d ago`;
+};
+const startFromScratch = () => {
+  clearDraft();
+  landing.value = false;
+};
+const resumeDraft = () => {
+  applyDraft(landingDraft.value);
+  landing.value = false;
+};
+// Adding a step (an app clicked or dragged in) starts too.
+watch(
+  () => nodes.value.length,
+  (n) => {
+    if (landing.value && n > 1) landing.value = false;
+  }
+);
 
 /*
 Fetch Initial Data
@@ -2358,7 +2391,11 @@ onMounted(async () => {
       }
     } else {
       enterCreateMode();
-      await offerDraft();
+      landingDraft.value = readDraft();
+      landing.value = true;
+      if (!(store.state.analysisModule.workflows || []).length) {
+        store.dispatch("analysisModule/fetchWorkflows").catch(() => {});
+      }
     }
   } catch (err) {
     console.error(err);
@@ -2469,6 +2506,7 @@ const openNodeSettings = (id) => {
           v-model:name="workflowName"
           v-model:description="workflowDescription"
           :readiness="readiness"
+          :started="started"
           :saving="saving"
           @save="saveWorkflow"
           @start-over="startOver"
@@ -2657,8 +2695,35 @@ const openNodeSettings = (id) => {
                 </template>
               </div>
 
+              <!-- Landing: how to start, before anything is built -->
+              <div v-if="landing && mode === 'create'" class="builder-landing">
+                <h3 class="builder-landing__title">Build a workflow</h3>
+                <div class="builder-landing__options">
+                  <button v-if="landingDraft" type="button" class="builder-landing__option is-primary" @click="resumeDraft">
+                    <span class="builder-landing__name">Resume your draft{{ landingDraft.name ? `: ${landingDraft.name}` : "" }}</span>
+                    <span class="builder-landing__desc">{{ Math.max(0, (landingDraft.nodes?.length || 1) - 1) }} step{{ (landingDraft.nodes?.length || 1) - 1 === 1 ? "" : "s" }}, kept in this browser {{ draftAge(landingDraft) }}</span>
+                  </button>
+                  <button type="button" class="builder-landing__option" :class="{ 'is-primary': !landingDraft }" @click="startFromScratch">
+                    <span class="builder-landing__name">Start from scratch</span>
+                    <span class="builder-landing__desc">An input, then the apps you add{{ landingDraft ? "; the draft is discarded" : "" }}</span>
+                  </button>
+                  <router-link :to="workflowsRoute" class="builder-landing__option">
+                    <span class="builder-landing__name">Start from a workflow in the Library</span>
+                    <span class="builder-landing__desc">Open one, then duplicate it to make it yours</span>
+                  </router-link>
+                </div>
+                <template v-if="myWorkflows.length">
+                  <h4 class="builder-landing__sub">Or edit one of yours</h4>
+                  <ul class="builder-landing__list">
+                    <li v-for="w in myWorkflows" :key="w.uuid">
+                      <router-link :to="workflowPage(w.uuid)" class="builder-landing__item">{{ w.name }}</router-link>
+                    </li>
+                  </ul>
+                </template>
+              </div>
+
               <!-- The first step: a hint while only the input is there. -->
-              <div v-if="!isReadOnly && nodes.length === 1 && nodes[0].type === 'data-source'" class="first-step-hint">
+              <div v-if="!isReadOnly && !landing && nodes.length === 1 && nodes[0].type === 'data-source'" class="first-step-hint">
                 Add the first step with the <strong>+</strong> under Input data, or click an app in the list.
                 Or start from a workflow in the
                 <router-link :to="workflowsRoute" class="first-step-link">Library</router-link>
@@ -3547,7 +3612,13 @@ const openNodeSettings = (id) => {
             </template>
 
             <!-- Building, nothing selected: what's left, and how -->
-            <template v-if="!selectedNode && mode !== 'browse'">
+            <template v-if="!selectedNode && mode !== 'browse' && !started">
+              <h4 class="sidebar-section-title">Getting started</h4>
+              <p class="checklist-intro">
+                {{ landing ? "Choose how to start." : "Add the first step with the + under Input data, or click an app in the list. What's left to do shows here as you build." }}
+              </p>
+            </template>
+            <template v-if="!selectedNode && mode !== 'browse' && started">
               <h4 class="sidebar-section-title">Checklist</h4>
               <!-- Where it stands, then what to do: each item goes to its step or link -->
               <p
@@ -4705,6 +4776,91 @@ kbd {
 .vue-flow__node:hover .add-next,
 .vue-flow__node.selected .add-next {
   opacity: 1;
+}
+.builder-landing {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 24px;
+  background: rgba(247, 247, 247, 0.96);
+}
+.builder-landing__title {
+  margin: 0 0 4px;
+  font-size: 18px;
+  font-weight: 600;
+  color: theme.$gray_6;
+}
+.builder-landing__options {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: min(420px, 100%);
+}
+.builder-landing__option {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 12px 14px;
+  border: 1px solid theme.$gray_2;
+  border-radius: 4px;
+  background: theme.$white;
+  font: inherit;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+
+  &:hover {
+    border-color: theme.$purple_1;
+  }
+  &.is-primary {
+    border-color: theme.$purple_1;
+    box-shadow: inset 3px 0 0 theme.$purple_1;
+  }
+}
+.builder-landing__name {
+  font-size: 14px;
+  font-weight: 600;
+  color: theme.$gray_6;
+}
+.builder-landing__desc {
+  font-size: 12px;
+  color: theme.$gray_4;
+}
+.builder-landing__sub {
+  margin: 8px 0 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: theme.$gray_4;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.builder-landing__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  width: min(420px, 100%);
+}
+.builder-landing__item {
+  display: block;
+  padding: 6px 2px;
+  font-size: 13px;
+  color: theme.$purple_2;
+  text-decoration: none;
+
+  &:hover {
+    text-decoration: underline;
+  }
+}
+.checklist-intro {
+  margin: 0 0 12px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: theme.$gray_5;
 }
 .first-step-hint {
   position: absolute;
