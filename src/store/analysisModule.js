@@ -880,6 +880,9 @@ const actions = {
           status: statusEntry.status || node.status,
           startedAt: statusEntry.startedAt || node.startedAt,
           completedAt: statusEntry.completedAt || node.completedAt,
+          // An input's download while the run's inputs are staged.
+          progress: statusEntry.progress || null,
+          errorMessage: statusEntry.errorMessage || "",
         };
       });
 
