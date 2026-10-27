@@ -2596,6 +2596,8 @@ onUnmounted(() => {
                     filterable
                     placeholder="Choose a compute node"
                     class="setup-select"
+                    fit-input-width
+                    popper-class="setup-node-popper"
                   >
                     <el-option
                       v-for="c in setupNodeChoices"
@@ -2604,7 +2606,7 @@ onUnmounted(() => {
                       :value="c.node.uuid"
                       :disabled="c.reasons.length > 0"
                     >
-                      <span class="setup-option-name">{{ c.node.name }}</span>
+                      <span class="setup-option-name" :title="c.node.name">{{ c.node.name }}</span>
                       <span v-if="c.reasons.length" class="setup-option-why">{{ c.reasons.join(" · ") }}</span>
                     </el-option>
                   </el-select>
@@ -3306,6 +3308,29 @@ onUnmounted(() => {
 </template>
 
 <style lang="scss">
+/* The run setup's compute node list (appended to body, so not scoped): as
+   wide as its field, each node's name with why it can't run this below it. */
+.setup-node-popper .el-select-dropdown__item {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  height: auto;
+  min-height: 34px;
+  padding: 6px 12px;
+  line-height: 1.3;
+  white-space: normal;
+
+  .setup-option-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .setup-option-why {
+    font-size: 11px;
+    font-weight: normal;
+    color: #999999; // theme.$gray_4
+  }
+}
 /* Unscoped styles for VueFlow handle rendering */
 @import "@vue-flow/core/dist/style.css";
 @import "@vue-flow/core/dist/theme-default.css";
@@ -4114,14 +4139,6 @@ onUnmounted(() => {
 
 .setup-select {
   width: 100%;
-}
-.setup-option-name {
-  margin-right: 8px;
-}
-.setup-option-why {
-  float: right;
-  font-size: 11px;
-  color: theme.$gray_4;
 }
 
 .configure-hint {
