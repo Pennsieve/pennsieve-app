@@ -716,6 +716,46 @@ const back = () => {
   if (n >= 0) step.value = n;
 };
 
+/* ------------------------------------------------------- info column ------ */
+// Input and Results show their own choices on the left (io-split); every
+// other step, what it's for and what's chosen so far.
+const stepHasChoices = computed(() => iface.value && (step.value === 3 || step.value === 5));
+const STEP_ABOUT = [
+  "A notebook is a live Jupyter session on a compute node. Choose its language.",
+  "The compute node the session runs on. Only nodes with notebook sessions are offered.",
+  "The CPU and memory the session gets. Memory follows the CPU unless you set it.",
+  "The dataset the notebook works with.",
+  "The files copied into the notebook's input/ folder before it starts.",
+  "Where the notebook's results go when the session ends.",
+  "Check the session, name it, and start it.",
+];
+const stepAbout = computed(() => STEP_ABOUT[step.value] || "");
+const soFar = computed(() => {
+  const rows = [];
+  if (step.value > 0 && selectedWorkflow.value) rows.push({ label: "Kernel", value: kernelLabel(notebookKernel(selectedWorkflow.value)) });
+  if (step.value > 1 && selectedComputeNode.value) rows.push({ label: "Compute node", value: selectedComputeNode.value.name });
+  if (step.value > 2) {
+    rows.push({ label: "Resources", value: `${cpuLabel(resourceCpu.value)} · ${isAutoMemory.value ? memoryLabel(autoMemoryForCpu(resourceCpu.value)) : memoryLabel(resourceMemory.value)}` });
+  }
+  if (step.value > 3) {
+    const input = iface.value
+      ? inputChoice.value === "public"
+        ? publicDataset.value?.name || "A public dataset"
+        : inputChoice.value === "dataset"
+        ? selectedDataset.value?.content?.name || "A dataset"
+        : "No input"
+      : props.personal
+      ? publicDataset.value?.name || "None"
+      : selectedDataset.value?.content?.name;
+    if (input) rows.push({ label: "Input", value: input });
+  }
+  if (step.value > 4 && iface.value && inputChoice.value === "dataset") {
+    rows.push({ label: "Files", value: String(dataSourceNodes.value.reduce((n, d) => n + fileCountForNode(d.id), 0)) });
+  }
+  if (step.value > 5 && iface.value) rows.push({ label: "Results", value: outputLabel(outputChoice.value) });
+  return rows;
+});
+
 // The run's dataset: the input's (its files' dataset), else the one chosen for
 // the results; none in My Workspace.
 const runDatasetId = computed(() => {
@@ -824,7 +864,7 @@ async function execute() {
   <el-dialog
     v-model="visible"
     :title="stepTitles[step]"
-    width="840px"
+    width="min(840px, 96vw)"
     :close-on-click-modal="false"
   >
     <div class="wizard-body">
@@ -837,6 +877,24 @@ async function execute() {
           :class="{ active: step === i, done: step > i }"
         />
       </div>
+
+      <!-- Two columns on every step: what it's for and what's chosen so far on
+           the left (on Input and Results, the step's own choices are), the
+           step on the right. On a narrow screen, the step alone. -->
+      <div class="nb-layout" :class="{ 'has-info': !stepHasChoices }">
+      <aside v-if="!stepHasChoices" class="nb-info">
+        <p class="nb-info__about">{{ stepAbout }}</p>
+        <template v-if="soFar.length">
+          <h4 class="nb-info__title">So far</h4>
+          <dl class="nb-info__list">
+            <template v-for="row in soFar" :key="row.label">
+              <dt>{{ row.label }}</dt>
+              <dd>{{ row.value }}</dd>
+            </template>
+          </dl>
+        </template>
+      </aside>
+      <div class="nb-content">
 
       <!-- Step 0: Kernel -->
       <div v-if="step === 0" class="wizard-step">
@@ -1372,6 +1430,8 @@ async function execute() {
           @input="nameTouched = true"
         />
       </div>
+      </div>
+      </div>
     </div>
 
     <template #footer>
@@ -1472,6 +1532,65 @@ async function execute() {
 
 .wizard-body {
   min-height: 300px;
+}
+.nb-layout.has-info {
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr);
+  gap: 20px;
+  min-height: 320px;
+}
+.nb-info {
+  padding-right: 20px;
+  border-right: 1px solid theme.$gray_2;
+  font-size: 13px;
+  color: theme.$gray_5;
+}
+.nb-info__about {
+  margin: 0 0 16px;
+  line-height: 1.5;
+}
+.nb-info__title {
+  margin: 0 0 6px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: theme.$gray_4;
+}
+.nb-info__list {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 4px 10px;
+  margin: 0;
+
+  dt {
+    color: theme.$gray_4;
+  }
+  dd {
+    margin: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: theme.$gray_6;
+  }
+}
+.nb-content {
+  min-width: 0;
+}
+/* A narrow screen: the step alone */
+@media (max-width: 900px) {
+  .nb-layout.has-info,
+  .io-split {
+    display: block;
+  }
+  .nb-info {
+    display: none;
+  }
+  .io-side {
+    margin-bottom: 16px;
+    padding-right: 0;
+    border-right: none;
+  }
 }
 .wizard-progress {
   display: flex;
