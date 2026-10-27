@@ -224,7 +224,8 @@ const getComputeTypesForTarget = (targetType) => {
   if (!targetType) return [];
   const tt = targetTypes.value.find((t) => t.targetType === targetType);
   const types = tt?.runtimeConfig?.computeTypes;
-  return types && types.length ? withGpu(types) : [];
+  // A target moves results, so it never runs on a GPU.
+  return (types || []).filter((t) => t !== "gpu");
 };
 
 const getComputeTypesForProcessor = (sourceUrl) => {

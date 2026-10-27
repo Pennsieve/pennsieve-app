@@ -504,7 +504,9 @@ const getComputeTypesForTarget = (targetType) => {
   // TODO: use API-driven computeTypes once target types return them reliably
   // return tt?.runtimeConfig?.computeTypes || DEFAULT_COMPUTE_TYPES;
   const types = tt?.runtimeConfig?.computeTypes;
-  return types && types.length ? withGpu(types) : DEFAULT_COMPUTE_TYPES;
+  // A target moves results, so it never runs on a GPU.
+  const noGpu = (list) => list.filter((t) => t !== "gpu");
+  return noGpu(types && types.length ? types : DEFAULT_COMPUTE_TYPES);
 };
 
 const getComputeTypesForApplication = (application) => {
