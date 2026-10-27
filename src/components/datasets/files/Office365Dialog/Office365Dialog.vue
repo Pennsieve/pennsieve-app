@@ -53,10 +53,6 @@ import BfDialogHeader from "../../../shared/bf-dialog-header/BfDialogHeader.vue"
 import DialogBody from "../../../shared/dialog-body/DialogBody.vue";
 import Request from "../../../../mixins/request/index";
 import { useGetToken } from "@/composables/useGetToken";
-import {
-  useSendXhr,
-  useHandleXhrError,
-} from "@/mixins/request/request_composable";
 import { viewFileUrl } from "@/utils/viewFileUrl";
 
 export default {
@@ -120,7 +116,7 @@ export default {
      * viewer. The viewer caps the URL it opens, which a presigned link is
      * over, so the link is a short one: download-service's redirecting link
      * for a source file (viewFileUrl), pennsieve-api's shortened link
-     * otherwise.
+     * otherwise. A failure rejects, and acceptAgreement shows the error.
      */
     getPackageFiles: function () {
       const packageId = pathOr("", ["content", "nodeId"], this.officeFile);
@@ -128,13 +124,11 @@ export default {
       return viewFileUrl(
         { datasetId, packageId, file: head(this.sourceFile), short: true },
         { config: this.config }
-      )
-        .then((url) => {
-          this.awsURL = url;
-          const finalURL = `https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(this.awsURL)}`;
-          window.open(finalURL, "_blank");
-        })
-        .catch((err) => useHandleXhrError(err));
+      ).then((url) => {
+        this.awsURL = url;
+        const finalURL = `https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(this.awsURL)}`;
+        window.open(finalURL, "_blank");
+      });
     },
 
     /**
