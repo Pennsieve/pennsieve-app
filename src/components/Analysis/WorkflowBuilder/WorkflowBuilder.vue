@@ -4673,8 +4673,8 @@ kbd {
 .io-node__remove {
   position: absolute;
   /* Clear of the pill's rounded end */
-  top: -18px;
-  right: -2px;
+  top: -13px;
+  right: -10px;
 }
 .add-next {
   position: absolute;
