@@ -4285,9 +4285,8 @@ onUnmounted(() => {
   border-radius: 4px;
 
   img {
-    width: 96px;
-    height: 60px;
-    border-radius: 8px;
+    width: 64px;
+    height: 64px;
     object-fit: cover;
   }
 }

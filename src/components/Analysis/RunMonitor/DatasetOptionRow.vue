@@ -40,9 +40,8 @@ const s = computed(() => datasetSummary(props.dataset));
 }
 .dor__banner {
   flex: 0 0 auto;
-  width: 56px;
-  height: 36px;
-  border-radius: 6px;
+  width: 44px;
+  height: 44px;
   object-fit: cover;
   background: theme.$gray_1;
 }
