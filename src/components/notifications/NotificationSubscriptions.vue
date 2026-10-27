@@ -66,6 +66,9 @@ const loading = ref(false)
 const topics = ref([])
 const subscriptions = ref([])
 
+// v1 is email only.
+const EMAIL_ONLY = { email: true, push: false, sms: false }
+
 // The BE validates the context against the topic's schema: only the fields
 // the topic requires, all numeric IDs (not node IDs), nothing else.
 function contextValue(field) {
@@ -106,13 +109,16 @@ async function handleToggle(topic, enabled) {
   const context = buildContext(topic)
 
   if (enabled) {
-    // POST upserts — creates or re-enables. No notification_channels, so the
-    // subscription follows the user's channel preferences.
+    // POST upserts — creates or re-enables. notification_channels sits beside
+    // the context fields and must name all three channels.
     const tempSub = { id: `temp-${Date.now()}`, topic_id: topicId, enabled: true, context }
     subscriptions.value.push(tempSub)
 
     try {
-      const created = await subscribe(topicId, context)
+      const created = await subscribe(topicId, {
+        ...context,
+        notification_channels: EMAIL_ONLY,
+      })
       const idx = subscriptions.value.indexOf(tempSub)
       if (idx !== -1) {
         subscriptions.value.splice(idx, 1, created)
