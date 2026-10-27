@@ -66,7 +66,6 @@ const view = computed({
     router.replace({ query: { ...route.query, view: v } });
   },
 });
-const newWorkflow = () => (view.value = "builder");
 
 const includeNotebooks = computed({
   get: () => route.query.notebooks === "1",
@@ -92,14 +91,16 @@ watch(() => route.query.run, openRunFromQuery);
 <template>
   <div class="wf-page">
     <AnalysisViewBar v-model="view" :views="VIEWS" :class="{ 'wf-toolbar--builder': view === 'builder' }">
-      <bf-button v-if="view === 'library'" @click="newWorkflow">+ New Workflow</bf-button>
-      <div v-else-if="view === 'live'" class="wf-actions">
+      <!-- Live's one action is running a workflow; the Library's cards each
+           have their own Run, and building one is the Builder tab's (a
+           "+ New Workflow" here was taken for running one). -->
+      <div v-if="view === 'live'" class="wf-actions">
         <el-checkbox v-model="includeNotebooks" size="small">Include notebooks</el-checkbox>
         <bf-button @click="runsRef?.openWizardDialog()">+ Run Workflow</bf-button>
       </div>
       <!-- The builder's bar (name, readiness, Save) goes here, so the canvas
            starts right below one bar. -->
-      <div v-else id="wf-toolbar-builder" class="wf-builder-bar" />
+      <div v-else-if="view === 'builder'" id="wf-toolbar-builder" class="wf-builder-bar" />
     </AnalysisViewBar>
     <!-- Nothing until a first visit knows whether to open on Live -->
     <div v-if="view" class="wf-body">

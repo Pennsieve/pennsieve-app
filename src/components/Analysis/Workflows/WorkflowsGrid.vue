@@ -368,7 +368,10 @@ onMounted(async () => {
       <div v-else class="empty-state">
         <IconAnalysis :width="48" :height="48" color="#9ca3af" />
         <span v-if="isLoadingAll">Loading workflows...</span>
-        <span v-else-if="workflows.length === 0">No workflows yet</span>
+        <template v-else-if="workflows.length === 0">
+          <span>No workflows yet</span>
+          <button type="button" class="clear-filters" @click="router.replace({ query: { ...route.query, view: 'builder' } })">Build one in the Builder</button>
+        </template>
         <span v-else-if="searchQuery">
           No workflows match
           <strong>"{{ searchQuery }}"</strong>
