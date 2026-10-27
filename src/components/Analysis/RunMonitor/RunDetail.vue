@@ -32,6 +32,7 @@ import LayerNameSelector from "./LayerNameSelector.vue";
 import TargetDatasetField from "./TargetDatasetField.vue";
 import { targetWritesToDataset, targetParamFields, buildDataTargets, targetDatasetId, datasetName, shownTargetParams, datasetSummary, sortDatasets, isPathPrefixParam } from "./dataTargets";
 import DatasetOptionRow from "./DatasetOptionRow.vue";
+import IoPill from "../WorkflowGraph/IoPill.vue";
 import { withInterfaceNodes, destinationChoices, NO_DESTINATION } from "./workflowInterface";
 import { importStatusUrl, importSummary, importStillMoving, isDatasetImport } from "./runImports";
 import { nodeUnfit, rememberedSetup, rememberSetup, defaultNode, needsDataset } from "./runSetup";
@@ -483,18 +484,22 @@ const allDataSourcesHaveFiles = computed(() => {
 const { detailed, setDetailed } = useGraphDensity();
 const DETAILED_BOX = { width: NODE_WIDTH, height: NODE_HEIGHT, nodesep: 120, ranksep: 150 };
 
+const PILL_BOX = { width: 200, height: 44 };
 const autoLayout = () => {
   if (nodes.value.length === 0) return;
   const box = layoutBox(detailed.value, DETAILED_BOX);
   const g = new dagre.graphlib.Graph();
   g.setDefaultEdgeLabel(() => ({}));
   g.setGraph({ rankdir: "TB", nodesep: box.nodesep, ranksep: box.ranksep });
-  for (const node of nodes.value) g.setNode(node.id, { width: box.width, height: box.height });
+  // Inputs and outputs are pills (IoPill), laid out at their size.
+  const sizeOf = (node) => (node.type === "data-source" || node.type === "data-target" ? PILL_BOX : box);
+  for (const node of nodes.value) g.setNode(node.id, { width: sizeOf(node).width, height: sizeOf(node).height });
   for (const edge of edges.value) g.setEdge(edge.source, edge.target);
   dagre.layout(g);
   nodes.value = nodes.value.map((node) => {
     const pos = g.node(node.id);
-    return { ...node, position: { x: pos.x - box.width / 2, y: pos.y - box.height / 2 } };
+    const size = sizeOf(node);
+    return { ...node, position: { x: pos.x - size.width / 2, y: pos.y - size.height / 2 } };
   });
   setTimeout(() => fitView({ padding: 0.2, maxZoom: 1 }), 50);
 };
@@ -572,6 +577,25 @@ const titleOf = (id, data) => canvasTitles.value.get(id) || data.targetType || d
 const statusMark = (data) => (mode.value === "browse" && statusMarkOf(data.status)) || null;
 
 // A source with one file shows its name; with more, how many.
+// An input's and output's second line on the graph (IoPill): its files, or
+// where it goes and how that went.
+const sourceSubOf = (id, data) => {
+  if (mode.value === "configure") {
+    if (isLeftOut(id)) return "Left out";
+    const n = fileCountForNode(id);
+    return n ? `${n} file${n === 1 ? "" : "s"}` : "Choose files";
+  }
+  return data.view ? "Public dataset" : data.packageCount != null ? sourceDetail(data) : "";
+};
+const targetSubOf = (id, data) => {
+  if (mode.value === "configure") {
+    if (isUnsaved(id)) return "Not saved";
+    const t = nodeConfigs[id]?.targetType;
+    return t ? `to ${getTargetTypeLabel(t, targetTypes.value)}` : "";
+  }
+  return importLineOf(id)?.text || targetFacts(data).join(" · ") || getTargetTypeLabel(data.targetType, targetTypes.value);
+};
+
 const sourceDetail = (data) => {
   if (data.packageCount === 1) {
     const name = browseFileInfo.value[data.packageIds[0]]?.name;
@@ -2251,47 +2275,13 @@ onUnmounted(() => {
             <!-- Data-source node template -->
             <template #node-data-source="{ data, id }">
               <div :style="{ '--node-border-color': '#6366f1' }" :class="{ 'is-off': isLeftOut(id) }">
-                <CompactFlowNode
-                  v-if="!detailed"
-                  kind="source"
-                  :label="titleOf(id, data)"
+                <IoPill
+                  kind="input"
+                  :name="titleOf(id, data)"
+                  :sub="sourceSubOf(id, data)"
                   :unmet="nodeUnmetCount(id, 'data-source')"
-                  :detail="isLeftOut(id)
-                    ? 'Left out'
-                    : mode === 'configure'
-                    ? `${fileCountForNode(id)} file${fileCountForNode(id) !== 1 ? 's' : ''} selected`
-                    : data.view
-                    ? 'Public dataset'
-                    : data.packageCount != null
-                    ? sourceDetail(data)
-                    : ''"
+                  :off="isLeftOut(id)"
                 />
-                <div
-                  v-else
-                  class="custom-node data-source-node"
-                >
-                  <span v-if="nodeUnmetCount(id, 'data-source') > 0" class="node-unmet-badge">{{ nodeUnmetCount(id, 'data-source') }}</span>
-                  <div class="node-header">
-                    <span class="node-title" :title="titleOf(id, data)">{{ titleOf(id, data) }}</span>
-                  </div>
-                  <div class="node-tags">
-                    <span v-if="mode === 'browse' && data.view" class="node-tag-info" :title="viewSourceLabel(data.view)">
-                      {{ viewSourceLabel(data.view) }}
-                    </span>
-                    <span v-else-if="mode === 'browse' && data.packageCount != null" class="node-tag-info" :title="sourceDetail(data)">
-                      {{ sourceDetail(data) }}
-                    </span>
-                    <template v-if="mode === 'configure'">
-                      <span class="node-tag-info">
-                        {{ isLeftOut(id) ? "Left out" : `${fileCountForNode(id)} file${fileCountForNode(id) !== 1 ? 's' : ''} selected` }}
-                      </span>
-                    </template>
-                  </div>
-                  <div v-if="mode === 'configure'" class="node-config-hint">{{ isLeftOut(id) ? "This run doesn't use it" : "Click to select files" }}</div>
-                </div>
-                <button v-if="canLeaveOut(id)" type="button" class="node-off-toggle nodrag" @click.stop="toggleLeftOut(id)">
-                  {{ isLeftOut(id) ? "Use it" : "Leave out" }}
-                </button>
                 <Handle id="source" type="source" :position="Position.Bottom" />
               </div>
             </template>
@@ -2300,62 +2290,17 @@ onUnmounted(() => {
             <template #node-data-target="{ data, id }">
               <div :style="{ '--node-border-color': mode === 'browse' ? (data.status && !['NOT_STARTED', 'SUCCEEDED'].includes(data.status) ? graphStatusColor(data.status) : '#64748b') : '#64748b', '--handle-target-color': incomingEdgeColor(id) }" :class="{ 'is-off': isUnsaved(id) }">
                 <Handle id="target" type="target" :position="Position.Top" />
-                <CompactFlowNode
-                  v-if="!detailed"
-                  kind="target"
-                  :label="titleOf(id, data)"
-                  :status="mode === 'browse' ? data.status : ''"
-                  :runtime="nodeConfigs[id]?.computeType || data.computeType"
+                <IoPill
+                  kind="output"
+                  :name="titleOf(id, data)"
+                  :sub="targetSubOf(id, data)"
+                  :mark="statusMark(data)"
+                  :mark-title="statusLabel(data.status)"
+                  :running="mode === 'browse' && data.status === 'STARTED'"
+                  :failed="mode === 'browse' && data.status === 'FAILED'"
                   :unmet="nodeUnmetCount(id, 'data-target')"
-                  :detail="isUnsaved(id) ? 'Not saved' : importLineOf(id)?.text || ''"
+                  :off="isUnsaved(id)"
                 />
-                <div v-else class="custom-node data-target-node" :class="mode === 'browse' ? statusClass(data.status) : ''">
-                  <span v-if="nodeUnmetCount(id, 'data-target') > 0" class="node-unmet-badge">{{ nodeUnmetCount(id, 'data-target') }}</span>
-                  <div class="node-header">
-                    <span class="node-title" :title="titleOf(id, data)">{{ titleOf(id, data) }}</span>
-                    <RuntimeMark :runtime="nodeConfigs[id]?.computeType || data.computeType" />
-                    <span
-                      v-if="statusMark(data)"
-                      class="node-mark"
-                      :class="`node-mark--${statusMark(data).kind}`"
-                      :title="statusLabel(data.status)"
-                      :aria-label="statusLabel(data.status)"
-                    >{{ statusMark(data).glyph }}</span>
-                  </div>
-                  <div class="node-tags">
-                  </div>
-                  <div v-if="mode === 'browse' && targetFacts(data).length" class="node-facts">
-                    {{ targetFacts(data).join(" · ") }}
-                  </div>
-                  <div
-                    v-if="mode === 'browse' && importLineOf(id)"
-                    class="node-import"
-                    :class="`node-import--${importLineOf(id).state}`"
-                    title="The files' copies into the dataset (select the target for details)"
-                  >
-                    {{ importLineOf(id).text }}
-                  </div>
-                  <div class="node-body">
-                    <div v-if="mode === 'browse' && targetParamsShown(id, data).length > 0" class="param-preview">
-                      <div v-for="(p, i) in targetParamsShown(id, data).slice(0, 3)" :key="i" class="param-row">
-                        <span class="param-key">{{ p.key }}</span>
-                        <span v-if="p.value" class="param-val">{{ p.value }}</span>
-                      </div>
-                      <span v-if="targetParamsShown(id, data).length > 3" class="param-more">+{{ targetParamsShown(id, data).length - 3 }} more</span>
-                    </div>
-                    <div v-if="isUnsaved(id)" class="node-config-hint">Not saved: the run still makes it</div>
-                    <template v-else-if="mode === 'configure'">
-                      <div v-if="nodeConfigs[id]?.params?.length > 0" class="param-preview">
-                        <div v-for="(p, i) in nodeConfigs[id].params.slice(0, 3)" :key="i" class="param-row">
-                          <span class="param-key">{{ p.name || p.key }}</span>
-                          <span v-if="p.value" class="param-val">{{ p.value }}</span>
-                        </div>
-                        <span v-if="nodeConfigs[id].params.length > 3" class="param-more">+{{ nodeConfigs[id].params.length - 3 }} more</span>
-                      </div>
-                      <div class="node-config-hint">Click to configure</div>
-                    </template>
-                  </div>
-                </div>
                 <button v-if="canSkipOutput(id)" type="button" class="node-off-toggle nodrag" @click.stop="toggleSaved(id)">
                   {{ isUnsaved(id) ? "Save it" : "Don't save" }}
                 </button>

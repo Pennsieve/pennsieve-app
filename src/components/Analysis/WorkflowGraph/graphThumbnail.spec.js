@@ -19,6 +19,9 @@ describe("thumbnailLayout", () => {
     expect(l.edges.every((e) => e.points.length >= 2)).toBe(true);
     expect(l.width).toBeGreaterThan(0);
     expect(l.nodes.find((n) => n.id === "t1").kind).toBe("target");
+    // Inputs and outputs at the pill's size, steps at the card's
+    expect(l.nodes.find((n) => n.id === "s1")).toMatchObject({ w: 200, h: 44 });
+    expect(l.nodes.find((n) => n.id === "p1")).toMatchObject({ w: 220, h: 40 });
   });
 
   it("has nothing to draw without nodes", () => {

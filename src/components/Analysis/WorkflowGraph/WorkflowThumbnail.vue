@@ -32,8 +32,12 @@ const path = (points) => points.map((p, i) => `${i ? "L" : "M"}${p.x},${p.y}`).j
     <template v-if="layout">
       <path v-for="e in layout.edges" :key="e.id" :d="path(e.points)" class="wt__edge" />
       <g v-for="n in layout.nodes" :key="n.id">
-        <rect :x="n.x" :y="n.y" :width="n.w" :height="n.h" rx="6" :fill="KIND_FILL[n.kind]" class="wt__box" />
-        <rect :x="n.x" :y="n.y" width="8" :height="n.h" rx="3" :fill="KIND_COLOR[n.kind]" />
+        <!-- A step: a card with its strip; an input or output: a pill -->
+        <template v-if="n.kind === 'processor'">
+          <rect :x="n.x" :y="n.y" :width="n.w" :height="n.h" rx="6" :fill="KIND_FILL[n.kind]" class="wt__box" />
+          <rect :x="n.x" :y="n.y" width="8" :height="n.h" rx="3" :fill="KIND_COLOR[n.kind]" />
+        </template>
+        <rect v-else :x="n.x" :y="n.y" :width="n.w" :height="n.h" :rx="n.h / 2" :fill="KIND_FILL[n.kind]" :stroke="KIND_COLOR[n.kind]" stroke-width="3" />
       </g>
     </template>
   </svg>
