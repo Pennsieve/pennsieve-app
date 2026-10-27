@@ -3056,7 +3056,9 @@ onUnmounted(() => {
               ? "Choose a dataset to see its files."
               : filePickerCurrentFile?.content?.id ? "This folder is empty." : `${datasetName(sourceDatasetOf(filePickerNodeId), datasetOptions)} has no files.` }}
           </p>
-          <div v-else class="files-table-container">
+          <!-- Hidden, not removed, while there's nothing to list: the table
+               re-ticks chosen files when its list changes, so it stays mounted. -->
+          <div v-show="!filePickerLoading && filePickerFiles.length" class="files-table-container">
             <analysis-files-table
               :data="filePickerFiles"
               :clear-selected-values="clearSelectedValues"
