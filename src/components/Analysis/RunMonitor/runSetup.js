@@ -5,6 +5,8 @@
 //
 // Pure, but for the remembered choices (localStorage, guarded).
 import { interactiveCapable } from "./notebookHelpers";
+import { targetWritesToDataset } from "./dataTargets";
+import { hasInterface, worksWithoutDataset } from "./workflowInterface";
 
 // Why a node can't run a workflow, as short reasons ("Paused", "No LLM
 // access"), [] when it can. steps: the workflow's DAG; manifestOf(stepId):
@@ -56,10 +58,13 @@ export function defaultNode(requested, remembered, nodes, fits) {
 }
 
 // Outside a workspace (My Workspace) a run has no dataset, so a workflow
-// can't run there yet if it reads from one (data-source nodes) or writes to
-// one (data targets other than these, which need no dataset).
-const TARGETS_WITHOUT_DATASET = new Set(["persistent-layer"]);
-export const needsDataset = (wf) =>
-  (wf?.dag || []).some(
-    (d) => d.type === "data-source" || (d.type === "data-target" && !TARGETS_WITHOUT_DATASET.has(d.targetType))
+// can't run there yet if it reads from one (inputs, data-source nodes) or must
+// write to one: a data target that writes to a dataset, or, of a workflow with
+// outputs, a required output that accepts only datasets. Downloads and
+// reference data need none (as the compute node allows on a user's run).
+export const needsDataset = (wf) => {
+  if (hasInterface(wf)) return (wf.inputs?.length || 0) > 0 || !worksWithoutDataset(wf.outputs);
+  return (wf?.dag || []).some(
+    (d) => d.type === "data-source" || (d.type === "data-target" && targetWritesToDataset(d.targetType))
   );
+};

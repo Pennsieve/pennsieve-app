@@ -6,6 +6,7 @@
   every step, so it's always clear what is being run.
 */
 import { computed } from "vue";
+import { interfaceDag } from "../RunMonitor/workflowInterface";
 import WorkflowThumbnail from "../WorkflowGraph/WorkflowThumbnail.vue";
 import LlmMark from "../WorkflowGraph/LlmMark.vue";
 import { runSummary } from "./runSummary";
@@ -32,7 +33,7 @@ const meta = computed(() => {
   <aside class="rws">
     <template v-if="summary">
       <div class="rws__thumb">
-        <WorkflowThumbnail :dag="workflow.dag || []" :aspect="1.6" />
+        <WorkflowThumbnail :dag="interfaceDag(workflow)" :aspect="1.6" />
       </div>
       <h3 class="rws__name" :title="summary.name">{{ summary.name }}</h3>
       <div class="rws__meta">

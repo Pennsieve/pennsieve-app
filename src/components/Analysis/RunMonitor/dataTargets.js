@@ -65,7 +65,18 @@ export const buildDataTargets = (dag, nodeConfigs, runDatasetId = "") => {
       if (p.name && p.value) params[p.name] = p.value;
     }
     const entry = {};
-    const datasetId = targetWritesToDataset(d.targetType) ? cfg.datasetId || "" : "";
+    // A workflow output names the destination this run binds it to; with
+    // none it takes nothing else.
+    const targetType = d.output ? cfg.targetType || "" : d.targetType;
+    if (d.output) {
+      if (!targetType) continue;
+      entry.targetType = targetType;
+      if (targetType === "none") {
+        dataTargets[d.id] = entry;
+        continue;
+      }
+    }
+    const datasetId = targetWritesToDataset(targetType) ? cfg.datasetId || "" : "";
     if (datasetId && datasetId !== runDatasetId) entry.datasetId = datasetId;
     if (Object.keys(params).length > 0) entry.params = params;
     if (Object.keys(entry).length > 0) dataTargets[d.id] = entry;
