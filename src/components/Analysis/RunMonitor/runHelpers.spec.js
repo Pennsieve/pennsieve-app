@@ -29,3 +29,14 @@ describe("graphStatusColor", () => {
     expect(nodeBorderColor("data-source", null)).toBe("#6366f1");
   });
 });
+
+describe("inputProgressLine", () => {
+  it("says how far an input's download got, by bytes, else files", async () => {
+    const { inputProgressLine } = await import("./runHelpers");
+    expect(inputProgressLine({ files: 1204, filesTotal: 3400, bytes: 380, bytesTotal: 1000 })).toBe("38% · 1,204 of 3,400 files");
+    expect(inputProgressLine({ files: 1, filesTotal: 4, bytes: 0, bytesTotal: 0 })).toBe("25% · 1 of 4 files");
+    expect(inputProgressLine({ files: 0, filesTotal: 1, bytes: 0, bytesTotal: 10 })).toBe("0% · 0 of 1 file");
+    expect(inputProgressLine({ files: 9, filesTotal: 9, bytes: 12, bytesTotal: 10 })).toBe("100% · 9 of 9 files");
+    expect(inputProgressLine(null)).toBe("");
+  });
+});

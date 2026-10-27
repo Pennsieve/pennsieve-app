@@ -55,6 +55,7 @@ import {
   statusClass,
   graphStatusColor,
   statusMarkOf,
+  inputProgressLine,
   nodeBorderColor,
   statusDotClass,
   statusLabel,
@@ -616,8 +617,14 @@ const sourceSubOf = (id, data) => {
     const noun = picks.some((p) => p.isFolder) ? "item" : "file";
     return `${n} ${picks.length ? "public " : ""}${noun}${n === 1 ? "" : "s"}`;
   }
+  if (inputStaging(data)) return data.progress ? inputProgressLine(data.progress) : "Preparing files…";
+  if (data.status === "FAILED") return "Couldn't get its files";
   return data.view ? "Public dataset" : data.packageCount != null ? sourceDetail(data) : "";
 };
+// An input whose files are being prepared or downloaded: it says STARTED
+// while the run is still going (a run that ended meanwhile leaves it so).
+const inputStaging = (data) =>
+  mode.value === "browse" && data.status === "STARTED" && !isTerminalStatus(selectedWorkflowActivity.value?.status);
 const targetSubOf = (id, data) => {
   if (mode.value === "configure") {
     if (isUnsaved(id)) return "Not saved";
@@ -727,6 +734,8 @@ const runToNodesAndEdges = (run) => {
         version: d.tag || null,
         startedAt: d.startedAt,
         completedAt: d.completedAt,
+        progress: d.progress || null,
+        errorMessage: d.errorMessage || "",
         ...extra,
       },
       position: hasSavedPositions && d.position && typeof d.position.x === "number"
@@ -2381,6 +2390,8 @@ onUnmounted(() => {
                   :sub="sourceSubOf(id, data)"
                   :unmet="nodeUnmetCount(id, 'data-source')"
                   :off="isLeftOut(id)"
+                  :running="inputStaging(data)"
+                  :failed="mode === 'browse' && data.status === 'FAILED'"
                 />
                 <Handle id="source" type="source" :position="Position.Bottom" />
               </div>
@@ -2956,6 +2967,17 @@ onUnmounted(() => {
             <!-- BROWSE MODE: Selected Data Source Node -->
             <template v-else-if="mode === 'browse' && selectedNode && selectedNode.type === 'data-source'">
               <h4 class="sidebar-section-title">Data Source</h4>
+              <!-- Its files while the run's inputs are staged, or why it
+                   couldn't get them -->
+              <div v-if="inputStaging(selectedNode.data)" class="info-card">
+                <div class="info-row">
+                  <span class="info-label">Files</span>
+                  <span class="info-value">{{ selectedNode.data.progress ? inputProgressLine(selectedNode.data.progress) : "Preparing…" }}</span>
+                </div>
+              </div>
+              <p v-else-if="selectedNode.data?.status === 'FAILED'" class="files-mismatch" role="alert">
+                Couldn't get this input's files{{ selectedNode.data.errorMessage ? `: ${selectedNode.data.errorMessage}` : "." }}
+              </p>
               <template v-if="selectedNode.data?.view">
                 <div class="info-card">
                   <div class="info-row">
