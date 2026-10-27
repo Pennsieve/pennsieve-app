@@ -30,7 +30,7 @@ import { useSendXhr } from "@/mixins/request/request_composable";
 import toQueryParams from "@/utils/toQueryParams";
 import LayerNameSelector from "./LayerNameSelector.vue";
 import TargetDatasetField from "./TargetDatasetField.vue";
-import { targetWritesToDataset, targetParamFields, buildDataTargets, targetDatasetId, datasetName, shownTargetParams, datasetSummary, sortDatasets } from "./dataTargets";
+import { targetWritesToDataset, targetParamFields, buildDataTargets, targetDatasetId, datasetName, shownTargetParams, datasetSummary, sortDatasets, isPathPrefixParam } from "./dataTargets";
 import DatasetOptionRow from "./DatasetOptionRow.vue";
 import { withInterfaceNodes, destinationChoices, NO_DESTINATION } from "./workflowInterface";
 import { importStatusUrl, importSummary, importStillMoving, isDatasetImport } from "./runImports";
@@ -914,10 +914,10 @@ const initiateWorkflowFromConfig = async (pendingConfig) => {
         const paramDefs = ttDef?.params || [];
         // Values: the run being rerun, then the definition's defaults on the
         // node, then the registry's (workflow-service applies them in that order).
-        const targetParams = targetParamFields(paramDefs, {
+        const targetParams = outputParams(d, targetParamFields(paramDefs, {
           sourceParams: srcTargetParams,
           definitionDefaults: targetType === d.targetType ? d.defaultParams || {} : {},
-        });
+        }));
         nodeConfigs[d.id] = {
           computeType: computeTypeForMode(srcCfg?.executionTarget || (targetType === d.targetType && d.computeType) || fallback),
           targetType: targetType || null,
@@ -1788,13 +1788,19 @@ const onDestinationChange = (nodeId, targetType) => {
   const isDefault = targetType === d.output.default?.targetType;
   cfg.targetType = targetType;
   cfg.datasetId = "";
-  cfg.params = targetType === NO_DESTINATION ? [] : targetParamFields(getTargetTypeDefinition(targetType)?.params || [], {
+  cfg.params = targetType === NO_DESTINATION ? [] : outputParams(d, targetParamFields(getTargetTypeDefinition(targetType)?.params || [], {
     definitionDefaults: isDefault ? d.output.default?.params || {} : {},
-  });
+  }));
   cfg.computeType = targetType === NO_DESTINATION ? null : computeTypeForMode(getComputeTypesForTarget(targetType)?.[0] || null);
   const n = nodes.value.find((x) => x.id === nodeId);
   if (n) n.data = { ...n.data, targetType: targetType === NO_DESTINATION ? null : targetType, computeType: cfg.computeType };
 };
+
+// An output's params as a run sets them: not its path prefix, which
+// workflow-service sets from the step output it comes from.
+function outputParams(d, params) {
+  return d.output ? params.filter((p) => !isPathPrefixParam(p.name)) : params;
+}
 
 // A target's type for this run: an output's destination, else the node's.
 const runTargetType = (d) => (d.output ? nodeConfigs[d.id]?.targetType : d.targetType) || "";
