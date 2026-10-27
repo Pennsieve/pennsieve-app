@@ -70,10 +70,16 @@ async function send(url, { method, body, token, fetchFn }) {
 // (`download`), or to open it in a viewer (`view`, recorded apart from
 // downloads).
 //
+// short asks for a short link that redirects to the presigned one, for a
+// client that can't carry a presigned link (Microsoft's Office viewer caps
+// the URL it opens).
+//
 // Resolves to { url, expiresAt, fileName, size }. Rejects with a 409
 // 'scan_pending' while the file is still being scanned for malware.
-export function getFileUrl({ datasetId, packageId, purpose = 'download' }, options = {}) {
-  return downloadServiceRequest('/files/url', { ...options, method: 'POST', datasetId, body: { packageId, purpose } })
+export function getFileUrl({ datasetId, packageId, purpose = 'download', short = false }, options = {}) {
+  const body = { packageId, purpose }
+  if (short) body.short = true
+  return downloadServiceRequest('/files/url', { ...options, method: 'POST', datasetId, body })
 }
 
 // Archives: a selection zipped by the service, fetched when ready. Records
