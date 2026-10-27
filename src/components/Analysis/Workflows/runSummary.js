@@ -3,7 +3,14 @@
 // with what they take, and its outputs with where they go. From the
 // workflow's definition and its steps' app.yml (portsOfStep).
 import { appNames, outputLabel } from "./workflowSummary";
-import { sourceLabel, sourceHints, hintLine, portsOfStep } from "../WorkflowGraph/sourceInputs";
+import { sourceLabel, sourceHints, portsOfStep } from "../WorkflowGraph/sourceInputs";
+
+// What an input takes, without its name (it's beside it): "CSV files", "a
+// BIDS folder", "CSV, JSON files"; "" when its app has no app.yml.
+function takes(hints) {
+  const parts = hints.map((h) => (h.layout ? `a ${h.layout} folder` : h.types.length ? `${h.types.join(", ")} files` : ""));
+  return [...new Set(parts.filter(Boolean))].join("; ");
+}
 
 // Where an output goes, in a few words.
 function outputWhere(node) {
@@ -26,7 +33,7 @@ export function runSummary(wf, applications = [], targetTypes = []) {
     usesLLM: steps.some((n) => !!portsOf(n.id)?.runtime?.llm),
     inputs: dag
       .filter((n) => n.type === "data-source")
-      .map((n) => ({ id: n.id, name: sourceLabel(n.id, dag), hint: hintLine(sourceHints(n.id, dag, portsOf)) })),
+      .map((n) => ({ id: n.id, name: sourceLabel(n.id, dag), hint: takes(sourceHints(n.id, dag, portsOf)) })),
     outputs: dag
       .filter((n) => n.type === "data-target")
       .map((n) => ({ id: n.id, label: outputLabel(n.targetType, targetTypes) || "Output", where: outputWhere(n) })),

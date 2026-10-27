@@ -84,9 +84,14 @@ const meta = computed(() => {
   background: theme.$gray_0;
   border-right: 1px solid theme.$gray_2;
   overflow-y: auto;
+
+  // Each keeps its height; the column scrolls instead.
+  > * {
+    flex-shrink: 0;
+  }
 }
 .rws__thumb {
-  height: 120px;
+  height: 110px;
   padding: 8px;
   border: 1px solid theme.$gray_2;
   border-radius: 4px;

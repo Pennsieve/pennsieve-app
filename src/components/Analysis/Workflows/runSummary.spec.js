@@ -30,7 +30,7 @@ describe("runSummary", () => {
     expect(s.version).toBe(2);
     expect(s.stepCount).toBe(2);
     expect(s.usesLLM).toBe(true);
-    expect(s.inputs).toEqual([{ id: "signals", name: "signals", hint: "signals takes CSV files" }]);
+    expect(s.inputs).toEqual([{ id: "signals", name: "signals", hint: "CSV files" }]);
     expect(s.outputs.map((o) => o.where)).toEqual(["as a download", "into e2e-results/"]);
   });
 

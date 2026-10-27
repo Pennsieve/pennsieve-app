@@ -351,8 +351,7 @@ const configure = () => {
 .rw {
   display: grid;
   grid-template-columns: 300px minmax(0, 1fr);
-  height: min(560px, 70vh);
-  margin: -10px -20px 0;
+  height: min(520px, calc(100vh - 260px));
   border-top: 1px solid theme.$gray_2;
   border-bottom: 1px solid theme.$gray_2;
 }
@@ -557,5 +556,13 @@ const configure = () => {
 .rw__footer-right {
   display: flex;
   gap: 8px;
+}
+</style>
+
+<style lang="scss">
+/* The two columns reach the dialog's edges (the body's padding goes); the
+   dialog is appended to body, so this isn't scoped. */
+.run-wizard-dialog .el-dialog__body {
+  padding: 0;
 }
 </style>
