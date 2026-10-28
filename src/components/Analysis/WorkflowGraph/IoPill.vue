@@ -79,18 +79,20 @@ defineProps({
   &.is-failed {
     --io-border: #{theme.$status_red};
   }
+  // Running: a teal border that stays, and a breathing teal glow (as the
+  // step cards), instead of a border that blinked out.
   &.is-running {
     --io-border: #06b6d4;
-    animation: io-pill-pulse 1.6s ease-in-out infinite;
+    animation: io-pill-glow 1.6s ease-in-out infinite;
   }
   &.is-off {
     opacity: 0.55;
     border-style: dashed;
   }
 }
-@keyframes io-pill-pulse {
-  0%, 100% { border-color: var(--io-border); }
-  50% { border-color: transparent; }
+@keyframes io-pill-glow {
+  0%, 100% { box-shadow: 0 0 0 2px rgba(6, 182, 212, 0.35), 0 0 8px rgba(6, 182, 212, 0.35); }
+  50% { box-shadow: 0 0 0 4px rgba(6, 182, 212, 0.2), 0 0 18px rgba(6, 182, 212, 0.65); }
 }
 .io-pill__icon {
   flex: 0 0 auto;

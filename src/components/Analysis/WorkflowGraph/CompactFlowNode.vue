@@ -150,9 +150,14 @@ const tooltip = computed(() =>
     }
   }
 }
-// Running: the strip pulses; failed: a red border too (as detailed).
-.cfn--running::before {
-  animation: cfn-pulse 1.6s ease-in-out infinite;
+// Running: a teal border and a breathing teal glow, the strip pulsing too
+// (as the detailed cards); failed: a red border.
+.cfn--running {
+  border-color: #06b6d4;
+  animation: cfn-running-glow 1.6s ease-in-out infinite;
+  &::before {
+    animation: cfn-pulse 1.6s ease-in-out infinite;
+  }
 }
 .cfn--failed {
   border-color: theme.$status_red;
@@ -187,6 +192,15 @@ const tooltip = computed(() =>
   }
   50% {
     opacity: 0.25;
+  }
+}
+@keyframes cfn-running-glow {
+  0%,
+  100% {
+    box-shadow: 0 0 0 2px rgba(6, 182, 212, 0.35), 0 0 8px rgba(6, 182, 212, 0.35);
+  }
+  50% {
+    box-shadow: 0 0 0 4px rgba(6, 182, 212, 0.2), 0 0 18px rgba(6, 182, 212, 0.65);
   }
 }
 </style>

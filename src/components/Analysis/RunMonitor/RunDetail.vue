@@ -4349,8 +4349,14 @@ onUnmounted(() => {
   }
 
   &.gray-node { border-color: theme.$gray_4; }
-  // Running: the type strip pulses; the card and its border stay still.
-  &.blue-node::before { animation: strip-pulse 1.6s ease-in-out infinite; }
+  // Running: a teal border and a breathing teal glow around the card, the
+  // same teal as its connectors, so the steps at work stand out across the
+  // graph; the type strip pulses too. The animation keeps the glow on hover.
+  &.blue-node {
+    border-color: #06b6d4;
+    animation: node-running-glow 1.6s ease-in-out infinite;
+    &::before { animation: strip-pulse 1.6s ease-in-out infinite; }
+  }
   // Succeeded: no colour, the ✓ by the title says it (graphStatusColor).
   &.green-node { border-color: theme.$gray_3; }
   &.red-node { border-color: theme.$status_red; }
@@ -4402,6 +4408,10 @@ onUnmounted(() => {
 @keyframes strip-pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.25; }
+}
+@keyframes node-running-glow {
+  0%, 100% { box-shadow: 0 0 0 2px rgba(6, 182, 212, 0.35), 0 0 10px rgba(6, 182, 212, 0.35); }
+  50% { box-shadow: 0 0 0 5px rgba(6, 182, 212, 0.2), 0 0 24px rgba(6, 182, 212, 0.65); }
 }
 
 /* Chosen files a source's inputs don't take, in its panel. */
