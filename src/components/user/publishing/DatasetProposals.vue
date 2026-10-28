@@ -42,7 +42,7 @@
         <div class="proposals-list">
           <request-list-item
             v-for="proposal in datasetProposals"
-            :key="proposal.id"
+            :key="proposal.nodeId"
             :dataset-request="proposal"
             @edit="editProposal"
             @remove="removeProposal"

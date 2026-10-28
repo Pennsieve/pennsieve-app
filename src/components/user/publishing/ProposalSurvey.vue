@@ -1,6 +1,5 @@
 <script setup>
 import { ref, computed, watch } from "vue";
-import { useStore } from "vuex";
 import { useProposalStore } from "@/stores/proposalStore";
 import BfButton from "@/components/shared/bf-button/BfButton.vue";
 import IconCheck from "@/components/icons/IconCheck.vue";
@@ -62,7 +61,6 @@ const emit = defineEmits([
   "update:dialogVisible",
 ]);
 
-const store = useStore();
 const proposalStore = useProposalStore();
 
 const proposal = ref({
@@ -76,7 +74,6 @@ const surveyAnswersByRepository = ref({});
 // Which button triggered the pending request, so only that one shows a spinner
 const pendingAction = ref("");
 
-const profile = computed(() => store.state.profile);
 const availableRepositories = computed(() => proposalStore.repositories);
 
 const currentRepository = computed(() =>
@@ -384,10 +381,9 @@ function handleDialogUpdate(visible) {
   }
 }
 
-function saveProposal() {
-  if (!readyToSave.value || props.processing) return;
-  pendingAction.value = "save";
-
+// Builds what the parent saves. Only fields the API reads are included; the
+// store sends nodeId and userId back on update so PUT can find the proposal.
+function buildProposalData() {
   const surveyResponses = repositoryQuestions.value
     .map((question) => ({
       questionId: question.id,
@@ -399,89 +395,44 @@ function saveProposal() {
     name: proposal.value.name.trim(),
     description: proposal.value.description,
     organizationNodeId: currentRepository.value.organizationNodeId,
-    status: "DRAFT",
     survey: surveyResponses,
-    contributors: [],
-    userId: profile.value?.intId,
-    ownerName: `${profile.value?.firstName || ""} ${
-      profile.value?.lastName || ""
-    }`.trim(),
   };
 
-  // Check if this is an existing proposal and if the repository has changed
-  const isExistingProposal = props.proposal && props.proposal.nodeId;
+  const isExistingProposal = Boolean(props.proposal?.nodeId);
   const hasRepositoryChanged =
     isExistingProposal &&
     props.proposal.organizationNodeId !==
       currentRepository.value.organizationNodeId;
 
   if (hasRepositoryChanged) {
-    // Repository changed - need to delete old proposal and create new one
-    proposalData._originalProposal = props.proposal; // Pass original for deletion
-    proposalData._requiresRecreation = true;
-    emit("recreate-proposal", proposalData);
+    // PUT can't change the repository, so the parent creates a new proposal
+    // and then removes this one
+    proposalData._originalProposal = props.proposal;
   } else if (isExistingProposal) {
-    // Same repository - normal update
-    proposalData.id = props.proposal.id;
     proposalData.nodeId = props.proposal.nodeId;
-    proposalData.datasetNodeId = props.proposal.datasetNodeId;
-    proposalData.createdAt = props.proposal.createdAt;
-    proposalData.updatedAt = props.proposal.updatedAt;
-    emit("create-proposal", proposalData);
-  } else {
-    // New proposal - normal creation
-    emit("create-proposal", proposalData);
+    proposalData.userId = props.proposal.userId;
   }
+
+  return { proposalData, hasRepositoryChanged };
+}
+
+function saveProposal() {
+  if (!readyToSave.value || props.processing) return;
+  pendingAction.value = "save";
+
+  const { proposalData, hasRepositoryChanged } = buildProposalData();
+  emit(hasRepositoryChanged ? "recreate-proposal" : "create-proposal", proposalData);
 }
 
 function submitProposal() {
   if (!readyToSubmit.value || props.processing) return;
   pendingAction.value = "submit";
 
-  const surveyResponses = repositoryQuestions.value
-    .map((question) => ({
-      questionId: question.id,
-      response: proposal.value.survey[question.id] || "",
-    }))
-    .filter((response) => response.response.trim());
-
-  const proposalData = {
-    name: proposal.value.name.trim(),
-    description: proposal.value.description,
-    organizationNodeId: currentRepository.value.organizationNodeId,
-    status: "DRAFT",
-    survey: surveyResponses,
-    contributors: [],
-    userId: profile.value?.intId,
-    ownerName: `${profile.value?.firstName || ""} ${
-      profile.value?.lastName || ""
-    }`.trim(),
-  };
-
-  // Check if this is an existing proposal and if the repository has changed
-  const isExistingProposal = props.proposal && props.proposal.nodeId;
-  const hasRepositoryChanged =
-    isExistingProposal &&
-    props.proposal.organizationNodeId !==
-      currentRepository.value.organizationNodeId;
-
-  if (hasRepositoryChanged) {
-    // Repository changed - need to delete old proposal and create new one, then submit
-    proposalData._originalProposal = props.proposal; // Pass original for deletion
-    proposalData._requiresRecreation = true;
-    emit("recreate-and-submit-proposal", proposalData);
-  } else if (isExistingProposal) {
-    // Same repository - normal update then submit
-    proposalData.id = props.proposal.id;
-    proposalData.nodeId = props.proposal.nodeId;
-    proposalData.datasetNodeId = props.proposal.datasetNodeId;
-    proposalData.createdAt = props.proposal.createdAt;
-    proposalData.updatedAt = props.proposal.updatedAt;
-    emit("submit-proposal", proposalData);
-  } else {
-    // New proposal - create and submit
-    emit("submit-proposal", proposalData);
-  }
+  const { proposalData, hasRepositoryChanged } = buildProposalData();
+  emit(
+    hasRepositoryChanged ? "recreate-and-submit-proposal" : "submit-proposal",
+    proposalData
+  );
 }
 </script>
 

@@ -44,26 +44,26 @@ export const useProposalStore = defineStore('proposalStore', () => {
     )
   }
 
-  const getOwnerName = (profile) => {
-    const firstName = profile?.firstName || ''
-    const lastName = profile?.lastName || ''
-    return `${firstName} ${lastName}`.trim()
+  // contributors is deprecated on the backend; drop it so it never gets sent back
+  const transformProposalIn = (proposal) => {
+    const { contributors, ...proposalFields } = proposal
+    return proposalFields
   }
 
-  const transformProposalIn = (proposal, count = 0) => {
-    return {
-      id: count,
-      ...proposal
-    }
-  }
-
-  const transformProposalOut = (proposal, profile) => {
-    return {
-      userId: profile?.intId,
-      ownerName: getOwnerName(profile),
-      ...proposal
-    }
-  }
+  // Only send what the API reads. ownerName, emailAddress, status and timestamps
+  // are set by the backend; sending them back is at best ignored.
+  const toProposalRequestBody = (proposal, profile) => ({
+    // PUT looks the proposal up by nodeId and the userId in the body, so send
+    // back the userId it came with
+    ...(proposal.nodeId && {
+      nodeId: proposal.nodeId,
+      userId: proposal.userId ?? profile?.intId,
+    }),
+    name: proposal.name,
+    description: proposal.description,
+    organizationNodeId: proposal.organizationNodeId,
+    survey: proposal.survey,
+  })
 
   // Clear store state
   const clearProposalStore = () => {
@@ -165,10 +165,7 @@ export const useProposalStore = defineStore('proposalStore', () => {
       if (response.ok) {
         // The Go backend encodes an empty list as null (user has no proposals yet)
         const responseJson = (await response.json()) ?? []
-        let count = 0
-        datasetProposals.value = responseJson.map(p =>
-          transformProposalIn(p, ++count)
-        )
+        datasetProposals.value = responseJson.map(transformProposalIn)
       } else {
         datasetProposals.value = []
         throw new Error(response.statusText)
@@ -195,13 +192,12 @@ export const useProposalStore = defineStore('proposalStore', () => {
       const response = await fetch(url, {
         method: "POST",
         headers: myHeaders,
-        body: JSON.stringify(transformProposalOut(proposal, profile))
+        body: JSON.stringify(toProposalRequestBody(proposal, profile))
       })
       
       if (response.ok) {
         const responseJson = await response.json()
-        const count = datasetProposals.value.length
-        const newProposal = transformProposalIn(responseJson, count + 1)
+        const newProposal = transformProposalIn(responseJson)
         datasetProposals.value.push(newProposal)
         return {
           status: "SUCCESS",
@@ -229,7 +225,7 @@ export const useProposalStore = defineStore('proposalStore', () => {
       const response = await fetch(url, {
         method: "PUT",
         headers: myHeaders,
-        body: JSON.stringify(transformProposalOut(proposal, profile))
+        body: JSON.stringify(toProposalRequestBody(proposal, profile))
       })
       
       if (response.ok) {
@@ -239,8 +235,6 @@ export const useProposalStore = defineStore('proposalStore', () => {
         // Update the proposal in the list
         const index = datasetProposals.value.findIndex(p => p.nodeId === proposal.nodeId)
         if (index > -1) {
-          const existing = datasetProposals.value[index]
-          updatedProposal.id = existing.id
           datasetProposals.value[index] = updatedProposal
         }
         
@@ -299,7 +293,7 @@ export const useProposalStore = defineStore('proposalStore', () => {
       const response = await fetch(url, {
         method: "PUT",
         headers: myHeaders,
-        body: JSON.stringify(transformProposalOut(proposal, profile))
+        body: JSON.stringify(toProposalRequestBody(proposal, profile))
       })
       
       if (response.ok) {
@@ -307,10 +301,8 @@ export const useProposalStore = defineStore('proposalStore', () => {
         const updatedProposal = transformProposalIn(responseJson)
         
         // Update the proposal in the list
-        const index = datasetProposals.value.findIndex(p => p.nodeId === proposal.nodeId || p.id === proposal.id)
+        const index = datasetProposals.value.findIndex(p => p.nodeId === proposal.nodeId)
         if (index > -1) {
-          const existing = datasetProposals.value[index]
-          updatedProposal.id = existing.id
           datasetProposals.value[index] = updatedProposal
         }
         
@@ -348,8 +340,6 @@ export const useProposalStore = defineStore('proposalStore', () => {
         // Update the proposal in the list
         const index = datasetProposals.value.findIndex(p => p.nodeId === proposal.nodeId)
         if (index > -1) {
-          const existing = datasetProposals.value[index]
-          submittedProposal.id = existing.id
           datasetProposals.value[index] = submittedProposal
         }
         
@@ -387,8 +377,6 @@ export const useProposalStore = defineStore('proposalStore', () => {
         // Update the proposal in the list
         const index = datasetProposals.value.findIndex(p => p.nodeId === proposal.nodeId)
         if (index > -1) {
-          const existing = datasetProposals.value[index]
-          withdrawnProposal.id = existing.id
           datasetProposals.value[index] = withdrawnProposal
         }
         
@@ -426,8 +414,6 @@ export const useProposalStore = defineStore('proposalStore', () => {
         // Update the proposal in the list
         const index = datasetProposals.value.findIndex(p => p.nodeId === proposal.nodeId)
         if (index > -1) {
-          const existing = datasetProposals.value[index]
-          acceptedProposal.id = existing.id
           datasetProposals.value[index] = acceptedProposal
         }
         
@@ -465,8 +451,6 @@ export const useProposalStore = defineStore('proposalStore', () => {
         // Update the proposal in the list
         const index = datasetProposals.value.findIndex(p => p.nodeId === proposal.nodeId)
         if (index > -1) {
-          const existing = datasetProposals.value[index]
-          rejectedProposal.id = existing.id
           datasetProposals.value[index] = rejectedProposal
         }
         

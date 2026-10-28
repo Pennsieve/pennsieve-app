@@ -19,12 +19,8 @@ export function useProposalSave() {
 
   async function saveProposal(proposalData, { submit = false } = {}) {
     // Changing repository can't be done with PUT, so the dialog asks for the old
-    // proposal to be replaced. These markers are for us, not the API.
-    const {
-      _originalProposal: replacedProposal,
-      _requiresRecreation,
-      ...proposalFields
-    } = proposalData
+    // proposal to be replaced. This marker is for us, not the API.
+    const { _originalProposal: replacedProposal, ...proposalFields } = proposalData
 
     isSavingProposal.value = true
     try {
