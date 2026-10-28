@@ -275,8 +275,9 @@ export const nodeMetricRows = (nm) => {
   } else if (memGiven) {
     push("Memory", `${Math.round(memGiven).toLocaleString()} MiB`);
   }
-  if (nm.estimatedCost != null) push("Estimated cost", formatCost(nm.estimatedCost), { cost: true });
   if (nm.imageUri) push("Image", shortImage(nm.imageUri), { title: nm.imageUri });
+  // The cost last: it is the receipt's total line.
+  if (nm.estimatedCost != null) push("Estimated cost", formatCost(nm.estimatedCost), { cost: true });
   if (cpuUsed == null && memUsed == null && (nm.computeType === "standard" || nm.computeType === "gpu") && cpuGiven) {
     rows.push({ note: "No usage sample: usage is sampled once a minute, and this step ran under a minute, or its node has no Container Insights." });
   }
