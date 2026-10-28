@@ -3,8 +3,6 @@ import { ref, computed, watch, nextTick, useTemplateRef } from "vue";
 import { Close, Loading } from "@element-plus/icons-vue";
 import { useProposalStore } from "@/stores/proposalStore";
 import IconCheck from "@/components/icons/IconCheck.vue";
-import IconKitchenTimer from "@/components/icons/IconKitchenTimer.vue";
-import IconAlertLine from "@/components/icons/IconAlertLine.vue";
 import IconSaveLine from "@/components/icons/IconSaveLine.vue";
 import {
   PROPOSAL_NAME_MAX_LENGTH,
@@ -177,15 +175,17 @@ const isNameTooLong = computed(
   () => (proposal.value.name || "").trim().length > PROPOSAL_NAME_MAX_LENGTH
 );
 
-const readyToSave = computed(() => {
-  if (!hasRepositorySelected.value || isNameTooLong.value) return false;
-  // For updating existing proposals, allow saving even if incomplete
-  if (props.proposal) {
-    return true;
-  }
-  // For new proposals, require name and description
-  return isNameValid.value && isDescriptionFilled.value;
-});
+// A draft only needs something in it; submitting needs every field
+const hasAnyContent = computed(
+  () =>
+    hasText(proposal.value.name) ||
+    isDescriptionFilled.value ||
+    Object.values(proposal.value.survey || {}).some(hasText)
+);
+
+const readyToSave = computed(
+  () => hasRepositorySelected.value && !isNameTooLong.value && hasAnyContent.value
+);
 
 const readyToSubmit = computed(() => {
   // Require all fields including all questions for submission
@@ -230,26 +230,12 @@ const totalRequiredFields = computed(() => {
   return 2 + repositoryQuestions.value.length; // name + description + questions
 });
 
-// What the footer tells the user about where the form stands, most
-// blocking problem first
+// The footer is either "Ready to submit" or "Save as draft"; the detail line
+// says what is still needed
 const footerStatus = computed(() => {
   const remainingFields = totalRequiredFields.value - completedFieldsCount.value;
   const fieldsWord = (count) => (count === 1 ? "field" : "fields");
 
-  if (!hasRepositorySelected.value) {
-    return {
-      tone: "blocked",
-      title: "Choose a repository",
-      detail: "Pick where this proposal should be submitted.",
-    };
-  }
-  if (isNameTooLong.value) {
-    return {
-      tone: "blocked",
-      title: "Dataset name is too long",
-      detail: "Shorten the name to save or submit.",
-    };
-  }
   if (readyToSubmit.value) {
     return {
       tone: "ready",
@@ -257,18 +243,16 @@ const footerStatus = computed(() => {
       detail: `All ${totalRequiredFields.value} required ${fieldsWord(totalRequiredFields.value)} are complete.`,
     };
   }
-  if (readyToSave.value) {
-    return {
-      tone: "draft",
-      title: "Draft can be saved",
-      detail: `${remainingFields} required ${fieldsWord(remainingFields)} left before you can submit.`,
-    };
+
+  let detail = `${remainingFields} required ${fieldsWord(remainingFields)} left before you can submit.`;
+  if (!hasRepositorySelected.value) {
+    detail = "Choose a repository to save.";
+  } else if (isNameTooLong.value) {
+    detail = "Shorten the dataset name to save.";
+  } else if (!hasAnyContent.value) {
+    detail = "Fill in any field to save a draft.";
   }
-  return {
-    tone: "progress",
-    title: "Add a name and description",
-    detail: "Both are needed to save a draft.",
-  };
+  return { tone: "draft", title: "Save as draft", detail };
 });
 
 const progressPercentage = computed(() => {
@@ -731,9 +715,7 @@ function submitProposal() {
             <div class="completion-status" :class="footerStatus.tone">
               <div class="status-icon">
                 <IconCheck v-if="footerStatus.tone === 'ready'" :width="18" :height="18" />
-                <IconAlertLine v-else-if="footerStatus.tone === 'blocked'" :width="16" :height="16" />
-                <IconSaveLine v-else-if="footerStatus.tone === 'draft'" :width="16" :height="16" />
-                <IconKitchenTimer v-else :width="18" :height="18" />
+                <IconSaveLine v-else :width="16" :height="16" />
               </div>
               <div class="status-text">
                 <span class="status-title">{{ footerStatus.title }}</span>
@@ -1218,11 +1200,6 @@ function submitProposal() {
       &.ready .status-icon {
         background: rgba(theme.$green_2, 0.12);
         color: theme.$green_2;
-      }
-
-      &.blocked .status-icon {
-        background: rgba(theme.$orange_1, 0.12);
-        color: theme.$orange_2;
       }
     }
   }
