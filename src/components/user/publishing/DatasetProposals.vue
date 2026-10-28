@@ -83,8 +83,6 @@
       :copied-from="copySourceProposal"
       :read-only="Boolean(activeProposal) && activeProposal.proposalStatus !== 'DRAFT'"
       :processing="isSavingProposal"
-      allow-copy-to-draft
-      @copy-to-draft="copyProposalToDraft"
       @create-proposal="handleSaveProposal"
       @submit-proposal="handleSubmitProposal"
       @recreate-proposal="handleSaveProposal"
@@ -108,7 +106,7 @@
 </template>
 
 <script setup>
-import { ref, shallowRef, computed, onMounted, watch, nextTick } from 'vue'
+import { ref, shallowRef, computed, onMounted, watch } from 'vue'
 import { useStore } from 'vuex'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
@@ -263,12 +261,7 @@ const withdrawProposal = (proposal) => {
   isConfirmDialogVisible.value = true
 }
 
-const copyProposalToDraft = async (sourceProposal) => {
-  if (showProposalDialog.value) {
-    closeProposalDialog()
-    await nextTick()
-  }
-
+const copyProposalToDraft = (sourceProposal) => {
   copySourceProposal.value = sourceProposal
   activeProposal.value = null
   selectedRepository.value = repositories.value.find(repo =>

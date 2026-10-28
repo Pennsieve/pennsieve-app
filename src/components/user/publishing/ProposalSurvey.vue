@@ -1,10 +1,9 @@
 <script setup>
-import { ref, computed, watch } from "vue";
+import { ref, computed, watch, nextTick, useTemplateRef } from "vue";
 import { useProposalStore } from "@/stores/proposalStore";
 import BfButton from "@/components/shared/bf-button/BfButton.vue";
 import IconCheck from "@/components/icons/IconCheck.vue";
 import IconKitchenTimer from "@/components/icons/IconKitchenTimer.vue";
-import BfDialogHeader from "@/components/shared/bf-dialog-header/BfDialogHeader.vue";
 import {
   PROPOSAL_NAME_MAX_LENGTH,
   isValidProposalName,
@@ -33,10 +32,6 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
-  allowCopyToDraft: {
-    type: Boolean,
-    default: false,
-  },
   copiedFrom: {
     type: Object,
     default: () => null,
@@ -55,7 +50,6 @@ const emit = defineEmits([
   "recreate-and-submit-proposal",
   "accept",
   "reject",
-  "copy-to-draft",
   "update:dialogVisible",
 ]);
 
@@ -138,12 +132,6 @@ const proposalStatus = computed(() => {
 
 const submittedOn = computed(() =>
   formatTimestamp(props.proposal?.submittedAt || props.proposal?.updatedAt)
-);
-
-const canCopyToDraft = computed(
-  () =>
-    props.allowCopyToDraft &&
-    ["WITHDRAWN", "REJECTED"].includes(props.proposal?.proposalStatus)
 );
 
 const copiedFromSummary = computed(() => {
@@ -257,6 +245,17 @@ watch(
   }
 );
 
+const proposalDialog = useTemplateRef("proposalDialog");
+
+// The dialog's content stays mounted between opens, so without this it
+// reopens at the previous proposal's scroll position
+async function scrollDialogToTop() {
+  await nextTick();
+  const dialogElement = proposalDialog.value?.dialogContentRef?.$el;
+  dialogElement?.querySelector(".el-dialog__body")?.scrollTo({ top: 0 });
+  dialogElement?.closest(".el-overlay-dialog")?.scrollTo({ top: 0 });
+}
+
 // Watch for repository changes and save/restore survey responses
 watch(
   () => selectedRepository.value.organizationNodeId,
@@ -356,10 +355,6 @@ function rejectProposal() {
   emit("reject", props.proposal);
 }
 
-function copyToDraft() {
-  emit("copy-to-draft", props.proposal);
-}
-
 function handleRepositoryChange(repository) {
   selectedRepository.value = repository;
 }
@@ -430,17 +425,22 @@ function submitProposal() {
 <template>
   <div>
     <el-dialog
+      ref="proposalDialog"
       :modelValue="dialogVisible"
       @update:modelValue="handleDialogUpdate"
+      @open="scrollDialogToTop"
+      align-center
       width="90%"
       :max-width="900"
-      :close-on-click-modal="false"
+      :close-on-click-modal="readOnly"
       :close-on-press-escape="true"
-      :show-close="true"
+      :show-close="false"
       class="proposal-dialog"
     >
       <template #header>
-        <bf-dialog-header :title="dialogTitle" class="dialog-header" />
+        <div class="dialog-header">
+          <h2 class="dialog-title">{{ dialogTitle }}</h2>
+        </div>
       </template>
 
       <div class="proposal-content">
@@ -463,29 +463,12 @@ function submitProposal() {
         </div>
 
         <!-- Read-only Actions -->
-        <div class="read-only-actions" v-if="readOnly">
-          <bf-button
-            v-if="showReviewActions"
-            class="primary"
-            @click="acceptProposal"
-          >
+        <div class="read-only-actions" v-if="readOnly && showReviewActions">
+          <bf-button class="primary" @click="acceptProposal">
             Accept Proposal
           </bf-button>
-          <bf-button
-            v-if="showReviewActions"
-            class="secondary"
-            @click="rejectProposal"
-          >
+          <bf-button class="secondary" @click="rejectProposal">
             Reject Proposal
-          </bf-button>
-          <bf-button v-if="canCopyToDraft" class="primary" @click="copyToDraft">
-            Copy to new draft
-          </bf-button>
-          <bf-button
-            @click="closeDialog"
-            :class="showReviewActions || canCopyToDraft ? 'secondary' : 'primary'"
-          >
-            Close
           </bf-button>
         </div>
 
@@ -737,7 +720,21 @@ function submitProposal() {
 }
 
 .dialog-header {
-  margin: 0 0 24px 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.dialog-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 1.3;
+  color: theme.$purple_3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 // Repository Header
@@ -746,6 +743,7 @@ function submitProposal() {
   justify-content: space-between;
   align-items: flex-start;
   padding: 20px 24px;
+  border-radius: 8px;
   background: linear-gradient(
     135deg,
     lighten(theme.$purple_2, 45%) 0%,
@@ -779,7 +777,7 @@ function submitProposal() {
 
       .repo-description {
         margin: 0;
-        color: theme.$gray_5;
+        color: theme.$gray_6;
         font-size: 14px;
         line-height: 1.4;
       }
@@ -890,9 +888,9 @@ function submitProposal() {
 // Form Sections
 .proposal-form {
   .form-section {
-    margin-bottom: 32px;
+    margin-bottom: 16px;
     border: 1px solid theme.$gray_2;
-    border-radius: 3px;
+    border-radius: 8px;
     overflow: hidden;
     transition: all 0.2s ease;
 
@@ -936,7 +934,7 @@ function submitProposal() {
 
       .field-description {
         margin: 0;
-        color: theme.$gray_5;
+        color: theme.$gray_6;
         font-size: 14px;
         line-height: 1.4;
       }
@@ -1149,18 +1147,20 @@ function submitProposal() {
 
 // Dialog Overrides
 :deep(.el-dialog) {
+  padding: 0;
   border-radius: 12px;
   max-height: 90vh;
   overflow: hidden;
 }
 
 :deep(.el-dialog__header) {
-  padding: 20px 24px 0;
+  padding: 20px 16px 16px;
+  border-bottom: 1px solid theme.$gray_2;
   position: relative;
 }
 
 :deep(.el-dialog__body) {
-  padding: 0 24px 24px;
+  padding: 16px;
   max-height: calc(90vh - 120px);
   overflow-y: auto;
 }
@@ -1288,7 +1288,7 @@ function submitProposal() {
   margin-bottom: 24px;
   padding: 12px 16px;
   border: 1px solid theme.$purple_tint;
-  border-radius: 4px;
+  border-radius: 8px;
   background: theme.$gray_1;
 
   p {
