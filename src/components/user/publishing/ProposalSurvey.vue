@@ -1,11 +1,15 @@
 <script setup>
 import { ref, computed, watch } from "vue";
-import { useStore } from "vuex";
 import { useProposalStore } from "@/stores/proposalStore";
 import BfButton from "@/components/shared/bf-button/BfButton.vue";
 import IconCheck from "@/components/icons/IconCheck.vue";
 import IconKitchenTimer from "@/components/icons/IconKitchenTimer.vue";
 import BfDialogHeader from "@/components/shared/bf-dialog-header/BfDialogHeader.vue";
+import {
+  PROPOSAL_NAME_MAX_LENGTH,
+  isValidProposalName,
+  hasText,
+} from "@/utils/proposalValidation";
 
 const props = defineProps({
   dialogVisible: {
@@ -29,6 +33,18 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
+  allowCopyToDraft: {
+    type: Boolean,
+    default: false,
+  },
+  copiedFrom: {
+    type: Object,
+    default: () => null,
+  },
+  processing: {
+    type: Boolean,
+    default: false,
+  },
 });
 
 const emit = defineEmits([
@@ -39,10 +55,10 @@ const emit = defineEmits([
   "recreate-and-submit-proposal",
   "accept",
   "reject",
+  "copy-to-draft",
   "update:dialogVisible",
 ]);
 
-const store = useStore();
 const proposalStore = useProposalStore();
 
 const proposal = ref({
@@ -53,8 +69,8 @@ const proposal = ref({
 
 const selectedRepository = ref({});
 const surveyAnswersByRepository = ref({});
+const pendingAction = ref("");
 
-const profile = computed(() => store.state.profile);
 const availableRepositories = computed(() => proposalStore.repositories);
 
 const currentRepository = computed(() =>
@@ -91,20 +107,15 @@ const submitterName = computed(() => props.proposal?.ownerName || "");
 
 const submitterEmail = computed(() => props.proposal?.emailAddress || "");
 
-const proposalStatus = computed(() => {
-  const statusMap = {
-    DRAFT: "Draft",
-    SUBMITTED: "Submitted",
-    ACCEPTED: "Accepted",
-    REJECTED: "Rejected",
-    WITHDRAWN: "Withdrawn",
-  };
-  const status = props.proposal?.proposalStatus;
-  return status ? statusMap[status] || status : "";
-});
+const statusLabels = {
+  DRAFT: "Draft",
+  SUBMITTED: "Submitted",
+  ACCEPTED: "Accepted",
+  REJECTED: "Rejected",
+  WITHDRAWN: "Withdrawn",
+};
 
-const submittedOn = computed(() => {
-  const timestamp = props.proposal?.submittedAt || props.proposal?.updatedAt;
+function formatTimestamp(timestamp) {
   if (!timestamp) {
     return "";
   }
@@ -118,7 +129,45 @@ const submittedOn = computed(() => {
     month: "short",
     day: "numeric",
   });
+}
+
+const proposalStatus = computed(() => {
+  const status = props.proposal?.proposalStatus;
+  return status ? statusLabels[status] || status : "";
 });
+
+const submittedOn = computed(() =>
+  formatTimestamp(props.proposal?.submittedAt || props.proposal?.updatedAt)
+);
+
+const canCopyToDraft = computed(
+  () =>
+    props.allowCopyToDraft &&
+    ["WITHDRAWN", "REJECTED"].includes(props.proposal?.proposalStatus)
+);
+
+const copiedFromSummary = computed(() => {
+  const sourceProposal = props.copiedFrom;
+  if (!sourceProposal) {
+    return "";
+  }
+  const status = statusLabels[sourceProposal.proposalStatus] || "";
+  const closedOn = formatTimestamp(
+    sourceProposal.rejectedAt || sourceProposal.withdrawnAt
+  );
+  const statusDetail = [status, closedOn].filter(Boolean).join(" ");
+  return statusDetail
+    ? `"${sourceProposal.name || "Untitled Proposal"}" (${statusDetail})`
+    : `"${sourceProposal.name || "Untitled Proposal"}"`;
+});
+
+const hasRepositorySelected = computed(() =>
+  Boolean(currentRepository.value?.organizationNodeId)
+);
+
+const isCopiedRepositoryMissing = computed(
+  () => Boolean(props.copiedFrom) && !props.repository?.organizationNodeId
+);
 
 const hasSubmissionSummary = computed(
   () =>
@@ -131,20 +180,29 @@ const hasSubmissionSummary = computed(
     )
 );
 
+const isNameValid = computed(() => isValidProposalName(proposal.value.name));
+const isDescriptionFilled = computed(() => hasText(proposal.value.description));
+
+const isNameTooLong = computed(
+  () => (proposal.value.name || "").trim().length > PROPOSAL_NAME_MAX_LENGTH
+);
+
 const readyToSave = computed(() => {
+  if (!hasRepositorySelected.value || isNameTooLong.value) return false;
   // For updating existing proposals, allow saving even if incomplete
   if (props.proposal) {
     return true;
   }
   // For new proposals, require name and description
-  return proposal.value.name && proposal.value.description;
+  return isNameValid.value && isDescriptionFilled.value;
 });
 
 const readyToSubmit = computed(() => {
   // Require all fields including all questions for submission
   return (
-    proposal.value.name &&
-    proposal.value.description &&
+    hasRepositorySelected.value &&
+    isNameValid.value &&
+    isDescriptionFilled.value &&
     allRepoQuestionsAnswered.value
   );
 });
@@ -164,8 +222,8 @@ const allRepoQuestionsAnswered = computed(() => {
 
 const completedFieldsCount = computed(() => {
   let count = 0;
-  if (proposal.value.name) count++;
-  if (proposal.value.description) count++;
+  if (isNameValid.value) count++;
+  if (isDescriptionFilled.value) count++;
 
   const answeredQuestions = repositoryQuestions.value.filter((question) => {
     return (
@@ -250,9 +308,9 @@ function initializeSelectedRepository() {
   // Set the initial repository from props
   selectedRepository.value = props.repository || {};
 
-  // If editing an existing proposal, store its survey answers for the current repository
+  // If editing or copying a proposal, store its survey answers for the current repository
   if (
-    props.proposal &&
+    (props.proposal || props.copiedFrom) &&
     props.repository?.organizationNodeId &&
     proposal.value.survey
   ) {
@@ -263,26 +321,26 @@ function initializeSelectedRepository() {
 }
 
 function populateForm() {
-  if (props.proposal) {
-    // Editing existing proposal - populate with existing data
+  const sourceProposal = props.proposal || props.copiedFrom;
+  if (sourceProposal) {
     proposal.value = {
-      name: props.proposal.name || "",
-      description: props.proposal.description || "",
+      name: sourceProposal.name || "",
+      description: sourceProposal.description || "",
       survey: {},
     };
 
     // Convert survey array to object format for the form
-    if (Array.isArray(props.proposal.survey)) {
+    if (Array.isArray(sourceProposal.survey)) {
       const surveyObject = {};
-      props.proposal.survey.forEach((item) => {
+      sourceProposal.survey.forEach((item) => {
         if (item.questionId !== undefined && item.response) {
           surveyObject[item.questionId] = item.response;
         }
       });
       proposal.value.survey = surveyObject;
-    } else if (props.proposal.survey && typeof props.proposal.survey === "object") {
+    } else if (sourceProposal.survey && typeof sourceProposal.survey === "object") {
       // Already keyed by question id
-      proposal.value.survey = { ...props.proposal.survey };
+      proposal.value.survey = { ...sourceProposal.survey };
     }
   } else {
     // New proposal - clear form
@@ -298,6 +356,10 @@ function rejectProposal() {
   emit("reject", props.proposal);
 }
 
+function copyToDraft() {
+  emit("copy-to-draft", props.proposal);
+}
+
 function handleRepositoryChange(repository) {
   selectedRepository.value = repository;
 }
@@ -305,15 +367,14 @@ function handleRepositoryChange(repository) {
 function handleDialogUpdate(visible) {
   // Allow ESC key and explicit close actions
   if (!visible) {
+    if (props.processing) return;
     closeDialog();
   } else {
     emit("update:dialogVisible", visible);
   }
 }
 
-function saveProposal() {
-  if (!readyToSave.value) return;
-
+function buildProposalData() {
   const surveyResponses = repositoryQuestions.value
     .map((question) => ({
       questionId: question.id,
@@ -322,95 +383,47 @@ function saveProposal() {
     .filter((response) => response.response.trim());
 
   const proposalData = {
-    name: proposal.value.name,
+    name: proposal.value.name.trim(),
     description: proposal.value.description,
     organizationNodeId: currentRepository.value.organizationNodeId,
-    status: "DRAFT",
     survey: surveyResponses,
-    contributors: [],
-    userId: profile.value?.intId,
-    ownerName: `${profile.value?.firstName || ""} ${
-      profile.value?.lastName || ""
-    }`.trim(),
   };
 
-  // Check if this is an existing proposal and if the repository has changed
-  const isExistingProposal = props.proposal && props.proposal.nodeId;
+  const isExistingProposal = Boolean(props.proposal?.nodeId);
   const hasRepositoryChanged =
     isExistingProposal &&
     props.proposal.organizationNodeId !==
       currentRepository.value.organizationNodeId;
 
   if (hasRepositoryChanged) {
-    // Repository changed - need to delete old proposal and create new one
-    proposalData._originalProposal = props.proposal; // Pass original for deletion
-    proposalData._requiresRecreation = true;
-    emit("recreate-proposal", proposalData);
+    // PUT can't change the repository, so the parent creates a new proposal
+    // and then removes this one
+    proposalData._originalProposal = props.proposal;
   } else if (isExistingProposal) {
-    // Same repository - normal update
-    proposalData.id = props.proposal.id;
     proposalData.nodeId = props.proposal.nodeId;
-    proposalData.datasetNodeId = props.proposal.datasetNodeId;
-    proposalData.createdAt = props.proposal.createdAt;
-    proposalData.updatedAt = props.proposal.updatedAt;
-    emit("create-proposal", proposalData);
-  } else {
-    // New proposal - normal creation
-    emit("create-proposal", proposalData);
+    proposalData.userId = props.proposal.userId;
   }
 
-  closeDialog();
+  return { proposalData, hasRepositoryChanged };
+}
+
+function saveProposal() {
+  if (!readyToSave.value || props.processing) return;
+  pendingAction.value = "save";
+
+  const { proposalData, hasRepositoryChanged } = buildProposalData();
+  emit(hasRepositoryChanged ? "recreate-proposal" : "create-proposal", proposalData);
 }
 
 function submitProposal() {
-  if (!readyToSubmit.value) return;
+  if (!readyToSubmit.value || props.processing) return;
+  pendingAction.value = "submit";
 
-  const surveyResponses = repositoryQuestions.value
-    .map((question) => ({
-      questionId: question.id,
-      response: proposal.value.survey[question.id] || "",
-    }))
-    .filter((response) => response.response.trim());
-
-  const proposalData = {
-    name: proposal.value.name,
-    description: proposal.value.description,
-    organizationNodeId: currentRepository.value.organizationNodeId,
-    status: "DRAFT",
-    survey: surveyResponses,
-    contributors: [],
-    userId: profile.value?.intId,
-    ownerName: `${profile.value?.firstName || ""} ${
-      profile.value?.lastName || ""
-    }`.trim(),
-  };
-
-  // Check if this is an existing proposal and if the repository has changed
-  const isExistingProposal = props.proposal && props.proposal.nodeId;
-  const hasRepositoryChanged =
-    isExistingProposal &&
-    props.proposal.organizationNodeId !==
-      currentRepository.value.organizationNodeId;
-
-  if (hasRepositoryChanged) {
-    // Repository changed - need to delete old proposal and create new one, then submit
-    proposalData._originalProposal = props.proposal; // Pass original for deletion
-    proposalData._requiresRecreation = true;
-    emit("recreate-and-submit-proposal", proposalData);
-  } else if (isExistingProposal) {
-    // Same repository - normal update then submit
-    proposalData.id = props.proposal.id;
-    proposalData.nodeId = props.proposal.nodeId;
-    proposalData.datasetNodeId = props.proposal.datasetNodeId;
-    proposalData.createdAt = props.proposal.createdAt;
-    proposalData.updatedAt = props.proposal.updatedAt;
-    emit("submit-proposal", proposalData);
-  } else {
-    // New proposal - create and submit
-    emit("submit-proposal", proposalData);
-  }
-
-  closeDialog();
+  const { proposalData, hasRepositoryChanged } = buildProposalData();
+  emit(
+    hasRepositoryChanged ? "recreate-and-submit-proposal" : "submit-proposal",
+    proposalData
+  );
 }
 </script>
 
@@ -465,12 +478,26 @@ function submitProposal() {
           >
             Reject Proposal
           </bf-button>
+          <bf-button v-if="canCopyToDraft" class="primary" @click="copyToDraft">
+            Copy to new draft
+          </bf-button>
           <bf-button
             @click="closeDialog"
-            :class="showReviewActions ? 'secondary' : 'primary'"
+            :class="showReviewActions || canCopyToDraft ? 'secondary' : 'primary'"
           >
             Close
           </bf-button>
+        </div>
+
+        <div class="copied-from-notice" v-if="copiedFrom && !readOnly">
+          <p>
+            Copied from {{ copiedFromSummary }}. Saving creates a new proposal;
+            the original stays in your list.
+          </p>
+          <p v-if="isCopiedRepositoryMissing" class="copied-from-warning">
+            The original repository is no longer available. Choose a repository
+            below.
+          </p>
         </div>
 
         <!-- Progress Indicator -->
@@ -504,7 +531,7 @@ function submitProposal() {
               />
             </div>
             <div class="repo-details">
-              <h2>{{ currentRepository.displayName }}</h2>
+              <h2>{{ currentRepository.displayName || "Repository unavailable" }}</h2>
               <p class="repo-description" v-if="currentRepository.description">
                 {{ currentRepository.description }}
               </p>
@@ -568,9 +595,15 @@ function submitProposal() {
                 v-model="proposal.name"
                 placeholder="e.g., Neural Activity in Visual Cortex During Object Recognition"
                 size="large"
-                :class="{ 'field-completed': proposal.name }"
+                :maxlength="PROPOSAL_NAME_MAX_LENGTH"
+                :show-word-limit="!readOnly"
+                :class="{ 'field-completed': isNameValid }"
                 :readonly="readOnly"
               />
+              <p v-if="isNameTooLong && !readOnly" class="field-error">
+                Dataset names can be at most {{ PROPOSAL_NAME_MAX_LENGTH }}
+                characters.
+              </p>
             </div>
           </div>
 
@@ -666,19 +699,25 @@ function submitProposal() {
           </div>
 
           <div class="action-buttons">
-            <bf-button @click="closeDialog" class="secondary">
+            <bf-button
+              @click="closeDialog"
+              class="secondary"
+              :disabled="processing"
+            >
               Cancel
             </bf-button>
             <bf-button
               class="secondary"
-              :disabled="!readyToSave"
+              :disabled="!readyToSave || processing"
+              :processing="processing && pendingAction === 'save'"
               @click="saveProposal"
             >
               {{ props.proposal ? "Update Proposal" : "Save Proposal" }}
             </bf-button>
             <bf-button
               class="primary"
-              :disabled="!readyToSubmit"
+              :disabled="!readyToSubmit || processing"
+              :processing="processing && pendingAction === 'submit'"
               @click="submitProposal"
             >
               Submit Proposal
@@ -1237,6 +1276,32 @@ function submitProposal() {
   gap: 8px;
   padding: 0 0 24px 0;
   margin-top: 24px;
+}
+
+.field-error {
+  margin: 8px 0 0;
+  color: theme.$red_2;
+  font-size: 13px;
+}
+
+.copied-from-notice {
+  margin-bottom: 24px;
+  padding: 12px 16px;
+  border: 1px solid theme.$purple_tint;
+  border-radius: 4px;
+  background: theme.$gray_1;
+
+  p {
+    margin: 0;
+    color: theme.$gray_6;
+    font-size: 14px;
+    line-height: 1.5;
+  }
+
+  .copied-from-warning {
+    margin-top: 8px;
+    color: theme.$orange_1;
+  }
 }
 
 .submission-summary {

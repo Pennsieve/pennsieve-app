@@ -101,7 +101,7 @@ export const DatasetProposalAction = Object.freeze({
   ACCEPT: 'accept',
   REJECT: 'reject',
   REMOVE: 'remove',
-  RESUBMIT: 'resubmit',
+  COPY_TO_DRAFT: 'copy-to-draft',
   OPEN_DATASET: 'open-dataset'
 })
 

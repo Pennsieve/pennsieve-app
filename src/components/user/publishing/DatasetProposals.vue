@@ -26,8 +26,8 @@
       </div>
 
       <!-- Error State -->
-      <div v-else-if="error" class="error-state">
-        <p class="error-message">{{ error }}</p>
+      <div v-else-if="loadError" class="error-state">
+        <p class="error-message">{{ loadError }}</p>
         <bf-button @click="fetchProposals" class="secondary">
           Try Again
         </bf-button>
@@ -42,14 +42,14 @@
         <div class="proposals-list">
           <request-list-item
             v-for="proposal in datasetProposals"
-            :key="proposal.id"
+            :key="proposal.nodeId"
             :dataset-request="proposal"
             @edit="editProposal"
             @remove="removeProposal"
             @submit="submitProposal"
             @withdraw="withdrawProposal"
             @open-dataset="openDataset"
-            @resubmit="resubmitProposal"
+            @copy-to-draft="copyProposalToDraft"
           />
         </div>
       </div>
@@ -80,11 +80,15 @@
       :dialog-visible="showProposalDialog"
       :repository="selectedRepository"
       :proposal="activeProposal"
-      :read-only="activeProposal && !['DRAFT', 'WITHDRAWN'].includes(activeProposal.proposalStatus)"
-      @create-proposal="handleCreateProposal"
+      :copied-from="copySourceProposal"
+      :read-only="Boolean(activeProposal) && activeProposal.proposalStatus !== 'DRAFT'"
+      :processing="isSavingProposal"
+      allow-copy-to-draft
+      @copy-to-draft="copyProposalToDraft"
+      @create-proposal="handleSaveProposal"
       @submit-proposal="handleSubmitProposal"
-      @recreate-proposal="handleRecreateProposal"
-      @recreate-and-submit-proposal="handleRecreateAndSubmitProposal"
+      @recreate-proposal="handleSaveProposal"
+      @recreate-and-submit-proposal="handleSubmitProposal"
       @close="closeProposalDialog"
     />
 
@@ -106,26 +110,31 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, watch, nextTick } from 'vue'
 import { useStore } from 'vuex'
 import { useRouter } from 'vue-router'
+import { ElMessage } from 'element-plus'
 import { useProposalStore } from '@/stores/proposalStore'
 import BfButton from '@/components/shared/bf-button/BfButton.vue'
 import RequestListItem from './RequestListItem.vue'
 import ProposalSurvey from './ProposalSurvey.vue'
 import ConfirmationDialog from '@/components/shared/ConfirmationDialog/ConfirmationDialog.vue'
 import IconDocument from '@/components/icons/IconDocument.vue'
+import { useProposalSave } from '@/composables/useProposalSave'
+import { getProposalErrorMessage, isStaleProposalError } from '@/utils/proposalErrorMessages'
 
 const store = useStore()
 const proposalStore = useProposalStore()
 const router = useRouter()
+const { isSavingProposal, saveProposal } = useProposalSave()
 
 // Reactive data
 const isLoading = ref(false)
-const error = ref('')
+const loadError = ref('')
 const showProposalDialog = ref(false)
 const selectedRepository = ref({})
 const activeProposal = ref({})
+const copySourceProposal = ref(null)
 const confirmationDialogVisible = ref(false)
 const confirmationDialog = ref({
   action: '',
@@ -139,12 +148,9 @@ const confirmationDialog = ref({
 
 // Computed properties
 const datasetProposals = computed(() => {
-  // Sort proposals by updatedAt timestamp, most recent first
-  return [...proposalStore.datasetProposals].sort((a, b) => {
-    const aTime = a.updatedAt || a.createdAt || 0
-    const bTime = b.updatedAt || b.createdAt || 0
-    return bTime - aTime // Descending order (newest first)
-  })
+  return [...proposalStore.datasetProposals].sort(
+    (a, b) => (b.createdAt || 0) - (a.createdAt || 0)
+  )
 })
 const hasProposals = computed(() => proposalStore.hasProposals)
 const repositories = computed(() => proposalStore.repositories)
@@ -153,16 +159,13 @@ const profile = computed(() => store.state.profile)
 // Methods
 const fetchProposals = async () => {
   isLoading.value = true
-  error.value = ''
-  
-  try {
-    await proposalStore.fetchProposals()
-  } catch (err) {
-    error.value = 'Failed to load proposals. Please try again.'
-    console.error('Error fetching proposals:', err)
-  } finally {
-    isLoading.value = false
+  loadError.value = ''
+
+  await proposalStore.fetchProposals()
+  if (proposalStore.proposalsError) {
+    loadError.value = 'Failed to load proposals. Please try again.'
   }
+  isLoading.value = false
 }
 
 const fetchRepositories = async () => {
@@ -180,86 +183,15 @@ const startNewProposal = () => {
   showProposalDialog.value = true
 }
 
-const handleCreateProposal = async (proposalData) => {
-  try {
-    // Check if we're editing an existing proposal (has nodeId) or creating new
-    if (proposalData.nodeId) {
-      // Editing existing proposal - use PUT API
-      await proposalStore.updateProposal(proposalData, profile.value)
-    } else {
-      // Creating new proposal - use POST API
-      await proposalStore.storeNewProposal(proposalData, profile.value)
-    }
+const handleSaveProposal = async (proposalData) => {
+  if (await saveProposal(proposalData)) {
     closeProposalDialog()
-  } catch (err) {
-    const action = proposalData.nodeId ? 'update' : 'create'
-    error.value = `Failed to ${action} proposal. Please try again.`
-    console.error(`Error ${action}ing proposal:`, err)
   }
 }
 
 const handleSubmitProposal = async (proposalData) => {
-  try {
-    let proposalToSubmit = proposalData
-    
-    // If editing existing proposal, first update it
-    if (proposalData.nodeId) {
-      const response = await proposalStore.updateProposal(proposalData, profile.value)
-      proposalToSubmit = response.result
-    } else {
-      // If creating new proposal, first save it as DRAFT
-      const response = await proposalStore.storeNewProposal(proposalData, profile.value)
-      proposalToSubmit = response.result
-    }
-    
-    // Now submit the proposal
-    if (proposalToSubmit?.nodeId) {
-      await proposalStore.submitProposal(proposalToSubmit)
-    }
-    
+  if (await saveProposal(proposalData, { submit: true })) {
     closeProposalDialog()
-  } catch (err) {
-    error.value = 'Failed to submit proposal. Please try again.'
-    console.error('Error submitting proposal:', err)
-  }
-}
-
-const handleRecreateProposal = async (proposalData) => {
-  try {
-    // First delete the original proposal
-    await proposalStore.removeProposal(proposalData._originalProposal)
-    
-    // Then create the new proposal with the new repository
-    delete proposalData._originalProposal
-    delete proposalData._requiresRecreation
-    await proposalStore.storeNewProposal(proposalData, profile.value)
-    
-    closeProposalDialog()
-  } catch (err) {
-    error.value = 'Failed to move proposal to new repository. Please try again.'
-    console.error('Error recreating proposal:', err)
-  }
-}
-
-const handleRecreateAndSubmitProposal = async (proposalData) => {
-  try {
-    // First delete the original proposal
-    await proposalStore.removeProposal(proposalData._originalProposal)
-    
-    // Then create the new proposal with the new repository
-    delete proposalData._originalProposal
-    delete proposalData._requiresRecreation
-    const response = await proposalStore.storeNewProposal(proposalData, profile.value)
-    
-    // Now submit the new proposal
-    if (response.result?.nodeId) {
-      await proposalStore.submitProposal(response.result)
-    }
-    
-    closeProposalDialog()
-  } catch (err) {
-    error.value = 'Failed to move and submit proposal to new repository. Please try again.'
-    console.error('Error recreating and submitting proposal:', err)
   }
 }
 
@@ -267,22 +199,16 @@ const closeProposalDialog = () => {
   showProposalDialog.value = false
   selectedRepository.value = {}
   activeProposal.value = {}
+  copySourceProposal.value = null
 }
 
 const editProposal = (proposal) => {
   activeProposal.value = proposal
-  
-  // Find the repository for this proposal
-  const repository = repositories.value.find(repo => 
+
+  selectedRepository.value = repositories.value.find(repo =>
     repo.organizationNodeId === proposal.organizationNodeId
-  )
-  
-  if (repository) {
-    selectedRepository.value = repository
-    showProposalDialog.value = true
-  } else {
-    error.value = 'Repository not found for this proposal.'
-  }
+  ) || {}
+  showProposalDialog.value = true
 }
 
 const removeProposal = (proposal) => {
@@ -324,16 +250,25 @@ const withdrawProposal = (proposal) => {
     action: 'withdraw',
     actionMessage: `Withdraw Dataset Proposal: "${proposal.name}"?`,
     resource: proposal,
-    warningMessage: `This will withdraw your proposal from ${repositoryName}. You can resubmit it later if needed.`,
+    warningMessage: `This will withdraw your proposal from ${repositoryName}. A withdrawn proposal can't be resubmitted, but you can copy it into a new draft.`,
     confirmActionLabel: 'Withdraw',
     cancelActionLabel: 'Cancel',
   }
   confirmationDialogVisible.value = true
 }
 
-const resubmitProposal = (proposal) => {
-  // Navigate to open repositories page to select a new repository for resubmission
-  router.push({ name: 'open-repositories' })
+const copyProposalToDraft = async (sourceProposal) => {
+  if (showProposalDialog.value) {
+    closeProposalDialog()
+    await nextTick()
+  }
+
+  copySourceProposal.value = sourceProposal
+  activeProposal.value = null
+  selectedRepository.value = repositories.value.find(repo =>
+    repo.organizationNodeId === sourceProposal.organizationNodeId
+  ) || {}
+  showProposalDialog.value = true
 }
 
 const openDataset = (proposal) => {
@@ -343,7 +278,12 @@ const openDataset = (proposal) => {
 
 const handleConfirmedAction = async (event) => {
   const { action, resource } = event
-  
+  const successMessages = {
+    remove: 'Proposal removed',
+    submit: 'Proposal submitted',
+    withdraw: 'Proposal withdrawn',
+  }
+
   try {
     switch (action) {
       case 'remove':
@@ -356,11 +296,16 @@ const handleConfirmedAction = async (event) => {
         await proposalStore.withdrawProposal(resource)
         break
     }
+    ElMessage.success(successMessages[action])
   } catch (err) {
-    error.value = `Failed to ${action} proposal. Please try again.`
-    console.error(`Error ${action} proposal:`, err)
+    ElMessage.error(getProposalErrorMessage(action, err))
+    closeConfirmationDialog()
+    if (isStaleProposalError(err)) {
+      await fetchProposals()
+    }
+    return
   }
-  
+
   closeConfirmationDialog()
 }
 

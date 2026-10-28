@@ -6,9 +6,11 @@ import RepositoryListItem from './RepositoryListItem.vue'
 import ProposalSurvey from './ProposalSurvey.vue'
 import RepositoryInfoModal from './RepositoryInfoModal.vue'
 import BfButton from "@/components/shared/bf-button/BfButton.vue";
+import { useProposalSave } from '@/composables/useProposalSave'
 
 const store = useStore()
 const proposalStore = useProposalStore()
+const { isSavingProposal, saveProposal } = useProposalSave()
 
 const showProposalDialog = ref(false)
 const selectedRepository = ref({})
@@ -62,35 +64,14 @@ function closeProposalDialog() {
 }
 
 async function createProposal(proposalData) {
-  try {
-    await proposalStore.storeNewProposal(proposalData, profile.value)
-    console.log('Proposal created successfully')
+  if (await saveProposal(proposalData)) {
     closeProposalDialog()
-    // Show success message or redirect
-    // You might want to emit an event or show a notification here
-  } catch (err) {
-    console.error('Error creating proposal:', err)
-    // Handle error - show error message to user
   }
 }
 
 async function submitProposal(proposalData) {
-  try {
-    // First save the proposal as DRAFT
-    const response = await proposalStore.storeNewProposal(proposalData, profile.value)
-    
-    // Get the saved proposal with its nodeId from the response
-    if (response?.result?.nodeId) {
-      // Now submit the saved proposal
-      await proposalStore.submitProposal(response.result)
-    }
-    
-    console.log('Proposal submitted successfully')
+  if (await saveProposal(proposalData, { submit: true })) {
     closeProposalDialog()
-    // Show success message or redirect
-  } catch (err) {
-    console.error('Error submitting proposal:', err)
-    // Handle error - show error message to user
   }
 }
 
@@ -155,6 +136,7 @@ onMounted(() => {
     <proposal-survey
       :dialog-visible="showProposalDialog"
       :repository="selectedRepository"
+      :processing="isSavingProposal"
       @close="closeProposalDialog"
       @create-proposal="createProposal"
       @submit-proposal="submitProposal"

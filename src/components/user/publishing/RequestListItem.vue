@@ -89,25 +89,20 @@
               </button>
             </template>
 
-            <!-- Rejected actions -->
-            <template v-else-if="isRejected">
+            <template v-else-if="isRejected || isWithdrawn">
               <button
-                class="text-link"
-                @click.stop="triggerRequest(DatasetProposalAction.RESUBMIT)"
+                class="text-link primary-action"
+                @click.stop="triggerRequest(DatasetProposalAction.COPY_TO_DRAFT)"
               >
-                Resubmit
+                Copy to new draft
+              </button>
+              <button
+                class="text-link secondary-action"
+                @click.stop="triggerRequest(DatasetProposalAction.REMOVE)"
+              >
+                Remove
               </button>
             </template>
-
-            <!-- Withdrawn actions -->
-            <!-- <template v-else-if="isWithdrawn">
-              <button 
-                class="text-link"
-                @click.stop="triggerRequest(DatasetProposalAction.EDIT)"
-              >
-                Edit & Resubmit
-              </button>
-            </template> -->
           </div>
         </div>
       </div>
@@ -119,6 +114,7 @@
 import { computed } from "vue";
 import { useProposalStore } from "@/stores/proposalStore";
 import { DatasetProposalAction } from "@/utils/constants";
+import { isValidProposalName, hasText } from "@/utils/proposalValidation";
 
 // Props
 const props = defineProps({
@@ -135,7 +131,7 @@ const emit = defineEmits([
   "submit",
   "withdraw",
   "open-dataset",
-  "resubmit",
+  "copy-to-draft",
 ]);
 
 // Store
@@ -208,35 +204,26 @@ const truncatedDescription = computed(() => {
 });
 
 const surveyComplete = computed(() => {
-  let result = false;
-  const organizationNodeId = props.datasetRequest.organizationNodeId;
-  const repo = repository.value;
-
-  if (
-    repo &&
-    repo.questions != null &&
-    props.datasetRequest &&
-    props.datasetRequest.survey != null
-  ) {
-    result = repo.questions
-      .map((q) => {
-        const answer = props.datasetRequest.survey.find(
-          (r) => r.questionId === q.id
-        );
-        return answer && answer.response !== "";
-      })
-      .reduce((a, c) => a && c, true);
+  const questions = repository.value?.questions;
+  const surveyResponses = props.datasetRequest.survey;
+  if (questions == null || surveyResponses == null) {
+    return false;
   }
-  return result;
+
+  return questions.every((question) => {
+    const answer = surveyResponses.find(
+      (response) => response.questionId === question.id
+    );
+    return hasText(answer?.response);
+  });
 });
 
 const readyToSubmit = computed(() => {
-  const validName =
-    props.datasetRequest.name !== null && props.datasetRequest.name !== "";
-  const validDescription =
-    props.datasetRequest.description !== null &&
-    props.datasetRequest.description !== "";
-  return validName && validDescription && surveyComplete.value;
+  return (
+    isValidProposalName(props.datasetRequest.name) &&
+    hasText(props.datasetRequest.description) &&
+    surveyComplete.value
+  );
 });
 
 // Methods
