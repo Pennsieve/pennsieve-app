@@ -2,6 +2,7 @@ import { ref, computed } from 'vue'
 import { useStore } from 'vuex'
 import { ElMessage } from 'element-plus'
 import { useProposalStore } from '@/stores/proposalStore'
+import { getProposalErrorMessage } from '@/utils/proposalErrorMessages'
 
 /**
  * Saves (and optionally submits) a proposal coming out of the ProposalSurvey dialog.
@@ -32,9 +33,9 @@ export function useProposalSave() {
         savedProposal = response.result
       } catch (error) {
         ElMessage.error(
-          submit
-            ? 'Could not submit proposal. Please try again.'
-            : 'Could not save proposal. Please try again.'
+          getProposalErrorMessage('save', error, {
+            summary: submit ? 'Could not submit the proposal.' : undefined,
+          })
         )
         return false
       }
@@ -64,7 +65,9 @@ export function useProposalSave() {
         ElMessage.success('Proposal submitted')
       } catch (error) {
         ElMessage.error(
-          'Your proposal was saved as a draft, but it could not be submitted. Try submitting it from your list.'
+          getProposalErrorMessage('submit', error, {
+            summary: 'Your proposal was saved as a draft, but it could not be submitted.',
+          })
         )
       }
       return true

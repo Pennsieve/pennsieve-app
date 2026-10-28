@@ -121,6 +121,7 @@ import ProposalSurvey from './ProposalSurvey.vue'
 import ConfirmationDialog from '@/components/shared/ConfirmationDialog/ConfirmationDialog.vue'
 import IconDocument from '@/components/icons/IconDocument.vue'
 import { useProposalSave } from '@/composables/useProposalSave'
+import { getProposalErrorMessage, isStaleProposalError } from '@/utils/proposalErrorMessages'
 
 const store = useStore()
 const proposalStore = useProposalStore()
@@ -283,10 +284,10 @@ const openDataset = (proposal) => {
 
 const handleConfirmedAction = async (event) => {
   const { action, resource } = event
-  const actionMessages = {
-    remove: { success: 'Proposal removed', failure: 'Could not remove proposal. Please try again.' },
-    submit: { success: 'Proposal submitted', failure: 'Could not submit proposal. Please try again.' },
-    withdraw: { success: 'Proposal withdrawn', failure: 'Could not withdraw proposal. Please try again.' },
+  const successMessages = {
+    remove: 'Proposal removed',
+    submit: 'Proposal submitted',
+    withdraw: 'Proposal withdrawn',
   }
 
   try {
@@ -301,9 +302,15 @@ const handleConfirmedAction = async (event) => {
         await proposalStore.withdrawProposal(resource)
         break
     }
-    ElMessage.success(actionMessages[action].success)
+    ElMessage.success(successMessages[action])
   } catch (err) {
-    ElMessage.error(actionMessages[action].failure)
+    ElMessage.error(getProposalErrorMessage(action, err))
+    closeConfirmationDialog()
+    // Show the proposal's real status instead of offering an action that will fail again
+    if (isStaleProposalError(err)) {
+      await fetchProposals()
+    }
+    return
   }
 
   closeConfirmationDialog()

@@ -65,6 +65,14 @@ export const useProposalStore = defineStore('proposalStore', () => {
     survey: proposal.survey,
   })
 
+  // Error responses have an empty body, so callers need the status code to
+  // tell the user what went wrong (see utils/proposalErrorMessages.js)
+  const throwRequestError = (response) => {
+    const requestError = new Error(`${response.status} ${response.statusText}`)
+    requestError.status = response.status
+    throw requestError
+  }
+
   // Clear store state
   const clearProposalStore = () => {
     publishingInfo.value = []
@@ -105,7 +113,7 @@ export const useProposalStore = defineStore('proposalStore', () => {
         }))
       } else {
         publishingInfo.value = []
-        throw new Error(response.statusText)
+        throwRequestError(response)
       }
     } catch (err) {
       console.error('Failed to fetch publishing info:', err)
@@ -138,7 +146,7 @@ export const useProposalStore = defineStore('proposalStore', () => {
         repositories.value = sortRepositories(processedRepositories)
       } else {
         repositories.value = []
-        throw new Error(response.statusText)
+        throwRequestError(response)
       }
     } catch (err) {
       console.error('Failed to fetch repositories:', err)
@@ -168,7 +176,7 @@ export const useProposalStore = defineStore('proposalStore', () => {
         datasetProposals.value = responseJson.map(transformProposalIn)
       } else {
         datasetProposals.value = []
-        throw new Error(response.statusText)
+        throwRequestError(response)
       }
     } catch (err) {
       console.error('Failed to fetch proposals:', err)
@@ -204,7 +212,7 @@ export const useProposalStore = defineStore('proposalStore', () => {
           result: newProposal
         }
       } else {
-        throw new Error(response.statusText)
+        throwRequestError(response)
       }
     } catch (err) {
       console.error('Failed to create proposal:', err)
@@ -243,7 +251,7 @@ export const useProposalStore = defineStore('proposalStore', () => {
           result: updatedProposal
         }
       } else {
-        throw new Error(response.statusText)
+        throwRequestError(response)
       }
     } catch (err) {
       console.error('Failed to update proposal:', err)
@@ -272,7 +280,7 @@ export const useProposalStore = defineStore('proposalStore', () => {
           status: "SUCCESS"
         }
       } else {
-        throw new Error(response.statusText)
+        throwRequestError(response)
       }
     } catch (err) {
       console.error('Failed to delete proposal:', err)
@@ -311,7 +319,7 @@ export const useProposalStore = defineStore('proposalStore', () => {
           result: updatedProposal
         }
       } else {
-        throw new Error(response.statusText)
+        throwRequestError(response)
       }
     } catch (err) {
       console.error('Failed to update proposal:', err)
@@ -348,7 +356,7 @@ export const useProposalStore = defineStore('proposalStore', () => {
           result: submittedProposal
         }
       } else {
-        throw new Error(response.statusText)
+        throwRequestError(response)
       }
     } catch (err) {
       console.error('Failed to submit proposal:', err)
@@ -385,7 +393,7 @@ export const useProposalStore = defineStore('proposalStore', () => {
           result: withdrawnProposal
         }
       } else {
-        throw new Error(response.statusText)
+        throwRequestError(response)
       }
     } catch (err) {
       console.error('Failed to withdraw proposal:', err)
@@ -422,7 +430,7 @@ export const useProposalStore = defineStore('proposalStore', () => {
           result: acceptedProposal
         }
       } else {
-        throw new Error(`Failed to accept proposal: ${response.status} ${response.statusText}`)
+        throwRequestError(response)
       }
     } catch (err) {
       console.error('Failed to accept proposal:', err)
@@ -459,7 +467,7 @@ export const useProposalStore = defineStore('proposalStore', () => {
           result: rejectedProposal
         }
       } else {
-        throw new Error(`Failed to reject proposal: ${response.status} ${response.statusText}`)
+        throwRequestError(response)
       }
     } catch (err) {
       console.error('Failed to reject proposal:', err)
