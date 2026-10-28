@@ -148,12 +148,11 @@ const confirmationDialog = ref({
 
 // Computed properties
 const datasetProposals = computed(() => {
-  // Sort proposals by updatedAt timestamp, most recent first
-  return [...proposalStore.datasetProposals].sort((a, b) => {
-    const aTime = a.updatedAt || a.createdAt || 0
-    const bTime = b.updatedAt || b.createdAt || 0
-    return bTime - aTime // Descending order (newest first)
-  })
+  // Newest proposals first. Sorting by createdAt keeps rows from jumping to the
+  // top whenever a proposal is edited, submitted or withdrawn.
+  return [...proposalStore.datasetProposals].sort(
+    (a, b) => (b.createdAt || 0) - (a.createdAt || 0)
+  )
 })
 const hasProposals = computed(() => proposalStore.hasProposals)
 const repositories = computed(() => proposalStore.repositories)
