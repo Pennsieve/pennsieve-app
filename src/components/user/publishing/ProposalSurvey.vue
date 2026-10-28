@@ -1,10 +1,11 @@
 <script setup>
 import { ref, computed, watch, nextTick, useTemplateRef } from "vue";
-import { Close } from "@element-plus/icons-vue";
+import { Close, Loading } from "@element-plus/icons-vue";
 import { useProposalStore } from "@/stores/proposalStore";
-import BfButton from "@/components/shared/bf-button/BfButton.vue";
 import IconCheck from "@/components/icons/IconCheck.vue";
 import IconKitchenTimer from "@/components/icons/IconKitchenTimer.vue";
+import IconAlertLine from "@/components/icons/IconAlertLine.vue";
+import IconSaveLine from "@/components/icons/IconSaveLine.vue";
 import {
   PROPOSAL_NAME_MAX_LENGTH,
   isValidProposalName,
@@ -227,6 +228,47 @@ const completedFieldsCount = computed(() => {
 
 const totalRequiredFields = computed(() => {
   return 2 + repositoryQuestions.value.length; // name + description + questions
+});
+
+// What the footer tells the user about where the form stands, most
+// blocking problem first
+const footerStatus = computed(() => {
+  const remainingFields = totalRequiredFields.value - completedFieldsCount.value;
+  const fieldsWord = (count) => (count === 1 ? "field" : "fields");
+
+  if (!hasRepositorySelected.value) {
+    return {
+      tone: "blocked",
+      title: "Choose a repository",
+      detail: "Pick where this proposal should be submitted.",
+    };
+  }
+  if (isNameTooLong.value) {
+    return {
+      tone: "blocked",
+      title: "Dataset name is too long",
+      detail: "Shorten the name to save or submit.",
+    };
+  }
+  if (readyToSubmit.value) {
+    return {
+      tone: "ready",
+      title: "Ready to submit",
+      detail: `All ${totalRequiredFields.value} required ${fieldsWord(totalRequiredFields.value)} are complete.`,
+    };
+  }
+  if (readyToSave.value) {
+    return {
+      tone: "draft",
+      title: "Draft can be saved",
+      detail: `${remainingFields} required ${fieldsWord(remainingFields)} left before you can submit.`,
+    };
+  }
+  return {
+    tone: "progress",
+    title: "Add a name and description",
+    detail: "Both are needed to save a draft.",
+  };
 });
 
 const progressPercentage = computed(() => {
@@ -491,12 +533,12 @@ function submitProposal() {
 
         <!-- Read-only Actions -->
         <div class="read-only-actions" v-if="readOnly && showReviewActions">
-          <bf-button class="primary" @click="acceptProposal">
-            Accept Proposal
-          </bf-button>
-          <bf-button class="secondary" @click="rejectProposal">
+          <button type="button" class="dialog-button secondary" @click="rejectProposal">
             Reject Proposal
-          </bf-button>
+          </button>
+          <button type="button" class="dialog-button primary" @click="acceptProposal">
+            Accept Proposal
+          </button>
         </div>
 
         <div class="copied-from-notice" v-if="copiedFrom && !readOnly">
@@ -681,62 +723,66 @@ function submitProposal() {
             </div>
           </div>
         </el-form>
+      </div>
 
-        <!-- Action Section -->
-        <div class="action-section" v-if="!readOnly">
+      <template v-if="!readOnly" #footer>
+        <div class="action-section">
           <div class="action-info">
-            <div class="completion-status" :class="{ ready: readyToSave }">
+            <div class="completion-status" :class="footerStatus.tone">
               <div class="status-icon">
-                <IconCheck v-if="readyToSave" :width="20" :height="20" />
-                <IconKitchenTimer v-else :width="20" :height="20" />
+                <IconCheck v-if="footerStatus.tone === 'ready'" :width="18" :height="18" />
+                <IconAlertLine v-else-if="footerStatus.tone === 'blocked'" :width="16" :height="16" />
+                <IconSaveLine v-else-if="footerStatus.tone === 'draft'" :width="16" :height="16" />
+                <IconKitchenTimer v-else :width="18" :height="18" />
               </div>
               <div class="status-text">
-                <span v-if="readyToSubmit" class="ready-text"
-                  >Ready to submit</span
-                >
-                <span v-else-if="readyToSave" class="ready-text"
-                  >Ready to save draft</span
-                >
-                <span v-else class="pending-text"
-                  >Complete all required fields to continue</span
-                >
+                <span class="status-title">{{ footerStatus.title }}</span>
+                <span class="status-detail">{{ footerStatus.detail }}</span>
               </div>
             </div>
           </div>
 
           <div class="action-buttons">
-            <bf-button
-              @click="closeDialog"
-              class="secondary"
+            <button
+              type="button"
+              class="dialog-button secondary"
               :disabled="processing"
+              @click="closeDialog"
             >
               Cancel
-            </bf-button>
-            <bf-button
-              class="secondary"
+            </button>
+            <button
+              type="button"
+              class="dialog-button secondary"
               :disabled="!readyToSave || processing"
-              :processing="processing && pendingAction === 'save'"
               @click="saveProposal"
             >
+              <el-icon v-if="processing && pendingAction === 'save'" class="is-loading">
+                <Loading />
+              </el-icon>
               {{ props.proposal ? "Update Proposal" : "Save Proposal" }}
-            </bf-button>
-            <bf-button
-              class="primary"
+            </button>
+            <button
+              type="button"
+              class="dialog-button primary"
               :disabled="!readyToSubmit || processing"
-              :processing="processing && pendingAction === 'submit'"
               @click="submitProposal"
             >
+              <el-icon v-if="processing && pendingAction === 'submit'" class="is-loading">
+                <Loading />
+              </el-icon>
               Submit Proposal
-            </bf-button>
+            </button>
           </div>
         </div>
-      </div>
+      </template>
     </el-dialog>
   </div>
 </template>
 
 <style scoped lang="scss">
 @use "../../../styles/_theme.scss";
+@use "../../../styles/dialog-button";
 
 .proposal-content {
   padding: 0;
@@ -1127,10 +1173,13 @@ function submitProposal() {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 0 0 24px 0;
-  margin-top: 16px;
+  gap: 16px;
 
+  // el-dialog right-aligns footer text by default
   .action-info {
+    min-width: 0;
+    text-align: left;
+
     .completion-status {
       display: flex;
       align-items: center;
@@ -1138,26 +1187,42 @@ function submitProposal() {
 
       .status-icon {
         display: flex;
+        flex-shrink: 0;
         align-items: center;
         justify-content: center;
-        color: theme.$purple_1;
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        background: rgba(theme.$purple_3, 0.08);
+        color: theme.$purple_2;
       }
 
       .status-text {
-        .ready-text {
-          color: theme.$green_2;
-          font-weight: 500;
-        }
-
-        .pending-text {
-          color: theme.$gray_5;
-        }
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        min-width: 0;
       }
 
-      &.ready {
-        .status-text {
-          color: theme.$green_2;
-        }
+      .status-title {
+        font-size: 14px;
+        font-weight: 600;
+        color: theme.$gray_6;
+      }
+
+      .status-detail {
+        font-size: 12px;
+        color: theme.$gray_5;
+      }
+
+      &.ready .status-icon {
+        background: rgba(theme.$green_2, 0.12);
+        color: theme.$green_2;
+      }
+
+      &.blocked .status-icon {
+        background: rgba(theme.$orange_1, 0.12);
+        color: theme.$orange_2;
       }
     }
   }
@@ -1168,8 +1233,15 @@ function submitProposal() {
   }
 }
 
+.dialog-button {
+  @include dialog-button.styles;
+}
+
 // Dialog Overrides
+// Header and footer stay fixed; only the body scrolls between them
 :deep(.el-dialog) {
+  display: flex;
+  flex-direction: column;
   padding: 0;
   border-radius: 12px;
   max-height: 90vh;
@@ -1177,15 +1249,23 @@ function submitProposal() {
 }
 
 :deep(.el-dialog__header) {
+  flex-shrink: 0;
   padding: 20px 16px 16px;
   border-bottom: 1px solid theme.$gray_2;
   position: relative;
 }
 
 :deep(.el-dialog__body) {
+  flex: 1 1 auto;
+  min-height: 0;
   padding: 16px;
-  max-height: calc(90vh - 120px);
   overflow-y: auto;
+}
+
+:deep(.el-dialog__footer) {
+  flex-shrink: 0;
+  padding: 12px 16px;
+  border-top: 1px solid theme.$gray_2;
 }
 
 :deep(.el-input__wrapper) {
