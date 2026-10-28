@@ -738,6 +738,10 @@ const runToNodesAndEdges = (run) => {
         completedAt: d.completedAt,
         progress: d.progress || null,
         errorMessage: d.errorMessage || "",
+        reason: d.reason || null,
+        exitCode: d.exitCode ?? null,
+        cpuUnits: d.cpuUnits || null,
+        memoryMiB: d.memoryMiB || null,
         ...extra,
       },
       position: hasSavedPositions && d.position && typeof d.position.x === "number"
@@ -1850,6 +1854,32 @@ const viewSourceLabel = (view) => {
     .filter(Boolean)
     .join(" · ");
 };
+
+/*
+  Why a step ended, in a sentence, from the reason the compute node reported
+  (OUT_OF_MEMORY, EXIT_CODE, IMAGE_PULL, TIMEOUT, STOPPED, UPSTREAM, ERROR),
+  with what to do about it where there is something to do.
+*/
+function failureSummary(data) {
+  if (!data?.reason) return null;
+  const mem = data.memoryMiB ? `${data.memoryMiB} MiB` : "its memory";
+  switch (data.reason) {
+    case "OUT_OF_MEMORY":
+      return `Killed for memory at ${mem}. Raise runtime.memory in the app's app.yml, or the step's memory for the run.`;
+    case "EXIT_CODE":
+      return `The app exited with code ${data.exitCode}. See its logs.`;
+    case "IMAGE_PULL":
+      return "The app's image could not be pulled, twice. Check the app's release, then run again.";
+    case "TIMEOUT":
+      return "The step ran past its time limit.";
+    case "STOPPED":
+      return "Stopped because another step failed.";
+    case "UPSTREAM":
+      return data.errorMessage ? `Not run: ${data.errorMessage}.` : "Not run: a step it depends on failed.";
+    default:
+      return data.errorMessage || "The step failed.";
+  }
+}
 
 const selectedNodeMetrics = computed(() => {
   if (!selectedNode.value || !runMetrics.value?.nodeMetrics) return null;
@@ -3067,6 +3097,14 @@ onUnmounted(() => {
                     {{ statusLabel(selectedNode.data?.status) }}
                   </span>
                 </div>
+                <div v-if="failureSummary(selectedNode.data)" class="info-row node-failure">
+                  <span class="info-label">Why</span>
+                  <span class="info-value">{{ failureSummary(selectedNode.data) }}</span>
+                </div>
+                <div v-if="selectedNode.data?.cpuUnits && selectedNode.data?.memoryMiB" class="info-row">
+                  <span class="info-label">Ran with</span>
+                  <span class="info-value">{{ (selectedNode.data.cpuUnits / 1024).toFixed(1) }} vCPU, {{ selectedNode.data.memoryMiB }} MiB</span>
+                </div>
                 <div v-if="selectedNode.data?.processorType" class="info-row">
                   <span class="info-label">Type</span>
                   <span class="info-value">{{ selectedNode.data.processorType }}</span>
@@ -3469,7 +3507,11 @@ onUnmounted(() => {
             </div>
             <div v-if="nm.maxMemoryUsedMiB != null" class="receipt-row">
               <span>Memory Used</span>
-              <span>{{ nm.maxMemoryUsedMiB }} / {{ nm.memoryConfiguredMiB }} MiB</span>
+              <span>{{ Math.round(nm.maxMemoryUsedMiB) }} / {{ nm.memoryConfiguredMiB }} MiB</span>
+            </div>
+            <div v-if="nm.maxCpuUtilized != null && nm.cpuUnits" class="receipt-row">
+              <span>CPU Used</span>
+              <span>{{ (nm.maxCpuUtilized / 1024).toFixed(2) }} / {{ (nm.cpuUnits / 1024).toFixed(1) }} vCPU</span>
             </div>
             <div class="receipt-row">
               <span>Status</span>

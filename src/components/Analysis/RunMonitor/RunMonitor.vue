@@ -2854,7 +2854,11 @@ onUnmounted(() => {
             </div>
             <div v-if="nm.maxMemoryUsedMiB != null" class="receipt-row">
               <span>Memory Used</span>
-              <span>{{ nm.maxMemoryUsedMiB }} / {{ nm.memoryConfiguredMiB }} MiB</span>
+              <span>{{ Math.round(nm.maxMemoryUsedMiB) }} / {{ nm.memoryConfiguredMiB }} MiB</span>
+            </div>
+            <div v-if="nm.maxCpuUtilized != null && nm.cpuUnits" class="receipt-row">
+              <span>CPU Used</span>
+              <span>{{ (nm.maxCpuUtilized / 1024).toFixed(2) }} / {{ (nm.cpuUnits / 1024).toFixed(1) }} vCPU</span>
             </div>
             <div class="receipt-row">
               <span>Status</span>
