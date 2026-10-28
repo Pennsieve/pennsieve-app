@@ -18,6 +18,8 @@ import { useWorkspaceMembers } from "./useWorkspaceMembers";
 import { fetchReleaseStatus, releaseNudge } from "./release";
 import AppArchiveToggle from "../../user/code/AppArchiveToggle.vue";
 import { useGetToken } from "@/composables/useGetToken";
+import { useAppUsage } from "@/composables/useAppUsage";
+import { sizingHint, usageRows, usageSummary } from "./appUsage";
 import { useSendXhr } from "@/mixins/request/request_composable";
 
 
@@ -185,6 +187,13 @@ watch(permissions, (perms) => {
   if ((perms || []).some((p) => p?.entityType === "user" || p?.userId)) loadAllMembers();
 });
 const viewingOrgId = computed(() => store.state.activeOrganization?.organization?.id || null);
+
+// What the app used across runs, by version (workflow-service metrics/usage).
+const { usage: appUsage } = useAppUsage(computed(() => detail.value?.sourceUrl));
+const appUsageRows = computed(() => usageRows(appUsage.value));
+const appUsageHints = computed(() => (appUsage.value?.versions || []).map(sizingHint).filter(Boolean));
+const appUsageLead = computed(() => usageSummary(appUsage.value));
+const shortDate = (iso) => (iso ? new Date(iso).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" }) : "");
 const accessList = computed(() =>
   accessEntries(
     permissions.value,
@@ -808,6 +817,39 @@ watch(
                     </span>
                   </div>
                 </div>
+              </section>
+
+              <!-- What the app used across runs, by version -->
+              <section v-if="appUsage && appUsage.runs" class="manifest-block">
+                <h4 class="manifest-block-title">Usage across runs</h4>
+                <p class="manifest-description usage-lead">{{ appUsageLead }}</p>
+                <table class="usage-table">
+                  <thead>
+                    <tr>
+                      <th>Version</th>
+                      <th>Runs</th>
+                      <th>Memory given</th>
+                      <th>Memory used</th>
+                      <th>CPU given</th>
+                      <th>CPU used</th>
+                      <th>Duration</th>
+                      <th>Last run</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="row in appUsageRows" :key="row.version">
+                      <td class="usage-version">{{ row.version }}</td>
+                      <td>{{ row.runs }}<span v-if="row.failed" class="usage-failed" :title="`${row.failed} failed`"> ({{ row.failed }} failed)</span></td>
+                      <td>{{ row.memoryGiven || "—" }}</td>
+                      <td :title="row.memoryUsed ? `median · 95th percentile of ${row.memorySamples} sampled steps` : 'no step ran long enough to be sampled'">{{ row.memoryUsed || "—" }}</td>
+                      <td>{{ row.cpuGiven || "—" }}</td>
+                      <td>{{ row.cpuUsed || "—" }}</td>
+                      <td>{{ row.duration || "—" }}</td>
+                      <td>{{ shortDate(row.lastRunAt) }}</td>
+                    </tr>
+                  </tbody>
+                </table>
+                <p v-for="hint in appUsageHints" :key="hint" class="usage-hint">{{ hint }}</p>
               </section>
 
               <!-- Maintainers -->
@@ -1694,6 +1736,49 @@ watch(
   font-size: 13px;
   line-height: 1.5;
   color: theme.$gray_5;
+}
+
+.usage-lead {
+  margin: 0 0 10px;
+}
+
+.usage-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  color: theme.$black;
+
+  th,
+  td {
+    padding: 5px 8px;
+    text-align: left;
+    white-space: nowrap;
+    border-bottom: 1px solid theme.$gray_2;
+  }
+
+  th {
+    font-size: 11px;
+    font-weight: 600;
+    color: theme.$gray_5;
+  }
+
+  .usage-version {
+    font-weight: 600;
+  }
+
+  .usage-failed {
+    color: theme.$gray_4;
+  }
+}
+
+.usage-hint {
+  margin: 10px 0 0;
+  padding: 8px 10px;
+  border-radius: 4px;
+  background: theme.$teal_tint;
+  font-size: 12px;
+  line-height: 1.5;
+  color: theme.$black;
 }
 
 .manifest-chips {
