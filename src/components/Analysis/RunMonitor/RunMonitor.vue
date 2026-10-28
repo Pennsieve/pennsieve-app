@@ -21,7 +21,9 @@ import toQueryParams from "@/utils/toQueryParams";
 import LayerNameSelector from "./LayerNameSelector.vue";
 import TargetDatasetField from "./TargetDatasetField.vue";
 import { targetWritesToDataset, targetParamFields, buildDataTargets, targetDatasetId, datasetName } from "./dataTargets";
-import { validateRunName, runDisplayName, RUN_NAME_MAX_LENGTH, targetTypeName } from "./runHelpers";
+import { validateRunName, runDisplayName, RUN_NAME_MAX_LENGTH, targetTypeName,
+  nodeMetricRows,
+} from "./runHelpers";
 import { sourceLabel, sourceHints, hintLine, portsOfStep, missingFilesMessage } from "../WorkflowGraph/sourceInputs";
 
 const { onNodeClick, onPaneClick, fitView, updateNodeData } = useVueFlow();
@@ -3073,16 +3075,13 @@ onUnmounted(() => {
         </div>
 
         <div class="receipt-section">
-          <div
-            v-for="(value, key) in selectedNodeMetrics"
-            :key="key"
-            class="receipt-row"
-          >
-            <template v-if="key !== 'nodeId'">
-              <span>{{ formatMetricKey(key) }}</span>
-              <span>{{ formatMetricValue(key, value) }}</span>
-            </template>
-          </div>
+          <template v-for="(row, i) in nodeMetricRows(selectedNodeMetrics)" :key="i">
+            <div v-if="row.note" class="receipt-note">{{ row.note }}</div>
+            <div v-else class="receipt-row" :class="{ 'receipt-row-cost': row.cost }">
+              <span>{{ row.label }}</span>
+              <span class="receipt-value" :title="row.title">{{ row.value }}</span>
+            </div>
+          </template>
         </div>
       </div>
 
@@ -4362,12 +4361,27 @@ onUnmounted(() => {
   border-bottom: 1px solid theme.$gray_2;
 }
 
+.receipt-note {
+  margin-top: 6px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: theme.$gray_4;
+}
 .receipt-row {
   display: flex;
   justify-content: space-between;
+  gap: 12px;
   padding: 3px 0;
   font-size: 13px;
   color: theme.$gray_5;
+
+  .receipt-value {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    text-align: right;
+  }
 
   &.receipt-row-cost {
     font-weight: 600;
