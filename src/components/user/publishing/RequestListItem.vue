@@ -9,10 +9,10 @@
             {{ datasetRequest.name || "Untitled Proposal" }}
           </h3>
           <div class="status-badges">
-            <span class="request-status" :class="statusClass">
+            <span class="status-badge" :class="statusBadgeClass">
               {{ statusDisplay }}
             </span>
-            <span v-if="!readyToSubmit && isDraft" class="incomplete-badge">
+            <span v-if="!readyToSubmit && isDraft" class="status-badge status-incomplete">
               Incomplete
             </span>
           </div>
@@ -47,70 +47,69 @@
           <div class="action-buttons">
             <!-- Draft actions -->
             <template v-if="isDraft">
-              <el-button
+              <button
                 v-if="readyToSubmit"
-                size="small"
-                type="primary"
+                type="button"
+                class="action-button primary"
                 @click.stop="triggerRequest(DatasetProposalAction.SUBMIT)"
               >
                 Submit
-              </el-button>
-              <el-button
+              </button>
+              <button
                 v-else
-                size="small"
+                type="button"
+                class="action-button secondary"
                 @click.stop="triggerRequest(DatasetProposalAction.EDIT)"
               >
                 Edit
-              </el-button>
-              <el-button
-                size="small"
-                type="danger"
-                plain
+              </button>
+              <button
+                type="button"
+                class="action-button danger"
                 @click.stop="triggerRequest(DatasetProposalAction.REMOVE)"
               >
                 Remove
-              </el-button>
+              </button>
             </template>
 
             <!-- Submitted actions -->
             <template v-else-if="isSubmitted">
-              <el-button
-                size="small"
-                type="danger"
-                plain
+              <button
+                type="button"
+                class="action-button danger"
                 @click.stop="triggerRequest(DatasetProposalAction.WITHDRAW)"
               >
                 Withdraw
-              </el-button>
+              </button>
             </template>
 
             <!-- Accepted actions -->
             <template v-else-if="isAccepted">
-              <el-button
-                size="small"
-                type="primary"
+              <button
+                type="button"
+                class="action-button primary"
                 @click.stop="triggerRequest(DatasetProposalAction.OPEN_DATASET)"
               >
-                Open Dataset
-              </el-button>
+                <span>Open Dataset</span>
+                <span class="arrow">&rarr;</span>
+              </button>
             </template>
 
             <template v-else-if="isRejected || isWithdrawn">
-              <el-button
-                size="small"
-                type="primary"
+              <button
+                type="button"
+                class="action-button primary"
                 @click.stop="triggerRequest(DatasetProposalAction.COPY_TO_DRAFT)"
               >
                 Copy to new draft
-              </el-button>
-              <el-button
-                size="small"
-                type="danger"
-                plain
+              </button>
+              <button
+                type="button"
+                class="action-button danger"
                 @click.stop="triggerRequest(DatasetProposalAction.REMOVE)"
               >
                 Remove
-              </el-button>
+              </button>
             </template>
           </div>
         </div>
@@ -178,7 +177,7 @@ const statusDisplay = computed(() => {
   );
 });
 
-const statusClass = computed(() => {
+const statusBadgeClass = computed(() => {
   const status = props.datasetRequest.proposalStatus?.toLowerCase();
   return `status-${status}`;
 });
@@ -317,20 +316,20 @@ const displayDate = computed(() => {
 }
 
 .request-content {
-  padding: 16px;
+  padding: 24px 24px 12px;
 }
 
 .request-main {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 16px;
 }
 
 .request-header {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 16px;
 
   @media (max-width: 640px) {
     flex-direction: column;
@@ -350,32 +349,29 @@ const displayDate = computed(() => {
 .status-badges {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   flex-wrap: wrap;
 }
 
-.request-status {
-  display: inline-flex;
-  align-items: center;
-  padding: 4px 8px;
-  border-radius: 6px;
-  font-size: 11px;
-  font-weight: 500;
-  text-transform: capitalize;
+// Matches the status badges in Analysis > Applications
+.status-badge {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 4px;
   white-space: nowrap;
-
-  &.status-draft {
-    background: theme.$gray_1;
-    color: theme.$gray_5;
-  }
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  background: theme.$gray_2;
+  color: theme.$gray_5;
 
   &.status-submitted {
-    background: rgba(theme.$green_2, 0.1);
-    color: theme.$green_2;
+    background: theme.$purple_tint;
+    color: theme.$purple_3;
   }
 
   &.status-accepted {
-    background: rgba(theme.$green_1, 0.1);
+    background: rgba(theme.$green_1, 0.12);
     color: theme.$green_1;
   }
 
@@ -388,19 +384,11 @@ const displayDate = computed(() => {
     background: rgba(theme.$orange_1, 0.1);
     color: theme.$orange_1;
   }
-}
 
-.incomplete-badge {
-  display: inline-flex;
-  align-items: center;
-  padding: 2px 6px;
-  border-radius: 4px;
-  font-size: 10px;
-  font-weight: 500;
-  background: rgba(theme.$purple_1, 0.1);
-  color: theme.$purple_1;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
+  &.status-incomplete {
+    background: rgba(theme.$purple_1, 0.1);
+    color: theme.$purple_1;
+  }
 }
 
 .request-body {
@@ -444,17 +432,18 @@ const displayDate = computed(() => {
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  padding-top: 8px;
+  padding-top: 12px;
   border-top: 1px solid theme.$gray_3;
 
   @media (max-width: 640px) {
     flex-direction: column;
     align-items: flex-start;
-    gap: 12px;
+    gap: 16px;
   }
 }
 
 .request-metadata {
+  align-self: flex-start;
   display: flex;
   align-items: center;
   gap: 12px;
@@ -465,17 +454,79 @@ const displayDate = computed(() => {
 .action-buttons {
   display: flex;
   flex-direction: row;
-  align-items: flex-end;
+  align-items: center;
   gap: 8px;
-
-  // The flex gap already spaces the buttons
-  .el-button + .el-button {
-    margin-left: 0;
-  }
 
   @media (max-width: 640px) {
     width: 100%;
     align-items: flex-end;
+  }
+}
+
+.action-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  height: 28px;
+  padding: 0 12px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+
+  &:focus-visible {
+    outline: 2px solid theme.$purple_2;
+    outline-offset: 2px;
+  }
+
+  &:active {
+    transform: translateY(1px);
+  }
+
+  &.primary {
+    background: theme.$purple_3;
+    color: theme.$white;
+
+    &:hover {
+      background: theme.$purple_2;
+    }
+  }
+
+  // White fill keeps it distinct from the card's gray hover background
+  &.secondary {
+    background: theme.$white;
+    border-color: theme.$gray_3;
+    color: theme.$gray_6;
+
+    &:hover {
+      background: theme.$gray_0;
+      border-color: theme.$gray_4;
+    }
+  }
+
+  &.danger {
+    background: theme.$white;
+    border-color: rgba(theme.$red_2, 0.4);
+    color: theme.$red_2;
+
+    &:hover {
+      background: rgba(theme.$red_2, 0.08);
+      border-color: theme.$red_2;
+    }
+  }
+
+  .arrow {
+    transition: transform 0.15s ease;
+  }
+
+  &:hover .arrow {
+    transform: translateX(2px);
   }
 }
 </style>
