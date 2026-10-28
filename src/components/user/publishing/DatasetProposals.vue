@@ -94,23 +94,21 @@
 
 
     <!-- Confirmation Dialog -->
-    <confirmation-dialog
-      :dialog-visible="confirmationDialogVisible"
-      :action="confirmationDialog.action"
-      :action-message="confirmationDialog.actionMessage"
-      :resource="confirmationDialog.resource"
-      :info-message="confirmationDialog.infoMessage"
-      :warning-message="confirmationDialog.warningMessage"
-      :confirm-action-label="confirmationDialog.confirmActionLabel"
-      :cancel-action-label="confirmationDialog.cancelActionLabel"
-      @close="closeConfirmationDialog"
-      @confirmed="handleConfirmedAction"
+    <confirm-dialog
+      v-model:visible="isConfirmDialogVisible"
+      :heading="confirmDialog.heading"
+      :message="confirmDialog.message"
+      :variant="confirmDialog.variant"
+      :icon="confirmDialog.icon"
+      :confirm-label="confirmDialog.confirmLabel"
+      :processing="isConfirmProcessing"
+      @confirm="handleConfirmedAction"
     />
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch, nextTick } from 'vue'
+import { ref, shallowRef, computed, onMounted, watch, nextTick } from 'vue'
 import { useStore } from 'vuex'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
@@ -118,7 +116,10 @@ import { useProposalStore } from '@/stores/proposalStore'
 import BfButton from '@/components/shared/bf-button/BfButton.vue'
 import RequestListItem from './RequestListItem.vue'
 import ProposalSurvey from './ProposalSurvey.vue'
-import ConfirmationDialog from '@/components/shared/ConfirmationDialog/ConfirmationDialog.vue'
+import IconTrashLine from '@/components/icons/IconTrashLine.vue'
+import IconUndoLine from '@/components/icons/IconUndoLine.vue'
+import IconSendLine from '@/components/icons/IconSendLine.vue'
+import ConfirmDialog from '@/components/shared/ConfirmDialog/ConfirmDialog.vue'
 import IconDocument from '@/components/icons/IconDocument.vue'
 import { useProposalSave } from '@/composables/useProposalSave'
 import { getProposalErrorMessage, isStaleProposalError } from '@/utils/proposalErrorMessages'
@@ -135,15 +136,17 @@ const showProposalDialog = ref(false)
 const selectedRepository = ref({})
 const activeProposal = ref({})
 const copySourceProposal = ref(null)
-const confirmationDialogVisible = ref(false)
-const confirmationDialog = ref({
+const isConfirmDialogVisible = ref(false)
+const isConfirmProcessing = ref(false)
+// shallowRef: the icon is a component and must not be made deeply reactive
+const confirmDialog = shallowRef({
   action: '',
-  actionMessage: '',
-  resource: {},
-  infoMessage: '',
-  warningMessage: '',
-  confirmActionLabel: '',
-  cancelActionLabel: '',
+  proposal: null,
+  heading: '',
+  message: '',
+  variant: 'default',
+  icon: undefined,
+  confirmLabel: '',
 })
 
 // Computed properties
@@ -212,15 +215,16 @@ const editProposal = (proposal) => {
 }
 
 const removeProposal = (proposal) => {
-  confirmationDialog.value = {
+  confirmDialog.value = {
     action: 'remove',
-    actionMessage: `Remove Dataset Proposal: "${proposal.name}"?`,
-    resource: proposal,
-    warningMessage: 'This will permanently delete the dataset proposal and cannot be undone.',
-    confirmActionLabel: 'Remove',
-    cancelActionLabel: 'Cancel',
+    proposal,
+    heading: `Remove proposal "${proposal.name}"?`,
+    message: 'This will permanently delete the dataset proposal and cannot be undone.',
+    variant: 'danger',
+    icon: IconTrashLine,
+    confirmLabel: 'Remove',
   }
-  confirmationDialogVisible.value = true
+  isConfirmDialogVisible.value = true
 }
 
 const submitProposal = (proposal) => {
@@ -229,15 +233,16 @@ const submitProposal = (proposal) => {
   )
   const repositoryName = repository?.displayName || 'Unknown Repository'
   
-  confirmationDialog.value = {
+  confirmDialog.value = {
     action: 'submit',
-    actionMessage: `Submit Dataset Proposal: "${proposal.name}"?`,
-    resource: proposal,
-    warningMessage: `This will submit your proposal to ${repositoryName} for review. You will not be able to edit it after submission.`,
-    confirmActionLabel: 'Submit',
-    cancelActionLabel: 'Cancel',
+    proposal,
+    heading: `Submit proposal "${proposal.name}"?`,
+    message: `This will submit your proposal to ${repositoryName} for review. You will not be able to edit it after submission.`,
+    variant: 'default',
+    icon: IconSendLine,
+    confirmLabel: 'Submit',
   }
-  confirmationDialogVisible.value = true
+  isConfirmDialogVisible.value = true
 }
 
 const withdrawProposal = (proposal) => {
@@ -246,15 +251,16 @@ const withdrawProposal = (proposal) => {
   )
   const repositoryName = repository?.displayName || 'Unknown Repository'
   
-  confirmationDialog.value = {
+  confirmDialog.value = {
     action: 'withdraw',
-    actionMessage: `Withdraw Dataset Proposal: "${proposal.name}"?`,
-    resource: proposal,
-    warningMessage: `This will withdraw your proposal from ${repositoryName}. A withdrawn proposal can't be resubmitted, but you can copy it into a new draft.`,
-    confirmActionLabel: 'Withdraw',
-    cancelActionLabel: 'Cancel',
+    proposal,
+    heading: `Withdraw proposal "${proposal.name}"?`,
+    message: `This will withdraw your proposal from ${repositoryName}. A withdrawn proposal can't be resubmitted, but you can copy it into a new draft.`,
+    variant: 'danger',
+    icon: IconUndoLine,
+    confirmLabel: 'Withdraw',
   }
-  confirmationDialogVisible.value = true
+  isConfirmDialogVisible.value = true
 }
 
 const copyProposalToDraft = async (sourceProposal) => {
@@ -276,49 +282,34 @@ const openDataset = (proposal) => {
   router.push(`/${proposal.organizationNodeId}/datasets/${proposal.datasetNodeId}/overview`)
 }
 
-const handleConfirmedAction = async (event) => {
-  const { action, resource } = event
+const handleConfirmedAction = async () => {
+  const { action, proposal } = confirmDialog.value
+  const storeActions = {
+    remove: proposalStore.removeProposal,
+    submit: proposalStore.submitProposal,
+    withdraw: proposalStore.withdrawProposal,
+  }
   const successMessages = {
     remove: 'Proposal removed',
     submit: 'Proposal submitted',
     withdraw: 'Proposal withdrawn',
   }
 
+  isConfirmProcessing.value = true
   try {
-    switch (action) {
-      case 'remove':
-        await proposalStore.removeProposal(resource)
-        break
-      case 'submit':
-        await proposalStore.submitProposal(resource)
-        break
-      case 'withdraw':
-        await proposalStore.withdrawProposal(resource)
-        break
-    }
+    await storeActions[action](proposal)
     ElMessage.success(successMessages[action])
+    isConfirmDialogVisible.value = false
   } catch (err) {
     ElMessage.error(getProposalErrorMessage(action, err))
-    closeConfirmationDialog()
+    // A stale proposal can't be retried, so close and show its real status;
+    // otherwise keep the dialog open so the user can try again
     if (isStaleProposalError(err)) {
+      isConfirmDialogVisible.value = false
       await fetchProposals()
     }
-    return
-  }
-
-  closeConfirmationDialog()
-}
-
-const closeConfirmationDialog = () => {
-  confirmationDialogVisible.value = false
-  confirmationDialog.value = {
-    action: '',
-    actionMessage: '',
-    resource: {},
-    infoMessage: '',
-    warningMessage: '',
-    confirmActionLabel: '',
-    cancelActionLabel: '',
+  } finally {
+    isConfirmProcessing.value = false
   }
 }
 
