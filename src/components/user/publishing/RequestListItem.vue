@@ -450,15 +450,7 @@ const displayDate = computed(() => {
   align-items: center;
   gap: 12px;
   font-size: 12px;
-  color: theme.$gray_4;
-
-  .warning-badge {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    color: theme.$orange_1;
-    font-weight: 500;
-  }
+  color: theme.$gray_5;
 }
 
 .action-buttons {
