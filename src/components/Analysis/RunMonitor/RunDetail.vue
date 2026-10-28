@@ -2423,6 +2423,7 @@ onUnmounted(() => {
                   :unmet="nodeUnmetCount(id, 'data-source')"
                   :off="isLeftOut(id)"
                   :running="inputStaging(data)"
+                  :done="mode === 'browse' && data.status === 'SUCCEEDED'"
                   :failed="mode === 'browse' && data.status === 'FAILED'"
                 />
                 <Handle id="source" type="source" :position="Position.Bottom" />
@@ -2440,6 +2441,7 @@ onUnmounted(() => {
                   :mark="statusMark(data)"
                   :mark-title="statusLabel(data.status)"
                   :running="mode === 'browse' && data.status === 'STARTED'"
+                  :done="mode === 'browse' && data.status === 'SUCCEEDED'"
                   :failed="mode === 'browse' && data.status === 'FAILED'"
                   :unmet="nodeUnmetCount(id, 'data-target')"
                   :off="isUnsaved(id)"
@@ -4357,9 +4359,18 @@ onUnmounted(() => {
     animation: node-running-glow 1.6s ease-in-out infinite;
     &::before { animation: strip-pulse 1.6s ease-in-out infinite; }
   }
-  // Succeeded: no colour, the ✓ by the title says it (graphStatusColor).
-  &.green-node { border-color: theme.$gray_3; }
-  &.red-node { border-color: theme.$status_red; }
+  // Succeeded: a green border and a still, soft green ring, settled once
+  // (a short fade-in when the step just finished), beside the ✓ by the
+  // title. Only a running step moves.
+  &.green-node {
+    border-color: theme.$status_green;
+    box-shadow: 0 0 0 2px rgba(23, 187, 98, 0.22), 0 0 8px rgba(23, 187, 98, 0.25);
+    animation: node-done-settle 1.2s ease-out 1;
+  }
+  &.red-node {
+    border-color: theme.$status_red;
+    box-shadow: 0 0 0 2px rgba(233, 75, 75, 0.2), 0 0 8px rgba(233, 75, 75, 0.25);
+  }
 
   &.data-source-node {
     --type-strip: #6366f1;
@@ -4408,6 +4419,10 @@ onUnmounted(() => {
 @keyframes strip-pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.25; }
+}
+@keyframes node-done-settle {
+  0% { box-shadow: 0 0 0 5px rgba(23, 187, 98, 0.35), 0 0 24px rgba(23, 187, 98, 0.7); }
+  100% { box-shadow: 0 0 0 2px rgba(23, 187, 98, 0.22), 0 0 8px rgba(23, 187, 98, 0.25); }
 }
 @keyframes node-running-glow {
   0%, 100% { box-shadow: 0 0 0 2px rgba(6, 182, 212, 0.35), 0 0 10px rgba(6, 182, 212, 0.35); }
