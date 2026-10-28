@@ -293,17 +293,10 @@ const displayDate = computed(() => {
 @use "../../../styles/_theme.scss";
 
 .request-list-item {
-  border-bottom: 1px solid theme.$gray_2;
+  border: 1px solid theme.$gray_3;
+  border-radius: 4px;
   background-color: white;
   transition: all 0.2s ease;
-
-  &:first-child {
-    border-top: none;
-  }
-
-  &:last-child {
-    border-bottom: none;
-  }
 
   &:hover {
     background-color: theme.$gray_1;
@@ -443,7 +436,7 @@ const displayDate = computed(() => {
   justify-content: space-between;
   gap: 16px;
   padding-top: 8px;
-  border-top: 1px solid theme.$gray_1;
+  border-top: 1px solid theme.$gray_3;
 
   @media (max-width: 640px) {
     flex-direction: column;

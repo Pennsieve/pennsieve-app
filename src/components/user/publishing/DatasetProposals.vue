@@ -475,10 +475,9 @@ watch(repositories, (newRepositories) => {
 }
 
 .proposals-list {
-  background: white;
-  border-radius: 4px;
-  border: 1px solid theme.$gray_2;
-  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
 }
 
 .empty-state {
