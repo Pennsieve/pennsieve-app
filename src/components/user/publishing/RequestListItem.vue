@@ -47,61 +47,70 @@
           <div class="action-buttons">
             <!-- Draft actions -->
             <template v-if="isDraft">
-              <button
+              <el-button
                 v-if="readyToSubmit"
-                class="text-link primary-action"
+                size="small"
+                type="primary"
                 @click.stop="triggerRequest(DatasetProposalAction.SUBMIT)"
               >
                 Submit
-              </button>
-              <button
+              </el-button>
+              <el-button
                 v-else
-                class="text-link"
+                size="small"
                 @click.stop="triggerRequest(DatasetProposalAction.EDIT)"
               >
                 Edit
-              </button>
-              <button
-                class="text-link secondary-action"
+              </el-button>
+              <el-button
+                size="small"
+                type="danger"
+                plain
                 @click.stop="triggerRequest(DatasetProposalAction.REMOVE)"
               >
                 Remove
-              </button>
+              </el-button>
             </template>
 
             <!-- Submitted actions -->
             <template v-else-if="isSubmitted">
-              <button
-                class="text-link secondary-action"
+              <el-button
+                size="small"
+                type="danger"
+                plain
                 @click.stop="triggerRequest(DatasetProposalAction.WITHDRAW)"
               >
                 Withdraw
-              </button>
+              </el-button>
             </template>
 
             <!-- Accepted actions -->
             <template v-else-if="isAccepted">
-              <button
-                class="text-link primary-action"
+              <el-button
+                size="small"
+                type="primary"
                 @click.stop="triggerRequest(DatasetProposalAction.OPEN_DATASET)"
               >
                 Open Dataset
-              </button>
+              </el-button>
             </template>
 
             <template v-else-if="isRejected || isWithdrawn">
-              <button
-                class="text-link primary-action"
+              <el-button
+                size="small"
+                type="primary"
                 @click.stop="triggerRequest(DatasetProposalAction.COPY_TO_DRAFT)"
               >
                 Copy to new draft
-              </button>
-              <button
-                class="text-link secondary-action"
+              </el-button>
+              <el-button
+                size="small"
+                type="danger"
+                plain
                 @click.stop="triggerRequest(DatasetProposalAction.REMOVE)"
               >
                 Remove
-              </button>
+              </el-button>
             </template>
           </div>
         </div>
@@ -457,59 +466,16 @@ const displayDate = computed(() => {
   display: flex;
   flex-direction: row;
   align-items: flex-end;
-  gap: 4px;
+  gap: 8px;
+
+  // The flex gap already spaces the buttons
+  .el-button + .el-button {
+    margin-left: 0;
+  }
 
   @media (max-width: 640px) {
     width: 100%;
     align-items: flex-end;
-  }
-}
-
-.text-link {
-  background: none;
-  border: none;
-  color: theme.$purple_2;
-  font-size: 13px;
-  font-weight: 500;
-  cursor: pointer;
-  padding: 3px 6px;
-  transition: all 0.15s ease;
-  white-space: nowrap;
-  border-radius: 4px;
-  text-decoration: none;
-
-  &:hover {
-    color: theme.$purple_3;
-    background: rgba(theme.$purple_2, 0.05);
-  }
-
-  &.primary-action {
-    color: theme.$purple_2;
-    font-weight: 600;
-
-    &:hover {
-      color: darken(theme.$purple_2, 10%);
-      background: rgba(theme.$purple_2, 0.08);
-    }
-  }
-
-  &.secondary-action {
-    color: theme.$red_2;
-
-    &:hover {
-      color: darken(theme.$red_2, 10%);
-      background: rgba(theme.$red_2, 0.05);
-    }
-  }
-}
-
-// Button overrides for compact size
-:deep(.bf-button) {
-  &.compact {
-    padding: 5px 12px;
-    font-size: 13px;
-    min-width: auto;
-    font-weight: 500;
   }
 }
 </style>
