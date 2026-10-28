@@ -14,8 +14,8 @@ describe('getProposalErrorMessage', () => {
     expect(getProposalErrorMessage('accept', httpError(400))).toContain('already use this name')
   })
 
-  it('explains a 401 on reject', () => {
-    expect(getProposalErrorMessage('reject', httpError(401))).toContain('Only publishers')
+  it('explains a 400 on reject', () => {
+    expect(getProposalErrorMessage('reject', httpError(400))).toContain('no longer awaiting review')
   })
 
   it('falls back to "try again" for codes without a known meaning', () => {
@@ -32,8 +32,8 @@ describe('getProposalErrorMessage', () => {
 
   it('uses a custom first sentence when given one', () => {
     expect(
-      getProposalErrorMessage('accept', httpError(401), { summary: 'Could not accept "Cortex".' })
-    ).toBe('Could not accept "Cortex". Only publishers in this workspace can accept proposals.')
+      getProposalErrorMessage('reject', httpError(400), { summary: 'Could not reject "Cortex".' })
+    ).toBe('Could not reject "Cortex". It is no longer awaiting review.')
   })
 })
 

@@ -15,11 +15,9 @@ const failureReasons = {
   },
   accept: {
     400: 'Another dataset in this workspace may already use this name, or the proposal is no longer awaiting review.',
-    401: 'Only publishers in this workspace can accept proposals.',
   },
   reject: {
     400: 'It is no longer awaiting review.',
-    401: 'Only publishers in this workspace can reject proposals.',
   },
 }
 
