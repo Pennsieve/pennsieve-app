@@ -26,17 +26,12 @@ export const useProposalStore = defineStore('proposalStore', () => {
     )
   }
 
-  // contributors is deprecated on the backend; drop it so it never gets sent back
   const transformProposalIn = (proposal) => {
     const { contributors, ...proposalFields } = proposal
     return proposalFields
   }
 
-  // Only send what the API reads. ownerName, emailAddress, status and timestamps
-  // are set by the backend; sending them back is at best ignored.
   const toProposalRequestBody = (proposal, profile) => ({
-    // PUT looks the proposal up by nodeId and the userId in the body, so send
-    // back the userId it came with
     ...(proposal.nodeId && {
       nodeId: proposal.nodeId,
       userId: proposal.userId ?? profile?.intId,

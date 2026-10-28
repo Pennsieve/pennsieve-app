@@ -148,8 +148,6 @@ const confirmationDialog = ref({
 
 // Computed properties
 const datasetProposals = computed(() => {
-  // Newest proposals first. Sorting by createdAt keeps rows from jumping to the
-  // top whenever a proposal is edited, submitted or withdrawn.
   return [...proposalStore.datasetProposals].sort(
     (a, b) => (b.createdAt || 0) - (a.createdAt || 0)
   )
@@ -163,7 +161,6 @@ const fetchProposals = async () => {
   isLoading.value = true
   loadError.value = ''
 
-  // The store swallows fetch errors and reports them through proposalsError
   await proposalStore.fetchProposals()
   if (proposalStore.proposalsError) {
     loadError.value = 'Failed to load proposals. Please try again.'
@@ -208,8 +205,6 @@ const closeProposalDialog = () => {
 const editProposal = (proposal) => {
   activeProposal.value = proposal
 
-  // Open even when the repository is gone: read-only proposals can still be
-  // viewed or copied, and the dialog won't save a draft until a repository is picked
   selectedRepository.value = repositories.value.find(repo =>
     repo.organizationNodeId === proposal.organizationNodeId
   ) || {}
@@ -305,7 +300,6 @@ const handleConfirmedAction = async (event) => {
   } catch (err) {
     ElMessage.error(getProposalErrorMessage(action, err))
     closeConfirmationDialog()
-    // Show the proposal's real status instead of offering an action that will fail again
     if (isStaleProposalError(err)) {
       await fetchProposals()
     }

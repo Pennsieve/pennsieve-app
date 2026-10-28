@@ -41,8 +41,6 @@ const props = defineProps({
     type: Object,
     default: () => null,
   },
-  // The parent owns the API calls and closes the dialog on success, so the
-  // form stays filled in for a retry if the call fails
   processing: {
     type: Boolean,
     default: false,
@@ -71,7 +69,6 @@ const proposal = ref({
 
 const selectedRepository = ref({});
 const surveyAnswersByRepository = ref({});
-// Which button triggered the pending request, so only that one shows a spinner
 const pendingAction = ref("");
 
 const availableRepositories = computed(() => proposalStore.repositories);
@@ -168,7 +165,6 @@ const hasRepositorySelected = computed(() =>
   Boolean(currentRepository.value?.organizationNodeId)
 );
 
-// The original repository may have been removed since the proposal was made
 const isCopiedRepositoryMissing = computed(
   () => Boolean(props.copiedFrom) && !props.repository?.organizationNodeId
 );
@@ -187,7 +183,6 @@ const hasSubmissionSummary = computed(
 const isNameValid = computed(() => isValidProposalName(proposal.value.name));
 const isDescriptionFilled = computed(() => hasText(proposal.value.description));
 
-// Copied or older proposals can carry a name the input's maxlength won't trim
 const isNameTooLong = computed(
   () => (proposal.value.name || "").trim().length > PROPOSAL_NAME_MAX_LENGTH
 );
@@ -326,8 +321,6 @@ function initializeSelectedRepository() {
 }
 
 function populateForm() {
-  // Answers to questions the repository no longer asks are dropped on save,
-  // since save only maps the current repository's questions
   const sourceProposal = props.proposal || props.copiedFrom;
   if (sourceProposal) {
     proposal.value = {
@@ -381,8 +374,6 @@ function handleDialogUpdate(visible) {
   }
 }
 
-// Builds what the parent saves. Only fields the API reads are included; the
-// store sends nodeId and userId back on update so PUT can find the proposal.
 function buildProposalData() {
   const surveyResponses = repositoryQuestions.value
     .map((question) => ({

@@ -203,7 +203,6 @@ const truncatedDescription = computed(() => {
   return desc.length > 150 ? desc.substring(0, 150) + "..." : desc;
 });
 
-// Same rule as the dialog: a whitespace-only answer doesn't count
 const surveyComplete = computed(() => {
   const questions = repository.value?.questions;
   const surveyResponses = props.datasetRequest.survey;
