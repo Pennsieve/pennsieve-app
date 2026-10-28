@@ -418,14 +418,12 @@ export default {
       }
       // set selected proposal
       this.selectedRequest = proposal
-      this.proposalStore.setSelectedProposal(proposal)
 
       // set selected repo, so the repository questions render alongside
       // the submitted survey responses
       this.selectedRepository = proposal.organizationNodeId
         ? this.getRepositoryByNodeId(proposal.organizationNodeId)
         : {}
-      this.proposalStore.setSelectedRepo(this.selectedRepository)
 
       // enable modal visibility
       this.proposalStore.updateRequestModalVisible(true)

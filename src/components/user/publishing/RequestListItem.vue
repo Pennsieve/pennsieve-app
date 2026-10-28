@@ -203,27 +203,20 @@ const truncatedDescription = computed(() => {
   return desc.length > 150 ? desc.substring(0, 150) + "..." : desc;
 });
 
+// Same rule as the dialog: a whitespace-only answer doesn't count
 const surveyComplete = computed(() => {
-  let result = false;
-  const organizationNodeId = props.datasetRequest.organizationNodeId;
-  const repo = repository.value;
-
-  if (
-    repo &&
-    repo.questions != null &&
-    props.datasetRequest &&
-    props.datasetRequest.survey != null
-  ) {
-    result = repo.questions
-      .map((q) => {
-        const answer = props.datasetRequest.survey.find(
-          (r) => r.questionId === q.id
-        );
-        return answer && answer.response !== "";
-      })
-      .reduce((a, c) => a && c, true);
+  const questions = repository.value?.questions;
+  const surveyResponses = props.datasetRequest.survey;
+  if (questions == null || surveyResponses == null) {
+    return false;
   }
-  return result;
+
+  return questions.every((question) => {
+    const answer = surveyResponses.find(
+      (response) => response.questionId === question.id
+    );
+    return hasText(answer?.response);
+  });
 });
 
 const readyToSubmit = computed(() => {

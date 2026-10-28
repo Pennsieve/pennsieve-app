@@ -10,12 +10,9 @@ export const useProposalStore = defineStore('proposalStore', () => {
   const datasetProposals = ref([])
   const requestModalVisible = ref(false)
   const shouldCollapsePrimaryNav = ref(false)
-  const selectedRepoForRequest = ref({})
-  const selectedDatasetProposal = ref({})
 
   // Loading and error states
   const isLoadingRepositories = ref(false)
-  const isLoadingProposals = ref(false)
   const repositoriesError = ref('')
   const proposalsError = ref('')
 
@@ -133,7 +130,6 @@ export const useProposalStore = defineStore('proposalStore', () => {
 
   // Fetch user's proposals
   const fetchProposals = async () => {
-    isLoadingProposals.value = true
     proposalsError.value = ''
 
     try {
@@ -144,8 +140,6 @@ export const useProposalStore = defineStore('proposalStore', () => {
       console.error('Failed to fetch proposals:', err)
       proposalsError.value = 'Failed to load proposals'
       datasetProposals.value = []
-    } finally {
-      isLoadingProposals.value = false
     }
   }
 
@@ -230,24 +224,13 @@ export const useProposalStore = defineStore('proposalStore', () => {
     requestModalVisible.value = isModalVisible
   }
 
-  const setSelectedRepo = (repo) => {
-    selectedRepoForRequest.value = repo || {}
-  }
-
-  const setSelectedProposal = (proposal) => {
-    selectedDatasetProposal.value = proposal || {}
-  }
-
   return {
     // State
     repositories,
     datasetProposals,
     requestModalVisible,
     shouldCollapsePrimaryNav,
-    selectedRepoForRequest,
-    selectedDatasetProposal,
     isLoadingRepositories,
-    isLoadingProposals,
     repositoriesError,
     proposalsError,
 
@@ -265,8 +248,6 @@ export const useProposalStore = defineStore('proposalStore', () => {
     withdrawProposal,
     acceptProposal,
     rejectProposal,
-    updateRequestModalVisible,
-    setSelectedRepo,
-    setSelectedProposal
+    updateRequestModalVisible
   }
 })
