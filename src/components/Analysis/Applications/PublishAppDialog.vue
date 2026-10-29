@@ -522,14 +522,20 @@ const close = () => {
             <p class="wizard-step-desc">Create it on GitHub, then come back here and tick Done.</p>
             <div class="wizard-row">
               <label class="wizard-field">
-                <span>GitHub owner</span>
-                <el-input v-model="draft.owner" placeholder="your account or organization" />
+                <span>GitHub username or organization</span>
+                <el-input v-model="draft.owner" placeholder="octocat or my-lab" />
+                <small>As it appears in a GitHub URL, not an account number.</small>
               </label>
               <label class="wizard-field">
                 <span>Repository name</span>
                 <el-input v-model="draft.repo" placeholder="spike-sorter" @input="repoTouched = true" />
+                <small>Lower case, words joined by dashes.</small>
               </label>
             </div>
+            <p class="wizard-aside">
+              The repository will be
+              <code v-if="repo">github.com/{{ repoName }}</code><span v-else>github.com/&lt;username or organization&gt;/&lt;repository name&gt;</span>.
+            </p>
             <div class="wizard-actions">
               <bf-button :disabled="!draft.repo" @click="createOnGitHub">Create on GitHub</bf-button>
               <el-checkbox v-model="draft.created" :disabled="installed">Done</el-checkbox>
@@ -863,6 +869,13 @@ const close = () => {
   margin: 0 0 8px;
   font-size: 12px;
   color: theme.$gray_4;
+
+  code {
+    background: theme.$gray_1;
+    padding: 1px 5px;
+    border-radius: 3px;
+    color: theme.$gray_6;
+  }
 }
 
 .wizard-note {
