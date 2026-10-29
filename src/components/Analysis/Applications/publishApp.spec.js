@@ -30,7 +30,7 @@ describe("templateUrl and installUrl", () => {
   it("prefills GitHub's create-from-template page and points at the app's install page", () => {
     const url = templateUrl({ ...newDraft(), name: "Spike Sorter", description: "Sorts spikes.", owner: "lab" });
     expect(url).toMatch(/^https:\/\/github\.com\/new\?/);
-    expect(url).toMatch(/template_owner=Pennsieve/);
+    expect(url).toMatch(/template_owner=pennsieve-apps/);
     expect(url).toMatch(/template_name=processor-template-python/);
     expect(url).toMatch(/name=spike-sorter/);
     expect(url).toMatch(/owner=lab/);

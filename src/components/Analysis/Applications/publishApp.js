@@ -6,7 +6,7 @@
 // is known once the app is installed on it); the rest the author ticks.
 import { createApplicationSchema, createPort, serializeManifestYaml } from "./applicationSchema";
 
-export const TEMPLATE_OWNER = "Pennsieve";
+export const TEMPLATE_OWNER = "pennsieve-apps";
 export const TEMPLATE_REPO = "processor-template-python";
 
 export const COMPUTE_CHOICES = Object.freeze([
