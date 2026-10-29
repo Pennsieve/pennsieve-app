@@ -5,6 +5,7 @@
         Connect your GitHub account to track and publish your repositories. Each time you create a release, 
         Pennsieve will archive the version, create a citable DOI, and generate a landing page.
       </p>
+      <bf-button v-if="hasGithubProfile && !isLoading" class="add-repository-button" @click="openAddRepository()">Add repository</bf-button>
     </div>
 
     <!-- GitHub Account Linking Section -->
@@ -74,21 +75,14 @@
                   <!-- Info Section -->
                   <div class="info-section">
                     <div class="info-card">
-                      <h3>Connected GitHub Repositories</h3>
                       <p>
-                        Manage publishing destinations for the repositories
-                        you've connected through GitHub. Toggle Discover or
-                        App Store publishing per repo, and each tagged
-                        release will fan out to the right place automatically.
+                        These are the repositories the Pennsieve GitHub App can see. Choose where each
+                        one's releases go (Discover, the App Store, or both); every tagged release then
+                        fans out automatically.
                       </p>
-                      <div class="documentation-link">
-                        <router-link
-                          to="/my-workspace/settings/integrations/github"
-                          class="doc-link"
-                        >
-                          Manage GitHub Settings &rarr;
-                        </router-link>
-                      </div>
+                      <router-link to="/my-workspace/settings/integrations/github" class="doc-link">
+                        Manage GitHub settings &rarr;
+                      </router-link>
                     </div>
                   </div>
 
@@ -97,7 +91,6 @@
                     <div class="repos-section-header">
                       <div class="repos-section-title">
                         <h3>My Repositories ({{ totalRepoCount }})</h3>
-                        <bf-button class="add-repository-button" @click="openAddRepository()">Add repository</bf-button>
                         <el-tooltip
                           ref="refresh-tooltip"
                           placement="bottom"
@@ -572,14 +565,22 @@ export default {
 }
 
 .github-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
   margin-bottom: 32px;
 
   .page-description {
     font-size: 16px;
     color: theme.$gray_5;
     line-height: 1.6;
-    margin: 0 0 24px 0;
+    margin: 0;
     max-width: 800px;
+  }
+
+  .add-repository-button {
+    flex-shrink: 0;
   }
 }
 
@@ -836,52 +837,37 @@ export default {
 }
 
 .info-section {
-  margin-bottom: 32px;
+  margin-bottom: 20px;
 }
 
 .info-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
   background: theme.$gray_1;
   border: 1px solid theme.$gray_2;
-  padding: 24px;
-
-  h3 {
-    font-size: 18px;
-    font-weight: 500;
-    color: theme.$gray_6;
-    margin: 0 0 12px 0;
-  }
+  padding: 12px 16px;
 
   p {
-    font-size: 14px;
+    font-size: 13px;
     color: theme.$gray_5;
     line-height: 1.5;
-    margin: 0 0 12px 0;
+    margin: 0;
   }
 
-  .documentation-link {
-    margin-top: 16px;
+  .doc-link {
+    flex-shrink: 0;
+    font-size: 13px;
+    font-weight: 500;
+    color: theme.$purple_3;
+    text-decoration: none;
+    white-space: nowrap;
 
-    .doc-link {
-      display: inline-flex;
-      align-items: center;
-      padding: 8px 16px;
-      background: theme.$purple_3;
-      color: white;
-      text-decoration: none;
-      border-radius: 4px;
-      font-size: 14px;
-      font-weight: 500;
-      transition: background 0.2s ease;
-
-      &:hover {
-        background: theme.$purple_2;
-      }
+    &:hover {
+      text-decoration: underline;
     }
   }
-}
-
-.repos-section {
-  margin-bottom: 48px;
 }
 
 .repos-section-header {
@@ -896,10 +882,6 @@ export default {
   display: flex;
   align-items: center;
   gap: 8px;
-
-  .add-repository-button {
-    margin-left: 8px;
-  }
 
   h3 {
     font-size: 20px;
