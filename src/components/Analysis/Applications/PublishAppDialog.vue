@@ -1,5 +1,7 @@
 <script setup>
-// Publish an app: a guided wizard (publishApp.js has the pure parts).
+// Publish an app: a guided wizard (publishApp.js has the pure parts), laid
+// out like the notebook dialog: what the step is for and what's chosen so
+// far on the left, the step on the right.
 //
 //   1. Describe the app: name, what it does, where it may run, its size,
 //      its inputs and outputs. The dialog writes app.yml from it.
@@ -24,6 +26,7 @@ import { fetchReleaseStatus, publishRelease } from "./release";
 import { STANDARD_CPU_OPTIONS, getStandardMemoryOptions } from "../RunMonitor/runHelpers";
 import {
   COMPUTE_CHOICES,
+  STEPS,
   appYmlFor,
   clearDraft,
   installUrl,
@@ -75,6 +78,7 @@ watch(
 const appYml = computed(() => appYmlFor(draft.value));
 const api2Url = computed(() => store.state.config?.api2Url);
 const repo = computed(() => (draft.value.owner && draft.value.repo ? { owner: draft.value.owner, repo: draft.value.repo } : null));
+const repoName = computed(() => (repo.value ? `${draft.value.owner}/${draft.value.repo}` : ""));
 
 // What the services say: the repository is known (the app is installed on
 // it), and whether it has a release.
@@ -108,6 +112,47 @@ const stopPolling = () => {
   if (poll) clearInterval(poll);
   poll = null;
 };
+
+// The steps: their state from the draft and the services, and the one shown.
+const steps = computed(() => stepsFor(draft.value, { installed: installed.value, released: released.value }));
+const stepState = (key) => steps.value.find((s) => s.key === key) || {};
+const stepTitles = ["Describe the app", "Create the repository", "Give Pennsieve access", "Add the app.yml", "Release it"];
+const stepAbouts = [
+  "An app is a GitHub repository with an app.yml. Describe the app here; the dialog writes the app.yml for you, and the next steps put it on GitHub and release it.",
+  "GitHub creates the repository from Pennsieve's template: a working step with a place for your code, runnable as every compute type. You keep the repository.",
+  "Pennsieve reads the repository and builds its releases through the Pennsieve GitHub App. Install it on the repository, or add the repository to an installation you have.",
+  "The template ships a placeholder app.yml. Replace it with the one written here: a pull request from this dialog, merged on GitHub, or a copy you commit yourself.",
+  "A release publishes the app: Pennsieve builds the image and lists the app in the gallery when the build is done. Every later release is a new version.",
+];
+const step = ref(0);
+// Where to open: the first step still to do, or the last when all are done.
+const firstToDo = () => {
+  const i = steps.value.findIndex((s) => s.current);
+  return i < 0 ? STEPS.length - 1 : i;
+};
+const describeOk = computed(() => String(draft.value.name || "").trim().length >= 2);
+const canNext = computed(() => {
+  switch (STEPS[step.value]) {
+    case "describe":
+      return describeOk.value;
+    case "create":
+      return Boolean(repo.value) && (draft.value.created || installed.value);
+    case "install":
+      return installed.value;
+    case "manifest":
+      return draft.value.manifest;
+    default:
+      return false;
+  }
+});
+const next = () => {
+  if (step.value < STEPS.length - 1 && canNext.value) step.value += 1;
+};
+const back = () => {
+  if (step.value > 0) step.value -= 1;
+};
+const isLast = computed(() => step.value === STEPS.length - 1);
+
 watch(
   () => props.modelValue,
   (open) => {
@@ -115,7 +160,10 @@ watch(
       ownerPrefilled();
       installed.value = false;
       released.value = false;
-      checkRepository();
+      step.value = firstToDo();
+      checkRepository().then(() => {
+        step.value = firstToDo();
+      });
       startPolling();
     } else {
       stopPolling();
@@ -128,22 +176,45 @@ watch(repo, () => {
   released.value = false;
   checkRepository();
 });
+// The access step ticks itself when the app sees the repository.
+watch(installed, (v) => {
+  if (v && STEPS[step.value] === "install") step.value += 1;
+});
 onBeforeUnmount(stopPolling);
 
-const steps = computed(() => stepsFor(draft.value, { installed: installed.value, released: released.value }));
-const stepState = (key) => steps.value.find((s) => s.key === key) || {};
-// The current step is open unless the author opened another, or closed it
-// ("none"); a done step can be opened to look.
-const openStep = ref("");
-const isOpen = (key) => (openStep.value ? openStep.value === key : stepState(key).current);
-const toggle = (key) => {
-  if (isOpen(key)) {
-    openStep.value = stepState(key).current ? "none" : "";
-  } else {
-    openStep.value = key;
+// What's chosen so far, for the left column.
+const runsAs = computed(() => {
+  const kinds = ["container"];
+  if (draft.value.lambda) kinds.push("Lambda");
+  if (draft.value.gpu) kinds.push("GPU");
+  return kinds.join(", ");
+});
+const sizeLabel = computed(() => {
+  const cpu = STANDARD_CPU_OPTIONS.find((o) => o.value === draft.value.cpu)?.label || draft.value.cpu;
+  const mem = memoryOptions.value.find((o) => o.value === draft.value.memory)?.label || draft.value.memory;
+  return `${cpu}, ${mem}`;
+});
+const soFar = computed(() => {
+  const rows = [];
+  if (describeOk.value) {
+    rows.push({ label: "Name", value: draft.value.name.trim() });
+    rows.push({ label: "Runs as", value: runsAs.value });
+    rows.push({ label: "Size", value: sizeLabel.value });
   }
-};
-const describeOk = computed(() => String(draft.value.name || "").trim().length >= 2);
+  if (step.value >= 1 && repoName.value) {
+    rows.push({ label: "Repository", value: repoName.value });
+  }
+  if (step.value >= 2 && repoName.value) {
+    rows.push({ label: "Access", value: installed.value ? "installed" : "not yet" });
+  }
+  if (step.value >= 3) {
+    rows.push({ label: "app.yml", value: stepState("manifest").done ? "merged" : "not yet" });
+  }
+  if (step.value >= 4) {
+    rows.push({ label: "Release", value: released.value ? draft.value.releaseTag || "released" : "not yet" });
+  }
+  return rows;
+});
 
 const openExternal = (url) => window.open(url, "_blank", "noopener");
 const createOnGitHub = () => {
@@ -170,7 +241,6 @@ const openPullRequest = async () => {
   try {
     const token = await useGetToken();
     prOutcome.value = await openAppYmlPullRequest(api2Url.value, repo.value, appYml.value, token);
-    if (prOutcome.value.kind === "opened") draft.value.manifest = true;
   } finally {
     prBusy.value = false;
   }
@@ -180,7 +250,7 @@ const prMessage = computed(() => {
   if (!o) return "";
   switch (o.kind) {
     case "opened":
-      return "Pull request opened. Merge it on GitHub, then publish.";
+      return "Pull request opened. Merge it on GitHub, then tick Merged.";
     case "needsApproval":
       return "The repository's owner hasn't accepted the Pennsieve GitHub App's permissions yet.";
     case "noPush":
@@ -250,7 +320,8 @@ const startOver = () => {
   released.value = false;
   prOutcome.value = null;
   releaseOutcome.value = null;
-  openStep.value = "";
+  releaseStatus.value = null;
+  step.value = 0;
   ownerPrefilled();
 };
 const close = () => {
@@ -259,197 +330,196 @@ const close = () => {
 </script>
 
 <template>
-  <el-dialog v-model="visible" title="Create a new app" width="680px" append-to-body class="publish-app-dialog" @closed="openStep = ''">
-    <p class="wizard-lead">
-      An app is a GitHub repository with an <code>app.yml</code>. Five steps: describe it, create the
-      repository from our template, give Pennsieve access, add the <code>app.yml</code>, release.
-    </p>
+  <el-dialog
+    v-model="visible"
+    :title="stepTitles[step]"
+    width="min(840px, 96vw)"
+    append-to-body
+    class="publish-app-dialog"
+    :close-on-click-modal="false"
+  >
+    <div class="wizard-body">
+      <div class="wizard-progress">
+        <span
+          v-for="(title, i) in stepTitles"
+          :key="i"
+          class="wizard-dot"
+          :class="{ active: step === i, done: stepState(STEPS[i]).done }"
+          :title="title"
+        />
+      </div>
 
-    <ol class="wizard-steps">
-      <!-- 1. Describe -->
-      <li class="wizard-step" :class="{ 'is-done': stepState('describe').done, 'is-current': stepState('describe').current, 'is-open': isOpen('describe') }">
-        <button type="button" class="wizard-step-head" @click="toggle('describe')">
-          <span class="wizard-mark">{{ stepState("describe").done ? "✓" : "1" }}</span>
-          <span class="wizard-title">Describe the app</span>
-          <span v-if="stepState('describe').done && !isOpen('describe')" class="wizard-summary">{{ draft.name }}</span>
-        </button>
-        <div v-if="isOpen('describe')" class="wizard-body">
-          <label class="wizard-field">
-            <span>Name</span>
-            <el-input v-model="draft.name" placeholder="Spike Sorter" maxlength="80" />
-          </label>
-          <label class="wizard-field">
-            <span>What it does</span>
-            <el-input v-model="draft.description" type="textarea" :rows="2" placeholder="One or two sentences, shown in the gallery." maxlength="350" />
-          </label>
-          <label class="wizard-field">
-            <span>Tags</span>
-            <el-input v-model="draft.tags" placeholder="ephys, sorting" />
-          </label>
-          <div class="wizard-field">
-            <span>Runs</span>
-            <div class="wizard-choices">
-              <div class="wizard-choice is-fixed">
-                <el-checkbox :model-value="true" disabled>As a container (standard)</el-checkbox>
-                <small>Any size, any duration.</small>
-              </div>
-              <div v-for="c in COMPUTE_CHOICES" :key="c.value" class="wizard-choice">
-                <el-checkbox v-model="draft[c.value]">{{ c.label }}</el-checkbox>
-                <small>{{ c.hint }}</small>
+      <div class="nb-layout">
+        <aside class="nb-info">
+          <p class="nb-info__about">{{ stepAbouts[step] }}</p>
+          <template v-if="soFar.length">
+            <h4 class="nb-info__title">This app</h4>
+            <dl class="nb-info__list">
+              <template v-for="row in soFar" :key="row.label">
+                <dt>{{ row.label }}</dt>
+                <dd :title="row.value">{{ row.value }}</dd>
+              </template>
+            </dl>
+          </template>
+        </aside>
+        <div class="nb-content">
+          <!-- 1. Describe -->
+          <div v-if="step === 0" class="wizard-step">
+            <label class="wizard-field">
+              <span>Name</span>
+              <el-input v-model="draft.name" placeholder="Spike Sorter" maxlength="80" />
+            </label>
+            <label class="wizard-field">
+              <span>What it does</span>
+              <el-input v-model="draft.description" type="textarea" :rows="2" placeholder="One or two sentences, shown in the gallery." maxlength="350" />
+            </label>
+            <label class="wizard-field">
+              <span>Tags</span>
+              <el-input v-model="draft.tags" placeholder="ephys, sorting" />
+            </label>
+            <div class="wizard-field">
+              <span>Runs</span>
+              <div class="wizard-choices">
+                <div class="wizard-choice is-fixed">
+                  <el-checkbox :model-value="true" disabled>As a container (standard)</el-checkbox>
+                  <small>Any size, any duration.</small>
+                </div>
+                <div v-for="c in COMPUTE_CHOICES" :key="c.value" class="wizard-choice">
+                  <el-checkbox v-model="draft[c.value]">{{ c.label }}</el-checkbox>
+                  <small>{{ c.hint }}</small>
+                </div>
               </div>
             </div>
+            <div class="wizard-row">
+              <label class="wizard-field">
+                <span>CPU</span>
+                <el-select v-model="draft.cpu" size="default">
+                  <el-option v-for="o in STANDARD_CPU_OPTIONS" :key="o.value" :label="o.label" :value="o.value" />
+                </el-select>
+              </label>
+              <label class="wizard-field">
+                <span>Memory</span>
+                <el-select v-model="draft.memory" size="default">
+                  <el-option v-for="o in memoryOptions" :key="o.value" :label="o.label" :value="o.value" />
+                </el-select>
+              </label>
+            </div>
+            <div class="wizard-row">
+              <label class="wizard-field">
+                <span>Inputs</span>
+                <el-input v-model="draft.inputs" placeholder="data" />
+                <small>Names, comma-separated. Each arrives in its own folder of INPUT_DIR.</small>
+              </label>
+              <label class="wizard-field">
+                <span>Outputs</span>
+                <el-input v-model="draft.outputs" placeholder="results" />
+                <small>Each is written to its own folder of OUTPUT_DIR.</small>
+              </label>
+            </div>
+            <details class="wizard-yml">
+              <summary>Preview app.yml</summary>
+              <pre>{{ appYml }}</pre>
+            </details>
           </div>
-          <div class="wizard-row">
-            <label class="wizard-field">
-              <span>CPU</span>
-              <el-select v-model="draft.cpu" size="default">
-                <el-option v-for="o in STANDARD_CPU_OPTIONS" :key="o.value" :label="o.label" :value="o.value" />
-              </el-select>
-            </label>
-            <label class="wizard-field">
-              <span>Memory</span>
-              <el-select v-model="draft.memory" size="default">
-                <el-option v-for="o in memoryOptions" :key="o.value" :label="o.label" :value="o.value" />
-              </el-select>
-            </label>
-          </div>
-          <div class="wizard-row">
-            <label class="wizard-field">
-              <span>Inputs</span>
-              <el-input v-model="draft.inputs" placeholder="data" />
-              <small>Names, comma-separated. Each arrives in its own folder of INPUT_DIR.</small>
-            </label>
-            <label class="wizard-field">
-              <span>Outputs</span>
-              <el-input v-model="draft.outputs" placeholder="results" />
-              <small>Each is written to its own folder of OUTPUT_DIR.</small>
-            </label>
-          </div>
-          <details class="wizard-yml">
-            <summary>Preview app.yml</summary>
-            <pre>{{ appYml }}</pre>
-          </details>
-          <div class="wizard-actions">
-            <bf-button :disabled="!describeOk" @click="openStep = 'create'">Next</bf-button>
-          </div>
-        </div>
-      </li>
 
-      <!-- 2. Create the repository -->
-      <li class="wizard-step" :class="{ 'is-done': stepState('create').done, 'is-current': stepState('create').current, 'is-open': isOpen('create') }">
-        <button type="button" class="wizard-step-head" @click="toggle('create')">
-          <span class="wizard-mark">{{ stepState("create").done ? "✓" : "2" }}</span>
-          <span class="wizard-title">Create the repository</span>
-          <span v-if="repo && !isOpen('create')" class="wizard-summary">{{ draft.owner }}/{{ draft.repo }}</span>
-        </button>
-        <div v-if="isOpen('create')" class="wizard-body">
-          <p>
-            GitHub creates it from our template: a working step with a place for your code, runnable as every
-            compute type. Create it on GitHub, then come back here.
-          </p>
-          <div class="wizard-row">
-            <label class="wizard-field">
-              <span>GitHub owner</span>
-              <el-input v-model="draft.owner" placeholder="your account or organization" />
-            </label>
-            <label class="wizard-field">
-              <span>Repository name</span>
-              <el-input v-model="draft.repo" placeholder="spike-sorter" @input="repoTouched = true" />
-            </label>
-          </div>
-          <div class="wizard-actions">
-            <bf-button :disabled="!draft.repo" @click="createOnGitHub">Create on GitHub</bf-button>
-            <el-checkbox v-model="draft.created" :disabled="installed">Done</el-checkbox>
-            <span class="wizard-aside">Have a repository already? Enter it above and tick Done.</span>
-          </div>
-        </div>
-      </li>
-
-      <!-- 3. Install the GitHub App -->
-      <li class="wizard-step" :class="{ 'is-done': stepState('install').done, 'is-current': stepState('install').current, 'is-open': isOpen('install') }">
-        <button type="button" class="wizard-step-head" @click="toggle('install')">
-          <span class="wizard-mark">{{ stepState("install").done ? "✓" : "3" }}</span>
-          <span class="wizard-title">Give Pennsieve access to it</span>
-          <span v-if="installed && !isOpen('install')" class="wizard-summary">installed</span>
-        </button>
-        <div v-if="isOpen('install')" class="wizard-body">
-          <p>
-            Install the Pennsieve GitHub App on
-            <a v-if="repo" :href="repoUrl(draft)" target="_blank" rel="noopener">{{ draft.owner }}/{{ draft.repo }}</a><span v-else>the repository</span>
-            (or add it to an installation you have). This step ticks itself once Pennsieve can see the repository.
-          </p>
-          <div class="wizard-actions">
-            <bf-button @click="installApp">Install the GitHub App</bf-button>
-            <bf-button class="secondary" :disabled="checking" @click="checkRepository">{{ checking ? "Checking…" : "Check now" }}</bf-button>
-          </div>
-        </div>
-      </li>
-
-      <!-- 4. app.yml -->
-      <li class="wizard-step" :class="{ 'is-done': stepState('manifest').done, 'is-current': stepState('manifest').current, 'is-open': isOpen('manifest') }">
-        <button type="button" class="wizard-step-head" @click="toggle('manifest')">
-          <span class="wizard-mark">{{ stepState("manifest").done ? "✓" : "4" }}</span>
-          <span class="wizard-title">Add the app.yml</span>
-        </button>
-        <div v-if="isOpen('manifest')" class="wizard-body">
-          <p>
-            Replace the template's placeholder <code>app.yml</code> with yours: open a pull request from here and merge
-            it on GitHub, or copy it and commit it yourself.
-          </p>
-          <div class="wizard-actions">
-            <bf-button :disabled="!installed || prBusy" @click="openPullRequest">{{ prBusy ? "Opening…" : "Open a pull request" }}</bf-button>
-            <bf-button class="secondary" @click="copyAppYml">Copy app.yml</bf-button>
-            <el-checkbox v-model="draft.manifest">Merged</el-checkbox>
-          </div>
-          <p v-if="prMessage" class="wizard-note" :class="{ 'is-error': prOutcome && prOutcome.kind !== 'opened' }">
-            {{ prMessage }}
-            <a v-if="prOutcome?.url" :href="prOutcome.url" target="_blank" rel="noopener">Open it</a>
-            <a v-else-if="prOutcome?.reviewUrl" :href="prOutcome.reviewUrl" target="_blank" rel="noopener">Review the permissions</a>
-          </p>
-          <details class="wizard-yml">
-            <summary>app.yml</summary>
-            <pre>{{ appYml }}</pre>
-          </details>
-        </div>
-      </li>
-
-      <!-- 5. Release -->
-      <li class="wizard-step" :class="{ 'is-done': stepState('release').done, 'is-current': stepState('release').current, 'is-open': isOpen('release') }">
-        <button type="button" class="wizard-step-head" @click="toggle('release')">
-          <span class="wizard-mark">{{ stepState("release").done ? "✓" : "5" }}</span>
-          <span class="wizard-title">Release it</span>
-          <span v-if="released && !isOpen('release')" class="wizard-summary">released</span>
-        </button>
-        <div v-if="isOpen('release')" class="wizard-body">
-          <p>
-            A release publishes the app: Pennsieve builds the image and lists the app here when the build is done.
-            Every later release is a new version.
-          </p>
-          <div class="wizard-row">
-            <label class="wizard-field wizard-field--short">
-              <span>Version</span>
-              <el-input v-model="draft.releaseTag" placeholder="v0.1.0" />
-            </label>
+          <!-- 2. Create the repository -->
+          <div v-else-if="step === 1" class="wizard-step">
+            <p class="wizard-step-desc">Create it on GitHub, then come back here and tick Done.</p>
+            <div class="wizard-row">
+              <label class="wizard-field">
+                <span>GitHub owner</span>
+                <el-input v-model="draft.owner" placeholder="your account or organization" />
+              </label>
+              <label class="wizard-field">
+                <span>Repository name</span>
+                <el-input v-model="draft.repo" placeholder="spike-sorter" @input="repoTouched = true" />
+              </label>
+            </div>
             <div class="wizard-actions">
-              <bf-button :disabled="!installed || releaseBusy || released" @click="publish">{{ releaseBusy ? "Publishing…" : "Publish release" }}</bf-button>
+              <bf-button :disabled="!draft.repo" @click="createOnGitHub">Create on GitHub</bf-button>
+              <el-checkbox v-model="draft.created" :disabled="installed">Done</el-checkbox>
             </div>
+            <p class="wizard-aside">Have a repository already? Enter it above and tick Done.</p>
           </div>
-          <p v-if="releaseStatus && releaseStatus.latestTag && !released" class="wizard-aside">
-            Latest release on GitHub: {{ releaseStatus.latestTag }}.
-          </p>
-          <p v-if="releaseMessage" class="wizard-note" :class="{ 'is-error': releaseOutcome && releaseOutcome.kind !== 'released' }">
-            {{ releaseMessage }}
-            <a v-if="releaseOutcome?.url" :href="releaseOutcome.url" target="_blank" rel="noopener">See the release</a>
-            <a v-else-if="releaseOutcome?.reviewUrl" :href="releaseOutcome.reviewUrl" target="_blank" rel="noopener">Review the permissions</a>
-          </p>
+
+          <!-- 3. Install the GitHub App -->
+          <div v-else-if="step === 2" class="wizard-step">
+            <p class="wizard-step-desc">
+              Install the Pennsieve GitHub App on
+              <a v-if="repo" :href="repoUrl(draft)" target="_blank" rel="noopener">{{ repoName }}</a><span v-else>the repository</span>.
+              This step completes itself once Pennsieve can see the repository.
+            </p>
+            <div class="wizard-actions">
+              <bf-button @click="installApp">Install the GitHub App</bf-button>
+              <bf-button class="secondary" :disabled="checking" @click="checkRepository">{{ checking ? "Checking…" : "Check now" }}</bf-button>
+            </div>
+            <p class="wizard-note" :class="{ 'is-ok': installed }">
+              {{ installed ? "Pennsieve sees the repository." : "Waiting for the installation…" }}
+            </p>
+          </div>
+
+          <!-- 4. app.yml -->
+          <div v-else-if="step === 3" class="wizard-step">
+            <p class="wizard-step-desc">
+              Open a pull request from here and merge it on GitHub, or copy the <code>app.yml</code> and commit it
+              yourself. Then tick Merged.
+            </p>
+            <div class="wizard-actions">
+              <bf-button :disabled="!installed || prBusy" @click="openPullRequest">{{ prBusy ? "Opening…" : "Open a pull request" }}</bf-button>
+              <bf-button class="secondary" @click="copyAppYml">Copy app.yml</bf-button>
+              <el-checkbox v-model="draft.manifest">Merged</el-checkbox>
+            </div>
+            <p v-if="prMessage" class="wizard-note" :class="{ 'is-error': prOutcome && prOutcome.kind !== 'opened' }">
+              {{ prMessage }}
+              <a v-if="prOutcome?.url" :href="prOutcome.url" target="_blank" rel="noopener">Open it</a>
+              <a v-else-if="prOutcome?.reviewUrl" :href="prOutcome.reviewUrl" target="_blank" rel="noopener">Review the permissions</a>
+            </p>
+            <details class="wizard-yml" open>
+              <summary>app.yml</summary>
+              <pre>{{ appYml }}</pre>
+            </details>
+          </div>
+
+          <!-- 5. Release -->
+          <div v-else class="wizard-step">
+            <p class="wizard-step-desc">Pick the first version, then publish the release.</p>
+            <div class="wizard-row">
+              <label class="wizard-field wizard-field--short">
+                <span>Version</span>
+                <el-input v-model="draft.releaseTag" placeholder="v0.1.0" :disabled="released" />
+              </label>
+            </div>
+            <p v-if="releaseStatus && releaseStatus.latestTag && !released" class="wizard-aside">
+              Latest release on GitHub: {{ releaseStatus.latestTag }}.
+            </p>
+            <p v-if="releaseMessage" class="wizard-note" :class="{ 'is-error': releaseOutcome && releaseOutcome.kind !== 'released', 'is-ok': released }">
+              {{ releaseMessage }}
+              <a v-if="releaseOutcome?.url" :href="releaseOutcome.url" target="_blank" rel="noopener">See the release</a>
+              <a v-else-if="releaseOutcome?.reviewUrl" :href="releaseOutcome.reviewUrl" target="_blank" rel="noopener">Review the permissions</a>
+            </p>
+            <p v-else-if="released && draft.releaseUrl" class="wizard-note is-ok">
+              Released already.
+              <a :href="draft.releaseUrl" target="_blank" rel="noopener">See the release</a>
+            </p>
+          </div>
         </div>
-      </li>
-    </ol>
+      </div>
+    </div>
 
     <template #footer>
-      <div class="wizard-footer">
-        <button type="button" class="wizard-link" @click="startOver">Start over</button>
-        <bf-button class="secondary" @click="close">{{ released ? "Done" : "Close" }}</bf-button>
+      <div class="run-dialog-footer">
+        <div class="wizard-footer-left">
+          <bf-button class="secondary" @click="close">Cancel</bf-button>
+          <button type="button" class="wizard-link" @click="startOver">Start over</button>
+        </div>
+        <div class="wizard-footer-right">
+          <bf-button v-if="step > 0" class="secondary" @click="back">Back</bf-button>
+          <bf-button v-if="!isLast" :disabled="!canNext" @click="next">Next</bf-button>
+          <bf-button v-else-if="released" @click="close">Done</bf-button>
+          <bf-button v-else :disabled="!installed || !draft.releaseTag" :processing="releaseBusy" @click="publish">
+            Publish release
+          </bf-button>
+        </div>
       </div>
     </template>
   </el-dialog>
@@ -458,94 +528,99 @@ const close = () => {
 <style scoped lang="scss">
 @use "../../../styles/theme";
 
-.wizard-lead {
-  margin: 0 0 14px;
-  font-size: 13px;
-  line-height: 1.5;
-  color: theme.$gray_5;
-
-  code {
-    font-size: 12px;
-  }
+.wizard-body {
+  min-height: 300px;
 }
 
-.wizard-steps {
-  list-style: none;
+.wizard-progress {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  margin-bottom: 20px;
+}
+.wizard-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: theme.$gray_2;
+}
+.wizard-dot.active {
+  background: theme.$purple_1;
+}
+.wizard-dot.done {
+  background: theme.$green_1;
+}
+
+.nb-layout {
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr);
+  gap: 20px;
+  min-height: 320px;
+}
+.nb-info {
+  padding-right: 20px;
+  border-right: 1px solid theme.$gray_2;
+  font-size: 13px;
+  color: theme.$gray_5;
+}
+.nb-info__about {
+  margin: 0 0 16px;
+  line-height: 1.5;
+}
+.nb-info__title {
+  margin: 0 0 6px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: theme.$gray_4;
+}
+.nb-info__list {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 4px 10px;
   margin: 0;
-  padding: 0;
-  border: 1px solid theme.$gray_3;
-  border-radius: 4px;
+
+  dt {
+    color: theme.$gray_4;
+  }
+  dd {
+    margin: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: theme.$gray_6;
+  }
+}
+.nb-content {
+  min-width: 0;
+}
+/* A narrow screen: the step alone */
+@media (max-width: 900px) {
+  .nb-layout {
+    display: block;
+  }
+  .nb-info {
+    display: none;
+  }
 }
 
 .wizard-step {
-  border-bottom: 1px solid theme.$gray_2;
-
-  &:last-child {
-    border-bottom: none;
-  }
-}
-
-.wizard-step-head {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  width: 100%;
-  padding: 10px 12px;
-  border: none;
-  background: none;
-  text-align: left;
-  font: inherit;
-  cursor: pointer;
-
-  .is-current & {
-    background: theme.$teal_tint;
-  }
-}
-
-.wizard-mark {
-  flex-shrink: 0;
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  border: 1px solid theme.$gray_3;
-  font-size: 12px;
-  font-weight: 700;
-  line-height: 20px;
-  text-align: center;
-  color: theme.$gray_5;
-
-  .is-done & {
-    border-color: theme.$status_green;
-    background: theme.$status_green;
-    color: theme.$white;
-  }
-
-  .is-current & {
-    border-color: theme.$teal_2;
-    color: theme.$teal_2;
-  }
-}
-
-.wizard-title {
-  flex: 1;
-  font-size: 14px;
-  font-weight: 600;
-  color: theme.$black;
-}
-
-.wizard-summary {
-  font-size: 12px;
-  color: theme.$gray_5;
-}
-
-.wizard-body {
-  padding: 4px 12px 14px 44px;
   font-size: 13px;
   line-height: 1.5;
   color: theme.$gray_6;
+}
 
-  > p {
-    margin: 0 0 10px;
+.wizard-step-desc {
+  color: theme.$gray_5;
+  font-size: 13px;
+  margin: 0 0 14px;
+
+  code {
+    background: theme.$gray_1;
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-size: 12px;
   }
 }
 
@@ -626,6 +701,7 @@ const close = () => {
 }
 
 .wizard-aside {
+  margin: 0 0 8px;
   font-size: 12px;
   color: theme.$gray_4;
 }
@@ -634,8 +710,12 @@ const close = () => {
   margin: 6px 0 0;
   padding: 8px 10px;
   border-radius: 4px;
-  background: theme.$teal_tint;
+  background: theme.$gray_0;
   font-size: 12px;
+
+  &.is-ok {
+    background: theme.$teal_tint;
+  }
 
   &.is-error {
     background: #fef3c7;
@@ -646,10 +726,19 @@ const close = () => {
   }
 }
 
-.wizard-footer {
+.run-dialog-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.wizard-footer-left,
+.wizard-footer-right {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: 12px;
+}
+.wizard-footer-right {
+  gap: 8px;
 }
 
 .wizard-link {
