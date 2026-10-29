@@ -57,7 +57,14 @@ describe("usageSidebar", () => {
     expect(side.memoryTitle).toMatch(/7,168 MiB would do\.$/);
     expect(side.cpuTitle).toMatch(/peak cpu over 11 runs/);
     expect(side.hint).toMatch(/7,168 MiB would do/);
-    expect(usageSidebar({ versions: [{ version: "v2", runs: 1, memoryUsedMiB: { samples: 0 }, cpuUsedUnits: { samples: 0 } }] })).toBeNull();
+    const short = usageSidebar({ versions: [{ version: "v2", runs: 1, computeTypes: { standard: 1 }, memoryUsedMiB: { samples: 0 }, cpuUsedUnits: { samples: 0 } }] });
+    expect(short.memory).toBe("—");
+    expect(short.memoryTitle).toMatch(/every step ran under a minute/);
+    const lambda = usageSidebar({ versions: [{ version: "v1.2.0", runs: 1, computeTypes: { lambda: 7 }, memoryUsedMiB: { p50: 41, p95: 42, max: 42, samples: 5 }, cpuUsedUnits: { samples: 0 } }] });
+    expect(lambda.memory).toBe("42 MiB");
+    expect(lambda.cpu).toBe("—");
+    expect(lambda.cpuTitle).toMatch(/Lambda function, which reports memory only/);
+    expect(usageSidebar({ runs: 0, versions: [] }).memory).toBe("—");
     expect(usageSidebar(null)).toBeNull();
   });
 });

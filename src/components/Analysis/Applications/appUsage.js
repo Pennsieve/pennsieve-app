@@ -68,23 +68,35 @@ export const usageSummary = (usage) => {
 // the runs they rest on, plus the sizing hint when there is one. Null
 // without a sampled step.
 export const usageSidebar = (usage) => {
-  const v = usage?.versions?.[0];
-  if (!v) return null;
+  // No usage served (the app is not ours to see here): no tiles. Served
+  // but empty: tiles with a dash, and why, so the row keeps its shape.
+  if (!usage) return null;
+  const v = usage.versions?.[0];
+  const none = {
+    caption: "",
+    memory: "—",
+    cpu: "—",
+    memoryTitle: "No usage sampled yet: usage is recorded as runs finish.",
+    cpuTitle: "No usage sampled yet: usage is recorded as runs finish.",
+    hint: "",
+  };
+  if (!v) return none;
   const mem = v.memoryUsedMiB;
   const cpu = v.cpuUsedUnits;
-  if (!mem?.samples && !cpu?.samples) return null;
   const runs = `${v.runs} run${v.runs === 1 ? "" : "s"}`;
   const version = v.version ? ` of ${v.version}` : "";
   const hint = sizingHint(v);
   const explain = (d, fmt, what) =>
     `The 95th percentile of each step's peak ${what} over ${runs}${version}, ${d.samples} sampled step${d.samples === 1 ? "" : "s"}: half the steps peaked at ${fmt(d.p50)} or less, the most was ${fmt(d.max)}. Usage depends on the inputs.`;
+  const lambdaOnly = v.computeTypes && Object.keys(v.computeTypes).every((t) => t === "lambda");
+  const noSample = `No usage sampled over ${runs}${version}: usage is sampled once a minute, and every step ran under a minute.`;
   return {
     caption: `Measured over ${runs}${version}`,
     // One number each: the 95th percentile, what a size has to cover.
     memory: mem?.samples ? MiB(mem.p95) : "—",
-    cpu: cpu?.samples ? vcpu(cpu.p95) : "",
-    memoryTitle: mem?.samples ? explain(mem, MiB, "memory") + (hint ? " " + hint : "") : "",
-    cpuTitle: cpu?.samples ? explain(cpu, vcpu, "cpu") : "",
+    cpu: cpu?.samples ? vcpu(cpu.p95) : "—",
+    memoryTitle: mem?.samples ? explain(mem, MiB, "memory") + (hint ? " " + hint : "") : noSample,
+    cpuTitle: cpu?.samples ? explain(cpu, vcpu, "cpu") : lambdaOnly ? `No cpu figure: ${version ? version.slice(4) + " ran" : "the app runs"} as a Lambda function, which reports memory only.` : noSample,
     hint,
   };
 };

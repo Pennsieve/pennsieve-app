@@ -637,15 +637,13 @@ watch(
                   <span class="stat-label stat-label-explained">Peak memory</span>
                 </div>
               </el-tooltip>
-              <template v-if="appUsageSide.cpu">
-                <div class="summary-divider" />
-                <el-tooltip placement="right" :content="appUsageSide.cpuTitle" :show-after="150">
-                  <div class="summary-stat usage-stat">
-                    <span class="stat-value">{{ appUsageSide.cpu }}</span>
-                    <span class="stat-label stat-label-explained">Peak CPU</span>
-                  </div>
-                </el-tooltip>
-              </template>
+              <div class="summary-divider" />
+              <el-tooltip placement="right" :content="appUsageSide.cpuTitle" :show-after="150">
+                <div class="summary-stat usage-stat">
+                  <span class="stat-value">{{ appUsageSide.cpu }}</span>
+                  <span class="stat-label stat-label-explained">Peak CPU</span>
+                </div>
+              </el-tooltip>
             </template>
           </MetricsDashboard>
           <div v-else class="metrics-placeholder">
