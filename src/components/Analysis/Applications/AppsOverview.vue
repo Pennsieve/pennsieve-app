@@ -28,7 +28,7 @@ const publishOpen = ref(false);
           />
         </label>
       </template>
-      <bf-button @click="publishOpen = true">Create new app</bf-button>
+      <bf-button @click="publishOpen = true">Create New App</bf-button>
     </AnalysisViewBar>
     <PublishAppDialog v-model="publishOpen" />
     <!-- As the Workflows tab's Library: the grid's own 20px/32px padding,
