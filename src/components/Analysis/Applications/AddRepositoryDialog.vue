@@ -242,17 +242,30 @@ const saveSettings = async () => {
 // --- 4. The release ------------------------------------------------------
 
 const releaseStatus = ref(null);
+const releaseLoading = ref(false);
 const releaseBusy = ref(false);
 const releaseOutcome = ref(null);
 const loadRelease = async () => {
-  if (!repo.value || !hasAccess(access.value)) return;
-  const token = await useGetToken();
-  const [found, status] = await Promise.all([fetchRepository(api2Url.value, repo.value), fetchReleaseStatus(api2Url.value, repo.value, token)]);
-  if (found) repository.value = found;
-  releaseStatus.value = status;
+  if (!repo.value || !hasAccess(access.value) || releaseLoading.value) return;
+  releaseLoading.value = true;
+  try {
+    const token = await useGetToken();
+    const [found, status] = await Promise.all([fetchRepository(api2Url.value, repo.value), fetchReleaseStatus(api2Url.value, repo.value, token)]);
+    if (found) repository.value = found;
+    releaseStatus.value = status;
+  } finally {
+    releaseLoading.value = false;
+  }
 };
+// Every release Pennsieve or GitHub knows of: the ones stored since the app
+// saw the repository, and GitHub's latest (which may predate that).
 const knownTags = computed(() => (repository.value?.releases || []).map((r) => r.label).filter(Boolean));
-const latest = computed(() => latestVersion([...knownTags.value, releaseStatus.value?.latestTag].filter(Boolean)));
+const existingTags = computed(() => {
+  const tags = [...new Set([...knownTags.value, releaseStatus.value?.latestTag].filter(Boolean))];
+  // newest first, versions before anything that isn't one
+  return tags.sort((a, b) => (latestVersion([a, b]) === a ? -1 : 1));
+});
+const latest = computed(() => latestVersion(existingTags.value) || existingTags.value[0] || "");
 const suggestions = computed(() => nextVersions(latest.value));
 const BUMPS = [
   { key: "patch", label: "Patch", hint: "fixes" },
@@ -266,11 +279,18 @@ const pickBump = (key) => {
 };
 const tagIssue = computed(() => (draft.value.releaseChoice === "new" ? tagProblem(draft.value.releaseTag, knownTags.value, latest.value) : ""));
 const released = computed(() => Boolean(draft.value.releasedTag));
-// The first choice offered: the latest release when there is one.
-watch([latest, () => draft.value.releaseChoice], ([l, choice]) => {
-  if (!choice) draft.value.releaseChoice = l ? "existing" : "new";
+// The choice proposed, until the user picks one: build the latest release
+// when there is one (nothing to change on GitHub), else make the first.
+watch([latest, releaseLoading], ([l, loading]) => {
+  if (loading) return;
+  if (!draft.value.releaseChoiceTouched) draft.value.releaseChoice = l ? "existing" : "new";
+  if (l && (!draft.value.buildTag || !existingTags.value.includes(draft.value.buildTag))) draft.value.buildTag = l;
   if (draft.value.releaseChoice === "new" && !draft.value.releaseTag) pickBump(l ? "patch" : "minor");
 });
+const chooseRelease = () => {
+  draft.value.releaseChoiceTouched = true;
+  if (draft.value.releaseChoice === "new" && !draft.value.releaseTag) pickBump(latest.value ? "patch" : "minor");
+};
 
 const destinationLabels = computed(() => DESTINATIONS.filter((d) => draft.value[d.key]).map((d) => d.label));
 const release = async () => {
@@ -280,11 +300,12 @@ const release = async () => {
   try {
     const token = await useGetToken();
     if (draft.value.releaseChoice === "existing") {
-      const outcome = await publishStoredRelease(api2Url.value, repo.value, { label: latest.value, destinations: destinationsOf(draft.value) }, token);
+      const label = draft.value.buildTag || latest.value;
+      const outcome = await publishStoredRelease(api2Url.value, repo.value, { label, destinations: destinationsOf(draft.value) }, token);
       releaseOutcome.value = outcome;
       if (outcome.kind === "accepted") {
         draft.value.releasedTag = outcome.label;
-        draft.value.releaseUrl = releaseStatus.value?.latestUrl || `${url.value}/releases/tag/${outcome.label}`;
+        draft.value.releaseUrl = label === releaseStatus.value?.latestTag && releaseStatus.value?.latestUrl ? releaseStatus.value.latestUrl : `${url.value}/releases/tag/${label}`;
         emit("done", { ...repo.value, tag: outcome.label, destinations: destinationsOf(draft.value) });
       }
     } else {
@@ -579,9 +600,22 @@ const close = () => {
                 <template v-if="latest"> The latest release on GitHub is <strong>{{ latest }}</strong><template v-if="releaseStatus?.commitsSince">, with {{ releaseStatus.commitsSince }} new commit{{ releaseStatus.commitsSince === 1 ? "" : "s" }} since</template>.</template>
                 <template v-else> The repository has no release yet.</template>
               </p>
-              <el-radio-group v-model="draft.releaseChoice" class="release-choices">
+              <p v-if="releaseLoading" class="wizard-aside">Looking for releases…</p>
+              <el-radio-group v-else v-model="draft.releaseChoice" class="release-choices" @change="chooseRelease">
                 <div v-if="latest" class="wizard-choice">
-                  <el-radio value="existing">Build {{ latest }}, the latest release</el-radio>
+                  <el-radio value="existing">
+                    Build an existing release
+                    <el-select
+                      v-if="draft.releaseChoice === 'existing'"
+                      v-model="draft.buildTag"
+                      size="small"
+                      class="release-pick"
+                      @click.stop
+                    >
+                      <el-option v-for="t in existingTags" :key="t" :label="t === latest ? `${t} (latest)` : t" :value="t" />
+                    </el-select>
+                    <template v-else>, {{ latest }} being the latest</template>
+                  </el-radio>
                   <small>Nothing changes on GitHub; Pennsieve fetches the release and publishes it.</small>
                 </div>
                 <div class="wizard-choice">
@@ -627,7 +661,7 @@ const close = () => {
           </bf-button>
           <bf-button v-else-if="released" @click="close">Done</bf-button>
           <bf-button v-else-if="draft.releaseChoice === 'later'" @click="finishLater">Done</bf-button>
-          <bf-button v-else-if="draft.releaseChoice === 'existing'" :processing="releaseBusy" :disabled="!latest" @click="release">Build {{ latest }}</bf-button>
+          <bf-button v-else-if="draft.releaseChoice === 'existing'" :processing="releaseBusy" :disabled="!(draft.buildTag || latest)" @click="release">Build {{ draft.buildTag || latest }}</bf-button>
           <bf-button v-else :processing="releaseBusy" :disabled="Boolean(tagIssue) || !draft.releaseTag" @click="release">Release {{ draft.releaseTag }}</bf-button>
         </div>
       </div>
@@ -857,6 +891,10 @@ const close = () => {
 .release-tag {
   max-width: 200px;
   margin-top: 6px;
+}
+.release-pick {
+  width: 180px;
+  margin-left: 8px;
 }
 .wizard-actions {
   display: flex;

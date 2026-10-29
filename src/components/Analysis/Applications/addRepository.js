@@ -37,6 +37,10 @@ export const newDraft = () => ({
   settingsSaved: false,
   // "existing" (build a release GitHub has), "new" (make one), "later".
   releaseChoice: "",
+  // The user picked the choice themselves (else the dialog proposes one).
+  releaseChoiceTouched: false,
+  // The existing release to build, and the new version to make.
+  buildTag: "",
   releaseTag: "",
   // The release built or made from here, once there is one.
   releasedTag: "",
