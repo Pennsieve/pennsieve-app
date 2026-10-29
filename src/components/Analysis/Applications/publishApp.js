@@ -32,6 +32,8 @@ export const newDraft = () => ({
   // What the author has done, beyond what the services can tell.
   runs: false,
   created: false,
+  // The author skipped installing the GitHub App, to test locally first.
+  accessSkipped: false,
   manifest: false,
   releaseTag: "v0.1.0",
   releaseUrl: "",
@@ -92,11 +94,15 @@ export const installUrl = (githubAppUrl) => `${String(githubAppUrl || "").replac
 
 export const repoUrl = (draft) => (draft.owner && draft.repo ? `https://github.com/${draft.owner}/${draft.repo}` : "");
 
-// stepsFor is each step's state: done, or the current one, or ahead.
+// stepsFor is each step's state: done, or the current one, or ahead; the
+// access step may instead be skipped (the author tests locally first), which
+// lets the later steps open but not finish: without the app, Pennsieve can't
+// see the repository, so nothing is released.
 // installed is what the repository endpoint said (the app is installed on
 // a repository it knows); released, the release the dialog made or found.
 export const stepsFor = (draft, { installed = false, released = false } = {}) => {
   const described = Boolean(String(draft.name || "").trim());
+  const skipped = !installed && Boolean(draft.accessSkipped);
   const done = {
     describe: described,
     runs: described && Boolean(draft.runs),
@@ -105,12 +111,15 @@ export const stepsFor = (draft, { installed = false, released = false } = {}) =>
     manifest: installed && draft.manifest,
     release: released,
   };
+  // What lets the next step open: done, or passed over.
+  const passed = { ...done, install: done.install || skipped, manifest: done.manifest || (skipped && draft.manifest) };
   let current = "";
   const steps = STEPS.map((key) => {
     const isDone = done[key];
-    const isCurrent = !isDone && !current && (key === "describe" || done[STEPS[STEPS.indexOf(key) - 1]]);
+    const isSkipped = key === "install" && skipped;
+    const isCurrent = !passed[key] && !isSkipped && !current && (key === "describe" || passed[STEPS[STEPS.indexOf(key) - 1]]);
     if (isCurrent) current = key;
-    return { key, done: isDone, current: isCurrent };
+    return { key, done: isDone, current: isCurrent, skipped: isSkipped };
   });
   return steps;
 };

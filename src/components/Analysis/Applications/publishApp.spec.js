@@ -60,6 +60,20 @@ describe("stepsFor", () => {
     expect(s.release.done).toBe(true);
     expect(stepsFor({ ...newDraft(), name: "x", runs: true, manifest: true }, { installed: true, released: true }).some((x) => x.current)).toBe(false);
   });
+  it("lets the access step be skipped, opening the later steps but finishing none", () => {
+    let s = byKey(stepsFor({ ...newDraft(), name: "x", runs: true, created: true, accessSkipped: true }));
+    expect(s.install.skipped).toBe(true);
+    expect(s.install.done).toBe(false);
+    expect(s.manifest.current).toBe(true);
+    s = byKey(stepsFor({ ...newDraft(), name: "x", runs: true, created: true, accessSkipped: true, manifest: true }));
+    expect(s.manifest.done).toBe(false);
+    expect(s.release.current).toBe(true);
+    // Installed after all: the skip no longer counts.
+    s = byKey(stepsFor({ ...newDraft(), name: "x", runs: true, created: true, accessSkipped: true, manifest: true }, { installed: true }));
+    expect(s.install.skipped).toBe(false);
+    expect(s.install.done).toBe(true);
+    expect(s.manifest.done).toBe(true);
+  });
   it("does not count the manifest done before the app is installed", () => {
     const s = byKey(stepsFor({ ...newDraft(), name: "x", runs: true, created: true, manifest: true }));
     expect(s.create.done).toBe(true);

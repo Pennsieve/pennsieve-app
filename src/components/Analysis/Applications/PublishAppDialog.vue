@@ -9,7 +9,9 @@
 //   3. Create the repository on GitHub, from Pennsieve's template, on
 //      GitHub's own page prefilled (the author keeps their repository).
 //   4. Install the Pennsieve GitHub App on it. The dialog polls the
-//      repository and ticks the step when the app sees it.
+//      repository and ticks the step when the app sees it. The author may
+//      skip this to test locally first; the later steps then warn that
+//      nothing shows up on Pennsieve until it's installed.
 //   5. Add app.yml: a pull request from here, or a copy to commit.
 //   6. Publish: the first release. The app is in the gallery when its
 //      image is built.
@@ -166,7 +168,7 @@ const canNext = computed(() => {
     case "create":
       return Boolean(repo.value) && (draft.value.created || installed.value);
     case "install":
-      return installed.value;
+      return installed.value || draft.value.accessSkipped;
     case "manifest":
       return draft.value.manifest;
     default:
@@ -184,6 +186,13 @@ const canGoTo = (i) => i <= firstToDo();
 const goTo = (i) => {
   if (canGoTo(i)) step.value = i;
 };
+const skipAccess = () => {
+  draft.value.accessSkipped = true;
+  step.value += 1;
+};
+// The access step was skipped and the app still isn't installed: the later
+// steps say so.
+const accessPending = computed(() => stepState("install").skipped);
 const back = () => {
   if (step.value > 0) step.value -= 1;
 };
@@ -244,7 +253,7 @@ const soFar = computed(() => {
     rows.push({ label: "Repository", value: repoName.value });
   }
   if (step.value >= 3 && repoName.value) {
-    rows.push({ label: "Access", value: installed.value ? "installed" : "not yet" });
+    rows.push({ label: "Access", value: installed.value ? "installed" : accessPending.value ? "skipped" : "not yet" });
   }
   if (step.value >= 4) {
     rows.push({ label: "app.yml", value: stepState("manifest").done ? "merged" : "not yet" });
@@ -383,10 +392,10 @@ const close = () => {
           v-for="(label, i) in stepLabels"
           :key="i"
           class="wizard-progress__step"
-          :class="{ active: step === i, done: stepState(STEPS[i]).done, reachable: canGoTo(i) }"
+          :class="{ active: step === i, done: stepState(STEPS[i]).done, skipped: stepState(STEPS[i]).skipped, reachable: canGoTo(i) }"
         >
           <button type="button" :disabled="!canGoTo(i)" :title="stepTitles[i]" @click="goTo(i)">
-            <span class="wizard-progress__mark">{{ stepState(STEPS[i]).done && step !== i ? "✓" : i + 1 }}</span>
+            <span class="wizard-progress__mark">{{ stepState(STEPS[i]).done && step !== i ? "✓" : stepState(STEPS[i]).skipped && step !== i ? "–" : i + 1 }}</span>
             <span class="wizard-progress__label">{{ label }}</span>
           </button>
         </li>
@@ -558,10 +567,23 @@ const close = () => {
             <p class="wizard-note" :class="{ 'is-ok': installed }">
               {{ installed ? "Pennsieve sees the repository." : "Waiting for the installation…" }}
             </p>
+            <div v-if="!installed" class="wizard-skip">
+              <p class="wizard-aside">
+                Want to build and test the app locally first? The template's README has <code>make</code> targets for
+                that. You can skip this step now and come back: the app only shows up on Pennsieve once the GitHub App
+                is installed.
+              </p>
+              <button type="button" class="wizard-link" @click="skipAccess">Skip for now</button>
+            </div>
           </div>
 
           <!-- 5. app.yml -->
           <div v-else-if="step === 4" class="wizard-step">
+            <p v-if="accessPending" class="wizard-note is-warning">
+              Pennsieve can't see this repository yet, so the app won't show up here and the pull request button is off.
+              Copy the app.yml and commit it yourself, and
+              <button type="button" class="wizard-link" @click="goTo(3)">install the GitHub App</button> when you're ready.
+            </p>
             <p class="wizard-step-desc">
               Open a pull request from here and merge it on GitHub, or copy the <code>app.yml</code> and commit it
               yourself. Then tick Merged.
@@ -584,6 +606,11 @@ const close = () => {
 
           <!-- 6. Release -->
           <div v-else class="wizard-step">
+            <p v-if="accessPending" class="wizard-note is-warning">
+              Pennsieve builds the release through the GitHub App, so nothing can be published yet.
+              <button type="button" class="wizard-link" @click="goTo(3)">Install the GitHub App</button> first; this
+              dialog remembers where you are.
+            </p>
             <p class="wizard-step-desc">Pick the first version, then publish the release.</p>
             <div class="wizard-row">
               <label class="wizard-field wizard-field--short">
@@ -703,6 +730,10 @@ const close = () => {
     border-color: theme.$green_1;
     background: theme.$green_1;
     color: theme.$white;
+  }
+  .skipped & {
+    border-color: #f59e0b;
+    color: #b45309;
   }
 }
 @media (max-width: 900px) {
@@ -906,8 +937,12 @@ const close = () => {
     background: theme.$teal_tint;
   }
 
-  &.is-error {
+  &.is-error,
+  &.is-warning {
     background: #fef3c7;
+  }
+  &.is-warning .wizard-link {
+    color: #92400e;
   }
 
   a {
@@ -928,6 +963,19 @@ const close = () => {
 }
 .wizard-footer-right {
   gap: 8px;
+}
+
+.wizard-skip {
+  margin-top: 14px;
+  padding-top: 10px;
+  border-top: 1px dashed theme.$gray_2;
+
+  .wizard-aside {
+    margin-bottom: 4px;
+  }
+  code {
+    font-size: 11px;
+  }
 }
 
 .wizard-link {
