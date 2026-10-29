@@ -43,7 +43,7 @@ describe("packageStateLabel", () => {
 describe("isPackageReady", () => {
   it("is true only for READY", () => {
     expect(isPackageReady({ content: { state: "READY" } })).toBe(true);
-    for (const s of ["UPLOADED", "ERROR", "PROCESSING", "UNAVAILABLE", ""]) {
+    for (const s of ["UPLOADED", "ERROR", "INFECTED", "PROCESSING", "UNAVAILABLE", ""]) {
       expect(isPackageReady({ content: { state: s } })).toBe(false);
     }
     expect(isPackageReady(undefined)).toBe(false);

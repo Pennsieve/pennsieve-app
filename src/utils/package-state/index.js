@@ -7,7 +7,9 @@
  *   UNAVAILABLE  the upload hasn't finished                 -> "Uploading"
  *   UPLOADED     uploaded, waiting for the scan verdict     -> "Scanning…"
  *   READY        cleared by the scan (or too big to scan)   -> no badge
- *   ERROR        quarantined (infected) or failed           -> "Quarantined" / "Failed"
+ *   INFECTED     the scan found a threat (quarantined)      -> "Quarantined"
+ *   ERROR        the scan failed for good                   -> "Failed"
+ *                (a legacy ERROR whose file is infected     -> "Quarantined")
  *
  * Only READY packages can be downloaded or opened in a viewer. Which viewer
  * opens depends on what data exists for the package (channels, a Zarr bundle,
@@ -25,8 +27,7 @@ export const PACKAGE_STATE = {
   UPLOADED: "UPLOADED",
   READY: "READY",
   ERROR: "ERROR",
-  // In pennsieve-api's PackageState but not set today; ERROR + an infected
-  // file is what the scanner writes. Read as quarantined either way.
+  // The malware scan found a threat: quarantined, never downloadable.
   INFECTED: "INFECTED",
   PROCESSING: "PROCESSING",
   RUNNING: "RUNNING",

@@ -253,7 +253,7 @@ describe('BfDownloadFile gating on READY', () => {
 
   it('holds back a file that is still being scanned, quarantined or failed', async () => {
     const emit = vi.spyOn(EventBus, '$emit')
-    for (const state of ['UPLOADED', 'ERROR', 'PROCESSING', 'UNAVAILABLE']) {
+    for (const state of ['UPLOADED', 'ERROR', 'INFECTED', 'PROCESSING', 'UNAVAILABLE']) {
       const cmp = await gate([withState(state)])
       expect(cmp.tryDirectDownload, state).not.toHaveBeenCalled()
     }

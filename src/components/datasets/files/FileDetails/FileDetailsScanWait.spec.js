@@ -135,3 +135,18 @@ describe('FileDetails once the scan verdict lands', () => {
     expect(getDisplayFileStatus.call(details('ERROR', 'failed'))).toBe('Failed')
   })
 })
+
+describe('FileDetails for a quarantined file', () => {
+  const { getDisplayFileStatus } = FileDetails.computed
+  const label = (state, scanStatus) =>
+    getDisplayFileStatus.call(component({
+      proxyRecord: { content: { id: 'N:package:1', state } },
+      packageSourceFiles: [source(scanStatus)],
+    }))
+
+  it('reads INFECTED as quarantined and a final scan failure as failed', () => {
+    expect(label('INFECTED', 'infected')).toBe('Quarantined')
+    expect(label('ERROR', 'failed')).toBe('Failed')
+    expect(label('ERROR', 'infected'), 'legacy ERROR with an infected file').toBe('Quarantined')
+  })
+})

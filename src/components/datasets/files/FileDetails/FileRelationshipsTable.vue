@@ -433,6 +433,7 @@ export default {
         const statusRows = {
           'Processing': 'processing-row',
           'Failed': 'failed-row',
+          'Quarantined': 'failed-row',
           'Scanning…': 'unprocessed-row',
           'Uploading': 'unprocessed-row'
         }
@@ -857,6 +858,7 @@ export default {
 
               const fileStates = {
                 'ERROR': 'Failed',
+                'INFECTED': 'Quarantined',
                 'UPLOADED': 'Scanning…',
                 'PROCESSING': 'Processing',
                 'UNAVAILABLE': 'Uploading',

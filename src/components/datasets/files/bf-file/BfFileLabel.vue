@@ -131,6 +131,14 @@
         </div>
       </template>
 
+      <!-- Quarantined: the malware scan found a threat in this file. -->
+      <div
+        v-if="isQuarantined && !isPlaceholder && !isUploadOverlay"
+        class="placeholder-meta"
+      >
+        <span class="status-label failed">Quarantined</span>
+      </div>
+
       <!-- Placeholder meta (new-upload rows only). Overlay rows put
            their status inline above; they skip this block. -->
       <div
@@ -340,6 +348,10 @@ export default {
     // Uploading, waiting for the malware scan, or (legacy) processing.
     isInFlight: function() {
       return isPackageInFlight(path(['content', 'state'], this.file))
+    },
+
+    isQuarantined: function() {
+      return path(['content', 'state'], this.file) === 'INFECTED'
     },
 
     stateLabel: function() {
