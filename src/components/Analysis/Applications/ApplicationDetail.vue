@@ -19,7 +19,7 @@ import { fetchReleaseStatus, releaseNudge } from "./release";
 import AppArchiveToggle from "../../user/code/AppArchiveToggle.vue";
 import { useGetToken } from "@/composables/useGetToken";
 import { useAppUsage } from "@/composables/useAppUsage";
-import { sizingHint, usageRows, usageSummary } from "./appUsage";
+import { usageSidebar } from "./appUsage";
 import { useSendXhr } from "@/mixins/request/request_composable";
 
 
@@ -190,10 +190,7 @@ const viewingOrgId = computed(() => store.state.activeOrganization?.organization
 
 // What the app used across runs, by version (workflow-service metrics/usage).
 const { usage: appUsage } = useAppUsage(computed(() => detail.value?.sourceUrl));
-const appUsageRows = computed(() => usageRows(appUsage.value));
-const appUsageHints = computed(() => (appUsage.value?.versions || []).map(sizingHint).filter(Boolean));
-const appUsageLead = computed(() => usageSummary(appUsage.value));
-const shortDate = (iso) => (iso ? new Date(iso).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" }) : "");
+const appUsageSide = computed(() => usageSidebar(appUsage.value));
 const accessList = computed(() =>
   accessEntries(
     permissions.value,
@@ -634,41 +631,6 @@ watch(
           </div>
         </div>
 
-        <!-- What the app used across runs, by version (workflow-service metrics/usage) -->
-        <div v-if="appUsage && appUsage.runs" class="usage-section">
-          <div class="usage-header">
-            <span class="usage-title">Usage across runs</span>
-          </div>
-          <div class="usage-body">
-            <p class="usage-lead">{{ appUsageLead }}</p>
-            <table class="usage-table">
-              <thead>
-                <tr>
-                  <th>Version</th>
-                  <th>Runs</th>
-                  <th>Memory given</th>
-                  <th>Memory used</th>
-                  <th>CPU given</th>
-                  <th>CPU used</th>
-                  <th>Duration</th>
-                  <th>Last run</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="row in appUsageRows" :key="row.version">
-                  <td class="usage-version">{{ row.version }}</td>
-                  <td>{{ row.runs }}<span v-if="row.failed" class="usage-failed" :title="`${row.failed} failed`"> ({{ row.failed }} failed)</span></td>
-                  <td>{{ row.memoryGiven || "—" }}</td>
-                  <td :title="row.memoryUsed ? `median · 95th percentile of ${row.memorySamples} sampled steps` : 'no step ran long enough to be sampled'">{{ row.memoryUsed || "—" }}</td>
-                  <td>{{ row.cpuGiven || "—" }}</td>
-                  <td>{{ row.cpuUsed || "—" }}</td>
-                  <td>{{ row.duration || "—" }}</td>
-                  <td>{{ shortDate(row.lastRunAt) }}</td>
-                </tr>
-              </tbody>
-            </table>
-            <p v-for="hint in appUsageHints" :key="hint" class="usage-hint">{{ hint }}</p>
-          </div>
         </div>
 
         <!-- README Section -->
@@ -1099,6 +1061,17 @@ watch(
                     <span class="manifest-summary-label">Resources</span>
                     <span class="manifest-summary-value">{{ manifestSummary.compute }}</span>
                   </div>
+                  <!-- What the app used across runs (workflow-service metrics/usage): the
+                       version run last, against the resources above. -->
+                  <div v-if="appUsageSide" class="manifest-summary-row" :title="appUsageSide.title">
+                    <span class="manifest-summary-label">Peak memory</span>
+                    <span class="manifest-summary-value">{{ appUsageSide.memory }}</span>
+                  </div>
+                  <div v-if="appUsageSide && appUsageSide.cpu" class="manifest-summary-row" :title="appUsageSide.title">
+                    <span class="manifest-summary-label">Peak CPU</span>
+                    <span class="manifest-summary-value">{{ appUsageSide.cpu }}</span>
+                  </div>
+                  <p v-if="appUsageSide && appUsageSide.hint" class="manifest-summary-hint">{{ appUsageSide.hint }}</p>
                   <div class="manifest-summary-row">
                     <span class="manifest-summary-label">Parameters</span>
                     <span class="manifest-summary-value">{{ manifestSummary.parameters }}</span>
@@ -1742,72 +1715,11 @@ watch(
   color: theme.$gray_5;
 }
 
-.usage-section {
-  margin-bottom: 16px;
-  background: theme.$white;
-  border: 1px solid theme.$gray_3;
-  border-radius: 4px;
-}
-
-.usage-header {
-  padding: 8px 12px;
-  border-bottom: 1px solid theme.$gray_3;
-}
-
-.usage-title {
-  font-weight: 600;
-  font-size: 13px;
-  color: theme.$black;
-}
-
-.usage-body {
-  padding: 12px;
-}
-
-.usage-lead {
-  margin: 0 0 10px;
-  font-size: 13px;
-  line-height: 1.5;
+.manifest-summary-hint {
+  margin: 6px 0 0;
+  font-size: 11px;
+  line-height: 1.4;
   color: theme.$gray_5;
-}
-
-.usage-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 12px;
-  color: theme.$black;
-
-  th,
-  td {
-    padding: 5px 8px;
-    text-align: left;
-    white-space: nowrap;
-    border-bottom: 1px solid theme.$gray_2;
-  }
-
-  th {
-    font-size: 11px;
-    font-weight: 600;
-    color: theme.$gray_5;
-  }
-
-  .usage-version {
-    font-weight: 600;
-  }
-
-  .usage-failed {
-    color: theme.$gray_4;
-  }
-}
-
-.usage-hint {
-  margin: 10px 0 0;
-  padding: 8px 10px;
-  border-radius: 4px;
-  background: theme.$teal_tint;
-  font-size: 12px;
-  line-height: 1.5;
-  color: theme.$black;
 }
 
 .manifest-chips {

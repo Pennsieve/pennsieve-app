@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { sizingHint, usageRows, usageSummary } from "./appUsage";
+import { sizingHint, usageRows, usageSidebar, usageSummary } from "./appUsage";
 
 const v = {
   version: "v0.1.0", runs: 11, steps: 12, succeeded: 11, failed: 1, lastRunAt: "2026-10-28T22:04:41Z",
@@ -44,5 +44,17 @@ describe("usageSummary", () => {
     expect(usageSummary({ runs: 11, steps: 12 })).toMatch(/^Across 11 runs \(12 steps\)/);
     expect(usageSummary({ runs: 1, steps: 1 })).toMatch(/^Across 1 run:/);
     expect(usageSummary({ runs: 0 })).toBe("");
+  });
+});
+
+describe("usageSidebar", () => {
+  it("gives the side panel the version run last, and nothing without a sampled step", () => {
+    const side = usageSidebar({ versions: [v] });
+    expect(side.memory).toBe("3,835 MiB · 4,900 MiB");
+    expect(side.cpu).toBe("1.9 vCPU · 2.0 vCPU");
+    expect(side.title).toMatch(/over v0.1.0, 11 runs/);
+    expect(side.hint).toMatch(/7,168 MiB would do/);
+    expect(usageSidebar({ versions: [{ version: "v2", runs: 1, memoryUsedMiB: { samples: 0 }, cpuUsedUnits: { samples: 0 } }] })).toBeNull();
+    expect(usageSidebar(null)).toBeNull();
   });
 });

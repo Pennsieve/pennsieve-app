@@ -62,3 +62,23 @@ export const usageSummary = (usage) => {
   const steps = usage.steps !== usage.runs ? ` (${usage.steps} steps)` : "";
   return `Across ${usage.runs} run${usage.runs === 1 ? "" : "s"}${steps}: what this app was given and what it used, the median and the 95th percentile of each step's peak. Usage depends on the inputs.`;
 };
+
+// usageSidebar is the side panel's two lines, for the version run last:
+// the median and 95th percentile of the steps' peak memory and cpu, with
+// the runs they rest on, plus the sizing hint when there is one. Null
+// without a sampled step.
+export const usageSidebar = (usage) => {
+  const v = usage?.versions?.[0];
+  if (!v) return null;
+  const mem = v.memoryUsedMiB;
+  const cpu = v.cpuUsedUnits;
+  if (!mem?.samples && !cpu?.samples) return null;
+  const runs = `${v.runs} run${v.runs === 1 ? "" : "s"}`;
+  const version = v.version ? `${v.version}, ` : "";
+  return {
+    memory: mem?.samples ? `${MiB(mem.p50)} · ${MiB(mem.p95)}` : "—",
+    cpu: cpu?.samples ? `${vcpu(cpu.p50)} · ${vcpu(cpu.p95)}` : "",
+    title: `Median · 95th percentile of each step's peak, over ${version}${runs}. Usage depends on the inputs.`,
+    hint: sizingHint(v),
+  };
+};
