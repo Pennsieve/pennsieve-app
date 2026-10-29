@@ -48,10 +48,11 @@ describe("input ports", () => {
     expect(edgeId("a", "b", "out:summary", "in:events")).not.toBe(edgeId("a", "b", "out:copies", "in:signals"));
   });
 
-  it("lets two outputs feed two inputs, each input once", () => {
+  it("lets two outputs feed two inputs, and several links feed one input", () => {
     const edges = [edge("a", "b", "out:copies", "in:signals")];
     expect(linkAllowed(a, b, "out:summary", "in:events", edges).ok).toBe(true);
-    expect(linkAllowed(a, b, "out:summary", "in:signals", edges).reason).toBe("input-taken");
+    expect(linkAllowed(a, b, "out:summary", "in:signals", edges).ok).toBe(true);
+    expect(linkAllowed(app("c"), b, "out:copies", "in:signals", edges).ok).toBe(true);
     expect(linkAllowed(a, b, "out:copies", "in:signals", []).ok).toBe(true);
     expect(linkAllowed(a, b, "out:copies", "in:nope", []).reason).toBe("unknown-input");
     // An output port goes to an input, not to "all inputs".

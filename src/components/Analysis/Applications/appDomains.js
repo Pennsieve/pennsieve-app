@@ -57,7 +57,7 @@ export const DOMAINS = [
     // Magenta: the widest gap between the subjects' strong hues (indigo
     // 245, crimson 340); the tasks near it (280, 315) are muted.
     hue: 300,
-    aliases: ["flow-cytometry", "flow", "spectral-flow", "spectral-cytometry", "mass-cytometry", "cytof", "fcs", "immunophenotyping"],
+    aliases: ["flow-cytometry", "spectral-flow", "spectral-cytometry", "mass-cytometry", "cytof", "fcs", "immunophenotyping"],
     // Three cells, each with a nucleus.
     icon: "M4 9a4 4 0 1 0 8 0a4 4 0 1 0-8 0M8 9h.01M13 16a3 3 0 1 0 6 0a3 3 0 1 0-6 0M16 16h.01M4 18a2 2 0 1 0 4 0a2 2 0 1 0-4 0M18 5h.01",
   },

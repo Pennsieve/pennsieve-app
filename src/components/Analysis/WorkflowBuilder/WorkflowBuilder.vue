@@ -1235,7 +1235,6 @@ const addNode = (type, app, position) => {
 // Connects two steps, with the same checks and feedback as dragging a
 // connection between them.
 const LINK_REFUSED = {
-  "input-taken": (input) => `The ${input} input already has a link. Remove it first.`,
   "unknown-input": (input) => `This step has no ${input} input.`,
   "port-to-all": () => "Connect an output to one of the step's inputs.",
   mixed: () => "These steps are already linked the other way: link them all to inputs, or all to the step's top point.",
