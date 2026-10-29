@@ -232,3 +232,40 @@ describe('BfDownloadFile over the limit', () => {
     expect(disableDownload.call({ tooLargeForZip: true, downloadSize: 1, config: { maxDownloadSize: 15e9 }, sizeTarget: [pkg] })).toBe(true)
   })
 })
+
+describe('BfDownloadFile gating on READY', () => {
+  const { triggerDownload } = BfDownloadFile.methods
+  const withState = (state, packageType = 'CSV') => ({ content: { ...pkg.content, state, packageType } })
+
+  function gate(packageDTOs) {
+    const cmp = {
+      packageDTOs: [],
+      shouldConfirmDownload: false,
+      $nextTick: () => Promise.resolve(),
+      tryDirectDownload: vi.fn(() => Promise.resolve(true)),
+      downloadPackages: vi.fn(),
+      closeDialog: vi.fn(),
+    }
+    return triggerDownload.call(cmp, packageDTOs).then(() => cmp)
+  }
+
+  beforeEach(() => vi.clearAllMocks())
+
+  it('holds back a file that is still being scanned, quarantined or failed', async () => {
+    const emit = vi.spyOn(EventBus, '$emit')
+    for (const state of ['UPLOADED', 'ERROR', 'PROCESSING', 'UNAVAILABLE']) {
+      const cmp = await gate([withState(state)])
+      expect(cmp.tryDirectDownload, state).not.toHaveBeenCalled()
+    }
+    expect(emit).toHaveBeenCalledWith('toast', {
+      detail: { type: 'info', msg: "The selected file(s) aren't available for download yet." },
+    })
+  })
+
+  it('downloads READY files and folders', async () => {
+    const ready = await gate([withState('READY')])
+    expect(ready.tryDirectDownload).toHaveBeenCalled()
+    const folder = await gate([withState('READY', 'Collection'), withState('UPLOADED')])
+    expect(folder.packageDTOs).toHaveLength(1)
+  })
+})

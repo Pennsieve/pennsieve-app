@@ -9,27 +9,8 @@
         class="illustration"
       />
 
-      <h2>No preview available</h2>
-
-      <!--      <p-->
-      <!--        v-if="!failed"-->
-      <!--        class="copy"-->
-      <!--      >-->
-      <!--        This package has failed to process.-->
-      <!--      </p>-->
-      <!--      <p-->
-      <!--        v-else-->
-      <!--        class="copy"-->
-      <!--      >-->
-      <!--        This package type is not supported.-->
-      <!--      </p>-->
-
-      <!--      <bf-button-->
-      <!--        class="primary"-->
-      <!--        @click="downloadFile"-->
-      <!--      >-->
-      <!--        Download File-->
-      <!--      </bf-button>-->
+      <h2>{{ heading }}</h2>
+      <p class="copy">{{ copy }}</p>
     </div>
   </div>
 </template>
@@ -59,6 +40,34 @@ export default {
      */
     failed: function () {
       return pathEq(["content", "state"], "ERROR", this.pkg);
+    },
+
+    /**
+     * True while the file waits for its malware scan (UPLOADED)
+     * @returns {Boolean}
+     */
+    scanning: function () {
+      return pathEq(["content", "state"], "UPLOADED", this.pkg);
+    },
+
+    heading: function () {
+      if (this.scanning) {
+        return "Scanning for malware";
+      }
+      if (this.failed) {
+        return "Not available";
+      }
+      return "No preview available";
+    },
+
+    copy: function () {
+      if (this.scanning) {
+        return "This file can be viewed and downloaded once the scan finishes.";
+      }
+      if (this.failed) {
+        return "This file can't be viewed or downloaded.";
+      }
+      return "There is no viewer for this file. Download it to open it.";
     },
   },
 

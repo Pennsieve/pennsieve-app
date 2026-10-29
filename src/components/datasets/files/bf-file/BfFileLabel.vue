@@ -51,8 +51,9 @@
     </div>
 
     <div
-      v-else-if="!isPlaceholder && !isUploadOverlay && (fileState === 'processing' || fileState === 'uploading')"
+      v-else-if="!isPlaceholder && !isUploadOverlay && isInFlight"
       class="icon-waiting mr-16"
+      :title="stateLabel"
     >
       <bf-waiting-icon />
     </div>
@@ -169,7 +170,8 @@ import FileIcon from '../../../../mixins/file-icon/index'
 import GetFileProperty from '../../../../mixins/get-file-property'
 import FileTypeMapper from '../../../../mixins/FileTypeMapper'
 import { packageDisplayName } from '../../../../utils/packages'
-import { useTimeseriesZarrAssets } from '@/composables/useTimeseriesZarrAssets'
+import { usePackageViewerData, viewerNeedsData } from '@/composables/usePackageViewerData'
+import { isPackageInFlight, isPackageReady, packageStateLabel, packageStatus } from '@/utils/package-state'
 
 import validUrl from 'valid-url'
 import IconEyeball from "../../../icons/IconEyeball.vue";
@@ -222,22 +224,25 @@ export default {
   },
 
   setup() {
-    const { hasTimeseriesZarrAsset, probeTimeseriesZarrAsset } =
-      useTimeseriesZarrAssets()
-    return { hasTimeseriesZarrAsset, probeTimeseriesZarrAsset }
+    const { hasViewerData, probeViewerData } = usePackageViewerData()
+    return { hasViewerData, probeViewerData }
   },
 
   watch: {
-    // A timeseries package that never ran the legacy pipeline can still be
-    // viewable via its Zarr bundle. Only rows the state check would hide ask,
-    // and the composable caches the answer per package.
-    needsZarrProbe: {
+    // A timeseries or slide viewer needs derived data (channels, a Zarr
+    // bundle, slide tiles) that may not exist. Only READY rows of those types
+    // ask, and the composable caches the answer per package.
+    needsViewerDataProbe: {
       immediate: true,
       handler: function(needed) {
         if (!needed) {
           return
         }
-        this.probeTimeseriesZarrAsset(this.fileDatasetId, this.filePackageId)
+        this.probeViewerData({
+          datasetId: this.fileDatasetId,
+          packageId: this.filePackageId,
+          packageType: this.packageType
+        })
       }
     },
 
@@ -276,6 +281,11 @@ export default {
      * @returns {Boolean}
      */
     packageHasViewer: function() {
+      // Only a package the malware scan has cleared can be opened.
+      if (!isPackageReady(this.file)) {
+        return false
+      }
+
       const packageType = pathOr('', ['content', 'packageType'], this.file)
 
       let hasViewer = isNil(this.typeMapper[packageType]) === false
@@ -290,14 +300,10 @@ export default {
         hasViewer = true
       }
       
-      const isTimeseriesFile = packageType.toLowerCase() === 'timeseries'
-      if (isTimeseriesFile && this.isFileUnprocessed(this.file)) {
-        // A ready Zarr bundle makes the package viewable even though the legacy
-        // pipeline never ran — but only out of the resting UPLOADED state; one
-        // that is still uploading or mid-pipeline has nothing to read yet.
-        hasViewer =
-          this.isUnprocessedTimeseriesPackage &&
-          this.hasTimeseriesZarrAsset(this.filePackageId)
+      // Timeseries and slides open only when their derived data exists
+      // (channels or a Zarr bundle; slide tiles). Otherwise: download only.
+      if (viewerNeedsData(packageType)) {
+        hasViewer = this.hasViewerData(this.filePackageId)
       }
 
       return hasViewer
@@ -319,26 +325,25 @@ export default {
       )
     },
 
-    // The legacy resting state — an upload that no processing pipeline ever
-    // touched. The transient states (uploading, processing, failed) stay hidden.
-    isUnprocessedTimeseriesPackage: function() {
-      const packageType = pathOr('', ['content', 'packageType'], this.file)
+    needsViewerDataProbe: function() {
       return (
-        packageType.toLowerCase() === 'timeseries' &&
-        this.fileState === 'unprocessed'
-      )
-    },
-
-    needsZarrProbe: function() {
-      return (
-        this.isUnprocessedTimeseriesPackage &&
-        Boolean(this.fileDatasetId) &&
+        isPackageReady(this.file) &&
+        viewerNeedsData(this.packageType) &&
         Boolean(this.filePackageId)
       )
     },
 
     fileState: function() {
       return this.getFileState(this.file)
+    },
+
+    // Uploading, waiting for the malware scan, or (legacy) processing.
+    isInFlight: function() {
+      return isPackageInFlight(path(['content', 'state'], this.file))
+    },
+
+    stateLabel: function() {
+      return packageStateLabel(path(['content', 'state'], this.file))
     },
 
     // Client-side placeholder flags (see uploadModule
@@ -462,56 +467,21 @@ export default {
       this.$emit('rename-cancel');
     },
 
-    isFileUnprocessed: function (file) {
-      const fileState = this.getFileState(file)
-      if (fileState !== 'processed') {
-        return true;
-      } else {
-        return false;
-      }
+    isCollectionReady: function (collection) {
+      return this.getCollectionState(collection) === 'ready'
     },
 
-    isCollectionProcessed: function (collection) {
-      const collectionState = this.getCollectionState(collection)
-      if (collectionState === 'processed') {
-        return true;
-      } else {
-        return false;
-      }
-    },
-
+    /**
+     * Status key for a package: uploading | importing | scanning |
+     * processing (legacy) | ready | failed, or '' for anything else.
+     * READY means the malware scan cleared the file.
+     */
     getFileState: function(file) {
-      const states = {
-        'UPLOADED': 'unprocessed',
-        'PROCESSING': 'processing',
-        'RUNNING': 'processing',
-        'UNAVAILABLE': 'uploading',
-        'PENDING': 'processing',
-        'ERROR': 'failed',
-        'READY': 'processed',
-        // Client-side placeholder states (see uploadModule
-        // getPlaceholdersForFolder).
-        'UPLOADING': 'uploading',
-        'IMPORTING': 'importing',
-      }
-      const fileState = path(['content', 'state'], file)
-      return states[fileState] ? states[fileState] : ''
+      return packageStatus(path(['content', 'state'], file))
     },
 
     getCollectionState: function(collection) {
-      const states = {
-        'UPLOADED': 'unprocessed',
-        'PROCESSING': 'processing',
-        'RUNNING': 'processing',
-        'UNAVAILABLE': 'uploading',
-        'PENDING': 'processing',
-        'ERROR': 'failed',
-        'READY': 'processed',
-        'UPLOADING': 'uploading',
-        'IMPORTING': 'importing',
-      }
-      const collectionState = path(['content', 'state'], collection)
-      return states[collectionState] ? states[collectionState] : ''
+      return packageStatus(path(['content', 'state'], collection))
     },
 
     isTimeseriesCollectionProcessed: function(datasetPackage) {
@@ -529,7 +499,7 @@ export default {
         
         const isTimeseriesCollection = collectionSubtype.toLowerCase() === 'pennsieve_timeseries';
       if (isTimeseriesCollection) {
-        isCollectionProcessed = this.isCollectionProcessed(this.file);
+        isCollectionProcessed = this.isCollectionReady(this.file);
       }
 
       return isCollectionProcessed;
