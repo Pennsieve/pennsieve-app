@@ -3,14 +3,15 @@
 // out like the notebook dialog: what the step is for and what's chosen so
 // far on the left, the step on the right.
 //
-//   1. Describe the app: name, what it does, where it may run, its size,
-//      its inputs and outputs. The dialog writes app.yml from it.
-//   2. Create the repository on GitHub, from Pennsieve's template, on
+//   1. Describe the app: name, what it does, tags (the gallery's domains).
+//   2. How it runs: where it may run, its size, its inputs and outputs.
+//      The dialog writes app.yml from these two.
+//   3. Create the repository on GitHub, from Pennsieve's template, on
 //      GitHub's own page prefilled (the author keeps their repository).
-//   3. Install the Pennsieve GitHub App on it. The dialog polls the
+//   4. Install the Pennsieve GitHub App on it. The dialog polls the
 //      repository and ticks the step when the app sees it.
-//   4. Add app.yml: a pull request from here, or a copy to commit.
-//   5. Publish: the first release. The app is in the gallery when its
+//   5. Add app.yml: a pull request from here, or a copy to commit.
+//   6. Publish: the first release. The app is in the gallery when its
 //      image is built.
 //
 // The draft is kept in this browser, so closing and coming back resumes.
@@ -24,6 +25,7 @@ import { fetchRepository } from "./githubRepository";
 import { openAppYmlPullRequest } from "./pullRequest";
 import { fetchReleaseStatus, publishRelease } from "./release";
 import { STANDARD_CPU_OPTIONS, getStandardMemoryOptions } from "../RunMonitor/runHelpers";
+import { canonicalTag, domainColors, domainOfTag, hasDomainTag, preferredTagGroups, tagDomainNudge, tagOptionMatches } from "./appDomains";
 import {
   COMPUTE_CHOICES,
   STEPS,
@@ -63,6 +65,27 @@ watch(
 );
 const ownerPrefilled = () => {
   if (!draft.value.owner) draft.value.owner = store.state.gitHubProfile?.login || "";
+};
+
+// Tags: the gallery's domain tags first (they colour the app's card), then
+// the spellings people use, or a typed one. The draft keeps them as text.
+const tagList = computed({
+  get: () => String(draft.value.tags || "").split(/[,\s]+/).map((t) => t.trim()).filter(Boolean),
+  set: (tags) => {
+    draft.value.tags = [...new Set((tags || []).map(canonicalTag).filter(Boolean))].join(", ");
+  },
+});
+const removeTag = (tag) => (tagList.value = tagList.value.filter((t) => t !== tag));
+const tagQuery = ref("");
+const tagGroups = preferredTagGroups();
+const preferredOptions = computed(() => tagGroups.preferred.filter((o) => tagOptionMatches(o, tagQuery.value, { preferred: true })));
+const aliasOptions = computed(() => tagGroups.aliases.filter((o) => tagOptionMatches(o, tagQuery.value)));
+const tagNudge = computed(() => tagDomainNudge(tagList.value));
+const tagChipStyle = (tag) => {
+  const d = domainOfTag(tag);
+  if (!d) return {};
+  const c = domainColors(d);
+  return { "--el-tag-bg-color": c.bg, "--el-tag-border-color": c.line, "--el-tag-text-color": c.ink };
 };
 
 const memoryOptions = computed(() => getStandardMemoryOptions(draft.value.cpu));
@@ -116,9 +139,12 @@ const stopPolling = () => {
 // The steps: their state from the draft and the services, and the one shown.
 const steps = computed(() => stepsFor(draft.value, { installed: installed.value, released: released.value }));
 const stepState = (key) => steps.value.find((s) => s.key === key) || {};
-const stepTitles = ["Describe the app", "Create the repository", "Give Pennsieve access", "Add the app.yml", "Release it"];
+const stepTitles = ["Describe the app", "How it runs", "Create the repository", "Give Pennsieve access", "Add the app.yml", "Release it"];
+// The progress bar's short names.
+const stepLabels = ["Describe", "Runtime", "Repository", "Access", "app.yml", "Release"];
 const stepAbouts = [
-  "An app is a GitHub repository with an app.yml. Describe the app here; the dialog writes the app.yml for you, and the next steps put it on GitHub and release it.",
+  "An app is a GitHub repository with an app.yml. These six steps write the app.yml for you, put it on GitHub and release it. Start with what people see in the gallery.",
+  "Where the app may run and what it needs. The defaults suit most steps; you can change them in the app.yml later.",
   "GitHub creates the repository from Pennsieve's template: a working step with a place for your code, runnable as every compute type. You keep the repository.",
   "Pennsieve reads the repository and builds its releases through the Pennsieve GitHub App. Install it on the repository, or add the repository to an installation you have.",
   "The template ships a placeholder app.yml. Replace it with the one written here: a pull request from this dialog, merged on GitHub, or a copy you commit yourself.",
@@ -135,6 +161,8 @@ const canNext = computed(() => {
   switch (STEPS[step.value]) {
     case "describe":
       return describeOk.value;
+    case "runs":
+      return true;
     case "create":
       return Boolean(repo.value) && (draft.value.created || installed.value);
     case "install":
@@ -146,7 +174,15 @@ const canNext = computed(() => {
   }
 });
 const next = () => {
-  if (step.value < STEPS.length - 1 && canNext.value) step.value += 1;
+  if (step.value >= STEPS.length - 1 || !canNext.value) return;
+  if (STEPS[step.value] === "runs") draft.value.runs = true;
+  step.value += 1;
+};
+// A step the author may jump to from the progress bar: one done, or the
+// first still to do.
+const canGoTo = (i) => i <= firstToDo();
+const goTo = (i) => {
+  if (canGoTo(i)) step.value = i;
 };
 const back = () => {
   if (step.value > 0) step.value -= 1;
@@ -198,19 +234,22 @@ const soFar = computed(() => {
   const rows = [];
   if (describeOk.value) {
     rows.push({ label: "Name", value: draft.value.name.trim() });
+    if (tagList.value.length) rows.push({ label: "Tags", value: tagList.value.join(", ") });
+  }
+  if (step.value >= 1) {
     rows.push({ label: "Runs as", value: runsAs.value });
     rows.push({ label: "Size", value: sizeLabel.value });
   }
-  if (step.value >= 1 && repoName.value) {
+  if (step.value >= 2 && repoName.value) {
     rows.push({ label: "Repository", value: repoName.value });
   }
-  if (step.value >= 2 && repoName.value) {
+  if (step.value >= 3 && repoName.value) {
     rows.push({ label: "Access", value: installed.value ? "installed" : "not yet" });
   }
-  if (step.value >= 3) {
+  if (step.value >= 4) {
     rows.push({ label: "app.yml", value: stepState("manifest").done ? "merged" : "not yet" });
   }
-  if (step.value >= 4) {
+  if (step.value >= 5) {
     rows.push({ label: "Release", value: released.value ? draft.value.releaseTag || "released" : "not yet" });
   }
   return rows;
@@ -339,15 +378,19 @@ const close = () => {
     :close-on-click-modal="false"
   >
     <div class="wizard-body">
-      <div class="wizard-progress">
-        <span
-          v-for="(title, i) in stepTitles"
+      <ol class="wizard-progress">
+        <li
+          v-for="(label, i) in stepLabels"
           :key="i"
-          class="wizard-dot"
-          :class="{ active: step === i, done: stepState(STEPS[i]).done }"
-          :title="title"
-        />
-      </div>
+          class="wizard-progress__step"
+          :class="{ active: step === i, done: stepState(STEPS[i]).done, reachable: canGoTo(i) }"
+        >
+          <button type="button" :disabled="!canGoTo(i)" :title="stepTitles[i]" @click="goTo(i)">
+            <span class="wizard-progress__mark">{{ stepState(STEPS[i]).done && step !== i ? "✓" : i + 1 }}</span>
+            <span class="wizard-progress__label">{{ label }}</span>
+          </button>
+        </li>
+      </ol>
 
       <div class="nb-layout">
         <aside class="nb-info">
@@ -373,10 +416,62 @@ const close = () => {
               <span>What it does</span>
               <el-input v-model="draft.description" type="textarea" :rows="2" placeholder="One or two sentences, shown in the gallery." maxlength="350" />
             </label>
-            <label class="wizard-field">
+            <div class="wizard-field">
               <span>Tags</span>
-              <el-input v-model="draft.tags" placeholder="ephys, sorting" />
-            </label>
+              <el-select
+                v-model="tagList"
+                multiple
+                filterable
+                allow-create
+                default-first-option
+                :reserve-keyword="false"
+                :filter-method="(q) => (tagQuery = q)"
+                placeholder="Pick a domain tag, or type your own"
+                popper-class="tag-options"
+                @visible-change="(open) => open || (tagQuery = '')"
+              >
+                <template #tag>
+                  <el-tag
+                    v-for="t in tagList"
+                    :key="t"
+                    closable
+                    disable-transitions
+                    class="domain-tag-chip"
+                    :style="tagChipStyle(t)"
+                    @close="removeTag(t)"
+                  >{{ t }}</el-tag>
+                </template>
+                <el-option-group v-if="preferredOptions.length" label="Domains">
+                  <el-option v-for="o in preferredOptions" :key="o.tag" :label="o.tag" :value="o.tag">
+                    <span class="tag-option">
+                      <span class="tag-dot" :style="{ background: domainColors(o.domain).accent }" />
+                      <svg class="tag-icon" viewBox="0 0 24 24" aria-hidden="true"><path :d="o.domain.icon" /></svg>
+                      <span class="tag-name">{{ o.tag }}</span>
+                      <span class="tag-meta">{{ o.domain.label }}</span>
+                    </span>
+                  </el-option>
+                </el-option-group>
+                <el-option-group v-if="aliasOptions.length" label="Also recognised">
+                  <el-option v-for="o in aliasOptions" :key="o.tag" :label="o.tag" :value="o.tag">
+                    <span class="tag-option tag-option--alias">
+                      <span class="tag-name">{{ o.tag }}</span>
+                      <span class="tag-meta">→ {{ o.domain.label }}</span>
+                    </span>
+                  </el-option>
+                </el-option-group>
+              </el-select>
+              <small v-if="tagNudge">
+                Also add <strong>{{ tagNudge.tag }}</strong>, the domain's own tag?
+                <button type="button" class="wizard-link" @click="tagList = [...tagList, tagNudge.tag]">Add</button>
+              </small>
+              <small v-else-if="!hasDomainTag(tagList)">
+                A domain tag colours the app's card and puts it under that filter in the gallery.
+              </small>
+            </div>
+          </div>
+
+          <!-- 2. How it runs -->
+          <div v-else-if="step === 1" class="wizard-step">
             <div class="wizard-field">
               <span>Runs</span>
               <div class="wizard-choices">
@@ -422,8 +517,8 @@ const close = () => {
             </details>
           </div>
 
-          <!-- 2. Create the repository -->
-          <div v-else-if="step === 1" class="wizard-step">
+          <!-- 3. Create the repository -->
+          <div v-else-if="step === 2" class="wizard-step">
             <p class="wizard-step-desc">Create it on GitHub, then come back here and tick Done.</p>
             <div class="wizard-row">
               <label class="wizard-field">
@@ -442,8 +537,8 @@ const close = () => {
             <p class="wizard-aside">Have a repository already? Enter it above and tick Done.</p>
           </div>
 
-          <!-- 3. Install the GitHub App -->
-          <div v-else-if="step === 2" class="wizard-step">
+          <!-- 4. Install the GitHub App -->
+          <div v-else-if="step === 3" class="wizard-step">
             <p class="wizard-step-desc">
               Install the Pennsieve GitHub App on
               <a v-if="repo" :href="repoUrl(draft)" target="_blank" rel="noopener">{{ repoName }}</a><span v-else>the repository</span>.
@@ -458,8 +553,8 @@ const close = () => {
             </p>
           </div>
 
-          <!-- 4. app.yml -->
-          <div v-else-if="step === 3" class="wizard-step">
+          <!-- 5. app.yml -->
+          <div v-else-if="step === 4" class="wizard-step">
             <p class="wizard-step-desc">
               Open a pull request from here and merge it on GitHub, or copy the <code>app.yml</code> and commit it
               yourself. Then tick Merged.
@@ -480,7 +575,7 @@ const close = () => {
             </details>
           </div>
 
-          <!-- 5. Release -->
+          <!-- 6. Release -->
           <div v-else class="wizard-step">
             <p class="wizard-step-desc">Pick the first version, then publish the release.</p>
             <div class="wizard-row">
@@ -532,23 +627,87 @@ const close = () => {
   min-height: 300px;
 }
 
+/* The progress bar: each step named, done ones ticked and reachable. */
 .wizard-progress {
   display: flex;
-  gap: 8px;
   justify-content: center;
-  margin-bottom: 20px;
+  gap: 4px;
+  list-style: none;
+  margin: 0 0 20px;
+  padding: 0;
 }
-.wizard-dot {
-  width: 8px;
-  height: 8px;
+.wizard-progress__step {
+  display: flex;
+  align-items: center;
+
+  button {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 8px;
+    border: none;
+    border-radius: 14px;
+    background: none;
+    font: inherit;
+    font-size: 12px;
+    color: theme.$gray_4;
+    cursor: default;
+  }
+  &.reachable button {
+    cursor: pointer;
+  }
+  &.reachable button:hover {
+    background: theme.$gray_1;
+  }
+  &.active button {
+    color: theme.$black;
+    font-weight: 600;
+  }
+  &.done button {
+    color: theme.$gray_5;
+  }
+  /* The line between steps */
+  & + &::before {
+    content: "";
+    width: 16px;
+    height: 1px;
+    margin-right: 4px;
+    background: theme.$gray_2;
+  }
+}
+.wizard-progress__mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
   border-radius: 50%;
-  background: theme.$gray_2;
+  border: 1px solid theme.$gray_3;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
+
+  .active & {
+    border-color: theme.$purple_1;
+    background: theme.$purple_1;
+    color: theme.$white;
+  }
+  .done & {
+    border-color: theme.$green_1;
+    background: theme.$green_1;
+    color: theme.$white;
+  }
 }
-.wizard-dot.active {
-  background: theme.$purple_1;
+@media (max-width: 900px) {
+  .wizard-progress__label {
+    display: none;
+  }
 }
-.wizard-dot.done {
-  background: theme.$green_1;
+
+.domain-tag-chip {
+  margin: 2px 4px 2px 0;
+  border-radius: 3px;
+  font-size: 12px;
 }
 
 .nb-layout {
@@ -750,5 +909,47 @@ const close = () => {
   color: theme.$gray_4;
   cursor: pointer;
   text-decoration: underline;
+}
+</style>
+
+<style lang="scss">
+@use "../../../styles/theme";
+
+/* The tag dropdown is teleported, so its option styles can't be scoped. */
+.tag-options {
+  .tag-option {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+  }
+  .tag-dot {
+    width: 8px;
+    height: 8px;
+    flex-shrink: 0;
+    border-radius: 50%;
+  }
+  .tag-icon {
+    width: 14px;
+    height: 14px;
+    flex-shrink: 0;
+    fill: none;
+    stroke: theme.$gray_5;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+  .tag-name {
+    color: theme.$gray_6;
+  }
+  .tag-meta {
+    margin-left: auto;
+    padding-left: 12px;
+    font-size: 12px;
+    color: theme.$gray_4;
+  }
+  .tag-option--alias .tag-name {
+    color: theme.$gray_5;
+  }
 }
 </style>

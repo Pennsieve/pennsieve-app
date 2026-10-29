@@ -46,19 +46,22 @@ describe("stepsFor", () => {
     expect(s.describe.current).toBe(true);
     s = byKey(stepsFor({ ...newDraft(), name: "x" }));
     expect(s.describe.done).toBe(true);
+    expect(s.runs.current).toBe(true);
+    s = byKey(stepsFor({ ...newDraft(), name: "x", runs: true }));
+    expect(s.runs.done).toBe(true);
     expect(s.create.current).toBe(true);
-    s = byKey(stepsFor({ ...newDraft(), name: "x" }, { installed: true }));
+    s = byKey(stepsFor({ ...newDraft(), name: "x", runs: true }, { installed: true }));
     expect(s.create.done).toBe(true);
     expect(s.install.done).toBe(true);
     expect(s.manifest.current).toBe(true);
-    s = byKey(stepsFor({ ...newDraft(), name: "x", manifest: true }, { installed: true }));
+    s = byKey(stepsFor({ ...newDraft(), name: "x", runs: true, manifest: true }, { installed: true }));
     expect(s.release.current).toBe(true);
-    s = byKey(stepsFor({ ...newDraft(), name: "x", manifest: true }, { installed: true, released: true }));
+    s = byKey(stepsFor({ ...newDraft(), name: "x", runs: true, manifest: true }, { installed: true, released: true }));
     expect(s.release.done).toBe(true);
-    expect(stepsFor({ ...newDraft(), name: "x", manifest: true }, { installed: true, released: true }).some((x) => x.current)).toBe(false);
+    expect(stepsFor({ ...newDraft(), name: "x", runs: true, manifest: true }, { installed: true, released: true }).some((x) => x.current)).toBe(false);
   });
   it("does not count the manifest done before the app is installed", () => {
-    const s = byKey(stepsFor({ ...newDraft(), name: "x", created: true, manifest: true }));
+    const s = byKey(stepsFor({ ...newDraft(), name: "x", runs: true, created: true, manifest: true }));
     expect(s.create.done).toBe(true);
     expect(s.install.current).toBe(true);
     expect(s.manifest.done).toBe(false);

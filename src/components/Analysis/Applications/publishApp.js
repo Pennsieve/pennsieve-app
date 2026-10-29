@@ -14,7 +14,7 @@ export const COMPUTE_CHOICES = Object.freeze([
   { value: "gpu", label: "Also on a GPU", hint: "For steps that need one." },
 ]);
 
-export const STEPS = Object.freeze(["describe", "create", "install", "manifest", "release"]);
+export const STEPS = Object.freeze(["describe", "runs", "create", "install", "manifest", "release"]);
 
 // A fresh draft.
 export const newDraft = () => ({
@@ -30,6 +30,7 @@ export const newDraft = () => ({
   owner: "",
   repo: "",
   // What the author has done, beyond what the services can tell.
+  runs: false,
   created: false,
   manifest: false,
   releaseTag: "v0.1.0",
@@ -98,6 +99,7 @@ export const stepsFor = (draft, { installed = false, released = false } = {}) =>
   const described = Boolean(String(draft.name || "").trim());
   const done = {
     describe: described,
+    runs: described && Boolean(draft.runs),
     create: installed || draft.created,
     install: installed,
     manifest: installed && draft.manifest,
