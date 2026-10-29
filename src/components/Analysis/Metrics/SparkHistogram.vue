@@ -181,10 +181,19 @@ watch(size, renderChart)
   min-height: 0;
 }
 
+/* The box is sized by its parent alone; the svg sits over it, out of the
+   flow, so its size can never feed back into the measurement. */
 .spark-box {
+  position: relative;
   flex: 1;
   min-height: 90px;
   min-width: 0;
+}
+
+.spark-box svg {
+  position: absolute;
+  top: 0;
+  left: 0;
 }
 
 .spark-label {
