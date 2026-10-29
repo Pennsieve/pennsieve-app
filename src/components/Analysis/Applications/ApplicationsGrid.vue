@@ -5,7 +5,7 @@ import { useRouter, useRoute } from "vue-router";
 
 import IconAnalysis from "../../icons/IconAnalysis.vue";
 import AppBanner from "./AppBanner.vue";
-import { appDomain, domainColors, domainCounts } from "./appDomains";
+import { appDomain, appFields, domainColors, domainCounts, fieldCounts } from "./appDomains";
 import { versionManifest } from "../WorkflowBuilder/appManifestInfo";
 import {
   APP_SORTS,
@@ -118,6 +118,8 @@ const visibilityLabel = (app) => {
 const computeFilter = ref("any");
 // A domain's key, or null for every app: the colour legend above the cards.
 const domainFilter = ref(null);
+// A research field's key, or null: combines with the domain (both must hold).
+const fieldFilter = ref(null);
 const computeChoices = computed(() => [
   ...new Set(applications.value.flatMap((a) => a.runtimeConfig?.computeTypes || [])),
 ]);
@@ -154,13 +156,14 @@ const githubUrl = (app) => {
 
 const filtersSet = computed(
   () =>
-    !!searchQuery.value.trim() || visibilityFilter.value !== "all" || computeFilter.value !== "any" || !!domainFilter.value
+    !!searchQuery.value.trim() || visibilityFilter.value !== "all" || computeFilter.value !== "any" || !!domainFilter.value || !!fieldFilter.value
 );
 function clearFilters() {
   searchQuery.value = "";
   visibilityFilter.value = "all";
   computeFilter.value = "any";
   domainFilter.value = null;
+  fieldFilter.value = null;
 }
 
 // The domains among the apps in this status (active, archived…), as chips
@@ -176,6 +179,9 @@ const chipStyle = (domain) => {
   return { "--chip-bg": c.bg, "--chip-ink": c.ink, "--chip-line": c.line, "--chip-dot": c.accent };
 };
 const toggleDomain = (key) => (domainFilter.value = domainFilter.value === key ? null : key);
+// The research fields among them: plain chips, since a colour means a domain.
+const fieldChips = computed(() => fieldCounts(statusApps.value));
+const toggleField = (key) => (fieldFilter.value = fieldFilter.value === key ? null : key);
 
 const filteredApplications = computed(() => {
   let list = applications.value;
@@ -199,6 +205,9 @@ const filteredApplications = computed(() => {
   }
   if (domainFilter.value) {
     list = list.filter((app) => appDomain(app)?.key === domainFilter.value);
+  }
+  if (fieldFilter.value) {
+    list = list.filter((app) => appFields(app).some((f) => f.key === fieldFilter.value));
   }
 
   return sortApps(list, sortBy.value, workflows.value);
@@ -364,6 +373,21 @@ const goToManifestBuilder = () => {
         >
           <span class="domain-dot" />
           {{ domain.label }}
+          <span class="domain-count">{{ count }}</span>
+        </button>
+      </div>
+      <div v-if="fieldChips.length" class="domain-row field-row" role="group" aria-label="Research field">
+        <span class="field-label">Field</span>
+        <button
+          v-for="{ field, count } in fieldChips"
+          :key="field.key"
+          type="button"
+          class="field-chip"
+          :class="{ active: fieldFilter === field.key }"
+          :aria-pressed="fieldFilter === field.key"
+          @click="toggleField(field.key)"
+        >
+          {{ field.label }}
           <span class="domain-count">{{ count }}</span>
         </button>
       </div>
@@ -581,6 +605,37 @@ const goToManifestBuilder = () => {
   height: 8px;
   border-radius: 50%;
   background: var(--chip-dot);
+}
+/* The research fields under them: outlined and grey, a filter only. */
+.field-row {
+  align-items: center;
+  margin-top: -8px;
+}
+.field-label {
+  margin-right: 4px;
+  font-size: 12px;
+  color: theme.$gray_5;
+}
+.field-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border: 1px solid theme.$gray_2;
+  border-radius: 3px;
+  background: theme.$white;
+  font: inherit;
+  font-size: 12px;
+  color: theme.$gray_6;
+  cursor: pointer;
+
+  &:hover {
+    border-color: theme.$gray_4;
+  }
+  &.active {
+    border-color: theme.$gray_6;
+    font-weight: 600;
+  }
 }
 .domain-count {
   color: theme.$gray_4;
