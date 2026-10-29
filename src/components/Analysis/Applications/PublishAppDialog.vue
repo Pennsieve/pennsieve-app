@@ -580,36 +580,32 @@ const close = () => {
           <!-- 5. app.yml -->
           <div v-else-if="step === 4" class="wizard-step">
             <p v-if="accessPending" class="wizard-note is-warning">
-              Pennsieve can't see this repository yet, so the app won't show up here and the pull request button is off.
-              Copy the app.yml and commit it yourself, and
-              <button type="button" class="wizard-link" @click="goTo(3)">install the GitHub App</button> when you're ready.
-            </p>
-            <p class="wizard-step-desc">
-              Open a pull request from here and merge it on GitHub, or copy the <code>app.yml</code> and commit it
-              yourself. Then tick Merged.
+              Pull requests need the GitHub App, so copy the app.yml and commit it yourself.
+              <button type="button" class="wizard-link" @click="goTo(3)">Install the GitHub App</button> when you're ready.
             </p>
             <div class="wizard-actions">
               <bf-button :disabled="!installed || prBusy" @click="openPullRequest">{{ prBusy ? "Opening…" : "Open a pull request" }}</bf-button>
               <bf-button class="secondary" @click="copyAppYml">Copy app.yml</bf-button>
-              <el-checkbox v-model="draft.manifest">Merged</el-checkbox>
             </div>
             <p v-if="prMessage" class="wizard-note" :class="{ 'is-error': prOutcome && prOutcome.kind !== 'opened' }">
               {{ prMessage }}
               <a v-if="prOutcome?.url" :href="prOutcome.url" target="_blank" rel="noopener">Open it</a>
               <a v-else-if="prOutcome?.reviewUrl" :href="prOutcome.reviewUrl" target="_blank" rel="noopener">Review the permissions</a>
             </p>
-            <details class="wizard-yml" open>
-              <summary>app.yml</summary>
+            <details class="wizard-yml">
+              <summary>Show the app.yml</summary>
               <pre>{{ appYml }}</pre>
             </details>
+            <div class="wizard-confirm">
+              <el-checkbox v-model="draft.manifest">It's merged on the default branch</el-checkbox>
+            </div>
           </div>
 
           <!-- 6. Release -->
           <div v-else class="wizard-step">
             <p v-if="accessPending" class="wizard-note is-warning">
-              Pennsieve builds the release through the GitHub App, so nothing can be published yet.
-              <button type="button" class="wizard-link" @click="goTo(3)">Install the GitHub App</button> first; this
-              dialog remembers where you are.
+              Releases are built through the GitHub App, so nothing can be published yet.
+              <button type="button" class="wizard-link" @click="goTo(3)">Install the GitHub App</button> first.
             </p>
             <p class="wizard-step-desc">Pick the first version, then publish the release.</p>
             <div class="wizard-row">
@@ -910,7 +906,7 @@ const close = () => {
   align-items: center;
   gap: 12px;
   flex-wrap: wrap;
-  margin-bottom: 8px;
+  margin-bottom: 12px;
 }
 
 .wizard-aside {
@@ -928,6 +924,11 @@ const close = () => {
 
 .wizard-note {
   margin: 6px 0 0;
+  line-height: 1.5;
+
+  .wizard-step > &:first-child {
+    margin: 0 0 18px;
+  }
   padding: 8px 10px;
   border-radius: 4px;
   background: theme.$gray_0;
@@ -963,6 +964,12 @@ const close = () => {
 }
 .wizard-footer-right {
   gap: 8px;
+}
+
+.wizard-confirm {
+  margin-top: 18px;
+  padding-top: 12px;
+  border-top: 1px dashed theme.$gray_2;
 }
 
 .wizard-skip {
