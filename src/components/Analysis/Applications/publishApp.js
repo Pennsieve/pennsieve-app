@@ -10,8 +10,8 @@ export const TEMPLATE_OWNER = "pennsieve-apps";
 export const TEMPLATE_REPO = "processor-template-python";
 
 export const COMPUTE_CHOICES = Object.freeze([
-  { value: "lambda", label: "Also as a Lambda function", hint: "Starts in seconds; for steps that finish within 15 minutes and 10 GB." },
-  { value: "gpu", label: "Also on a GPU", hint: "An ECS task on a GPU instance, for steps that need one." },
+  { value: "lambda", label: "Also as a Lambda function", hint: "Starts in seconds. For steps that finish within 15 minutes and 10 GB." },
+  { value: "gpu", label: "Also on a GPU", hint: "For steps that need one." },
 ]);
 
 export const STEPS = Object.freeze(["describe", "create", "install", "manifest", "release"]);

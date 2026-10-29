@@ -224,7 +224,7 @@ const releaseMessage = computed(() => {
   if (!o) return "";
   switch (o.kind) {
     case "released":
-      return "Released. Pennsieve is building the image; the app is in the gallery when it's done.";
+      return "Released. Pennsieve is building the image; the app appears here when it's done.";
     case "needsApproval":
       return "The repository's owner hasn't accepted the Pennsieve GitHub App's permissions yet.";
     case "noPush":
@@ -259,10 +259,10 @@ const close = () => {
 </script>
 
 <template>
-  <el-dialog v-model="visible" title="Publish an app" width="680px" append-to-body class="publish-app-dialog" @closed="openStep = ''">
+  <el-dialog v-model="visible" title="Create a new app" width="680px" append-to-body class="publish-app-dialog" @closed="openStep = ''">
     <p class="wizard-lead">
-      An app is a repository with an <code>app.yml</code>. Describe it here, create the repository from
-      Pennsieve's template, install the Pennsieve GitHub App on it, and publish the first release.
+      An app is a GitHub repository with an <code>app.yml</code>. Five steps: describe it, create the
+      repository from our template, give Pennsieve access, add the <code>app.yml</code>, release.
     </p>
 
     <ol class="wizard-steps">
@@ -287,11 +287,11 @@ const close = () => {
             <el-input v-model="draft.tags" placeholder="ephys, sorting" />
           </label>
           <div class="wizard-field">
-            <span>Where it may run</span>
+            <span>Runs</span>
             <div class="wizard-choices">
               <div class="wizard-choice is-fixed">
-                <el-checkbox :model-value="true" disabled>As an ECS task (standard)</el-checkbox>
-                <small>Any size, any duration. Always on.</small>
+                <el-checkbox :model-value="true" disabled>As a container (standard)</el-checkbox>
+                <small>Any size, any duration.</small>
               </div>
               <div v-for="c in COMPUTE_CHOICES" :key="c.value" class="wizard-choice">
                 <el-checkbox v-model="draft[c.value]">{{ c.label }}</el-checkbox>
@@ -326,7 +326,7 @@ const close = () => {
             </label>
           </div>
           <details class="wizard-yml">
-            <summary>The app.yml this writes</summary>
+            <summary>Preview app.yml</summary>
             <pre>{{ appYml }}</pre>
           </details>
           <div class="wizard-actions">
@@ -344,8 +344,8 @@ const close = () => {
         </button>
         <div v-if="isOpen('create')" class="wizard-body">
           <p>
-            GitHub creates it from Pennsieve's template, which has a working step to fill in and runs as every compute type.
-            Pick the owner and name, create it on GitHub, then come back.
+            GitHub creates it from our template: a working step with a place for your code, runnable as every
+            compute type. Create it on GitHub, then come back here.
           </p>
           <div class="wizard-row">
             <label class="wizard-field">
@@ -359,8 +359,8 @@ const close = () => {
           </div>
           <div class="wizard-actions">
             <bf-button :disabled="!draft.repo" @click="createOnGitHub">Create on GitHub</bf-button>
-            <el-checkbox v-model="draft.created" :disabled="installed">I created it</el-checkbox>
-            <span class="wizard-aside">Already have a repository? Enter it above and tick this.</span>
+            <el-checkbox v-model="draft.created" :disabled="installed">Done</el-checkbox>
+            <span class="wizard-aside">Have a repository already? Enter it above and tick Done.</span>
           </div>
         </div>
       </li>
@@ -369,14 +369,14 @@ const close = () => {
       <li class="wizard-step" :class="{ 'is-done': stepState('install').done, 'is-current': stepState('install').current, 'is-open': isOpen('install') }">
         <button type="button" class="wizard-step-head" @click="toggle('install')">
           <span class="wizard-mark">{{ stepState("install").done ? "✓" : "3" }}</span>
-          <span class="wizard-title">Install the Pennsieve GitHub App on it</span>
+          <span class="wizard-title">Give Pennsieve access to it</span>
           <span v-if="installed && !isOpen('install')" class="wizard-summary">installed</span>
         </button>
         <div v-if="isOpen('install')" class="wizard-body">
           <p>
-            Pennsieve reads the repository and publishes releases through its GitHub App. Install it on
-            <a v-if="repo" :href="repoUrl(draft)" target="_blank" rel="noopener">{{ draft.owner }}/{{ draft.repo }}</a><span v-else>the repository</span>,
-            or add the repository to an installation you have. This step ticks itself once Pennsieve sees it.
+            Install the Pennsieve GitHub App on
+            <a v-if="repo" :href="repoUrl(draft)" target="_blank" rel="noopener">{{ draft.owner }}/{{ draft.repo }}</a><span v-else>the repository</span>
+            (or add it to an installation you have). This step ticks itself once Pennsieve can see the repository.
           </p>
           <div class="wizard-actions">
             <bf-button @click="installApp">Install the GitHub App</bf-button>
@@ -393,13 +393,13 @@ const close = () => {
         </button>
         <div v-if="isOpen('manifest')" class="wizard-body">
           <p>
-            The template's app.yml is a placeholder; this one describes your app. Open a pull request with it and merge it on
-            GitHub, or copy it and commit it yourself.
+            Replace the template's placeholder <code>app.yml</code> with yours: open a pull request from here and merge
+            it on GitHub, or copy it and commit it yourself.
           </p>
           <div class="wizard-actions">
             <bf-button :disabled="!installed || prBusy" @click="openPullRequest">{{ prBusy ? "Opening…" : "Open a pull request" }}</bf-button>
             <bf-button class="secondary" @click="copyAppYml">Copy app.yml</bf-button>
-            <el-checkbox v-model="draft.manifest">It's on the default branch</el-checkbox>
+            <el-checkbox v-model="draft.manifest">Merged</el-checkbox>
           </div>
           <p v-if="prMessage" class="wizard-note" :class="{ 'is-error': prOutcome && prOutcome.kind !== 'opened' }">
             {{ prMessage }}
@@ -417,13 +417,13 @@ const close = () => {
       <li class="wizard-step" :class="{ 'is-done': stepState('release').done, 'is-current': stepState('release').current, 'is-open': isOpen('release') }">
         <button type="button" class="wizard-step-head" @click="toggle('release')">
           <span class="wizard-mark">{{ stepState("release").done ? "✓" : "5" }}</span>
-          <span class="wizard-title">Publish the first release</span>
+          <span class="wizard-title">Release it</span>
           <span v-if="released && !isOpen('release')" class="wizard-summary">released</span>
         </button>
         <div v-if="isOpen('release')" class="wizard-body">
           <p>
-            A release publishes the app: Pennsieve builds the image from the default branch and lists the app in the gallery
-            when the build is done. Every later release is a new version.
+            A release publishes the app: Pennsieve builds the image and lists the app here when the build is done.
+            Every later release is a new version.
           </p>
           <div class="wizard-row">
             <label class="wizard-field wizard-field--short">
