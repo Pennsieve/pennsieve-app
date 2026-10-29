@@ -634,6 +634,43 @@ watch(
           </div>
         </div>
 
+        <!-- What the app used across runs, by version (workflow-service metrics/usage) -->
+        <div v-if="appUsage && appUsage.runs" class="usage-section">
+          <div class="usage-header">
+            <span class="usage-title">Usage across runs</span>
+          </div>
+          <div class="usage-body">
+            <p class="usage-lead">{{ appUsageLead }}</p>
+            <table class="usage-table">
+              <thead>
+                <tr>
+                  <th>Version</th>
+                  <th>Runs</th>
+                  <th>Memory given</th>
+                  <th>Memory used</th>
+                  <th>CPU given</th>
+                  <th>CPU used</th>
+                  <th>Duration</th>
+                  <th>Last run</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="row in appUsageRows" :key="row.version">
+                  <td class="usage-version">{{ row.version }}</td>
+                  <td>{{ row.runs }}<span v-if="row.failed" class="usage-failed" :title="`${row.failed} failed`"> ({{ row.failed }} failed)</span></td>
+                  <td>{{ row.memoryGiven || "—" }}</td>
+                  <td :title="row.memoryUsed ? `median · 95th percentile of ${row.memorySamples} sampled steps` : 'no step ran long enough to be sampled'">{{ row.memoryUsed || "—" }}</td>
+                  <td>{{ row.cpuGiven || "—" }}</td>
+                  <td>{{ row.cpuUsed || "—" }}</td>
+                  <td>{{ row.duration || "—" }}</td>
+                  <td>{{ shortDate(row.lastRunAt) }}</td>
+                </tr>
+              </tbody>
+            </table>
+            <p v-for="hint in appUsageHints" :key="hint" class="usage-hint">{{ hint }}</p>
+          </div>
+        </div>
+
         <!-- README Section -->
         <div class="readme-section">
           <div class="readme-header">
@@ -817,39 +854,6 @@ watch(
                     </span>
                   </div>
                 </div>
-              </section>
-
-              <!-- What the app used across runs, by version -->
-              <section v-if="appUsage && appUsage.runs" class="manifest-block">
-                <h4 class="manifest-block-title">Usage across runs</h4>
-                <p class="manifest-description usage-lead">{{ appUsageLead }}</p>
-                <table class="usage-table">
-                  <thead>
-                    <tr>
-                      <th>Version</th>
-                      <th>Runs</th>
-                      <th>Memory given</th>
-                      <th>Memory used</th>
-                      <th>CPU given</th>
-                      <th>CPU used</th>
-                      <th>Duration</th>
-                      <th>Last run</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr v-for="row in appUsageRows" :key="row.version">
-                      <td class="usage-version">{{ row.version }}</td>
-                      <td>{{ row.runs }}<span v-if="row.failed" class="usage-failed" :title="`${row.failed} failed`"> ({{ row.failed }} failed)</span></td>
-                      <td>{{ row.memoryGiven || "—" }}</td>
-                      <td :title="row.memoryUsed ? `median · 95th percentile of ${row.memorySamples} sampled steps` : 'no step ran long enough to be sampled'">{{ row.memoryUsed || "—" }}</td>
-                      <td>{{ row.cpuGiven || "—" }}</td>
-                      <td>{{ row.cpuUsed || "—" }}</td>
-                      <td>{{ row.duration || "—" }}</td>
-                      <td>{{ shortDate(row.lastRunAt) }}</td>
-                    </tr>
-                  </tbody>
-                </table>
-                <p v-for="hint in appUsageHints" :key="hint" class="usage-hint">{{ hint }}</p>
               </section>
 
               <!-- Maintainers -->
@@ -1738,8 +1742,33 @@ watch(
   color: theme.$gray_5;
 }
 
+.usage-section {
+  margin-bottom: 16px;
+  background: theme.$white;
+  border: 1px solid theme.$gray_3;
+  border-radius: 4px;
+}
+
+.usage-header {
+  padding: 8px 12px;
+  border-bottom: 1px solid theme.$gray_3;
+}
+
+.usage-title {
+  font-weight: 600;
+  font-size: 13px;
+  color: theme.$black;
+}
+
+.usage-body {
+  padding: 12px;
+}
+
 .usage-lead {
   margin: 0 0 10px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: theme.$gray_5;
 }
 
 .usage-table {
