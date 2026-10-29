@@ -46,6 +46,8 @@ export const sizingHint = (v) => {
   const label = v.version || "unpinned";
   if (share < 0.5) {
     const target = FARGATE_MEMORY_MIB.find((m) => m >= d.p95 * 1.3) || Math.ceil((d.p95 * 1.3) / 1024) * 1024;
+    // Nothing smaller to suggest (a Lambda step at its floor): no hint.
+    if (target >= v.memoryGivenMiB) return "";
     return `${label} is given ${MiB(v.memoryGivenMiB)} and 95% of its ${d.samples} steps peaked under ${MiB(d.p95)}: ${MiB(target)} would do.`;
   }
   if (share > 0.9) {

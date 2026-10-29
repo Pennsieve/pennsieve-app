@@ -35,6 +35,7 @@ describe("sizingHint", () => {
     expect(sizingHint({ ...v, memoryUsedMiB: { p95: 11500, samples: 5 } })).toMatch(/Give it more/);
     expect(sizingHint({ ...v, memoryUsedMiB: { p95: 8000, samples: 5 } })).toBe("");
     expect(sizingHint({ ...v, memoryUsedMiB: { p95: 1000, samples: 2 } })).toBe("");
+    expect(sizingHint({ ...v, memoryGivenMiB: 512, memoryUsedMiB: { p95: 42, samples: 5 } })).toBe("", "already at the smallest size");
   });
 });
 
