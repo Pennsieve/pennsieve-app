@@ -625,7 +625,24 @@ watch(
             v-if="detail.sourceUrl"
             filter-column="sourceUrl"
             :filter-value="detail.sourceUrl"
-          />
+          >
+            <!-- What the app's steps peaked at across runs (workflow-service
+                 metrics/usage): median · 95th percentile, the version run last. -->
+            <template v-if="appUsageSide" #summary>
+              <div class="summary-divider" />
+              <div class="summary-stat usage-stat" :title="appUsageSide.title">
+                <span class="stat-value">{{ appUsageSide.memory }}</span>
+                <span class="stat-label">Peak memory</span>
+              </div>
+              <template v-if="appUsageSide.cpu">
+                <div class="summary-divider" />
+                <div class="summary-stat usage-stat" :title="appUsageSide.title">
+                  <span class="stat-value">{{ appUsageSide.cpu }}</span>
+                  <span class="stat-label">Peak CPU</span>
+                </div>
+              </template>
+            </template>
+          </MetricsDashboard>
           <div v-else class="metrics-placeholder">
             <span>No source URL available for metrics</span>
           </div>
@@ -1059,19 +1076,7 @@ watch(
                     <span class="manifest-summary-label">Resources</span>
                     <span class="manifest-summary-value">{{ manifestSummary.compute }}</span>
                   </div>
-                  <!-- What the app used across runs (workflow-service metrics/usage): the
-                       version run last, against the resources above. A caption sets
-                       these apart: measured, not declared. -->
-                  <div v-if="appUsageSide" class="manifest-summary-measured">{{ appUsageSide.caption }}</div>
-                  <div v-if="appUsageSide" class="manifest-summary-row manifest-summary-row-measured" :title="appUsageSide.title">
-                    <span class="manifest-summary-label">Peak memory</span>
-                    <span class="manifest-summary-value">{{ appUsageSide.memory }}</span>
-                  </div>
-                  <div v-if="appUsageSide && appUsageSide.cpu" class="manifest-summary-row manifest-summary-row-measured" :title="appUsageSide.title">
-                    <span class="manifest-summary-label">Peak CPU</span>
-                    <span class="manifest-summary-value">{{ appUsageSide.cpu }}</span>
-                  </div>
-                  <p v-if="appUsageSide && appUsageSide.hint" class="manifest-summary-hint">{{ appUsageSide.hint }}</p>
+
                   <div class="manifest-summary-row">
                     <span class="manifest-summary-label">Parameters</span>
                     <span class="manifest-summary-value">{{ manifestSummary.parameters }}</span>
@@ -1715,27 +1720,36 @@ watch(
   color: theme.$gray_5;
 }
 
-.manifest-summary-measured {
-  margin: 8px 0 2px;
-  padding-top: 8px;
-  border-top: 1px dashed theme.$gray_3;
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: theme.$gray_4;
+/* The peak tiles in the Metrics card: the dashboard's own tile styles,
+   which its scoped sheet does not reach from here. */
+.metrics-section :deep(.usage-stat) {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 6px 0;
+
+  .stat-value {
+    font-size: 14px;
+    font-weight: 700;
+    color: theme.$black;
+    line-height: 1.2;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .stat-label {
+    font-size: 9px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    color: theme.$gray_4;
+    margin-top: 1px;
+  }
 }
 
-.manifest-summary-row-measured .manifest-summary-value {
-  color: theme.$teal_2;
-  font-variant-numeric: tabular-nums;
-}
-
-.manifest-summary-hint {
-  margin: 6px 0 0;
-  font-size: 11px;
-  line-height: 1.4;
-  color: theme.$gray_5;
+.metrics-section :deep(.summary-divider) {
+  height: 1px;
+  background: theme.$gray_2;
+  margin: 0 8px;
 }
 
 .manifest-chips {

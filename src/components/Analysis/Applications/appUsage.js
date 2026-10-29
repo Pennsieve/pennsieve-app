@@ -75,12 +75,15 @@ export const usageSidebar = (usage) => {
   if (!mem?.samples && !cpu?.samples) return null;
   const runs = `${v.runs} run${v.runs === 1 ? "" : "s"}`;
   const version = v.version ? ` of ${v.version}` : "";
+  const hint = sizingHint(v);
+  const sampled = mem?.samples ? ` (${mem.samples} sampled step${mem.samples === 1 ? "" : "s"})` : "";
   return {
-    // The caption that sets these apart from the settings above them.
     caption: `Measured over ${runs}${version}`,
     memory: mem?.samples ? `${MiB(mem.p50)} · ${MiB(mem.p95)}` : "—",
     cpu: cpu?.samples ? `${vcpu(cpu.p50)} · ${vcpu(cpu.p95)}` : "",
-    title: `Median · 95th percentile of each step's peak, over ${runs}${version}. Usage depends on the inputs.`,
-    hint: sizingHint(v),
+    // The tiles' tooltip: what the figures are, and the sizing hint when
+    // there is one.
+    title: `Median · 95th percentile of each step's peak, over ${runs}${version}${sampled}. Usage depends on the inputs.${hint ? " " + hint : ""}`,
+    hint,
   };
 };

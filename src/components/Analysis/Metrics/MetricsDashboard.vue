@@ -109,6 +109,8 @@ const formatCost = (v) => {
           <span class="stat-value">{{ formatCost(avgCost) }}</span>
           <span class="stat-label">Avg Cost</span>
         </div>
+        <!-- More observed figures the page has (an app's peak usage). -->
+        <slot name="summary" />
       </div>
 
       <!-- Duration histogram (from parquet/DuckDB — loads in background) -->
