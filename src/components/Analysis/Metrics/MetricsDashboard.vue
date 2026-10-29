@@ -289,7 +289,8 @@ const formatCost = (v) => {
   }
 
   .stats-top & {
-    height: 170px;
+    height: 130px;
+    min-height: 0;
   }
 }
 
