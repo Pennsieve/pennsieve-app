@@ -25,6 +25,10 @@ export function runChannel(organizationId, userId, runId) {
   return runScopeChannel(organizationId, userId).replace(/\*$/, stripNodePrefix(runId))
 }
 
+// A user's in-app notifications (`notification-event`). Not served yet —
+// the path is a placeholder until pennsieve-go-core pkg/realtime defines it.
+export const userNotificationsChannel = (userIntId) => `/users/${userIntId}/notifications`
+
 // The Pusher channel a path maps to, for environments still on Pusher.
 export function pusherChannelName(path) {
   const [namespace, first] = path.replace(/^\//, '').split('/')
@@ -33,6 +37,8 @@ export function pusherChannelName(path) {
       return `dataset-${first}`
     case 'applications':
       return `application-${first}`
+    case 'users':
+      return `user-${first}-notifications`
     case 'runs':
       if (first?.startsWith('org-')) return `organization-${first.slice(4)}-analytics`
       if (first?.startsWith('user-')) return `user-${first.slice(5)}-analytics`

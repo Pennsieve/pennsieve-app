@@ -1,5 +1,7 @@
 import { createRouter, createWebHistory } from "vue-router";
+import { propOr } from 'ramda'
 import { PublicationStatus, PublicationTabs } from '../utils/constants.js'
+import store from '../store'
 
 import NotFound from './not-found/NotFound.vue'
 import MyCollectionsStage from "@/router/MyWorkSpace/MyCollectionsStage.vue";
@@ -49,6 +51,7 @@ const DatasetPermissionsHeader = () => import('./Dataset/DatasetPermissionsHeade
 const DatasetPermissions = () => import('../components/datasets/DatasetPermissions/DatasetPermissions.vue')
 const EmbargoedPermissions = () => import('../components/datasets/DatasetPermissions/EmbargoedPermissions/EmbargoedPermissions.vue')
 const DatasetIntegrationsSettings = () => import('../components/datasets/settings/DatasetIntegrationsSettings.vue')
+const DatasetNotificationSubscriptions = () => import('../components/notifications/NotificationSubscriptions.vue')
 
 /**
  * ORCIDRedirect
@@ -121,6 +124,7 @@ const SharedWorkspaces = () => import('../components/user/shared/SharedWorkspace
 const SharedDatasets = () => import('../components/user/shared/SharedDatasets.vue')
 const Downloads = () => import('./downloads/Downloads.vue')
 const WorkspaceDownloads = () => import('../components/downloads/WorkspaceDownloads.vue')
+const MyDownloads = () => import('../components/downloads/MyDownloads.vue')
 const PublicDatasetList = () => import('../components/user/shared/PublicDatasetList.vue')
 const PublicDatasetDetail = () => import('../components/datasets/PublicDataset/PublicDatasetDetail.vue')
 const PublicDatasetOverview = () => import('../components/datasets/PublicDataset/PublicDatasetOverview.vue')
@@ -147,18 +151,18 @@ const WebhooksList = () => import ('../components/Integrations/WebhooksList/Webh
 const IntegrationsList = () => import ('../components/Integrations/IntegrationsList/IntegrationsList.vue')
 const ComputeNodesList = () => import ('../components/Analysis/ComputeNodes/ComputeNodesList.vue')
 const ComputeNodeManagement = () => import ('../components/Analysis/ComputeNodes/ComputeNodeManagement.vue')
-const ApplicationsGrid = () => import ('../components/Analysis/Applications/ApplicationsGrid.vue')
 const ApplicationDetail = () => import ('../components/Analysis/Applications/ApplicationDetail.vue')
 const AppManifestGuide = () => import ('../components/Analysis/Applications/AppManifestGuide.vue')
 const AppManifestBuilder = () => import ('../components/Analysis/Applications/AppManifestBuilder.vue')
 const ActivityMonitor = () => import ('../components/Analysis/Activity/ActivityMonitor.vue')
 const RunMonitor = () => import ('../components/Analysis/RunMonitor/RunMonitor.vue')
-const RunsOverview = () => import ('../components/Analysis/RunMonitor/RunsOverview.vue')
 const RunDetail = () => import ('../components/Analysis/RunMonitor/RunDetail.vue')
 const NotebooksOverview = () => import ('../components/Analysis/RunMonitor/NotebooksOverview.vue')
 const NotebookSession = () => import ('../components/Analysis/JupyterSession/NotebookSession.vue')
 const WorkflowBuilder = () => import ('../components/Analysis/WorkflowBuilder/WorkflowBuilder.vue')
-const WorkflowsGrid = () => import ('../components/Analysis/Workflows/WorkflowsGrid.vue')
+const WorkflowsOverview = () => import ('../components/Analysis/Workflows/WorkflowsOverview.vue')
+const AppsOverview = () => import ('../components/Analysis/Applications/AppsOverview.vue')
+import { galleryRedirect } from './galleryRedirect'
 
 /**
  * Metadata Components
@@ -182,6 +186,17 @@ const PS404 = () => import('../components/PS-404/PS-404.vue')
  * if more navigation history is needed, this functionality should be moved to its own store. 
  */
 let previousCollection = null;
+
+function requireAdminRights(to, from, next) {
+  const activeOrg = store.getters.activeOrganization
+  const isAdmin = propOr(false, 'isAdmin', activeOrg)
+  const isOwner = propOr(false, 'isOwner', activeOrg)
+  if (isAdmin || isOwner) {
+    next()
+  } else {
+    next({ name: 'workspace-settings-overview', params: { orgId: to.params.orgId } })
+  }
+}
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -511,6 +526,8 @@ const router = createRouter({
         {
           name: 'my-analysis',
           path: 'analysis',
+          // Workflows first (its Library): what there is to run
+          redirect: { name: 'my-workflows' },
           components: {
             stage: MyAnalysis,
             navigation: UserNavigation,
@@ -523,6 +540,194 @@ const router = createRouter({
             hideSecondaryNav: true,
             title: 'My Analysis',
             description: 'Advanced data analysis and visualization tools for your research datasets.'
+          },
+          // Tabs, as in a workspace's Analysis page
+          children: [
+            {
+              name: 'my-notebooks',
+              path: 'notebooks',
+              component: NotebooksOverview,
+              props: true,
+              meta: {
+                hideSecondaryNav: true,
+                title: 'Notebooks',
+                description: 'Interactive notebooks on your personal compute nodes.'
+              }
+            },
+            {
+              // Runs are on the Workflows tab's Live view (and notebooks on
+              // the Notebooks tab); old links land there.
+              name: 'my-runs',
+              path: 'runs',
+              redirect: { name: 'my-workflows' }
+            },
+            {
+              // Before 'runs/:runId', which would otherwise match 'configure'
+              name: 'my-run-configure',
+              path: 'runs/configure',
+              component: RunDetail,
+              meta: {
+                hideSecondaryNav: true,
+                backLink: { name: 'my-runs' },
+                title: 'New Run',
+                description: 'Run one of your workflows, or a public one, on a personal compute node.'
+              }
+            },
+            {
+              name: 'my-run-detail',
+              path: 'runs/:runId',
+              component: RunDetail,
+              props: true,
+              meta: {
+                hideSecondaryNav: true,
+                backLink: { name: 'my-runs' },
+                title: 'Run',
+                description: 'A run outside any workspace.'
+              }
+            },
+            {
+              // The apps workflow steps run, and their app.yml
+              name: 'my-apps',
+              path: 'apps',
+              component: AppsOverview,
+              meta: {
+                hideSecondaryNav: true,
+                title: 'Apps',
+                description: 'The applications workflow steps run: your own, public ones, and ones shared with you.'
+              }
+            },
+            // The Gallery's old links: its Workflows view is the Workflows
+            // tab's Library, its Apps view the Apps tab.
+            {
+              name: 'my-gallery',
+              path: 'gallery',
+              redirect: galleryRedirect('my-')
+            },
+            { path: 'gallery/workflows/:uuid', redirect: (to) => ({ name: 'my-workflow-detail', params: to.params, query: to.query }) },
+            { path: 'gallery/apps/manifest-guide', redirect: (to) => ({ name: 'my-application-manifest-guide', query: to.query }) },
+            { path: 'gallery/apps/manifest-builder', redirect: (to) => ({ name: 'my-application-manifest-builder', query: to.query }) },
+            { path: 'gallery/apps/:uuid', redirect: (to) => ({ name: 'my-application-detail', params: to.params, query: to.query }) },
+            {
+              // Older still: the Applications tab
+              name: 'my-applications',
+              path: 'applications',
+              redirect: { name: 'my-apps' }
+            },
+            { path: 'applications/manifest-guide', redirect: { name: 'my-application-manifest-guide' } },
+            { path: 'applications/manifest-builder', redirect: (to) => ({ name: 'my-application-manifest-builder', query: to.query }) },
+            { path: 'applications/:uuid', redirect: (to) => ({ name: 'my-application-detail', params: to.params }) },
+            {
+              // Static paths before 'apps/:uuid'
+              name: 'my-application-manifest-guide',
+              path: 'apps/manifest-guide',
+              component: AppManifestGuide,
+              meta: {
+                hideSecondaryNav: true,
+                backLink: { name: 'my-apps' },
+                title: 'Manifest Guide',
+                description: 'The app.yml manifest specification.'
+              }
+            },
+            {
+              name: 'my-application-manifest-builder',
+              path: 'apps/manifest-builder',
+              component: AppManifestBuilder,
+              meta: {
+                hideSecondaryNav: true,
+                backLink: { name: 'my-apps' },
+                title: 'Manifest Builder',
+                description: 'Generate an app.yml manifest for your application.'
+              }
+            },
+            {
+              name: 'my-application-detail',
+              path: 'apps/:uuid',
+              component: ApplicationDetail,
+              props: true,
+              meta: {
+                hideSecondaryNav: true,
+                backLink: { name: 'my-apps' },
+                title: 'Application',
+                description: 'An application from the Pennsieve App Store.'
+              }
+            },
+            {
+              name: 'my-workflows',
+              path: 'workflows',
+              component: WorkflowsOverview,
+              meta: {
+                hideSecondaryNav: true,
+                title: 'Workflows',
+                description: 'Workflows to run (your own and public ones), their runs, and the builder.'
+              }
+            },
+            {
+              name: 'my-workflow-create',
+              path: 'workflows/new',
+              component: WorkflowBuilder,
+              meta: {
+                hideSecondaryNav: true,
+                backLink: { name: 'my-workflows' },
+                title: 'New Workflow',
+                description: 'Create a workflow of your own, outside any workspace.'
+              }
+            },
+            {
+              // After 'workflows/new'
+              name: 'my-workflow-detail',
+              path: 'workflows/:uuid',
+              component: WorkflowBuilder,
+              props: true,
+              meta: {
+                hideSecondaryNav: true,
+                backLink: { name: 'my-workflows' },
+                title: 'Workflow',
+                description: 'A workflow of your own, or a public one.'
+              }
+            },
+            {
+              name: 'my-compute-nodes',
+              path: 'compute-nodes',
+              component: ComputeNodesList,
+              props: true,
+              meta: {
+                hideSecondaryNav: true,
+                title: 'Compute Nodes',
+                description: 'Your personal compute nodes, on AWS accounts you registered. They are private to you.'
+              }
+            },
+            {
+              name: 'my-compute-node-management',
+              path: 'compute-nodes/:nodeId',
+              component: ComputeNodeManagement,
+              props: true,
+              meta: {
+                hideSecondaryNav: true,
+                backLink: { name: 'my-compute-nodes' },
+                title: 'Compute Node',
+                description: 'Configure your personal compute node.'
+              }
+            }
+          ]
+        },
+        {
+          // A notebook session outside any workspace. Like 'run-notebook', its own
+          // page rather than a My Analysis tab, so the tab bar doesn't show.
+          name: 'my-run-notebook',
+          path: 'analysis/notebooks/:runId',
+          components: {
+            stage: NotebookSession,
+            navigation: UserNavigation,
+          },
+          props: {
+            stage: true,
+            navigation: true
+          },
+          meta: {
+            hideSecondaryNav: true,
+            backLink: { name: 'my-notebooks' },
+            title: 'Notebook',
+            description: 'An interactive notebook on your personal compute node.'
           }
         },
         {
@@ -623,6 +828,22 @@ const router = createRouter({
               component: PublicDatasetRecord,
             },
           ]
+        },
+        // Run archives (download targets). download-service's emails for
+        // them link here.
+        {
+          name: 'my-downloads',
+          path: 'downloads',
+          components: {
+            stage: MyDownloads,
+            navigation: UserNavigation,
+          },
+          props: true,
+          meta: {
+            hideSecondaryNav: true,
+            title: 'Downloads',
+            description: 'Results of your runs, ready to download.'
+          },
         },
         {
           name: 'my-collections',
@@ -1180,6 +1401,16 @@ const router = createRouter({
               },
               props: {
                 stage: true
+              }
+            },
+            {
+              name: 'dataset-notifications-settings',
+              path: 'notifications',
+              components: {
+                stage: DatasetNotificationSubscriptions
+              },
+              props: {
+                stage: () => ({ scope: 'dataset' })
               }
             },
           ]
@@ -1797,16 +2028,18 @@ const router = createRouter({
         page: Analysis,
         navigation: BfNavigation
       },
+      // Workflows first (its Library): what there is to run
       redirect: {
-        name: 'runs'
+        name: 'workflows'
       },
       props: true,
       children: [
         {
+          // Library (the workflows), Live (their runs) and Builder
           name: 'workflows',
           path: 'workflows',
           components: {
-            stage: WorkflowsGrid,
+            stage: WorkflowsOverview,
           }
         },
         {
@@ -1817,6 +2050,7 @@ const router = createRouter({
           }
         },
         {
+          // A workflow's page, under the Workflows tab (after 'workflows/new')
           name: 'workflow-detail',
           path: 'workflows/:uuid',
           components: {
@@ -1827,11 +2061,11 @@ const router = createRouter({
           }
         },
         {
+          // Runs are on the Workflows tab's Live view (and notebooks on the
+          // Notebooks tab); old links land there.
           name: 'runs',
           path: 'runs',
-          components: {
-            stage: RunsOverview,
-          }
+          redirect: (to) => ({ name: 'workflows', params: to.params })
         },
         {
           name: 'notebooks',
@@ -1881,29 +2115,51 @@ const router = createRouter({
           props: true
         },
         {
-          name: 'applications',
-          path: 'applications',
+          // The apps workflow steps run, and their app.yml
+          name: 'apps',
+          path: 'apps',
           components: {
-            stage: ApplicationsGrid,
+            stage: AppsOverview,
           }
         },
+        // The Gallery's old links: its Workflows view is the Workflows tab's
+        // Library, its Apps view the Apps tab.
         {
+          name: 'gallery',
+          path: 'gallery',
+          redirect: galleryRedirect()
+        },
+        { path: 'gallery/workflows/:uuid', redirect: (to) => ({ name: 'workflow-detail', params: to.params, query: to.query }) },
+        { path: 'gallery/apps/manifest-guide', redirect: (to) => ({ name: 'application-manifest-guide', params: to.params, query: to.query }) },
+        { path: 'gallery/apps/manifest-builder', redirect: (to) => ({ name: 'application-manifest-builder', params: to.params, query: to.query }) },
+        { path: 'gallery/apps/:uuid', redirect: (to) => ({ name: 'application-detail', params: to.params, query: to.query }) },
+        {
+          // Older still: the Applications tab
+          name: 'applications',
+          path: 'applications',
+          redirect: (to) => ({ name: 'apps', params: to.params })
+        },
+        { path: 'applications/manifest-guide', redirect: (to) => ({ name: 'application-manifest-guide', params: to.params }) },
+        { path: 'applications/manifest-builder', redirect: (to) => ({ name: 'application-manifest-builder', params: to.params, query: to.query }) },
+        { path: 'applications/:uuid', redirect: (to) => ({ name: 'application-detail', params: to.params }) },
+        {
+          // Static paths before 'apps/:uuid'
           name: 'application-manifest-guide',
-          path: 'applications/manifest-guide',
+          path: 'apps/manifest-guide',
           components: {
             stage: AppManifestGuide,
           }
         },
         {
           name: 'application-manifest-builder',
-          path: 'applications/manifest-builder',
+          path: 'apps/manifest-builder',
           components: {
             stage: AppManifestBuilder,
           }
         },
         {
           name: 'application-detail',
-          path: 'applications/:uuid',
+          path: 'apps/:uuid',
           components: {
             stage: ApplicationDetail,
           },
@@ -1952,34 +2208,46 @@ const router = createRouter({
           path: 'general',
           components: {
             stage: () => import('../components/OrgSettings/GeneralSettingsPage.vue')
-          }
+          },
+          beforeEnter: requireAdminRights
         },
         {
           name: 'workspace-dataset-statuses',
           path: 'dataset-statuses',
           components: {
             stage: () => import('../components/OrgSettings/DatasetStatusesPage.vue')
-          }
+          },
+          beforeEnter: requireAdminRights
         },
         {
           name: 'workspace-data-use-agreements',
           path: 'data-use-agreements',
           components: {
             stage: () => import('../components/OrgSettings/DataUseAgreementsPage.vue')
-          }
+          },
+          beforeEnter: requireAdminRights
         },
         {
           name: 'workspace-usage-analytics',
           path: 'usage',
           components: {
             stage: () => import('../components/OrgSettings/UsageAnalyticsPage.vue')
-          }
+          },
+          beforeEnter: requireAdminRights
         },
         {
           name: 'workspace-storage-nodes',
           path: 'storage-nodes',
           components: {
             stage: () => import('../components/OrgSettings/StorageNodesPage.vue')
+          },
+          beforeEnter: requireAdminRights
+        },
+        {
+          name: 'workspace-notifications',
+          path: 'notifications',
+          components: {
+            stage: () => import('../components/notifications/NotificationSubscriptions.vue')
           }
         },
       ],

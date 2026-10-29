@@ -5,7 +5,12 @@
 
     <div v-if="$route.name === 'data-publishing'">
       <div class="info-section">
-        <p>Submit your datasets to available repositories on the Pennsieve platform. Browse repositories to find the right home for your research data, then create and track proposals for dataset publication. If your proposal is accepted, you will be invited to a dataset for uploading and curation of the data which you can access through <router-link :to="{ name: 'shared-with-me' }" class="info-link">My Data</router-link>.</p>
+        <p class="info-lead">Submit your datasets to available repositories on the Pennsieve platform.</p>
+        <ul class="info-steps">
+          <li>Browse repositories to find the right home for your research data</li>
+          <li>Create and track proposals for dataset publication</li>
+          <li>If your proposal is accepted, you will be invited to a dataset for uploading and curation, which you can access from <router-link :to="{ name: 'shared-datasets' }" class="info-link">Shared With Me</router-link></li>
+        </ul>
 
         <div class="info-note">
           <strong>Note:</strong> If you already have access to the repository workspace as a collaborator, create your dataset directly in the workspace to bypass the submission approval process.
@@ -67,11 +72,20 @@ export default {
     margin: 0 0 12px 0;
   }
 
-  p {
-    font-size: 14px;
-    color: theme.$gray_4;
+  .info-lead {
+    font-size: 18px;
+    color: theme.$gray_6;
     line-height: 1.5;
+    margin: 0 0 8px 0;
+    max-width: 800px;
+  }
+
+  .info-steps {
+    font-size: 16px;
+    color: theme.$gray_5;
+    line-height: 1.6;
     margin: 0 0 16px 0;
+    padding-left: 24px;
     max-width: 800px;
   }
 }

@@ -70,10 +70,16 @@ async function send(url, { method, body, token, fetchFn }) {
 // (`download`), or to open it in a viewer (`view`, recorded apart from
 // downloads).
 //
+// short asks for a short link that redirects to the presigned one, for a
+// client that can't carry a presigned link (Microsoft's Office viewer caps
+// the URL it opens).
+//
 // Resolves to { url, expiresAt, fileName, size }. Rejects with a 409
 // 'scan_pending' while the file is still being scanned for malware.
-export function getFileUrl({ datasetId, packageId, purpose = 'download' }, options = {}) {
-  return downloadServiceRequest('/files/url', { ...options, method: 'POST', datasetId, body: { packageId, purpose } })
+export function getFileUrl({ datasetId, packageId, purpose = 'download', short = false }, options = {}) {
+  const body = { packageId, purpose }
+  if (short) body.short = true
+  return downloadServiceRequest('/files/url', { ...options, method: 'POST', datasetId, body })
 }
 
 // Archives: a selection zipped by the service, fetched when ready. Records
@@ -175,6 +181,30 @@ export function getPublicArchiveUrl({ id }, options = {}) {
 
 export function deletePublicArchive({ id }, options = {}) {
   return publicDownloadsRequest(`/archives/${encodeURIComponent(id)}`, { ...options, method: 'DELETE' })
+}
+
+// A compute run's results, zipped by the service when the run's download
+// data target asks for it. Its record has scope "run" and runId. A run
+// archive is its creator's, outside any dataset and whatever workspace the
+// run was in, so these routes name only the archive: the user's token is
+// enough.
+export async function listRunArchives(options = {}) {
+  const data = await downloadServiceRequest('/runs/archives', options)
+  return data.downloads || []
+}
+
+// Polling an active run archive also tells the service its creator is
+// watching, so it skips the email.
+export function getRunArchive({ id }, options = {}) {
+  return downloadServiceRequest(`/runs/archives/${encodeURIComponent(id)}`, options)
+}
+
+export function getRunArchiveUrl({ id }, options = {}) {
+  return downloadServiceRequest(`/runs/archives/${encodeURIComponent(id)}/url`, options)
+}
+
+export function deleteRunArchive({ id }, options = {}) {
+  return downloadServiceRequest(`/runs/archives/${encodeURIComponent(id)}`, { ...options, method: 'DELETE' })
 }
 
 // Selections too large to zip download with the Pennsieve agent instead.

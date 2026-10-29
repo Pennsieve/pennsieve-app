@@ -1,0 +1,165 @@
+import { describe, it, expect } from "vitest";
+import { targetWritesToDataset, prefixParamName, targetParamFields, buildDataTargets, targetDatasetId, datasetName, searchDatasets, isPathPrefixParam, targetParamLabel, defaultsToRunName, canWriteDataset, shownTargetParams, datasetSummary, sortDatasets } from "./dataTargets";
+
+describe("targetWritesToDataset / prefixParamName", () => {
+  it("built-ins write no dataset and take pathPrefix", () => {
+    expect(targetWritesToDataset("download")).toBe(false);
+    expect(targetWritesToDataset("persistent-layer")).toBe(false);
+    expect(targetWritesToDataset("Pennsieve Dataset")).toBe(true);
+    expect(targetWritesToDataset(null)).toBe(false);
+    expect(prefixParamName("download")).toBe("pathPrefix");
+    expect(prefixParamName("Pennsieve Dataset")).toBe("PATH_PREFIX");
+  });
+});
+
+describe("targetParamFields", () => {
+  const defs = [
+    { name: "TARGET_FOLDER", type: "string", defaultValue: "" },
+    { name: "PATH_PREFIX", type: "string", description: "Only below this path", defaultValue: "" },
+    { name: "OVERWRITE_FILES", type: "boolean", defaultValue: "false" },
+  ];
+  it("prefers the rerun source, then the definition, then the registry", () => {
+    const fields = targetParamFields(defs, {
+      sourceParams: { TARGET_FOLDER: "from-run" },
+      definitionDefaults: { TARGET_FOLDER: "from-def", PATH_PREFIX: "qc" },
+    });
+    expect(fields.map((f) => f.value)).toEqual(["from-run", "qc", "false"]);
+    expect(fields[1].description).toBe("Only below this path");
+  });
+  it("marks params without a registry default required", () => {
+    const fields = targetParamFields([{ name: "layerName" }, { name: "notify", defaultValue: "auto" }]);
+    expect(fields.map((f) => [f.required, f.value])).toEqual([[true, ""], [false, "auto"]]);
+  });
+});
+
+describe("buildDataTargets", () => {
+  const dag = [
+    { id: "src", type: "data-source" },
+    { id: "a", type: "data-target", targetType: "Pennsieve Dataset" },
+    { id: "b", type: "data-target", targetType: "Pennsieve Dataset" },
+    { id: "dl", type: "data-target", targetType: "download" },
+  ];
+  it("sends a target's own dataset only when it differs from the run's", () => {
+    const out = buildDataTargets(dag, {
+      a: { datasetId: "N:dataset:other", params: [{ name: "PATH_PREFIX", value: "qc" }, { name: "TARGET_FOLDER", value: "" }] },
+      b: { datasetId: "N:dataset:run", params: [{ name: "PATH_PREFIX", value: "data" }] },
+      dl: { datasetId: "N:dataset:other", params: [{ name: "pathPrefix", value: "reports" }, { name: "notify", value: "none" }] },
+    }, "N:dataset:run");
+    expect(out).toEqual({
+      a: { datasetId: "N:dataset:other", params: { PATH_PREFIX: "qc" } },
+      b: { params: { PATH_PREFIX: "data" } },
+      dl: { params: { pathPrefix: "reports", notify: "none" } }, // a built-in never names a dataset
+    });
+  });
+  it("sends a dataset without params, and nothing for an empty target", () => {
+    expect(buildDataTargets(dag, { a: { datasetId: "N:dataset:x", params: [] }, b: { params: [] } }, "N:dataset:run"))
+      .toEqual({ a: { datasetId: "N:dataset:x" } });
+    expect(buildDataTargets(dag, {}, "")).toEqual({});
+  });
+});
+
+describe("targetDatasetId / datasetName", () => {
+  const datasets = [{ content: { id: "N:dataset:1", name: "One" } }];
+  it("falls back to the run's dataset and to the id", () => {
+    expect(targetDatasetId({ datasetId: "N:dataset:2" }, "N:dataset:1")).toBe("N:dataset:2");
+    expect(targetDatasetId({ params: {} }, "N:dataset:1")).toBe("N:dataset:1");
+    expect(datasetName("N:dataset:1", datasets)).toBe("One");
+    expect(datasetName("N:dataset:9", datasets)).toBe("N:dataset:9");
+  });
+});
+
+describe("searchDatasets", () => {
+  it("asks the paginated datasets endpoint with the query and token", async () => {
+    const calls = [];
+    const out = await searchDatasets("https://api", "mef", {
+      getToken: async () => "tok",
+      sendXhr: async (url) => { calls.push(url); return { datasets: [{ content: { id: "N:dataset:1" } }] }; },
+      toQueryParams: (o) => Object.entries(o).map(([k, v]) => `${k}=${v}`).join("&"),
+    });
+    expect(out).toHaveLength(1);
+    expect(calls[0]).toContain("https://api/datasets/paginated?");
+    expect(calls[0]).toContain("query=mef");
+    expect(calls[0]).toContain("api_key=tok");
+  });
+});
+
+describe("the notebook launcher's target params", () => {
+  it("leaves out the path prefix, names the download after the run, labels its params", () => {
+    expect(isPathPrefixParam("pathPrefix")).toBe(true);
+    expect(isPathPrefixParam("PATH_PREFIX")).toBe(true);
+    expect(isPathPrefixParam("name")).toBe(false);
+    expect(defaultsToRunName("download", "name")).toBe(true);
+    expect(defaultsToRunName("pennsieve", "name")).toBe(false);
+    expect(targetParamLabel("name")).toBe("Archive name");
+    expect(targetParamLabel("layerName")).toBe("layerName");
+  });
+
+  it("writes only to datasets where the role is Editor or above", () => {
+    expect(["owner", "manager", "editor", "Editor"].every(canWriteDataset)).toBe(true);
+    expect(["viewer", "", undefined, null].some(canWriteDataset)).toBe(false);
+  });
+});
+
+describe("shownTargetParams", () => {
+  const params = [
+    { key: "name", value: "e2e-ports-b-summary" },
+    { key: "notify", value: "auto" },
+    { key: "pathPrefix", value: "summary" },
+  ];
+  const defs = [{ name: "name" }, { name: "notify", defaultValue: "auto" }, { name: "pathPrefix", defaultValue: "" }];
+
+  it("leaves out defaults and the prefix a port line shows", () => {
+    expect(shownTargetParams(params, defs, true).map((p) => p.key)).toEqual(["name"]);
+  });
+  it("keeps the prefix when no port line shows it", () => {
+    expect(shownTargetParams(params, defs, false).map((p) => p.key)).toEqual(["name", "pathPrefix"]);
+  });
+  it("keeps a changed default and params without a definition", () => {
+    const shown = shownTargetParams([{ key: "notify", value: "never" }, { key: "extra", value: "x" }], defs);
+    expect(shown.map((p) => p.key)).toEqual(["notify", "extra"]);
+  });
+});
+
+describe("datasetSummary / sortDatasets", () => {
+  const now = new Date("2026-10-27T12:00:00Z");
+  const ds = (id, counts, extra = {}) => ({
+    content: { id, name: `ds ${id}`, description: " A study ", updatedAt: "2026-10-24T10:00:00Z" },
+    packageTypeCounts: counts,
+    storage: 2300000000,
+    role: "editor",
+    ...extra,
+  });
+
+  it("says files, size, when it was updated and the user's role", () => {
+    const s = datasetSummary(ds("a", { CSV: 120, Unsupported: 8 }, { bannerPresignedUrl: "https://b" }), now);
+    expect(s).toMatchObject({ id: "a", name: "ds a", description: "A study", banner: "https://b", empty: false });
+    expect(s.meta).toBe("128 files · 2.3 GB · updated Oct 24 · Editor");
+  });
+
+  it("calls out a dataset with no files", () => {
+    const s = datasetSummary(ds("b", {}, { content: { id: "b", name: "b", updatedAt: "2025-01-02T12:00:00Z" } }), now);
+    expect(s.empty).toBe(true);
+    expect(s.meta).toBe("No files · updated Jan 2, 2025 · Editor");
+  });
+
+  it("lists datasets with files first", () => {
+    expect(sortDatasets([ds("e", {}), ds("f", { CSV: 1 }), ds("g", { CSV: 2 })]).map((d) => d.content.id)).toEqual(["f", "g", "e"]);
+  });
+});
+
+describe("buildDataTargets for a workflow's outputs", () => {
+  const dag = [
+    { id: "results", type: "data-target", targetType: "download", output: { id: "results" } },
+    { id: "skip", type: "data-target", targetType: "download", output: { id: "skip" } },
+  ];
+  it("names each output's destination, and nothing else for none", () => {
+    const configs = {
+      results: { targetType: "Pennsieve Dataset", datasetId: "N:dataset:2", params: [{ name: "TARGET_FOLDER", value: "out" }] },
+      skip: { targetType: "none", params: [{ name: "name", value: "x" }] },
+    };
+    expect(buildDataTargets(dag, configs, "N:dataset:1")).toEqual({
+      results: { targetType: "Pennsieve Dataset", datasetId: "N:dataset:2", params: { TARGET_FOLDER: "out" } },
+      skip: { targetType: "none" },
+    });
+  });
+});

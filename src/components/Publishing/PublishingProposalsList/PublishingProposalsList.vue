@@ -154,6 +154,7 @@ import IconMagnifyingGlass from "../../icons/IconMagnifyingGlass.vue";
 import IconSort from "../../icons/IconSort.vue";
 import EventBus from "../../../utils/event-bus";
 import { ProposalStatus, ProposalReviewStatuses } from "../../../utils/constants";
+import { getProposalErrorMessage, isStaleProposalError } from "../../../utils/proposalErrorMessages";
 
 export default {
   name: 'PublishingProposalsList',
@@ -417,14 +418,12 @@ export default {
       }
       // set selected proposal
       this.selectedRequest = proposal
-      this.proposalStore.setSelectedProposal(proposal)
 
       // set selected repo, so the repository questions render alongside
       // the submitted survey responses
       this.selectedRepository = proposal.organizationNodeId
         ? this.getRepositoryByNodeId(proposal.organizationNodeId)
         : {}
-      this.proposalStore.setSelectedRepo(this.selectedRepository)
 
       // enable modal visibility
       this.proposalStore.updateRequestModalVisible(true)
@@ -480,13 +479,18 @@ export default {
             break;
         }
       } catch (err) {
-        console.error(err)
         EventBus.$emit('toast', {
           detail: {
             type: 'error',
-            msg: `Failed to ${action} "${resource.name}". Please try again.`
+            msg: getProposalErrorMessage(action, err, {
+              summary: `Could not ${action} "${resource.name}".`
+            })
           }
         })
+        // A 400 usually means the author withdrew it meanwhile; show the real queue
+        if (isStaleProposalError(err)) {
+          await this.refreshProposals()
+        }
       }
     },
 

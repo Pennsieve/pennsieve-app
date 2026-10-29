@@ -8,6 +8,7 @@ import {
   onMounted,
   onBeforeUnmount,
   getCurrentInstance,
+  watch,
 } from "vue";
 import { runScopeChannel } from "@/realtime/channels";
 import { useStore } from "vuex";
@@ -16,9 +17,10 @@ import BfButton from "../../shared/bf-button/BfButton.vue";
 import IconControllerPlay from "../../icons/IconControllerPlay.vue";
 import IconXCircle from "../../icons/IconXCircle.vue";
 import NewNotebookDialog from "./NewNotebookDialog.vue";
+import AnalysisViewBar from "../AnalysisViewBar.vue";
 import EnvironmentsSection from "./EnvironmentsSection.vue";
 import CreateEnvironmentDialog from "./CreateEnvironmentDialog.vue";
-import { useComputeResourcesStore } from "@/stores/computeResourcesStore";
+import { environmentsServiceUrl } from "@/utils/environmentsService";
 import { endInteractiveSession } from "@/composables/useJupyterSession";
 import { useGetToken } from "@/composables/useGetToken";
 import {
@@ -29,13 +31,29 @@ import {
   runDisplayName,
   getUserName as getUserNameFn,
 } from "./runHelpers";
-import { isNotebookWorkflow, interactiveCapable } from "./notebookHelpers";
+import { isNotebookWorkflow } from "./notebookHelpers";
+import RunHistory from "./RunHistory.vue";
+import NotebookUsage from "./NotebookUsage.vue";
 
 const store = useStore();
-const computeResources = useComputeResourcesStore();
 const router = useRouter();
 const route = useRoute();
 const realtime = getCurrentInstance()?.appContext.config.globalProperties.$realtime;
+
+// Shown in a workspace (/:orgId/analysis/notebooks) and in My Workspace
+// (/my-workspace/analysis/notebooks), where notebooks run on the user's own
+// compute nodes and there is no dataset to pick yet.
+const isMyWorkspace = computed(() => !route.params.orgId);
+const notebookRoute = (runId) =>
+  isMyWorkspace.value
+    ? { name: "my-run-notebook", params: { runId } }
+    : {
+        name: "run-notebook",
+        params: {
+          orgId: route.params.orgId || store.state.activeOrganization?.organization?.id,
+          runId,
+        },
+      };
 
 /* ----------------------------------------------------------------- store ---- */
 const workflowInstances = computed(
@@ -49,26 +67,56 @@ const getUserName = (userId) =>
 
 /* --------------------------------------------------- notebook workflows ----- */
 const notebookWorkflows = ref([]);
-// Public "Pennsieve - Build {Python,R} Environment" workflows, resolved from the
-// definitions list and handed to the create-environment dialog (one per language).
-const buildPythonEnvWorkflow = ref(null);
-const buildREnvWorkflow = ref(null);
-const buildEnvWorkflows = computed(() => ({
-  python: buildPythonEnvWorkflow.value,
-  r: buildREnvWorkflow.value,
-}));
-const hasEnvBuilder = computed(
-  () => !!buildPythonEnvWorkflow.value || !!buildREnvWorkflow.value
-);
-const computeNodesList = computed(() =>
-  (store.getters["analysisModule/computeNodes"] || []).filter(interactiveCapable)
-);
+// Environments come from environments-service, where the site has it.
+const hasEnvironments = !!environmentsServiceUrl();
 const createEnvVisible = ref(false);
-function onEnvCreated({ nodeId }) {
-  if (nodeId) computeResources.fetchNodeLayers(nodeId, true);
+// Where the New environment dialog starts: empty, or an edit or retry of an
+// environment (see EnvironmentsSection).
+const envInitial = ref(null);
+const environmentsRef = ref(null);
+function openCreateEnvironment(initial = null) {
+  envInitial.value = initial;
+  createEnvVisible.value = true;
+}
+// Names the New environment dialog mustn't reuse.
+const takenEnvNames = computed(() => environmentsRef.value?.ownNames || []);
+// "Use in a notebook": a new notebook, where the environment is picked from
+// the session's sidebar once it runs.
+function onEnvUse() {
+  openNewNotebook();
+}
+function onEnvCreated() {
+  environmentsRef.value?.refresh?.();
 }
 const isLoading = ref(false);
 const dialogVisible = ref(false);
+// The kernel the New notebook dialog opens on: a link to a notebook
+// workflow lands here with ?start=<workflow>. The query goes once it's
+// open, so a reload doesn't open it again.
+const startWorkflowId = ref("");
+function openNewNotebook(workflowId = "") {
+  view.value = "live";
+  startWorkflowId.value = workflowId;
+  dialogVisible.value = true;
+}
+function openFromQuery() {
+  const id = route.query.start;
+  if (!id || !notebookWorkflowIds.value.has(String(id))) return;
+  const { start, ...rest } = route.query;
+  router.replace({ query: rest });
+  openNewNotebook(String(id));
+}
+watch(() => route.query.start, openFromQuery);
+// The sub-tab, kept in the URL so it can be linked to and survives reloads.
+// Environments only where the site has environments-service.
+const VIEWS = [
+  { key: "live", label: "Live" },
+  ...(hasEnvironments ? [{ key: "environments", label: "Environments" }] : []),
+];
+const view = computed({
+  get: () => (hasEnvironments && route.query.view === "environments" ? "environments" : "live"),
+  set: (v) => router.replace({ query: { ...route.query, view: v === "live" ? undefined : v } }),
+});
 
 const notebookWorkflowIds = computed(
   () => new Set(notebookWorkflows.value.map((w) => w.uuid))
@@ -100,15 +148,10 @@ async function fetchNotebookWorkflows() {
     }
     const all = [...byId.values()];
     // Require the Official flag (set by Pennsieve, not user-settable) so a workflow
-    // a user merely *names* "Pennsieve - …" can't masquerade as an official kernel
-    // or environment builder. Name still selects which official workflow it is.
+    // a user merely *names* "Pennsieve - …" can't masquerade as an official
+    // kernel. Name still selects which official workflow it is.
     const official = all.filter((w) => w?.official);
     notebookWorkflows.value = official.filter(isNotebookWorkflow);
-    buildPythonEnvWorkflow.value =
-      official.find((w) => (w?.name || "").startsWith("Pennsieve - Build Python Environment")) ||
-      null;
-    buildREnvWorkflow.value =
-      official.find((w) => (w?.name || "").startsWith("Pennsieve - Build R Environment")) || null;
     if (notebookWorkflows.value.length === 0) {
       console.warn(
         "[Notebooks] no notebook workflows matched among",
@@ -138,7 +181,9 @@ const activeNotebookRuns = computed(() =>
     )
     .sort((a, b) => new Date(b.startedAt) - new Date(a.startedAt))
 );
-const recentNotebookRuns = computed(() =>
+// Every finished notebook loaded so far, newest first; more load on request
+// (the runs list pages through all runs, notebooks among them).
+const historyRuns = computed(() =>
   notebookRuns.value
     .filter((r) => isTerminalStatus(r.status))
     .sort(
@@ -146,8 +191,21 @@ const recentNotebookRuns = computed(() =>
         new Date(b.completedAt || b.startedAt) -
         new Date(a.completedAt || a.startedAt)
     )
-    .slice(0, 10)
 );
+const nodeName = (id) =>
+  (store.getters["analysisModule/computeNodes"] || []).find((n) => n.uuid === id)?.name || "";
+const hasMoreRuns = computed(() => !!store.getters["analysisModule/workflowInstancesCursor"]);
+const loadingMore = ref(false);
+async function loadMoreRuns() {
+  loadingMore.value = true;
+  try {
+    await store.dispatch("analysisModule/fetchMoreWorkflowInstances");
+  } catch (err) {
+    console.error("Failed to load more notebooks:", err);
+  } finally {
+    loadingMore.value = false;
+  }
+}
 
 // After a notebook is created, open its notebook page straight away — it shows
 // the "waiting for the kernel" empty state while the session task launches.
@@ -180,19 +238,20 @@ const onNotebookCreated = async (newRun) => {
     return;
   }
 
-  const orgId =
-    route.params.orgId || store.state.activeOrganization?.organization?.id;
-  router.push({ name: "run-notebook", params: { orgId, runId: run.uuid } });
+  router.push(notebookRoute(run.uuid));
 };
 
 /* ----------------------------------------------------------- navigation ----- */
+// My Workspace has no run detail page yet; a run opens its notebook there.
 const selectRun = (run) => {
+  if (isMyWorkspace.value) {
+    router.push(notebookRoute(run.uuid));
+    return;
+  }
   router.push({ name: "run-detail", params: { runId: run.uuid } });
 };
 const openNotebook = (run) => {
-  const orgId =
-    route.params.orgId || store.state.activeOrganization?.organization?.id;
-  router.push({ name: "run-notebook", params: { orgId, runId: run.uuid } });
+  router.push(notebookRoute(run.uuid));
 };
 // End a notebook session, confirmed via the in-app Pennsieve dialog (not the
 // browser prompt). `endRun` opens the dialog; `confirmEndRun` does the work.
@@ -244,17 +303,21 @@ onMounted(async () => {
   try {
     await Promise.all([
       store.dispatch("analysisModule/fetchWorkflowInstances"),
-      store.dispatch("analysisModule/fetchComputeNodes"),
+      // Forced in My Workspace: the cached list may be a workspace's nodes
+      store.dispatch("analysisModule/fetchComputeNodes", { force: isMyWorkspace.value }),
       store.dispatch("analysisModule/fetchTargetTypes"),
       fetchNotebookWorkflows(),
     ]);
   } finally {
     isLoading.value = false;
   }
+  openFromQuery();
   // Live updates for every run in the workspace (or the user's own runs)
   if (realtime) {
     analyticsChannel = realtime.subscribe(
-      runScopeChannel(store.state.activeOrganization?.organization?.id, store.state.profile?.id)
+      // The route's workspace, not activeOrganization: that stays set in My
+      // Workspace, where a personal run's events go to the user's channel.
+      runScopeChannel(route.params.orgId, store.state.profile?.id)
     );
     analyticsChannel.bind("workflow-run-status", onRunStatusUpdate);
   }
@@ -269,42 +332,20 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="notebooks-container">
-      <div class="info-section">
-        <div class="info-card">
-          <h3>Notebooks &amp; Environments</h3>
-          <p>
-            Launch an interactive Jupyter or R notebook on your data in a few
-            clicks — pick a kernel, compute node, and input files, and start
-            exploring. Create a reusable <strong>environment</strong> from a
-            <code>requirements.txt</code> to preinstall the Python or R packages
-            you need, then attach it when you launch a notebook. For multi-step
-            analyses, add a notebook step to a custom workflow under
-            <router-link :to="{ name: 'workflows' }" class="info-card-link">
-              Workflows</router-link
-            >.
-          </p>
-          <div class="info-card-actions">
-            <bf-button
-              :disabled="notebookWorkflows.length === 0"
-              @click="dialogVisible = true"
-            >
-              + New Notebook
-            </bf-button>
-            <bf-button
-              class="ghost"
-              :disabled="!hasEnvBuilder"
-              :title="hasEnvBuilder ? '' : 'Environment builder not available yet'"
-              @click="createEnvVisible = true"
-            >
-              + New Environment
-            </bf-button>
-          </div>
-        </div>
-      </div>
+  <div class="notebooks-page">
+    <!-- Live: the notebooks running and the ones before; Environments: what
+         they run with. The view is in the URL (?view=environments). -->
+    <AnalysisViewBar v-model="view" :views="VIEWS">
+        <bf-button v-if="view === 'live'" :disabled="notebookWorkflows.length === 0" @click="openNewNotebook()">
+          + New Notebook
+        </bf-button>
+        <bf-button v-else @click="openCreateEnvironment()">+ New Environment</bf-button>
+    </AnalysisViewBar>
+    <div class="notebooks-container">
 
+      <template v-if="view === 'live'">
       <div v-if="!isLoading && notebookWorkflows.length === 0" class="empty-canvas">
-        <h3>No notebook environments available</h3>
+        <h3>No notebook kernels available</h3>
         <p>
           A published notebook workflow (e.g. "Jupyter Notebook") must exist
           before you can start a notebook here.
@@ -361,52 +402,56 @@ onBeforeUnmount(() => {
           </div>
         </div>
 
-        <div v-if="recentNotebookRuns.length > 0" class="dashboard-section">
-          <h3 class="dashboard-section-title">Recent Notebooks</h3>
-          <div class="recent-runs-list">
-            <div
-              v-for="run in recentNotebookRuns"
-              :key="run.uuid"
-              class="recent-run-row"
-              @click="selectRun(run)"
-            >
-              <span class="run-status-dot" :class="statusDotClass(run.status)" />
-              <span class="recent-run-name">{{
-                runDisplayName(run) || "Unnamed"
-              }}</span>
-              <span class="recent-run-status">{{ statusLabel(run.status) }}</span>
-              <span class="recent-run-time">{{
-                formatTime(run.completedAt || run.startedAt)
-              }}</span>
-            </div>
-          </div>
-        </div>
+        <!-- Usage: sessions, time and cost, as the Workflows tab's overview -->
+        <NotebookUsage />
 
-        <div
-          v-if="
-            !isLoading &&
-            activeNotebookRuns.length === 0 &&
-            recentNotebookRuns.length === 0
+        <run-history
+          from="notebooks"
+          :title="activeNotebookRuns.length ? 'Earlier notebooks' : 'Notebooks'"
+          :runs="historyRuns"
+          :loading="isLoading"
+          :has-more="hasMoreRuns"
+          :loading-more="loadingMore"
+          :empty-text="
+            activeNotebookRuns.length
+              ? 'No earlier notebooks.'
+              : 'No notebooks yet. Start one to work with your data interactively; it uses the packages of an environment you switch to from its sidebar.'
           "
-          class="empty-canvas"
-        >
-          <h3>No notebooks yet</h3>
-          <p>Start a notebook to work with your data interactively.</p>
-        </div>
+          search-placeholder="Search notebooks…"
+          :node-name="nodeName"
+          :user-name="getUserName"
+          @load-more="loadMoreRuns"
+        />
+      </template>
+      </template>
 
-        <environments-section />
+      <template v-else>
+        <p class="nb-view-desc">
+          Python package environments for your notebooks. Build one from a requirements list, then switch to it from a
+          notebook's sidebar while it runs.
+        </p>
+        <environments-section
+          ref="environmentsRef"
+          :show-title="false"
+          @create="openCreateEnvironment()"
+          @edit="openCreateEnvironment"
+          @retry="openCreateEnvironment"
+          @use="onEnvUse"
+        />
       </template>
 
     <new-notebook-dialog
       v-model="dialogVisible"
       :notebook-workflows="notebookWorkflows"
+      :initial-workflow-id="startWorkflowId"
+      :personal="isMyWorkspace"
       @created="onNotebookCreated"
     />
 
     <create-environment-dialog
       v-model="createEnvVisible"
-      :build-workflows="buildEnvWorkflows"
-      :compute-nodes="computeNodesList"
+      :initial="envInitial"
+      :taken-names="takenEnvNames"
       @created="onEnvCreated"
     />
 
@@ -439,16 +484,16 @@ onBeforeUnmount(() => {
         </div>
       </template>
     </el-dialog>
+    </div>
   </div>
 </template>
 
 <style scoped lang="scss">
 @use "../../../styles/theme";
 
+/* Lined up with the Analysis tabs above (32px). */
 .notebooks-container {
-  max-width: 1000px;
-  margin: 0;
-  padding: 16px 24px;
+  padding: 20px 32px;
 }
 /* End-session dialog footer: right-aligned buttons with an even 8px gap (the
    mr-8 utility doesn't reliably land on the bf-button root). */
@@ -457,38 +502,10 @@ onBeforeUnmount(() => {
   justify-content: flex-end;
   gap: 8px;
 }
-.info-section {
-  margin-bottom: 32px;
-}
-.info-card-actions {
-  margin-top: 16px;
-  display: flex;
-  gap: 12px;
-}
-.info-card {
-  background: theme.$gray_1;
-  border: 1px solid theme.$gray_2;
-  padding: 24px;
-}
-.info-card h3 {
-  font-size: 18px;
-  font-weight: 500;
-  color: theme.$gray_6;
-  margin: 0 0 12px 0;
-}
-.info-card p {
-  font-size: 14px;
-  color: theme.$gray_5;
-  line-height: 1.5;
-  margin: 0;
-}
-.info-card-link {
-  color: theme.$purple_1;
-  font-weight: 600;
-  text-decoration: none;
-}
-.info-card-link:hover {
-  text-decoration: underline;
+.nb-view-desc {
+  margin: 0 0 12px;
+  font-size: 13px;
+  color: theme.$gray_4;
 }
 .dashboard-section {
   margin-bottom: 24px;
@@ -604,40 +621,6 @@ onBeforeUnmount(() => {
   height: 8px;
   border-radius: 50%;
   background: theme.$gray_3;
-}
-.recent-runs-list {
-  display: flex;
-  flex-direction: column;
-  background: theme.$white;
-  border: 1px solid theme.$gray_3;
-  border-radius: 4px;
-  overflow: hidden;
-}
-.recent-run-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 14px;
-  border-bottom: 1px solid theme.$gray_1;
-  cursor: pointer;
-  font-size: 13px;
-}
-.recent-run-row:last-child {
-  border-bottom: none;
-}
-.recent-run-row:hover {
-  background: theme.$gray_1;
-}
-.recent-run-name {
-  font-weight: 500;
-  color: theme.$gray_6;
-}
-.recent-run-status {
-  color: theme.$gray_5;
-}
-.recent-run-time {
-  margin-left: auto;
-  color: theme.$gray_4;
 }
 .empty-canvas {
   text-align: center;

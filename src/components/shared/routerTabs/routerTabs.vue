@@ -32,6 +32,9 @@ export default {
       try {
         const currentName = this.$route.name
         if (currentName === tab.to) return true
+        // Pages that belong to the tab without living under its path, e.g.
+        // a run's page under Workflows (tab.activeWhen(route)).
+        if (tab.activeWhen) return !!tab.activeWhen(this.$route) || this.$route.matched.some(r => r.name === tab.to)
 
         // Check if any matched route in the chain has this name
         const matched = this.$route.matched

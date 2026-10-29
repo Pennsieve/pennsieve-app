@@ -4,6 +4,7 @@ import { useSendXhr } from "@/mixins/request/request_composable.js";
 import { useDuckDBStore } from "@/stores/duckdbStore.js";
 import * as siteConfig from "@/site-config/site.json";
 import { getPublicFileUrl } from "@/utils/downloadService";
+import { browsePublicFiles } from "@/utils/publicDatasets";
 
 // "cde_classification" -> "Cde Classification"
 const humanize = (name) =>
@@ -91,14 +92,7 @@ const discoverAdapter = {
 
   // Path-scoped, paginated file browsing for a published version.
   async browseFiles({ id, version, path = "", limit, offset }) {
-    const params = new URLSearchParams({ limit, offset });
-    if (path) params.set("path", path);
-    const url = `${siteConfig.discoverUrl}/datasets/${id}/versions/${version}/files/browse?${params.toString()}`;
-    const response = await useSendXhr(url, { method: "GET" });
-    return {
-      files: response?.files || [],
-      totalCount: response?.totalCount || 0,
-    };
+    return browsePublicFiles({ id, version, path, limit, offset });
   },
 
   // A link to one file from download-service: to save it (`download`), or
