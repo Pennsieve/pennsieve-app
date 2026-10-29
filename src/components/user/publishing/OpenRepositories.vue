@@ -1,19 +1,16 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue'
 import { useStore } from 'vuex'
+import { useRouter } from 'vue-router'
 import { useProposalStore } from '@/stores/proposalStore'
 import RepositoryListItem from './RepositoryListItem.vue'
-import ProposalSurvey from './ProposalSurvey.vue'
 import RepositoryInfoModal from './RepositoryInfoModal.vue'
 import BfButton from "@/components/shared/bf-button/BfButton.vue";
-import { useProposalSave } from '@/composables/useProposalSave'
 
 const store = useStore()
 const proposalStore = useProposalStore()
-const { isSavingProposal, saveProposal } = useProposalSave()
+const router = useRouter()
 
-const showProposalDialog = ref(false)
-const selectedRepository = ref({})
 const selectedRepositoryForProposal = ref(null)
 const showRepositoryInfo = ref(false)
 const selectedRepositoryForInfo = ref({})
@@ -46,33 +43,22 @@ function handleRepositorySelect(repository) {
   selectedRepositoryForProposal.value = repository
 }
 
+// New proposals are all created from the Dataset Proposals page, so hand the
+// chosen repository over instead of opening a second copy of the dialog here
 function handleSubmitProposal() {
-  if (selectedRepositoryForProposal.value) {
-    selectedRepository.value = selectedRepositoryForProposal.value
-    showProposalDialog.value = true
-  }
+  if (!selectedRepositoryForProposal.value) return
+  router.push({
+    name: 'dataset-proposals',
+    query: {
+      openSubmitModal: 'true',
+      repositoryId: selectedRepositoryForProposal.value.organizationNodeId
+    }
+  })
 }
 
 function handleViewInfo(repository) {
   selectedRepositoryForInfo.value = repository
   showRepositoryInfo.value = true
-}
-
-function closeProposalDialog() {
-  showProposalDialog.value = false
-  selectedRepository.value = {}
-}
-
-async function createProposal(proposalData) {
-  if (await saveProposal(proposalData)) {
-    closeProposalDialog()
-  }
-}
-
-async function submitProposal(proposalData) {
-  if (await saveProposal(proposalData, { submit: true })) {
-    closeProposalDialog()
-  }
 }
 
 onMounted(() => {
@@ -131,16 +117,6 @@ onMounted(() => {
         <p>No repositories available at this time.</p>
       </div>
     </div>
-
-    <!-- Proposal Submission Dialog -->
-    <proposal-survey
-      :dialog-visible="showProposalDialog"
-      :repository="selectedRepository"
-      :processing="isSavingProposal"
-      @close="closeProposalDialog"
-      @create-proposal="createProposal"
-      @submit-proposal="submitProposal"
-    />
 
     <!-- Repository Information Modal -->
     <repository-info-modal

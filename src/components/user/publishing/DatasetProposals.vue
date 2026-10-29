@@ -1,19 +1,29 @@
 <template>
   <div class="dataset-proposals">
     <div class="page-header">
-      <p class="page-description">
-        Manage your dataset proposal submissions. Track the status of your submissions, edit drafts, 
-        and submit new proposals to available repositories.
-      </p>
-      
-      <div class="header-actions">
-        <bf-button 
-          class="primary"
-          @click="startNewProposal"
-        >
+      <div class="header-row">
+        <p class="page-intro">
+          Propose your datasets to open repositories and follow them through review.
+        </p>
+        <bf-button class="primary" @click="startNewProposal">
+          <template #prefix>
+            <IconPlus :width="14" :height="14" color="currentColor" />
+          </template>
           New Proposal
         </bf-button>
       </div>
+
+      <ul class="workflow-steps">
+        <li v-for="step in workflowSteps" :key="step.title" class="workflow-step">
+          <span class="step-icon">
+            <component :is="step.icon" :width="20" :height="20" color="currentColor" />
+          </span>
+          <div class="step-text">
+            <h3 class="step-title">{{ step.title }}</h3>
+            <p class="step-description">{{ step.description }}</p>
+          </div>
+        </li>
+      </ul>
     </div>
 
     <div class="proposals-content">
@@ -62,15 +72,9 @@
           </div>
           <h2>No Dataset Proposals Yet</h2>
           <p>
-            You haven't created any dataset proposals yet. Submit your datasets to open repositories 
-            for review and publication.
+            You haven't created any dataset proposals yet. Click <strong>New Proposal</strong> to submit
+            a dataset to an open repository for review and publication.
           </p>
-          <bf-button 
-            class="primary"
-            @click="startNewProposal"
-          >
-            Create Your First Proposal
-          </bf-button>
         </div>
       </div>
     </div>
@@ -108,7 +112,7 @@
 <script setup>
 import { ref, shallowRef, computed, onMounted, watch } from 'vue'
 import { useStore } from 'vuex'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { useProposalStore } from '@/stores/proposalStore'
 import BfButton from '@/components/shared/bf-button/BfButton.vue'
@@ -119,13 +123,36 @@ import IconUndoLine from '@/components/icons/IconUndoLine.vue'
 import IconSendLine from '@/components/icons/IconSendLine.vue'
 import ConfirmDialog from '@/components/shared/ConfirmDialog/ConfirmDialog.vue'
 import IconDocument from '@/components/icons/IconDocument.vue'
+import IconPlus from '@/components/icons/IconPlus.vue'
+import IconPencil from '@/components/icons/IconPencil.vue'
+import IconEyeball from '@/components/icons/IconEyeball.vue'
 import { useProposalSave } from '@/composables/useProposalSave'
 import { getProposalErrorMessage, isStaleProposalError } from '@/utils/proposalErrorMessages'
 
 const store = useStore()
 const proposalStore = useProposalStore()
 const router = useRouter()
+const route = useRoute()
 const { isSavingProposal, saveProposal } = useProposalSave()
+
+// Static content; icons are components so they're kept out of reactivity
+const workflowSteps = [
+  {
+    icon: IconPlus,
+    title: 'Propose a dataset',
+    description: 'Start a new proposal and choose the open repository it should go to.',
+  },
+  {
+    icon: IconPencil,
+    title: 'Edit drafts',
+    description: 'Drafts stay editable until you submit them for review.',
+  },
+  {
+    icon: IconEyeball,
+    title: 'Track status',
+    description: 'Follow each proposal from submission through acceptance.',
+  },
+]
 
 // Reactive data
 const isLoading = ref(false)
@@ -315,10 +342,7 @@ onMounted(async () => {
 })
 
 const handleQueryParameters = () => {
-  const urlParams = new URLSearchParams(window.location.search)
-  const openSubmitModal = urlParams.get('openSubmitModal')
-  const repositoryId = urlParams.get('repositoryId')
-  const repositoryName = urlParams.get('repositoryName')
+  const { openSubmitModal, repositoryId, repositoryName } = route.query
   
   if (openSubmitModal === 'true' && repositories.value.length > 0) {
     let repository = null
@@ -347,9 +371,8 @@ const handleQueryParameters = () => {
       activeProposal.value = null
       showProposalDialog.value = true
       
-      // Clean up URL by removing query parameters
-      const newUrl = window.location.pathname
-      window.history.replaceState({}, document.title, newUrl)
+      // Drop the query so a refresh doesn't reopen the dialog
+      router.replace({ query: {} })
     } else {
       const searchTerm = repositoryId || repositoryName
       if (searchTerm) {
@@ -371,32 +394,71 @@ watch(repositories, (newRepositories) => {
 @use '../../../styles/_theme.scss';
 
 .dataset-proposals {
-  //padding: 40px;
-  max-width: 1200px;
-  margin: 0 auto;
+  width: 100%;
+  margin: 0;
 }
 
 .page-header {
   margin-bottom: 40px;
-  
-  h1 {
-    font-size: 28px;
-    font-weight: 300;
-    color: theme.$gray_6;
-    margin: 0 0 8px 0;
-  }
-  
-  .page-description {
-    font-size: 16px;
-    color: theme.$gray_5;
-    line-height: 1.6;
-    margin: 0 0 24px 0;
-    max-width: 800px;
-  }
-  
-  .header-actions {
+
+  .header-row {
     display: flex;
-    justify-content: flex-end;
+    align-items: center;
+    justify-content: space-between;
+    gap: 24px;
+    margin-bottom: 24px;
+  }
+
+  .page-intro {
+    font-size: 18px;
+    color: theme.$gray_6;
+    line-height: 1.5;
+    margin: 0;
+  }
+}
+
+.workflow-steps {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 16px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.workflow-step {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 16px;
+  background: theme.$gray_1;
+  border: 1px solid theme.$gray_2;
+  border-radius: 8px;
+
+  .step-icon {
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    border-radius: 8px;
+    background: theme.$purple_tint;
+    color: theme.$purple_3;
+  }
+
+  .step-title {
+    font-size: 15px;
+    font-weight: 500;
+    color: theme.$gray_6;
+    margin: 0 0 4px 0;
+  }
+
+  .step-description {
+    font-size: 14px;
+    color: theme.$gray_5;
+    line-height: 1.5;
+    margin: 0;
   }
 }
 
@@ -501,10 +563,9 @@ watch(repositories, (newRepositories) => {
     padding: 20px;
   }
   
-  .page-header {
-    .header-actions {
-      justify-content: center;
-    }
+  .page-header .header-row {
+    flex-direction: column;
+    align-items: flex-start;
   }
   
   .proposals-grid {
