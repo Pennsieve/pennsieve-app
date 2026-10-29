@@ -1,5 +1,10 @@
 <script setup>
-import { ref, watch, onMounted } from 'vue'
+// A histogram drawn at the size its box has on the page: the box is
+// measured (ResizeObserver) and the chart re-rendered at that many pixels,
+// so the bars fill the panel it sits in and the axis text keeps its size,
+// instead of a fixed drawing scaled up with the text in it. width and
+// height, when given, fix the size instead.
+import { ref, watch, onMounted, onBeforeUnmount } from 'vue'
 import * as d3 from 'd3'
 
 const props = defineProps({
@@ -17,11 +22,11 @@ const props = defineProps({
   },
   width: {
     type: Number,
-    default: 200,
+    default: 0,
   },
   height: {
     type: Number,
-    default: 90,
+    default: 0,
   },
   formatFn: {
     type: Function,
@@ -30,15 +35,29 @@ const props = defineProps({
 })
 
 const svgRef = ref(null)
+const boxRef = ref(null)
+// The size drawn at: the props when given, else the box's.
+const size = ref({ width: props.width || 200, height: props.height || 90 })
+let observer = null
 
 const margin = { top: 4, right: 4, bottom: 20, left: 28 }
+
+const measure = () => {
+  if (!boxRef.value || (props.width && props.height)) return
+  const rect = boxRef.value.getBoundingClientRect()
+  const width = props.width || Math.floor(rect.width)
+  const height = props.height || Math.floor(rect.height)
+  if (width > 0 && height > 0 && (width !== size.value.width || height !== size.value.height)) {
+    size.value = { width, height }
+  }
+}
 
 const renderChart = () => {
   if (!svgRef.value || !props.bins.length) return
 
   const svg = d3.select(svgRef.value)
-  const w = props.width - margin.left - margin.right
-  const h = props.height - margin.top - margin.bottom
+  const w = size.value.width - margin.left - margin.right
+  const h = size.value.height - margin.top - margin.bottom
 
   svg.selectAll('g.chart-area').remove()
 
@@ -125,19 +144,30 @@ const renderChart = () => {
     )
 }
 
-onMounted(() => renderChart())
+onMounted(() => {
+  measure()
+  if (!(props.width && props.height) && typeof ResizeObserver !== 'undefined' && boxRef.value) {
+    observer = new ResizeObserver(measure)
+    observer.observe(boxRef.value)
+  }
+  renderChart()
+})
+onBeforeUnmount(() => observer?.disconnect())
 watch(() => props.bins, renderChart, { deep: true })
+watch(size, renderChart)
 </script>
 
 <template>
   <div class="spark-histogram">
     <div v-if="label" class="spark-label">{{ label }}</div>
-    <svg
-      ref="svgRef"
-      :width="width"
-      :height="height"
-      :viewBox="`0 0 ${width} ${height}`"
-    />
+    <div ref="boxRef" class="spark-box">
+      <svg
+        ref="svgRef"
+        :width="size.width"
+        :height="size.height"
+        :viewBox="`0 0 ${size.width} ${size.height}`"
+      />
+    </div>
   </div>
 </template>
 
@@ -145,7 +175,16 @@ watch(() => props.bins, renderChart, { deep: true })
 .spark-histogram {
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
+  align-items: stretch;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+}
+
+.spark-box {
+  flex: 1;
+  min-height: 90px;
+  min-width: 0;
 }
 
 .spark-label {

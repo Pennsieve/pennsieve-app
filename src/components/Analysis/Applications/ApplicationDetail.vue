@@ -630,16 +630,20 @@ watch(
                  metrics/usage): median · 95th percentile, the version run last. -->
             <template v-if="appUsageSide" #summary>
               <div class="summary-divider" />
-              <div class="summary-stat usage-stat" :title="appUsageSide.title">
-                <span class="stat-value">{{ appUsageSide.memory }}</span>
-                <span class="stat-label">Peak memory</span>
-              </div>
+              <el-tooltip placement="right" :content="appUsageSide.memoryTitle" :show-after="150">
+                <div class="summary-stat usage-stat">
+                  <span class="stat-value">{{ appUsageSide.memory }}</span>
+                  <span class="stat-label stat-label-explained">Peak memory</span>
+                </div>
+              </el-tooltip>
               <template v-if="appUsageSide.cpu">
                 <div class="summary-divider" />
-                <div class="summary-stat usage-stat" :title="appUsageSide.title">
-                  <span class="stat-value">{{ appUsageSide.cpu }}</span>
-                  <span class="stat-label">Peak CPU</span>
-                </div>
+                <el-tooltip placement="right" :content="appUsageSide.cpuTitle" :show-after="150">
+                  <div class="summary-stat usage-stat">
+                    <span class="stat-value">{{ appUsageSide.cpu }}</span>
+                    <span class="stat-label stat-label-explained">Peak CPU</span>
+                  </div>
+                </el-tooltip>
               </template>
             </template>
           </MetricsDashboard>
@@ -1743,6 +1747,12 @@ watch(
     letter-spacing: 0.3px;
     color: theme.$gray_4;
     margin-top: 1px;
+  }
+
+  // An explanation on hover: the dotted line says so.
+  .stat-label-explained {
+    border-bottom: 1px dotted theme.$gray_3;
+    cursor: help;
   }
 }
 

@@ -50,11 +50,12 @@ describe("usageSummary", () => {
 describe("usageSidebar", () => {
   it("gives the side panel the version run last, and nothing without a sampled step", () => {
     const side = usageSidebar({ versions: [v] });
-    expect(side.memory).toBe("3,835 MiB · 4,900 MiB");
-    expect(side.cpu).toBe("1.9 vCPU · 2.0 vCPU");
+    expect(side.memory).toBe("4,900 MiB");
+    expect(side.cpu).toBe("2.0 vCPU");
     expect(side.caption).toBe("Measured over 11 runs of v0.1.0");
-    expect(side.title).toMatch(/over 11 runs of v0.1.0 \(11 sampled steps\)/);
-    expect(side.title).toMatch(/7,168 MiB would do\.$/);
+    expect(side.memoryTitle).toMatch(/^The 95th percentile of each step's peak memory over 11 runs of v0.1.0, 11 sampled steps: half the steps peaked at 3,835 MiB or less, the most was 4,900 MiB/);
+    expect(side.memoryTitle).toMatch(/7,168 MiB would do\.$/);
+    expect(side.cpuTitle).toMatch(/peak cpu over 11 runs/);
     expect(side.hint).toMatch(/7,168 MiB would do/);
     expect(usageSidebar({ versions: [{ version: "v2", runs: 1, memoryUsedMiB: { samples: 0 }, cpuUsedUnits: { samples: 0 } }] })).toBeNull();
     expect(usageSidebar(null)).toBeNull();

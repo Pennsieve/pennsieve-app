@@ -76,14 +76,15 @@ export const usageSidebar = (usage) => {
   const runs = `${v.runs} run${v.runs === 1 ? "" : "s"}`;
   const version = v.version ? ` of ${v.version}` : "";
   const hint = sizingHint(v);
-  const sampled = mem?.samples ? ` (${mem.samples} sampled step${mem.samples === 1 ? "" : "s"})` : "";
+  const explain = (d, fmt, what) =>
+    `The 95th percentile of each step's peak ${what} over ${runs}${version}, ${d.samples} sampled step${d.samples === 1 ? "" : "s"}: half the steps peaked at ${fmt(d.p50)} or less, the most was ${fmt(d.max)}. Usage depends on the inputs.`;
   return {
     caption: `Measured over ${runs}${version}`,
-    memory: mem?.samples ? `${MiB(mem.p50)} · ${MiB(mem.p95)}` : "—",
-    cpu: cpu?.samples ? `${vcpu(cpu.p50)} · ${vcpu(cpu.p95)}` : "",
-    // The tiles' tooltip: what the figures are, and the sizing hint when
-    // there is one.
-    title: `Median · 95th percentile of each step's peak, over ${runs}${version}${sampled}. Usage depends on the inputs.${hint ? " " + hint : ""}`,
+    // One number each: the 95th percentile, what a size has to cover.
+    memory: mem?.samples ? MiB(mem.p95) : "—",
+    cpu: cpu?.samples ? vcpu(cpu.p95) : "",
+    memoryTitle: mem?.samples ? explain(mem, MiB, "memory") + (hint ? " " + hint : "") : "",
+    cpuTitle: cpu?.samples ? explain(cpu, vcpu, "cpu") : "",
     hint,
   };
 };

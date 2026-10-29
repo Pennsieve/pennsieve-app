@@ -125,8 +125,6 @@ const formatCost = (v) => {
           :bins="durationBins"
           label="Duration Distribution"
           color="#7C3AED"
-          :width="280"
-          :height="100"
           :format-fn="formatDuration"
         />
       </div>
@@ -143,8 +141,6 @@ const formatCost = (v) => {
           :bins="costBins"
           label="Cost Distribution"
           color="#2563EB"
-          :width="280"
-          :height="100"
           :format-fn="formatCost"
         />
       </div>
@@ -248,14 +244,13 @@ const formatCost = (v) => {
 .chart-panel {
   flex: 1;
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+  // The chart draws itself at the panel's size (SparkHistogram).
+  min-height: 150px;
 
-  :deep(.spark-histogram) {
-    width: 100%;
-  }
-
-  :deep(svg) {
-    width: 100%;
-    height: auto;
+  .vertical & {
+    min-height: 140px;
   }
 }
 
