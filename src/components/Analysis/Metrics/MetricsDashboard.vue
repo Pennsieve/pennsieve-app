@@ -17,6 +17,13 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
+  // statsTop puts the summary tiles in a row across the top, the charts
+  // side by side under them: the charts then have a height of their own,
+  // not one set by how many tiles there are.
+  statsTop: {
+    type: Boolean,
+    default: false,
+  },
   hideHeader: {
     type: Boolean,
     default: false,
@@ -76,7 +83,7 @@ const formatCost = (v) => {
 </script>
 
 <template>
-  <div class="metrics-dashboard" :class="{ vertical, 'hide-header': hideHeader }">
+  <div class="metrics-dashboard" :class="{ vertical, 'stats-top': statsTop, 'hide-header': hideHeader }">
     <div v-if="!hideHeader" class="metrics-header">
       <span class="metrics-title">Metrics</span>
     </div>
@@ -208,6 +215,10 @@ const formatCost = (v) => {
   .vertical & {
     flex-direction: column;
   }
+
+  .stats-top & {
+    flex-wrap: wrap;
+  }
 }
 
 .metrics-panel {
@@ -239,6 +250,30 @@ const formatCost = (v) => {
     flex-direction: row;
     justify-content: space-evenly;
   }
+
+  // A row across the top, each tile with its share of the width.
+  .stats-top & {
+    flex: 1 0 100%;
+    flex-direction: row;
+    justify-content: space-evenly;
+    align-items: center;
+    padding: 8px 12px;
+    border-right: none;
+    border-bottom: 1px solid theme.$gray_3;
+
+    .summary-stat,
+    :deep(.summary-stat) {
+      flex: 1;
+      padding: 4px 0;
+    }
+
+    .summary-divider,
+    :deep(.summary-divider) {
+      height: 28px;
+      width: 1px;
+      margin: 0;
+    }
+  }
 }
 
 .chart-panel {
@@ -251,6 +286,10 @@ const formatCost = (v) => {
 
   .vertical & {
     min-height: 140px;
+  }
+
+  .stats-top & {
+    height: 170px;
   }
 }
 

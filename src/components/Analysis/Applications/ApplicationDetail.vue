@@ -625,6 +625,7 @@ watch(
             v-if="detail.sourceUrl"
             filter-column="sourceUrl"
             :filter-value="detail.sourceUrl"
+            stats-top
           >
             <!-- What the app's steps peaked at across runs (workflow-service
                  metrics/usage): median · 95th percentile, the version run last. -->
@@ -1757,9 +1758,10 @@ watch(
 }
 
 .metrics-section :deep(.summary-divider) {
-  height: 1px;
+  height: 28px;
+  width: 1px;
   background: theme.$gray_2;
-  margin: 0 8px;
+  margin: 0;
 }
 
 .manifest-chips {
