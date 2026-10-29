@@ -631,8 +631,6 @@ watch(
           </div>
         </div>
 
-        </div>
-
         <!-- README Section -->
         <div class="readme-section">
           <div class="readme-header">
