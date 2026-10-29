@@ -36,6 +36,7 @@ import PublicFilesPicker from "./PublicFilesPicker.vue";
 import { picksKey } from "./publicPicks";
 import IoPill from "../WorkflowGraph/IoPill.vue";
 import { withInterfaceNodes, destinationChoices, NO_DESTINATION } from "./workflowInterface";
+import { placeRunNodes, workflowLayouts } from "./runLayout";
 import { importStatusUrl, importSummary, importStillMoving, isDatasetImport } from "./runImports";
 import { nodeUnfit, rememberedSetup, rememberSetup, defaultNode, needsDataset } from "./runSetup";
 import DownloadItem from "@/components/downloads/DownloadItem.vue";
@@ -535,14 +536,28 @@ const autoLayout = () => {
 
 // This page saves no positions, so a graph is laid out for its node size:
 // compact always gets a tight layout of its own; detailed keeps the
-// definition's saved positions, where it has them.
+// definition's saved positions, where it has them (a run's, the workflow's
+// as saved now: runLayout.js).
 const needsLayout = (result) => result.needsAutoLayout || !detailed.value;
+
+// The shown run's workflow's saved layout (null: none, or not read).
+const runWorkflowLayout = ref(null);
 
 const changeDensity = (value) => {
   if (value === detailed.value) return;
   setDetailed(value);
   redrawGraph();
-  autoLayout();
+  // Back to detailed: the saved positions again, where the graph has them.
+  const result = value && mode.value === "browse" && selectedWorkflowActivity.value?.dag?.length
+    ? runToNodesAndEdges(selectedWorkflowActivity.value)
+    : null;
+  if (result && !needsLayout(result)) {
+    const at = new Map(result.nodes.map((n) => [n.id, n.position]));
+    nodes.value = nodes.value.map((n) => ({ ...n, position: at.get(n.id) || n.position }));
+    setTimeout(() => fitView({ padding: 0.2, maxZoom: 1 }), 50);
+  } else {
+    autoLayout();
+  }
 };
 
 // The graph's nodes and edges again from what it shows (the run, or the
@@ -690,7 +705,8 @@ const definitionToNodesAndEdges = (definition) => {
 const runToNodesAndEdges = (run) => {
   const dag = run.dag || [];
   if (dag.length === 0) return { nodes: [], edges: [], needsAutoLayout: true };
-  const hasSavedPositions = dag.some((d) => d.position && typeof d.position.x === "number");
+  // The workflow's layout as saved now, else the run's own (runLayout.js).
+  const placed = placeRunNodes(dag, runWorkflowLayout.value, { box: DETAILED_BOX });
   const runDataSources = run.dataSources || {};
   const runDataTargets = run.dataTargets || {};
   const runProcessorConfigs = run.processorConfigs || [];
@@ -740,14 +756,12 @@ const runToNodesAndEdges = (run) => {
         errorMessage: d.errorMessage || "",
         ...extra,
       },
-      position: hasSavedPositions && d.position && typeof d.position.x === "number"
-        ? { x: d.position.x, y: d.position.y }
-        : { x: 0, y: 0 },
+      position: placed.positions[d.id] || { x: 0, y: 0 },
     };
   });
   const dagMap = Object.fromEntries(dag.map((d) => [d.id, d]));
   const resultEdges = graphEdges(dag, resultNodes, (src) => nodeBorderColor(dagMap[src]?.type, dagMap[src]?.status));
-  return { nodes: resultNodes, edges: resultEdges, needsAutoLayout: !hasSavedPositions };
+  return { nodes: resultNodes, edges: resultEdges, needsAutoLayout: placed.needsAutoLayout };
 };
 
 /*
@@ -868,6 +882,12 @@ const loadRun = async (runId) => {
     await store.dispatch("analysisModule/setSelectedWorkflowActivity", run);
     const activity = selectedWorkflowActivity.value;
     if (activity && activity.dag && activity.dag.length > 0) {
+      // Laid out as its workflow is now (cached per workflow).
+      const layout = await workflowLayouts.get(activity.workflowUuid, (uuid) =>
+        store.dispatch("analysisModule/fetchWorkflowDefinition", uuid)
+      );
+      if (selectedWorkflowActivity.value?.uuid !== activity.uuid) return;
+      runWorkflowLayout.value = layout;
       const result = runToNodesAndEdges(activity);
       nodes.value = result.nodes;
       edges.value = result.edges;
