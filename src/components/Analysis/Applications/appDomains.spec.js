@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { appBanner, canonicalTag, domainColors, domainCounts, domainOf, domainOfTag, DOMAINS, fitTypes, NEUTRAL_COLORS, SUGGESTED_TAGS, preferredTagGroups, tagOptionMatches, tagDomainNudge, hasDomainTag } from "./appDomains";
+import { appBanner, appFields, canonicalTag, fieldCounts, fieldOfTag, fieldsOf, FIELDS, domainColors, domainCounts, domainOf, domainOfTag, DOMAINS, fitTypes, NEUTRAL_COLORS, SUGGESTED_TAGS, preferredTagGroups, tagOptionMatches, tagDomainNudge, hasDomainTag } from "./appDomains";
 
 const withManifest = (manifest, name = "spike-detect") => ({
   name,
@@ -93,6 +93,87 @@ describe("app domains", () => {
       withManifest({ tags: ["penn"] }, "d"),
     ]);
     expect(chips.map((c) => [c.domain.key, c.count])).toEqual([["ephys", 1], ["viz", 2]]);
+  });
+});
+
+describe("cytometry", () => {
+  it("is a subject of its own, by any of its spellings", () => {
+    for (const t of ["cytometry", "Flow Cytometry", "spectral-flow", "CyTOF", "mass_cytometry", "FCS", "immunophenotyping"]) {
+      expect(domainOfTag(t).key).toBe("cytometry");
+    }
+    expect(domainOfTag("cytometry").subject).toBe(true);
+    // A subject wins over a task named first.
+    expect(domainOf({ tags: ["preprocessing", "fcs"] }).key).toBe("cytometry");
+  });
+});
+
+describe("research fields", () => {
+  const cytometryApp = withManifest({ tags: ["cytometry", "flow-cytometry", "spectral-flow", "mass-cytometry", "fcs", "preprocessing", "immunology"] }, "fcs-qc");
+  const mriApp = withManifest({ tags: ["neuroimaging", "mri", "nifti", "synthstrip", "freesurfer", "skull-stripping"] }, "skull-strip");
+
+  it("matches a tag however it's spelled, apart from domains", () => {
+    expect(fieldOfTag("Neuroscience").key).toBe("neuroscience");
+    expect(fieldOfTag("epilepsy").key).toBe("neuroscience");
+    expect(fieldOfTag("Immuno-Oncology").key).toBe("immunology");
+    expect(fieldOfTag("tumour").key).toBe("oncology");
+    expect(fieldOfTag("cardiac").key).toBe("cardiology");
+    expect(fieldOfTag("eeg")).toBeNull();
+    expect(domainOfTag("neuroscience")).toBeNull();
+  });
+
+  it("counts a tag for both axes where it belongs to both", () => {
+    expect(domainOfTag("neuroimaging").key).toBe("imaging");
+    expect(fieldOfTag("neuroimaging").key).toBe("neuroscience");
+    expect(domainOfTag("immunophenotyping").key).toBe("cytometry");
+    expect(fieldOfTag("immunophenotyping").key).toBe("immunology");
+    expect(domainOfTag("neurophysiology").key).toBe("ephys");
+    expect(fieldOfTag("neurophysiology").key).toBe("neuroscience");
+  });
+
+  it("reads the demo apps: cytometry for immunology, imaging for neuroscience", () => {
+    expect(appBanner(cytometryApp).domain.key).toBe("cytometry");
+    expect(appFields(cytometryApp).map((f) => f.key)).toEqual(["immunology"]);
+    expect(appBanner(mriApp).domain.key).toBe("imaging");
+    expect(appFields(mriApp).map((f) => f.key)).toEqual(["neuroscience"]);
+  });
+
+  it("gives an app several fields, once each, in the order named", () => {
+    expect(fieldsOf({ tags: ["cancer", "immune", "immunology", "eeg"] }).map((f) => f.key)).toEqual(["oncology", "immunology"]);
+    expect(fieldsOf({ tags: ["penn"] })).toEqual([]);
+    expect(fieldsOf(null)).toEqual([]);
+  });
+
+  it("never colours: the colour stays the domain's", () => {
+    const a = appBanner(withManifest({ tags: ["neuroscience"] }));
+    expect(a.domain).toBeNull();
+    expect(a.colors).toBe(NEUTRAL_COLORS);
+    expect(FIELDS.some((f) => "hue" in f)).toBe(false);
+  });
+
+  it("counts the fields among apps, an app once per field", () => {
+    const chips = fieldCounts([
+      cytometryApp,
+      mriApp,
+      withManifest({ tags: ["epilepsy", "eeg", "cardiac"] }, "c"),
+      withManifest({ tags: ["penn"] }, "d"),
+    ]);
+    expect(chips.map((c) => [c.field.key, c.count])).toEqual([["neuroscience", 2], ["cardiology", 1], ["immunology", 1]]);
+  });
+
+  it("suggests field tags as their own group, found by alias", () => {
+    const { fields } = preferredTagGroups();
+    expect(fields.map((o) => o.tag)).toEqual(FIELDS.map((f) => f.tag));
+    const neuro = fields.find((o) => o.tag === "neuroscience");
+    expect(tagOptionMatches(neuro, "epilep", { preferred: true })).toBe(true);
+    expect(tagOptionMatches(neuro, "cancer", { preferred: true })).toBe(false);
+    expect(canonicalTag("Clinical Research")).toBe("clinical-research");
+    expect(canonicalTag("Immunology")).toBe("immunology");
+  });
+
+  it("nudges a domain's tag before a field's", () => {
+    expect(tagDomainNudge(["epilepsy", "eeg"])).toMatchObject({ tag: "electrophysiology", label: "Electrophysiology" });
+    expect(tagDomainNudge(["epilepsy", "eeg", "electrophysiology"])).toMatchObject({ tag: "neuroscience", label: "Neuroscience" });
+    expect(tagDomainNudge(["imaging", "neuroimaging", "neuroscience"])).toBeNull();
   });
 });
 
