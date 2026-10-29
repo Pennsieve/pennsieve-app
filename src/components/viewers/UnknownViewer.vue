@@ -43,6 +43,14 @@ export default {
     },
 
     /**
+     * Confirms if the malware scan found the file infected
+     * @returns {Boolean}
+     */
+    quarantined: function () {
+      return pathEq(["content", "state"], "INFECTED", this.pkg);
+    },
+
+    /**
      * True while the file waits for its malware scan (UPLOADED)
      * @returns {Boolean}
      */
@@ -54,6 +62,9 @@ export default {
       if (this.scanning) {
         return "Scanning for malware";
       }
+      if (this.quarantined) {
+        return "Quarantined";
+      }
       if (this.failed) {
         return "Not available";
       }
@@ -63,6 +74,9 @@ export default {
     copy: function () {
       if (this.scanning) {
         return "This file can be viewed and downloaded once the scan finishes.";
+      }
+      if (this.quarantined) {
+        return "The malware scan found a threat in this file. It can't be viewed or downloaded.";
       }
       if (this.failed) {
         return "This file can't be viewed or downloaded.";

@@ -16,7 +16,7 @@ const pkg = (packageType, state = 'READY', extra = {}) => ({
 
 describe('checkViewerType', () => {
   it('gives anything not yet cleared by the scan no viewer', () => {
-    for (const state of ['UPLOADED', 'ERROR', 'UNAVAILABLE', 'PROCESSING']) {
+    for (const state of ['UPLOADED', 'ERROR', 'INFECTED', 'UNAVAILABLE', 'PROCESSING']) {
       expect(check(pkg('PDF', state)), state).toEqual(['UnknownViewer'])
     }
   })

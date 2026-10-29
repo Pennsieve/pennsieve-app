@@ -504,6 +504,7 @@ export default {
 
               const fileStates = {
                 'ERROR': 'Failed',
+                'INFECTED': 'Quarantined',
                 'UPLOADED': 'Scanning…',
                 'PROCESSING': 'Processing',
                 'UNAVAILABLE': 'Uploading',
