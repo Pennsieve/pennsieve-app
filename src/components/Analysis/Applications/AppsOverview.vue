@@ -1,17 +1,36 @@
 <script setup>
 // The Apps tab: the applications workflow steps run. No views; the bar has
 // the search on the left (where other tabs have their view switch) and the
-// action on the right: publishing an app, a guided wizard
+// actions on the right: a new app from Pennsieve's template, a guided wizard
 // (PublishAppDialog: describe it, the repository from the template, the
-// GitHub App, the app.yml, the release).
-import { ref } from "vue";
+// GitHub App, the app.yml, the release); or a repository the user already
+// has (AddRepositoryDialog: access, destinations, sharing, a release).
+import { onBeforeUnmount, ref } from "vue";
+import { useStore } from "vuex";
 import BfButton from "../../shared/bf-button/BfButton.vue";
 import ApplicationsGrid from "./ApplicationsGrid.vue";
 import AnalysisViewBar from "../AnalysisViewBar.vue";
 import PublishAppDialog from "./PublishAppDialog.vue";
+import AddRepositoryDialog from "./AddRepositoryDialog.vue";
 
+const store = useStore();
 const search = ref("");
 const publishOpen = ref(false);
+const addOpen = ref(false);
+// The wizard picks from the repositories Pennsieve sees; have them ready.
+const openAdd = () => {
+  store.dispatch("codeReposModule/fetchAllMyRepos").catch(() => {});
+  addOpen.value = true;
+};
+// A release is under way: the App Store adds the app once its image is built.
+const timers = [];
+const onDone = ({ destinations = [] } = {}) => {
+  if (!destinations.includes("appstore")) return;
+  for (const delay of [60000, 150000]) {
+    timers.push(setTimeout(() => store.dispatch("analysisModule/fetchApplications", { force: true }).catch(() => {}), delay));
+  }
+};
+onBeforeUnmount(() => timers.forEach(clearTimeout));
 </script>
 
 <template>
@@ -28,9 +47,13 @@ const publishOpen = ref(false);
           />
         </label>
       </template>
-      <bf-button @click="publishOpen = true">Create New App</bf-button>
+      <div class="apps-actions">
+        <bf-button class="secondary" @click="openAdd">Add Repository</bf-button>
+        <bf-button @click="publishOpen = true">Create New App</bf-button>
+      </div>
     </AnalysisViewBar>
     <PublishAppDialog v-model="publishOpen" />
+    <AddRepositoryDialog v-model="addOpen" @done="onDone" />
     <!-- As the Workflows tab's Library: the grid's own 20px/32px padding,
          scrolling under a fixed bar. -->
     <div class="apps-body">
@@ -59,6 +82,11 @@ const publishOpen = ref(false);
 }
 .apps-search {
   width: 360px;
+}
+.apps-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 .apps-body {
   flex: 1;

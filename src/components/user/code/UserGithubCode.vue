@@ -97,6 +97,7 @@
                     <div class="repos-section-header">
                       <div class="repos-section-title">
                         <h3>My Repositories ({{ totalRepoCount }})</h3>
+                        <bf-button class="add-repository-button" @click="openAddRepository()">Add repository</bf-button>
                         <el-tooltip
                           ref="refresh-tooltip"
                           placement="bottom"
@@ -136,8 +137,9 @@
                       class="empty-state"
                     >
                       <p>
-                        No repositories found. Make sure you have repositories
-                        in your connected GitHub account.
+                        The Pennsieve GitHub App doesn't see any repository yet.
+                        <button type="button" class="link-button" @click="openAddRepository()">Add one</button>
+                        to publish it.
                       </p>
                     </div>
 
@@ -158,6 +160,7 @@
                           :key="repo.id"
                           :repo="repo"
                           @manage-settings="openPublishingDialog"
+                          @setup="openAddRepository"
                         />
                       </div>
 
@@ -208,6 +211,14 @@
       </div>
     </div>
 
+    <!-- Add a repository: access, destinations, sharing, a release -->
+    <add-repository-dialog
+      v-model="showAddRepository"
+      :initial-repo="addRepositoryInitial"
+      @saved="refreshRepositories"
+      @done="onRepositoryDone"
+    />
+
     <!-- Publishing Dialog -->
     <publishing-dialog
       v-if="showPublishingDialog"
@@ -229,6 +240,8 @@ import IconXCircle from '@/components/icons/IconXCircle.vue'
 import CodeRepoListItem from './CodeRepoListItem.vue'
 import PublishingDialog from './PublishingDialog.vue'
 import PublishedAppsList from './PublishedAppsList.vue'
+import AddRepositoryDialog from '@/components/Analysis/Applications/AddRepositoryDialog.vue'
+import { parseRepoInput } from '@/components/Analysis/Applications/addRepository'
 import { Refresh } from '@element-plus/icons-vue'
 
 export default {
@@ -241,6 +254,7 @@ export default {
     CodeRepoListItem,
     PublishingDialog,
     PublishedAppsList,
+    AddRepositoryDialog,
     Refresh
   },
 
@@ -262,8 +276,18 @@ export default {
       showPublishingDialog: false,
       selectedRepo: null,
       activeTab: 'repositories',
-      reposSearchQuery: ''
+      reposSearchQuery: '',
+
+      // The Add repository wizard, and the repository it opens on
+      // ({ owner, repo }) when started from a card or a link.
+      showAddRepository: false,
+      addRepositoryInitial: null,
+      refreshTimers: [],
     }
+  },
+
+  beforeUnmount() {
+    this.refreshTimers.forEach(clearTimeout)
   },
 
   computed: {
@@ -359,7 +383,7 @@ export default {
     if (this.$route.query.tab === 'published') {
       this.activeTab = 'published'
     }
-    this.fetchGithubProfile()
+    this.fetchGithubProfile().then(() => this.openFromQuery())
   },
 
   methods: {
@@ -468,6 +492,42 @@ export default {
     onPaginationPageChange(page) {
       // All repos are already loaded; just update the current page locally.
       this.$store.commit('codeReposModule/SET_MY_REPOS_CURRENT_PAGE', page)
+    },
+
+    // The wizard, on a repository when one is given (a card's "Set up", or
+    // a link's ?add=owner/repo); otherwise where the draft left off.
+    openAddRepository(repo = null) {
+      const full = repo?.full_name || (repo?.html_url || repo?.url || '')
+      this.addRepositoryInitial = parseRepoInput(full)
+      this.showAddRepository = true
+    },
+
+    // Opened from a link: ?add=owner/repo starts the wizard on that
+    // repository; GitHub's return after a change to the installation
+    // (?setup_action=...) resumes it. The query is dropped once used.
+    openFromQuery() {
+      if (!this.hasGithubProfile) return
+      const { add, setup_action: setupAction, installation_id: installationId, ...rest } = this.$route.query
+      if (add === undefined && setupAction === undefined) return
+      if (add) {
+        this.addRepositoryInitial = parseRepoInput(add)
+      } else {
+        this.addRepositoryInitial = null
+      }
+      this.showAddRepository = true
+      this.$router.replace({ query: rest }).catch(() => {})
+    },
+
+    // A release is under way: the App Store adds the app (or version) once
+    // its image is built, Discover its publication; look again in a while.
+    onRepositoryDone({ destinations = [] } = {}) {
+      this.refreshRepositories()
+      if (!destinations.includes('appstore')) return
+      for (const delay of [60000, 150000]) {
+        this.refreshTimers.push(setTimeout(() => {
+          this.$store.dispatch('analysisModule/fetchApplications', { force: true }).catch(() => {})
+        }, delay))
+      }
     },
 
     openPublishingDialog(repo) {
@@ -837,6 +897,10 @@ export default {
   align-items: center;
   gap: 8px;
 
+  .add-repository-button {
+    margin-left: 8px;
+  }
+
   h3 {
     font-size: 20px;
     font-weight: 500;
@@ -994,5 +1058,15 @@ export default {
 @keyframes spin {
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
+}
+
+.link-button {
+  border: none;
+  background: none;
+  padding: 0;
+  font: inherit;
+  color: theme.$purple_2;
+  text-decoration: underline;
+  cursor: pointer;
 }
 </style>

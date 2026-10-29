@@ -302,7 +302,10 @@ export const actions = {
     }
   },
 
-  updateRepoPublishingSettings: async({ rootState }, { repoUrl, publish_to_discover, publish_to_appstore }) => {
+  // access (optional) is the App Store sharing to apply when the app is first
+  // created from the repository: { visibility, users, teams, workspaces }.
+  // Left out, github-service keeps whatever was stored.
+  updateRepoPublishingSettings: async({ rootState }, { repoUrl, publish_to_discover, publish_to_appstore, access }) => {
     try {
       const token = await useGetToken()
       const url = `${rootState.config.api2Url}/repositories`
@@ -317,7 +320,8 @@ export const actions = {
         body: JSON.stringify({
           url: repoUrl,
           publish_to_discover,
-          publish_to_appstore
+          publish_to_appstore,
+          ...(access && { access })
         })
       })
 
