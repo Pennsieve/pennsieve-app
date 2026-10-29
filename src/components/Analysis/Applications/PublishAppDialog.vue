@@ -520,12 +520,13 @@ const close = () => {
           <!-- 3. Create the repository -->
           <div v-else-if="step === 2" class="wizard-step">
             <p class="wizard-step-desc">Create it on GitHub, then come back here and tick Done.</p>
-            <div class="wizard-row">
+            <div class="wizard-row wizard-row--repo">
               <label class="wizard-field">
                 <span>GitHub username or organization</span>
                 <el-input v-model="draft.owner" placeholder="octocat or my-lab" />
                 <small>As it appears in a GitHub URL, not an account number.</small>
               </label>
+              <span class="wizard-slash" aria-hidden="true">/</span>
               <label class="wizard-field">
                 <span>Repository name</span>
                 <el-input v-model="draft.repo" placeholder="spike-sorter" @input="repoTouched = true" />
@@ -817,6 +818,22 @@ const close = () => {
   display: flex;
   gap: 12px;
   align-items: flex-end;
+}
+/* owner / repository, as GitHub writes it: the slash sits on the inputs' line */
+.wizard-row--repo {
+  gap: 8px;
+  align-items: flex-start;
+
+  .wizard-field > span:first-child {
+    white-space: nowrap;
+  }
+}
+.wizard-slash {
+  /* label (11px line + 4px gap) above the input, then centre on the 32px input */
+  padding-top: 22px;
+  font-size: 18px;
+  line-height: 32px;
+  color: theme.$gray_4;
 }
 
 .wizard-choices {
