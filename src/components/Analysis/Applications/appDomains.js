@@ -3,7 +3,8 @@
 // coloured by. Tags are free text, so each domain lists the spellings people
 // use ("EEG", "iEEG", "electrophysiology"); a tag matches regardless of case
 // and punctuation. An app whose tags match none is grey: a colour always
-// means a domain.
+// means a domain. The same tags also name research fields (FIELDS, below),
+// which filter but never colour.
 import { versionManifest, shortMediaType, sessionTypeOf } from "../WorkflowBuilder/appManifestInfo";
 
 // A domain is a subject (what the app is about: EEG, imaging, genomics…) or
@@ -34,7 +35,7 @@ export const DOMAINS = [
     label: "Imaging",
     tag: "imaging",
     hue: 185,
-    aliases: ["image", "images", "microscopy", "mri", "fmri", "ct", "pet", "dicom", "nifti", "histology", "segmentation", "registration", "calcium-imaging", "image-processing"],
+    aliases: ["image", "images", "neuroimaging", "microscopy", "mri", "fmri", "ct", "pet", "dicom", "nifti", "histology", "segmentation", "registration", "calcium-imaging", "image-processing"],
     icon: "M4 5h16v14H4zM4 16l5-5 4 4 2-2 5 5M15.5 9.5h.01",
   },
   {
@@ -45,6 +46,20 @@ export const DOMAINS = [
     hue: 135,
     aliases: ["sequencing", "rna-seq", "rnaseq", "scrna-seq", "dna", "rna", "omics", "transcriptomics", "proteomics", "genetics", "bioinformatics", "single-cell", "scrna", "seurat"],
     icon: "M7 3c0 6 10 6 10 12s-10 6-10 6M17 3c0 6-10 6-10 12M9 7h6M9 17h6",
+  },
+  {
+    // Cells counted one by one as they flow past (or fly, in mass
+    // cytometry): a subject of its own, not imaging, though both see cells.
+    key: "cytometry",
+    subject: true,
+    label: "Cytometry",
+    tag: "cytometry",
+    // Magenta: the widest gap between the subjects' strong hues (indigo
+    // 245, crimson 340); the tasks near it (280, 315) are muted.
+    hue: 300,
+    aliases: ["flow-cytometry", "flow", "spectral-flow", "spectral-cytometry", "mass-cytometry", "cytof", "fcs", "immunophenotyping"],
+    // Three cells, each with a nucleus.
+    icon: "M4 9a4 4 0 1 0 8 0a4 4 0 1 0-8 0M8 9h.01M13 16a3 3 0 1 0 6 0a3 3 0 1 0-6 0M16 16h.01M4 18a2 2 0 1 0 4 0a2 2 0 1 0-4 0M18 5h.01",
   },
   {
     key: "ml",
@@ -135,37 +150,100 @@ export function domainOf(manifest) {
   return null;
 }
 
+// The research field an app serves (neuroscience, immunology…): a second
+// axis, read from the same tags. Where the domain says what data an app
+// handles, the field says whose research it's for, so an MRI app is Imaging
+// and Neuroscience. An app can have several fields, and they never colour
+// anything: a colour always means a domain. Some tags count for both axes
+// ("neuroimaging", "immunophenotyping"); each axis matches on its own.
+export const FIELDS = [
+  {
+    key: "neuroscience",
+    label: "Neuroscience",
+    tag: "neuroscience",
+    aliases: ["neuro", "neuroimaging", "neurology", "brain", "epilepsy", "neurophysiology", "cognitive-neuroscience"],
+  },
+  {
+    key: "immunology",
+    label: "Immunology",
+    tag: "immunology",
+    aliases: ["immune", "immune-health", "immunophenotyping", "immune-profiling", "immuno-oncology"],
+  },
+  {
+    key: "oncology",
+    label: "Oncology",
+    tag: "oncology",
+    aliases: ["cancer", "tumor", "tumour"],
+  },
+  {
+    key: "cardiology",
+    label: "Cardiology",
+    tag: "cardiology",
+    aliases: ["cardiac", "cardiovascular", "heart"],
+  },
+  {
+    key: "clinical",
+    label: "Clinical research",
+    tag: "clinical-research",
+    aliases: ["clinical", "clinical-trial", "clinical-trials"],
+  },
+];
+
+const FIELD_BY_TAG = new Map();
+for (const f of FIELDS) for (const t of [f.tag, f.key, f.label, ...f.aliases]) FIELD_BY_TAG.set(normalize(t), f);
+
+export const fieldOfTag = (tag) => FIELD_BY_TAG.get(normalize(tag)) || null;
+
+// An app's fields, in the order its tags first name them.
+export function fieldsOf(manifest) {
+  return [...new Set((manifest?.tags || []).map(fieldOfTag).filter(Boolean))];
+}
+
 // The tags the app.yml builder suggests: each domain's own, then the
-// spellings people use, so a typed "EEG" lands on a known "eeg".
-export const SUGGESTED_TAGS = [...new Set(DOMAINS.flatMap((d) => [d.tag, ...d.aliases]))];
+// spellings people use, so a typed "EEG" lands on a known "eeg"; then the
+// fields', so "Neuroscience" lands on "neuroscience".
+export const SUGGESTED_TAGS = [
+  ...new Set([...DOMAINS, ...FIELDS].flatMap((d) => [d.tag, ...d.aliases])),
+];
 
 // The builder's tag options: each domain's preferred tag (subjects first, then
 // tasks, in DOMAINS order) and the aliases that colour a card the same way.
+// Each field's tag, as a group of its own: a field doesn't colour the card,
+// so it isn't Preferred. Its aliases aren't listed (several are a domain's
+// too); typing one finds the field's tag.
 export function preferredTagGroups() {
   const ordered = [...DOMAINS.filter((d) => d.subject), ...DOMAINS.filter((d) => !d.subject)];
   return {
     preferred: ordered.map((domain) => ({ tag: domain.tag, domain })),
     aliases: ordered.flatMap((domain) => domain.aliases.filter((a) => a !== domain.tag).map((tag) => ({ tag, domain }))),
+    fields: FIELDS.map((field) => ({ tag: field.tag, field })),
   };
 }
 
-// Whether a tag option matches what's typed: the tag, its domain's label and,
-// for a preferred tag, the domain's aliases ("spike" finds spike-sorting).
+// Whether a tag option matches what's typed: the tag, its domain's (or
+// field's) label and, for a preferred tag, the aliases ("spike" finds
+// spike-sorting).
 export function tagOptionMatches(option, query, { preferred = false } = {}) {
   const q = normalize(query);
   if (!q) return true;
-  const words = [option.tag, option.domain?.label, ...(preferred ? option.domain?.aliases || [] : [])];
+  const named = option.domain || option.field;
+  const words = [option.tag, named?.label, ...(preferred ? named?.aliases || [] : [])];
   return words.filter(Boolean).some((w) => normalize(w).includes(q));
 }
 
 // The preferred tag to suggest: an alias names a domain whose preferred tag
-// the app doesn't have yet ("eeg" -> electrophysiology). Free-typed tags with
-// no domain suggest nothing.
+// the app doesn't have yet ("eeg" -> electrophysiology); else a field's
+// ("epilepsy" -> neuroscience), so apps of a field share one tag. Free-typed
+// tags with neither suggest nothing.
 export function tagDomainNudge(tags = []) {
   const have = new Set(tags.map(normalize));
   for (const t of tags) {
     const domain = domainOfTag(t);
-    if (domain && !have.has(normalize(domain.tag))) return { tag: domain.tag, domain };
+    if (domain && !have.has(normalize(domain.tag))) return { tag: domain.tag, domain, label: domain.label };
+  }
+  for (const t of tags) {
+    const field = fieldOfTag(t);
+    if (field && !have.has(normalize(field.tag))) return { tag: field.tag, field, label: field.label };
   }
   return null;
 }
@@ -218,6 +296,19 @@ export function domainCounts(apps) {
   return [...counts]
     .map(([domain, count]) => ({ domain, count }))
     .sort((a, b) => Number(!!b.domain.subject) - Number(!!a.domain.subject) || b.count - a.count || a.domain.label.localeCompare(b.domain.label));
+}
+
+// The fields of an app (of a version, by tag), from its app.yml.
+export const appFields = (app, tag) => fieldsOf(versionManifest(app, tag));
+
+// The fields among apps, most common first, with how many apps each: the
+// Apps tab's Field chips. An app counts once for each of its fields.
+export function fieldCounts(apps) {
+  const counts = new Map();
+  for (const app of apps || []) for (const f of appFields(app)) counts.set(f, (counts.get(f) || 0) + 1);
+  return [...counts]
+    .map(([field, count]) => ({ field, count }))
+    .sort((a, b) => b.count - a.count || a.field.label.localeCompare(b.field.label));
 }
 
 const typesOf = (ports) => [...new Set((ports || []).flatMap((p) => (p.mediaTypes || []).map(shortMediaType)))];
