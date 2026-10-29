@@ -52,6 +52,7 @@ import StepPicker from "./StepPicker.vue";
 import LinkEdge from "./LinkEdge.vue";
 import { sourceLabel, sourceHints, hintLine } from "../WorkflowGraph/sourceInputs";
 import { canvasDefinition, toInterfaceDefinition } from "./builderInterface";
+import { workflowLayouts } from "../RunMonitor/runLayout";
 import IoPill from "../WorkflowGraph/IoPill.vue";
 import { isFeatureEnabled } from "@/utils/features";
 import { useGraphHistory, snapshot } from "./graphHistory";
@@ -1099,6 +1100,8 @@ const saveLayout = async () => {
   try {
     const positions = layoutOf();
     await store.dispatch("analysisModule/updateWorkflow", { uuid: wf.uuid, payload: { positions } });
+    // Its runs are drawn with this layout: read it again there.
+    workflowLayouts.forget(wf.uuid);
     markLayoutSaved();
     EventBus.$emit("toast", { detail: { type: "success", msg: "Layout saved." } });
   } catch (err) {
@@ -2284,6 +2287,7 @@ const saveEdit = async () => {
   } finally {
     saving.value = false;
   }
+  workflowLayouts.forget(wf.uuid);
   const updated = await store.dispatch("analysisModule/fetchWorkflowDefinition", wf.uuid);
   selectWorkflow(updated);
 };
