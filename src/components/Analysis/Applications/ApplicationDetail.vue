@@ -18,6 +18,8 @@ import { useWorkspaceMembers } from "./useWorkspaceMembers";
 import { fetchReleaseStatus, releaseNudge } from "./release";
 import AppArchiveToggle from "../../user/code/AppArchiveToggle.vue";
 import { useGetToken } from "@/composables/useGetToken";
+import { useAppUsage } from "@/composables/useAppUsage";
+import { usageSidebar } from "./appUsage";
 import { useSendXhr } from "@/mixins/request/request_composable";
 
 
@@ -185,6 +187,10 @@ watch(permissions, (perms) => {
   if ((perms || []).some((p) => p?.entityType === "user" || p?.userId)) loadAllMembers();
 });
 const viewingOrgId = computed(() => store.state.activeOrganization?.organization?.id || null);
+
+// What the app used across runs, by version (workflow-service metrics/usage).
+const { usage: appUsage } = useAppUsage(computed(() => detail.value?.sourceUrl));
+const appUsageSide = computed(() => usageSidebar(appUsage.value));
 const accessList = computed(() =>
   accessEntries(
     permissions.value,
@@ -619,7 +625,27 @@ watch(
             v-if="detail.sourceUrl"
             filter-column="sourceUrl"
             :filter-value="detail.sourceUrl"
-          />
+            stats-top
+          >
+            <!-- What the app's steps peaked at across runs (workflow-service
+                 metrics/usage): median · 95th percentile, the version run last. -->
+            <template v-if="appUsageSide" #summary>
+              <div class="summary-divider" />
+              <el-tooltip placement="right" :content="appUsageSide.memoryTitle" :show-after="150">
+                <div class="summary-stat usage-stat">
+                  <span class="stat-value">{{ appUsageSide.memory }}</span>
+                  <span class="stat-label stat-label-explained">Peak memory</span>
+                </div>
+              </el-tooltip>
+              <div class="summary-divider" />
+              <el-tooltip placement="right" :content="appUsageSide.cpuTitle" :show-after="150">
+                <div class="summary-stat usage-stat">
+                  <span class="stat-value">{{ appUsageSide.cpu }}</span>
+                  <span class="stat-label stat-label-explained">Peak CPU</span>
+                </div>
+              </el-tooltip>
+            </template>
+          </MetricsDashboard>
           <div v-else class="metrics-placeholder">
             <span>No source URL available for metrics</span>
           </div>
@@ -1053,6 +1079,7 @@ watch(
                     <span class="manifest-summary-label">Resources</span>
                     <span class="manifest-summary-value">{{ manifestSummary.compute }}</span>
                   </div>
+
                   <div class="manifest-summary-row">
                     <span class="manifest-summary-label">Parameters</span>
                     <span class="manifest-summary-value">{{ manifestSummary.parameters }}</span>
@@ -1694,6 +1721,45 @@ watch(
   font-size: 13px;
   line-height: 1.5;
   color: theme.$gray_5;
+}
+
+/* The peak tiles in the Metrics card: the dashboard's own tile styles,
+   which its scoped sheet does not reach from here. */
+.metrics-section :deep(.usage-stat) {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 6px 0;
+
+  .stat-value {
+    font-size: 14px;
+    font-weight: 700;
+    color: theme.$black;
+    line-height: 1.2;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .stat-label {
+    font-size: 9px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    color: theme.$gray_4;
+    margin-top: 1px;
+  }
+
+  // An explanation on hover: the dotted line says so.
+  .stat-label-explained {
+    border-bottom: 1px dotted theme.$gray_3;
+    cursor: help;
+  }
+}
+
+.metrics-section :deep(.summary-divider) {
+  height: 28px;
+  width: 1px;
+  background: theme.$gray_2;
+  margin: 0;
 }
 
 .manifest-chips {

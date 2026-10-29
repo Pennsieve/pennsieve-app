@@ -247,6 +247,50 @@ export const formatMetricValue = (key, value) => {
 };
 
 // Fargate resources
+// nodeMetricRows is a step's receipt from its node metrics: what it ran as,
+// how long, what it used of what it was given (the peak over its minute
+// samples, Container Insights; a Lambda step's from its REPORT line), its
+// cost, its image. Each row: {label, value, title?, note?}. A step with no
+// usage sample says so rather than showing nothing.
+export const nodeMetricRows = (nm) => {
+  if (!nm) return [];
+  const rows = [];
+  const push = (label, value, extra = {}) => rows.push({ label, value, ...extra });
+  push("Compute type", nm.computeType || "standard");
+  if (nm.status) push("Status", statusLabel(nm.status));
+  if (nm.durationSec != null) push("Duration", formatDurationSec(nm.durationSec));
+  if (nm.billedDurationMs != null) push("Billed", `${Math.round(nm.billedDurationMs).toLocaleString()} ms`);
+
+  const cpuGiven = nm.cpuUnits > 0 ? nm.cpuUnits / 1024 : null;
+  const cpuUsed = nm.maxCpuUtilized != null && cpuGiven ? nm.maxCpuUtilized / 1024 : null;
+  if (cpuUsed != null) {
+    push("CPU used", `${cpuUsed.toFixed(2)} of ${cpuGiven.toFixed(cpuGiven < 1 ? 2 : 1)} vCPU (${Math.round((cpuUsed / cpuGiven) * 100)}%)`);
+  } else if (cpuGiven) {
+    push("CPU", `${cpuGiven.toFixed(cpuGiven < 1 ? 2 : 1)} vCPU`);
+  }
+  const memGiven = nm.memoryConfiguredMiB || nm.memoryMiB || null;
+  const memUsed = nm.maxMemoryUsedMiB != null && memGiven ? Math.round(nm.maxMemoryUsedMiB) : null;
+  if (memUsed != null) {
+    push("Memory used", `${memUsed.toLocaleString()} of ${Math.round(memGiven).toLocaleString()} MiB (${Math.round((memUsed / memGiven) * 100)}%)`);
+  } else if (memGiven) {
+    push("Memory", `${Math.round(memGiven).toLocaleString()} MiB`);
+  }
+  if (nm.imageUri) push("Image", shortImage(nm.imageUri), { title: nm.imageUri });
+  // The cost last: it is the receipt's total line.
+  if (nm.estimatedCost != null) push("Estimated cost", formatCost(nm.estimatedCost), { cost: true });
+  if (cpuUsed == null && memUsed == null && (nm.computeType === "standard" || nm.computeType === "gpu") && cpuGiven) {
+    rows.push({ note: "No usage sample: usage is sampled once a minute, and this step ran under a minute, or its node has no Container Insights." });
+  }
+  return rows;
+};
+
+// shortImage is an image reference without its registry, with a short digest.
+export const shortImage = (uri) => {
+  if (!uri) return "";
+  const noRegistry = uri.replace(/^[^/]+\.amazonaws\.com\//, "");
+  return noRegistry.replace(/@sha256:([0-9a-f]{12})[0-9a-f]*$/, "@sha256:$1…");
+};
+
 export const FARGATE_CPU_OPTIONS = ["256", "512", "1024", "2048", "4096", "8192"];
 export const FARGATE_MEMORY_MAP = {
   "256": ["512", "1024", "2048"],
