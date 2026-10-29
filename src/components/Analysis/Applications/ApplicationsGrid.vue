@@ -584,8 +584,6 @@ const goToManifestBuilder = () => {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding-right: 12px;
-  border-right: 1px solid theme.$gray_2;
 }
 .filter-btn {
   height: 24px;
