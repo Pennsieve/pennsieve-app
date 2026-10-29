@@ -1,22 +1,17 @@
 <script setup>
 // The Apps tab: the applications workflow steps run. No views; the bar has
 // the search on the left (where other tabs have their view switch) and the
-// action on the right: publishing an app, which the guide walks through
-// (an app.yml in the repository, then the App Store release; the builder
-// is reached from it).
-import { computed, ref } from "vue";
-import { useRoute, useRouter } from "vue-router";
+// action on the right: publishing an app, a guided wizard
+// (PublishAppDialog: describe it, the repository from the template, the
+// GitHub App, the app.yml, the release).
+import { ref } from "vue";
 import BfButton from "../../shared/bf-button/BfButton.vue";
 import ApplicationsGrid from "./ApplicationsGrid.vue";
 import AnalysisViewBar from "../AnalysisViewBar.vue";
-
-const route = useRoute();
-const router = useRouter();
-const isMyWorkspace = computed(() => !route.params.orgId);
-const scoped = (name) => (isMyWorkspace.value ? `my-${name}` : name);
+import PublishAppDialog from "./PublishAppDialog.vue";
 
 const search = ref("");
-const publishGuide = () => router.push({ name: scoped("application-manifest-guide") });
+const publishOpen = ref(false);
 </script>
 
 <template>
@@ -33,8 +28,9 @@ const publishGuide = () => router.push({ name: scoped("application-manifest-guid
           />
         </label>
       </template>
-      <bf-button class="secondary" @click="publishGuide">Publish an app</bf-button>
+      <bf-button class="secondary" @click="publishOpen = true">Publish an app</bf-button>
     </AnalysisViewBar>
+    <PublishAppDialog v-model="publishOpen" />
     <!-- As the Workflows tab's Library: the grid's own 20px/32px padding,
          scrolling under a fixed bar. -->
     <div class="apps-body">
