@@ -77,8 +77,7 @@
                     <div class="info-card">
                       <p>
                         These are the repositories the Pennsieve GitHub App can see. Choose where each
-                        one's releases go (Discover, the App Store, or both); every tagged release then
-                        fans out automatically.
+                        one's releases go: Discover, the App Store, or both.
                       </p>
                       <router-link to="/my-workspace/settings/integrations/github" class="doc-link">
                         Manage GitHub settings &rarr;
