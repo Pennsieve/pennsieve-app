@@ -10,7 +10,7 @@ import IconPennsieveMark from "../../icons/IconPennsieveMark.vue";
 import WorkflowThumbnail from "../WorkflowGraph/WorkflowThumbnail.vue";
 import RunWizardDialog from "../RunMonitor/RunWizardDialog.vue";
 import { ioSummary, appNames, usageLine, cardText } from "./workflowSummary";
-import { applyFilters, libraryWorkflows, outputOptions, sortWorkflows, SORTS } from "./galleryFilter";
+import { applyFilters, fieldOptions, libraryWorkflows, outputOptions, sortWorkflows, SORTS } from "./galleryFilter";
 
 defineProps({
   // Inside the Workflows tab's Library, whose bar has the New Workflow button.
@@ -31,6 +31,7 @@ const statusFilter = ref("active");
 const scopeFilter = ref("workspace"); // "workspace" | "public" | "pennsieve" (public, official only)
 const inputFilter = ref("any"); // "any" | "dataset" | "none"
 const outputFilter = ref("any"); // "any" | a target type
+const fieldFilter = ref("any"); // "any" | a research field's key
 
 // The sort is the viewer's, kept in this browser.
 const SORT_KEY = "pennsieve.gallery.workflowSort";
@@ -80,13 +81,18 @@ const scopeOptions = computed(() => [
 const isPublicScope = computed(() => scopeFilter.value !== "workspace");
 
 const outputChoices = computed(() => outputOptions(workflows.value, targetTypes.value));
+// The research fields the workflows' apps serve, as chips, as on the Apps tab.
+const fieldChips = computed(() => fieldOptions(libraryWorkflows(workflows.value), applications.value));
+const toggleField = (key) => (fieldFilter.value = fieldFilter.value === key ? "any" : key);
 const filtersSet = computed(
-  () => !!searchQuery.value.trim() || inputFilter.value !== "any" || outputFilter.value !== "any"
+  () =>
+    !!searchQuery.value.trim() || inputFilter.value !== "any" || outputFilter.value !== "any" || fieldFilter.value !== "any"
 );
 function clearFilters() {
   searchQuery.value = "";
   inputFilter.value = "any";
   outputFilter.value = "any";
+  fieldFilter.value = "any";
 }
 
 const filteredWorkflows = computed(() =>
@@ -95,6 +101,7 @@ const filteredWorkflows = computed(() =>
       query: searchQuery.value,
       input: inputFilter.value,
       output: outputFilter.value,
+      field: fieldFilter.value,
       officialOnly: scopeFilter.value === "pennsieve",
       applications: applications.value,
       targetTypes: targetTypes.value,
@@ -301,6 +308,22 @@ onMounted(async () => {
         <el-select v-model="statusFilter" size="small" class="status-select toolbar-status" aria-label="Status">
           <el-option v-for="option in filterOptions" :key="option.value" :label="option.label" :value="option.value" />
         </el-select>
+      </div>
+
+      <div v-if="fieldChips.length" class="field-row" role="group" aria-label="Research field">
+        <span class="field-label">Field</span>
+        <button
+          v-for="{ field, count } in fieldChips"
+          :key="field.key"
+          type="button"
+          class="field-chip"
+          :class="{ active: fieldFilter === field.key }"
+          :aria-pressed="fieldFilter === field.key"
+          @click="toggleField(field.key)"
+        >
+          {{ field.label }}
+          <span class="field-count">{{ count }}</span>
+        </button>
       </div>
 
       <p v-if="scopeFilter === 'pennsieve'" class="scope-hint">
@@ -558,6 +581,45 @@ onMounted(async () => {
 .scope-buttons {
   padding-right: 12px;
   border-right: 1px solid theme.$gray_2;
+}
+
+/* The research fields, outlined and grey as on the Apps tab. */
+.field-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: -4px 0 16px;
+}
+.field-label {
+  margin-right: 4px;
+  font-size: 12px;
+  color: theme.$gray_5;
+}
+.field-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border: 1px solid theme.$gray_2;
+  border-radius: 3px;
+  background: theme.$white;
+  font: inherit;
+  font-size: 12px;
+  color: theme.$gray_6;
+  cursor: pointer;
+
+  &:hover {
+    border-color: theme.$gray_4;
+  }
+  &.active {
+    border-color: theme.$gray_6;
+    font-weight: 600;
+  }
+}
+.field-count {
+  color: theme.$gray_4;
+  font-weight: 400;
 }
 
 .scope-hint {

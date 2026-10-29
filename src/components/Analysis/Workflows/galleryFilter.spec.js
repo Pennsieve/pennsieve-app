@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { applyFilters, libraryWorkflows, matchesSearch, outputOptions, sortWorkflows, workflowsView } from "./galleryFilter";
+import { applyFilters, fieldOptions, libraryWorkflows, workflowFields, matchesSearch, outputOptions, sortWorkflows, workflowsView } from "./galleryFilter";
 
 const spikes = {
   name: "EEG spikes",
@@ -57,6 +57,41 @@ describe("applyFilters", () => {
       { value: "download", label: "Download" },
       { value: "pennsieve", label: "Pennsieve Dataset" },
     ]);
+  });
+});
+
+describe("research fields", () => {
+  const app = (url, tags) => ({ sourceUrl: url, versions: [{ version: "v1", createdAt: "2026-01-01", manifest: { tags } }] });
+  const applications = [
+    app("https://github.com/org/spike-detect", ["eeg", "epilepsy"]),
+    app("https://github.com/org/fcs-qc", ["cytometry", "immunology"]),
+    app("https://github.com/org/tumour-map", ["imaging", "oncology", "immune"]),
+  ];
+  const step = (url) => ({ id: url, type: "processor", sourceUrl: url });
+  const cyto = { name: "Cyto", dag: [step("https://github.com/org/fcs-qc/"), step("https://github.com/org/tumour-map")] };
+  const all = [spikes, zipper, cyto];
+
+  it("are the union of its steps' apps' fields", () => {
+    expect(workflowFields(spikes, applications).map((f) => f.key)).toEqual(["neuroscience"]);
+    expect(workflowFields(cyto, applications).map((f) => f.key)).toEqual(["immunology", "oncology"]);
+    // An app not loaded, or without fields, adds none.
+    expect(workflowFields(zipper, applications)).toEqual([]);
+  });
+
+  it("offers the fields the list has, most common first", () => {
+    const more = { name: "Spikes again", dag: [step("https://github.com/org/spike-detect")] };
+    expect(fieldOptions([...all, more], applications).map((o) => [o.field.key, o.count])).toEqual([
+      ["neuroscience", 2],
+      ["immunology", 1],
+      ["oncology", 1],
+    ]);
+  });
+
+  it("filters by field, with the other filters", () => {
+    expect(applyFilters(all, { field: "immunology", applications })).toEqual([cyto]);
+    expect(applyFilters(all, { field: "neuroscience", input: "dataset", applications })).toEqual([spikes]);
+    expect(applyFilters(all, { field: "neuroscience", input: "none", applications })).toEqual([]);
+    expect(applyFilters(all, { field: "any", applications })).toEqual(all);
   });
 });
 

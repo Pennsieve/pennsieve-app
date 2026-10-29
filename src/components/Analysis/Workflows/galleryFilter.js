@@ -5,6 +5,7 @@ import { normalizeUrl } from "../RunMonitor/runHelpers";
 import { versionManifest } from "../WorkflowBuilder/appManifestInfo";
 import { isNotebookWorkflow } from "../RunMonitor/notebookHelpers";
 import { interfaceDag } from "../RunMonitor/workflowInterface";
+import { fieldsOf } from "../Applications/appDomains";
 
 // Whether a workflow matches a search: its name, description, the apps it
 // runs, or what goes in and comes out ("spike" finds the one running
@@ -36,13 +37,38 @@ export function outputOptions(list, targetTypes = []) {
     .sort((a, b) => a.label.localeCompare(b.label));
 }
 
-// officialOnly keeps Pennsieve's.
-export function applyFilters(list, { query, input = "any", output = "any", officialOnly = false, ...context } = {}) {
+// Each app step's app, by its source URL (null for an app not loaded).
+function stepApps(wf, applications) {
+  const byUrl = new Map((applications || []).map((a) => [normalizeUrl(a.sourceUrl), a]));
+  return interfaceDag(wf)
+    .filter((n) => n.sourceUrl)
+    .map((n) => byUrl.get(normalizeUrl(n.sourceUrl)) || null);
+}
+
+// The research fields a workflow serves: those of its steps' apps, from
+// their app.yml tags, in step order.
+export function workflowFields(wf, applications = []) {
+  return [...new Set(stepApps(wf, applications).flatMap((app) => fieldsOf(versionManifest(app))))];
+}
+
+// The field chips for a list: each field some workflow serves, with how
+// many workflows, most common first.
+export function fieldOptions(list, applications = []) {
+  const counts = new Map();
+  for (const wf of list || []) for (const f of workflowFields(wf, applications)) counts.set(f, (counts.get(f) || 0) + 1);
+  return [...counts]
+    .map(([field, count]) => ({ field, count }))
+    .sort((a, b) => b.count - a.count || a.field.label.localeCompare(b.field.label));
+}
+
+// officialOnly keeps Pennsieve's; field is a research field's key.
+export function applyFilters(list, { query, input = "any", output = "any", field = "any", officialOnly = false, ...context } = {}) {
   return list.filter(
     (wf) =>
       (!officialOnly || wf.official) &&
       (input === "any" || inputKind(wf) === input) &&
       (output === "any" || outputTypes(wf).includes(output)) &&
+      (field === "any" || workflowFields(wf, context.applications).some((f) => f.key === field)) &&
       matchesSearch(wf, query, context)
   );
 }
@@ -62,10 +88,7 @@ export const SORTS = [
 
 // Whether every app step's app has an app.yml (a workflow of no apps does).
 function appsDeclared(wf, applications) {
-  const byUrl = new Map((applications || []).map((a) => [normalizeUrl(a.sourceUrl), a]));
-  return interfaceDag(wf)
-    .filter((n) => n.sourceUrl)
-    .every((n) => versionManifest(byUrl.get(normalizeUrl(n.sourceUrl))));
+  return stepApps(wf, applications).every((app) => versionManifest(app));
 }
 
 // Recommended, in tiers that can be explained: official first, then active
