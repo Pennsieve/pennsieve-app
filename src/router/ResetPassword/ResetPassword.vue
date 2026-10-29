@@ -29,6 +29,7 @@
         class="auth-form"
         label-position="top"
         hide-required-asterisk
+        novalidate
         @submit.prevent="onEmailFormSubmit"
       >
         <el-form-item
@@ -103,6 +104,7 @@
         class="auth-form"
         label-position="top"
         hide-required-asterisk
+        novalidate
         @submit.prevent="onPasswordFormSubmit"
       >
         <el-form-item
