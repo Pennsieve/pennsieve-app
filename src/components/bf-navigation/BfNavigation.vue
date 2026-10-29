@@ -189,7 +189,7 @@
       </bf-navigation-item>
 
       <bf-navigation-item
-        v-if="hasAdminRights && !pageNotFound && !isWorkspaceGuest"
+        v-if="!(pageNotFound || isWelcomeOrg) && !isWorkspaceGuest"
         :link="{ name: 'workspace-settings-overview', params: { orgId: activeOrganizationId } }"
         label="Settings"
         :condensed="primaryNavCondensed"

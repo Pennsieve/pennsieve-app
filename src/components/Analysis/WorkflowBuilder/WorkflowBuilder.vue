@@ -1,21 +1,22 @@
 <script setup>
-import { computed, ref, reactive, onMounted, nextTick } from "vue";
+import { computed, h, ref, reactive, onMounted, onBeforeUnmount, nextTick, watch, provide } from "vue";
 
 import { useStore } from "vuex";
-import { useRouter } from "vue-router";
+import { useRouter, useRoute } from "vue-router";
 
 // Vue Flow Imports
 import { useVueFlow, VueFlow, Handle, Position } from "@vue-flow/core";
 import { Background } from "@vue-flow/background";
 import { Controls } from "@vue-flow/controls";
+import { MiniMap } from "@vue-flow/minimap";
 import dagre from "@dagrejs/dagre";
 import { ElMessage, ElMessageBox } from "element-plus";
+import { ArrowLeft, ArrowRight, RefreshLeft, RefreshRight } from "@element-plus/icons-vue";
 import EventBus from "../../../utils/event-bus";
 import IconFile from "../../icons/IconFile.vue";
 import IconCollection from "../../icons/IconCollection.vue";
 import IconAnalysis from "../../icons/IconAnalysis.vue";
 import IconInfoSmall from "../../icons/IconInfoSmall.vue";
-import IconPencil from "../../icons/IconPencil.vue";
 import IconPennsieveMark from "../../icons/IconPennsieveMark.vue";
 import {
   STANDARD_CPU_OPTIONS,
@@ -23,16 +24,67 @@ import {
   LAMBDA_MEMORY_OPTIONS,
   getCpuForMemory,
   formatResourceLabel,
+  targetTypeName,
 } from "../RunMonitor/runHelpers";
 import BfButton from "../../shared/bf-button/BfButton.vue";
 import MetricsDashboard from "../Metrics/MetricsDashboard.vue";
+import CompactFlowNode from "../WorkflowGraph/CompactFlowNode.vue";
+import LlmMark from "../WorkflowGraph/LlmMark.vue";
+import RunWizardDialog from "../RunMonitor/RunWizardDialog.vue";
+import RuntimeMark from "../WorkflowGraph/RuntimeMark.vue";
+import GraphDensityToggle from "../WorkflowGraph/GraphDensityToggle.vue";
+import { COMPACT_BOX, layoutBox, overlaps, recenter, useGraphDensity } from "../WorkflowGraph/graphDensity";
 import {
   toParamSchema,
   validateAppConnection,
+  validateStepInputs,
 } from "../Applications/applicationSchema";
 import { useAppManifest } from "@/composables/useAppManifest";
+import BuilderBar from "./BuilderBar.vue";
+import BuilderPalette from "./BuilderPalette.vue";
+import ParamField from "./ParamField.vue";
+import { ioLine, sessionTypeOf, versionManifest, shortMediaType } from "./appManifestInfo";
+import { domainOfTag, domainColors } from "../Applications/appDomains";
+import { diffLines, manifestDiff, versionWarnings } from "./manifestDiff";
+import { builderReadiness, readinessLabel } from "./builderReadiness";
+import { stepNames } from "./stepNames";
+import StepPicker from "./StepPicker.vue";
+import LinkEdge from "./LinkEdge.vue";
+import { sourceLabel, sourceHints, hintLine } from "../WorkflowGraph/sourceInputs";
+import { canvasDefinition, toInterfaceDefinition } from "./builderInterface";
+import { workflowLayouts } from "../RunMonitor/runLayout";
+import IoPill from "../WorkflowGraph/IoPill.vue";
+import { isFeatureEnabled } from "@/utils/features";
+import { useGraphHistory, snapshot } from "./graphHistory";
+import { canConnect, neighbourInDirection } from "./graphEditing";
+import {
+  routedOutputs,
+  portHandleId,
+  portOfHandle,
+  canConnectFromHandle,
+  withPortPrefix,
+  withoutPortPrefix,
+  prefixParamOf,
+  PREFIX_PARAMS,
+  attachPorts,
+} from "./outputPorts";
+import {
+  routedInputs,
+  inputHandleId,
+  inputOfHandle,
+  edgeId,
+  linkAllowed,
+  linksOf,
+  edgesForStep,
+  attachInputPorts,
+  linkKeys,
+  edgeLink,
+  linkPorts,
+} from "./inputPorts";
+import { requiredUnset } from "./builderReadiness";
+import { fitsAfter } from "./appManifestInfo";
 
-const { onNodeClick, onPaneClick, onConnect, screenToFlowCoordinate, fitView } =
+const { onNodeClick, onPaneClick, onConnect, onConnectStart, onConnectEnd, onEdgeUpdate, screenToFlowCoordinate, fitView } =
   useVueFlow();
 
 const props = defineProps({
@@ -40,9 +92,22 @@ const props = defineProps({
     type: String,
     default: "",
   },
+  // Where the builder's bar goes (a selector), e.g. the Workflows tab's
+  // toolbar; empty: above the canvas.
+  toolbarTarget: {
+    type: String,
+    default: "",
+  },
 });
 
 const router = useRouter();
+const route = useRoute();
+// A workflow's page leads back to the Workflows tab's Library (My
+// Workspace's pages live under My Analysis, with no orgId).
+const workflowsRoute = computed(() => ({
+  name: route.params.orgId ? "workflows" : "my-workflows",
+  query: { view: "library" },
+}));
 
 /*
 Local State
@@ -56,7 +121,7 @@ const draggedApp = ref(null);
 const draggedType = ref(null); // 'application', 'data-source', or 'data-target'
 
 // Mode & workflow list state
-const mode = ref("browse"); // 'browse' | 'create'
+const mode = ref("browse"); // 'browse' (a saved workflow, read-only) | 'edit' (its owner editing it) | 'create'
 const selectedWorkflow = ref(null);
 const accordionActiveNames = ref(["workflows"]);
 
@@ -82,6 +147,9 @@ const selectedNodeParamSchema = computed(() => {
   if (!node || node.type !== "default") return [];
   // In browse mode: use paramSchema from the workflow definition DAG node
   if (node.data?.paramSchema?.length > 0) return node.data.paramSchema;
+  // Else the pinned version's app.yml (per-version manifests)
+  const manifestParams = versionManifest(node.data?.application, node.data?.tag)?.parameters;
+  if (manifestParams?.length) return toParamSchema(manifestParams);
   // In create mode: use params from the application (flat key-value object)
   const appParams = node.data?.application?.params;
   if (appParams && typeof appParams === "object" && !Array.isArray(appParams)) {
@@ -173,7 +241,7 @@ const saveWorkflowChanges = async () => {
       updated,
       availableApplications.value,
     );
-    nodes.value = result.nodes;
+    nodes.value = result.needsAutoLayout ? result.nodes : placeSaved(result.nodes);
     edges.value = result.edges;
     snapshotDefaultParams();
     hydrateManifestPorts();
@@ -182,6 +250,177 @@ const saveWorkflowChanges = async () => {
       detail: { type: "error", msg: "Failed to save workflow changes." },
     });
   }
+};
+
+// An app's name: its app.yml's, else its repository's (without its owner).
+const appDisplayName = (app) => versionManifest(app)?.name || extractRepoName(app?.sourceUrl) || repoName(app);
+
+/*
+  The side panels (palette, inspector) can be folded to a rail; the choice
+  is kept in this browser.
+*/
+const PANELS_KEY = "pennsieve.builder.panels";
+const storedPanels = () => {
+  try {
+    return { palette: true, inspector: true, ...JSON.parse(localStorage.getItem(PANELS_KEY) || "{}") };
+  } catch {
+    return { palette: true, inspector: true };
+  }
+};
+const panels = ref(storedPanels());
+const togglePanel = (which) => {
+  panels.value = { ...panels.value, [which]: !panels.value[which] };
+  try {
+    localStorage.setItem(PANELS_KEY, JSON.stringify(panels.value));
+  } catch {
+    // not kept
+  }
+};
+// Selecting a step opens the inspector, if folded.
+watch(selectedNode, (n) => {
+  if (n && !panels.value.inspector) panels.value = { ...panels.value, inspector: true };
+});
+
+// The selected app step's manifest: its pinned version's.
+const stepManifest = computed(() => {
+  const node = selectedNode.value;
+  if (node?.type !== "default") return null;
+  return versionManifest(node.data?.application, node.data?.tag);
+});
+const manifestsKnown = computed(() =>
+  (availableApplications.value || []).some((a) => (a.versions || []).some((v) => v.manifest)),
+);
+const ioTypes = (port) => ioLine({ inputs: [port], outputs: [] }).replace(/ → .*$/, "");
+
+/*
+  The app step's panel: what the app is (its app.yml as the step loaded
+  it), and where each input comes from and each output goes on the canvas.
+*/
+const stepAbout = computed(() => {
+  const node = selectedNode.value;
+  if (node?.type !== "default") return null;
+  const about = node.data?.manifestAbout;
+  const released = stepManifest.value;
+  const version = (node.data?.application?.versions || []).find((v) => v.version === node.data?.tag);
+  return {
+    description: about?.description || released?.description || node.data?.application?.description || "",
+    maintainers: about?.maintainers?.length ? about.maintainers : released?.maintainers || [],
+    tags: about?.tags?.length ? about.tags : released?.tags || [],
+    license: version?.license || "",
+  };
+});
+const tagStyle = (tag) => {
+  const c = domainColors(domainOfTag(tag));
+  return { background: c.bg, color: c.ink, borderColor: c.line };
+};
+const nodeLabel = (id) => nodes.value.find((n) => n.id === id)?.data?.label || "a step";
+// Where the step's inputs come from: the steps linked into it.
+const stepSources = computed(() => {
+  const node = selectedNode.value;
+  if (!node) return [];
+  return edges.value.filter((e) => e.target === node.id).map((e) => nodeLabel(e.source));
+});
+// Each output's links: by its port, or through "all outputs".
+const stepPorts = computed(() => {
+  const node = selectedNode.value;
+  if (node?.type !== "default") return { inputs: [], outputs: [], routed: false, allTo: [] };
+  const ports = node.data?.manifestPorts || stepManifest.value || { inputs: [], outputs: [] };
+  const routed = routedOutputs(ports).length > 0;
+  const out = edges.value.filter((e) => e.source === node.id);
+  const portName = (e) => portOfHandle(e.sourceHandle);
+  return {
+    inputs: ports.inputs || [],
+    outputs: (ports.outputs || []).map((p) => ({
+      ...p,
+      to: routed ? out.filter((e) => portName(e) === p.name).map((e) => nodeLabel(e.target)) : [],
+    })),
+    routed,
+    allTo: out.filter((e) => !portName(e)).map((e) => nodeLabel(e.target)),
+  };
+});
+const showAdvanced = ref(false);
+// An app step's panel: Settings (what you set) or About (what the app is).
+// Settings when the workflow can be edited, About when it can't.
+const stepTab = ref("settings");
+watch(
+  () => selectedNode.value?.id,
+  () => {
+    stepTab.value = canEditConfig.value ? "settings" : "about";
+  }
+);
+
+/*
+  A step's app version: pinned (data.tag). Switching shows what changes,
+  from the two versions' app.yml (manifestDiff), and warns about what the
+  workflow would lose; a newer version is offered as an update.
+*/
+const newerVersion = computed(() => {
+  const node = selectedNode.value;
+  if (node?.type !== "default") return null;
+  const latest = latestVersion(node.data?.application);
+  return latest && node.data.tag && latest.version !== node.data.tag ? latest.version : null;
+});
+const updateLines = computed(() => {
+  const node = selectedNode.value;
+  if (!newerVersion.value) return [];
+  return diffLines(
+    manifestDiff(versionManifest(node.data.application, node.data.tag), versionManifest(node.data.application, newerVersion.value)),
+  );
+});
+
+const applyVersion = (node, tag) => {
+  node.data.tag = tag;
+  const m = versionManifest(node.data.application, tag);
+  if (m) {
+    node.data.paramSchema = toParamSchema(m.parameters || []);
+    node.data.manifestPorts = { inputs: m.inputs || [], outputs: m.outputs || [] };
+    node.data.hasManifest = true;
+  }
+  revalidateEdges();
+};
+
+const requestVersion = async (tag) => {
+  const node = selectedNode.value;
+  if (!node || !tag || tag === node.data.tag) return;
+  const app = node.data.application;
+  const d = manifestDiff(versionManifest(app, node.data.tag), versionManifest(app, tag));
+  const lines = diffLines(d);
+  const warnings = versionWarnings(d, node.data.defaultParams || {});
+  if (lines.length || warnings.length) {
+    try {
+      await ElMessageBox.confirm(
+        h("div", { class: "version-change" }, [
+          lines.length ? h("ul", lines.map((l) => h("li", l))) : null,
+          ...warnings.map((w) => h("p", { class: "version-warning" }, `⚠ ${w}`)),
+        ]),
+        `Use version ${tag}?`,
+        { confirmButtonText: `Use ${tag}`, cancelButtonText: "Keep current", type: warnings.length ? "warning" : "info" },
+      );
+    } catch {
+      return;
+    }
+  }
+  applyVersion(node, tag);
+};
+
+// app.yml as written, in a dialog.
+const appYml = ref(null); // { title, text }
+const viewAppYml = async (node) => {
+  const app = node?.data?.application;
+  if (!app?.uuid) return;
+  appYml.value = { title: `${node.data.label}: app.yml`, text: "Loading…" };
+  const parsed = await loadManifest(app.uuid);
+  if (appYml.value) appYml.value.text = parsed?.raw || "This app has no app.yml.";
+};
+
+// Set (or, with undefined, clear) a step's override of a parameter.
+const setDefaultParam = (paramName, value) => {
+  const node = selectedNode.value;
+  if (!node) return;
+  const updated = { ...(node.data.defaultParams || {}) };
+  if (value === undefined) delete updated[paramName];
+  else updated[paramName] = value;
+  node.data.defaultParams = updated;
 };
 
 // Remove a defaultParam override (reverts to app default)
@@ -267,7 +506,9 @@ const getComputeTypesForTarget = (targetType) => {
   // TODO: use API-driven computeTypes once target types return them reliably
   // return tt?.runtimeConfig?.computeTypes || DEFAULT_COMPUTE_TYPES;
   const types = tt?.runtimeConfig?.computeTypes;
-  return types && types.length ? withGpu(types) : DEFAULT_COMPUTE_TYPES;
+  // A target moves results, so it never runs on a GPU.
+  const noGpu = (list) => list.filter((t) => t !== "gpu");
+  return noGpu(types && types.length ? types : DEFAULT_COMPUTE_TYPES);
 };
 
 const getComputeTypesForApplication = (application) => {
@@ -327,7 +568,16 @@ const setManifestPorts = (node, parsed) => {
     inputs: parsed.schema.inputs || [],
     outputs: parsed.schema.outputs || [],
   };
+  // What the step's panel says about the app, from the same app.yml.
+  node.data.manifestAbout = {
+    description: parsed.meta?.description || "",
+    maintainers: parsed.meta?.maintainers || [],
+    tags: parsed.schema?.tags || [],
+  };
   node.data.hasManifest = true;
+  // A reopened workflow's links into data targets leave from the output
+  // ports their prefixes name, once the ports are known.
+  edges.value = attachInputPorts(attachPorts(edges.value, nodes.value), nodes.value);
   // A manifest can land after the user has already drawn the edge — the
   // connection was made against no port information at all, so re-check
   // everything now that we have some.
@@ -366,15 +616,33 @@ const getTargetTypeParams = (targetType) => {
   return tt?.params || [];
 };
 
-const getTargetTypeLabel = (targetType) => {
-  if (!targetType) return "No target selected";
-  const tt = targetTypes.value.find((t) => t.targetType === targetType);
-  return tt?.label || targetType;
-};
+const getTargetTypeLabel = (targetType) =>
+  targetType ? targetTypeName(targetType, targetTypes.value) : "No target selected";
 
 const onTargetTypeChange = (data) => {
   const types = getComputeTypesForTarget(data.targetType);
   data.computeType = types.length ? types[0] : null;
+  applyPortPrefix(data);
+};
+
+// A target fed by an output port takes that output's folder, in the prefix
+// parameter its type reads (PATH_PREFIX or pathPrefix). A type that takes
+// no prefix can't take part of an output: the port's link is removed.
+const applyPortPrefix = (data) => {
+  // The settings panel's data may be the step's or a copy: find the step.
+  const node = nodes.value.find((n) => n.data === data) || nodes.value.find((n) => n.id === selectedNode.value?.id);
+  const edge = node && edges.value.find((e) => e.target === node.id && portOfHandle(e.sourceHandle));
+  if (!edge) return;
+  const port = portOfHandle(edge.sourceHandle);
+  const key = prefixParamOf(getTargetTypeParams(data.targetType));
+  node.data.defaultParams = withoutPortPrefix(node.data.defaultParams, port);
+  if (key) {
+    node.data.defaultParams = withPortPrefix(node.data.defaultParams, port, key);
+    return;
+  }
+  dropEdges((e) => e.id === edge.id);
+  revalidateEdges();
+  ElMessage({ type: "info", showClose: true, message: `This kind of data target takes a step's whole output, so the link from the ${port} output was removed. Connect it from "all outputs" instead.` });
 };
 
 const toggleTargetEdit = (nodeId) => {
@@ -393,6 +661,10 @@ Filtered Workflow List
 Mode Management
 */
 const isReadOnly = computed(() => mode.value === "browse");
+// The builder saves inputs and outputs (features.workflowInterface).
+const interfaceOn = isFeatureEnabled("workflowInterface");
+// Where a new output can go, to start with.
+const DEFAULT_ACCEPTS = ["Pennsieve Dataset", "download"];
 
 const enterCreateMode = () => {
   mode.value = "create";
@@ -400,7 +672,9 @@ const enterCreateMode = () => {
   selectedNode.value = null;
   isEditingDetails.value = false;
   clearWorkflow();
-  accordionActiveNames.value = ["data-and-apps"];
+  seedCanvas();
+  history.reset();
+  accordionActiveNames.value = ["information"];
   store.commit("analysisModule/SET_SELECTED_WORKFLOW", {});
 };
 
@@ -499,6 +773,14 @@ const versionOptionLabel = (app, v) => {
     : v.version;
 };
 
+// The minimap, from this many steps: below it, fit-to-view does the job.
+const MINIMAP_FROM = 15;
+const minimapColor = (node) => {
+  if (node.type === "data-source") return "#6366f1";
+  if (node.type === "data-target") return "#64748b";
+  return "#E0912A"; // the processor orange ($orange_2)
+};
+
 const nodeTypeColor = (type) => {
   if (type === "data-source") return "#6366f1";
   if (type === "data-target") return "#64748b";
@@ -506,7 +788,8 @@ const nodeTypeColor = (type) => {
 };
 
 const definitionToNodesAndEdges = (workflow, applications) => {
-  const raw = workflow.dag || [];
+  // A workflow's inputs and outputs drawn as its source and target nodes.
+  const raw = canvasDefinition(workflow).dag || [];
   if (raw.length === 0) return { nodes: [], edges: [], needsAutoLayout: false };
 
   // Normalize IDs
@@ -568,10 +851,16 @@ const definitionToNodesAndEdges = (workflow, applications) => {
           (p.memory ? String(p.memory) : "") ||
           (matchedApplication?.runtimeConfig?.memory ? String(matchedApplication.runtimeConfig.memory) : ""),
         application: matchedApplication,
+        ...(p.runtimeConfig?.interactive && { interactive: true, sessionType: p.runtimeConfig.sessionType || "" }),
         defaultParams: p.defaultParams || {},
         paramSchema: p.paramSchema || [],
         resolvedParams: p.resolvedParams || {},
         tag: p.tag || latestVersion(matchedApplication)?.version || "",
+        // An input's or output's own name and settings (its panel).
+        ...(p.name && { name: p.name }),
+        ...(p.input?.optional && { optional: true }),
+        ...(p.output?.accepts?.length && { accepts: [...p.output.accepts] }),
+        ...(p.output?.required && { required: true }),
       },
       position:
         hasSavedPositions && p.position
@@ -580,20 +869,25 @@ const definitionToNodesAndEdges = (workflow, applications) => {
     };
   });
 
-  // Build edges from dependsOn
+  // Build edges from the steps' links (inputs) and dependsOn
   const procMap = Object.fromEntries(processors.map((p) => [p.id, p]));
   const resultEdges = [];
   for (const p of processors) {
-    for (const dep of p.dependsOn || []) {
-      const srcNode = procMap[dep];
-      resultEdges.push({
-        id: `e${dep}-${p.id}`,
-        source: dep,
-        target: p.id,
+    resultEdges.push(
+      ...edgesForStep(p, ({ source, target, data }) => ({
+        id: data ? `e${source}:${data.output || ""}-${target}:${data.input}` : `e${source}-${target}`,
+        source,
+        target,
+        // Named, so a step with ports draws it from its main points;
+        // attachPorts and attachInputPorts move it to its ports once the
+        // manifests are in. A link keeps its input and output until then.
+        sourceHandle: "source",
+        targetHandle: "target",
+        ...(data && { data }),
         animated: false,
-        style: { stroke: nodeTypeColor(srcNode?.type) },
-      });
-    }
+        style: { stroke: nodeTypeColor(procMap[source]?.type) },
+      }))
+    );
   }
 
   return {
@@ -678,11 +972,8 @@ const isWorkflowCreator = computed(() => {
   );
 });
 
-// Application version + default params are editable while building a new
-// workflow (create mode) or by the creator viewing an existing definition.
-const canEditConfig = computed(
-  () => mode.value === "create" || isWorkflowCreator.value,
-);
+// Steps' settings are editable while building (create) or editing (edit).
+const canEditConfig = computed(() => mode.value !== "browse");
 
 const isPublicWorkflow = computed(
   () => selectedWorkflow.value?.visibility === "public",
@@ -746,6 +1037,8 @@ const togglePublish = async () => {
 
 const selectWorkflow = (workflow) => {
   mode.value = "browse";
+  viewingVersion.value = null;
+  if (workflow?.uuid && workflow.uuid !== selectedWorkflow.value?.uuid) loadVersions(workflow.uuid);
   selectedWorkflow.value = workflow;
   selectedNode.value = null;
   isEditingDetails.value = false;
@@ -758,7 +1051,7 @@ const selectWorkflow = (workflow) => {
     workflow,
     availableApplications.value,
   );
-  nodes.value = result.nodes;
+  nodes.value = result.needsAutoLayout ? result.nodes : placeSaved(result.nodes);
   edges.value = result.edges;
   snapshotDefaultParams();
   // Fire-and-forget: the manifests patch the nodes and re-run the check.
@@ -769,6 +1062,59 @@ const selectWorkflow = (workflow) => {
   } else {
     setTimeout(() => fitView({ padding: 0.2, maxZoom: 1 }), 50);
   }
+  markLayoutSaved();
+  history.reset();
+};
+
+/*
+  Layout of a saved workflow: its owner can move steps, inputs and outputs
+  (or Tidy up) while viewing it, and save where they are, in place on the
+  latest version: positions never change what runs, so no new version.
+*/
+const layoutOf = () =>
+  Object.fromEntries(
+    nodes.value.map((n) => {
+      const p = positionToSave(n);
+      return [n.id, { x: Math.round(p.x), y: Math.round(p.y) }];
+    })
+  );
+const savedLayout = ref({});
+const markLayoutSaved = () => {
+  savedLayout.value = layoutOf();
+};
+const canSaveLayout = computed(() => mode.value === "browse" && isWorkflowCreator.value && !viewingVersion.value);
+const layoutChanged = computed(() => {
+  if (!canSaveLayout.value) return false;
+  const saved = savedLayout.value;
+  return nodes.value.some((n) => {
+    const p = positionToSave(n);
+    const was = saved[n.id];
+    return !was || Math.abs(Math.round(p.x) - was.x) > 0 || Math.abs(Math.round(p.y) - was.y) > 0;
+  });
+});
+const savingLayout = ref(false);
+const saveLayout = async () => {
+  const wf = selectedWorkflow.value;
+  if (!wf?.uuid || !layoutChanged.value) return;
+  savingLayout.value = true;
+  try {
+    const positions = layoutOf();
+    await store.dispatch("analysisModule/updateWorkflow", { uuid: wf.uuid, payload: { positions } });
+    // Its runs are drawn with this layout: read it again there.
+    workflowLayouts.forget(wf.uuid);
+    markLayoutSaved();
+    EventBus.$emit("toast", { detail: { type: "success", msg: "Layout saved." } });
+  } catch (err) {
+    console.error(err);
+    EventBus.$emit("toast", { detail: { type: "error", msg: "Could not save the layout." } });
+  } finally {
+    savingLayout.value = false;
+  }
+};
+const undoMoves = () => {
+  const saved = savedLayout.value;
+  const back = detailed.value ? (p) => p : (p) => recenter([{ position: p }], DETAILED_BOX, COMPACT_BOX)[0].position;
+  nodes.value = nodes.value.map((n) => (saved[n.id] ? { ...n, position: back({ ...saved[n.id] }) } : n));
 };
 
 /*
@@ -817,65 +1163,213 @@ const onDrop = (event) => {
     y: flowPos.y - dragOffset.value.y,
   };
 
-  const nodeId = generateNodeId();
-  let newNode;
-
-  if (draggedType.value === "data-source") {
-    newNode = {
-      id: nodeId,
-      type: "data-source",
-      data: {
-        label: "Data Source",
-      },
-      position,
-    };
-  } else if (draggedType.value === "data-target") {
-    newNode = {
-      id: nodeId,
-      type: "data-target",
-      data: {
-        label: "Data Target",
-        targetType:
-          targetTypes.value.length === 1
-            ? targetTypes.value[0].targetType
-            : null,
-        computeType:
-          targetTypes.value.length === 1 &&
-          targetTypes.value[0].runtimeConfig?.computeTypes?.length
-            ? targetTypes.value[0].runtimeConfig.computeTypes[0]
-            : null,
-      },
-      position,
-    };
-  } else if (draggedApp.value) {
-    newNode = {
-      id: nodeId,
-      type: "default",
-      data: {
-        label: repoName(draggedApp.value),
-        application: draggedApp.value,
-        computeType: "standard",
-        cpu: "",
-        memory: "",
-        defaultParams: {},
-        paramSchema: [],
-        hasManifest: false,
-        tag: latestVersion(draggedApp.value)?.version || "",
-      },
-      position,
-    };
-  }
-
-  const droppedApp = draggedApp.value;
-
-  if (newNode) {
-    nodes.value.push(newNode);
-    // Fire-and-forget: patches the node in place once app.yml is read.
-    if (droppedApp) applyManifestDefaults(newNode.id, droppedApp);
-  }
+  const type = draggedType.value === "application" ? "default" : draggedType.value;
+  if (type !== "default" || draggedApp.value) addNode(type, draggedApp.value, position);
 
   draggedApp.value = null;
   draggedType.value = null;
+};
+
+/*
+  Adding steps
+  ------------
+  A node of a type ("data-source", "data-target", or "default" for an app),
+  at a position. Dragging places it where it's dropped; clicking a palette
+  item or a step's + places it below a step, connects it and tidies the
+  layout (addStep).
+*/
+// An app step's domain colour (its pinned version's app.yml tags), for its
+// strip on the canvas; none for an app without a domain, which keeps the
+// processor's own.
+// Whether a step's app calls language models through Pennsieve: its version's
+// app.yml declares runtime.llm (LLM access is opt-in). Shown as an icon.
+const usesLLM = (data) => !!versionManifest(data?.application, data?.tag)?.runtime?.llm;
+const makeNode = (type, app, position) => {
+  const id = generateNodeId();
+  if (type === "data-source") {
+    return { id, type, data: { label: "Input data" }, position };
+  }
+  if (type === "data-target") {
+    const only = targetTypes.value.length === 1 ? targetTypes.value[0] : null;
+    return {
+      id,
+      type,
+      data: {
+        label: "Output",
+        targetType: only ? only.targetType : null,
+        computeType: only?.runtimeConfig?.computeTypes?.[0] || null,
+        // A new output can go to a dataset or a download unless the author
+        // says otherwise (those the registry has).
+        ...(interfaceOn && {
+          accepts: DEFAULT_ACCEPTS.filter((t) => targetTypes.value.some((tt) => tt.targetType === t)),
+        }),
+      },
+      position,
+    };
+  }
+  return {
+    id,
+    type: "default",
+    data: {
+      label: appDisplayName(app),
+      application: app,
+      // A notebook kernel: a human-in-the-loop step, run as a live session.
+      ...(sessionTypeOf(app) && { interactive: true, sessionType: sessionTypeOf(app) }),
+      computeType: "standard",
+      cpu: "",
+      memory: "",
+      defaultParams: {},
+      paramSchema: [],
+      hasManifest: false,
+      tag: latestVersion(app)?.version || "",
+    },
+    position,
+  };
+};
+
+const addNode = (type, app, position) => {
+  const node = makeNode(type, app, position);
+  nodes.value.push(node);
+  // Fire-and-forget: patches the node in place once app.yml is read.
+  if (app) applyManifestDefaults(node.id, app);
+  return node;
+};
+
+// Connects two steps, with the same checks and feedback as dragging a
+// connection between them.
+const LINK_REFUSED = {
+  "input-taken": (input) => `The ${input} input already has a link. Remove it first.`,
+  "unknown-input": (input) => `This step has no ${input} input.`,
+  "port-to-all": () => "Connect an output to one of the step's inputs.",
+  mixed: () => "These steps are already linked the other way: link them all to inputs, or all to the step's top point.",
+  duplicate: () => "These points are already linked.",
+};
+
+const connectNodes = (sourceId, targetId, sourceHandle, targetHandle) => {
+  const src = nodes.value.find((n) => n.id === sourceId);
+  const tgt = nodes.value.find((n) => n.id === targetId);
+  if (!canConnect(src, tgt, edges.value)) return false;
+  const port = portOfHandle(sourceHandle);
+  const input = inputOfHandle(targetHandle);
+  if (tgt.type === "default") {
+    const verdict = linkAllowed(src, tgt, sourceHandle, targetHandle, edges.value);
+    if (!verdict.ok) {
+      ElMessage({ type: "info", showClose: true, message: LINK_REFUSED[verdict.reason]?.(input) || "These points can't be linked." });
+      return false;
+    }
+  }
+  if (port) {
+    // An output port routes one output to one data target, or to an app.
+    if (!canConnectFromHandle(src, tgt, sourceHandle)) {
+      ElMessage({ type: "info", showClose: true, message: `The ${port} output connects to a data target or to another app's input.` });
+      return false;
+    }
+  }
+  if (port && tgt.type === "data-target") {
+    if (edges.value.some((e) => e.target === targetId)) {
+      ElMessage({ type: "info", showClose: true, message: "A data target fed by an output takes that one link. Remove its other link first." });
+      return false;
+    }
+    // No type picked yet: the prefix is set when it is (onTargetTypeChange).
+    if (tgt.data.targetType && !prefixParamOf(getTargetTypeParams(tgt.data.targetType))) {
+      ElMessage({ type: "info", showClose: true, message: "This kind of data target takes a step's whole output, not one output. Connect it from the step's main connection point." });
+      return false;
+    }
+  }
+  const handles = { sourceHandle: port ? sourceHandle : "source", targetHandle: input ? targetHandle : "target" };
+  edges.value.push({
+    id: edgeId(sourceId, targetId, handles.sourceHandle, handles.targetHandle),
+    source: sourceId,
+    target: targetId,
+    ...handles,
+    animated: false,
+    style: { stroke: nodeTypeColor(src.type) },
+  });
+  // A data target takes only this output's folder: OUTPUT_DIR/<port>/.
+  if (port && tgt.type === "data-target" && tgt.data.targetType) tgt.data.defaultParams = withPortPrefix(tgt.data.defaultParams, port, prefixParamOf(getTargetTypeParams(tgt.data.targetType)));
+  reportConnectionCheck(src, tgt, edges.value[edges.value.length - 1]);
+  revalidateEdges();
+  return true;
+};
+
+const selectOnly = (id) => {
+  nodes.value.forEach((n) => (n.selected = n.id === id));
+  edges.value.forEach((e) => (e.selected = false));
+  selectedNode.value = nodes.value.find((n) => n.id === id) || null;
+};
+
+// Adds a step after another (the selected one when not given), or below the
+// whole graph, connects it when the types allow, selects it and lays the
+// graph out.
+const addStep = (type, app, afterId = selectedNode.value?.id) => {
+  if (isReadOnly.value) return null;
+  const after = nodes.value.find((n) => n.id === afterId) ||
+    [...nodes.value].filter((n) => n.type !== "data-target").sort((a, b) => b.position.y - a.position.y)[0];
+  const gap = layoutBox(detailed.value, DETAILED_BOX);
+  const position = after
+    ? { x: after.position.x, y: after.position.y + gap.height + gap.ranksep }
+    : { x: 0, y: 0 };
+  const node = addNode(type, app, position);
+  if (after) connectNodes(after.id, node.id);
+  selectOnly(node.id);
+  nextTick(() => autoLayout());
+  return node;
+};
+
+/*
+  Connecting: while a connection is dragged from a step, steps whose inputs
+  accept its outputs (as their app.yml files declare) are highlighted, ones
+  that don't are dimmed, and ones that can't take it at all (an input, the
+  step itself) are faded. Unknown (no declared types) stays as is.
+*/
+const connectingFrom = ref(null);
+onConnectStart(({ nodeId, handleType }) => {
+  if (handleType === "source") connectingFrom.value = nodeId;
+});
+onConnectEnd(() => {
+  connectingFrom.value = null;
+});
+const connectClass = (id) => {
+  const fromId = connectingFrom.value;
+  if (!fromId || fromId === id) return "";
+  const src = nodes.value.find((n) => n.id === fromId);
+  const tgt = nodes.value.find((n) => n.id === id);
+  if (!canConnect(src, tgt, edges.value)) return "connect-no";
+  if (src.type !== "default" || tgt.type !== "default") return "";
+  const verdict = fitsAfter(src.data?.manifestPorts, tgt.data?.manifestPorts);
+  return verdict === "fits" ? "connect-fits" : verdict === "no" ? "connect-mismatch" : "";
+};
+const stepWarning = (id) => {
+  const node = nodes.value.find((n) => n.id === id);
+  const unset = node?.type === "default" ? requiredUnset(node) : [];
+  return unset.length ? `No value for ${unset.map((p) => `"${p}"`).join(", ")} (can be given when running)` : "";
+};
+const portTypes = (port) => (port.mediaTypes || []).map(shortMediaType).join(", ");
+// A link's label names types as the port chips do (CSV, not text/csv), so
+// labels on links into neighbouring inputs fit side by side.
+const shortTypes = (mediaTypes) => [...new Set(mediaTypes.map(shortMediaType))].join(", ");
+
+// The + under a step: pick what comes next.
+const pickerFor = ref(null); // the step the picker adds after
+const openStepPicker = (nodeId) => {
+  if (isReadOnly.value) return;
+  pickerFor.value = nodeId;
+};
+const onStepPicked = ({ type, app }) => {
+  const after = pickerFor.value;
+  pickerFor.value = null;
+  addStep(type, app, after);
+};
+const pickerTitle = computed(() => {
+  const n = nodes.value.find((x) => x.id === pickerFor.value);
+  return n ? `Add a step after ${n.data?.label || "this step"}` : "Add a step";
+});
+
+// A new workflow starts with its input, and a + below it.
+const seedCanvas = () => {
+  if (nodes.value.length) return;
+  addNode("data-source", null, { x: 0, y: 0 });
+  nextTick(() => setTimeout(() => fitView({ padding: 0.8, maxZoom: 1 }), 50));
 };
 
 const onDragOver = (event) => {
@@ -887,30 +1381,9 @@ const onDragOver = (event) => {
 onConnect((params) => {
   if (isReadOnly.value) return;
 
-  // Guard against self-loops
-  if (params.source === params.target) return;
-
-  // Guard against duplicate edges
-  const duplicate = edges.value.some(
-    (e) => e.source === params.source && e.target === params.target,
-  );
-  if (duplicate) return;
-
-  const srcNode = nodes.value.find((n) => n.id === params.source);
-  const tgtNode = nodes.value.find((n) => n.id === params.target);
-
-  edges.value.push({
-    id: `e${params.source}-${params.target}`,
-    source: params.source,
-    target: params.target,
-    animated: false,
-    style: { stroke: nodeTypeColor(srcNode?.type) },
-  });
-
-  // Immediate feedback: a toast for this connection, plus the persistent
-  // marks (red edge / canvas summary) that outlive it.
-  reportConnectionCheck(srcNode, tgtNode);
-  revalidateEdges();
+  // Self-loops, duplicates, into an input or out of an output are refused;
+  // the rest get a toast and the persistent marks (connectNodes).
+  connectNodes(params.source, params.target, params.sourceHandle, params.targetHandle);
 });
 
 /*
@@ -939,6 +1412,14 @@ const uncheckedEdgeCount = ref(0);
 
 const isAppNode = (node) => node?.type === "default";
 
+// The app steps with a manifest that feed a step: what its inputs can be
+// judged against.
+const upstreamApps = (targetId) =>
+  edges.value
+    .filter((e) => e.target === targetId)
+    .map((e) => nodes.value.find((n) => n.id === e.source))
+    .filter((n) => isAppNode(n) && n.data?.manifestPorts);
+
 const classifyEdge = (edge) => {
   const src = nodes.value.find((n) => n.id === edge.source);
   const tgt = nodes.value.find((n) => n.id === edge.target);
@@ -952,15 +1433,64 @@ const classifyEdge = (edge) => {
   const target = tgt.data?.manifestPorts;
   if (!source || !target) return { state: "unchecked", src, tgt };
 
+  // A link to a named input: this output (or all of them) against that input.
+  const joined = linkPorts(edgeLink(edge, tgt, edges.value), source, target);
+  if (joined) {
+    const link = validateAppConnection({ outputs: joined.outputs }, { inputs: [joined.input] });
+    if (!link.checked) return { state: "unchecked", src, tgt };
+    return link.compatible
+      ? { state: "ok", src, tgt, metInputs: link.metInputs }
+      : { state: "invalid", src, tgt, reason: link.reason, unmetInputs: link.unmetInputs };
+  }
+
   const { compatible, checked, reason, unmetInputs, metInputs } =
     validateAppConnection(source, target);
   // Manifests present but nothing comparable on the ports — no media types
   // declared on one side. Reported as unchecked, not as a match.
   if (!checked) return { state: "unchecked", src, tgt };
+  // With more than one upstream step, a required input may come from
+  // another one: the link is fine as long as it feeds something, and the
+  // step's own check (stepInputIssues) says what's still missing.
+  if (reason === "unmet-required" && upstreamApps(tgt.id).length > 1) {
+    return metInputs.length
+      ? { state: "ok", src, tgt, metInputs }
+      : { state: "invalid", src, tgt, reason: "no-overlap", unmetInputs };
+  }
   return compatible
     ? { state: "ok", src, tgt, metInputs }
     : { state: "invalid", src, tgt, reason, unmetInputs };
 };
+
+// Required inputs no upstream step provides, for steps fed by more than one
+// app or with links to inputs (with one plain link, the link itself says
+// so). An input with a link is provided; the others are judged against the
+// steps linked to "all inputs".
+const linkedInputNames = (n) =>
+  new Set(edges.value.filter((e) => e.target === n.id).map((e) => edgeLink(e, n, edges.value)?.input).filter(Boolean));
+const stepInputIssues = () =>
+  nodes.value
+    .filter((n) => isAppNode(n) && n.data?.manifestPorts && (upstreamApps(n.id).length > 1 || linkedInputNames(n).size))
+    .map((n) => {
+      const linked = linkedInputNames(n);
+      const plainSources = edges.value
+        .filter((e) => e.target === n.id && !edgeLink(e, n, edges.value))
+        .map((e) => nodes.value.find((x) => x.id === e.source))
+        .filter((x) => isAppNode(x) && x.data?.manifestPorts);
+      const { checked, unmetRequired } = validateStepInputs(
+        plainSources.map((u) => u.data.manifestPorts),
+        { ...n.data.manifestPorts, inputs: (n.data.manifestPorts.inputs || []).filter((p) => !linked.has(p.name)) },
+      );
+      return checked && unmetRequired.length
+        ? {
+            id: `step:${n.id}`,
+            targetId: n.id,
+            target: nodeName(n),
+            reason: "missing-required",
+            mediaTypes: portMediaTypes(unmetRequired),
+          }
+        : null;
+    })
+    .filter(Boolean);
 
 /*
   Media types are what the check compares, so they are also what it reports.
@@ -983,23 +1513,33 @@ const portMediaTypes = (ports) => {
 };
 
 /*
-  What matched, in media-type terms: the type that carried the match and the
-  description app.yml gives the port it fed. Naming the two applications again
-  is noise — the user just drew that edge and can see both ends of it.
-*/
-const matchedPortSummary = (port) => {
-  const head = portMediaTypes([port]).join(", ") || "any";
-  // The sentence supplies its own full stop; manifest descriptions usually
-  // carry one of their own.
-  const description = (port?.description || "").trim().replace(/\.$/, "");
-  return description ? `${head} \u2014 ${description}` : head;
-};
-
-/*
   Re-derive every edge's appearance from the current nodes. Cheap (a handful of
   edges, ports already in memory) and idempotent, so it can be called from
   anywhere the graph changes rather than trying to patch single edges.
 */
+// A link's label in a box (detailed view).
+const labelBox = (fill, border, text) => ({
+  labelShowBg: true,
+  labelBgPadding: [6, 3],
+  labelBgBorderRadius: 2,
+  labelBgStyle: { fill, stroke: border },
+  labelStyle: { fill: text, fontSize: 11, fontWeight: 600 },
+});
+
+// The compact view's lone ✓ or ✕: no box, just a halo in the canvas colour so
+// the line doesn't run through it.
+const bareMark = (color) => ({
+  labelShowBg: false,
+  labelStyle: {
+    fill: color,
+    fontSize: 16,
+    fontWeight: 700,
+    stroke: "#f7f7f7",
+    strokeWidth: 4,
+    paintOrder: "stroke",
+  },
+});
+
 const revalidateEdges = () => {
   const issues = [];
   let unchecked = 0;
@@ -1022,12 +1562,17 @@ const revalidateEdges = () => {
 
     if (result.state === "invalid") {
       const mediaTypes = portMediaTypes(result.unmetInputs);
+      const link = edgeLink(edge, result.tgt, edges.value);
       issues.push({
         id: edge.id,
-        source: result.src.data.label,
-        target: result.tgt.data.label,
+        sourceId: edge.source,
+        targetId: edge.target,
+        source: nodeName(result.src),
+        target: nodeName(result.tgt),
         reason: result.reason,
         mediaTypes,
+        needs: shortTypes(mediaTypes),
+        ...(link && { output: link.output || "", input: link.input }),
       });
       return {
         ...next,
@@ -1036,17 +1581,17 @@ const revalidateEdges = () => {
           strokeWidth: 2,
           strokeDasharray: "6 4",
         },
-        label:
-          result.reason === "no-overlap"
+        // Compact: the verdict only (the issues list has the detail).
+        label: !detailed.value
+          ? "\u2715"
+          : result.reason === "no-overlap"
             ? "\u26A0 media type mismatch"
             : mediaTypes.length
-              ? `\u26A0 needs ${mediaTypes.join(", ")}`
+              ? `\u26A0 needs ${shortTypes(mediaTypes)}`
               : "\u26A0 incompatible",
-        labelShowBg: true,
-        labelBgPadding: [6, 3],
-        labelBgBorderRadius: 2,
-        labelBgStyle: { fill: "#fdecec", stroke: INVALID_EDGE_COLOR },
-        labelStyle: { fill: INVALID_EDGE_COLOR, fontSize: 11, fontWeight: 600 },
+        ...(detailed.value
+          ? labelBox("#fdecec", INVALID_EDGE_COLOR, INVALID_EDGE_COLOR)
+          : bareMark(INVALID_EDGE_COLOR)),
       };
     }
 
@@ -1055,33 +1600,86 @@ const revalidateEdges = () => {
       return { ...next, style: { stroke, strokeDasharray: "2 4" } };
     }
 
+    // Input data into an app, or an app into a target: nothing to check,
+    // but say what flows there, in grey.
+    const flows = detailed.value ? flowTypes(edge) : "";
+    if (result.state === "skip" && flows) {
+      return {
+        ...next,
+        label: flows,
+        ...labelBox("#f3f4f6", "#d1d5db", "#4b5563"),
+      };
+    }
+
     if (result.state === "ok") {
       validated += 1;
       const mediaTypes = portMediaTypes(result.metInputs);
       return {
         ...next,
-        style: { stroke: VALID_EDGE_COLOR, strokeWidth: 2 },
-        label: mediaTypes.length ? `\u2713 ${mediaTypes.join(", ")}` : "\u2713",
-        labelShowBg: true,
-        labelBgPadding: [6, 3],
-        labelBgBorderRadius: 2,
-        labelBgStyle: { fill: "#eaf9ef", stroke: VALID_EDGE_COLOR },
-        labelStyle: { fill: "#0f7a3f", fontSize: 11, fontWeight: 600 },
+        // The usual weight: a link that fits needs no attention; the ✓ says
+        // it. A link that doesn't fit stays heavier (dashed, red).
+        style: { stroke: VALID_EDGE_COLOR },
+        label: mediaTypes.length && detailed.value ? `\u2713 ${shortTypes(mediaTypes)}` : "\u2713",
+        ...(detailed.value
+          ? labelBox("#eaf9ef", VALID_EDGE_COLOR, "#0f7a3f")
+          : bareMark("#0f7a3f")),
       };
     }
 
     return next;
   });
 
-  edgeIssues.value = issues;
+  edgeIssues.value = [...issues, ...stepInputIssues()];
   validEdgeCount.value = validated;
   uncheckedEdgeCount.value = unchecked;
 };
 
-const reportConnectionCheck = (srcNode, tgtNode) => {
+// What flows over a link that isn't checked: into an app, the types its
+// linked input takes (all its inputs' on "all inputs"); into a target, the
+// types of the output feeding it (all outputs' from "all outputs"). "" when
+// the app.yml says nothing about them.
+const flowTypes = (edge) => {
+  const src = nodes.value.find((n) => n.id === edge.source);
+  const tgt = nodes.value.find((n) => n.id === edge.target);
+  let ports = [];
+  if (src?.type === "data-source" && isAppNode(tgt)) {
+    const inputs = tgt.data?.manifestPorts?.inputs || [];
+    const link = edgeLink(edge, tgt, edges.value);
+    ports = link ? inputs.filter((p) => p.name === link.input) : inputs;
+  } else if (isAppNode(src) && tgt?.type === "data-target") {
+    const outputs = src.data?.manifestPorts?.outputs || [];
+    const port = portOfHandle(edge.sourceHandle);
+    ports = port ? outputs.filter((p) => p.name === port) : outputs;
+  } else {
+    return "";
+  }
+  const layouts = ports.flatMap((p) => [].concat(p.conformsTo || []).slice(-1)).map((c) => String(c).split("@")[0].toUpperCase());
+  const types = ports.flatMap((p) => p.mediaTypes || []);
+  return [...new Set([...layouts, ...types.map(shortMediaType)])].join(", ");
+};
+
+const reportConnectionCheck = (srcNode, tgtNode, edge) => {
   const source = srcNode?.data?.manifestPorts;
   const target = tgtNode?.data?.manifestPorts;
   if (!source || !target) return;
+
+  // A link to a named input: that output (or any of them) against that input.
+  const joined = edge && linkPorts(edgeLink(edge, tgtNode, edges.value), source, target);
+  if (joined) {
+    const link = validateAppConnection({ outputs: joined.outputs }, { inputs: [joined.input] });
+    if (!link.checked || link.compatible) return;
+    const accepts = portMediaTypes([joined.input]).join(", ");
+    ElMessage({
+      type: "warning",
+      duration: 6000,
+      showClose: true,
+      message:
+        `${joined.outputs.length === 1 ? `The ${joined.outputs[0].name} output of ${srcNode.data.label} doesn't` : `No output of ${srcNode.data.label}`} ` +
+        `match the ${joined.input.name} input of ${tgtNode.data.label}${accepts ? ` (accepts ${accepts})` : ""}. ` +
+        "The connection was made — check it before running.",
+    });
+    return;
+  }
 
   const { compatible, checked, reason, unmetInputs, metInputs } =
     validateAppConnection(source, target);
@@ -1090,26 +1688,13 @@ const reportConnectionCheck = (srcNode, tgtNode) => {
   // dashed and counted as unchecked on the canvas.
   if (!checked) return;
 
-  if (compatible) {
-    if (!metInputs?.length) return;
-    // One line per media type, not per port: several inputs accepting the same
-    // type is one fact about the edge, not three.
-    const matched = [];
-    const seenTypes = [];
-    metInputs.forEach((port) => {
-      const type = portMediaTypes([port]).join(", ") || "any";
-      if (seenTypes.includes(type)) return;
-      seenTypes.push(type);
-      matched.push(matchedPortSummary(port));
-    });
-    ElMessage({
-      type: "success",
-      duration: 4000,
-      showClose: true,
-      message: `Media types match: ${matched.join("; ")}.`,
-    });
-    return;
-  }
+  // A match shows on the edge itself; only a mismatch is worth a toast.
+  if (compatible) return;
+
+  // Fed by other steps too: this link only has to feed something. What the
+  // step as a whole still lacks shows in the readiness list.
+  const others = upstreamApps(tgtNode.id).filter((n) => n.id !== srcNode.id);
+  if (reason === "unmet-required" && others.length && metInputs.length) return;
 
   const mediaTypes = portMediaTypes(unmetInputs).join(", ");
   const detail =
@@ -1129,14 +1714,52 @@ const reportConnectionCheck = (srcNode, tgtNode) => {
   });
 };
 
+// A step's one-line summary: version, CPU and memory ("v1.3.6 · 1 vCPU ·
+// 2 GB"). Where it runs, when not the default, is a mark (RuntimeMark).
+const stepMeta = (data) => {
+  const version = data.tag || latestVersion(data.application)?.version || "";
+  const cpu = data.computeType !== "lambda" && data.cpu ? `${+(Number(data.cpu) / 1024).toFixed(2)} vCPU` : "";
+  const memory = data.memory ? formatResourceLabel(data.memory) : "";
+  return [version, cpu, memory].filter(Boolean).join(" · ");
+};
+// The folded resources line: "1 vCPU · 2 GB · Standard".
+const resourcesSummary = (data) => {
+  const cpu = data?.computeType !== "lambda" && data?.cpu ? `${+(Number(data.cpu) / 1024).toFixed(2)} vCPU` : "";
+  const memory = data?.memory ? formatResourceLabel(data.memory) : "";
+  const where = data?.computeType ? computeTypeName(data.computeType) : "";
+  return [cpu, memory, where].filter(Boolean).join(" · ");
+};
+const computeTypeName = (t) => ({ gpu: "GPU", lambda: "Lambda" })[t] || t.charAt(0).toUpperCase() + t.slice(1);
+
+// Where output port i of n sits on the step's bottom edge: the middle of
+// its column. The detailed card has 11px of padding and border each side;
+// the compact one spreads them evenly. !important beats the connectors'
+// own left: 50%.
+const portHandleLeft = (i, n) =>
+  detailed.value
+    ? `calc(11px + (100% - 22px) * ${(i + 0.5) / n}) !important`
+    : `${((i + 1) * 100) / (n + 1)}% !important`;
+
+// The output port feeding a node, or "" when none does.
+const feedingPort = (nodeId) => portOfHandle(edges.value.find((e) => e.target === nodeId && e.sourceHandle)?.sourceHandle);
+
+// Removes the edges that match, and the path prefix an output port's link
+// set on its data target.
+const dropEdges = (matches) => {
+  edges.value.filter(matches).forEach((e) => {
+    const port = portOfHandle(e.sourceHandle);
+    const tgt = port && nodes.value.find((n) => n.id === e.target && n.type === "data-target");
+    if (tgt) tgt.data.defaultParams = withoutPortPrefix(tgt.data.defaultParams, port);
+  });
+  edges.value = edges.value.filter((e) => !matches(e));
+};
+
 const removeNode = (nodeId) => {
   const nodeIndex = nodes.value.findIndex((n) => n.id === nodeId);
   if (nodeIndex === -1) return;
 
   // Remove associated edges
-  edges.value = edges.value.filter(
-    (edge) => edge.source !== nodeId && edge.target !== nodeId,
-  );
+  dropEdges((edge) => edge.source === nodeId || edge.target === nodeId);
 
   // Remove node
   nodes.value.splice(nodeIndex, 1);
@@ -1156,15 +1779,46 @@ const clearWorkflow = () => {
 const NODE_WIDTH = 280;
 const NODE_HEIGHT = 100;
 
+// Compact (one line) or detailed nodes: the viewer's choice, shared with the
+// run page. Laid out with the box of the current choice. Saved positions are
+// always for detailed nodes, so a definition looks the same in either.
+const { detailed, setDetailed } = useGraphDensity();
+const DETAILED_BOX = { width: NODE_WIDTH, height: NODE_HEIGHT, nodesep: 120, ranksep: 150 };
+const placeSaved = (laidOut) => (detailed.value ? laidOut : recenter(laidOut, DETAILED_BOX, COMPACT_BOX));
+const positionToSave = (node) =>
+  detailed.value ? node.position : recenter([node], COMPACT_BOX, DETAILED_BOX)[0].position;
+
+// Switching keeps the arrangement (each node keeps its centre); growing to
+// detailed lays the graph out again only if the bigger cards would overlap.
+const changeDensity = (value) => {
+  if (value === detailed.value) return;
+  const from = layoutBox(detailed.value, DETAILED_BOX);
+  const to = layoutBox(value, DETAILED_BOX);
+  setDetailed(value);
+  nodes.value = recenter(nodes.value, from, to);
+  // Labels say more in detail: the types; compact shows only ✓ or ✕.
+  revalidateEdges();
+  if (value && overlaps(nodes.value, to)) autoLayout();
+  else setTimeout(() => fitView({ padding: 0.2, maxZoom: 1 }), 50);
+};
+
+// An input or output is a pill, smaller than a step's card: laid out at its
+// own size, so the gaps around it are the steps' gaps.
+const PILL_BOX = { width: 200, height: 44 };
+const layoutSizeOf = (node, box) =>
+  node.type === "data-source" || node.type === "data-target" ? PILL_BOX : box;
+
 const autoLayout = () => {
   if (nodes.value.length === 0) return;
+  const box = layoutBox(detailed.value, DETAILED_BOX);
 
   const g = new dagre.graphlib.Graph();
   g.setDefaultEdgeLabel(() => ({}));
-  g.setGraph({ rankdir: "TB", nodesep: 120, ranksep: 150 });
+  g.setGraph({ rankdir: "TB", nodesep: box.nodesep, ranksep: box.ranksep });
 
   for (const node of nodes.value) {
-    g.setNode(node.id, { width: NODE_WIDTH, height: NODE_HEIGHT });
+    const size = layoutSizeOf(node, box);
+    g.setNode(node.id, { width: size.width, height: size.height });
   }
   for (const edge of edges.value) {
     g.setEdge(edge.source, edge.target);
@@ -1174,11 +1828,12 @@ const autoLayout = () => {
 
   nodes.value = nodes.value.map((node) => {
     const pos = g.node(node.id);
+    const size = layoutSizeOf(node, box);
     return {
       ...node,
       position: {
-        x: pos.x - NODE_WIDTH / 2,
-        y: pos.y - NODE_HEIGHT / 2,
+        x: pos.x - size.width / 2,
+        y: pos.y - size.height / 2,
       },
     };
   });
@@ -1186,6 +1841,158 @@ const autoLayout = () => {
   // Fit the view after layout settles
   setTimeout(() => fitView({ padding: 0.2, maxZoom: 1 }), 50);
 };
+
+/*
+Readiness: what blocks saving, and what to check (builderReadiness.js).
+*/
+const readiness = computed(() =>
+  builderReadiness({
+    name: workflowName.value,
+    nodes: nodes.value,
+    edges: edges.value,
+    edgeIssues: edgeIssues.value,
+    nameOf: nodeName,
+  }),
+);
+const saving = ref(false);
+
+// A readiness item was clicked: show its step.
+const panelTitleRef = ref(null);
+const onReadinessSelect = (item) => {
+  // The name: its field at the top of the panel.
+  if (item.id === "name") {
+    panelTitleRef.value?.focus();
+    return;
+  }
+  // A link: select it, and show the two steps it joins.
+  const edge = item.edgeId && edges.value.find((e) => e.id === item.edgeId);
+  if (edge) {
+    nodes.value.forEach((n) => (n.selected = false));
+    edges.value.forEach((e) => (e.selected = e.id === edge.id));
+    selectedNode.value = null;
+    setTimeout(() => fitView({ nodes: [edge.source, edge.target], padding: 0.4, maxZoom: 1.2, duration: 300 }), 50);
+    return;
+  }
+  if (!item.nodeId) return;
+  openNodeSettings(item.nodeId);
+  setTimeout(() => fitView({ nodes: [item.nodeId], padding: 0.6, maxZoom: 1.2, duration: 300 }), 50);
+};
+
+const startOver = async () => {
+  if (nodes.value.length || workflowName.value) {
+    try {
+      await ElMessageBox.confirm(
+        "This clears the canvas, the name and the description.",
+        "Start over?",
+        { confirmButtonText: "Start over", cancelButtonText: "Cancel", type: "warning" },
+      );
+    } catch {
+      return;
+    }
+  }
+  clearWorkflow();
+  clearDraft();
+  selectedNode.value = null;
+  seedCanvas();
+};
+
+/*
+  Undo and redo (graphHistory.js): snapshots of the graph as it settles, so
+  every edit, adding, removing, connecting, moving or changing a step's
+  settings, can be undone.
+*/
+const history = useGraphHistory({
+  nodes,
+  edges,
+  enabled: () => !isReadOnly.value,
+  onRestore: () => {
+    selectedNode.value = null;
+    revalidateEdges();
+  },
+});
+
+/*
+  Keyboard: Delete/Backspace removes the selection, Cmd/Ctrl-Z undoes and
+  Shift-Cmd/Ctrl-Z (or Ctrl-Y) redoes, arrows move between steps, Esc
+  deselects. Not while typing.
+*/
+// A link's × (LinkEdge) removes it.
+const removeLink = (id) => {
+  if (isReadOnly.value) return;
+  dropEdges((e) => e.id === id);
+  revalidateEdges();
+};
+provide("removeLink", removeLink);
+provide("linksEditable", () => !isReadOnly.value);
+
+// Dragging an end of a link to another point moves it: the new link is
+// checked as one drawn there, and the old one stays if it's refused.
+onEdgeUpdate(({ edge, connection }) => {
+  if (isReadOnly.value) return;
+  const old = edges.value.find((e) => e.id === edge.id);
+  if (!old) return;
+  dropEdges((e) => e.id === edge.id);
+  const moved = connectNodes(connection.source, connection.target, connection.sourceHandle, connection.targetHandle);
+  if (!moved) {
+    edges.value.push(old);
+    // An output port's link to a data target set its prefix: set it again.
+    const port = portOfHandle(old.sourceHandle);
+    const tgt = port && nodes.value.find((n) => n.id === old.target && n.type === "data-target");
+    if (tgt?.data.targetType) tgt.data.defaultParams = withPortPrefix(tgt.data.defaultParams, port, prefixParamOf(getTargetTypeParams(tgt.data.targetType)));
+    revalidateEdges();
+  }
+});
+
+const deleteSelection = () => {
+  const selectedEdges = edges.value.filter((e) => e.selected).map((e) => e.id);
+  const selectedNodes = nodes.value.filter((n) => n.selected).map((n) => n.id);
+  if (selectedEdges.length) {
+    dropEdges((e) => selectedEdges.includes(e.id));
+    revalidateEdges();
+  }
+  selectedNodes.forEach((id) => removeNode(id));
+  if (selectedNodes.length) selectedNode.value = null;
+};
+
+const onKeydown = (event) => {
+  if (isReadOnly.value) return;
+  const t = event.target;
+  if (t?.closest?.("input, textarea, select, [contenteditable='true'], .el-select, .el-dialog, .el-popper")) return;
+  const mod = event.metaKey || event.ctrlKey;
+  const key = event.key.toLowerCase();
+  if (mod && key === "z") {
+    event.preventDefault();
+    if (event.shiftKey) history.redo();
+    else history.undo();
+    return;
+  }
+  if (mod && key === "y") {
+    event.preventDefault();
+    history.redo();
+    return;
+  }
+  if (mod) return;
+  if (event.key === "Delete" || event.key === "Backspace") {
+    event.preventDefault();
+    deleteSelection();
+  } else if (event.key === "Escape") {
+    nodes.value.forEach((n) => (n.selected = false));
+    edges.value.forEach((e) => (e.selected = false));
+    selectedNode.value = null;
+    pickerFor.value = null;
+  } else if (event.key.startsWith("Arrow")) {
+    const from = selectedNode.value?.id;
+    const next = from
+      ? neighbourInDirection(nodes.value, edges.value, from, event.key.slice(5).toLowerCase())
+      : nodes.value[0]?.id;
+    if (next) {
+      event.preventDefault();
+      selectOnly(next);
+    }
+  }
+};
+onMounted(() => window.addEventListener("keydown", onKeydown));
+onBeforeUnmount(() => window.removeEventListener("keydown", onKeydown));
 
 const saveWorkflow = async () => {
   if (!workflowName.value.trim()) {
@@ -1226,13 +2033,79 @@ const saveWorkflow = async () => {
     return;
   }
 
-  const processors = nodes.value.map((node) => {
-    // Build dependsOn from incoming edges (edges whose target is this node)
-    const dependsOn = edges.value
-      .filter((e) => e.target === node.id)
-      .map((e) => e.source);
+  const workflowData = {
+    name: workflowName.value,
+    description: workflowDescription.value,
+    ...definitionPayload(),
+  };
 
-    const position = { x: node.position.x, y: node.position.y };
+  saving.value = true;
+  try {
+    const created = await store.dispatch("analysisModule/createWorkflow", workflowData);
+    EventBus.$emit("toast", {
+      detail: { type: "success", msg: `Saved ${workflowData.name}.`, duration: 5000 },
+    });
+    clearDraft();
+    clearWorkflow();
+    // The workflow is created; a failed refresh of the list isn't a failed create
+    store.dispatch("analysisModule/fetchWorkflows").catch((err) =>
+      console.error("Failed to refresh workflows:", err)
+    );
+    // Open what was saved, where it can be run.
+    if (created?.uuid) {
+      router.push(workflowPage(created.uuid));
+    } else {
+      mode.value = "browse";
+    }
+  } catch (error) {
+    console.error(error);
+    EventBus.$emit("toast", {
+      detail: {
+        type: "error",
+        msg: "There was a problem submitting your request.",
+        duration: 6000,
+      },
+    });
+  } finally {
+    saving.value = false;
+  }
+};
+
+// The workflow page of a workflow (opened from the Library).
+const workflowPage = (uuid, query) => ({
+  name: route.params.orgId ? "workflow-detail" : "my-workflow-detail",
+  params: { ...(route.params.orgId && { orgId: route.params.orgId }), uuid },
+  ...(query && { query }),
+});
+
+// What saving sends for the canvas: its inputs, outputs and steps where
+// workflow-service takes a workflow's interface (and the canvas can be one),
+// else its processors, source and target nodes included.
+const definitionPayload = () => {
+  const processors = serializeProcessors();
+  if (!isFeatureEnabled("workflowInterface")) return { processors };
+  const byId = new Map(nodes.value.map((n) => [n.id, n]));
+  const iface = toInterfaceDefinition(processors, {
+    nameOf: (id) => nodeName(byId.get(id)),
+    routedPortsOf: (id) => routedOutputs(byId.get(id)?.data?.manifestPorts).map((p) => p.name),
+    extrasOf: (id) => {
+      const d = byId.get(id)?.data || {};
+      return { optional: !!d.optional, accepts: d.accepts || [], required: !!d.required };
+    },
+  });
+  return iface || { processors };
+};
+
+// The canvas as workflow-service takes it: one processor per node, with
+// what it depends on from the incoming edges.
+const serializeProcessors = () => {
+  return nodes.value.map((node) => {
+    // Build dependsOn from incoming edges (edges whose target is this node),
+    // each step once: two links can join the same steps
+    const dependsOn = [...new Set(edges.value.filter((e) => e.target === node.id).map((e) => e.source))];
+
+    const saved = positionToSave(node);
+    const position = { x: saved.x, y: saved.y };
 
     if (node.type === "data-source") {
       return {
@@ -1244,7 +2117,7 @@ const saveWorkflow = async () => {
     }
 
     if (node.type === "data-target") {
-      return {
+      const target = {
         id: node.id,
         type: "data-target",
         targetType: node.data.targetType,
@@ -1252,6 +2125,13 @@ const saveWorkflow = async () => {
         dependsOn: dependsOn,
         position,
       };
+      if (
+        node.data.defaultParams &&
+        Object.keys(node.data.defaultParams).length > 0
+      ) {
+        target.defaultParams = node.data.defaultParams;
+      }
+      return target;
     }
 
     // Default: processor
@@ -1264,8 +2144,15 @@ const saveWorkflow = async () => {
       dependsOn: dependsOn,
       position,
     };
+    // Which input each link feeds, and from which output (ports)
+    const inputs = linksOf(node, edges.value);
+    if (inputs.length) proc.inputs = inputs;
     if (node.data.cpu) proc.cpu = node.data.cpu;
     if (node.data.memory) proc.memory = node.data.memory;
+    if (node.data.interactive) {
+      proc.interactive = true;
+      if (node.data.sessionType) proc.sessionType = node.data.sessionType;
+    }
     if (
       node.data.defaultParams &&
       Object.keys(node.data.defaultParams).length > 0
@@ -1274,36 +2161,266 @@ const saveWorkflow = async () => {
     }
     return proc;
   });
+};
 
-  const workflowData = {
-    name: workflowName.value,
-    description: workflowDescription.value,
-    processors: processors,
-  };
+/*
+  A saved workflow: read-only, with Edit for its owner and Duplicate to edit
+  for everyone else. Saving an edit is a new version of it (workflow-service
+  versions); its history lists every version, and an older one can be
+  viewed (read-only) or duplicated.
+*/
+const versions = ref([]); // [{ version, name, note, steps, createdAt, createdBy, official }]
+const viewingVersion = ref(null); // an older version shown, or null for the latest
+const latestVersionNumber = computed(() => selectedWorkflow.value?.latestVersion || 1);
 
+const loadVersions = async (uuid) => {
   try {
-    await store.dispatch("analysisModule/createWorkflow", workflowData);
-    EventBus.$emit("toast", {
-      detail: {
-        type: "success",
-        msg: "Your request to create a Workflow has been initiated.",
-        duration: 8000,
+    versions.value = await store.dispatch("analysisModule/fetchWorkflowVersions", uuid);
+  } catch {
+    versions.value = []; // versions aren't served here (yet)
+  }
+};
+
+const showVersion = async (n) => {
+  const uuid = selectedWorkflow.value?.uuid;
+  if (!uuid || mode.value !== "browse") return;
+  try {
+    if (n === latestVersionNumber.value) {
+      const latest = await store.dispatch("analysisModule/fetchWorkflowDefinition", uuid);
+      selectWorkflow(latest);
+      viewingVersion.value = null;
+    } else {
+      const v = await store.dispatch("analysisModule/fetchWorkflowVersion", { uuid, version: n });
+      selectWorkflow({ ...v, latestVersion: latestVersionNumber.value });
+      viewingVersion.value = n;
+    }
+  } catch (err) {
+    EventBus.$emit("toast", { detail: { type: "error", msg: err?.message || "Could not load that version." } });
+  }
+};
+
+const startEdit = () => {
+  if (!isWorkflowCreator.value || viewingVersion.value) return;
+  mode.value = "edit";
+  selectedNode.value = null;
+  workflowName.value = selectedWorkflow.value?.name || "";
+  workflowDescription.value = selectedWorkflow.value?.description || "";
+  history.reset();
+};
+
+const cancelEdit = async () => {
+  if (history.canUndo()) {
+    try {
+      await ElMessageBox.confirm("Your changes to this workflow will be lost.", "Discard changes?", {
+        confirmButtonText: "Discard",
+        cancelButtonText: "Keep editing",
+        type: "warning",
+      });
+    } catch {
+      return;
+    }
+  }
+  selectWorkflow(selectedWorkflow.value);
+};
+
+// Whether the canvas has the saved workflow's steps and connections (only
+// settings changed): what can still be saved where versions aren't served.
+const sameShape = () => {
+  const dag = canvasDefinition(selectedWorkflow.value || {}).dag || [];
+  const ids = (list) => list.map((x) => x).sort().join(",");
+  return (
+    ids(dag.map((p) => p.id)) === ids(nodes.value.map((n) => n.id)) &&
+    ids(linkKeys(dag)) === ids(linkKeys(serializeProcessors()))
+  );
+};
+
+const saveEdit = async () => {
+  const wf = selectedWorkflow.value;
+  if (!wf?.uuid) return;
+  let note = "";
+  try {
+    const { value } = await ElMessageBox.prompt("What changed? (optional)", `Save version ${latestVersionNumber.value + 1}`, {
+      confirmButtonText: "Save",
+      cancelButtonText: "Cancel",
+      inputPlaceholder: "e.g. Raised the threshold; added a plot step",
+    });
+    note = (value || "").trim();
+  } catch {
+    return;
+  }
+  saving.value = true;
+  try {
+    const saved = await store.dispatch("analysisModule/saveWorkflowVersion", {
+      uuid: wf.uuid,
+      payload: {
+        name: workflowName.value,
+        description: workflowDescription.value,
+        ...definitionPayload(),
+        ...(note && { note }),
       },
     });
-    clearWorkflow();
-    await store.dispatch("analysisModule/fetchWorkflows");
-    mode.value = "browse";
-  } catch (error) {
-    console.error(error);
+    EventBus.$emit("toast", { detail: { type: "success", msg: `Saved version ${saved?.latestVersion || ""}.` } });
+  } catch (err) {
+    if (![404, 501].includes(err?.status)) {
+      EventBus.$emit("toast", {
+        detail: { type: "error", msg: err?.status === 409 ? "The workflow was saved meanwhile. Cancel, and edit it again." : err?.message || "Could not save." },
+      });
+      saving.value = false;
+      return;
+    }
+    // Versions aren't served here yet: settings can still be saved in
+    // place; changes to the steps can't.
+    if (!sameShape()) {
+      EventBus.$emit("toast", {
+        detail: { type: "error", msg: "Adding, removing or connecting steps of a saved workflow isn't available here yet. Duplicate it instead." },
+      });
+      saving.value = false;
+      return;
+    }
+    if (workflowName.value !== wf.name || workflowDescription.value !== wf.description) {
+      await store.dispatch("analysisModule/updateWorkflow", {
+        uuid: wf.uuid,
+        payload: { name: workflowName.value, description: workflowDescription.value },
+      });
+    }
+    await saveWorkflowChanges();
+  } finally {
+    saving.value = false;
+  }
+  workflowLayouts.forget(wf.uuid);
+  const updated = await store.dispatch("analysisModule/fetchWorkflowDefinition", wf.uuid);
+  selectWorkflow(updated);
+};
+
+const duplicating = ref(false);
+const duplicate = async () => {
+  const wf = selectedWorkflow.value;
+  if (!wf?.uuid) return;
+  duplicating.value = true;
+  try {
+    const copy = await store.dispatch("analysisModule/duplicateWorkflow", {
+      uuid: wf.uuid,
+      version: viewingVersion.value || undefined,
+    });
+    router.push(workflowPage(copy.uuid, { edit: "1" }));
+  } catch (err) {
     EventBus.$emit("toast", {
       detail: {
         type: "error",
-        msg: "There was a problem submitting your request.",
-        duration: 6000,
+        msg: [404, 501].includes(err?.status) ? "Duplicating isn't available here yet." : err?.message || "Could not duplicate.",
       },
     });
+  } finally {
+    duplicating.value = false;
   }
 };
+
+// The run dialog, here, on this workflow.
+const runDialog = ref(null);
+const runThis = () => runDialog.value?.open(selectedWorkflow.value?.uuid);
+
+/*
+  Drafts: a new workflow not yet saved is kept in this browser and offered
+  back when the builder opens again.
+*/
+const DRAFT_KEY = computed(() => `pennsieve.builder.draft.${route.params.orgId || "mine"}`);
+let draftTimer = null;
+const clearDraft = () => {
+  try {
+    localStorage.removeItem(DRAFT_KEY.value);
+  } catch {
+    // nothing kept
+  }
+};
+watch(
+  [nodes, edges, workflowName, workflowDescription],
+  () => {
+    if (mode.value !== "create") return;
+    clearTimeout(draftTimer);
+    draftTimer = setTimeout(() => {
+      if (nodes.value.length <= 1 && !workflowName.value.trim()) return;
+      const s = snapshot(nodes.value, edges.value);
+      s.nodes.forEach((n) => {
+        if (n.data.application) n.data.application = { uuid: n.data.application.uuid };
+        delete n.data.manifestPorts;
+      });
+      try {
+        localStorage.setItem(
+          DRAFT_KEY.value,
+          JSON.stringify({ name: workflowName.value, description: workflowDescription.value, ...s, savedAt: Date.now() }),
+        );
+      } catch {
+        // not kept
+      }
+    }, 800);
+  },
+  { deep: true },
+);
+
+const readDraft = () => {
+  try {
+    const draft = JSON.parse(localStorage.getItem(DRAFT_KEY.value) || "null");
+    return draft?.nodes?.length ? draft : null;
+  } catch {
+    return null;
+  }
+};
+
+const applyDraft = (draft) => {
+  const byUuid = (uuid) => availableApplications.value.find((a) => a.uuid === uuid) || { uuid };
+  draft.nodes.forEach((n) => {
+    if (n.data.application) n.data.application = byUuid(n.data.application.uuid);
+  });
+  nodes.value = draft.nodes;
+  edges.value = draft.edges;
+  workflowName.value = draft.name || "";
+  workflowDescription.value = draft.description || "";
+  hydrateManifestPorts();
+  revalidateEdges();
+  history.reset();
+  nextTick(() => setTimeout(() => fitView({ padding: 0.2, maxZoom: 1 }), 50));
+};
+
+/*
+  The builder's landing: what opening it offers before anything is built
+  (a new workflow from scratch, the draft kept in this browser, one from the
+  Library, or one of the user's own), so it doesn't open on a list of what
+  an empty workflow lacks. Readiness shows once building has started.
+*/
+const landing = ref(false);
+const landingDraft = ref(null);
+const started = computed(
+  () => mode.value !== "create" || (!landing.value && (!!workflowName.value.trim() || nodes.value.length > 1 || edges.value.length > 0))
+);
+const myWorkflows = computed(() => {
+  const me = store.state.profile?.id;
+  return (store.state.analysisModule.workflows || [])
+    .filter((w) => w.createdBy === me && w.isActive !== false)
+    .sort((a, b) => String(b.updatedAt || b.createdAt || "").localeCompare(String(a.updatedAt || a.createdAt || "")))
+    .slice(0, 5);
+});
+const draftAge = (draft) => {
+  const mins = Math.round((Date.now() - (draft?.savedAt || Date.now())) / 60000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins} min ago`;
+  const hours = Math.round(mins / 60);
+  return hours < 24 ? `${hours} h ago` : `${Math.round(hours / 24)} d ago`;
+};
+const startFromScratch = () => {
+  clearDraft();
+  landing.value = false;
+};
+const resumeDraft = () => {
+  applyDraft(landingDraft.value);
+  landing.value = false;
+};
+// Adding a step (an app clicked or dragged in) starts too.
+watch(
+  () => nodes.value.length,
+  (n) => {
+    if (landing.value && n > 1) landing.value = false;
+  }
+);
 
 /*
 Fetch Initial Data
@@ -1324,9 +2441,16 @@ onMounted(async () => {
       );
       if (wf) {
         selectWorkflow(wf);
+        // A duplicate opens ready to edit.
+        if (route.query.edit === "1" && isWorkflowCreator.value) startEdit();
       }
     } else {
       enterCreateMode();
+      landingDraft.value = readDraft();
+      landing.value = true;
+      if (!(store.state.analysisModule.workflows || []).length) {
+        store.dispatch("analysisModule/fetchWorkflows").catch(() => {});
+      }
     }
   } catch (err) {
     console.error(err);
@@ -1360,10 +2484,55 @@ onNodeClick(({ node }) => {
   }
 });
 
-onPaneClick(() => {
+onPaneClick(() => deselectStep());
+
+// Back to the workflow: no step selected.
+function deselectStep() {
   nodes.value.forEach((n) => (n.selected = false));
   selectedNode.value = null;
-});
+}
+
+// Input data is named after the app inputs it's linked to ("signals"), as
+// on the run dialogs and a run's page (sourceInputs.js); other steps by
+// their label.
+const linkedSteps = computed(() =>
+  nodes.value.filter((n) => n.type === "default").map((n) => ({ id: n.id, inputs: linksOf(n, edges.value) }))
+);
+// A step's own name: input data after the inputs it feeds, an output after
+// what it is, an app by its label.
+const baseName = (n) => {
+  if ((n?.type === "data-source" || n?.type === "data-target") && n.data?.name) return n.data.name;
+  if (n?.type === "data-source") return sourceLabel(n.id, linkedSteps.value);
+  if (n?.type === "data-target") return n.data?.targetType ? getTargetTypeLabel(n.data.targetType) : "Output";
+  return n?.data?.label || "";
+};
+// Names that tell steps apart, numbered when two share one (stepNames.js),
+// on the canvas and in the panel alike.
+const stepNameMap = computed(() => stepNames(stepListNodes.value, baseName));
+const nodeName = (n) => (n ? stepNameMap.value.get(n.id) || baseName(n) : "");
+const sourceFeeds = (id) =>
+  hintLine(sourceHints(id, linkedSteps.value, (stepId) => nodes.value.find((n) => n.id === stepId)?.data?.manifestPorts));
+
+// The workflow's steps, top to bottom as on the canvas, for the panel's list.
+const stepListNodes = computed(() =>
+  [...nodes.value].sort((a, b) => (a.position?.y ?? 0) - (b.position?.y ?? 0) || (a.position?.x ?? 0) - (b.position?.x ?? 0))
+);
+// What a step's row says beside its name: what input data feeds, what feeds
+// an output (and which of its outputs), an app's version.
+const stepListMeta = (n) => {
+  const byId = (id) => nodes.value.find((x) => x.id === id);
+  if (n.type === "data-source") {
+    const fed = edges.value.filter((e) => e.source === n.id).map((e) => nodeName(byId(e.target)));
+    return fed.length ? `→ ${[...new Set(fed)].join(", ")}` : "not connected";
+  }
+  if (n.type === "data-target") {
+    const from = edges.value.filter((e) => e.target === n.id)
+      .map((e) => [nodeName(byId(e.source)), portOfHandle(e.sourceHandle)].filter(Boolean).join(" · "));
+    return from.length ? `← ${from.join(", ")}` : "not connected";
+  }
+  return n.data?.tag || latestVersion(n.data?.application)?.version || "";
+};
+const stepKind = (n) => (n.type === "data-source" ? "source" : n.type === "data-target" ? "target" : "app");
 
 const openNodeSettings = (id) => {
   nodes.value.forEach((n) => (n.selected = false));
@@ -1384,48 +2553,118 @@ const openNodeSettings = (id) => {
 
 <template>
   <div class="workflow-builder">
-    <!-- Header (create mode) -->
-    <div class="builder-header" v-if="mode === 'create'">
-      <el-input
-        v-model="workflowName"
-        placeholder="Workflow name"
-        class="header-name-input"
-      />
-      <el-input
-        v-model="workflowDescription"
-        placeholder="Description (optional)"
-        class="header-desc-input"
-      />
-      <div class="header-actions">
-        <bf-button class="secondary" @click="clearWorkflow">Clear</bf-button>
-        <bf-button @click="saveWorkflow">Save</bf-button>
+    <!-- The bar (create mode): in the Workflows tab's toolbar when given
+         one (toolbarTarget), else above the canvas. -->
+    <Teleport v-if="mode === 'create'" defer :to="toolbarTarget || 'body'" :disabled="!toolbarTarget">
+      <div :class="toolbarTarget ? 'builder-bar-host' : 'builder-header'">
+        <BuilderBar
+          v-model:name="workflowName"
+          v-model:description="workflowDescription"
+          :readiness="readiness"
+          :started="started"
+          :saving="saving"
+          @save="saveWorkflow"
+          @start-over="startOver"
+          @select="onReadinessSelect"
+        />
       </div>
-    </div>
+    </Teleport>
 
-    <!-- Header (browse mode) -->
-    <div class="builder-header" v-if="isReadOnly">
+    <!-- A saved workflow: read-only, or its owner editing it -->
+    <div v-if="mode === 'edit'" class="builder-header">
+      <BuilderBar
+        v-model:name="workflowName"
+        v-model:description="workflowDescription"
+        :readiness="readiness"
+        :saving="saving"
+        :save-label="`Save version ${latestVersionNumber + 1}`"
+        editing
+        @save="saveEdit"
+        @cancel="cancelEdit"
+        @select="onReadinessSelect"
+      />
+    </div>
+    <div v-else-if="isReadOnly" class="builder-header">
       <span class="header-title">
-        <router-link :to="{ name: 'workflows' }" class="header-back-link">
+        <router-link :to="workflowsRoute" class="header-back-link">
           &larr; Workflows
         </router-link>
         <span class="header-breadcrumb-sep">/</span>
         <span class="header-detail-name">{{
           selectedWorkflow?.name || "Workflow"
         }}</span>
+        <el-dropdown v-if="versions.length > 1" trigger="click" @command="showVersion">
+          <button type="button" class="version-pill">
+            Version {{ viewingVersion || latestVersionNumber }}<template v-if="!viewingVersion"> (latest)</template> ▾
+          </button>
+          <template #dropdown>
+            <el-dropdown-menu>
+              <el-dropdown-item v-for="v in versions" :key="v.version" :command="v.version">
+                <div class="version-item">
+                  <span>
+                    Version {{ v.version }}
+                    <template v-if="v.version === latestVersionNumber"> · latest</template>
+                    <template v-if="v.official"> · verified</template>
+                  </span>
+                  <span class="version-item-meta">
+                    {{ v.createdAt ? new Date(v.createdAt).toLocaleDateString() : "" }}<template v-if="v.note"> · {{ v.note }}</template>
+                  </span>
+                </div>
+              </el-dropdown-item>
+            </el-dropdown-menu>
+          </template>
+        </el-dropdown>
+        <span v-else-if="selectedWorkflow?.latestVersion" class="version-pill version-pill--static">
+          Version {{ latestVersionNumber }}
+        </span>
       </span>
       <div class="header-actions">
-        <bf-button
+        <bf-button v-if="!viewingVersion && selectedWorkflow?.isActive !== false" class="secondary" @click="runThis">
+          ▶ Run
+        </bf-button>
+        <el-tooltip
           v-if="isWorkflowCreator"
-          :disabled="!hasAnyChanges"
-          @click="saveWorkflowChanges"
+          :disabled="!viewingVersion"
+          content="Edit works on the latest version; duplicate this one to change it."
+          placement="bottom"
         >
-          Save Changes
+          <span>
+            <bf-button :disabled="!!viewingVersion" @click="startEdit">Edit</bf-button>
+          </span>
+        </el-tooltip>
+        <bf-button v-else :processing="duplicating" @click="duplicate">Duplicate to edit</bf-button>
+        <bf-button v-if="isWorkflowCreator && viewingVersion" class="secondary" :processing="duplicating" @click="duplicate">
+          Duplicate this version
         </bf-button>
       </div>
     </div>
 
     <div class="builder-content">
-      <!-- Left: Main Panel -->
+      <!-- Left: what can be added (create and edit) -->
+      <button
+        v-if="!isReadOnly && !panels.palette && !landing"
+        type="button"
+        class="panel-rail"
+        title="Show the steps you can add"
+        aria-label="Show the steps you can add"
+        @click="togglePanel('palette')"
+      >
+        <el-icon><ArrowRight /></el-icon>
+        <span class="panel-rail-label">Add steps</span>
+      </button>
+      <BuilderPalette
+        v-if="!isReadOnly && panels.palette && !landing"
+        :applications="availableApplications"
+        :app-name="appDisplayName"
+        :step-ports="selectedNode?.type === 'default' ? selectedNode.data?.manifestPorts || null : null"
+        :step-label="nodeName(selectedNode)"
+        :loading="isLoading"
+        @add="(type, app) => addStep(type, app)"
+        @dragstart="(app, event, type) => onDragStart(app, event, type)"
+        @fold="togglePanel('palette')"
+      />
+
+      <!-- Middle: the canvas -->
       <div class="main-panel">
         <!-- Workflow Canvas -->
         <div class="workflow-canvas" @drop="onDrop" @dragover="onDragOver">
@@ -1439,58 +2678,8 @@ const openNodeSettings = (id) => {
             </template>
             <template v-else>
               <h3>No workflow loaded</h3>
-              <p>Return to the workflows gallery to select a workflow</p>
+              <p>Return to the workflow library to select a workflow</p>
             </template>
-          </div>
-
-          <!--
-            Persistent verdict for the whole canvas. The per-connection toast
-            is gone in six seconds; this stays, and survives reopening the
-            workflow, so "did it validate?" has a visible answer.
-          -->
-          <div
-            v-if="edgeIssues.length || validEdgeCount || uncheckedEdgeCount"
-            class="compat-panel"
-            :class="{
-              'compat-panel--invalid': edgeIssues.length > 0,
-              'compat-panel--valid':
-                edgeIssues.length === 0 && validEdgeCount > 0,
-            }"
-          >
-            <div class="compat-panel-title">
-              <template v-if="edgeIssues.length">
-                {{ edgeIssues.length }} incompatible
-                {{ edgeIssues.length === 1 ? "connection" : "connections" }}
-              </template>
-              <template v-else-if="validEdgeCount">
-                &#10003; {{ validEdgeCount }}
-                {{ validEdgeCount === 1 ? "connection" : "connections" }}
-                checked &mdash; media types match
-              </template>
-              <template v-else>Connections not checked</template>
-            </div>
-            <div
-              v-if="edgeIssues.length && validEdgeCount"
-              class="compat-panel-ok"
-            >
-              &#10003; {{ validEdgeCount }} other
-              {{ validEdgeCount === 1 ? "connection" : "connections" }} match
-            </div>
-            <ul v-if="edgeIssues.length" class="compat-panel-list">
-              <li v-for="issue in edgeIssues" :key="issue.id">
-                {{ issue.source }} &rarr; {{ issue.target }}
-                <span v-if="issue.mediaTypes.length" class="compat-panel-detail">
-                  {{ issue.reason === "no-overlap" ? "no media type match for" : "needs" }}
-                  {{ issue.mediaTypes.join(", ") }}
-                </span>
-              </li>
-            </ul>
-            <div v-if="uncheckedEdgeCount" class="compat-panel-note">
-              {{ uncheckedEdgeCount }}
-              {{ uncheckedEdgeCount === 1 ? "connection" : "connections" }} not
-              checked &mdash; one side declares no app.yml, or no media types on
-              its ports.
-            </div>
           </div>
 
           <div class="workflow-builder-flow">
@@ -1505,33 +2694,134 @@ const openNodeSettings = (id) => {
               :elements-selectable="true"
               :pan-on-drag="true"
               :zoom-on-scroll="true"
+              :delete-key-code="null"
+              :edges-updatable="!isReadOnly"
             >
+              <!-- Links: a × to remove one, on hover or when selected -->
+              <template #edge-default="edgeProps">
+                <LinkEdge v-bind="edgeProps" />
+              </template>
               <Background pattern-color="#aaa" :gap="16" />
-              <Controls position="top-left" />
+              <Controls position="bottom-right" />
+              <!-- Only for big workflows: steps in their kinds' colours, the
+                   view as an outlined window -->
+              <MiniMap
+                v-if="nodes.length >= MINIMAP_FROM"
+                position="bottom-left"
+                pannable
+                zoomable
+                :width="160"
+                :height="110"
+                :node-color="minimapColor"
+                :node-border-radius="2"
+                mask-color="rgba(241, 245, 249, 0.6)"
+                mask-stroke-color="#475569"
+                :mask-stroke-width="2"
+              />
 
-              <div class="canvas-toolbar">
+              <div v-if="!landing" class="canvas-toolbar">
+                <GraphDensityToggle
+                  v-if="nodes.length > 0"
+                  :detailed="detailed"
+                  @update:detailed="changeDensity"
+                />
                 <button
                   v-if="nodes.length > 0"
                   class="auto-layout-btn"
+                  title="Arrange the steps, inputs and outputs automatically"
                   @click="autoLayout"
                 >
-                  Auto Layout
+                  Tidy up
                 </button>
+                <!-- A saved workflow's owner, having moved things: keep them there -->
+                <template v-if="layoutChanged">
+                  <button class="auto-layout-btn is-primary" :disabled="savingLayout" title="Keep the steps where they are now (no new version)" @click="saveLayout">
+                    {{ savingLayout ? "Saving…" : "Save layout" }}
+                  </button>
+                  <button class="auto-layout-btn" title="Put them back where they were saved" @click="undoMoves">Undo moves</button>
+                </template>
+                <template v-if="!isReadOnly">
+                  <button
+                    v-if="edges.some((e) => e.selected)"
+                    class="auto-layout-btn"
+                    title="Remove the selected connection (Delete)"
+                    @click="deleteSelection()"
+                  >
+                    Remove connection
+                  </button>
+                  <button class="auto-layout-btn icon-btn" title="Undo (⌘Z)" aria-label="Undo" @click="history.undo()">
+                    <el-icon><RefreshLeft /></el-icon>
+                  </button>
+                  <button class="auto-layout-btn icon-btn" title="Redo (⇧⌘Z)" aria-label="Redo" @click="history.redo()">
+                    <el-icon><RefreshRight /></el-icon>
+                  </button>
+                </template>
+              </div>
+
+              <!-- Landing: how to start, before anything is built -->
+              <div v-if="landing && mode === 'create'" class="builder-landing">
+                <h3 class="builder-landing__title">Build a workflow</h3>
+                <div class="builder-landing__options">
+                  <button v-if="landingDraft" type="button" class="builder-landing__option is-primary" @click="resumeDraft">
+                    <span class="builder-landing__name">Resume your draft{{ landingDraft.name ? `: ${landingDraft.name}` : "" }}</span>
+                    <span class="builder-landing__desc">{{ Math.max(0, (landingDraft.nodes?.length || 1) - 1) }} step{{ (landingDraft.nodes?.length || 1) - 1 === 1 ? "" : "s" }}, kept in this browser {{ draftAge(landingDraft) }}</span>
+                  </button>
+                  <button type="button" class="builder-landing__option" :class="{ 'is-primary': !landingDraft }" @click="startFromScratch">
+                    <span class="builder-landing__name">Start from scratch</span>
+                    <span class="builder-landing__desc">An input, then the apps you add{{ landingDraft ? "; the draft is discarded" : "" }}</span>
+                  </button>
+                  <router-link :to="workflowsRoute" class="builder-landing__option">
+                    <span class="builder-landing__name">Start from a workflow in the Library</span>
+                    <span class="builder-landing__desc">Open one, then duplicate it to make it yours</span>
+                  </router-link>
+                </div>
+                <template v-if="myWorkflows.length">
+                  <h4 class="builder-landing__sub">Or edit one of yours</h4>
+                  <ul class="builder-landing__list">
+                    <li v-for="w in myWorkflows" :key="w.uuid">
+                      <router-link :to="workflowPage(w.uuid)" class="builder-landing__item">{{ w.name }}</router-link>
+                    </li>
+                  </ul>
+                </template>
+              </div>
+
+              <!-- The first step: a hint while only the input is there. -->
+              <div v-if="!isReadOnly && !landing && nodes.length === 1 && nodes[0].type === 'data-source'" class="first-step-hint">
+                Add the first step with the <strong>+</strong> under Input data, or click an app in the list.
+                Or start from a workflow in the
+                <router-link :to="workflowsRoute" class="first-step-link">Library</router-link>
+                and duplicate it.
               </div>
 
               <template #node-default="{ data, id }">
-                <Handle id="target" type="target" :position="Position.Top" />
-                <div class="custom-node">
-                  <div class="node-header">
-                    <span class="node-title">{{ data.label }}</span>
-                    <button
-                      v-if="!isReadOnly"
-                      class="settings-btn"
-                      @click.stop="openNodeSettings(id)"
-                      title="Configure"
-                    >
-                      <IconPencil :width="12" :height="12" />
-                    </button>
+                <!-- Two or more inputs: one connection point each, on the top
+                     edge over its column, and the step's main point (all
+                     inputs, each source whole at the root) last. -->
+                <Handle
+                  v-for="(p, i) in routedInputs(data.manifestPorts)"
+                  :key="`in:${p.name}`"
+                  :id="inputHandleId(p.name)"
+                  type="target"
+                  :position="Position.Top"
+                  :title="`${p.name}: link an output or a step to this input`"
+                  :style="{ left: portHandleLeft(i, routedInputs(data.manifestPorts).length + 1) }"
+                />
+                <Handle
+                  id="target"
+                  type="target"
+                  :position="Position.Top"
+                  :title="routedInputs(data.manifestPorts).length ? 'All inputs: each step linked here is given whole, at the root of the input folder' : undefined"
+                  :style="routedInputs(data.manifestPorts).length ? { left: portHandleLeft(routedInputs(data.manifestPorts).length, routedInputs(data.manifestPorts).length + 1) } : undefined"
+                />
+                <CompactFlowNode
+                  v-if="!detailed"
+                  kind="processor"
+                  :label="nodeName({ id, type: 'default', data })"
+                  :runtime="data.interactive ? 'interactive' : data.computeType"
+                  :class="connectClass(id)"
+                >
+                    <LlmMark v-if="usesLLM(data)" compact />
+                    <span v-if="stepWarning(id)" class="step-warn" :title="stepWarning(id)" />
                     <button
                       v-if="!isReadOnly"
                       class="remove-btn"
@@ -1539,44 +2829,137 @@ const openNodeSettings = (id) => {
                     >
                       &times;
                     </button>
+                </CompactFlowNode>
+                <div
+                  v-else
+                  class="custom-node processor-node"
+                  :class="connectClass(id)"
+                  :style="{
+                    // Room for each port's column (about 90px), up to the card's max.
+                    ...((routedOutputs(data.manifestPorts).length || routedInputs(data.manifestPorts).length) && {
+                      minWidth: `${Math.min(350, 90 * (Math.max(routedOutputs(data.manifestPorts).length, routedInputs(data.manifestPorts).length) + 1) + 30)}px`,
+                    }),
+                  }"
+                >
+                  <div
+                    v-if="data.manifestPorts?.inputs?.length"
+                    class="node-ports node-ports--in"
+                    :class="{ 'node-ports--routed': routedInputs(data.manifestPorts).length }"
+                    :style="routedInputs(data.manifestPorts).length ? { gridTemplateColumns: `repeat(${routedInputs(data.manifestPorts).length + 1}, minmax(0, 1fr))` } : undefined"
+                  >
+                    <span
+                      v-for="p in data.manifestPorts.inputs"
+                      :key="p.name"
+                      class="node-port"
+                      :class="{ 'node-port--routed': routedInputs(data.manifestPorts).length }"
+                      :title="[p.name, portTypes(p), p.description].filter(Boolean).join(' · ')"
+                    >
+                      {{ p.name }}<template v-if="portTypes(p) && !routedInputs(data.manifestPorts).length"> · {{ portTypes(p) }}</template>
+                    </span>
+                    <span
+                      v-if="routedInputs(data.manifestPorts).length"
+                      class="node-port node-port--all"
+                      title="All inputs: each step linked here is given whole, at the root of the input folder"
+                    >all inputs</span>
+                  </div>
+                  <!-- What the step is, on one line; actions on hover or selection -->
+                  <div class="node-header">
+                    <span v-if="data.interactive" class="node-type-badge processor-badge">Interactive</span>
+                    <span class="node-title" :title="nodeName({ id, type: 'default', data })">{{ nodeName({ id, type: 'default', data }) }}</span>
+                    <RuntimeMark :runtime="data.computeType" />
+                    <LlmMark v-if="usesLLM(data)" />
+                    <span v-if="stepWarning(id)" class="step-warn" :title="stepWarning(id)" />
+                    <button
+                      v-if="!isReadOnly"
+                      class="remove-btn node-action"
+                      title="Remove"
+                      @click.stop="removeNode(id)"
+                    >
+                      &times;
+                    </button>
+                  </div>
+                  <!-- Version and resources, one muted line; a badge only when outdated -->
+                  <div class="node-meta">
+                    <span>{{ stepMeta(data) }}</span>
+                    <span
+                      v-if="data.tag && latestVersion(data.application) && data.tag !== latestVersion(data.application).version"
+                      class="version-outdated-badge"
+                      :title="`This step uses ${data.tag}; ${latestVersion(data.application).version} is the latest`"
+                    >update: {{ latestVersion(data.application).version }}</span>
                   </div>
                   <div
-                    v-if="data.tag || (data.application && latestVersion(data.application))"
-                    class="node-description"
+                    v-if="data.manifestPorts?.outputs?.length"
+                    class="node-ports node-ports--out"
+                    :class="{ 'node-ports--routed': routedOutputs(data.manifestPorts).length }"
+                    :style="routedOutputs(data.manifestPorts).length ? { gridTemplateColumns: `repeat(${routedOutputs(data.manifestPorts).length + 1}, minmax(0, 1fr))` } : undefined"
                   >
-                    <span class="version-tag">{{
-                      data.tag || latestVersion(data.application)?.version
-                    }}</span>
                     <span
-                      v-if="
-                        data.tag &&
-                        latestVersion(data.application) &&
-                        data.tag !== latestVersion(data.application).version
-                      "
-                      class="version-outdated-badge"
+                      v-for="p in data.manifestPorts.outputs"
+                      :key="p.name"
+                      class="node-port"
+                      :class="{ 'node-port--routed': routedOutputs(data.manifestPorts).length }"
+                      :title="[p.name, portTypes(p), p.description].filter(Boolean).join(' · ') + (routedOutputs(data.manifestPorts).length ? ' — connect to a data target to send it there' : '')"
                     >
-                      older — latest
-                      {{ latestVersion(data.application).version }}
+                      <!-- Routed: the name only, cut to its column; the rest on hover -->
+                      {{ p.name }}<template v-if="portTypes(p) && !routedOutputs(data.manifestPorts).length"> · {{ portTypes(p) }}</template>
                     </span>
-                    <span v-else class="version-latest-badge">latest</span>
+                    <!-- The step's main point, last: all outputs, to another app -->
+                    <span
+                      v-if="routedOutputs(data.manifestPorts).length"
+                      class="node-port node-port--all"
+                      title="All outputs together: connect to another app"
+                    >all outputs</span>
                   </div>
-                  <div class="node-resources">
-                    <template v-if="data.computeType !== 'lambda'">
-                      CPU: {{ data.cpu || "N/A" }} |
-                    </template>
-                    Memory:
-                    {{ data.memory ? formatResourceLabel(data.memory) : "N/A" }}
-                    <span v-if="data.computeType" class="runtime-tag">{{
-                      data.computeType
-                    }}</span>
-                  </div>
+                  <div v-else-if="!data.hasManifest" class="node-ports node-ports--none">No manifest</div>
                 </div>
-                <Handle id="source" type="source" :position="Position.Bottom" />
+                <!-- Two or more outputs: one connection point each, on the
+                     bottom edge under its column (the chips sit in equal
+                     columns inside the 15px padding), half under the card
+                     like the other connectors. -->
+                <Handle
+                  v-for="(p, i) in routedOutputs(data.manifestPorts)"
+                  :key="p.name"
+                  :id="portHandleId(p.name)"
+                  type="source"
+                  :position="Position.Bottom"
+                  :title="`${p.name}: connect to a data target to send this output there`"
+                  :style="{ left: portHandleLeft(i, routedOutputs(data.manifestPorts).length + 1) }"
+                />
+                <!-- With output ports, the main point (all outputs, to another
+                     app) is the last column, under its "all outputs" chip. -->
+                <Handle
+                  id="source"
+                  type="source"
+                  :position="Position.Bottom"
+                  :title="routedOutputs(data.manifestPorts).length ? 'All outputs together: connect to another app' : undefined"
+                  :style="routedOutputs(data.manifestPorts).length ? { left: portHandleLeft(routedOutputs(data.manifestPorts).length, routedOutputs(data.manifestPorts).length + 1) } : undefined"
+                />
+                <button
+                  v-if="!isReadOnly"
+                  type="button"
+                  class="add-next nodrag"
+                  title="Add a step after this"
+                  aria-label="Add a step after this"
+                  @click.stop="openStepPicker(id)"
+                >+</button>
               </template>
 
               <template #node-input="{ data, id }">
                 <Handle id="target" type="target" :position="Position.Top" />
-                <div class="custom-node input-node">
+                <CompactFlowNode
+                  v-if="!detailed"
+                  kind="processor"
+                  :label="data.label"
+                >
+                    <button
+                      v-if="!isReadOnly"
+                      class="remove-btn"
+                      @click.stop="removeNode(id)"
+                    >
+                      &times;
+                    </button>
+                </CompactFlowNode>
+                <div v-else class="custom-node input-node">
                   <div class="node-header">
                     <span class="node-title">{{ data.label }}</span>
                     <button
@@ -1620,7 +3003,20 @@ const openNodeSettings = (id) => {
 
               <template #node-output="{ data, id }">
                 <Handle id="target" type="target" :position="Position.Top" />
-                <div class="custom-node output-node">
+                <CompactFlowNode
+                  v-if="!detailed"
+                  kind="processor"
+                  :label="data.label"
+                >
+                    <button
+                      v-if="!isReadOnly"
+                      class="remove-btn"
+                      @click.stop="removeNode(id)"
+                    >
+                      &times;
+                    </button>
+                </CompactFlowNode>
+                <div v-else class="custom-node output-node">
                   <div class="node-header">
                     <span class="node-title">{{ data.label }}</span>
                     <button
@@ -1663,54 +3059,40 @@ const openNodeSettings = (id) => {
               </template>
 
               <!-- Data Source Node: output only (feeds into processors) -->
+              <!-- Input: a circle where data enters the workflow -->
               <template #node-data-source="{ data, id }">
-                <div class="custom-node data-source-node">
-                  <div class="node-header">
-                    <span class="node-type-badge source-badge">Source</span>
-                    <span class="node-title">{{ data.label }}</span>
-                    <button
-                      v-if="!isReadOnly"
-                      class="remove-btn"
-                      @click.stop="removeNode(id)"
-                    >
-                      &times;
-                    </button>
-                  </div>
-                </div>
+                <IoPill
+                  kind="input"
+                  class="data-source-node"
+                  :class="connectClass(id)"
+                  :name="nodeName({ id, type: 'data-source', data })"
+                  :title="sourceFeeds(id) || undefined"
+                >
+                  <button v-if="!isReadOnly" class="remove-btn io-node__remove" title="Remove" @click.stop="removeNode(id)">&times;</button>
+                </IoPill>
                 <Handle id="source" type="source" :position="Position.Bottom" />
+                <button
+                  v-if="!isReadOnly"
+                  type="button"
+                  class="add-next nodrag"
+                  title="Add a step after this"
+                  aria-label="Add a step after this"
+                  @click.stop="openStepPicker(id)"
+                >+</button>
               </template>
 
-              <!-- Data Target Node: input only (receives from processors) -->
+              <!-- Output: a circle where results leave the workflow -->
               <template #node-data-target="{ data, id }">
                 <Handle id="target" type="target" :position="Position.Top" />
-                <div class="custom-node data-target-node">
-                  <div class="node-header">
-                    <span class="node-type-badge target-badge">Target</span>
-                    <span class="node-title">{{
-                      getTargetTypeLabel(data.targetType)
-                    }}</span>
-                    <button
-                      v-if="!isReadOnly"
-                      class="settings-btn"
-                      @click.stop="openNodeSettings(id)"
-                      title="Configure"
-                    >
-                      <IconPencil :width="12" :height="12" />
-                    </button>
-                    <button
-                      v-if="!isReadOnly"
-                      class="remove-btn"
-                      @click.stop="removeNode(id)"
-                    >
-                      &times;
-                    </button>
-                  </div>
-                  <div class="node-body">
-                    <span v-if="data.computeType" class="runtime-tag">{{
-                      data.computeType
-                    }}</span>
-                  </div>
-                </div>
+                <IoPill
+                  kind="output"
+                  class="data-target-node"
+                  :class="connectClass(id)"
+                  :name="data.name || data.targetType ? nodeName({ id, type: 'data-target', data }) : 'Output: choose a destination'"
+                  :sub="interfaceOn && data.targetType ? `by default ${getTargetTypeLabel(data.targetType)}` : ''"
+                >
+                  <button v-if="!isReadOnly" class="remove-btn io-node__remove" title="Remove" @click.stop="removeNode(id)">&times;</button>
+                </IoPill>
               </template>
             </VueFlow>
           </div>
@@ -1718,23 +3100,78 @@ const openNodeSettings = (id) => {
       </div>
 
       <!-- Sidebar (Right) -->
-      <div ref="sidebarRef" class="applications-sidebar">
-        <el-collapse v-model="accordionActiveNames" class="sidebar-accordion">
-          <!-- Information Section -->
-          <el-collapse-item title="Information" name="information">
+      <button
+        v-if="!panels.inspector && !landing"
+        type="button"
+        class="panel-rail panel-rail--right"
+        title="Show details"
+        aria-label="Show details"
+        @click="togglePanel('inspector')"
+      >
+        <el-icon><ArrowLeft /></el-icon>
+        <span class="panel-rail-label">Details</span>
+      </button>
+      <!-- The start screen shows on its own: no panels, no toolbar -->
+      <div v-else-if="!landing" ref="sidebarRef" class="applications-sidebar">
+        <div class="insp-top">
+          <span>Details</span>
+          <button type="button" class="insp-fold" title="Fold the details" aria-label="Fold the details" @click="togglePanel('inspector')">
+            <el-icon><ArrowRight /></el-icon>
+          </button>
+        </div>
+        <!-- The selected step, or the workflow: the panel's content, never
+             folded. The breadcrumb goes back to the workflow. -->
+        <div class="panel-main">
+          <!-- A step: the way back to the workflow, by name -->
+          <nav v-if="selectedNode" class="panel-crumbs" aria-label="Details">
+            <button type="button" class="crumb-link" @click="deselectStep">{{ workflowName.trim() || "Untitled workflow" }}</button>
+            <span class="crumb-sep">›</span>
+            <span class="crumb-current" :title="nodeName(selectedNode)">{{ nodeName(selectedNode) || "Step" }}</span>
+          </nav>
+          <!-- The workflow: its name as the panel's title, edited in place
+               (the same name as the bar's) -->
+          <template v-else>
+            <input
+              v-if="!isReadOnly"
+              ref="panelTitleRef"
+              v-model="workflowName"
+              class="panel-title panel-title-input"
+              placeholder="Untitled workflow"
+              aria-label="Workflow name"
+            />
+            <h3 v-else class="panel-title">{{ workflowName.trim() || "Untitled workflow" }}</h3>
+          </template>
             <!-- Selected Node Info -->
             <template v-if="selectedNode">
-              <h4 class="sidebar-section-title">Selected Node</h4>
-              <div class="info-card">
+              <h4 v-if="selectedNode.type !== 'default'" class="sidebar-section-title">{{ selectedNode.data?.label || "Step" }}</h4>
+              <div v-if="selectedNode.type !== 'default'" class="info-card">
                 <div class="info-row">
                   <span class="info-label">Name</span>
                   <span class="info-value">{{
-                    selectedNode.data?.label || "Unnamed"
+                    nodeName(selectedNode) || "Unnamed"
                   }}</span>
                 </div>
                 <div class="info-row">
-                  <span class="info-label">Type</span>
-                  <span class="info-value">{{ selectedNode.type }}</span>
+                  <span class="info-label">Kind</span>
+                  <span class="info-value">{{
+                    { "data-source": "Input data", "data-target": "Output", default: "App" }[selectedNode.type] || selectedNode.type
+                  }}</span>
+                </div>
+                <!-- An input's and output's own name and settings, saved with
+                     the workflow's interface -->
+                <template v-if="interfaceOn && !isReadOnly && (selectedNode.type === 'data-source' || selectedNode.type === 'data-target')">
+                  <div class="info-row">
+                    <label class="info-label" for="io-name">Called</label>
+                    <el-input id="io-name" v-model="selectedNode.data.name" size="small" class="info-inline-select" :placeholder="baseName({ ...selectedNode, data: { ...selectedNode.data, name: '' } })" />
+                  </div>
+                  <div v-if="selectedNode.type === 'data-source'" class="info-row">
+                    <span class="info-label">Optional</span>
+                    <el-checkbox v-model="selectedNode.data.optional">A run may leave it out</el-checkbox>
+                  </div>
+                </template>
+                <div v-if="selectedNode.type === 'data-source' && sourceFeeds(selectedNode.id)" class="info-row">
+                  <span class="info-label">Feeds</span>
+                  <span class="info-value">{{ sourceFeeds(selectedNode.id) }}</span>
                 </div>
                 <template v-if="selectedNode.data?.application?.description">
                   <div class="info-row">
@@ -1756,7 +3193,7 @@ const openNodeSettings = (id) => {
                 </template>
                 <template v-if="selectedNode.type === 'data-target'">
                   <div class="info-row">
-                    <span class="info-label">Target Type</span>
+                    <span class="info-label">{{ interfaceOn ? "Default destination" : "Target Type" }}</span>
                     <span class="info-value" v-if="isReadOnly">{{
                       getTargetTypeLabel(selectedNode.data.targetType)
                     }}</span>
@@ -1764,18 +3201,42 @@ const openNodeSettings = (id) => {
                       v-else
                       v-model="selectedNode.data.targetType"
                       size="small"
-                      placeholder="Select target type"
+                      :placeholder="interfaceOn ? 'None: each run chooses' : 'Select target type'"
                       class="info-inline-select"
                       @change="onTargetTypeChange(selectedNode.data)"
                     >
                       <el-option
                         v-for="tt in targetTypes"
                         :key="tt.targetType"
-                        :label="tt.label || tt.targetType"
+                        :label="targetTypeName(tt.targetType, targetTypes)"
                         :value="tt.targetType"
                       />
                     </el-select>
                   </div>
+                  <!-- Where else a run may send it, chosen per run -->
+                  <template v-if="interfaceOn">
+                    <p class="io-default-note">Each run can send it somewhere else; this is where it goes unless the run chooses.</p>
+                    <div class="info-row">
+                      <label class="info-label" for="io-accepts">Can go to</label>
+                      <span class="info-value" v-if="isReadOnly">{{ (selectedNode.data.accepts || []).map((t) => getTargetTypeLabel(t)).join(", ") || "Anywhere" }}</span>
+                      <el-select
+                        v-else
+                        id="io-accepts"
+                        v-model="selectedNode.data.accepts"
+                        multiple
+                        size="small"
+                        placeholder="Anywhere"
+                        class="info-inline-select"
+                      >
+                        <el-option v-for="tt in targetTypes" :key="tt.targetType" :label="targetTypeName(tt.targetType, targetTypes)" :value="tt.targetType" />
+                      </el-select>
+                    </div>
+                    <div class="info-row">
+                      <span class="info-label">Required</span>
+                      <span class="info-value" v-if="isReadOnly">{{ selectedNode.data.required ? "Yes" : "No" }}</span>
+                      <el-checkbox v-else v-model="selectedNode.data.required">Every run must send it somewhere</el-checkbox>
+                    </div>
+                  </template>
                 </template>
                 <template v-if="selectedNode.data?.computeType && isReadOnly">
                   <div class="info-row">
@@ -1786,6 +3247,130 @@ const openNodeSettings = (id) => {
                   </div>
                 </template>
               </div>
+
+              <!-- An app step: what it is, then its inputs and outputs -->
+              <template v-if="selectedNode.type === 'default'">
+                <div class="step-head">
+                  <h3 class="step-name" :title="selectedNode.data?.label">{{ selectedNode.data?.label || "Step" }}</h3>
+                </div>
+                <!-- What you set for this step, or what the app is -->
+                <el-radio-group v-model="stepTab" size="small" class="step-tabs" aria-label="Step details">
+                  <el-radio-button value="settings">Settings</el-radio-button>
+                  <el-radio-button value="about">About</el-radio-button>
+                </el-radio-group>
+
+                <template v-if="stepTab === 'settings'">
+                <h4 class="sidebar-section-title">Version</h4>
+                <div class="step-version-row">
+                  <el-select
+                    v-if="canEditConfig && selectedNode.data.application?.versions?.length"
+                    :model-value="selectedNode.data.tag"
+                    size="small"
+                    class="step-version"
+                    aria-label="Version"
+                    @update:model-value="requestVersion"
+                  >
+                    <el-option
+                      v-for="v in sortedVersions(selectedNode.data.application)"
+                      :key="v.version"
+                      :label="versionOptionLabel(selectedNode.data.application, v)"
+                      :value="v.version"
+                    />
+                  </el-select>
+                  <span v-else class="step-version-text">{{ selectedNode.data.tag || "—" }}</span>
+                </div>
+                <div v-if="newerVersion" class="update-note">
+                  <div class="update-head">
+                    <span>Update available: <strong>{{ newerVersion }}</strong></span>
+                    <button v-if="canEditConfig" type="button" class="text-link-btn" @click="requestVersion(newerVersion)">Update</button>
+                  </div>
+                  <ul v-if="updateLines.length" class="update-lines">
+                    <li v-for="l in updateLines" :key="l">{{ l }}</li>
+                  </ul>
+                  <p v-else class="update-lines-none">No changes declared in app.yml.</p>
+                </div>
+                </template>
+
+                <!-- About: read only, from the app.yml and the canvas -->
+                <template v-if="stepTab === 'about'">
+                <p v-if="stepAbout?.description" class="step-desc">{{ stepAbout.description }}</p>
+                <div v-if="stepAbout?.tags?.length" class="step-tags">
+                  <span v-for="tag in stepAbout.tags" :key="tag" class="step-tag" :style="tagStyle(tag)">{{ tag }}</span>
+                </div>
+                <p v-if="stepAbout?.maintainers?.length || stepAbout?.license" class="step-by">
+                  <template v-if="stepAbout.maintainers.length">Maintained by {{ stepAbout.maintainers.map((m) => m.name).filter(Boolean).join(", ") }}</template>
+                  <template v-if="stepAbout.maintainers.length && stepAbout.license"> · </template>
+                  <template v-if="stepAbout.license">{{ stepAbout.license }}</template>
+                </p>
+                <p v-if="!stepManifest && !selectedNode.data.hasManifest && manifestsKnown" class="about-none">
+                  This app has no app.yml, so its inputs, outputs and parameters aren't described.
+                  <router-link
+                    v-if="selectedNode.data.application?.ownerId === profile?.id"
+                    :to="{ name: route.params.orgId ? 'application-manifest-builder' : 'my-application-manifest-builder' }"
+                  >Create one with the manifest builder</router-link>
+                </p>
+                <div class="about-links">
+                  <router-link
+                    v-if="selectedNode.data.application?.uuid"
+                    :to="{
+                      name: route.params.orgId ? 'application-detail' : 'my-application-detail',
+                      params: { ...(route.params.orgId && { orgId: route.params.orgId }), uuid: selectedNode.data.application.uuid },
+                    }"
+                    class="text-link-btn"
+                  >App page ›</router-link>
+                  <button v-if="selectedNode.data.application?.uuid" type="button" class="text-link-btn" @click="viewAppYml(selectedNode)">app.yml ›</button>
+                  <a
+                    v-if="selectedNode.data.application?.sourceUrl"
+                    :href="selectedNode.data.application.sourceUrl"
+                    target="_blank"
+                    rel="noopener"
+                    class="text-link-btn"
+                  >GitHub ›</a>
+                </div>
+
+                <!-- Inputs: where they come from -->
+                <template v-if="stepPorts.inputs.length">
+                  <h4 class="sidebar-section-title">Inputs</h4>
+                  <div class="port-list">
+                    <div v-for="p in stepPorts.inputs" :key="'i' + p.name" class="port-item">
+                      <div class="port-line">
+                        <span class="port-name">{{ p.name }}</span>
+                        <span v-if="ioTypes(p)" class="port-types">{{ ioTypes(p) }}</span>
+                        <span class="port-link">{{ stepSources.length ? `from ${stepSources.join(", ")}` : "not connected" }}</span>
+                      </div>
+                      <p v-if="p.description" class="port-desc">{{ p.description }}</p>
+                    </div>
+                  </div>
+                </template>
+
+                <!-- Outputs: where each goes -->
+                <template v-if="stepPorts.outputs.length">
+                  <h4 class="sidebar-section-title">
+                    Outputs
+                    <span v-if="stepPorts.routed" class="section-note">each in OUTPUT_DIR/&lt;name&gt;/</span>
+                  </h4>
+                  <div class="port-list">
+                    <div v-for="p in stepPorts.outputs" :key="'o' + p.name" class="port-item">
+                      <div class="port-line">
+                        <span class="port-name">{{ p.name }}</span>
+                        <span v-if="ioTypes(p)" class="port-types">{{ ioTypes(p) }}</span>
+                        <span v-if="stepPorts.routed" class="port-link">{{ p.to.length ? `→ ${p.to.join(", ")}` : "not connected" }}</span>
+                      </div>
+                      <p v-if="p.description" class="port-desc">{{ p.description }}</p>
+                    </div>
+                    <div v-if="stepPorts.routed" class="port-item">
+                      <div class="port-line">
+                        <span class="port-name port-name--all">all outputs</span>
+                        <span class="port-link">{{ stepPorts.allTo.length ? `→ ${stepPorts.allTo.join(", ")}` : "not connected" }}</span>
+                      </div>
+                    </div>
+                    <div v-else-if="stepPorts.allTo.length" class="port-item">
+                      <span class="port-link">→ {{ stepPorts.allTo.join(", ") }}</span>
+                    </div>
+                  </div>
+                </template>
+                </template>
+              </template>
 
               <!-- Data target runtime config (editable in create mode) -->
               <template
@@ -1829,6 +3414,9 @@ const openNodeSettings = (id) => {
                 "
               >
                 <h4 class="sidebar-section-title">Parameters</h4>
+                <!-- A target's params can be fixed in the workflow (its
+                     defaultParams), e.g. PATH_PREFIX to route part of a
+                     step's output; a run can still override them. -->
                 <div class="info-card">
                   <template
                     v-if="
@@ -1836,31 +3424,24 @@ const openNodeSettings = (id) => {
                       0
                     "
                   >
-                    <div
+                    <template
                       v-for="param in getTargetTypeParams(
                         selectedNode.data.targetType,
                       )"
                       :key="param.name"
-                      class="info-row"
                     >
-                      <span class="info-label">
-                        {{ param.name }}
-                        <span
-                          v-if="!param.defaultValue"
-                          class="param-required-badge"
-                          >required at run</span
-                        >
-                      </span>
-                      <span
-                        v-if="isReadOnly"
-                        class="info-value param-value-truncate"
-                      >
-                        {{ param.defaultValue || "—" }}
-                      </span>
-                      <span v-else class="info-value">
-                        {{ param.defaultValue || "—" }}
-                      </span>
-                    </div>
+                      <!-- Fed by an output port: the prefix is that output's folder -->
+                      <ParamField
+                        :param="param"
+                        :editable="canEditConfig && !(PREFIX_PARAMS.includes(param.name) && feedingPort(selectedNode.id))"
+                        :model-value="selectedNode.data.defaultParams?.[param.name]"
+                        @update:model-value="(v) => setDefaultParam(param.name, v)"
+                      />
+                      <p v-if="PREFIX_PARAMS.includes(param.name) && feedingPort(selectedNode.id)" class="port-prefix-note">
+                        Set by the <strong>{{ feedingPort(selectedNode.id) }}</strong> output it's connected to: this target takes only
+                        that output's folder.
+                      </p>
+                    </template>
                   </template>
                   <div v-else class="info-row">
                     <span class="info-value">No parameters</span>
@@ -1868,68 +3449,14 @@ const openNodeSettings = (id) => {
                 </div>
               </template>
 
-              <!-- Processor version -->
-              <template
-                v-if="
-                  selectedNode.type === 'default' &&
-                  selectedNode.data.application?.versions?.length
-                "
-              >
-                <h4 class="sidebar-section-title">Application Version</h4>
-                <div class="info-card">
-                  <div class="info-row">
-                    <span class="info-label">Version</span>
-                    <el-select
-                      v-if="canEditConfig"
-                      v-model="selectedNode.data.tag"
-                      size="small"
-                      class="info-inline-select"
-                    >
-                      <el-option
-                        v-for="v in sortedVersions(
-                          selectedNode.data.application,
-                        )"
-                        :key="v.version"
-                        :label="versionOptionLabel(selectedNode.data.application, v)"
-                        :value="v.version"
-                      />
-                    </el-select>
-                    <span v-else class="info-value">
-                      {{ selectedNode.data.tag || "—" }}
-                      <span
-                        v-if="
-                          selectedNode.data.tag &&
-                          latestVersion(selectedNode.data.application) &&
-                          selectedNode.data.tag !==
-                            latestVersion(selectedNode.data.application).version
-                        "
-                        class="version-outdated-badge"
-                      >
-                        older — latest
-                        {{
-                          latestVersion(selectedNode.data.application).version
-                        }}
-                      </span>
-                      <span
-                        v-else-if="
-                          selectedNode.data.tag &&
-                          latestVersion(selectedNode.data.application) &&
-                          selectedNode.data.tag ===
-                            latestVersion(selectedNode.data.application).version
-                        "
-                        class="version-latest-badge"
-                      >
-                        latest
-                      </span>
-                    </span>
-                  </div>
-                </div>
-              </template>
-
-              <!-- Processor settings (editable in create mode) -->
-              <template v-if="selectedNode.type === 'default' && !isReadOnly">
-                <h4 class="sidebar-section-title">Runtime Configuration</h4>
-                <div class="info-card">
+              <!-- Processor settings (editable in create mode): folded, as
+                   the app's own resources usually do. -->
+              <template v-if="selectedNode.type === 'default' && !isReadOnly && stepTab === 'settings'">
+                <button type="button" class="advanced-toggle" :aria-expanded="showAdvanced" @click="showAdvanced = !showAdvanced">
+                  <span class="advanced-caret" :class="{ open: showAdvanced }">▸</span>
+                  Compute and resources<span class="advanced-summary">{{ resourcesSummary(selectedNode.data) }}</span>
+                </button>
+                <div v-show="showAdvanced" class="info-card">
                   <div class="info-row">
                     <span class="info-label">
                       Compute Type
@@ -2041,134 +3568,24 @@ const openNodeSettings = (id) => {
                 </div>
               </template>
 
-              <!-- Parameters for processor nodes -->
+              <!-- Parameters, from the app's app.yml (ParamField). -->
               <template
                 v-if="
                   selectedNode.type === 'default' &&
+                  stepTab === 'settings' &&
                   selectedNodeParamSchema.length > 0
                 "
               >
                 <h4 class="sidebar-section-title">Parameters</h4>
                 <div class="info-card">
-                  <div
+                  <ParamField
                     v-for="param in selectedNodeParamSchema"
                     :key="param.name"
-                    class="info-row"
-                  >
-                    <span class="info-label">
-                      {{ param.name }}
-                      <el-tooltip
-                        v-if="
-                          param.defaultValue == null &&
-                          !selectedNode.data.defaultParams?.[param.name]
-                        "
-                        content="No default — must be set here or at run time"
-                        placement="left"
-                      >
-                        <span class="param-required-badge"
-                          >required at run</span
-                        >
-                      </el-tooltip>
-                    </span>
-                    <template v-if="canEditConfig">
-                    <!-- Has app default: show value with edit toggle -->
-                    <template v-if="param.defaultValue != null">
-                      <template
-                        v-if="param.name in selectedNode.data.defaultParams"
-                      >
-                        <div class="param-edit-row">
-                          <el-input
-                            :model-value="
-                              selectedNode.data.defaultParams[param.name]
-                            "
-                            size="small"
-                            :placeholder="param.defaultValue"
-                            class="info-inline-select"
-                            @update:model-value="
-                              (val) => {
-                                selectedNode.data.defaultParams[param.name] =
-                                  val;
-                              }
-                            "
-                          />
-                          <button
-                            class="param-revert-btn"
-                            title="Revert to app default"
-                            @click="clearDefaultParam(param.name)"
-                          >
-                            &times;
-                          </button>
-                        </div>
-                      </template>
-                      <template v-else>
-                        <span
-                          class="param-default-display"
-                          @click="
-                            selectedNode.data.defaultParams[param.name] =
-                              param.defaultValue
-                          "
-                        >
-                          {{ param.defaultValue }}
-                          <span class="param-edit-icon" title="Override"
-                            >&#9998;</span
-                          >
-                        </span>
-                      </template>
-                    </template>
-                    <!-- No app default: always show input -->
-                    <template v-else>
-                      <el-input
-                        v-if="
-                          !param.validValues || param.validValues.length === 0
-                        "
-                        :model-value="
-                          selectedNode.data.defaultParams[param.name] ?? ''
-                        "
-                        size="small"
-                        placeholder="Set default..."
-                        class="info-inline-select"
-                        @update:model-value="
-                          (val) => {
-                            selectedNode.data.defaultParams[param.name] = val;
-                          }
-                        "
-                      />
-                      <el-select
-                        v-else
-                        :model-value="
-                          selectedNode.data.defaultParams[param.name] ?? ''
-                        "
-                        size="small"
-                        placeholder="Select..."
-                        clearable
-                        class="info-inline-select"
-                        @update:model-value="
-                          (val) => {
-                            selectedNode.data.defaultParams[param.name] = val;
-                          }
-                        "
-                      >
-                        <el-option
-                          v-for="v in param.validValues"
-                          :key="v"
-                          :label="v"
-                          :value="v"
-                        />
-                      </el-select>
-                    </template>
-                    </template>
-                    <!-- Read-only for non-creators -->
-                    <template v-else>
-                      <span class="info-value param-value-truncate">
-                        {{
-                          selectedNode.data.defaultParams?.[param.name] ??
-                          (param.defaultValue != null
-                            ? param.defaultValue
-                            : "—")
-                        }}
-                      </span>
-                    </template>
-                  </div>
+                    :param="param"
+                    :editable="canEditConfig"
+                    :model-value="selectedNode.data.defaultParams?.[param.name]"
+                    @update:model-value="(v) => setDefaultParam(param.name, v)"
+                  />
                 </div>
               </template>
 
@@ -2243,8 +3660,35 @@ const openNodeSettings = (id) => {
               </button>
             </template>
 
+            <!-- Building, nothing selected: what's left, and how -->
+            <template v-if="!selectedNode && mode !== 'browse' && !started">
+              <h4 class="sidebar-section-title">Getting started</h4>
+              <p class="checklist-intro">
+                {{ landing ? "Choose how to start." : "Add the first step with the + under Input data, or click an app in the list. What's left to do shows here as you build." }}
+              </p>
+            </template>
+            <template v-if="!selectedNode && mode !== 'browse' && started">
+              <h4 class="sidebar-section-title">Checklist</h4>
+              <!-- Where it stands, then what to do: each item goes to its step or link -->
+              <p
+                class="checklist-status"
+                :class="readiness.blocking.length ? 'is-block' : readiness.warnings.length ? 'is-warn' : 'is-ready'"
+              >{{ readinessLabel(readiness) }}</p>
+              <ul v-if="readiness.items.length" class="checklist">
+                <li v-for="item in readiness.items" :key="item.id">
+                  <button type="button" class="checklist-item" :class="`is-${item.level}`" @click="onReadinessSelect(item)">
+                    <span class="checklist-dot" />
+                    <span class="checklist-text">
+                      {{ item.text }}
+                      <span v-if="item.detail" class="checklist-detail">{{ item.detail }}</span>
+                    </span>
+                  </button>
+                </li>
+              </ul>
+            </template>
+
             <!-- Workflow Details -->
-            <template v-if="selectedWorkflow">
+            <template v-if="selectedWorkflow && !selectedNode">
               <h4 class="sidebar-section-title">Workflow Details</h4>
               <template v-if="isEditingDetails">
                 <div class="info-edit-form">
@@ -2345,14 +3789,42 @@ const openNodeSettings = (id) => {
               </template>
             </template>
 
-            <div v-if="!selectedWorkflow && !selectedNode" class="info-empty">
-              Select a workflow or click a node to see details
+            <!-- Nothing selected: every step, to open one -->
+            <template v-if="!selectedNode && nodes.length">
+              <h4 class="sidebar-section-title">Steps</h4>
+              <ul class="step-list">
+                <li v-for="n in stepListNodes" :key="n.id">
+                  <button type="button" class="step-list-item" @click="onReadinessSelect({ nodeId: n.id })">
+                    <!-- Its kind's colour, as on the canvas; a warning only when it needs attention -->
+                    <span class="step-list-kind" :class="`is-${stepKind(n)}`" />
+                    <span class="step-list-name">{{ nodeName(n) || "Step" }}</span>
+                    <span v-if="stepWarning(n.id)" class="step-list-warn" :title="stepWarning(n.id)">!</span>
+                    <span class="step-list-meta" :title="stepListMeta(n)">{{ stepListMeta(n) }}</span>
+                  </button>
+                </li>
+              </ul>
+            </template>
+
+            <!-- Building, nothing selected: how, last (read once) -->
+            <template v-if="!selectedNode && mode !== 'browse'">
+              <h4 class="sidebar-section-title">Tips</h4>
+              <ul class="tips">
+                <li>Click a step to see and change its settings.</li>
+                <li><strong>+</strong> under a step adds the next one; drag between steps to connect them.</li>
+                <li><kbd>Delete</kbd> removes the selection; <kbd>⌘Z</kbd> / <kbd>⇧⌘Z</kbd> undo and redo; arrows move between steps.</li>
+              </ul>
+            </template>
+
+            <div v-if="!selectedWorkflow && !selectedNode && !nodes.length" class="info-empty">
+              Select a workflow or add a step to see details
             </div>
-          </el-collapse-item>
+        </div>
+
+        <el-collapse v-model="accordionActiveNames" class="sidebar-accordion">
 
           <!-- Workflow Metrics Section -->
           <el-collapse-item
-            v-if="mode === 'browse' && selectedWorkflow"
+            v-if="mode === 'browse' && selectedWorkflow && !selectedNode"
             title="Workflow Metrics"
             name="workflow-metrics"
           >
@@ -2380,99 +3852,9 @@ const openNodeSettings = (id) => {
             />
           </el-collapse-item>
 
-          <!-- Data & Applications Section (create mode only) -->
-          <el-collapse-item
-            v-if="mode === 'create'"
-            title="Data & Applications"
-            name="data-and-apps"
-          >
-            <!-- Data Section -->
-            <h4 class="sidebar-section-title">Data</h4>
-            <div class="data-items-list">
-              <div
-                class="data-item data-source-item"
-                :class="{ disabled: isReadOnly }"
-                :draggable="!isReadOnly"
-                @dragstart="onDragStart(null, $event, 'data-source')"
-              >
-                <IconFile class="data-item-icon" :width="20" :height="20" />
-                <div class="data-item-info">
-                  <div class="data-item-name">Source</div>
-                  <div class="data-item-description">Select input sources</div>
-                </div>
-              </div>
-              <div
-                class="data-item data-target-item"
-                :class="{ disabled: isReadOnly }"
-                :draggable="!isReadOnly"
-                @dragstart="onDragStart(null, $event, 'data-target')"
-              >
-                <IconCollection
-                  class="data-item-icon"
-                  :width="20"
-                  :height="20"
-                />
-                <div class="data-item-info">
-                  <div class="data-item-name">Target</div>
-                  <div class="data-item-description">Select output target</div>
-                </div>
-              </div>
-            </div>
-
-            <!-- Applications Section -->
-            <h4 class="sidebar-section-title">Applications</h4>
-            <div v-if="isLoading" class="loading">Loading applications...</div>
-            <template v-else>
-              <el-input
-                v-model="applicationSearch"
-                size="small"
-                clearable
-                placeholder="Search applications"
-                class="application-search"
-              />
-              <div
-                v-if="!filteredApplications.length"
-                class="applications-empty"
-              >
-                <template v-if="availableApplications.length">
-                  No application matches &ldquo;{{ applicationSearch }}&rdquo;.
-                </template>
-                <template v-else>No applications available.</template>
-              </div>
-              <div class="applications-list">
-                <div
-                  v-for="app in filteredApplications"
-                  :key="app.uuid"
-                  class="application-item"
-                  :class="{ disabled: isReadOnly }"
-                  :draggable="!isReadOnly"
-                  @dragstart="onDragStart(app, $event, 'application')"
-                >
-                  <IconAnalysis class="app-icon" :width="20" :height="20" />
-                  <div class="app-info">
-                    <div class="app-name">{{ repoName(app) }}</div>
-                    <span
-                      v-if="visibilityLabel(app)"
-                      class="app-type-badge"
-                    >{{ visibilityLabel(app) }}</span>
-                    <div class="app-description">
-                      {{ (app.versions || []).length }}
-                      {{
-                        (app.versions || []).length === 1 ? "version" : "versions"
-                      }}
-                      <template v-if="latestVersion(app)">
-                        &middot; latest {{ latestVersion(app).version }}
-                      </template>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </template>
-          </el-collapse-item>
-
           <!-- Danger Zone (always last) -->
           <el-collapse-item
-            v-if="mode === 'browse' && selectedWorkflow"
+            v-if="mode === 'browse' && selectedWorkflow && !selectedNode"
             title="Danger Zone"
             name="danger-zone"
             class="danger-collapse-item"
@@ -2528,17 +3910,25 @@ const openNodeSettings = (id) => {
       </div>
     </div>
 
-    <!-- Workflow Summary -->
-    <div v-if="nodes.length > 0 && mode === 'create'" class="workflow-summary">
-      <h4>Workflow Summary</h4>
-      <div class="summary-content">
-        <span><strong>Steps:</strong> {{ nodes.length }}</span>
-        <span><strong>Name:</strong> {{ workflowName || "Unnamed" }}</span>
-        <span v-if="workflowDescription"
-          ><strong>Description:</strong> {{ workflowDescription }}</span
-        >
-      </div>
-    </div>
+    <StepPicker
+      :open="!!pickerFor"
+      :title="pickerTitle"
+      :applications="filteredApplications"
+      :app-name="appDisplayName"
+      :app-line="(app) => [ioLine(versionManifest(app)), versionManifest(app)?.description || app.description].filter(Boolean).join(' · ')"
+      @pick="onStepPicked"
+      @close="pickerFor = null"
+    />
+    <el-dialog
+      :model-value="!!appYml"
+      :title="appYml?.title"
+      width="640px"
+      append-to-body
+      @update:model-value="(v) => v || (appYml = null)"
+    >
+      <pre class="app-yml">{{ appYml?.text }}</pre>
+    </el-dialog>
+    <RunWizardDialog ref="runDialog" />
   </div>
 </template>
 
@@ -2546,6 +3936,19 @@ const openNodeSettings = (id) => {
 /* these are necessary styles for vue flow */
 @import "@vue-flow/core/dist/style.css";
 @import "@vue-flow/core/dist/theme-default.css";
+@import "@vue-flow/minimap/dist/style.css";
+
+/* The "Use version …?" confirmation (rendered outside the builder). */
+.version-change {
+  ul {
+    margin: 0 0 8px;
+    padding-left: 18px;
+  }
+  .version-warning {
+    margin: 4px 0 0;
+    color: #92400e;
+  }
+}
 
 /* Handle styles — must be unscoped so VueFlow can render them */
 .workflow-builder-flow {
@@ -2630,6 +4033,75 @@ const openNodeSettings = (id) => {
   overflow: hidden;
 }
 
+.update-note {
+  margin-top: 8px;
+  padding: 8px 10px;
+  border: 1px solid #fcd9a6;
+  border-radius: 4px;
+  background: #fff8ec;
+  font-size: 12px;
+  color: theme.$gray_6;
+}
+.update-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.update-lines {
+  margin: 6px 0 0;
+  padding-left: 16px;
+  color: theme.$gray_5;
+}
+.update-lines-none {
+  margin: 4px 0 0;
+  color: theme.$gray_4;
+}
+
+.version-pill {
+  margin-left: 10px;
+  padding: 2px 8px;
+  border: 1px solid theme.$gray_2;
+  border-radius: 3px;
+  background: theme.$white;
+  font: inherit;
+  font-size: 12px;
+  color: theme.$gray_5;
+  cursor: pointer;
+
+  &:hover {
+    border-color: theme.$purple_1;
+  }
+}
+.version-pill--static {
+  cursor: default;
+
+  &:hover {
+    border-color: theme.$gray_2;
+  }
+}
+.version-item {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.3;
+  padding: 2px 0;
+}
+.version-item-meta {
+  max-width: 320px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+  color: theme.$gray_4;
+}
+
+/* The bar's host when it's teleported into the Workflows toolbar. */
+.builder-bar-host {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+}
+
 .builder-header {
   display: flex;
   align-items: center;
@@ -2701,7 +4173,148 @@ const openNodeSettings = (id) => {
   overflow: hidden;
 }
 
+/* Folding the side panels: a rail to open one, a button to fold it. */
+.panel-rail {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  width: 30px;
+  flex-shrink: 0;
+  padding: 12px 0;
+  border: none;
+  border-right: 1px solid theme.$gray_2;
+  background: theme.$white;
+  color: theme.$gray_5;
+  cursor: pointer;
+
+  &:hover {
+    background: theme.$gray_1;
+    color: theme.$purple_3;
+  }
+}
+.panel-rail--right {
+  border-right: none;
+  border-left: 1px solid theme.$gray_2;
+}
+.panel-rail-label {
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  font-size: 12px;
+  font-weight: 500;
+}
+.insp-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: -4px 0 4px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: theme.$gray_4;
+}
+.insp-fold {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  border-radius: 3px;
+  background: none;
+  color: theme.$gray_5;
+  cursor: pointer;
+
+  &:hover {
+    background: theme.$gray_0;
+    color: theme.$purple_3;
+  }
+}
+.icon-btn {
+  display: flex;
+  align-items: center;
+  padding: 6px 8px;
+}
+.checklist,
+.tips {
+  margin: 0 0 12px;
+  padding: 0;
+  list-style: none;
+  font-size: 12px;
+}
+.checklist-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  width: 100%;
+  padding: 4px 2px;
+  border: none;
+  background: none;
+  font: inherit;
+  color: theme.$gray_6;
+  text-align: left;
+  cursor: pointer;
+
+  &:hover {
+    background: theme.$gray_1;
+  }
+}
+.checklist-dot {
+  width: 8px;
+  height: 8px;
+  flex-shrink: 0;
+  margin-top: 4px;
+  border-radius: 50%;
+  background: #f59e0b;
+}
+.checklist-item.is-block .checklist-dot {
+  background: theme.$status_red;
+}
+/* The checklist's verdict, first: what's left, or ready. */
+.checklist-status {
+  margin: 0 0 8px;
+  padding: 6px 10px;
+  font-size: 13px;
+  font-weight: 600;
+  &.is-block {
+    background: #fdecec;
+    color: #b42318;
+  }
+  &.is-warn {
+    background: theme.$orange_tint;
+    color: #9a5b0c;
+  }
+  &.is-ready {
+    background: #eaf9ef;
+    color: #0f7a3f;
+  }
+}
+.checklist-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.checklist-detail {
+  font-size: 12px;
+  color: theme.$gray_4;
+}
+.tips li {
+  margin-bottom: 6px;
+  line-height: 1.4;
+  color: theme.$gray_5;
+}
+kbd {
+  padding: 0 4px;
+  border: 1px solid theme.$gray_3;
+  border-radius: 3px;
+  background: theme.$gray_1;
+  font-size: 11px;
+}
+
 .applications-sidebar {
+  position: relative;
   width: 350px;
   background-color: theme.$white;
   border-left: 1px solid theme.$gray_3;
@@ -3024,67 +4637,568 @@ const openNodeSettings = (id) => {
   }
 }
 
+/* While connecting: what accepts the connection, what doesn't. */
+.connect-fits {
+  outline: 2px solid #17bb62;
+  outline-offset: 2px;
+}
+.connect-mismatch {
+  opacity: 0.6;
+  outline: 2px dashed #e94b4b;
+  outline-offset: 2px;
+}
+.connect-no {
+  opacity: 0.35;
+}
+/* A step with a required parameter without a value. */
+.step-warn {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: #f59e0b;
+}
+/* A step's declared inputs (top) and outputs (bottom). */
+.node-ports {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  font-size: 10px;
+}
+.node-ports--in {
+  margin-bottom: 4px;
+  /* Over the step's input connector (top centre); with two or more inputs,
+     each over its own connector (node-ports--routed). */
+  justify-content: center;
+}
+.node-ports--out {
+  margin-top: 5px;
+}
+.node-ports--none {
+  margin-top: 6px;
+  font-style: italic;
+  color: theme.$gray_4;
+}
+.node-port {
+  padding: 0 5px;
+  border-radius: 3px;
+  background: theme.$gray_0;
+  color: theme.$gray_5;
+}
+/* A step's version and resources: one muted line. */
+.node-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 2px;
+  font-size: 11px;
+  color: theme.$gray_4;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* Edit and remove: on hover or when the step is selected. */
+:deep(.vue-flow__node:not(.selected):not(:hover)) .node-action {
+  opacity: 0;
+}
+.port-prefix-note {
+  margin: -4px 0 10px;
+  font-size: 12px;
+  color: theme.$gray_5;
+}
+/* Two or more outputs (or inputs): chips in equal columns, so each one's
+   connection point can sit under (or over) the middle of its column. */
+.node-ports--routed {
+  display: grid;
+  justify-items: center;
+  /* Many outputs: the card grows to its max width, then names are cut. */
+  min-width: 0;
+  .node-port {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+.node-port--all {
+  background: none;
+  border: 1px dashed theme.$gray_3;
+  color: theme.$gray_4;
+}
+
+/* The + under a step: what comes next. Shown on hover and selection. */
+.io-default-note {
+  margin: 4px 0 8px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: theme.$gray_4;
+}
+.io-node__remove {
+  position: absolute;
+  /* Clear of the pill's rounded end */
+  top: -13px;
+  right: -10px;
+}
+.add-next {
+  position: absolute;
+  left: 50%;
+  bottom: -34px;
+  z-index: 5;
+  width: 22px;
+  height: 22px;
+  margin-left: -11px;
+  padding: 0;
+  border: 1px solid theme.$purple_1;
+  border-radius: 50%;
+  background: theme.$white;
+  color: theme.$purple_2;
+  font-size: 15px;
+  line-height: 19px;
+  cursor: pointer;
+  opacity: 0.55;
+  transition: opacity 0.15s, background 0.15s;
+
+  &:hover,
+  &:focus-visible {
+    opacity: 1;
+    background: theme.$purple_tint;
+    outline: none;
+  }
+}
+.vue-flow__node:hover .add-next,
+.vue-flow__node.selected .add-next {
+  opacity: 1;
+}
+.builder-landing {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 24px;
+  background: rgba(247, 247, 247, 0.96);
+}
+.builder-landing__title {
+  margin: 0 0 4px;
+  font-size: 18px;
+  font-weight: 600;
+  color: theme.$gray_6;
+}
+.builder-landing__options {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: min(420px, 100%);
+}
+.builder-landing__option {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 12px 14px;
+  border: 1px solid theme.$gray_2;
+  border-radius: 4px;
+  background: theme.$white;
+  font: inherit;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+
+  &:hover {
+    border-color: theme.$purple_1;
+  }
+  &.is-primary {
+    border-color: theme.$purple_1;
+    box-shadow: inset 3px 0 0 theme.$purple_1;
+  }
+}
+.builder-landing__name {
+  font-size: 14px;
+  font-weight: 600;
+  color: theme.$gray_6;
+}
+.builder-landing__desc {
+  font-size: 12px;
+  color: theme.$gray_4;
+}
+.builder-landing__sub {
+  margin: 8px 0 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: theme.$gray_4;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.builder-landing__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  width: min(420px, 100%);
+}
+.builder-landing__item {
+  display: block;
+  padding: 6px 2px;
+  font-size: 13px;
+  color: theme.$purple_2;
+  text-decoration: none;
+
+  &:hover {
+    text-decoration: underline;
+  }
+}
+.checklist-intro {
+  margin: 0 0 12px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: theme.$gray_5;
+}
+.first-step-hint {
+  position: absolute;
+  left: 50%;
+  bottom: 24px;
+  z-index: 5;
+  transform: translateX(-50%);
+  padding: 8px 14px;
+  border: 1px solid theme.$gray_2;
+  border-radius: 4px;
+  background: theme.$white;
+  font-size: 13px;
+  color: theme.$gray_5;
+}
+.first-step-link {
+  color: theme.$link-color;
+  text-decoration: none;
+
+  &:hover {
+    color: theme.$link-color-hover;
+  }
+}
+
+/* An app step's panel: name and version, what it is, then its ports. */
+/* The panel's fixed top: breadcrumb, then the step or the workflow. */
+.panel-main {
+  padding: 0 0 8px;
+}
+/* The workflow's name, as the panel's title; edited in place. */
+.panel-title {
+  display: block;
+  width: 100%;
+  margin: 4px 0 12px;
+  padding: 2px 4px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: none;
+  font: inherit;
+  font-size: 18px;
+  font-weight: 600;
+  color: theme.$gray_6;
+  box-sizing: border-box;
+}
+.panel-title-input {
+  margin-left: -5px;
+  &::placeholder {
+    color: theme.$gray_4;
+    font-weight: 500;
+  }
+  &:hover {
+    border-color: theme.$gray_2;
+  }
+  &:focus {
+    outline: none;
+    border-color: theme.$purple_1;
+    background: theme.$white;
+  }
+}
+.panel-crumbs {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  margin: 4px 0 10px;
+  font-size: 12px;
+  color: theme.$gray_4;
+}
+.crumb-link {
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  color: theme.$purple_3;
+  cursor: pointer;
+  &:hover {
+    text-decoration: underline;
+  }
+}
+.crumb-current {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: theme.$gray_5;
+}
+/* The steps: no box or rules, the kinds' bars separate them; a row shows
+   it's clickable on hover. */
+.step-list {
+  margin: 0 0 10px;
+  padding: 0;
+  list-style: none;
+}
+.step-list-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 8px;
+  border-radius: 3px;
+  border: none;
+  background: none;
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+  &:hover {
+    background: theme.$gray_1;
+  }
+}
+/* A step's kind, in the canvas's colours. */
+.step-list-kind {
+  flex-shrink: 0;
+  width: 4px;
+  height: 16px;
+  border-radius: 2px;
+  &.is-source {
+    background: #6366f1;
+  }
+  &.is-app {
+    background: theme.$orange_2;
+  }
+  &.is-target {
+    background: #64748b;
+  }
+}
+.step-list-warn {
+  flex-shrink: 0;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: theme.$orange_1;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 14px;
+  text-align: center;
+  color: theme.$white;
+}
+/* The name keeps its width (its number tells steps apart); the detail
+   beside it gives way, whole on hover. */
+.step-list-name {
+  flex-shrink: 0;
+  max-width: 70%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: theme.$gray_6;
+}
+.step-list-meta {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: right;
+  font-size: 12px;
+  color: theme.$gray_4;
+}
+.step-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 2px 0 6px;
+}
+.step-name {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: theme.$gray_6;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.step-version {
+  width: 100%;
+}
+.step-version-row {
+  margin-bottom: 8px;
+}
+.step-tabs {
+  margin: 4px 0 10px;
+}
+.step-version-text {
+  font-size: 12px;
+  color: theme.$gray_4;
+}
+.step-desc {
+  margin: 4px 0 8px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: theme.$gray_6;
+}
+.step-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+.step-tag {
+  padding: 0 6px;
+  border: 1px solid;
+  border-radius: 3px;
+  font-size: 11px;
+}
+.step-by {
+  margin: 0 0 6px;
+  font-size: 12px;
+  color: theme.$gray_4;
+}
+.section-note {
+  margin-left: 6px;
+  font-size: 11px;
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
+  color: theme.$gray_4;
+}
+.port-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+.port-item {
+  padding: 6px 8px;
+  border: 1px solid theme.$gray_2;
+  border-radius: 4px;
+  background: theme.$white;
+}
+.port-line {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 12px;
+}
+.port-name {
+  font-weight: 600;
+  color: theme.$gray_6;
+  &--all {
+    font-weight: 400;
+    font-style: italic;
+    color: theme.$gray_5;
+  }
+}
+.port-types {
+  color: theme.$gray_4;
+}
+.port-link {
+  margin-left: auto;
+  color: theme.$gray_5;
+  white-space: nowrap;
+}
+.port-desc {
+  margin: 2px 0 0;
+  font-size: 12px;
+  line-height: 1.4;
+  color: theme.$gray_4;
+}
+.advanced-summary {
+  margin-left: 6px;
+  font-weight: 400;
+  color: theme.$gray_4;
+}
+.about {
+  margin: 4px 0 10px;
+  font-size: 12px;
+}
+.about-desc {
+  margin: 0 0 8px;
+  line-height: 1.4;
+  color: theme.$gray_6;
+}
+.about-ports {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 4px;
+}
+.about-label {
+  width: 62px;
+  color: theme.$gray_4;
+}
+.about-port {
+  padding: 1px 6px;
+  border-radius: 3px;
+  background: theme.$gray_0;
+  color: theme.$gray_6;
+}
+.about-none {
+  margin: 0 0 6px;
+  font-style: italic;
+  color: theme.$gray_4;
+}
+.about-links {
+  display: flex;
+  gap: 12px;
+  margin-top: 6px;
+}
+.advanced-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  margin: 12px 0 6px;
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  color: theme.$gray_5;
+  cursor: pointer;
+}
+.advanced-caret {
+  font-size: 10px;
+  transition: transform 0.12s ease;
+
+  &.open {
+    transform: rotate(90deg);
+  }
+}
+.app-yml {
+  max-height: 60vh;
+  margin: 0;
+  padding: 10px 12px;
+  overflow: auto;
+  background: theme.$gray_1;
+  border: 1px solid theme.$gray_2;
+  font-size: 12px;
+}
+
 .canvas-toolbar {
   position: absolute;
   top: 10px;
   right: 10px;
   z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
-/* Sits under the Auto Layout button, which owns the top-right corner. */
-.compat-panel {
-  position: absolute;
-  top: 52px;
-  right: 10px;
-  z-index: 10;
-  max-width: 300px;
-  padding: 8px 10px;
-  border: 1px solid theme.$gray_3;
-  border-left: 3px solid theme.$gray_4;
-  border-radius: 4px;
-  background: theme.$white;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
-  font-size: 11px;
-  color: theme.$gray_5;
-}
-
-.compat-panel--invalid {
-  border-left-color: #e94b4b;
-}
-
-.compat-panel--valid {
-  border-left-color: #17bb62;
-}
-
-.compat-panel-ok {
-  margin-top: 6px;
-  color: #0f7a3f;
-}
-
-.compat-panel-title {
-  font-size: 12px;
-  font-weight: 600;
-  color: theme.$black;
-}
-
-.compat-panel-list {
-  margin: 6px 0 0;
-  padding-left: 14px;
-
-  li {
-    margin-bottom: 2px;
-  }
-}
-
-.compat-panel-detail {
-  color: #b45309;
-}
-
-.compat-panel-note {
-  margin-top: 6px;
-  color: theme.$gray_4;
-}
-
+/* Sits under the toolbar (node size switch and Auto Layout), which owns the
+   top-right corner. */
 .auto-layout-btn {
   padding: 6px 12px;
   border: 1px solid theme.$gray_3;
@@ -3100,6 +5214,22 @@ const openNodeSettings = (id) => {
     border-color: theme.$purple_1;
     color: theme.$purple_1;
     background: theme.$white;
+  }
+
+  /* Save layout: the one thing to do after moving */
+  &.is-primary {
+    border-color: theme.$purple_2;
+    background: theme.$purple_2;
+    color: theme.$white;
+
+    &:hover {
+      background: theme.$purple_1;
+      color: theme.$white;
+    }
+    &:disabled {
+      opacity: 0.6;
+      cursor: default;
+    }
   }
 }
 
@@ -3126,13 +5256,29 @@ const openNodeSettings = (id) => {
   background: white;
   border: 1px solid theme.$gray_3;
   border-radius: 4px;
-  padding: 14px;
-  min-width: 250px;
-  max-width: 350px;
+  padding: 8px 10px;
+  /* One size (NODE_WIDTH), so auto-arrange centres it; a long name is cut
+     short, in full on hover. */
+  box-sizing: border-box;
+  width: 280px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   transition: all 0.2s;
   position: relative;
   z-index: 1;
+
+  // What a step is, as a strip on the left over the border (as on the
+  // compact cards); the border says its state (selected, a warning; on a
+  // run, running or failed). The kinds set --type-strip.
+  &::before {
+    content: "";
+    position: absolute;
+    top: -1px;
+    bottom: -1px;
+    left: -1px;
+    width: 5px;
+    border-radius: 4px 0 0 4px;
+    background: var(--type-strip, transparent);
+  }
 
   &:hover {
     border-color: theme.$black;
@@ -3142,9 +5288,9 @@ const openNodeSettings = (id) => {
   .node-header {
     display: flex;
     justify-content: space-between;
-    align-items: flex-start;
-    gap: 10px;
-    margin-bottom: 8px;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 2px;
   }
 
   .node-title {
@@ -3152,7 +5298,13 @@ const openNodeSettings = (id) => {
     font-size: 15px;
     color: theme.$black;
     flex: 1;
+    min-width: 0;
     line-height: 1.3;
+    text-align: left;
+    // One line; the full name on hover.
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .settings-btn {
@@ -3197,7 +5349,7 @@ const openNodeSettings = (id) => {
   .node-description {
     font-size: 12px;
     color: theme.$gray_4;
-    margin-bottom: 8px;
+    margin-bottom: 4px;
     line-height: 1.4;
     display: flex;
     align-items: center;
@@ -3241,25 +5393,12 @@ const openNodeSettings = (id) => {
     font-size: 11px;
     color: theme.$gray_5;
     font-weight: 500;
-    margin-top: 8px;
-    padding-top: 8px;
+    margin-top: 6px;
+    padding-top: 6px;
     border-top: 1px solid theme.$gray_2;
     display: flex;
     align-items: center;
     gap: 8px;
-  }
-
-  .runtime-tag {
-    font-size: 10px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    padding: 2px 8px;
-    border-radius: 2px;
-    background: rgba(5, 150, 105, 0.12);
-    color: #047857;
-    white-space: nowrap;
-    margin-left: auto;
   }
 
   .node-badge {
@@ -3291,8 +5430,15 @@ const openNodeSettings = (id) => {
     }
   }
 
-  &.data-source-node {
-    border-color: #6366f1;
+  /* An app step: white, with the processor orange as its strip. Input
+     data and targets keep a light tint of their colour, so data in and out
+     reads apart from the work between. */
+  &.processor-node {
+    --type-strip: #{theme.$orange_2};
+  }
+
+  &.data-source-node:not(.io-node) {
+    --type-strip: #6366f1;
     background: #eef2ff;
 
     .node-header {
@@ -3301,8 +5447,8 @@ const openNodeSettings = (id) => {
     }
   }
 
-  &.data-target-node {
-    border-color: #64748b;
+  &.data-target-node:not(.io-node) {
+    --type-strip: #64748b;
     background: #f1f5f9;
 
     .node-body {
@@ -3325,19 +5471,6 @@ const openNodeSettings = (id) => {
         color: #64748b;
         background: rgba(100, 116, 139, 0.1);
       }
-    }
-
-    .runtime-tag {
-      font-size: 10px;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      padding: 2px 8px;
-      border-radius: 2px;
-      background: rgba(5, 150, 105, 0.12);
-      color: #047857;
-      white-space: nowrap;
-      display: inline-block;
     }
 
     .target-edit {
@@ -3375,28 +5508,15 @@ const openNodeSettings = (id) => {
       color: white;
     }
 
+    &.processor-badge {
+      background: theme.$orange_2;
+      color: white;
+    }
+
     &.target-badge {
       background: #64748b;
       color: white;
     }
-  }
-}
-
-.workflow-summary {
-  padding: 15px 20px;
-  background-color: theme.$white;
-  border-top: 1px solid theme.$gray_3;
-
-  h4 {
-    margin: 0 0 10px 0;
-    font-size: 14px;
-  }
-
-  .summary-content {
-    display: flex;
-    gap: 20px;
-    font-size: 13px;
-    flex-wrap: wrap;
   }
 }
 
@@ -3512,7 +5632,7 @@ const openNodeSettings = (id) => {
 .visibility-badge {
   display: inline-block;
   padding: 1px 8px;
-  border-radius: 10px;
+  border-radius: 3px;
   font-size: 11px;
   font-weight: 600;
   line-height: 16px;
@@ -3722,4 +5842,5 @@ const openNodeSettings = (id) => {
   white-space: nowrap;
   margin-left: 6px;
 }
+/* A step whose app calls language models (runtime.llm): a small sparkle. */
 </style>

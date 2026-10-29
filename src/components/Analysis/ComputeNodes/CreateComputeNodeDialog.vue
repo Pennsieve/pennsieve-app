@@ -9,10 +9,15 @@ import BfButton from '@/components/shared/bf-button/BfButton.vue'
 import BfDialogHeader from '@/components/shared/bf-dialog-header/BfDialogHeader.vue'
 import DialogBody from '@/components/shared/dialog-body/DialogBody.vue'
 import IconInfo from '@/components/icons/IconInfo.vue'
-import IconArrowRight from '@/components/icons/IconArrowRight.vue'
+import ConnectAwsAccountDialog from '@/components/user/integrations/ConnectAwsAccountDialog.vue'
 
 const props = defineProps({
-  dialogVisible: Boolean
+  dialogVisible: Boolean,
+  // A personal node, created from My Workspace: on one of the user's own
+  // accounts, with no organization.
+  personal: Boolean,
+  // An account to start on (one just connected), by its uuid.
+  initialAccount: { type: String, default: '' }
 })
 
 const emit = defineEmits(['close'])
@@ -206,6 +211,13 @@ const formatAccountId = (accountId) => {
 const fetchComputeResourceAccounts = async () => {
   isLoadingAccounts.value = true
   try {
+    if (props.personal) {
+      // Only the account's owner may create a node outside a workspace
+      computeResourceAccounts.value = await computeResourcesStore.fetchComputeAccounts() || []
+      preselectAccount()
+      return
+    }
+
     const token = await useGetToken()
     const orgId = currentOrganization.value?.id
 
@@ -245,7 +257,9 @@ const fetchGpuTiers = async () => {
   try {
     const token = await useGetToken()
     const orgId = currentOrganization.value?.id
-    const url = `${siteConfig.api2Url}/compute/resources/gpu-tiers?organization_id=${orgId}`
+    const url = props.personal
+      ? `${siteConfig.api2Url}/compute/resources/gpu-tiers`
+      : `${siteConfig.api2Url}/compute/resources/gpu-tiers?organization_id=${orgId}`
     const response = await fetch(url, {
       method: 'GET',
       headers: {
@@ -272,22 +286,20 @@ const createComputeNode = async (nodeData) => {
   const token = await useGetToken()
   const orgId = currentOrganization.value?.id
 
-  if (!orgId) {
+  if (!props.personal && !orgId) {
     throw new Error('No organization ID found')
   }
 
   const url = `${siteConfig.api2Url}/compute/resources/compute-nodes`
 
+  // A personal node names no organization, which makes it organization-independent
   const response = await fetch(url, {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${token}`,
       'Content-Type': 'application/json'
     },
-    body: JSON.stringify({
-      ...nodeData,
-      organizationId: orgId
-    })
+    body: JSON.stringify(props.personal ? nodeData : { ...nodeData, organizationId: orgId })
   })
 
   if (!response.ok) {
@@ -362,9 +374,27 @@ const handleCreateComputeNode = async () => {
 
 // Cached; populates latestVersion on the listed nodes if the list wasn't loaded yet
 const fetchLatestProvisionerVersion = () => {
+  if (props.personal) {
+    computeResourcesStore.fetchUserOwnedComputeNodes().catch(() => {})
+    return
+  }
   const orgId = currentOrganization.value?.id
   if (!orgId) return
   computeResourcesStore.fetchComputeNodes(orgId).catch(() => {})
+}
+
+// Start on the account asked for (one just connected), if it's offered.
+function preselectAccount(uuid = props.initialAccount) {
+  if (uuid && computeResourceAccounts.value.some((a) => a.uuid === uuid)) {
+    computeNode.value.account = uuid
+  }
+}
+
+// No account yet: connect one here, then carry on with it.
+const connectVisible = ref(false)
+async function onAccountConnected(created) {
+  await fetchComputeResourceAccounts()
+  preselectAccount(created?.uuid)
 }
 
 // Watch for dialog visibility to fetch accounts
@@ -495,20 +525,11 @@ onMounted(() => {
                 <div class="warning-content">
                   <div class="warning-icon">⚠️</div>
                   <div>
-                    <strong>No Compute Resource Accounts Available</strong>
+                    <strong>No cloud account yet</strong>
                     <p>
-                      You need to register a compute resource account before creating compute nodes.
-                      Visit the Compute Resources section to add your cloud account.
+                      A compute node runs in a cloud account you've connected. Connect your AWS account to continue.
                     </p>
-                    <a
-                      href="/integrations"
-                      target="_blank"
-                      class="setup-link"
-                      @click="closeDialog"
-                    >
-                      Setup Compute Resources
-                      <IconArrowRight :width="14" :height="14" />
-                    </a>
+                    <bf-button class="secondary compact" @click="connectVisible = true">Connect AWS account</bf-button>
                   </div>
                 </div>
               </div>
@@ -745,6 +766,7 @@ onMounted(() => {
       </div>
     </template>
   </el-dialog>
+  <ConnectAwsAccountDialog v-model="connectVisible" @connected="onAccountConnected" />
 </template>
 
 <style scoped lang="scss">
@@ -1037,24 +1059,6 @@ onMounted(() => {
           line-height: 1.4;
         }
 
-        .setup-link {
-          display: inline-flex;
-          align-items: center;
-          gap: 4px;
-          color: theme.$purple_2;
-          text-decoration: none;
-          font-size: 13px;
-          font-weight: 500;
-
-          &:hover {
-            color: theme.$purple_1;
-            text-decoration: underline;
-          }
-
-          svg {
-            flex-shrink: 0;
-          }
-        }
       }
     }
 

@@ -22,6 +22,7 @@
 import BfRafter from "@/components/shared/bf-rafter/BfRafter.vue";
 import RouterTabs from "@/components/shared/routerTabs/routerTabs.vue";
 import OrgBreadcrumb from "@/components/shared/OrgBreadcrumb/OrgBreadcrumb.vue";
+import { useComputeResourcesStore } from "@/stores/computeResourcesStore";
 
 export default {
   name: 'MyWorkSpacePage',
@@ -34,9 +35,29 @@ export default {
 
   mounted() {
     this.$store.commit('UPDATE_ACTIVE_ORGANIZATION', {})
+    // Analysis data (compute nodes, runs, workflows, applications) is cached per
+    // context. Drop the last workspace's on the way in, and My Workspace's own on
+    // the way out, so neither shows the other's.
+    this.$store.commit('analysisModule/CLEAR_STATE')
+  },
+
+  beforeUnmount() {
+    this.$store.commit('analysisModule/CLEAR_STATE')
   },
 
   computed: {
+    // A compute node page's title: the node's name, from the nodes the page
+    // loads (the user's own).
+    computeNodeName() {
+      const nodeId = this.$route.params.nodeId;
+      if (!nodeId) return "";
+      const store = useComputeResourcesStore();
+      const nodes = [
+        ...(store.getScopedComputeNodes("user-owned") || []),
+        ...(store.getScopedComputeNodes("account-owner") || []),
+      ];
+      return nodes.find((n) => n.uuid === nodeId)?.name || "";
+    },
     routeName() {
       return this.$route.name;
     },
@@ -47,6 +68,7 @@ export default {
       if (this.isPublishingSection) return 'Data Publishing';
       if (this.isCollectionsSection) return 'Collections';
       if (this.isCodeSection) return 'My Code';
+      if (this.isAnalysisSection) return 'My Analysis';
       if (this.myDataSection) return this.myDataSection.name;
 
       // Top-level pages
@@ -62,6 +84,7 @@ export default {
       if (this.isPublishingSection) return { name: 'data-publishing' };
       if (this.isCollectionsSection) return { name: 'collections-list' };
       if (this.isCodeSection) return { name: 'my-code' };
+      if (this.isAnalysisSection) return { name: 'my-analysis' };
       if (this.myDataSection) return this.myDataSection.route;
       return null;
     },
@@ -128,6 +151,50 @@ export default {
         return [];
       }
 
+      // My Analysis tabs
+      if (this.isAnalysisSection) {
+        if (routeName === 'my-notebooks') {
+          return [{ name: 'Notebooks' }];
+        }
+        if (routeName === 'my-run-notebook') {
+          return [
+            { name: 'Notebooks', route: { name: 'my-notebooks' } },
+            { name: 'Notebook' }
+          ];
+        }
+        if (routeName === 'my-workflows') {
+          return [{ name: 'Workflows' }];
+        }
+        if (routeName === 'my-workflow-create') {
+          return [{ name: 'Workflows', route: { name: 'my-workflows' } }, { name: 'New Workflow' }];
+        }
+        // A workflow's page leads back to the Workflows tab's Library
+        if (routeName === 'my-workflow-detail') {
+          return [{ name: 'Workflows', route: { name: 'my-workflows', query: { view: 'library' } } }, { name: 'Workflow' }];
+        }
+        if (routeName === 'my-apps') {
+          return [{ name: 'Apps' }];
+        }
+        const appPages = {
+          'my-application-detail': 'Application',
+          'my-application-manifest-guide': 'Manifest Guide',
+          'my-application-manifest-builder': 'Create Manifest',
+        };
+        if (appPages[routeName]) {
+          return [{ name: 'Apps', route: { name: 'my-apps' } }, { name: appPages[routeName] }];
+        }
+        if (routeName === 'my-compute-nodes') {
+          return [{ name: 'Compute Nodes' }];
+        }
+        if (routeName === 'my-compute-node-management') {
+          return [
+            { name: 'Compute Nodes', route: { name: 'my-compute-nodes' } },
+            { name: this.computeNodeName || 'Compute Node' }
+          ];
+        }
+        return [];
+      }
+
       // My Code sub-pages
       if (this.isCodeSection) {
         if (routeName === 'published-app-details') {
@@ -141,6 +208,11 @@ export default {
 
     isCodeSection() {
       return this.routeName === 'published-app-details';
+    },
+
+    isAnalysisSection() {
+      return this.routeName === 'my-run-notebook' ||
+        this.$route.matched.some(r => r.name === 'my-analysis');
     },
 
     // The "My Data" routes are now separate primary-nav entries; each shows

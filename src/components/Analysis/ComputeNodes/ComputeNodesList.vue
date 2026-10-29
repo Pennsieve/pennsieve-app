@@ -1,14 +1,14 @@
 <script setup>
 import { reactive, ref, computed, onMounted } from 'vue'
 import { useStore } from 'vuex'
+import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { useGetToken } from '@/composables/useGetToken'
 import * as siteConfig from '@/site-config/site.json'
 import BfButton from '@/components/shared/bf-button/BfButton.vue'
-import BfStage from '@/components/layout/BfStage/BfStage.vue'
 import BfEmptyPageState from '@/components/shared/bf-empty-page-state/BfEmptyPageState.vue'
-import IconArrowRight from '@/components/icons/IconArrowRight.vue'
 import CreateComputeNodeDialog from './CreateComputeNodeDialog.vue'
+import ConnectAwsAccountDialog from '@/components/user/integrations/ConnectAwsAccountDialog.vue'
 import ComputeNodeCard from './ComputeNodeCard.vue'
 import { useComputeResourcesStore } from '@/stores/computeResourcesStore'
 
@@ -22,13 +22,17 @@ const profile = computed(() => store.state.profile)
 const activeOrganization = computed(() => store.getters.activeOrganization)
 const orgMembers = computed(() => store.state.orgMembers || [])
 const orgId = computed(() => props.orgId)
+// Rendered in a workspace (/:orgId/analysis/compute-nodes) and in My Workspace
+// (/my-workspace/compute-nodes), where it lists the user's own nodes outside
+// any workspace.
+const isMyWorkspace = computed(() => !orgId.value)
+const scope = computed(() => isMyWorkspace.value ? 'user-owned' : `workspace:${orgId.value}`)
 
 // Use Pinia store for compute nodes data - use scoped system
 const statusOrder = { 'enabled': 0, 'active': 0, 'running': 0, 'ready': 0, 'paused': 1, 'stopped': 1, 'disabled': 1, 'destroying': 2, 'pending': 3 }
 
 const computeNodes = computed(() => {
-  const scope = orgId.value ? `workspace:${orgId.value}` : 'account-owner'
-  const nodes = computeResourcesStore.getScopedComputeNodes(scope) || []
+  const nodes = computeResourcesStore.getScopedComputeNodes(scope.value) || []
   return [...nodes].sort((a, b) => {
     const statusA = statusOrder[(a.status || 'pending').toLowerCase()] ?? 4
     const statusB = statusOrder[(b.status || 'pending').toLowerCase()] ?? 4
@@ -36,10 +40,7 @@ const computeNodes = computed(() => {
     return (a.name || '').toLowerCase().localeCompare((b.name || '').toLowerCase())
   })
 })
-const isLoading = computed(() => {
-  const scope = orgId.value ? `workspace:${orgId.value}` : 'account-owner'
-  return computeResourcesStore.isScopeLoading(scope)
-})
+const isLoading = computed(() => computeResourcesStore.isScopeLoading(scope.value))
 
 const expandedNodes = ref(new Set())
 const editingNodes = ref(new Set())
@@ -61,6 +62,9 @@ const hasAdminRights = computed(() => {
   }
   return false
 })
+
+// In My Workspace anyone may create a node, on an account they own
+const canCreate = computed(() => isMyWorkspace.value || hasAdminRights.value)
 
 // Check if user is owner
 const isOwner = computed(() => activeOrganization.value?.isOwner || false)
@@ -117,15 +121,36 @@ const getUserName = (userId) => {
   return String(userId).includes(':') ? String(userId).split(':').pop() : String(userId)
 }
 
+const route = useRoute()
+const router = useRouter()
+// "Create a compute node on it", from connecting an account, lands here with
+// ?newNode=<account>: the create dialog opens on that account.
+const newNodeAccount = ref('')
 onMounted(() => {
   fetchComputeNodes()
+  if (route.query.newNode && canCreate.value) {
+    newNodeAccount.value = String(route.query.newNode)
+    const { newNode, ...rest } = route.query
+    router.replace({ query: rest })
+    createComputeNodeDialogVisible.value = true
+  }
 })
 
-async function fetchComputeNodes() {
+const connectVisible = ref(false)
+
+async function fetchComputeNodes(forceRefresh = false) {
   try {
+    if (isMyWorkspace.value) {
+      await computeResourcesStore.fetchUserOwnedComputeNodes(forceRefresh)
+      return
+    }
     // Get organization ID from Vuex store
     const orgId = currentOrganization.value?.nodeId || currentOrganization.value?.id
-    await computeResourcesStore.fetchComputeNodes(orgId)
+    // Admins need the workspace's account enablements to know which nodes are Admin Managed
+    const accountsRequest = hasAdminRights.value && orgId
+      ? computeResourcesStore.fetchWorkspaceComputeAccounts(orgId)
+      : Promise.resolve()
+    await Promise.all([computeResourcesStore.fetchComputeNodes(orgId, forceRefresh), accountsRequest])
   } catch (error) {
     console.error('Failed to fetch compute nodes:', error)
   }
@@ -204,7 +229,7 @@ async function saveChanges(node) {
       const updatedNode = await response.json()
       
       // Refresh the compute nodes to get the updated data
-      await fetchComputeNodes()
+      await fetchComputeNodes(true)
       
       // Exit editing mode
       cancelEditing(nodeUuid)
@@ -252,8 +277,9 @@ function openCreateDialog() {
 
 function closeCreateDialog() {
   createComputeNodeDialogVisible.value = false
+  newNodeAccount.value = ''
   // Refresh the list after creating
-  fetchComputeNodes()
+  fetchComputeNodes(true)
 }
 
 function openDeleteDialog(node) {
@@ -283,7 +309,7 @@ async function confirmDeleteNode() {
     
     if (response.ok) {
       // Refresh the compute nodes list after deletion
-      await fetchComputeNodes()
+      await fetchComputeNodes(true)
       
       ElMessage.success('Compute node deleted successfully')
       closeDeleteDialog()
@@ -299,51 +325,40 @@ async function confirmDeleteNode() {
 </script>
 
 <template>
-  <bf-stage element-loading-background="transparent">
-    <template #actions>
-      <bf-button
-        :disabled="!hasAdminRights"
-        @click="openCreateDialog"
-      >
-        Create Compute Node
-      </bf-button>
-    </template>
-    
-    <div class="compute-nodes-container">
+  <div class="compute-nodes-page">
+  <div class="compute-nodes-container">
+    <div class="nodes-toolbar">
+      <p class="nodes-intro">
+        <template v-if="isMyWorkspace">
+          Your personal compute nodes, on AWS accounts you registered. They're private to you.
+        </template>
+        <template v-else>
+          Compute nodes run this workspace's workflows and notebooks, on cloud accounts members registered.
+        </template>
+        <router-link v-if="isMyWorkspace" :to="{ name: 'user-compute-resource' }" class="doc-link">Your compute resources</router-link>
+        <a v-else href="https://docs.pennsieve.io/docs/compute-nodes" target="_blank" rel="noopener" class="doc-link">Documentation</a>
+      </p>
+      <bf-button :disabled="!canCreate" @click="openCreateDialog">+ New Compute Node</bf-button>
+    </div>
+
       <div class="nodes-content">
-        <!-- Setup Information Section -->
-        <div class="info-section">
+        <div v-if="hasNoResources && !isLoading" class="info-section">
           <div class="info-card">
-            <h3>Managing Compute Nodes</h3>
-            <p>
-              Compute nodes are computational resources deployed on individual user's cloud accounts that process and analyze Pennsieve data.
-              Each compute node is created from a Compute Resource (AWS account) owned by a specific user, but can be shared with other users in workspaces to enable collaborative data analysis.
-            </p>
-            <p class="info-note">
-              <strong>Note:</strong> Compute Resources are associated with individual users who own the cloud accounts. 
-              Compute nodes created from these resources can be shared across workspace members with different permission levels (private, workspace, or shared access).
-            </p>
-            <div class="setup-steps" v-if="hasNoResources">
-              <h4>Quick Setup Guide:</h4>
-              <ol>
-                <li>Ensure your AWS account is registered as a Compute Resource</li>
-                <li>Click "Create Compute Node" to set up a new node</li>
-                <li>Configure the node with a name and description</li>
-                <li>Manage node status (enabled/paused) as needed</li>
-              </ol>
-            </div>
-            <div class="documentation-link">
-              <a href="https://docs.pennsieve.io/docs/compute-nodes" target="_blank" class="doc-link">
-                View Full Documentation
-                <IconArrowRight :width="14" :height="14" style="margin-left: 4px;" />
-              </a>
+            <h3>Getting started</h3>
+            <ol class="setup-steps">
+              <li>Connect your AWS account</li>
+              <li>Click <strong>+ New Compute Node</strong> and choose that account</li>
+              <li v-if="!isMyWorkspace">Choose who in the workspace can use it</li>
+            </ol>
+            <div class="connect-row">
+              <bf-button class="secondary" @click="connectVisible = true">Connect AWS account</bf-button>
             </div>
           </div>
         </div>
 
         <!-- Nodes List -->
         <div class="nodes-section" v-loading="isLoading">
-          <h3>Available Compute Nodes</h3>
+          <h3 class="nodes-title">Compute nodes</h3>
           
           <div v-if="showEmptyState" class="empty-state">
             <bf-empty-page-state class="empty">
@@ -353,12 +368,18 @@ async function confirmDeleteNode() {
                 width="247"
                 alt="Teams illustration"
               />
-              <div v-if="hasAdminRights" class="copy">
+              <div v-if="isMyWorkspace" class="copy">
+                <h2>You don't have any personal compute nodes yet.</h2>
+                <p>
+                  Click <strong>+ New Compute Node</strong> to create one on an AWS account you registered.
+                </p>
+              </div>
+              <div v-else-if="hasAdminRights" class="copy">
                 <h2>There are no Compute Nodes registered for {{ orgName }} yet.</h2>
                 <p>
                   Compute Nodes are created from user-owned Compute Resources (cloud accounts) and can be shared
                   with workspace members to enable collaborative data analysis. Workspace administrators can create nodes
-                  from available compute resources and manage access permissions. Click "Create Compute Node" above to get started.
+                  from available compute resources and manage access permissions. Click <strong>+ New Compute Node</strong> to get started.
                 </p>
               </div>
               <div v-else class="copy">
@@ -387,8 +408,11 @@ async function confirmDeleteNode() {
     <!-- Create Compute Node Dialog -->
     <create-compute-node-dialog
       :dialog-visible="createComputeNodeDialogVisible"
+      :personal="isMyWorkspace"
+      :initial-account="newNodeAccount"
       @close="closeCreateDialog"
     />
+    <ConnectAwsAccountDialog v-model="connectVisible" />
     
     <!-- Delete Node Confirmation Dialog -->
     <el-dialog
@@ -438,15 +462,23 @@ async function confirmDeleteNode() {
         </div>
       </template>
     </el-dialog>
-  </bf-stage>
+  </div>
 </template>
 
 <style scoped lang="scss">
 @use '../../../styles/_theme.scss';
 
+.connect-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px;
+  margin-top: 12px;
+}
+
 .compute-nodes-container {
-  max-width: 1000px;
   margin: 0;
+  padding: 20px 32px;
 }
 
 h2 {
@@ -456,82 +488,55 @@ h2 {
   margin-bottom: 8px;
 }
 
+// Intro line and the page's main action, where "+ New Notebook" sits on the
+// Notebooks tab.
+.nodes-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+.nodes-intro {
+  margin: 0;
+  font-size: 13px;
+  color: theme.$gray_5;
+
+  .doc-link {
+    margin-left: 6px;
+    color: theme.$purple_3;
+  }
+}
+
 .nodes-content {
   padding: 0;
 }
 
 .info-section {
-  margin-bottom: 32px;
+  margin-bottom: 24px;
 }
 
 .info-card {
   background: theme.$gray_1;
   border: 1px solid theme.$gray_2;
-  padding: 24px;
+  border-radius: 6px;
+  padding: 16px 20px;
 
   h3 {
-    font-size: 18px;
-    font-weight: 500;
-    color: theme.$gray_6;
-    margin: 0 0 12px 0;
-  }
-
-  p {
     font-size: 14px;
-    color: theme.$gray_5;
-    line-height: 1.5;
-    margin: 0 0 12px 0;
-  }
-
-  .info-note {
-    background: rgba(theme.$purple_1, 0.1);
-    border-left: 3px solid theme.$purple_1;
-    padding: 12px;
-    margin: 16px 0;
-    border-radius: 4px;
+    font-weight: 600;
+    color: theme.$gray_6;
+    margin: 0 0 8px 0;
   }
 
   .setup-steps {
-    margin: 20px 0;
+    margin: 0;
+    padding-left: 20px;
 
-    h4 {
-      font-size: 15px;
-      font-weight: 500;
-      color: theme.$gray_6;
-      margin: 0 0 12px 0;
-    }
-
-    ol {
-      margin: 0;
-      padding-left: 24px;
-
-      li {
-        font-size: 14px;
-        color: theme.$gray_5;
-        line-height: 1.6;
-        margin-bottom: 8px;
-      }
-    }
-  }
-
-  .documentation-link {
-    margin-top: 16px;
-
-    .doc-link {
-      display: inline-flex;
-      align-items: center;
-      padding: 8px 16px;
-      background: theme.$purple_3;
-      color: white;
-      text-decoration: none;
-      border-radius: 4px;
-      font-size: 14px;
-      font-weight: 500;
-      transition: background 0.2s ease;
-
-      &:hover {
-        background: theme.$purple_2;
-      }
+    li {
+      font-size: 13px;
+      color: theme.$gray_5;
+      line-height: 1.6;
     }
   }
 }
@@ -539,11 +544,11 @@ h2 {
 .nodes-section {
   margin-bottom: 48px;
 
-  h3 {
-    font-size: 20px;
-    font-weight: 500;
+  .nodes-title {
+    font-size: 14px;
+    font-weight: 600;
     color: theme.$gray_6;
-    margin-bottom: 16px;
+    margin: 0 0 12px;
   }
 }
 
@@ -698,41 +703,41 @@ h2 {
     // Status-specific colors
     &.enabled {
       :deep(.el-select__wrapper) {
-        background: rgba(#10B981, 0.08);
-        border-color: rgba(#10B981, 0.2);
+        background: rgba(theme.$green_1, 0.08);
+        border-color: rgba(theme.$green_1, 0.2);
         
         &:hover {
-          background: rgba(#10B981, 0.12);
-          border-color: rgba(#10B981, 0.3);
+          background: rgba(theme.$green_1, 0.12);
+          border-color: rgba(theme.$green_1, 0.3);
         }
       }
       
       :deep(.el-input__inner) {
-        color: #059669;
+        color: theme.$green_2;
       }
       
       :deep(.el-select__caret) {
-        color: #059669;
+        color: theme.$green_2;
       }
     }
     
     &.paused {
       :deep(.el-select__wrapper) {
-        background: rgba(#F59E0B, 0.08);
-        border-color: rgba(#F59E0B, 0.2);
+        background: rgba(theme.$orange_1, 0.08);
+        border-color: rgba(theme.$orange_1, 0.2);
         
         &:hover {
-          background: rgba(#F59E0B, 0.12);
-          border-color: rgba(#F59E0B, 0.3);
+          background: rgba(theme.$orange_1, 0.12);
+          border-color: rgba(theme.$orange_1, 0.3);
         }
       }
       
       :deep(.el-input__inner) {
-        color: #D97706;
+        color: theme.$orange_2;
       }
       
       :deep(.el-select__caret) {
-        color: #D97706;
+        color: theme.$orange_2;
       }
     }
   }
@@ -874,8 +879,8 @@ h2 {
           color: theme.$green_1;
 
           &.paused {
-            background: rgba(#F59E0B, 0.1);
-            color: #F59E0B;
+            background: rgba(theme.$orange_1, 0.1);
+            color: theme.$orange_1;
           }
         }
         
@@ -965,8 +970,8 @@ h2 {
     gap: 16px;
     margin-bottom: 24px;
     padding: 20px;
-    background: rgba(#F59E0B, 0.05);
-    border: 1px solid rgba(#F59E0B, 0.15);
+    background: rgba(theme.$orange_1, 0.05);
+    border: 1px solid rgba(theme.$orange_1, 0.15);
     border-radius: 8px;
 
     .warning-icon {
@@ -999,7 +1004,7 @@ h2 {
 
       .impact-message {
         font-size: 13px;
-        color: #D97706;
+        color: theme.$orange_2;
         margin: 0;
         font-weight: 500;
         line-height: 1.4;

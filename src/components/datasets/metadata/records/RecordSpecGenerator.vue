@@ -4,8 +4,7 @@ import { ElCard, ElForm, ElFormItem, ElInput, ElInputNumber, ElSelect, ElOption,
 import { useRouter, useRoute } from 'vue-router'
 import { useMetadataStore } from '@/stores/metadataStore.js'
 import { useOntologyStore } from '@/stores/ontologyStore.js'
-import Ajv from 'ajv'
-import addFormats from 'ajv-formats'
+import { createSchemaValidator, errorFieldPath } from '@/utils/jsonSchemaValidation'
 
 // Import components
 import BfStage from '@/components/layout/BfStage/BfStage.vue'
@@ -56,24 +55,8 @@ const jsonContent = ref('')
 const jsonError = ref('')
 const jsonEditor = ref(null)
 
-// Form validation - configure AJV for JSON Schema Draft 2020-12
-const ajv = new Ajv({ 
-  allErrors: true,
-  strict: false, // Allow unknown keywords like $schema
-  validateSchema: false, // Skip schema validation to avoid draft issues
-  loadSchema: false, // Don't try to load external schemas
-  addUsedSchema: false, // Don't add schemas to internal storage
-  missingRefs: 'ignore' // Ignore missing references instead of throwing errors
-})
-
-// Try to add formats, but don't fail if it doesn't work
-try {
-  if (typeof addFormats === 'function') {
-    addFormats(ajv)
-  }
-} catch (error) {
-  console.warn('Could not add AJV formats, proceeding without formats:', error)
-}
+// Form validation: the shared JSON Schema setup (utils/jsonSchemaValidation)
+const ajv = createSchemaValidator()
 
 // Computed properties
 const isUpdateMode = computed(() => !!props.recordId)
@@ -1105,16 +1088,7 @@ const cleanSchemaForValidation = (schema) => {
 }
 
 // Validation helper functions
-const getFieldPath = (error) => {
-  if (error.instancePath) {
-    return error.instancePath.replace(/^\//, '').replace(/\//g, '.')
-  }
-  if (error.schemaPath && error.schemaPath.includes('/properties/')) {
-    const match = error.schemaPath.match(/\/properties\/([^\/]+)/)
-    return match ? match[1] : 'Root'
-  }
-  return 'Root'
-}
+const getFieldPath = errorFieldPath
 
 const getSuggestion = (error) => {
   const keyword = error.keyword

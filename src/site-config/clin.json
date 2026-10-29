@@ -46,6 +46,7 @@
   "chatWsUrl": "wss://chat.pennsieve.ai",
   "chatRestUrl": "https://api2.pennsieve.ai/chat",
   "features": {
+    "workflowInterface": false,
     "inAppLogin": true,
     "publishing": false,
     "office365Viewer": false

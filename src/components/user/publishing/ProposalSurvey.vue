@@ -1,11 +1,14 @@
 <script setup>
-import { ref, computed, watch } from "vue";
-import { useStore } from "vuex";
+import { ref, computed, watch, nextTick, useTemplateRef } from "vue";
+import { Close, Loading } from "@element-plus/icons-vue";
 import { useProposalStore } from "@/stores/proposalStore";
-import BfButton from "@/components/shared/bf-button/BfButton.vue";
 import IconCheck from "@/components/icons/IconCheck.vue";
-import IconKitchenTimer from "@/components/icons/IconKitchenTimer.vue";
-import BfDialogHeader from "@/components/shared/bf-dialog-header/BfDialogHeader.vue";
+import IconSaveLine from "@/components/icons/IconSaveLine.vue";
+import {
+  PROPOSAL_NAME_MAX_LENGTH,
+  isValidProposalName,
+  hasText,
+} from "@/utils/proposalValidation";
 
 const props = defineProps({
   dialogVisible: {
@@ -29,6 +32,14 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
+  copiedFrom: {
+    type: Object,
+    default: () => null,
+  },
+  processing: {
+    type: Boolean,
+    default: false,
+  },
 });
 
 const emit = defineEmits([
@@ -42,7 +53,6 @@ const emit = defineEmits([
   "update:dialogVisible",
 ]);
 
-const store = useStore();
 const proposalStore = useProposalStore();
 
 const proposal = ref({
@@ -53,8 +63,8 @@ const proposal = ref({
 
 const selectedRepository = ref({});
 const surveyAnswersByRepository = ref({});
+const pendingAction = ref("");
 
-const profile = computed(() => store.state.profile);
 const availableRepositories = computed(() => proposalStore.repositories);
 
 const currentRepository = computed(() =>
@@ -91,20 +101,15 @@ const submitterName = computed(() => props.proposal?.ownerName || "");
 
 const submitterEmail = computed(() => props.proposal?.emailAddress || "");
 
-const proposalStatus = computed(() => {
-  const statusMap = {
-    DRAFT: "Draft",
-    SUBMITTED: "Submitted",
-    ACCEPTED: "Accepted",
-    REJECTED: "Rejected",
-    WITHDRAWN: "Withdrawn",
-  };
-  const status = props.proposal?.proposalStatus;
-  return status ? statusMap[status] || status : "";
-});
+const statusLabels = {
+  DRAFT: "Draft",
+  SUBMITTED: "Submitted",
+  ACCEPTED: "Accepted",
+  REJECTED: "Rejected",
+  WITHDRAWN: "Withdrawn",
+};
 
-const submittedOn = computed(() => {
-  const timestamp = props.proposal?.submittedAt || props.proposal?.updatedAt;
+function formatTimestamp(timestamp) {
   if (!timestamp) {
     return "";
   }
@@ -118,7 +123,39 @@ const submittedOn = computed(() => {
     month: "short",
     day: "numeric",
   });
+}
+
+const proposalStatus = computed(() => {
+  const status = props.proposal?.proposalStatus;
+  return status ? statusLabels[status] || status : "";
 });
+
+const submittedOn = computed(() =>
+  formatTimestamp(props.proposal?.submittedAt || props.proposal?.updatedAt)
+);
+
+const copiedFromSummary = computed(() => {
+  const sourceProposal = props.copiedFrom;
+  if (!sourceProposal) {
+    return "";
+  }
+  const status = statusLabels[sourceProposal.proposalStatus] || "";
+  const closedOn = formatTimestamp(
+    sourceProposal.rejectedAt || sourceProposal.withdrawnAt
+  );
+  const statusDetail = [status, closedOn].filter(Boolean).join(" ");
+  return statusDetail
+    ? `"${sourceProposal.name || "Untitled Proposal"}" (${statusDetail})`
+    : `"${sourceProposal.name || "Untitled Proposal"}"`;
+});
+
+const hasRepositorySelected = computed(() =>
+  Boolean(currentRepository.value?.organizationNodeId)
+);
+
+const isCopiedRepositoryMissing = computed(
+  () => Boolean(props.copiedFrom) && !props.repository?.organizationNodeId
+);
 
 const hasSubmissionSummary = computed(
   () =>
@@ -131,20 +168,31 @@ const hasSubmissionSummary = computed(
     )
 );
 
-const readyToSave = computed(() => {
-  // For updating existing proposals, allow saving even if incomplete
-  if (props.proposal) {
-    return true;
-  }
-  // For new proposals, require name and description
-  return proposal.value.name && proposal.value.description;
-});
+const isNameValid = computed(() => isValidProposalName(proposal.value.name));
+const isDescriptionFilled = computed(() => hasText(proposal.value.description));
+
+const isNameTooLong = computed(
+  () => (proposal.value.name || "").trim().length > PROPOSAL_NAME_MAX_LENGTH
+);
+
+// A draft only needs something in it; submitting needs every field
+const hasAnyContent = computed(
+  () =>
+    hasText(proposal.value.name) ||
+    isDescriptionFilled.value ||
+    Object.values(proposal.value.survey || {}).some(hasText)
+);
+
+const readyToSave = computed(
+  () => hasRepositorySelected.value && !isNameTooLong.value && hasAnyContent.value
+);
 
 const readyToSubmit = computed(() => {
   // Require all fields including all questions for submission
   return (
-    proposal.value.name &&
-    proposal.value.description &&
+    hasRepositorySelected.value &&
+    isNameValid.value &&
+    isDescriptionFilled.value &&
     allRepoQuestionsAnswered.value
   );
 });
@@ -164,8 +212,8 @@ const allRepoQuestionsAnswered = computed(() => {
 
 const completedFieldsCount = computed(() => {
   let count = 0;
-  if (proposal.value.name) count++;
-  if (proposal.value.description) count++;
+  if (isNameValid.value) count++;
+  if (isDescriptionFilled.value) count++;
 
   const answeredQuestions = repositoryQuestions.value.filter((question) => {
     return (
@@ -180,6 +228,31 @@ const completedFieldsCount = computed(() => {
 
 const totalRequiredFields = computed(() => {
   return 2 + repositoryQuestions.value.length; // name + description + questions
+});
+
+// The footer is either "Ready to submit" or "Save as draft"; the detail line
+// says what is still needed
+const footerStatus = computed(() => {
+  const remainingFields = totalRequiredFields.value - completedFieldsCount.value;
+  const fieldsWord = (count) => (count === 1 ? "field" : "fields");
+
+  if (readyToSubmit.value) {
+    return {
+      tone: "ready",
+      title: "Ready to submit",
+      detail: `All ${totalRequiredFields.value} required ${fieldsWord(totalRequiredFields.value)} are complete.`,
+    };
+  }
+
+  let detail = `${remainingFields} required ${fieldsWord(remainingFields)} left before you can submit.`;
+  if (!hasRepositorySelected.value) {
+    detail = "Choose a repository to save.";
+  } else if (isNameTooLong.value) {
+    detail = "Shorten the dataset name to save.";
+  } else if (!hasAnyContent.value) {
+    detail = "Fill in any field to save a draft.";
+  }
+  return { tone: "draft", title: "Save as draft", detail };
 });
 
 const progressPercentage = computed(() => {
@@ -198,6 +271,17 @@ watch(
     }
   }
 );
+
+const proposalDialog = useTemplateRef("proposalDialog");
+
+// The dialog's content stays mounted between opens, so without this it
+// reopens at the previous proposal's scroll position
+async function scrollDialogToTop() {
+  await nextTick();
+  const dialogElement = proposalDialog.value?.dialogContentRef?.$el;
+  dialogElement?.querySelector(".el-dialog__body")?.scrollTo({ top: 0 });
+  dialogElement?.closest(".el-overlay-dialog")?.scrollTo({ top: 0 });
+}
 
 // Watch for repository changes and save/restore survey responses
 watch(
@@ -250,9 +334,9 @@ function initializeSelectedRepository() {
   // Set the initial repository from props
   selectedRepository.value = props.repository || {};
 
-  // If editing an existing proposal, store its survey answers for the current repository
+  // If editing or copying a proposal, store its survey answers for the current repository
   if (
-    props.proposal &&
+    (props.proposal || props.copiedFrom) &&
     props.repository?.organizationNodeId &&
     proposal.value.survey
   ) {
@@ -263,26 +347,26 @@ function initializeSelectedRepository() {
 }
 
 function populateForm() {
-  if (props.proposal) {
-    // Editing existing proposal - populate with existing data
+  const sourceProposal = props.proposal || props.copiedFrom;
+  if (sourceProposal) {
     proposal.value = {
-      name: props.proposal.name || "",
-      description: props.proposal.description || "",
+      name: sourceProposal.name || "",
+      description: sourceProposal.description || "",
       survey: {},
     };
 
     // Convert survey array to object format for the form
-    if (Array.isArray(props.proposal.survey)) {
+    if (Array.isArray(sourceProposal.survey)) {
       const surveyObject = {};
-      props.proposal.survey.forEach((item) => {
+      sourceProposal.survey.forEach((item) => {
         if (item.questionId !== undefined && item.response) {
           surveyObject[item.questionId] = item.response;
         }
       });
       proposal.value.survey = surveyObject;
-    } else if (props.proposal.survey && typeof props.proposal.survey === "object") {
+    } else if (sourceProposal.survey && typeof sourceProposal.survey === "object") {
       // Already keyed by question id
-      proposal.value.survey = { ...props.proposal.survey };
+      proposal.value.survey = { ...sourceProposal.survey };
     }
   } else {
     // New proposal - clear form
@@ -305,15 +389,14 @@ function handleRepositoryChange(repository) {
 function handleDialogUpdate(visible) {
   // Allow ESC key and explicit close actions
   if (!visible) {
+    if (props.processing) return;
     closeDialog();
   } else {
     emit("update:dialogVisible", visible);
   }
 }
 
-function saveProposal() {
-  if (!readyToSave.value) return;
-
+function buildProposalData() {
   const surveyResponses = repositoryQuestions.value
     .map((question) => ({
       questionId: question.id,
@@ -322,155 +405,135 @@ function saveProposal() {
     .filter((response) => response.response.trim());
 
   const proposalData = {
-    name: proposal.value.name,
+    name: proposal.value.name.trim(),
     description: proposal.value.description,
     organizationNodeId: currentRepository.value.organizationNodeId,
-    status: "DRAFT",
     survey: surveyResponses,
-    contributors: [],
-    userId: profile.value?.intId,
-    ownerName: `${profile.value?.firstName || ""} ${
-      profile.value?.lastName || ""
-    }`.trim(),
   };
 
-  // Check if this is an existing proposal and if the repository has changed
-  const isExistingProposal = props.proposal && props.proposal.nodeId;
+  const isExistingProposal = Boolean(props.proposal?.nodeId);
   const hasRepositoryChanged =
     isExistingProposal &&
     props.proposal.organizationNodeId !==
       currentRepository.value.organizationNodeId;
 
   if (hasRepositoryChanged) {
-    // Repository changed - need to delete old proposal and create new one
-    proposalData._originalProposal = props.proposal; // Pass original for deletion
-    proposalData._requiresRecreation = true;
-    emit("recreate-proposal", proposalData);
+    // PUT can't change the repository, so the parent creates a new proposal
+    // and then removes this one
+    proposalData._originalProposal = props.proposal;
   } else if (isExistingProposal) {
-    // Same repository - normal update
-    proposalData.id = props.proposal.id;
     proposalData.nodeId = props.proposal.nodeId;
-    proposalData.datasetNodeId = props.proposal.datasetNodeId;
-    proposalData.createdAt = props.proposal.createdAt;
-    proposalData.updatedAt = props.proposal.updatedAt;
-    emit("create-proposal", proposalData);
-  } else {
-    // New proposal - normal creation
-    emit("create-proposal", proposalData);
+    proposalData.userId = props.proposal.userId;
   }
 
-  closeDialog();
+  return { proposalData, hasRepositoryChanged };
+}
+
+function saveProposal() {
+  if (!readyToSave.value || props.processing) return;
+  pendingAction.value = "save";
+
+  const { proposalData, hasRepositoryChanged } = buildProposalData();
+  emit(hasRepositoryChanged ? "recreate-proposal" : "create-proposal", proposalData);
 }
 
 function submitProposal() {
-  if (!readyToSubmit.value) return;
+  if (!readyToSubmit.value || props.processing) return;
+  pendingAction.value = "submit";
 
-  const surveyResponses = repositoryQuestions.value
-    .map((question) => ({
-      questionId: question.id,
-      response: proposal.value.survey[question.id] || "",
-    }))
-    .filter((response) => response.response.trim());
-
-  const proposalData = {
-    name: proposal.value.name,
-    description: proposal.value.description,
-    organizationNodeId: currentRepository.value.organizationNodeId,
-    status: "DRAFT",
-    survey: surveyResponses,
-    contributors: [],
-    userId: profile.value?.intId,
-    ownerName: `${profile.value?.firstName || ""} ${
-      profile.value?.lastName || ""
-    }`.trim(),
-  };
-
-  // Check if this is an existing proposal and if the repository has changed
-  const isExistingProposal = props.proposal && props.proposal.nodeId;
-  const hasRepositoryChanged =
-    isExistingProposal &&
-    props.proposal.organizationNodeId !==
-      currentRepository.value.organizationNodeId;
-
-  if (hasRepositoryChanged) {
-    // Repository changed - need to delete old proposal and create new one, then submit
-    proposalData._originalProposal = props.proposal; // Pass original for deletion
-    proposalData._requiresRecreation = true;
-    emit("recreate-and-submit-proposal", proposalData);
-  } else if (isExistingProposal) {
-    // Same repository - normal update then submit
-    proposalData.id = props.proposal.id;
-    proposalData.nodeId = props.proposal.nodeId;
-    proposalData.datasetNodeId = props.proposal.datasetNodeId;
-    proposalData.createdAt = props.proposal.createdAt;
-    proposalData.updatedAt = props.proposal.updatedAt;
-    emit("submit-proposal", proposalData);
-  } else {
-    // New proposal - create and submit
-    emit("submit-proposal", proposalData);
-  }
-
-  closeDialog();
+  const { proposalData, hasRepositoryChanged } = buildProposalData();
+  emit(
+    hasRepositoryChanged ? "recreate-and-submit-proposal" : "submit-proposal",
+    proposalData
+  );
 }
 </script>
 
 <template>
   <div>
     <el-dialog
+      ref="proposalDialog"
       :modelValue="dialogVisible"
       @update:modelValue="handleDialogUpdate"
+      @open="scrollDialogToTop"
+      align-center
       width="90%"
       :max-width="900"
-      :close-on-click-modal="false"
+      :close-on-click-modal="readOnly"
       :close-on-press-escape="true"
-      :show-close="true"
+      :show-close="false"
       class="proposal-dialog"
     >
       <template #header>
-        <bf-dialog-header :title="dialogTitle" class="dialog-header" />
+        <div class="dialog-header">
+          <h2 class="dialog-title">{{ dialogTitle }}</h2>
+          <span v-if="readOnly" class="read-only-tag">Read only</span>
+          <button
+            type="button"
+            class="dialog-close-button"
+            aria-label="Close"
+            :disabled="processing"
+            @click="handleDialogUpdate(false)"
+          >
+            <el-icon :size="18"><Close /></el-icon>
+          </button>
+        </div>
       </template>
 
       <div class="proposal-content">
-        <!-- Submission Summary (review) -->
-        <div class="submission-summary" v-if="hasSubmissionSummary">
-          <div class="summary-fields">
-            <p v-if="submitterName">
-              Submitted by <strong>{{ submitterName }}</strong>
-            </p>
-            <p v-if="submitterEmail">
-              Email <strong>{{ submitterEmail }}</strong>
-            </p>
-            <p v-if="submittedOn">
-              Submitted on <strong>{{ submittedOn }}</strong>
-            </p>
-            <p v-if="proposalStatus">
-              Status <strong>{{ proposalStatus }}</strong>
-            </p>
+        <!-- Submission Summary (read-only) -->
+        <div class="submission-summary" v-if="readOnly">
+          <dl v-if="hasSubmissionSummary" class="summary-fields">
+            <div v-if="submitterName" class="summary-field">
+              <dt>Submitted by</dt>
+              <dd>{{ submitterName }}</dd>
+            </div>
+            <div v-if="submitterEmail" class="summary-field">
+              <dt>Email</dt>
+              <dd>{{ submitterEmail }}</dd>
+            </div>
+            <div v-if="submittedOn" class="summary-field">
+              <dt>Submitted on</dt>
+              <dd>{{ submittedOn }}</dd>
+            </div>
+            <div v-if="proposalStatus" class="summary-field">
+              <dt>Status</dt>
+              <dd>{{ proposalStatus }}</dd>
+            </div>
+          </dl>
+
+          <div class="submitted-to">
+            <span class="submitted-to-label">Submitted to</span>
+            <div class="submitted-to-repository">
+              <img
+                v-if="currentRepository.logoFile"
+                :src="currentRepository.logoFile"
+                :alt="`${currentRepository.displayName} logo`"
+              />
+              <span>{{ currentRepository.displayName || "Repository unavailable" }}</span>
+            </div>
           </div>
         </div>
 
         <!-- Read-only Actions -->
-        <div class="read-only-actions" v-if="readOnly">
-          <bf-button
-            v-if="showReviewActions"
-            class="primary"
-            @click="acceptProposal"
-          >
-            Accept Proposal
-          </bf-button>
-          <bf-button
-            v-if="showReviewActions"
-            class="secondary"
-            @click="rejectProposal"
-          >
+        <div class="read-only-actions" v-if="readOnly && showReviewActions">
+          <button type="button" class="dialog-button secondary" @click="rejectProposal">
             Reject Proposal
-          </bf-button>
-          <bf-button
-            @click="closeDialog"
-            :class="showReviewActions ? 'secondary' : 'primary'"
-          >
-            Close
-          </bf-button>
+          </button>
+          <button type="button" class="dialog-button primary" @click="acceptProposal">
+            Accept Proposal
+          </button>
+        </div>
+
+        <div class="copied-from-notice" v-if="copiedFrom && !readOnly">
+          <p>
+            Copied from {{ copiedFromSummary }}. Saving creates a new proposal;
+            the original stays in your list.
+          </p>
+          <p v-if="isCopiedRepositoryMissing" class="copied-from-warning">
+            The original repository is no longer available. Choose a repository
+            below.
+          </p>
         </div>
 
         <!-- Progress Indicator -->
@@ -490,13 +553,9 @@ function submitProposal() {
           </div>
         </div>
 
-        <!-- Repository Header -->
-        <div class="repository-header">
+        <!-- Repository Header (read-only shows it in the summary instead) -->
+        <div class="repository-header" v-if="!readOnly">
           <div class="repo-info">
-            <!-- Read-only indicator -->
-            <div v-if="readOnly" class="read-only-tag">
-              <span>Read Only</span>
-            </div>
             <div v-if="currentRepository.logoFile" class="repo-logo">
               <img
                 :src="currentRepository.logoFile"
@@ -504,7 +563,7 @@ function submitProposal() {
               />
             </div>
             <div class="repo-details">
-              <h2>{{ currentRepository.displayName }}</h2>
+              <h2>{{ currentRepository.displayName || "Repository unavailable" }}</h2>
               <p class="repo-description" v-if="currentRepository.description">
                 {{ currentRepository.description }}
               </p>
@@ -568,9 +627,15 @@ function submitProposal() {
                 v-model="proposal.name"
                 placeholder="e.g., Neural Activity in Visual Cortex During Object Recognition"
                 size="large"
-                :class="{ 'field-completed': proposal.name }"
+                :maxlength="PROPOSAL_NAME_MAX_LENGTH"
+                :show-word-limit="!readOnly"
+                :class="{ 'field-completed': isNameValid }"
                 :readonly="readOnly"
               />
+              <p v-if="isNameTooLong && !readOnly" class="field-error">
+                Dataset names can be at most {{ PROPOSAL_NAME_MAX_LENGTH }}
+                characters.
+              </p>
             </div>
           </div>
 
@@ -642,63 +707,85 @@ function submitProposal() {
             </div>
           </div>
         </el-form>
+      </div>
 
-        <!-- Action Section -->
-        <div class="action-section" v-if="!readOnly">
+      <template v-if="!readOnly" #footer>
+        <div class="action-section">
           <div class="action-info">
-            <div class="completion-status" :class="{ ready: readyToSave }">
+            <div class="completion-status" :class="footerStatus.tone">
               <div class="status-icon">
-                <IconCheck v-if="readyToSave" :width="20" :height="20" />
-                <IconKitchenTimer v-else :width="20" :height="20" />
+                <IconCheck v-if="footerStatus.tone === 'ready'" :width="18" :height="18" />
+                <IconSaveLine v-else :width="16" :height="16" />
               </div>
               <div class="status-text">
-                <span v-if="readyToSubmit" class="ready-text"
-                  >Ready to submit</span
-                >
-                <span v-else-if="readyToSave" class="ready-text"
-                  >Ready to save draft</span
-                >
-                <span v-else class="pending-text"
-                  >Complete all required fields to continue</span
-                >
+                <span class="status-title">{{ footerStatus.title }}</span>
+                <span class="status-detail">{{ footerStatus.detail }}</span>
               </div>
             </div>
           </div>
 
           <div class="action-buttons">
-            <bf-button @click="closeDialog" class="secondary">
+            <button
+              type="button"
+              class="dialog-button secondary"
+              :disabled="processing"
+              @click="closeDialog"
+            >
               Cancel
-            </bf-button>
-            <bf-button
-              class="secondary"
-              :disabled="!readyToSave"
+            </button>
+            <button
+              type="button"
+              class="dialog-button secondary"
+              :disabled="!readyToSave || processing"
               @click="saveProposal"
             >
+              <el-icon v-if="processing && pendingAction === 'save'" class="is-loading">
+                <Loading />
+              </el-icon>
               {{ props.proposal ? "Update Proposal" : "Save Proposal" }}
-            </bf-button>
-            <bf-button
-              class="primary"
-              :disabled="!readyToSubmit"
+            </button>
+            <button
+              type="button"
+              class="dialog-button primary"
+              :disabled="!readyToSubmit || processing"
               @click="submitProposal"
             >
+              <el-icon v-if="processing && pendingAction === 'submit'" class="is-loading">
+                <Loading />
+              </el-icon>
               Submit Proposal
-            </bf-button>
+            </button>
           </div>
         </div>
-      </div>
+      </template>
     </el-dialog>
   </div>
 </template>
 
 <style scoped lang="scss">
 @use "../../../styles/_theme.scss";
+@use "../../../styles/dialog-button";
 
 .proposal-content {
   padding: 0;
 }
 
 .dialog-header {
-  margin: 0 0 24px 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.dialog-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 1.3;
+  color: theme.$purple_3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 // Repository Header
@@ -707,6 +794,7 @@ function submitProposal() {
   justify-content: space-between;
   align-items: flex-start;
   padding: 20px 24px;
+  border-radius: 8px;
   background: linear-gradient(
     135deg,
     lighten(theme.$purple_2, 45%) 0%,
@@ -740,7 +828,7 @@ function submitProposal() {
 
       .repo-description {
         margin: 0;
-        color: theme.$gray_5;
+        color: theme.$gray_6;
         font-size: 14px;
         line-height: 1.4;
       }
@@ -851,9 +939,9 @@ function submitProposal() {
 // Form Sections
 .proposal-form {
   .form-section {
-    margin-bottom: 32px;
+    margin-bottom: 16px;
     border: 1px solid theme.$gray_2;
-    border-radius: 3px;
+    border-radius: 8px;
     overflow: hidden;
     transition: all 0.2s ease;
 
@@ -897,7 +985,7 @@ function submitProposal() {
 
       .field-description {
         margin: 0;
-        color: theme.$gray_5;
+        color: theme.$gray_6;
         font-size: 14px;
         line-height: 1.4;
       }
@@ -1067,10 +1155,13 @@ function submitProposal() {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 0 0 24px 0;
-  margin-top: 16px;
+  gap: 16px;
 
+  // el-dialog right-aligns footer text by default
   .action-info {
+    min-width: 0;
+    text-align: left;
+
     .completion-status {
       display: flex;
       align-items: center;
@@ -1078,26 +1169,37 @@ function submitProposal() {
 
       .status-icon {
         display: flex;
+        flex-shrink: 0;
         align-items: center;
         justify-content: center;
-        color: theme.$purple_1;
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        background: rgba(theme.$purple_3, 0.08);
+        color: theme.$purple_2;
       }
 
       .status-text {
-        .ready-text {
-          color: theme.$green_2;
-          font-weight: 500;
-        }
-
-        .pending-text {
-          color: theme.$gray_5;
-        }
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        min-width: 0;
       }
 
-      &.ready {
-        .status-text {
-          color: theme.$green_2;
-        }
+      .status-title {
+        font-size: 14px;
+        font-weight: 600;
+        color: theme.$gray_6;
+      }
+
+      .status-detail {
+        font-size: 12px;
+        color: theme.$gray_5;
+      }
+
+      &.ready .status-icon {
+        background: rgba(theme.$green_2, 0.12);
+        color: theme.$green_2;
       }
     }
   }
@@ -1108,22 +1210,39 @@ function submitProposal() {
   }
 }
 
+.dialog-button {
+  @include dialog-button.styles;
+}
+
 // Dialog Overrides
+// Header and footer stay fixed; only the body scrolls between them
 :deep(.el-dialog) {
+  display: flex;
+  flex-direction: column;
+  padding: 0;
   border-radius: 12px;
   max-height: 90vh;
   overflow: hidden;
 }
 
 :deep(.el-dialog__header) {
-  padding: 20px 24px 0;
+  flex-shrink: 0;
+  padding: 20px 16px 16px;
+  border-bottom: 1px solid theme.$gray_2;
   position: relative;
 }
 
 :deep(.el-dialog__body) {
-  padding: 0 24px 24px;
-  max-height: calc(90vh - 120px);
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: 16px;
   overflow-y: auto;
+}
+
+:deep(.el-dialog__footer) {
+  flex-shrink: 0;
+  padding: 12px 16px;
+  border-top: 1px solid theme.$gray_2;
 }
 
 :deep(.el-input__wrapper) {
@@ -1210,52 +1329,170 @@ function submitProposal() {
 }
 
 // Read-only specific styles
-.read-only-tag {
-  position: absolute;
-  top: 6px;
-  left: 24px;
-  z-index: 10;
+.dialog-close-button {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  margin-left: auto;
+  padding: 0;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: theme.$gray_5;
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
 
-  span {
-    display: inline-flex;
-    align-items: center;
-    padding: 4px 8px;
-    background: rgba(theme.$orange_1, 0.1);
-    color: theme.$orange_1;
-    border: 1px solid rgba(theme.$orange_1, 0.3);
-    border-radius: 4px;
-    font-size: 11px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
+  &:hover:not(:disabled) {
+    background: theme.$purple_tint;
+    color: theme.$purple_3;
   }
+
+  &:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(theme.$purple_3, 0.25);
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+  }
+}
+
+.read-only-tag {
+  flex-shrink: 0;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: rgba(theme.$orange_1, 0.12);
+  color: theme.$orange_2;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
 }
 
 .read-only-actions {
   display: flex;
   justify-content: flex-end;
   gap: 8px;
-  padding: 0 0 24px 0;
-  margin-top: 24px;
+  margin-bottom: 16px;
+}
+
+.field-error {
+  margin: 8px 0 0;
+  color: theme.$red_2;
+  font-size: 13px;
+}
+
+.copied-from-notice {
+  margin-bottom: 24px;
+  padding: 12px 16px;
+  border: 1px solid theme.$purple_tint;
+  border-radius: 8px;
+  background: theme.$gray_1;
+
+  p {
+    margin: 0;
+    color: theme.$gray_6;
+    font-size: 14px;
+    line-height: 1.5;
+  }
+
+  .copied-from-warning {
+    margin-top: 8px;
+    color: theme.$orange_1;
+  }
 }
 
 .submission-summary {
-  margin-top: 24px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px 32px;
+  margin-bottom: 16px;
+  padding: 12px 20px;
+  border: 1px solid theme.$gray_2;
+  border-radius: 8px;
 
-  .summary-fields {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px 32px;
+  @media (max-width: 640px) {
+    flex-direction: column;
+  }
+}
 
-    p {
-      margin: 0;
-      color: theme.$gray_5;
-      font-size: 14px;
+.summary-fields {
+  display: flex;
+  flex: 1;
+  flex-wrap: wrap;
+  gap: 12px 32px;
+  margin: 0;
+  min-width: 0;
+}
 
-      strong {
-        color: theme.$gray_6;
-      }
-    }
+.summary-field {
+  min-width: 0;
+
+  dt {
+    margin-bottom: 2px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: theme.$gray_4;
+  }
+
+  dd {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 500;
+    color: theme.$gray_6;
+    overflow-wrap: anywhere;
+  }
+}
+
+.submitted-to {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  margin-left: auto;
+  padding-left: 32px;
+  border-left: 1px solid theme.$gray_2;
+  flex-shrink: 0;
+  align-self: stretch;
+  justify-content: center;
+
+  @media (max-width: 640px) {
+    margin-left: 0;
+    padding: 12px 0 0;
+    border-left: none;
+    border-top: 1px solid theme.$gray_2;
+  }
+}
+
+.submitted-to-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: theme.$gray_4;
+}
+
+.submitted-to-repository {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: theme.$purple_3;
+
+  img {
+    height: 28px;
+    width: auto;
+    max-width: 128px;
+    object-fit: contain;
   }
 }
 </style>

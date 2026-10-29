@@ -5,6 +5,7 @@ export default { name: "FileNode" };
 </script>
 
 <script setup>
+import { CRATE_FILE } from "@/composables/useJupyterSession";
 defineProps({
   node: { type: Object, required: true },
   depth: { type: Number, default: 0 },
@@ -13,7 +14,7 @@ defineProps({
   fmtTime: { type: Function, required: true },
 });
 
-const emit = defineEmits(["toggle", "copy", "download", "insert", "open"]);
+const emit = defineEmits(["toggle", "copy", "insert", "open"]);
 
 const isNotebook = (node) =>
   node.type === "notebook" || /\.ipynb$/i.test(node.name || "");
@@ -30,8 +31,13 @@ const isNotebook = (node) =>
       <span class="fn__caret">
         <template v-if="node.type === 'directory'">{{ node.open ? "▾" : "▸" }}</template>
       </span>
-      <span class="fn__icon">{{ iconOf(node) }}</span>
-      <span class="fn__name">{{ node.name }}</span>
+      <img class="fn__icon" :src="iconOf(node)" alt="" />
+      <!-- The crate is shown by what it is; its file name is in the row's title. -->
+      <span
+        class="fn__name"
+        :title="node.name === CRATE_FILE ? 'The input\'s RO-Crate manifest (ro-crate-metadata.json): every file of the dataset, with sizes, checksums and its source. Add files from Inputs.' : undefined"
+        >{{ node.name === CRATE_FILE ? "input manifest" : node.name }}</span
+      >
       <span
         v-if="depth === 0 && node.type === 'directory' && node.name === 'output'"
         class="fn__tag fn__tag--out"
@@ -57,16 +63,8 @@ const isNotebook = (node) =>
         >
           ↪
         </button>
-        <button class="fn__act" title="Insert path into a cell" @click="emit('insert', node.path)">↩</button>
-        <button class="fn__act" title="Copy path" @click="emit('copy', node)">⧉</button>
-        <button
-          v-if="node.type !== 'directory'"
-          class="fn__act"
-          title="Download"
-          @click="emit('download', node)"
-        >
-          ⬇
-        </button>
+        <button class="fn__act" title="Insert the path into a cell, as code (INPUT_DIR / …)" @click="emit('insert', node.path)">↩</button>
+        <button class="fn__act" title="Copy the path, as code (INPUT_DIR / …)" @click="emit('copy', node)">⧉</button>
       </span>
     </div>
 
@@ -85,7 +83,6 @@ const isNotebook = (node) =>
         :fmt-time="fmtTime"
         @toggle="emit('toggle', $event)"
         @copy="emit('copy', $event)"
-        @download="emit('download', $event)"
         @insert="emit('insert', $event)"
         @open="emit('open', $event)"
       />
@@ -100,7 +97,9 @@ const isNotebook = (node) =>
   </li>
 </template>
 
-<style scoped>
+<style scoped lang="scss">
+@use "../../../styles/theme";
+
 .fn { list-style: none; }
 .fn__children { list-style: none; margin: 0; padding: 0; }
 .fn__row {
@@ -112,15 +111,15 @@ const isNotebook = (node) =>
   white-space: nowrap;
   border-radius: 4px;
 }
-.fn__row:hover { background: #e6e9ef; } /* purple_tint */
-.fn__caret { width: 12px; color: #999; font-size: 10px; flex: 0 0 12px; } /* gray_4 */
-.fn__icon { flex: 0 0 auto; }
+.fn__row:hover { background: theme.$purple_tint; }
+.fn__caret { width: 12px; color: theme.$gray_4; font-size: 10px; flex: 0 0 12px; }
+.fn__icon { flex: 0 0 auto; width: 16px; height: 16px; }
 .fn__name {
   overflow: hidden;
   text-overflow: ellipsis;
-  color: #333333; /* gray_6 */
+  color: theme.$gray_6;
 }
-.fn__size { color: #999; font-size: 11px; margin-left: 6px; } /* gray_4 */
+.fn__size { color: theme.$gray_4; font-size: 11px; margin-left: 6px; }
 /* Flat, subtle folder hints — no pill, just small color-coded micro-text that
    only fully shows on hover of the row (kept faint otherwise). */
 .fn__tag {
@@ -131,10 +130,10 @@ const isNotebook = (node) =>
   opacity: 0.7;
 }
 .fn__tag--in {
-  color: #6b87b3; /* muted navy */
+  color: theme.$purple_1;
 }
 .fn__tag--out {
-  color: #14a758; /* green_2 */
+  color: theme.$green_2;
 }
 .fn__row:hover .fn__tag {
   opacity: 1;
@@ -151,16 +150,25 @@ const isNotebook = (node) =>
   background: none;
   cursor: pointer;
   font-size: 12px;
-  color: #4d4d4d; /* gray_5 */
+  color: theme.$gray_5;
   padding: 1px 5px;
-  border-radius: 4px;
+  border-radius: 2px;
 }
-.fn__act:hover { background: #e6e9ef; color: #011f5b; } /* purple_tint / purple_3 */
-.fn__act--open { color: #011f5b; font-weight: 700; } /* purple_3 — primary file action */
+/* The row's own hover is purple_tint, so an action stands out from it in
+   white with a hairline, and the same for keyboard focus. */
+.fn__act:hover,
+.fn__act:focus-visible {
+  background: theme.$white;
+  color: theme.$purple_3;
+  box-shadow: inset 0 0 0 1px theme.$gray_3;
+  outline: none;
+}
+.fn__act:active { background: theme.$gray_0; }
+.fn__act--open { color: theme.$purple_3; font-weight: 700; } /* purple_3 — primary file action */
 .fn__loading,
 .fn__empty {
   display: block;
-  color: #aaa;
+  color: theme.$gray_4;
   font-size: 11px;
   font-style: italic;
   padding-top: 2px;
