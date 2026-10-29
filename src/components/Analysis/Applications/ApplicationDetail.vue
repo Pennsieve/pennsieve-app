@@ -1060,12 +1060,14 @@ watch(
                     <span class="manifest-summary-value">{{ manifestSummary.compute }}</span>
                   </div>
                   <!-- What the app used across runs (workflow-service metrics/usage): the
-                       version run last, against the resources above. -->
-                  <div v-if="appUsageSide" class="manifest-summary-row" :title="appUsageSide.title">
+                       version run last, against the resources above. A caption sets
+                       these apart: measured, not declared. -->
+                  <div v-if="appUsageSide" class="manifest-summary-measured">{{ appUsageSide.caption }}</div>
+                  <div v-if="appUsageSide" class="manifest-summary-row manifest-summary-row-measured" :title="appUsageSide.title">
                     <span class="manifest-summary-label">Peak memory</span>
                     <span class="manifest-summary-value">{{ appUsageSide.memory }}</span>
                   </div>
-                  <div v-if="appUsageSide && appUsageSide.cpu" class="manifest-summary-row" :title="appUsageSide.title">
+                  <div v-if="appUsageSide && appUsageSide.cpu" class="manifest-summary-row manifest-summary-row-measured" :title="appUsageSide.title">
                     <span class="manifest-summary-label">Peak CPU</span>
                     <span class="manifest-summary-value">{{ appUsageSide.cpu }}</span>
                   </div>
@@ -1711,6 +1713,22 @@ watch(
   font-size: 13px;
   line-height: 1.5;
   color: theme.$gray_5;
+}
+
+.manifest-summary-measured {
+  margin: 8px 0 2px;
+  padding-top: 8px;
+  border-top: 1px dashed theme.$gray_3;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: theme.$gray_4;
+}
+
+.manifest-summary-row-measured .manifest-summary-value {
+  color: theme.$teal_2;
+  font-variant-numeric: tabular-nums;
 }
 
 .manifest-summary-hint {
