@@ -17,6 +17,7 @@ import { accessEntries, accessSummary, makeNamer } from "./appSharing";
 import { useWorkspaceMembers } from "./useWorkspaceMembers";
 import { fetchReleaseStatus, releaseNudge } from "./release";
 import AppArchiveToggle from "../../user/code/AppArchiveToggle.vue";
+import AppReferences from "./AppReferences.vue";
 import { useGetToken } from "@/composables/useGetToken";
 import { useSendXhr } from "@/mixins/request/request_composable";
 
@@ -496,6 +497,12 @@ const showRawManifest = ref(false);
 
 // The app.yml tab is always there: without a file it offers to create one.
 
+// The References tab: only when a version's repository has a CITATION.cff.
+const hasReferences = computed(() => sortedVersions.value.some((v) => v?.citation));
+watch(hasReferences, (has) => {
+  if (!has && activeTab.value === "references") activeTab.value = "readme";
+});
+
 
 // Members and teams power friendly-name resolution for the owner badge.
 // They are not always preloaded when navigating directly to this page;
@@ -649,6 +656,17 @@ watch(
               >
                 app.yml
               </button>
+              <button
+                v-if="hasReferences"
+                type="button"
+                role="tab"
+                class="detail-tab"
+                :class="{ 'detail-tab-active': activeTab === 'references' }"
+                :aria-selected="activeTab === 'references'"
+                @click="activeTab = 'references'"
+              >
+                References
+              </button>
             </div>
             <div class="readme-header-actions">
               <bf-button v-if="activeTab === 'manifest' && canUpdate" class="compact flex" @click="openBuilder">{{ builderLabel }}</bf-button>
@@ -687,6 +705,9 @@ watch(
               No README available
             </div>
           </template>
+
+          <!-- References tab: how to cite, authors, related works (CITATION.cff) -->
+          <AppReferences v-else-if="activeTab === 'references'" :versions="sortedVersions" />
 
           <!-- app.yml tab -->
           <template v-else>
