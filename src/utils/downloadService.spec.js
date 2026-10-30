@@ -108,6 +108,12 @@ describe('getFileUrl', () => {
     await getFileUrl({ datasetId: 'N:dataset:1', packageId: 'N:package:1', fileId: 7, purpose: 'view' }, { config, getToken, fetchFn })
     expect(JSON.parse(fetchFn.mock.calls[0][1].body)).toEqual({ packageId: 'N:package:1', purpose: 'view' })
   })
+
+  it('asks for a short link only when told to', async () => {
+    const fetchFn = respond(200, {})
+    await getFileUrl({ datasetId: 'N:dataset:1', packageId: 'N:package:1', purpose: 'view', short: true }, { config, getToken, fetchFn })
+    expect(JSON.parse(fetchFn.mock.calls[0][1].body)).toEqual({ packageId: 'N:package:1', purpose: 'view', short: true })
+  })
 })
 
 describe('archives', () => {
