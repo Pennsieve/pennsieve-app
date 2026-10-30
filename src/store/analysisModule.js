@@ -263,6 +263,11 @@ export const mutations = {
   },
 };
 
+// exampleUnavailable: the run-examples routes aren't there (not deployed in
+// this environment, or turned off): the reads show nothing rather than fail.
+export const exampleUnavailable = (err) =>
+  !err?.status || err.status === 404 || err.status === 501 || err.status === 503;
+
 export // A workflow-service request (api2/compute/workflows/...) with the user's
 // token; rejects with an Error carrying the response status.
 async function workflowRequest(rootState, path, { method = "GET", body } = {}) {
@@ -282,12 +287,15 @@ async function workflowRequest(rootState, path, { method = "GET", body } = {}) {
   if (!resp.ok) {
     const err = new Error(data.message || `workflow-service responded ${resp.status}`);
     err.status = resp.status;
+    // The response body, for errors that say more than a message (a 429's
+    // limit and reset time, a 409's job in flight).
+    err.body = data;
     throw err;
   }
   return data;
 }
 
-const actions = {
+export const actions = {
   fetchComputeNodes: async ({ state, commit, rootState }, { force } = {}) => {
     if (!force && state.computeNodesLoaded) return;
     return useGetToken()
@@ -599,6 +607,61 @@ const actions = {
     (await workflowRequest(rootState, `definitions/${uuid}/versions`)).versions || [],
   fetchWorkflowVersion: async ({ rootState }, { uuid, version }) =>
     workflowRequest(rootState, `definitions/${uuid}/versions/${version}`),
+  // Run examples (workflow-service): a workflow version's example is a PDF
+  // summary of one successful run of it. Where the routes aren't deployed
+  // (404, 501, 503, or no response) the reads resolve null, so the UI shows
+  // nothing; the writes reject with the status for the caller to explain.
+  //
+  // fetchRunExample: runId -> { job, limits } or null.
+  fetchRunExample: async ({ rootState }, runId) => {
+    try {
+      const data = await workflowRequest(rootState, `runs/${encodeURIComponent(runId)}/example`);
+      return { job: data.job || null, limits: data.limits || null };
+    } catch (err) {
+      if (exampleUnavailable(err)) return null;
+      throw err;
+    }
+  },
+  // setRunExample: { runId, refresh } -> { job, example? } (202: a job started
+  // or running; 200: this run's PDF exists and refresh is false).
+  setRunExample: async ({ rootState }, { runId, refresh = false }) => {
+    const data = await workflowRequest(rootState, `runs/${encodeURIComponent(runId)}/example`, {
+      method: "POST",
+      body: { refresh: !!refresh },
+    });
+    return { job: data.job || null, example: data.example || null };
+  },
+  // fetchWorkflowExample: uuid, or { uuid, strict } -> the example of the
+  // newest version that has one (fromVersion set when that isn't the
+  // latest), or null. strict rejects where the routes aren't there too (the
+  // library's cache stops asking then).
+  fetchWorkflowExample: async ({ rootState }, arg) => {
+    const { uuid, strict = false } = typeof arg === "string" ? { uuid: arg } : arg || {};
+    try {
+      return (await workflowRequest(rootState, `definitions/${encodeURIComponent(uuid)}/example`)).example || null;
+    } catch (err) {
+      if (!strict && exampleUnavailable(err)) return null;
+      throw err;
+    }
+  },
+  // fetchWorkflowVersionExample: { uuid, version } -> that version's example, or null.
+  fetchWorkflowVersionExample: async ({ rootState }, { uuid, version }) => {
+    try {
+      return (
+        (await workflowRequest(rootState, `definitions/${encodeURIComponent(uuid)}/versions/${version}/example`))
+          .example || null
+      );
+    } catch (err) {
+      if (exampleUnavailable(err)) return null;
+      throw err;
+    }
+  },
+  // deleteWorkflowVersionExample: { uuid, version } -> removes the version's
+  // example (204).
+  deleteWorkflowVersionExample: async ({ rootState }, { uuid, version }) =>
+    workflowRequest(rootState, `definitions/${encodeURIComponent(uuid)}/versions/${version}/example`, {
+      method: "DELETE",
+    }),
   // duplicateWorkflow: { uuid, version?, name? } -> the new workflow, in the
   // active workspace (or the user's own outside one).
   duplicateWorkflow: async ({ rootState }, { uuid, version, name }) => {
