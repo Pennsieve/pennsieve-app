@@ -41,6 +41,8 @@ import {
 } from "../Applications/applicationSchema";
 import { useAppManifest } from "@/composables/useAppManifest";
 import BuilderBar from "./BuilderBar.vue";
+import WorkflowExampleLink from "../Workflows/WorkflowExampleLink.vue";
+import { canEditWorkflow } from "../Workflows/runExamples";
 import BuilderPalette from "./BuilderPalette.vue";
 import ParamField from "./ParamField.vue";
 import { ioLine, sessionTypeOf, versionManifest, shortMediaType } from "./appManifestInfo";
@@ -971,6 +973,10 @@ const isWorkflowCreator = computed(() => {
     profile.value.id === wf.createdBy || profile.value.intId === wf.createdBy
   );
 });
+
+// Who may remove the workflow's example: who may edit it, as the workflow
+// says (permissions.canEdit), else its creator.
+const canEditExample = computed(() => canEditWorkflow(selectedWorkflow.value, profile.value));
 
 // Steps' settings are editable while building (create) or editing (edit).
 const canEditConfig = computed(() => mode.value !== "browse");
@@ -2619,6 +2625,13 @@ const openNodeSettings = (id) => {
         </span>
       </span>
       <div class="header-actions">
+        <!-- The example PDF (a run's summary) of the version shown -->
+        <WorkflowExampleLink
+          v-if="selectedWorkflow?.uuid"
+          :uuid="selectedWorkflow.uuid"
+          :version="viewingVersion"
+          :can-edit="canEditExample"
+        />
         <bf-button v-if="!viewingVersion && selectedWorkflow?.isActive !== false" class="secondary" @click="runThis">
           ▶ Run
         </bf-button>

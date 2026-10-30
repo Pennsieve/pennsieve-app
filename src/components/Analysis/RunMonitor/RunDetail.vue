@@ -32,6 +32,7 @@ import LayerNameSelector from "./LayerNameSelector.vue";
 import TargetDatasetField from "./TargetDatasetField.vue";
 import { targetWritesToDataset, targetParamFields, buildDataTargets, targetDatasetId, datasetName, shownTargetParams, datasetSummary, sortDatasets, isPathPrefixParam } from "./dataTargets";
 import DatasetOptionRow from "./DatasetOptionRow.vue";
+import RunExampleAction from "./RunExampleAction.vue";
 import PublicFilesPicker from "./PublicFilesPicker.vue";
 import { picksKey } from "./publicPicks";
 import IoPill from "../WorkflowGraph/IoPill.vue";
@@ -3311,6 +3312,10 @@ onUnmounted(() => {
               <bf-button class="secondary export-run-btn" :disabled="downloadingLogs" @click="downloadAllLogs">
                 {{ downloadingLogs ? 'Downloading...' : 'Download Logs & Configuration' }}
               </bf-button>
+
+              <!-- A succeeded run as its workflow version's example PDF
+                   (for whoever can edit the workflow, where it's served) -->
+              <RunExampleAction :run="selectedWorkflowActivity" />
             </template>
 
             <div v-else class="info-empty">
