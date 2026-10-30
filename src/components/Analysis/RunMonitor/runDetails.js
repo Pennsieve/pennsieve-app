@@ -40,12 +40,14 @@ export async function fetchRunCost(api2Url, runId, options) {
   return costOf(await fetchRun(api2Url, runId, options));
 }
 
-// The parts of a run's cost that aren't zero: [{ label, cost }].
+// The parts of a run's cost that aren't zero: [{ label, cost }]. Every
+// part the finalizer's costEstimate carries, so the parts add up to the total.
 const PARTS = {
   ecs: "Compute (ECS)",
+  gpu: "GPU",
   lambda: "Lambda",
   data: "Data transfer",
-  efsThroughput: "Storage throughput",
+  efsStorage: "Storage",
   cloudWatchLogs: "Logs",
   stepFunctions: "Orchestration",
   llm: "LLM",
