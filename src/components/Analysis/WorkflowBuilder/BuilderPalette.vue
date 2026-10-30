@@ -4,14 +4,17 @@
 // Searchable by name, description, tag and media type; with a step
 // selected, the apps that accept its output come first. Click adds after
 // the selected step; drag places. Apps without an app.yml are listed as
-// usual, marked; their owner gets a link to the manifest builder.
+// usual, marked; their owner gets a link to the manifest builder. An app
+// with variants (a CPU and a GPU build) is one entry with a chip per
+// variant: the entry adds the default, a chip that variant.
 import { computed, ref } from "vue";
 import { ArrowLeft } from "@element-plus/icons-vue";
 import { useRoute } from "vue-router";
 import { useStore } from "vuex";
 import { appInitials, githubRepo } from "../Applications/appCards";
 import { appColors } from "../Applications/appDomains";
-import { ioLine, manifestsServed, matchesApp, paletteGroups, versionManifest } from "./appManifestInfo";
+import RuntimeMark from "../WorkflowGraph/RuntimeMark.vue";
+import { ioLine, manifestsServed, matchesApp, paletteGroups, paletteVariants, versionManifest } from "./appManifestInfo";
 
 const props = defineProps({
   applications: { type: Array, default: () => [] },
@@ -22,7 +25,8 @@ const props = defineProps({
   stepLabel: { type: String, default: "" },
   loading: { type: Boolean, default: false },
 });
-// add(type, app), dragstart(app, event, type), fold
+// add(type, app, variant), dragstart(app, event, type, variant), fold; the
+// variant is a chip's id, else none (the app's default).
 const emit = defineEmits(["add", "dragstart", "fold"]);
 
 const store = useStore();
@@ -38,6 +42,8 @@ const groups = computed(() =>
 const manifestOf = (app) => versionManifest(app);
 const description = (app) => manifestOf(app)?.description || app.description || "";
 const lacksManifest = (app) => served.value && !manifestOf(app);
+const variantTitle = (app, v) =>
+  [`Add ${props.appName(app)} · ${v.name}`, v.description, v.gpu && "Runs on a GPU"].filter(Boolean).join("\n");
 const manifestBuilder = computed(() => ({
   name: route.params.orgId ? "application-manifest-builder" : "my-application-manifest-builder",
 }));
@@ -107,32 +113,47 @@ const tileOf = (app) => {
         <p v-if="!g.apps.length" class="pal-empty">
           No app declares that it takes this step's output.
         </p>
-        <button
-          v-for="app in g.apps"
-          :key="app.uuid || app.sourceUrl"
-          type="button"
-          class="pal-item"
-          draggable="true"
-          :title="description(app) || appName(app)"
-          @click="emit('add', 'default', app)"
-          @dragstart="emit('dragstart', app, $event, 'application')"
-        >
-          <span class="pal-tile" :style="tileColors(app)" aria-hidden="true">{{ appInitials(tileOf(app)) }}</span>
-          <span class="pal-text">
-            <span class="pal-name">{{ appName(app) }}</span>
-            <span v-if="ioLine(manifestOf(app))" class="pal-io">{{ ioLine(manifestOf(app)) }}</span>
-            <span v-if="description(app)" class="pal-line">{{ description(app) }}</span>
-            <span v-if="(manifestOf(app)?.tags || []).length" class="pal-tags">
-              <span v-for="t in manifestOf(app).tags.slice(0, 3)" :key="t" class="pal-tag">{{ t }}</span>
+        <template v-for="app in g.apps" :key="app.uuid || app.sourceUrl">
+          <button
+            type="button"
+            class="pal-item"
+            draggable="true"
+            :title="description(app) || appName(app)"
+            @click="emit('add', 'default', app)"
+            @dragstart="emit('dragstart', app, $event, 'application')"
+          >
+            <span class="pal-tile" :style="tileColors(app)" aria-hidden="true">{{ appInitials(tileOf(app)) }}</span>
+            <span class="pal-text">
+              <span class="pal-name">{{ appName(app) }}</span>
+              <span v-if="ioLine(manifestOf(app))" class="pal-io">{{ ioLine(manifestOf(app)) }}</span>
+              <span v-if="description(app)" class="pal-line">{{ description(app) }}</span>
+              <span v-if="(manifestOf(app)?.tags || []).length" class="pal-tags">
+                <span v-for="t in manifestOf(app).tags.slice(0, 3)" :key="t" class="pal-tag">{{ t }}</span>
+              </span>
+              <span v-if="lacksManifest(app)" class="pal-nomanifest">
+                No manifest
+                <router-link v-if="app.ownerId === me" :to="manifestBuilder" class="pal-link" @click.stop>
+                  Add an app.yml
+                </router-link>
+              </span>
             </span>
-            <span v-if="lacksManifest(app)" class="pal-nomanifest">
-              No manifest
-              <router-link v-if="app.ownerId === me" :to="manifestBuilder" class="pal-link" @click.stop>
-                Add an app.yml
-              </router-link>
-            </span>
-          </span>
-        </button>
+          </button>
+          <div v-if="paletteVariants(app).length" class="pal-variants" role="group" :aria-label="`${appName(app)} variants`">
+            <button
+              v-for="v in paletteVariants(app)"
+              :key="v.id"
+              type="button"
+              class="pal-variant"
+              :class="{ 'pal-variant--default': v.default }"
+              draggable="true"
+              :title="variantTitle(app, v)"
+              @click="emit('add', 'default', app, v.id)"
+              @dragstart="emit('dragstart', app, $event, 'application', v.id)"
+            >
+              <RuntimeMark v-if="v.gpu" runtime="gpu" compact />{{ v.name }}
+            </button>
+          </div>
+        </template>
       </div>
       <p v-if="!shown.length" class="pal-empty">No app matches "{{ query }}".</p>
     </template>
@@ -280,6 +301,39 @@ const tileOf = (app) => {
   background: theme.$gray_0;
   font-size: 10px;
   color: theme.$gray_5;
+}
+.pal-variants {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  // Under the entry's text, past its tile.
+  margin: -2px 0 4px 40px;
+}
+.pal-variant {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 7px;
+  border: 1px solid theme.$gray_2;
+  border-radius: 10px;
+  background: theme.$white;
+  font: inherit;
+  font-size: 11px;
+  color: theme.$gray_5;
+  cursor: pointer;
+
+  &:hover,
+  &:focus-visible {
+    border-color: theme.$purple_3;
+    color: theme.$purple_3;
+    outline: none;
+  }
+  &:active {
+    cursor: grabbing;
+  }
+}
+.pal-variant--default {
+  font-weight: 500;
+  color: theme.$gray_6;
 }
 .pal-nomanifest {
   font-size: 11px;
