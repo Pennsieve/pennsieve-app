@@ -339,7 +339,7 @@ export default {
     //     const statusRows = {
     //       'Processing': 'processing-row',
     //       'Failed': 'failed-row',
-    //       'Unprocessed': 'unprocessed-row',
+    //       'Scanning…': 'unprocessed-row',
     //       'Uploading': 'unprocessed-row'
     //     }
     //     return statusRows[row.status] !== '' ? statusRows[row.status] : 'no-status-row'
@@ -504,7 +504,8 @@ export default {
 
               const fileStates = {
                 'ERROR': 'Failed',
-                'UPLOADED': 'Unprocessed',
+                'INFECTED': 'Quarantined',
+                'UPLOADED': 'Scanning…',
                 'PROCESSING': 'Processing',
                 'UNAVAILABLE': 'Uploading',
                 'RUNNING': 'Processing',

@@ -6,19 +6,7 @@
     <template #dropdown>
       <el-dropdown-menu slot="dropdown" class="bf-menu" :offset="9">
         <el-dropdown-item
-          v-if="getFileState === 'Unprocessed'"
-          :disabled="datasetLocked"
-          command="processFile"
-        >
-          Process File
-        </el-dropdown-item>
-        <el-dropdown-item
-          v-if="
-            isMSOfficeFile &&
-            getFileState !== 'Unprocessed' &&
-            getFileState !== 'Processing' &&
-            !isExternalFile
-          "
+          v-if="isMSOfficeFile && isReady && !isExternalFile"
           command="openMSOfficeFile"
         >
           Open with Office 365
@@ -28,12 +16,10 @@
             !isMSOfficeFile &&
             packageType !== 'Collection' &&
             packageType !== 'Unknown' &&
-            (getFileState !== 'Unprocessed' || hasZarrTimeseries) &&
-            getFileState !== 'Processing' &&
-            getFileState !== 'Failed' &&
+            isReady &&
+            hasViewerDataForType &&
             !isExternalFile
           "
-          :disabled="getFileState === 'Uploading'"
           command="openViewer"
         >
           Open Viewer
@@ -42,7 +28,7 @@
           v-if="
             packageType !== 'Collection' && !multipleSelected && !isExternalFile
           "
-          :disabled="isFileProcessing"
+          :disabled="!isReady"
           command="download"
         >
           Download
@@ -51,7 +37,7 @@
           v-if="
             packageType !== 'Collection' && !multipleSelected && !isExternalFile
           "
-          :disabled="isFileProcessing"
+          :disabled="!isReady"
           command="copyUrl"
         >
           Copy URL to Clipboard
@@ -92,12 +78,16 @@
 <script>
 import { isFeatureEnabled } from "@/utils/features";
 import { mapGetters, mapState, mapActions } from "vuex";
-import { path, pathOr, propOr } from "ramda";
+import { pathOr, propOr } from "ramda";
 
 import EventBus from "../../utils/event-bus";
 import GetFileProperty from "../../mixins/get-file-property";
 import IconMenu from "../icons/IconMenu.vue";
-import { useTimeseriesZarrAssets } from "@/composables/useTimeseriesZarrAssets";
+import {
+  usePackageViewerData,
+  viewerNeedsData,
+} from "@/composables/usePackageViewerData";
+import { isPackageReady } from "@/utils/package-state";
 
 const conceptId = "00000000-0000-0000-0000-000000000000";
 
@@ -121,22 +111,25 @@ export default {
   },
 
   setup() {
-    const { hasTimeseriesZarrAsset, probeTimeseriesZarrAsset } =
-      useTimeseriesZarrAssets();
-    return { hasTimeseriesZarrAsset, probeTimeseriesZarrAsset };
+    const { hasViewerData, probeViewerData } = usePackageViewerData();
+    return { hasViewerData, probeViewerData };
   },
 
   watch: {
-    // Same rule as the file row's eye button: an unprocessed timeseries package
-    // with a ready Zarr bundle is viewable, so "Open Viewer" has to stay in the
-    // menu. Cached per package by the composable, so this rarely costs a call.
-    needsZarrProbe: {
+    // Same rule as the file row's eye button: a timeseries or slide package
+    // opens only when its channels / Zarr bundle / tiles exist. Cached per
+    // package by the composable, so this rarely costs a call.
+    needsViewerDataProbe: {
       immediate: true,
       handler: function (needed) {
         if (!needed) {
           return;
         }
-        this.probeTimeseriesZarrAsset(this.fileDatasetId, this.filePackageId);
+        this.probeViewerData({
+          datasetId: this.fileDatasetId,
+          packageId: this.filePackageId,
+          packageType: this.packageType,
+        });
       },
     },
   },
@@ -182,30 +175,12 @@ export default {
     },
 
     /**
-     * Gets the state of a file in the table
-     * @returns {String}
-     */
-    getFileState: function () {
-      const states = {
-        UPLOADED: "Unprocessed",
-        PROCESSING: "Processing",
-        RUNNING: "Processing",
-        UNAVAILABLE: "Uploading",
-        PENDING: "Processing",
-        ERROR: "Failed",
-      };
-      const fileState = path(["content", "state"], this.selection[0] || []);
-      return states[fileState] ? states[fileState] : "";
-    },
-
-    /**
-     * Computes if the file is processing
+     * READY: the malware scan cleared the file, so it can be downloaded
+     * and opened.
      * @returns {Boolean}
      */
-    isFileProcessing: function () {
-      return (
-        this.getFileState == "Uploading" || this.getFileState == "Processing"
-      );
+    isReady: function () {
+      return isPackageReady(this.selection[0]);
     },
 
     /**
@@ -237,22 +212,25 @@ export default {
       );
     },
 
-    needsZarrProbe: function () {
+    needsViewerDataProbe: function () {
       return (
-        this.packageType.toLowerCase() === "timeseries" &&
-        this.getFileState === "Unprocessed" &&
-        Boolean(this.fileDatasetId) &&
+        this.isReady &&
+        viewerNeedsData(this.packageType) &&
         Boolean(this.filePackageId)
       );
     },
 
     /**
-     * Whether the selected package carries a ready timeseries-zarr asset, which
-     * makes it viewable no matter what the legacy package state says.
+     * Timeseries and slides open only when their derived data exists
+     * (channels or a Zarr bundle; slide tiles); other types need only the
+     * source file.
      * @returns {Boolean}
      */
-    hasZarrTimeseries: function () {
-      return this.hasTimeseriesZarrAsset(this.filePackageId);
+    hasViewerDataForType: function () {
+      return (
+        !viewerNeedsData(this.packageType) ||
+        this.hasViewerData(this.filePackageId)
+      );
     },
   },
 
@@ -313,13 +291,6 @@ export default {
           params: { fileId },
         });
       }
-    },
-
-    /**
-     * Process file
-     */
-    processFile: function () {
-      this.$emit("process-file", this.selection[0] || []);
     },
 
     /**

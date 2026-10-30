@@ -204,7 +204,8 @@ export default {
       let type = pathOr('', ['content', 'packageType'], viewer)
       const packageState = pathOr('', ['content', 'state'], viewer)
 
-      if (packageState === 'ERROR') {
+      // Tools only for a package the malware scan cleared.
+      if (packageState !== 'READY') {
         type = 'unknown'
       }
 
