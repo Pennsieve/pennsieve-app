@@ -314,7 +314,7 @@ const tileOf = (app) => {
   align-items: center;
   padding: 1px 7px;
   border: 1px solid theme.$gray_2;
-  border-radius: 10px;
+  border-radius: 3px;
   background: theme.$white;
   font: inherit;
   font-size: 11px;
