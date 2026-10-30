@@ -68,6 +68,7 @@ import { canvasDefinition, toInterfaceDefinition } from "./builderInterface";
 import IoPill from "../WorkflowGraph/IoPill.vue";
 import { isFeatureEnabled } from "@/utils/features";
 import { useGraphHistory, snapshot } from "./graphHistory";
+import { workflowPermissions } from "./workflowPermissions";
 import { canConnect, neighbourInDirection } from "./graphEditing";
 import {
   routedOutputs,
@@ -1075,13 +1076,13 @@ Visibility (public / private)
 */
 const isSuperAdmin = computed(() => store.getters.isSuperAdmin === true);
 
-const isWorkflowCreator = computed(() => {
-  const wf = selectedWorkflow.value;
-  if (!wf || !profile.value) return false;
-  return (
-    profile.value.id === wf.createdBy || profile.value.intId === wf.createdBy
-  );
-});
+// What the user may do with the selected workflow: workflow-service's
+// permissions (its creator, the workspace's admins, super-admins on public
+// ones), or the creator check when the server doesn't send them.
+const permissions = computed(() =>
+  workflowPermissions(selectedWorkflow.value, { profile: profile.value, isSuperAdmin: isSuperAdmin.value }),
+);
+const canEditWorkflow = computed(() => permissions.value.canEdit);
 
 // Steps' settings are editable while building (create) or editing (edit).
 const canEditConfig = computed(() => mode.value !== "browse");
@@ -1090,13 +1091,12 @@ const isPublicWorkflow = computed(
   () => selectedWorkflow.value?.visibility === "public",
 );
 
-// Only the creator may publish. The creator or a super-admin (moderation) may
-// unpublish — mirrors the workflow-service authorization rules.
+// Publish / unpublish as workflow-service allows (permissions).
 const canPublish = computed(
-  () => !isPublicWorkflow.value && isWorkflowCreator.value,
+  () => !isPublicWorkflow.value && permissions.value.canPublish,
 );
 const canUnpublish = computed(
-  () => isPublicWorkflow.value && (isWorkflowCreator.value || isSuperAdmin.value),
+  () => isPublicWorkflow.value && permissions.value.canUnpublish,
 );
 
 const togglePublish = async () => {
@@ -1193,7 +1193,7 @@ const savedLayout = ref({});
 const markLayoutSaved = () => {
   savedLayout.value = layoutOf();
 };
-const canSaveLayout = computed(() => mode.value === "browse" && isWorkflowCreator.value && !viewingVersion.value);
+const canSaveLayout = computed(() => mode.value === "browse" && canEditWorkflow.value && !viewingVersion.value);
 const layoutChanged = computed(() => {
   if (!canSaveLayout.value) return false;
   const saved = savedLayout.value;
@@ -2284,8 +2284,9 @@ const serializeProcessors = () => {
 };
 
 /*
-  A saved workflow: read-only, with Edit for its owner and Duplicate to edit
-  for everyone else. Saving an edit is a new version of it (workflow-service
+  A saved workflow: read-only, with Edit for those who may edit it (its
+  creator, the workspace's admins, super-admins on public ones) and
+  Duplicate to edit for everyone else. Saving an edit is a new version of it (workflow-service
   versions); its history lists every version, and an older one can be
   viewed (read-only) or duplicated.
 */
@@ -2320,7 +2321,7 @@ const showVersion = async (n) => {
 };
 
 const startEdit = () => {
-  if (!isWorkflowCreator.value || viewingVersion.value) return;
+  if (!canEditWorkflow.value || viewingVersion.value) return;
   mode.value = "edit";
   selectedNode.value = null;
   workflowName.value = selectedWorkflow.value?.name || "";
@@ -2561,7 +2562,7 @@ onMounted(async () => {
       if (wf) {
         selectWorkflow(wf);
         // A duplicate opens ready to edit.
-        if (route.query.edit === "1" && isWorkflowCreator.value) startEdit();
+        if (route.query.edit === "1" && canEditWorkflow.value) startEdit();
       }
     } else {
       enterCreateMode();
@@ -2744,7 +2745,7 @@ const openNodeSettings = (id) => {
           ▶ Run
         </bf-button>
         <el-tooltip
-          v-if="isWorkflowCreator"
+          v-if="canEditWorkflow"
           :disabled="!viewingVersion"
           content="Edit works on the latest version; duplicate this one to change it."
           placement="bottom"
@@ -2754,7 +2755,7 @@ const openNodeSettings = (id) => {
           </span>
         </el-tooltip>
         <bf-button v-else :processing="duplicating" @click="duplicate">Duplicate to edit</bf-button>
-        <bf-button v-if="isWorkflowCreator && viewingVersion" class="secondary" :processing="duplicating" @click="duplicate">
+        <bf-button v-if="canEditWorkflow && viewingVersion" class="secondary" :processing="duplicating" @click="duplicate">
           Duplicate this version
         </bf-button>
       </div>
@@ -3945,7 +3946,7 @@ const openNodeSettings = (id) => {
                     }}</span>
                   </div>
                 </div>
-                <div class="info-actions">
+                <div v-if="canEditWorkflow" class="info-actions">
                   <button class="text-link-btn" @click="startEditDetails">
                     Edit name & description
                   </button>
@@ -4018,13 +4019,13 @@ const openNodeSettings = (id) => {
 
           <!-- Danger Zone (always last) -->
           <el-collapse-item
-            v-if="mode === 'browse' && selectedWorkflow && !selectedNode"
+            v-if="mode === 'browse' && selectedWorkflow && !selectedNode && (canEditWorkflow || canPublish || canUnpublish)"
             title="Danger Zone"
             name="danger-zone"
             class="danger-collapse-item"
           >
             <div class="danger-zone">
-              <div class="danger-row">
+              <div v-if="canEditWorkflow" class="danger-row">
                 <div class="danger-info">
                   <div class="danger-row-title">
                     {{
