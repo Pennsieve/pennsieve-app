@@ -42,7 +42,6 @@ import {
 import { useAppManifest } from "@/composables/useAppManifest";
 import BuilderBar from "./BuilderBar.vue";
 import WorkflowExampleLink from "../Workflows/WorkflowExampleLink.vue";
-import { canEditWorkflow } from "../Workflows/runExamples";
 import BuilderPalette from "./BuilderPalette.vue";
 import ParamField from "./ParamField.vue";
 import { ioLine, sessionTypeOf, versionManifest, shortMediaType, stepVariant } from "./appManifestInfo";
@@ -1089,7 +1088,7 @@ const canEditWorkflow = computed(() => permissions.value.canEdit);
 
 // Who may remove the workflow's example: who may edit it, as the workflow
 // says (permissions.canEdit), else its creator.
-const canEditExample = computed(() => canEditWorkflow(selectedWorkflow.value, profile.value));
+const canEditExample = computed(() => canEditWorkflow.value);
 
 // Steps' settings are editable while building (create) or editing (edit).
 const canEditConfig = computed(() => mode.value !== "browse");
