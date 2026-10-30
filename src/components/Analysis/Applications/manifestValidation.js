@@ -9,8 +9,10 @@ import { createSchemaValidator, errorFieldPath } from "@/utils/jsonSchemaValidat
 import manifestSchema from "./app-manifest.v1.schema.json";
 
 let validate = null;
-// Compiled on first use, then reused.
-const validator = () => (validate ||= createSchemaValidator().compile(manifestSchema));
+// Compiled on first use, then reused. next: the 2019-09 keywords the schema
+// uses (variants: at most one default, by contains + maxContains); without
+// it Ajv ignores maxContains and reads contains as "a default is required".
+const validator = () => (validate ||= createSchemaValidator({ next: true }).compile(manifestSchema));
 
 // Hints for the patterns and formats app.yml uses, by the field they're on.
 const PATTERN_HINTS = [
@@ -20,6 +22,8 @@ const PATTERN_HINTS = [
   [/(^|\.)email$/, "must be an email address"],
   // With two or more outputs, each is written to OUTPUT_DIR/<name>/.
   [/^outputs\.\d+\.name$/, "is a folder name with two or more outputs: lowercase letters, numbers and dashes"],
+  [/^variants\.\d+\.id$/, "must be lowercase letters, numbers and single dashes inside, at most 32 characters"],
+  [/\.args$/, "names build arguments: letters, numbers and _, not starting with a number"],
 ];
 const patternHint = (path) =>
   (PATTERN_HINTS.find(([re]) => re.test(path)) || [null, "isn't in the expected form"])[1];
@@ -53,9 +57,26 @@ function problemFor(error) {
     const port = path.replace(/\.(name|mediaTypes)$/, "");
     return { path: `${port}.${field}`, message };
   }
+  // A variant's id: "default" is reserved, and no double dashes (they
+  // separate the release tag from the variant in image tags).
+  if (keyword === "not" && /^variants\.\d+\.id$/.test(path)) {
+    return { path, message: 'can\'t be "default" or contain "--"' };
+  }
+  if (keyword === "not" && /(^|\.)build\.dockerfile$/.test(path)) {
+    return { path, message: 'must be a path inside the repository: relative, without ".."' };
+  }
+  if (path === "variants" && keyword === "contains") {
+    return { path, message: "can have at most one default variant (default: true)" };
+  }
+  if (path === "variants" && keyword === "maxItems") {
+    return { path, message: `can have at most ${params.limit} variants` };
+  }
   switch (keyword) {
     case "if":
       return null; // the then-branch error says why
+    case "allOf":
+    case "propertyNames":
+      return null; // the inner error says why
     case "additionalProperties":
       return {
         path: path === "Root" ? params.additionalProperty : `${path}.${params.additionalProperty}`,
@@ -70,8 +91,13 @@ function problemFor(error) {
     case "pattern":
     case "format":
       return { path, message: patternHint(path) };
-    case "type":
-      return { path, message: `must be ${TYPE_NAMES[params.type] || `a ${params.type}`}` };
+    case "type": {
+      // One type, or several ("string,number,boolean": a scalar).
+      const types = String(params.type).split(",");
+      const names = types.map((t) => TYPE_NAMES[t] || t);
+      const one = types.length === 1 ? TYPE_NAMES[types[0]] || `a ${types[0]}` : `a ${names.slice(0, -1).join(", ")} or ${names.at(-1)}`;
+      return { path, message: `must be ${one}` };
+    }
     default:
       return { path, message: error.message || "isn't valid" };
   }

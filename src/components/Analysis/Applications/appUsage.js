@@ -14,13 +14,22 @@ const seconds = (s) => {
   return `${(s / 3600).toFixed(1)}h`;
 };
 
+// A usage row's version, with its variant when the app has them
+// (workflow-service aggregates by version and variant; a sample from before
+// variants counts as the default): "v0.3.0 · gpu", "v1.2.0", "unpinned".
+export const usageVersionLabel = (v) => {
+  if (!v?.version) return "unpinned";
+  return v.variant ? `${v.version} · ${v.variant}` : v.version;
+};
+
 // spread is "p50 · p95" of a distribution, or "" without samples.
 const spread = (d, fmt) => (d && d.samples ? `${fmt(d.p50)} · ${fmt(d.p95)}` : "");
 
 // usageRows are the versions table's rows.
 export const usageRows = (usage) =>
   (usage?.versions || []).map((v) => ({
-    version: v.version || "unpinned",
+    version: usageVersionLabel(v),
+    variant: v.variant || "",
     runs: v.runs,
     steps: v.steps,
     failed: v.failed,
@@ -43,7 +52,7 @@ export const sizingHint = (v) => {
   const d = v?.memoryUsedMiB;
   if (!d || d.samples < 3 || !v.memoryGivenMiB) return "";
   const share = d.p95 / v.memoryGivenMiB;
-  const label = v.version || "unpinned";
+  const label = usageVersionLabel(v);
   if (share < 0.5) {
     const target = FARGATE_MEMORY_MIB.find((m) => m >= d.p95 * 1.3) || Math.ceil((d.p95 * 1.3) / 1024) * 1024;
     // Nothing smaller to suggest (a Lambda step at its floor): no hint.
@@ -84,7 +93,7 @@ export const usageSidebar = (usage) => {
   const mem = v.memoryUsedMiB;
   const cpu = v.cpuUsedUnits;
   const runs = `${v.runs} run${v.runs === 1 ? "" : "s"}`;
-  const version = v.version ? ` of ${v.version}` : "";
+  const version = v.version ? ` of ${usageVersionLabel(v)}` : "";
   const hint = sizingHint(v);
   const explain = (d, fmt, what) =>
     `The 95th percentile of each step's peak ${what} over ${runs}${version}, ${d.samples} sampled step${d.samples === 1 ? "" : "s"}: half the steps peaked at ${fmt(d.p50)} or less, the most was ${fmt(d.max)}. Usage depends on the inputs.`;

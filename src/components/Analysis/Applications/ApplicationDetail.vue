@@ -17,6 +17,10 @@ import ShareAppDialog from "./ShareAppDialog.vue";
 import { accessEntries, accessSummary, makeNamer } from "./appSharing";
 import { useWorkspaceMembers } from "./useWorkspaceMembers";
 import { fetchReleaseStatus, releaseNudge } from "./release";
+import { keepVariant, releaseProgress, variantDetails, variantManifestView, versionVariants } from "./versionVariants";
+import { versionsToWatch, withLiveStatus } from "./liveStatus";
+import { useAppStatusEvents } from "@/composables/useAppStatusEvents";
+import RuntimeMark from "../WorkflowGraph/RuntimeMark.vue";
 import AppArchiveToggle from "../../user/code/AppArchiveToggle.vue";
 import { useGetToken } from "@/composables/useGetToken";
 import { useAppUsage } from "@/composables/useAppUsage";
@@ -139,21 +143,31 @@ const stopReleaseWatch = () => {
   if (releaseWatch) clearTimeout(releaseWatch);
   releaseWatch = null;
 };
+// The tag just released here: for an app with variants, its builds'
+// progress (one per variant) shows until they've all finished.
+const releasedTag = ref("");
+const progress = computed(() => (releasedTag.value ? releaseProgress(liveDetail.value, releasedTag.value) : null));
 const onReleased = ({ tag }) => {
   stopReleaseWatch();
   loadReleaseStatus();
-  const bare = (s) => String(s || "").replace(/^v/, "");
+  releasedTag.value = tag;
   let tries = 0;
-  // Every 20 s for up to 10 minutes, until the app store has the version.
+  // Every 20 s for up to 10 minutes, until the app store has the version
+  // and its builds have finished.
   const check = async () => {
     tries += 1;
-    await loadDetail(props.uuid);
-    const there = (detail.value?.versions || []).some((v) => bare(v.version) === bare(tag));
-    if (!there && tries < 30) releaseWatch = setTimeout(check, 20000);
+    await loadDetail(props.uuid, { quiet: true });
+    const p = progress.value;
+    // An app with variants: until each variant's build has finished.
+    if ((!p || (p.variants && !p.done)) && tries < 30) releaseWatch = setTimeout(check, 20000);
     else releaseWatch = null;
   };
   releaseWatch = setTimeout(check, 20000);
 };
+// The newest version's variants: the Variants section, and the release
+// dialog's check of "--" in a tag.
+const newestVariants = computed(() => variantDetails(liveDetail.value, sortedVersions.value[0]?.version));
+
 onBeforeUnmount(stopReleaseWatch);
 
 // Permissions only apply to private applications.
@@ -213,14 +227,56 @@ const accessChips = computed(() =>
 // Visibility may change via the permissions editor — reload to reflect it.
 const reloadAfterPermissions = () => loadDetail(props.uuid);
 
+// The app with live build statuses over its versions (liveStatus.js), for
+// the versions still building: the version's event moves the version, a
+// variant's event only that variant (a failed GPU build leaves the version
+// deployed). Polling after a release reads the same statuses from the API.
+const { live: liveStatus } = useAppStatusEvents((l) => versionsToWatch(withLiveStatus(detail.value, l)));
+const liveDetail = computed(() => withLiveStatus(detail.value, liveStatus.value));
+
 const sortedVersions = computed(() => {
-  const versions = detail.value?.versions || [];
+  const versions = liveDetail.value?.versions || [];
   return [...versions].sort((a, b) => {
     const aTime = new Date(a.createdAt).getTime() || 0;
     const bTime = new Date(b.createdAt).getTime() || 0;
     return bTime - aTime;
   });
 });
+/*
+  The app.yml tab for a version with variants (the newest, whose app.yml the
+  tab shows): a switch between them, and Runtime and Parameters from the
+  chosen variant's resolved manifest, with what differs from the default
+  marked. The choice stays across a new version that has the variant, else
+  goes back to the default. A version without variants: app.yml as is.
+*/
+const appYmlVariant = ref("");
+watch(
+  () => [sortedVersions.value[0]?.version, newestVariants.value.map((v) => v.id).join(",")],
+  ([tag]) => {
+    appYmlVariant.value = keepVariant(liveDetail.value, tag, appYmlVariant.value);
+  },
+  { immediate: true }
+);
+const variantView = computed(() => variantManifestView(liveDetail.value, sortedVersions.value[0]?.version, appYmlVariant.value));
+const typeLabel = (t) => (t === "gpu" ? "GPU" : t.charAt(0).toUpperCase() + t.slice(1));
+// What Runtime and Parameters show: the variant's, else app.yml's.
+const shownRuntime = computed(() => {
+  const v = variantView.value;
+  if (v) return { computeTypes: v.runtime.computeTypes.map(typeLabel), cpu: v.runtime.cpu, memory: v.runtime.memory, timeoutSeconds: v.runtime.timeoutSeconds };
+  const s = manifestSchema.value;
+  return {
+    computeTypes: computeTypeLabels.value,
+    cpu: s?.resources?.cpu,
+    memory: s?.resources?.memory,
+    timeoutSeconds: manifestMeta.value?.timeoutSeconds,
+  };
+});
+const shownParams = computed(() => variantView.value?.parameters || manifestSchema.value?.parameters || []);
+// "set by variant": a value the chosen (non-default) variant sets itself.
+const setByVariant = (field) => !!variantView.value && !variantView.value.isDefault && !!variantView.value.differs[field];
+const paramSetByVariant = (param) =>
+  !!variantView.value && !variantView.value.isDefault && Object.values(param.differs || {}).some(Boolean);
+
 
 // The newest version's license: read by app-deploy-service from the
 // repository's LICENSE file at that release (an SPDX id), not from app.yml.
@@ -543,13 +599,17 @@ const ensureOrgData = async () => {
 /*
   Fetch application detail
 */
-const loadDetail = async (uuid) => {
-  detail.value = null;
-  readmeHtml.value = "";
+// quiet: a refresh in place (a release's progress), without clearing the
+// page while it loads.
+const loadDetail = async (uuid, { quiet = false } = {}) => {
+  if (!quiet) {
+    detail.value = null;
+    readmeHtml.value = "";
+    versionsPage.value = 1;
+  }
   detailError.value = "";
-  versionsPage.value = 1;
   if (!uuid) return;
-  detailLoading.value = true;
+  if (!quiet) detailLoading.value = true;
   try {
     const [detailResult, permissionsResult] = await Promise.allSettled([
       store.dispatch("analysisModule/fetchApplication", uuid),
@@ -773,6 +833,17 @@ watch(
               <p class="manifest-error-detail">{{ manifestParsed.error }}</p>
             </div>
             <div v-else class="manifest-detail">
+              <!-- A version with variants: which one Runtime and Parameters show -->
+              <div v-if="newestVariants.length" class="manifest-variant-switch">
+                <el-radio-group v-model="appYmlVariant" size="small" aria-label="Variant">
+                  <el-radio-button v-for="v in newestVariants" :key="v.id" :value="v.id" :title="v.description || v.name">
+                    <span class="manifest-variant-name"><RuntimeMark v-if="v.gpu" runtime="gpu" compact />{{ v.name }}</span>
+                  </el-radio-button>
+                </el-radio-group>
+                <span class="manifest-license-note">
+                  {{ variantView?.isDefault ? "The default variant" : "Values this variant sets are marked" }}
+                </span>
+              </div>
               <!-- The newest version's schema problems, if registration found any -->
               <section v-if="manifestProblems.length" class="manifest-block manifest-problems">
                 <h4 class="manifest-block-title">
@@ -826,6 +897,16 @@ watch(
                     {{ tag }}
                   </span>
                 </div>
+                <!-- Its variants: one build each, the default first -->
+                <div v-if="newestVariants.length" class="manifest-variants">
+                  <span class="manifest-field-label">Variants</span>
+                  <div v-for="v in newestVariants" :key="v.id" class="manifest-variant-line">
+                    <span class="manifest-field-value manifest-variant-name"><RuntimeMark v-if="v.gpu" runtime="gpu" compact />{{ v.name }}</span>
+                    <span v-if="v.default" class="manifest-license-note">default</span>
+                    <span v-if="v.runsOn" class="manifest-license-note">{{ v.runsOn }}</span>
+                    <span v-if="v.description" class="manifest-variant-desc">{{ v.description }}</span>
+                  </div>
+                </div>
               </section>
 
               <!-- Runtime -->
@@ -835,23 +916,29 @@ watch(
                   <div class="manifest-field">
                     <span class="manifest-field-label">Compute types</span>
                     <span class="manifest-field-value">
-                      {{ computeTypeLabels.join(", ") || "—" }}
+                      {{ shownRuntime.computeTypes.join(", ") || "—" }}
+                      <span v-if="setByVariant('computeTypes')" class="manifest-variant-mark">set by variant</span>
                     </span>
                   </div>
-                  <div v-if="manifestSchema.resources.cpu != null" class="manifest-field">
+                  <div v-if="shownRuntime.cpu != null" class="manifest-field">
                     <span class="manifest-field-label">CPU</span>
-                    <span class="manifest-field-value">{{ manifestSchema.resources.cpu }}</span>
+                    <span class="manifest-field-value">
+                      {{ shownRuntime.cpu }}
+                      <span v-if="setByVariant('cpu')" class="manifest-variant-mark">set by variant</span>
+                    </span>
                   </div>
-                  <div v-if="manifestSchema.resources.memory != null" class="manifest-field">
+                  <div v-if="shownRuntime.memory != null" class="manifest-field">
                     <span class="manifest-field-label">Memory</span>
                     <span class="manifest-field-value">
-                      {{ manifestSchema.resources.memory }} MB
+                      {{ shownRuntime.memory }} MB
+                      <span v-if="setByVariant('memory')" class="manifest-variant-mark">set by variant</span>
                     </span>
                   </div>
-                  <div v-if="manifestMeta.timeoutSeconds != null" class="manifest-field">
+                  <div v-if="shownRuntime.timeoutSeconds != null" class="manifest-field">
                     <span class="manifest-field-label">Timeout</span>
                     <span class="manifest-field-value">
-                      {{ manifestMeta.timeoutSeconds }}s
+                      {{ shownRuntime.timeoutSeconds }}s
+                      <span v-if="setByVariant('timeoutSeconds')" class="manifest-variant-mark">set by variant</span>
                     </span>
                   </div>
                 </div>
@@ -895,9 +982,9 @@ watch(
               </section>
 
               <!-- Parameters -->
-              <section v-if="manifestSchema.parameters.length" class="manifest-block">
+              <section v-if="shownParams.length" class="manifest-block">
                 <h4 class="manifest-block-title">
-                  Parameters ({{ manifestSchema.parameters.length }})
+                  Parameters ({{ shownParams.length }})
                 </h4>
                 <div class="manifest-table-scroll">
                   <table class="manifest-table">
@@ -911,8 +998,13 @@ watch(
                       </tr>
                     </thead>
                     <tbody>
-                      <tr v-for="param in manifestSchema.parameters" :key="param.name">
-                        <td class="manifest-mono">{{ param.name }}</td>
+                      <tr v-for="param in shownParams" :key="param.name">
+                        <td class="manifest-mono">
+                          {{ param.name }}
+                          <!-- A variant's view: its label, and a mark when it sets the parameter -->
+                          <span v-if="variantView && param.label" class="manifest-param-label">{{ param.label }}</span>
+                          <span v-if="paramSetByVariant(param)" class="manifest-variant-mark">set by variant</span>
+                        </td>
                         <td>{{ paramTypeLabel(param.type) }}</td>
                         <td class="manifest-mono">
                           {{ formatDefaultValue(param.defaultValue) }}
@@ -1166,10 +1258,38 @@ watch(
 
           </el-collapse-item>
 
+          <!-- The newest version's variants (a CPU and a GPU build): what
+               each is and runs with -->
+          <el-collapse-item v-if="newestVariants.length" :title="`Variants (${newestVariants.length})`" name="variants">
+            <div v-for="v in newestVariants" :key="v.id" class="variant-card">
+              <div class="version-header">
+                <span class="version-tag"><RuntimeMark v-if="v.gpu" runtime="gpu" compact />{{ v.name }}</span>
+                <span class="status-badge" :class="statusBadgeClass(v.status)">{{ v.status ? statusLabel(v.status) : "Not built" }}</span>
+              </div>
+              <p v-if="v.description" class="variant-desc">{{ v.description }}</p>
+              <div class="variant-facts">
+                <span class="variant-fact"><span class="variant-fact-label">Id</span> {{ v.id }}<template v-if="v.default"> (default)</template></span>
+                <span v-if="v.runsOn" class="variant-fact"><span class="variant-fact-label">Runs on</span> {{ v.runsOn }}</span>
+                <span v-if="v.timeout" class="variant-fact"><span class="variant-fact-label">Timeout</span> {{ v.timeout }}</span>
+                <span v-for="p in v.params" :key="p.name" class="variant-fact"><span class="variant-fact-label">{{ p.label }}</span> {{ p.value }}</span>
+              </div>
+              <p v-if="v.failureReason" class="variant-why">{{ v.failureReason }}</p>
+            </div>
+          </el-collapse-item>
+
           <el-collapse-item
             :title="`Versions (${sortedVersions.length})`"
             name="versions"
           >
+            <!-- A release from here: its builds, until they've finished -->
+            <div v-if="progress?.variants" class="release-progress">
+              <div class="release-progress-title">{{ progress.done ? `${progress.tag} is built` : `Building ${progress.tag}…` }}</div>
+              <div v-for="r in progress.rows" :key="r.id || r.name" class="version-variant" :title="r.failureReason || ''">
+                <span class="version-variant-name">{{ r.name }}</span>
+                <span class="status-badge status-badge-sm" :class="statusBadgeClass(r.status)">{{ r.status ? statusLabel(r.status) : "Waiting" }}</span>
+                <span v-if="r.failureReason" class="version-variant-why">{{ r.failureReason }}</span>
+              </div>
+            </div>
             <div v-if="sortedVersions.length === 0" class="empty-versions">
               No versions yet
             </div>
@@ -1189,6 +1309,19 @@ watch(
               </div>
               <div class="version-meta">
                 <span>Released {{ formatDate(version.createdAt) }}</span>
+              </div>
+              <!-- Each variant's build; the version's status is the default's -->
+              <div v-if="versionVariants(liveDetail, version.version).length" class="version-variants">
+                <div
+                  v-for="v in versionVariants(liveDetail, version.version)"
+                  :key="v.id"
+                  class="version-variant"
+                  :title="v.failureReason || v.description || ''"
+                >
+                  <span class="version-variant-name"><RuntimeMark v-if="v.gpu" runtime="gpu" compact />{{ v.name }}<template v-if="v.default"> (default)</template></span>
+                  <span class="status-badge status-badge-sm" :class="statusBadgeClass(v.status)">{{ v.status ? statusLabel(v.status) : "Not built" }}</span>
+                  <span v-if="v.failureReason" class="version-variant-why">{{ v.failureReason }}</span>
+                </div>
               </div>
               <!-- Deployments hidden for now -->
               <!--
@@ -1261,6 +1394,8 @@ watch(
       :known-tags="knownTags"
       :status="releaseStatus"
       :default-branch="releaseStatus?.target || ''"
+      :has-variants="newestVariants.length > 0"
+      :progress="progress?.variants ? progress : null"
       @released="onReleased"
     />
   </div>
@@ -2286,6 +2421,65 @@ p.access-ask {
   margin-bottom: 8px;
 }
 
+.version-variants {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 4px;
+}
+.version-variant {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-size: 12px;
+  color: theme.$gray_6;
+}
+.version-variant-name {
+  display: inline-flex;
+  align-items: center;
+}
+.version-variant-why,
+.variant-why {
+  flex-basis: 100%;
+  font-size: 11px;
+  color: theme.$red_2;
+}
+.variant-card {
+  background: theme.$gray_1;
+  border: 1px solid theme.$gray_2;
+  border-radius: 4px;
+  padding: 10px 12px;
+  margin-bottom: 10px;
+}
+.variant-desc {
+  margin: 0 0 6px;
+  font-size: 12px;
+  color: theme.$gray_5;
+}
+.variant-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  font-size: 12px;
+  color: theme.$gray_6;
+}
+.variant-fact-label {
+  color: theme.$gray_4;
+}
+.release-progress {
+  border: 1px solid theme.$gray_2;
+  border-radius: 4px;
+  padding: 10px 12px;
+  margin-bottom: 10px;
+}
+.release-progress-title {
+  margin-bottom: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: theme.$gray_6;
+}
+
 .deployments-list {
   border-top: 1px solid theme.$gray_2;
   padding-top: 8px;
@@ -2354,6 +2548,46 @@ p.access-ask {
   margin-left: 8px;
   font-size: 12px;
   color: theme.$gray_4;
+}
+.manifest-variant-switch {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.manifest-variant-name {
+  display: inline-flex;
+  align-items: center;
+}
+.manifest-variant-mark {
+  margin-left: 6px;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 400;
+  color: theme.$gray_4;
+}
+.manifest-param-label {
+  display: block;
+  font-family: inherit;
+  font-size: 11px;
+  color: theme.$gray_4;
+}
+.manifest-variants {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 10px;
+}
+.manifest-variant-line {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+}
+.manifest-variant-desc {
+  flex-basis: 100%;
+  font-size: 12px;
+  color: theme.$gray_5;
 }
 </style>
 

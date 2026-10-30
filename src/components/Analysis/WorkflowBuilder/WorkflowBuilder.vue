@@ -43,7 +43,20 @@ import { useAppManifest } from "@/composables/useAppManifest";
 import BuilderBar from "./BuilderBar.vue";
 import BuilderPalette from "./BuilderPalette.vue";
 import ParamField from "./ParamField.vue";
-import { ioLine, sessionTypeOf, versionManifest, shortMediaType } from "./appManifestInfo";
+import { ioLine, sessionTypeOf, versionManifest, shortMediaType, stepVariant } from "./appManifestInfo";
+import {
+  modelLine,
+  modelLineText,
+  nodesHaveGpus,
+  switchableVariants,
+  switchVariant,
+  titleWithVariant,
+  effectiveVariant,
+  variantFallback,
+  variantParamNote,
+  variantSetParams,
+  variantUnavailable,
+} from "./appVariants";
 import { domainOfTag, domainColors } from "../Applications/appDomains";
 import { diffLines, manifestDiff, versionWarnings } from "./manifestDiff";
 import { builderReadiness, readinessLabel } from "./builderReadiness";
@@ -56,6 +69,7 @@ import { workflowLayouts } from "../RunMonitor/runLayout";
 import IoPill from "../WorkflowGraph/IoPill.vue";
 import { isFeatureEnabled } from "@/utils/features";
 import { useGraphHistory, snapshot } from "./graphHistory";
+import { workflowPermissions } from "./workflowPermissions";
 import { canConnect, neighbourInDirection } from "./graphEditing";
 import {
   routedOutputs,
@@ -119,6 +133,7 @@ const workflowName = ref("");
 const workflowDescription = ref("");
 const draggedApp = ref(null);
 const draggedType = ref(null); // 'application', 'data-source', or 'data-target'
+const draggedVariant = ref(""); // a palette variant chip's id, else the default
 
 // Mode & workflow list state
 const mode = ref("browse"); // 'browse' (a saved workflow, read-only) | 'edit' (its owner editing it) | 'create'
@@ -148,7 +163,7 @@ const selectedNodeParamSchema = computed(() => {
   // In browse mode: use paramSchema from the workflow definition DAG node
   if (node.data?.paramSchema?.length > 0) return node.data.paramSchema;
   // Else the pinned version's app.yml (per-version manifests)
-  const manifestParams = versionManifest(node.data?.application, node.data?.tag)?.parameters;
+  const manifestParams = versionManifest(node.data?.application, node.data?.tag, node.data?.variant)?.parameters;
   if (manifestParams?.length) return toParamSchema(manifestParams);
   // In create mode: use params from the application (flat key-value object)
   const appParams = node.data?.application?.params;
@@ -285,7 +300,7 @@ watch(selectedNode, (n) => {
 const stepManifest = computed(() => {
   const node = selectedNode.value;
   if (node?.type !== "default") return null;
-  return versionManifest(node.data?.application, node.data?.tag);
+  return versionManifest(node.data?.application, node.data?.tag, node.data?.variant);
 });
 const manifestsKnown = computed(() =>
   (availableApplications.value || []).some((a) => (a.versions || []).some((v) => v.manifest)),
@@ -364,13 +379,21 @@ const updateLines = computed(() => {
   const node = selectedNode.value;
   if (!newerVersion.value) return [];
   return diffLines(
-    manifestDiff(versionManifest(node.data.application, node.data.tag), versionManifest(node.data.application, newerVersion.value)),
+    manifestDiff(
+      versionManifest(node.data.application, node.data.tag, node.data.variant),
+      versionManifest(node.data.application, newerVersion.value, node.data.variant),
+    ),
   );
 });
 
 const applyVersion = (node, tag) => {
+  // A variant the version doesn't have: the version's default, and a word
+  // that it is ("v0.2.2 has no GPU variant; using the default").
+  const fallback = variantFallback(node.data.application, node.data.tag, tag, node.data.variant);
   node.data.tag = tag;
-  const m = versionManifest(node.data.application, tag);
+  if (!stepVariant(node.data.application, tag, node.data.variant)) delete node.data.variant;
+  if (fallback) ElMessage({ type: "info", showClose: true, message: `${fallback}.` });
+  const m = versionManifest(node.data.application, tag, node.data.variant);
   if (m) {
     node.data.paramSchema = toParamSchema(m.parameters || []);
     node.data.manifestPorts = { inputs: m.inputs || [], outputs: m.outputs || [] };
@@ -383,7 +406,7 @@ const requestVersion = async (tag) => {
   const node = selectedNode.value;
   if (!node || !tag || tag === node.data.tag) return;
   const app = node.data.application;
-  const d = manifestDiff(versionManifest(app, node.data.tag), versionManifest(app, tag));
+  const d = manifestDiff(versionManifest(app, node.data.tag, node.data.variant), versionManifest(app, tag, node.data.variant));
   const lines = diffLines(d);
   const warnings = versionWarnings(d, node.data.defaultParams || {});
   if (lines.length || warnings.length) {
@@ -402,6 +425,87 @@ const requestVersion = async (tag) => {
   }
   applyVersion(node, tag);
 };
+
+/*
+  A step's app variant (docs/app-variants.md, section 6): a switch beside the
+  version when its version has two or more (a CPU and a GPU build). The
+  compute type, cpu and memory and the parameters the step didn't set follow
+  the variant (appVariants.switchVariant); values it set stay, with a note.
+  Ports are the same for every variant; should they differ, the switch asks
+  first, as a version change does. GPU variants are off where no compute
+  node has GPUs. Apps without variants show none of this.
+*/
+const computeNodesHere = computed(() => store.getters["analysisModule/computeNodes"] || []);
+const gpusHere = computed(() => nodesHaveGpus(computeNodesHere.value));
+const stepVariants = computed(() => {
+  const node = selectedNode.value;
+  if (node?.type !== "default") return [];
+  return switchableVariants(node.data?.application, node.data?.tag);
+});
+const stepVariantId = computed(() => {
+  const node = selectedNode.value;
+  return effectiveVariant(node?.data?.application, node?.data?.tag, node?.data?.variant)?.id || "";
+});
+const stepVariantInfo = computed(() => stepVariants.value.find((v) => v.id === stepVariantId.value) || null);
+const variantOptionTitle = (v) =>
+  [v.description, v.gpu && "Runs on a GPU", variantUnavailable(v, { gpus: gpusHere.value })].filter(Boolean).join("\n");
+// Notes from the last switch: values the step set that differ from the new
+// variant's default.
+const variantNotes = ref([]);
+watch(
+  () => selectedNode.value?.id,
+  () => (variantNotes.value = [])
+);
+
+const requestVariant = async (id) => {
+  const node = selectedNode.value;
+  if (!node || !id || id === stepVariantId.value) return;
+  const app = node.data.application;
+  const s = switchVariant(node.data, app, id);
+  if (s.portLines.length) {
+    try {
+      await ElMessageBox.confirm(
+        h("div", { class: "version-change" }, [h("ul", s.portLines.map((l) => h("li", l)))]),
+        "This variant's inputs and outputs differ",
+        { confirmButtonText: "Switch", cancelButtonText: "Keep current", type: "warning" },
+      );
+    } catch {
+      return;
+    }
+  }
+  if (s.variant) node.data.variant = s.variant;
+  else delete node.data.variant;
+  node.data.computeType = s.computeType;
+  node.data.cpu = s.cpu;
+  node.data.memory = s.memory;
+  if (s.manifest) {
+    node.data.paramSchema = toParamSchema(s.manifest.parameters || []);
+    node.data.manifestPorts = { inputs: s.manifest.inputs || [], outputs: s.manifest.outputs || [] };
+  }
+  variantNotes.value = s.kept.map(
+    (k) => `${k.label} stays ${k.value}, as you set it; this variant's default is ${k.variantDefault || "unset"}.`,
+  );
+  revalidateEdges();
+};
+
+// The parameters the step's variants set differently (DynaSD's Detector):
+// shown first, under the variant switch, each with what every variant
+// defaults it to; the rest under Parameters.
+const variantParamNames = computed(() => {
+  const node = selectedNode.value;
+  if (node?.type !== "default") return [];
+  return variantSetParams(node.data?.application, node.data?.tag);
+});
+const variantParams = computed(() =>
+  variantParamNames.value.map((name) => selectedNodeParamSchema.value.find((p) => p.name === name)).filter(Boolean),
+);
+const otherParams = computed(() => selectedNodeParamSchema.value.filter((p) => !variantParamNames.value.includes(p.name)));
+const variantParamNoteOf = (name) => {
+  const node = selectedNode.value;
+  return variantParamNote(node?.data?.application, node?.data?.tag, node?.data?.variant, name);
+};
+// The card's line of those values ("Detector: oncet"), or "".
+const stepModelLine = (data) => modelLineText(modelLine(data?.application, data?.tag, data?.variant, data?.defaultParams));
 
 // app.yml as written, in a dialog.
 const appYml = ref(null); // { title, text }
@@ -541,22 +645,29 @@ const applyManifestDefaults = async (nodeId, application) => {
   if (!node) return;
 
   const { schema } = parsed;
+  // A step of a variant: its runtime and parameter defaults are the
+  // variant's (the version's resolved manifest for it), not app.yml's top
+  // level. Inputs and outputs are the same for every variant.
+  const variant = node.data.variant ? versionManifest(application, node.data.tag, node.data.variant) : null;
+  const runtime = variant?.runtime || {};
 
   // computeType — first declared type that the builder actually supports.
-  const declared = schema.runtime?.computeTypes || [];
+  const declared = runtime.computeTypes?.length ? runtime.computeTypes : schema.runtime?.computeTypes || [];
   const supported = declared.find((t) => DEFAULT_COMPUTE_TYPES.includes(t));
   if (supported) node.data.computeType = supported;
 
   // cpu / memory — only when the manifest declares them and the node has none.
-  if (!node.data.cpu && schema.resources?.cpu != null) {
-    node.data.cpu = String(schema.resources.cpu);
+  const cpu = runtime.cpu || schema.resources?.cpu;
+  const memory = runtime.memory || schema.resources?.memory;
+  if (!node.data.cpu && cpu != null) {
+    node.data.cpu = String(cpu);
   }
-  if (!node.data.memory && schema.resources?.memory != null) {
-    node.data.memory = String(schema.resources.memory);
+  if (!node.data.memory && memory != null) {
+    node.data.memory = String(memory);
   }
 
   // Parameters — feeds both the parameter list and its editable defaults.
-  const paramSchema = toParamSchema(schema.parameters);
+  const paramSchema = toParamSchema(variant?.parameters?.length ? variant.parameters : schema.parameters);
   if (paramSchema.length) node.data.paramSchema = paramSchema;
 
   setManifestPorts(node, parsed);
@@ -856,6 +967,8 @@ const definitionToNodesAndEdges = (workflow, applications) => {
         paramSchema: p.paramSchema || [],
         resolvedParams: p.resolvedParams || {},
         tag: p.tag || latestVersion(matchedApplication)?.version || "",
+        // The app variant the step runs; none for the version's default.
+        ...(p.variant && { variant: p.variant }),
         // An input's or output's own name and settings (its panel).
         ...(p.name && { name: p.name }),
         ...(p.input?.optional && { optional: true }),
@@ -964,13 +1077,13 @@ Visibility (public / private)
 */
 const isSuperAdmin = computed(() => store.getters.isSuperAdmin === true);
 
-const isWorkflowCreator = computed(() => {
-  const wf = selectedWorkflow.value;
-  if (!wf || !profile.value) return false;
-  return (
-    profile.value.id === wf.createdBy || profile.value.intId === wf.createdBy
-  );
-});
+// What the user may do with the selected workflow: workflow-service's
+// permissions (its creator, the workspace's admins, super-admins on public
+// ones), or the creator check when the server doesn't send them.
+const permissions = computed(() =>
+  workflowPermissions(selectedWorkflow.value, { profile: profile.value, isSuperAdmin: isSuperAdmin.value }),
+);
+const canEditWorkflow = computed(() => permissions.value.canEdit);
 
 // Steps' settings are editable while building (create) or editing (edit).
 const canEditConfig = computed(() => mode.value !== "browse");
@@ -979,13 +1092,12 @@ const isPublicWorkflow = computed(
   () => selectedWorkflow.value?.visibility === "public",
 );
 
-// Only the creator may publish. The creator or a super-admin (moderation) may
-// unpublish — mirrors the workflow-service authorization rules.
+// Publish / unpublish as workflow-service allows (permissions).
 const canPublish = computed(
-  () => !isPublicWorkflow.value && isWorkflowCreator.value,
+  () => !isPublicWorkflow.value && permissions.value.canPublish,
 );
 const canUnpublish = computed(
-  () => isPublicWorkflow.value && (isWorkflowCreator.value || isSuperAdmin.value),
+  () => isPublicWorkflow.value && permissions.value.canUnpublish,
 );
 
 const togglePublish = async () => {
@@ -1082,7 +1194,7 @@ const savedLayout = ref({});
 const markLayoutSaved = () => {
   savedLayout.value = layoutOf();
 };
-const canSaveLayout = computed(() => mode.value === "browse" && isWorkflowCreator.value && !viewingVersion.value);
+const canSaveLayout = computed(() => mode.value === "browse" && canEditWorkflow.value && !viewingVersion.value);
 const layoutChanged = computed(() => {
   if (!canSaveLayout.value) return false;
   const saved = savedLayout.value;
@@ -1127,10 +1239,11 @@ const generateNodeId = () => {
 
 const dragOffset = ref({ x: 0, y: 0 });
 
-const onDragStart = (item, event, type = "application") => {
+const onDragStart = (item, event, type = "application", variant = "") => {
   if (isReadOnly.value) return;
   draggedType.value = type;
   draggedApp.value = type === "application" ? item : null;
+  draggedVariant.value = type === "application" ? variant || "" : "";
 
   // Capture where within the element the user clicked
   const rect = event.target.getBoundingClientRect();
@@ -1164,9 +1277,10 @@ const onDrop = (event) => {
   };
 
   const type = draggedType.value === "application" ? "default" : draggedType.value;
-  if (type !== "default" || draggedApp.value) addNode(type, draggedApp.value, position);
+  if (type !== "default" || draggedApp.value) addNode(type, draggedApp.value, position, draggedVariant.value);
 
   draggedApp.value = null;
+  draggedVariant.value = "";
   draggedType.value = null;
 };
 
@@ -1183,8 +1297,10 @@ const onDrop = (event) => {
 // processor's own.
 // Whether a step's app calls language models through Pennsieve: its version's
 // app.yml declares runtime.llm (LLM access is opt-in). Shown as an icon.
-const usesLLM = (data) => !!versionManifest(data?.application, data?.tag)?.runtime?.llm;
-const makeNode = (type, app, position) => {
+const usesLLM = (data) => !!versionManifest(data?.application, data?.tag, data?.variant)?.runtime?.llm;
+// variant: the app variant to run (a palette chip's id); none, or the
+// default, runs the version's default.
+const makeNode = (type, app, position, variant = "") => {
   const id = generateNodeId();
   if (type === "data-source") {
     return { id, type, data: { label: "Input data" }, position };
@@ -1207,6 +1323,11 @@ const makeNode = (type, app, position) => {
       position,
     };
   }
+  const tag = latestVersion(app)?.version || "";
+  const chosen = stepVariant(app, tag, variant);
+  // Where it runs, until its app.yml is read (applyManifestDefaults): a GPU
+  // variant on a GPU from the start.
+  const runsOn = (versionManifest(app, tag, chosen)?.runtime?.computeTypes || []).find((t) => DEFAULT_COMPUTE_TYPES.includes(t));
   return {
     id,
     type: "default",
@@ -1215,20 +1336,21 @@ const makeNode = (type, app, position) => {
       application: app,
       // A notebook kernel: a human-in-the-loop step, run as a live session.
       ...(sessionTypeOf(app) && { interactive: true, sessionType: sessionTypeOf(app) }),
-      computeType: "standard",
+      computeType: (chosen && runsOn) || "standard",
       cpu: "",
       memory: "",
       defaultParams: {},
       paramSchema: [],
       hasManifest: false,
-      tag: latestVersion(app)?.version || "",
+      tag,
+      ...(chosen && { variant: chosen }),
     },
     position,
   };
 };
 
-const addNode = (type, app, position) => {
-  const node = makeNode(type, app, position);
+const addNode = (type, app, position, variant = "") => {
+  const node = makeNode(type, app, position, variant);
   nodes.value.push(node);
   // Fire-and-forget: patches the node in place once app.yml is read.
   if (app) applyManifestDefaults(node.id, app);
@@ -1301,7 +1423,7 @@ const selectOnly = (id) => {
 // Adds a step after another (the selected one when not given), or below the
 // whole graph, connects it when the types allow, selects it and lays the
 // graph out.
-const addStep = (type, app, afterId = selectedNode.value?.id) => {
+const addStep = (type, app, afterId = selectedNode.value?.id, variant = "") => {
   if (isReadOnly.value) return null;
   const after = nodes.value.find((n) => n.id === afterId) ||
     [...nodes.value].filter((n) => n.type !== "data-target").sort((a, b) => b.position.y - a.position.y)[0];
@@ -1309,7 +1431,7 @@ const addStep = (type, app, afterId = selectedNode.value?.id) => {
   const position = after
     ? { x: after.position.x, y: after.position.y + gap.height + gap.ranksep }
     : { x: 0, y: 0 };
-  const node = addNode(type, app, position);
+  const node = addNode(type, app, position, variant);
   if (after) connectNodes(after.id, node.id);
   selectOnly(node.id);
   nextTick(() => autoLayout());
@@ -2147,6 +2269,8 @@ const serializeProcessors = () => {
     // Which input each link feeds, and from which output (ports)
     const inputs = linksOf(node, edges.value);
     if (inputs.length) proc.inputs = inputs;
+    // The app variant, when not the version's default (empty: the default).
+    if (node.data.variant) proc.variant = node.data.variant;
     if (node.data.cpu) proc.cpu = node.data.cpu;
     if (node.data.memory) proc.memory = node.data.memory;
     if (node.data.interactive) {
@@ -2164,8 +2288,9 @@ const serializeProcessors = () => {
 };
 
 /*
-  A saved workflow: read-only, with Edit for its owner and Duplicate to edit
-  for everyone else. Saving an edit is a new version of it (workflow-service
+  A saved workflow: read-only, with Edit for those who may edit it (its
+  creator, the workspace's admins, super-admins on public ones) and
+  Duplicate to edit for everyone else. Saving an edit is a new version of it (workflow-service
   versions); its history lists every version, and an older one can be
   viewed (read-only) or duplicated.
 */
@@ -2200,7 +2325,7 @@ const showVersion = async (n) => {
 };
 
 const startEdit = () => {
-  if (!isWorkflowCreator.value || viewingVersion.value) return;
+  if (!canEditWorkflow.value || viewingVersion.value) return;
   mode.value = "edit";
   selectedNode.value = null;
   workflowName.value = selectedWorkflow.value?.name || "";
@@ -2442,7 +2567,7 @@ onMounted(async () => {
       if (wf) {
         selectWorkflow(wf);
         // A duplicate opens ready to edit.
-        if (route.query.edit === "1" && isWorkflowCreator.value) startEdit();
+        if (route.query.edit === "1" && canEditWorkflow.value) startEdit();
       }
     } else {
       enterCreateMode();
@@ -2504,6 +2629,8 @@ const baseName = (n) => {
   if ((n?.type === "data-source" || n?.type === "data-target") && n.data?.name) return n.data.name;
   if (n?.type === "data-source") return sourceLabel(n.id, linkedSteps.value);
   if (n?.type === "data-target") return n.data?.targetType ? getTargetTypeLabel(n.data.targetType) : "Output";
+  // An app with variants: "<app> · <variant>" (the step can't be renamed).
+  if (n?.type === "default") return titleWithVariant(n.data?.label || "", n.data?.application, n.data?.tag, n.data?.variant);
   return n?.data?.label || "";
 };
 // Names that tell steps apart, numbered when two share one (stepNames.js),
@@ -2623,7 +2750,7 @@ const openNodeSettings = (id) => {
           ▶ Run
         </bf-button>
         <el-tooltip
-          v-if="isWorkflowCreator"
+          v-if="canEditWorkflow"
           :disabled="!viewingVersion"
           content="Edit works on the latest version; duplicate this one to change it."
           placement="bottom"
@@ -2633,7 +2760,7 @@ const openNodeSettings = (id) => {
           </span>
         </el-tooltip>
         <bf-button v-else :processing="duplicating" @click="duplicate">Duplicate to edit</bf-button>
-        <bf-button v-if="isWorkflowCreator && viewingVersion" class="secondary" :processing="duplicating" @click="duplicate">
+        <bf-button v-if="canEditWorkflow && viewingVersion" class="secondary" :processing="duplicating" @click="duplicate">
           Duplicate this version
         </bf-button>
       </div>
@@ -2659,8 +2786,8 @@ const openNodeSettings = (id) => {
         :step-ports="selectedNode?.type === 'default' ? selectedNode.data?.manifestPorts || null : null"
         :step-label="nodeName(selectedNode)"
         :loading="isLoading"
-        @add="(type, app) => addStep(type, app)"
-        @dragstart="(app, event, type) => onDragStart(app, event, type)"
+        @add="(type, app, variant) => addStep(type, app, undefined, variant)"
+        @dragstart="(app, event, type, variant) => onDragStart(app, event, type, variant)"
         @fold="togglePanel('palette')"
       />
 
@@ -2887,6 +3014,9 @@ const openNodeSettings = (id) => {
                       :title="`This step uses ${data.tag}; ${latestVersion(data.application).version} is the latest`"
                     >update: {{ latestVersion(data.application).version }}</span>
                   </div>
+                  <!-- An app with variants: the values they set differently
+                       ("Detector: oncet"), so the model is always in sight -->
+                  <div v-if="stepModelLine(data)" class="node-meta node-model" :title="stepModelLine(data)">{{ stepModelLine(data) }}</div>
                   <div
                     v-if="data.manifestPorts?.outputs?.length"
                     class="node-ports node-ports--out"
@@ -3289,6 +3419,46 @@ const openNodeSettings = (id) => {
                   </ul>
                   <p v-else class="update-lines-none">No changes declared in app.yml.</p>
                 </div>
+                <!-- The app's variants (a CPU and a GPU build): which one
+                     the step runs, and the parameters they set differently -->
+                <template v-if="stepVariants.length">
+                  <h4 class="sidebar-section-title">Variant</h4>
+                  <el-radio-group
+                    v-if="canEditConfig"
+                    :model-value="stepVariantId"
+                    size="small"
+                    class="step-variants"
+                    aria-label="Variant"
+                    @update:model-value="requestVariant"
+                  >
+                    <el-radio-button
+                      v-for="v in stepVariants"
+                      :key="v.id"
+                      :value="v.id"
+                      :disabled="!!variantUnavailable(v, { gpus: gpusHere }) && v.id !== stepVariantId"
+                      :title="variantOptionTitle(v)"
+                    >
+                      <span class="step-variant-label"><RuntimeMark v-if="v.gpu" runtime="gpu" compact />{{ v.name }}</span>
+                    </el-radio-button>
+                  </el-radio-group>
+                  <span v-else class="step-version-text">{{ stepVariantInfo?.name }}</span>
+                  <p v-if="stepVariantInfo?.description" class="step-variant-desc">{{ stepVariantInfo.description }}</p>
+                  <p v-if="!gpusHere && stepVariants.some((v) => v.gpu)" class="step-variant-desc">
+                    No compute node here has GPUs, so the GPU variants can't be picked.
+                  </p>
+                  <p v-for="n in variantNotes" :key="n" class="step-variant-note">{{ n }}</p>
+                  <div v-if="variantParams.length" class="info-card step-variant-params">
+                    <template v-for="param in variantParams" :key="param.name">
+                      <ParamField
+                        :param="param"
+                        :editable="canEditConfig"
+                        :model-value="selectedNode.data.defaultParams?.[param.name]"
+                        @update:model-value="(v) => setDefaultParam(param.name, v)"
+                      />
+                      <p class="step-variant-param-note">{{ variantParamNoteOf(param.name) }}</p>
+                    </template>
+                  </div>
+                </template>
                 </template>
 
                 <!-- About: read only, from the app.yml and the canvas -->
@@ -3573,13 +3743,13 @@ const openNodeSettings = (id) => {
                 v-if="
                   selectedNode.type === 'default' &&
                   stepTab === 'settings' &&
-                  selectedNodeParamSchema.length > 0
+                  otherParams.length > 0
                 "
               >
                 <h4 class="sidebar-section-title">Parameters</h4>
                 <div class="info-card">
                   <ParamField
-                    v-for="param in selectedNodeParamSchema"
+                    v-for="param in otherParams"
                     :key="param.name"
                     :param="param"
                     :editable="canEditConfig"
@@ -3781,7 +3951,7 @@ const openNodeSettings = (id) => {
                     }}</span>
                   </div>
                 </div>
-                <div class="info-actions">
+                <div v-if="canEditWorkflow" class="info-actions">
                   <button class="text-link-btn" @click="startEditDetails">
                     Edit name & description
                   </button>
@@ -3854,13 +4024,13 @@ const openNodeSettings = (id) => {
 
           <!-- Danger Zone (always last) -->
           <el-collapse-item
-            v-if="mode === 'browse' && selectedWorkflow && !selectedNode"
+            v-if="mode === 'browse' && selectedWorkflow && !selectedNode && (canEditWorkflow || canPublish || canUnpublish)"
             title="Danger Zone"
             name="danger-zone"
             class="danger-collapse-item"
           >
             <div class="danger-zone">
-              <div class="danger-row">
+              <div v-if="canEditWorkflow" class="danger-row">
                 <div class="danger-info">
                   <div class="danger-row-title">
                     {{
@@ -4033,6 +4203,33 @@ const openNodeSettings = (id) => {
   overflow: hidden;
 }
 
+.step-variants {
+  display: flex;
+  flex-wrap: wrap;
+  margin-top: 2px;
+}
+.step-variant-label {
+  display: inline-flex;
+  align-items: center;
+}
+.step-variant-desc,
+.step-variant-note,
+.step-variant-param-note {
+  margin: 6px 0 0;
+  font-size: 12px;
+  line-height: 1.4;
+  color: theme.$gray_5;
+}
+.step-variant-note {
+  color: theme.$gray_6;
+}
+.step-variant-params {
+  margin-top: 8px;
+}
+.step-variant-param-note {
+  margin: -2px 0 8px;
+  color: theme.$gray_4;
+}
 .update-note {
   margin-top: 8px;
   padding: 8px 10px;
@@ -4697,6 +4894,11 @@ kbd {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+// The variant-set parameters' values: one more muted line, cut to the card.
+.node-model {
+  display: block;
+  color: theme.$gray_5;
 }
 /* Edit and remove: on hover or when the step is selected. */
 :deep(.vue-flow__node:not(.selected):not(:hover)) .node-action {

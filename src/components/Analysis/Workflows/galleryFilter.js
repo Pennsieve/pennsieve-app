@@ -110,6 +110,9 @@ export function workflowsView(requested, last, hasRuns = false) {
   return hasRuns ? "live" : "library";
 }
 
-// The Library lists workflows to run; notebooks start on the Notebooks tab.
-export const libraryWorkflows = (list = []) => list.filter((wf) => !isNotebookWorkflow(wf));
+// The Library lists workflows to run; notebooks start on the Notebooks tab,
+// so they're left out unless asked for (e.g. to manage the notebook
+// workflows a workspace such as Pennsieve Admin publishes).
+export const libraryWorkflows = (list = [], includeNotebooks = false) =>
+  includeNotebooks ? list : list.filter((wf) => !isNotebookWorkflow(wf));
 
