@@ -11,10 +11,13 @@ import WorkflowThumbnail from "../WorkflowGraph/WorkflowThumbnail.vue";
 import RunWizardDialog from "../RunMonitor/RunWizardDialog.vue";
 import { ioSummary, appNames, usageLine, cardText } from "./workflowSummary";
 import { applyFilters, fieldOptions, libraryWorkflows, outputOptions, sortWorkflows, SORTS } from "./galleryFilter";
+import { isNotebookWorkflow } from "../RunMonitor/notebookHelpers";
 
-defineProps({
+const props = defineProps({
   // Inside the Workflows tab's Library, whose bar has the New Workflow button.
   embedded: { type: Boolean, default: false },
+  // List notebook workflows too (the Workflows tab's "Include notebooks").
+  includeNotebooks: { type: Boolean, default: false },
 });
 
 const store = useStore();
@@ -82,7 +85,7 @@ const isPublicScope = computed(() => scopeFilter.value !== "workspace");
 
 const outputChoices = computed(() => outputOptions(workflows.value, targetTypes.value));
 // The research fields the workflows' apps serve, as chips, as on the Apps tab.
-const fieldChips = computed(() => fieldOptions(libraryWorkflows(workflows.value), applications.value));
+const fieldChips = computed(() => fieldOptions(libraryWorkflows(workflows.value, props.includeNotebooks), applications.value));
 const toggleField = (key) => (fieldFilter.value = fieldFilter.value === key ? "any" : key);
 const filtersSet = computed(
   () =>
@@ -97,7 +100,7 @@ function clearFilters() {
 
 const filteredWorkflows = computed(() =>
   sortWorkflows(
-    applyFilters(libraryWorkflows(workflows.value), {
+    applyFilters(libraryWorkflows(workflows.value, props.includeNotebooks), {
       query: searchQuery.value,
       input: inputFilter.value,
       output: outputFilter.value,
@@ -229,10 +232,13 @@ const fetchAllWorkflows = async () => {
 };
 
 
-// Run from a card: the run dialog, here, on this workflow (notebooks aren't
-// listed; they start on the Notebooks tab).
+// Run from a card: the run dialog, here, on this workflow. A notebook
+// workflow (listed only with Include notebooks) starts on the Notebooks tab.
 const runDialog = ref(null);
-const runWorkflow = (wf) => runDialog.value?.open(wf.uuid);
+const runWorkflow = (wf) =>
+  isNotebookWorkflow(wf)
+    ? router.push({ name: "notebooks", params: route.params })
+    : runDialog.value?.open(wf.uuid);
 
 // Re-fetch all when the status or scope filter changes
 watch([statusFilter, isPublicScope], () => {

@@ -9,6 +9,10 @@ import {
   formatAccountId,
   deploymentMode,
   limitSummary,
+  nodeGpu,
+  gpuName,
+  gpuOffer,
+  gpuTaskResources,
 } from "./computeNodeHelpers";
 
 describe("compute node page", () => {
@@ -75,5 +79,47 @@ describe("compute node page", () => {
     expect(limitSummary({ dailyCostUsd: 0 })).toBe("$0.00 a day");
     expect(limitSummary({})).toBe("");
     expect(limitSummary(null)).toBe("");
+  });
+});
+
+// GET /compute/resources/gpu-tiers, as account-service lists them; taskCpu
+// and taskMemoryMiB (what a GPU task gets) where the tiers carry them.
+const TIERS = [
+  { tier: "small", instanceType: "g4dn.xlarge", gpu: "NVIDIA T4", gpuMemoryGB: 16, vcpus: 4, memoryGB: 16, pricePerHour: 0.526 },
+  { tier: "medium", instanceType: "g6.2xlarge", gpu: "NVIDIA L4", gpuMemoryGB: 24, vcpus: 8, memoryGB: 32, pricePerHour: 0.978, taskCpu: 8192, taskMemoryMiB: 30720 },
+];
+
+describe("a node's GPU", () => {
+  it("is null for a node without GPUs", () => {
+    expect(nodeGpu({ maxGpuInstances: 0, gpuTier: "medium" }, TIERS)).toBeNull();
+    expect(nodeGpu({}, TIERS)).toBeNull();
+    expect(nodeGpu(null, TIERS)).toBeNull();
+    expect(gpuOffer(null)).toBe("CPU only");
+  });
+
+  it("takes what a GPU task gets from its tier, exact where the tiers say", () => {
+    const g = nodeGpu({ maxGpuInstances: 2, gpuTier: "medium" }, TIERS);
+    expect(g).toEqual({ tier: "medium", model: "NVIDIA L4", vramGB: 24, instanceType: "g6.2xlarge", vcpu: 8, memoryGB: 30, approx: false, pricePerHour: 0.978, maxInstances: 2 });
+    expect(gpuName(g)).toBe("NVIDIA L4 · 24 GB");
+    expect(gpuOffer(g)).toBe("GPU: NVIDIA L4 · 24 GB · up to 2 instances");
+    expect(gpuTaskResources(g)).toBe("8 vCPU / 30 GB");
+    expect(gpuTaskResources(g, " · ")).toBe("8 vCPU · 30 GB");
+  });
+
+  it("derives them from the instance (less the agent's headroom) and says so, else", () => {
+    const g = nodeGpu({ maxGpuInstances: 1 }, TIERS); // small, the default tier
+    expect(g.vcpu).toBe(4);
+    expect(g.memoryGB).toBe(15);
+    expect(g.approx).toBe(true);
+    expect(gpuOffer(g)).toBe("GPU: NVIDIA T4 · 16 GB · up to 1 instance");
+    expect(gpuTaskResources(g)).toBe("≈ 4 vCPU / 15 GB");
+  });
+
+  it("names the tier until the tiers load", () => {
+    const g = nodeGpu({ maxGpuInstances: 2, gpuTier: "large" }, []);
+    expect(g.model).toBe("");
+    expect(gpuName(g)).toBe("large tier");
+    expect(gpuOffer(g)).toBe("GPU: large tier · up to 2 instances");
+    expect(gpuTaskResources(g)).toBe("");
   });
 });

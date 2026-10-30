@@ -766,6 +766,9 @@ export const buildManifest = (schema, meta = {}) => {
     if (runtime.sessionType === "jupyter") runtime.kernel = s.runtime.kernel || "python";
   }
   manifest.runtime = runtime;
+  // Blocks the form doesn't edit (build, variants) are written back as they
+  // were read (parseManifest's meta.build, meta.variants).
+  if (isPlainObject(meta.build)) manifest.build = clone(meta.build);
 
   const mParams = asArray(s.parameters).filter((p) => (p.name || "").trim());
   if (mParams.length) manifest.parameters = mParams.map(manifestParameter);
@@ -774,9 +777,13 @@ export const buildManifest = (schema, meta = {}) => {
   const mOutputs = asArray(s.outputs).filter((p) => (p.name || "").trim());
   if (mInputs.length) manifest.inputs = mInputs.map(manifestPort);
   if (mOutputs.length) manifest.outputs = mOutputs.map(manifestPort);
+  if (asArray(meta.variants).length) manifest.variants = clone(meta.variants);
 
   return manifest;
 };
+
+const isPlainObject = (v) => !!v && typeof v === "object" && !Array.isArray(v);
+const clone = (v) => JSON.parse(JSON.stringify(v));
 
 /* ──────────────────────────────────────────────────────────────────────────
  * YAML (de)serialization — manifest object  <->  app.yml text
@@ -910,6 +917,10 @@ export const parseManifest = (source) => {
     timeoutSeconds:
       typeof runtime.timeoutSeconds === "number" ? runtime.timeoutSeconds : null,
     shape: earlier ? MANIFEST_SHAPES.FLAT : MANIFEST_SHAPES.NESTED,
+    // Not edited by the form, kept as they are so buildManifest writes them
+    // back: how the image is built, and the app's variants.
+    ...(!earlier && isPlainObject(manifest.build) && { build: manifest.build }),
+    ...(!earlier && Array.isArray(manifest.variants) && manifest.variants.length && { variants: manifest.variants }),
   };
 
   const schema = earlier
