@@ -10,6 +10,7 @@ import MetricsDashboard from "../Metrics/MetricsDashboard.vue";
 import { parseManifest } from "./applicationSchema";
 import AppPermissions from "../../user/code/AppPermissions.vue";
 import AppArchiveToggle from "../../user/code/AppArchiveToggle.vue";
+import AppReferences from "./AppReferences.vue";
 import { useGetToken } from "@/composables/useGetToken";
 import { useSendXhr } from "@/mixins/request/request_composable";
 
@@ -342,6 +343,12 @@ watch(hasManifest, (has) => {
   if (!has && activeTab.value === "manifest") activeTab.value = "readme";
 });
 
+// The References tab: only when a version's repository has a CITATION.cff.
+const hasReferences = computed(() => sortedVersions.value.some((v) => v?.citation));
+watch(hasReferences, (has) => {
+  if (!has && activeTab.value === "references") activeTab.value = "readme";
+});
+
 
 // Members and teams power friendly-name resolution for the owner badge.
 // They are not always preloaded when navigating directly to this page;
@@ -485,6 +492,17 @@ watch(
               >
                 app.yml
               </button>
+              <button
+                v-if="hasReferences"
+                type="button"
+                role="tab"
+                class="detail-tab"
+                :class="{ 'detail-tab-active': activeTab === 'references' }"
+                :aria-selected="activeTab === 'references'"
+                @click="activeTab = 'references'"
+              >
+                References
+              </button>
             </div>
             <el-tooltip
               v-if="githubRepoUrl"
@@ -531,6 +549,9 @@ watch(
             </div>
             <div v-else class="readme-content" v-html="readmeHtml" />
           </template>
+
+          <!-- References tab: how to cite, authors, related works (CITATION.cff) -->
+          <AppReferences v-else-if="activeTab === 'references'" :versions="sortedVersions" />
 
           <!-- app.yml tab -->
           <template v-else>
