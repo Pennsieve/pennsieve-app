@@ -92,6 +92,8 @@ import { stepNames } from "../WorkflowBuilder/stepNames";
 import { modelLine, modelLineText, variantName } from "../WorkflowBuilder/appVariants";
 import { fetchVariantGate, runsNonDefaultVariant } from "./variantGate";
 import { gpuReasonNote } from "./notebookHelpers";
+import { nodeGpu, gpuOffer, gpuName, gpuTaskResources } from "../ComputeNodes/computeNodeHelpers";
+import { useComputeResourcesStore } from "@/stores/computeResourcesStore";
 
 // Shown in a workspace (/:orgId/analysis/runs/...) and in My Workspace
 // (/my-workspace/analysis/runs/...), where there's no organization and a run
@@ -1861,8 +1863,17 @@ onBeforeUnmount(() => clearTimeout(importTimer));
 const importLineOf = (id) => importSummary(importStatus[id]);
 
 const nodeRunTime = (data) => formatRunTime(nodeDurationSec(data, nowTick.value));
+// A GPU step runs with its node's GPU instance's CPU and memory (the node's
+// GPU tier), not the numbers it declares.
 const processorFacts = (id, data) =>
-  [data.version, formatResources(data.cpu, data.memory), nodeRunTime(data)].filter(Boolean);
+  [
+    data.version,
+    data.executionTarget === "gpu"
+      ? gpuTaskResources(nodeGpu(nodeById(selectedWorkflowActivity.value?.computeNodeUuid), gpuTiers.value), " · ") ||
+        formatResources(data.cpu, data.memory)
+      : formatResources(data.cpu, data.memory),
+    nodeRunTime(data),
+  ].filter(Boolean);
 const targetFacts = (data) => [nodeRunTime(data)].filter(Boolean);
 const viewSourceLabel = (view) => {
   const info = view && browseViewInfo.value[view.viewId];
@@ -1924,9 +1935,26 @@ const unfitReasons = (node) =>
     nonDefaultVariant: setupNonDefaultVariant,
     gate: variantGate.value,
   });
+// The GPU tiers (GET /compute/resources/gpu-tiers): what a node's GPU is.
+const computeResourcesStore = useComputeResourcesStore();
+const gpuTiers = ref([]);
+const nodeById = (id) => (id ? computeNodes.value.find((c) => c.uuid === id) || null : null);
+// A workflow with GPU steps: each node says what GPU it has.
+const setupHasGpuSteps = computed(() =>
+  (configDefinition.value?.dag || []).some((d) => d.type === "processor" && setupComputeTypeOf(d.id) === "gpu")
+);
+// What a GPU step gets on the chosen node: its GPU tier's instance.
+const setupGpu = computed(() => nodeGpu(nodeById(initiateForm.value.computeNodeId), gpuTiers.value));
+const gpuStepResources = computed(() => {
+  if (!initiateForm.value.computeNodeId) return "The chosen compute node's GPU instance";
+  const g = setupGpu.value;
+  if (!g) return "The chosen compute node has no GPUs";
+  const res = gpuTaskResources(g, " · ");
+  return `${res ? `${res} · ` : ""}${gpuName(g)} (the node's GPU instance)`;
+});
 const setupNodeChoices = computed(() =>
   computeNodes.value
-    .map((n) => ({ node: n, reasons: unfitReasons(n) }))
+    .map((n) => ({ node: n, reasons: unfitReasons(n), offer: setupHasGpuSteps.value ? gpuOffer(nodeGpu(n, gpuTiers.value)) : "" }))
     .sort((a, b) => (a.reasons.length > 0) - (b.reasons.length > 0) || String(a.node.name).localeCompare(String(b.node.name)))
 );
 // My Workspace runs have no dataset (see the run dialog's "Needs a dataset").
@@ -2122,6 +2150,10 @@ onMounted(async () => {
 
   // The variant gate's minimum: read alongside, never waited on.
   fetchVariantGate(config.value.api2Url, useGetToken).then((g) => (variantGate.value = g));
+  computeResourcesStore
+    .fetchGpuTiers(store.getters.activeOrganization?.organization?.id)
+    .then((t) => (gpuTiers.value = t || []))
+    .catch(() => {});
   await Promise.all([
     // Forced in My Workspace: the cached list may be a workspace's nodes
     store.dispatch("analysisModule/fetchComputeNodes", { force: isMyWorkspace.value }),
@@ -2582,6 +2614,12 @@ onUnmounted(() => {
                   </div>
                 </template>
 
+                <!-- GPU: the node's GPU instance's CPU and memory (its tier) -->
+                <div v-if="nodeConfigs[selectedNode.id].executionTarget === 'gpu'" class="config-field">
+                  <label>Resources</label>
+                  <span class="version-hint">{{ gpuStepResources }}</span>
+                </div>
+
                 <!-- Lambda memory -->
                 <template v-if="nodeConfigs[selectedNode.id].executionTarget === 'lambda'">
                   <div class="config-field">
@@ -2987,6 +3025,7 @@ onUnmounted(() => {
                     >
                       <span class="setup-option-name" :title="c.node.name">{{ c.node.name }}</span>
                       <span v-if="c.reasons.length" class="setup-option-why" :title="gpuReasonNote(c.reasons) || undefined">{{ c.reasons.join(" · ") }}</span>
+                      <span v-else-if="c.offer" class="setup-option-why">{{ c.offer }}</span>
                     </el-option>
                   </el-select>
                   <span v-if="setupNodeUnfit.length" class="run-name-error">Can't run this workflow: {{ setupNodeUnfit.join(", ") }}<template v-if="gpuReasonNote(setupNodeUnfit)">. {{ gpuReasonNote(setupNodeUnfit) }}</template></span>

@@ -15,7 +15,10 @@ import EnvironmentPanel from "./EnvironmentPanel.vue";
 import { sessionPathCode } from "./pathCode";
 import RuntimeMark from "../WorkflowGraph/RuntimeMark.vue";
 import { fetchRun } from "../RunMonitor/runDetails";
-import { runOnGpu } from "../RunMonitor/notebookHelpers";
+import { runOnGpu, runNodeId, gpuShortLabel, gpuMarkTitle } from "../RunMonitor/notebookHelpers";
+import { nodeGpu } from "../ComputeNodes/computeNodeHelpers";
+import { useComputeResourcesStore } from "@/stores/computeResourcesStore";
+import { useStore } from "vuex";
 import * as siteConfig from "@/site-config/site.json";
 import {
   VideoPlay,
@@ -36,14 +39,38 @@ const props = defineProps({
 // A GPU session (the session app's gpu variant): marked in the header, and
 // the environment panel warns about environments that bring their own
 // torch, tensorflow or jax. Read from the run; a CPU session until it is.
+// The header names the run's node's GPU (its GPU tier) where known.
 const onGpu = ref(false);
+const sessionGpu = ref(null);
+const vuexStore = useStore();
+const computeResourcesStore = useComputeResourcesStore();
+async function loadSessionGpu(run) {
+  const nodeId = runNodeId(run);
+  if (!nodeId) return null;
+  try {
+    let nodes = vuexStore.getters["analysisModule/computeNodes"] || [];
+    if (!nodes.some((n) => n.uuid === nodeId)) {
+      await vuexStore.dispatch("analysisModule/fetchComputeNodes");
+      nodes = vuexStore.getters["analysisModule/computeNodes"] || [];
+    }
+    const tiers = await computeResourcesStore.fetchGpuTiers(vuexStore.getters.activeOrganization?.organization?.id);
+    return nodeGpu(nodes.find((n) => n.uuid === nodeId), tiers || []);
+  } catch {
+    return null;
+  }
+}
 watch(
   () => props.runId,
   async (id) => {
     onGpu.value = false;
+    sessionGpu.value = null;
     if (!id) return;
     const run = await fetchRun(siteConfig.api2Url, id);
-    if (id === props.runId) onGpu.value = runOnGpu(run);
+    if (id !== props.runId) return;
+    onGpu.value = runOnGpu(run);
+    if (!onGpu.value) return;
+    const gpu = await loadSessionGpu(run);
+    if (id === props.runId) sessionGpu.value = gpu;
   },
   { immediate: true }
 );
@@ -874,8 +901,8 @@ const kernelPill = computed(() => {
 
           <span class="nb-spacer" />
 
-          <span v-if="onGpu" class="nb-gpu" title="This notebook runs on a GPU (NVIDIA T4)">
-            <RuntimeMark runtime="gpu" compact /><template v-if="!compactToolbar">GPU (T4)</template>
+          <span v-if="onGpu" class="nb-gpu" :title="gpuMarkTitle(sessionGpu)">
+            <RuntimeMark runtime="gpu" compact :label="gpuMarkTitle(sessionGpu)" /><template v-if="!compactToolbar">{{ gpuShortLabel(sessionGpu) }}</template>
           </span>
 
           <span
