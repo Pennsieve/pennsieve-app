@@ -30,6 +30,8 @@ const props = defineProps({
   userName: { type: Function, default: () => "" },
   // (run) -> where it ran when that's worth a mark ("gpu"), else "".
   runtimeOf: { type: Function, default: () => "" },
+  // (run) -> the mark's title (e.g. the GPU it ran on), "" for the default.
+  runtimeTitleOf: { type: Function, default: () => "" },
 });
 const emit = defineEmits(["load-more"]);
 
@@ -101,7 +103,7 @@ const errorOf = (run) => run.errorMessage || details.value[run.uuid]?.errorMessa
           <span class="run-status-dot" :class="statusDotClass(run.status)" />
           <span class="rh-name">
             {{ runDisplayName(run) || "Unnamed" }}
-            <RuntimeMark v-if="runtimeOf(run)" :runtime="runtimeOf(run)" compact class="rh-mark" />
+            <RuntimeMark v-if="runtimeOf(run)" :runtime="runtimeOf(run)" :label="runtimeTitleOf(run)" compact class="rh-mark" />
             <span v-if="showWorkflow && run.name && run.workflowName" class="rh-workflow">{{ run.workflowName }}</span>
           </span>
           <span class="rh-status">{{ statusLabel(run.status) }}</span>

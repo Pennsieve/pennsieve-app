@@ -1,3 +1,5 @@
+import { gpuTaskResources } from "../ComputeNodes/computeNodeHelpers";
+
 // Shared helpers for the Notebooks tab + launcher. A notebook is a workflow
 // whose step's app declares, in its app.yml, a live Jupyter session;
 // workflow-service says so as the workflow's \`notebook\` field ({kernel,
@@ -156,6 +158,82 @@ export function variantNodeUnfit(node, v, gateReason = () => "") {
   return gate ? [gate] : [];
 }
 
+/*
+  The Hardware step (after the compute node). A kernel card's hardware
+  choices, whichever way the kernel offers them: its variants picked per
+  run, or its CPU and GPU twin workflows. Each is { id, name, description,
+  gpu, default, cpu, memory, workflowId, variant }: picking one sets the
+  run's workflow and session variant ("" for a twin).
+*/
+export function hardwareOptions(card) {
+  if (!card) return [];
+  if (card.perRun) {
+    return runVariants(card.perRun).map((v) => ({ ...v, workflowId: card.perRun.uuid, variant: v.id }));
+  }
+  if (card.cpu && card.gpu) {
+    return [
+      { id: "cpu", name: "CPU", gpu: false, default: true, workflowId: card.cpu.uuid, variant: "" },
+      { id: "gpu", name: "GPU", gpu: true, default: false, workflowId: card.gpu.uuid, variant: "" },
+    ];
+  }
+  return [];
+}
+
+// The option a workflow and variant pick, or null.
+export const pickedOption = (options, workflowId, variant) =>
+  (options || []).find((o) => o.workflowId === workflowId && (o.variant || "") === (variant || "")) || null;
+
+// The options a node can run (variantNodeUnfit), in order: a node without
+// GPUs offers no GPU option at all.
+export const optionsForNode = (options, node, gateReason = () => "") =>
+  (options || []).filter((o) => !variantNodeUnfit(node, o, gateReason).length);
+
+// Why a node can't host any of the hardware the session may still run on
+// (options: all of the kernel's, or the one already chosen, e.g. a link to
+// a GPU twin), [] when it can host one. The same rule both ways: a node
+// picked first narrows the hardware, hardware picked first the nodes.
+export function nodeHardwareUnfit(node, options, gateReason = () => "") {
+  let first = null;
+  for (const o of options || []) {
+    const reasons = variantNodeUnfit(node, o, gateReason);
+    if (!reasons.length) return [];
+    first = first || reasons;
+  }
+  return first || [];
+}
+
+// The option to keep on a node: the current one if the node runs it, else
+// the node's default (the kernel's default variant), else its first; null
+// when the node runs none.
+export function hardwareForNode(options, node, current, gateReason = () => "") {
+  const fit = optionsForNode(options, node, gateReason);
+  if (current && fit.some((o) => o.workflowId === current.workflowId && o.variant === current.variant)) return current;
+  return fit.find((o) => o.default) || fit[0] || null;
+}
+
+// A hardware option for people, with the node's GPU (nodeGpu,
+// ComputeNodes/computeNodeHelpers.js) on a GPU one: "GPU · NVIDIA L4 · 8
+// vCPU / 30 GB"; another, its name and declared resources.
+export function hardwareLabel(option, gpu) {
+  if (!option) return "";
+  const name = variantLabel(option) || (option.gpu ? "GPU" : "CPU");
+  if (option.gpu) return [name, gpu?.model || "", gpuTaskResources(gpu)].filter(Boolean).join(" · ");
+  return [name, variantResources(option)].filter(Boolean).join(" · ");
+}
+
+// What a GPU session takes, under the GPU chip.
+export function gpuSessionHelp(gpu) {
+  const where = gpu?.model ? `the node's ${gpu.model} GPU${gpu.instanceType ? ` (${gpu.instanceType})` : ""}` : "the node's GPU instance";
+  return `Runs on ${where}, with all of its CPU and memory. Slower to start (an instance may need to launch) and billed while the notebook is open.`;
+}
+
+// The session's resources on a GPU, for the review: "8 vCPU · 30 GB (the
+// node's GPU instance)".
+export function gpuReviewResources(gpu) {
+  const res = gpuTaskResources(gpu, " · ");
+  return res ? `${res} (the node's GPU instance)` : "The node's GPU instance";
+}
+
 // The id of a workflow definition's session step (the one that takes the
 // run's variant): its interactive step, else its first processor; "" when
 // it has none.
@@ -275,3 +353,14 @@ export function runOnGpu(run) {
     return target === "gpu";
   });
 }
+
+// The compute node a run ran on (its id), as the run and the runs list say.
+export const runNodeId = (run) =>
+  run?.computeNodeUuid || run?.computeNodeId || run?.workflowInstanceConfiguration?.computeNodeId || "";
+
+// A GPU session's mark, with its node's GPU (nodeGpu) where known: the
+// header's label ("GPU (L4)", else "GPU") and the mark's title ("Runs on a
+// GPU (NVIDIA L4)"). The node's GPU now: a tier changed since is not the
+// run's.
+export const gpuShortLabel = (gpu) => (gpu?.model ? `GPU (${gpu.model.replace(/^NVIDIA\s+/i, "")})` : "GPU");
+export const gpuMarkTitle = (gpu) => (gpu?.model ? `Runs on a GPU (${gpu.model})` : "Runs on a GPU");

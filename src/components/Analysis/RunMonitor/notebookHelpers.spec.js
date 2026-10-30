@@ -22,6 +22,17 @@ import {
   variantNodeUnfit,
   sessionStepId,
   cardSelection,
+  hardwareOptions,
+  pickedOption,
+  optionsForNode,
+  nodeHardwareUnfit,
+  hardwareForNode,
+  hardwareLabel,
+  gpuSessionHelp,
+  gpuReviewResources,
+  runNodeId,
+  gpuShortLabel,
+  gpuMarkTitle,
 } from "./notebookHelpers";
 
 // workflow-service's computed field: a notebook only when a step's app.yml
@@ -257,5 +268,100 @@ describe("variants per run", () => {
       processorConfigs: [{ nodeId: "s", executionTarget: "standard" }],
     };
     expect(runOnGpu(cpuRun)).toBe(false);
+  });
+});
+
+describe("the Hardware step", () => {
+  const variants = [
+    { id: "cpu", name: "CPU", default: true, gpu: false },
+    { id: "gpu", name: "GPU", default: false, gpu: true, cpu: 4096, memory: 14336 },
+  ];
+  const perRun = { uuid: "nb", notebook: { kernel: "python", variant: "cpu", variants } };
+  const perRunCard = { key: "k", cpu: perRun, gpu: null, perRun, twins: [] };
+  const twinCard = { key: "t", cpu: { uuid: "c" }, gpu: { uuid: "g" }, perRun: null, twins: [] };
+  const cpuNode = { uuid: "n1", deploymentMode: "secure", maxGpuInstances: 0 };
+  const gpuNode = { uuid: "n2", deploymentMode: "secure", maxGpuInstances: 2, gpuTier: "medium" };
+  const basicGpuNode = { uuid: "n3", deploymentMode: "basic", maxGpuInstances: 2 };
+  const L4 = { tier: "medium", model: "NVIDIA L4", vramGB: 24, instanceType: "g6.2xlarge", vcpu: 8, memoryGB: 30, approx: false, maxInstances: 2 };
+
+  it("offers a kernel's variants per run, or its CPU and GPU twins, or nothing", () => {
+    expect(hardwareOptions(perRunCard).map((o) => [o.id, o.workflowId, o.variant, o.gpu])).toEqual([
+      ["cpu", "nb", "cpu", false],
+      ["gpu", "nb", "gpu", true],
+    ]);
+    expect(hardwareOptions(twinCard).map((o) => [o.id, o.workflowId, o.variant, o.gpu, o.default])).toEqual([
+      ["cpu", "c", "", false, true],
+      ["gpu", "g", "", true, false],
+    ]);
+    expect(hardwareOptions({ key: "x", cpu: { uuid: "x" }, gpu: null, perRun: null })).toEqual([]);
+    expect(hardwareOptions(null)).toEqual([]);
+  });
+
+  it("finds the option a workflow and variant pick", () => {
+    const opts = hardwareOptions(twinCard);
+    expect(pickedOption(opts, "g", "")).toBe(opts[1]);
+    expect(pickedOption(opts, "g", undefined)).toBe(opts[1]);
+    expect(pickedOption(opts, "x", "")).toBeNull();
+  });
+
+  it("shows only what the node can run: no GPU chip on a node without GPUs", () => {
+    const opts = hardwareOptions(perRunCard);
+    expect(optionsForNode(opts, cpuNode).map((o) => o.id)).toEqual(["cpu"]);
+    expect(optionsForNode(opts, basicGpuNode).map((o) => o.id)).toEqual(["cpu"]);
+    expect(optionsForNode(opts, gpuNode).map((o) => o.id)).toEqual(["cpu", "gpu"]);
+    expect(optionsForNode(opts, gpuNode, () => "Provisioner too old").map((o) => o.id)).toEqual(["cpu"]);
+  });
+
+  it("narrows the nodes by the hardware chosen first, the same rule", () => {
+    const opts = hardwareOptions(perRunCard);
+    // Nothing chosen yet: any node that runs one of them.
+    expect(nodeHardwareUnfit(cpuNode, opts)).toEqual([]);
+    // GPU chosen first (a link to the GPU twin): only nodes that run it.
+    expect(nodeHardwareUnfit(cpuNode, [opts[1]])).toEqual(["No GPUs"]);
+    expect(nodeHardwareUnfit(basicGpuNode, [opts[1]])).toEqual([BASIC_GPU_REASON]);
+    expect(nodeHardwareUnfit(gpuNode, [opts[1]])).toEqual([]);
+    expect(nodeHardwareUnfit(cpuNode, [])).toEqual([]);
+  });
+
+  it("keeps the pick on a node that runs it, else the node's default", () => {
+    const opts = hardwareOptions(perRunCard);
+    expect(hardwareForNode(opts, gpuNode, opts[1])).toBe(opts[1]);
+    expect(hardwareForNode(opts, cpuNode, opts[1])).toBe(opts[0]);
+    expect(hardwareForNode([opts[1]], cpuNode, opts[1])).toBeNull();
+  });
+
+  it("names the GPU option with the node's GPU and what a session gets", () => {
+    const opts = hardwareOptions(perRunCard);
+    expect(hardwareLabel(opts[1], L4)).toBe("GPU · NVIDIA L4 · 8 vCPU / 30 GB");
+    expect(hardwareLabel(opts[1], null)).toBe("GPU");
+    expect(hardwareLabel(opts[0], L4)).toBe("CPU");
+    expect(hardwareLabel({ id: "big", name: "Big", cpu: 8192, memory: 32768 }, null)).toBe("Big · 8 vCPU · 32 GB");
+    expect(hardwareLabel(null, L4)).toBe("");
+  });
+
+  it("says where a GPU session runs and what it gets, from the node", () => {
+    expect(gpuSessionHelp(L4)).toContain("the node's NVIDIA L4 GPU (g6.2xlarge)");
+    expect(gpuSessionHelp(L4)).toContain("billed while the notebook is open");
+    expect(gpuSessionHelp(null)).toContain("the node's GPU instance");
+    expect(gpuSessionHelp(L4)).not.toContain("T4");
+    expect(gpuReviewResources(L4)).toBe("8 vCPU · 30 GB (the node's GPU instance)");
+    expect(gpuReviewResources(null)).toBe("The node's GPU instance");
+  });
+});
+
+describe("a GPU session's mark", () => {
+  it("names the run's node's GPU where known", () => {
+    const L4 = { model: "NVIDIA L4" };
+    expect(gpuShortLabel(L4)).toBe("GPU (L4)");
+    expect(gpuShortLabel({ model: "" })).toBe("GPU");
+    expect(gpuShortLabel(null)).toBe("GPU");
+    expect(gpuMarkTitle(L4)).toBe("Runs on a GPU (NVIDIA L4)");
+    expect(gpuMarkTitle(null)).toBe("Runs on a GPU");
+  });
+
+  it("finds the run's node", () => {
+    expect(runNodeId({ computeNodeUuid: "a" })).toBe("a");
+    expect(runNodeId({ workflowInstanceConfiguration: { computeNodeId: "b" } })).toBe("b");
+    expect(runNodeId(null)).toBe("");
   });
 });

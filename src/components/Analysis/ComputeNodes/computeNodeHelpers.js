@@ -95,12 +95,58 @@ const MODES = {
 export const deploymentMode = (node) =>
   MODES[(node?.deploymentMode || "basic").toLowerCase()] || MODES.basic;
 
+/*
+  A node's GPU, as the wizard, the run page and the session header describe
+  it. A node has GPUs when maxGpuInstances > 0; its gpuTier names one of the
+  GPU tiers (GET /compute/resources/gpu-tiers: [{ tier, instanceType, gpu,
+  gpuMemoryGB, vcpus, memoryGB, pricePerHour, taskCpu?, taskMemoryMiB? }]).
+  A GPU task gets the tier's whole instance less the ECS agent's headroom:
+  taskCpu (CPU units) and taskMemoryMiB where the tiers list them; else
+  derived from vcpus and memoryGB (15/16 of the memory, as the provisioner
+  sets it), only for display and marked approximate.
+*/
+// { tier, model, vramGB, instanceType, vcpu, memoryGB, approx,
+// maxInstances }, or null for a node without GPUs. Before the tiers load
+// (or for an unknown tier), model is "" and vcpu/memoryGB 0.
+export function nodeGpu(node, gpuTiers = []) {
+  const maxInstances = node?.maxGpuInstances || 0;
+  if (!(maxInstances > 0)) return null;
+  const tier = node.gpuTier || "small";
+  const t = (gpuTiers || []).find((x) => x?.tier === tier);
+  if (!t) return { tier, model: "", vramGB: 0, instanceType: "", vcpu: 0, memoryGB: 0, approx: false, maxInstances };
+  const exact = (t.taskCpu || 0) > 0 && (t.taskMemoryMiB || 0) > 0;
+  return {
+    tier,
+    model: t.gpu || "",
+    vramGB: t.gpuMemoryGB || 0,
+    instanceType: t.instanceType || "",
+    vcpu: exact ? t.taskCpu / 1024 : t.vcpus || 0,
+    memoryGB: exact ? t.taskMemoryMiB / 1024 : Math.floor(((t.memoryGB || 0) * 15) / 16),
+    approx: !exact,
+    maxInstances,
+  };
+}
+
+// The GPU and its memory ("NVIDIA L4 · 24 GB"), else the tier ("medium
+// tier"); "" for none.
+export const gpuName = (g) => (!g ? "" : g.model ? [g.model, g.vramGB ? `${g.vramGB} GB` : ""].filter(Boolean).join(" · ") : `${g.tier} tier`);
+
+// What a node offers, in a line: "GPU: NVIDIA L4 · 24 GB · up to 2
+// instances", or "CPU only".
+export const gpuOffer = (g) =>
+  g ? `GPU: ${gpuName(g)} · up to ${g.maxInstances} instance${g.maxInstances === 1 ? "" : "s"}` : "CPU only";
+
+const num = (n) => String(+Number(n).toFixed(1));
+// What a GPU task gets ("8 vCPU / 30 GB"; "≈ 8 vCPU / 30 GB" when derived),
+// "" when unknown. sep goes between CPU and memory.
+export const gpuTaskResources = (g, sep = " / ") =>
+  g && g.vcpu > 0 && g.memoryGB > 0 ? `${g.approx ? "≈ " : ""}${num(g.vcpu)} vCPU${sep}${num(g.memoryGB)} GB` : "";
+
 // What the node can do, one entry each, on or off.
 export function nodeCapabilities(node, gpuTiers = []) {
   if (!node) return [];
-  const gpus = node.maxGpuInstances || 0;
+  const gpu = nodeGpu(node, gpuTiers);
   const sessions = node.maxInteractiveSessions || 0;
-  const tier = gpus > 0 ? gpuTiers.find((t) => t.tier === (node.gpuTier || "small")) : null;
   return [
     {
       key: "notebooks",
@@ -111,11 +157,10 @@ export function nodeCapabilities(node, gpuTiers = []) {
     {
       key: "gpu",
       label: "GPUs",
-      on: gpus > 0,
-      detail:
-        gpus > 0
-          ? [tier ? `${tier.gpu}, ${tier.gpuMemoryGB} GB` : node.gpuTier || "small", `up to ${gpus}`].join(" · ")
-          : "Not enabled",
+      on: !!gpu,
+      detail: gpu
+        ? [gpu.model ? `${gpu.model}, ${gpu.vramGB} GB` : gpu.tier, `up to ${gpu.maxInstances}`].join(" · ")
+        : "Not enabled",
     },
     {
       key: "ai",

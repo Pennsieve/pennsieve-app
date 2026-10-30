@@ -31,7 +31,9 @@ import {
   runDisplayName,
   getUserName as getUserNameFn,
 } from "./runHelpers";
-import { isNotebookWorkflow, notebookGpu, runOnGpu } from "./notebookHelpers";
+import { isNotebookWorkflow, notebookGpu, runOnGpu, runNodeId, gpuMarkTitle } from "./notebookHelpers";
+import { nodeGpu } from "../ComputeNodes/computeNodeHelpers";
+import { useComputeResourcesStore } from "@/stores/computeResourcesStore";
 import RuntimeMark from "../WorkflowGraph/RuntimeMark.vue";
 import RunHistory from "./RunHistory.vue";
 import NotebookUsage from "./NotebookUsage.vue";
@@ -130,6 +132,15 @@ const gpuWorkflowIds = computed(
 );
 const runRuntime = (run) =>
   (run?.dag?.length ? runOnGpu(run) : gpuWorkflowIds.value.has(run.workflowUuid)) ? "gpu" : "";
+// The GPU mark's title: the run's node's GPU (its GPU tier), where known.
+const gpuTiers = ref([]);
+const computeResourcesStore = useComputeResourcesStore();
+const runRuntimeTitle = (run) => {
+  if (runRuntime(run) !== "gpu") return "";
+  const id = runNodeId(run);
+  const node = id && (store.getters["analysisModule/computeNodes"] || []).find((n) => n.uuid === id);
+  return gpuMarkTitle(nodeGpu(node, gpuTiers.value));
+};
 
 async function fetchDefinitions(query) {
   const token = await useGetToken();
@@ -324,6 +335,10 @@ onMounted(async () => {
     isLoading.value = false;
   }
   openFromQuery();
+  computeResourcesStore
+    .fetchGpuTiers(store.getters.activeOrganization?.organization?.id)
+    .then((t) => (gpuTiers.value = t || []))
+    .catch(() => {});
   // Live updates for every run in the workspace (or the user's own runs)
   if (realtime) {
     analyticsChannel = realtime.subscribe(
@@ -401,7 +416,7 @@ onBeforeUnmount(() => {
               </div>
               <div class="active-run-name">
                 {{ runDisplayName(run) || "Unnamed notebook" }}
-                <RuntimeMark v-if="runRuntime(run)" :runtime="runRuntime(run)" compact class="active-run-mark" />
+                <RuntimeMark v-if="runRuntime(run)" :runtime="runRuntime(run)" :label="runRuntimeTitle(run)" compact class="active-run-mark" />
               </div>
               <div class="active-run-subtitle">
                 {{ getUserName(run.createdBy) }}
@@ -434,6 +449,7 @@ onBeforeUnmount(() => {
           :node-name="nodeName"
           :user-name="getUserName"
           :runtime-of="runRuntime"
+          :runtime-title-of="runRuntimeTitle"
           @load-more="loadMoreRuns"
         />
       </template>
