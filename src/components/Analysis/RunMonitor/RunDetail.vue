@@ -91,6 +91,7 @@ import { portHandleId, portOfHandle } from "../WorkflowBuilder/outputPorts";
 import { stepNames } from "../WorkflowBuilder/stepNames";
 import { modelLine, modelLineText, variantName } from "../WorkflowBuilder/appVariants";
 import { fetchVariantGate, runsNonDefaultVariant } from "./variantGate";
+import { gpuReasonNote } from "./notebookHelpers";
 
 // Shown in a workspace (/:orgId/analysis/runs/...) and in My Workspace
 // (/my-workspace/analysis/runs/...), where there's no organization and a run
@@ -3036,10 +3037,10 @@ onUnmounted(() => {
                       :disabled="c.reasons.length > 0"
                     >
                       <span class="setup-option-name" :title="c.node.name">{{ c.node.name }}</span>
-                      <span v-if="c.reasons.length" class="setup-option-why">{{ c.reasons.join(" · ") }}</span>
+                      <span v-if="c.reasons.length" class="setup-option-why" :title="gpuReasonNote(c.reasons) || undefined">{{ c.reasons.join(" · ") }}</span>
                     </el-option>
                   </el-select>
-                  <span v-if="setupNodeUnfit.length" class="run-name-error">Can't run this workflow: {{ setupNodeUnfit.join(", ") }}</span>
+                  <span v-if="setupNodeUnfit.length" class="run-name-error">Can't run this workflow: {{ setupNodeUnfit.join(", ") }}<template v-if="gpuReasonNote(setupNodeUnfit)">. {{ gpuReasonNote(setupNodeUnfit) }}</template></span>
                 </div>
                 <div v-if="configLayers.length" class="info-row">
                   <span class="info-label">Reference data</span>

@@ -127,20 +127,32 @@ export function kernelCards(kernels = []) {
 export const cardOf = (cards, workflowId) =>
   (cards || []).find((c) => c.cpu?.uuid === workflowId || c.gpu?.uuid === workflowId) || null;
 
-// Why a node can't host a GPU session, as short reasons, [] when it can: it
-// has no GPUs; it is a basic-mode node (a GPU task gets no public address for
-// the platform gateway, so v1 needs secure mode); its provisioner fails the
-// variant gate (gateReason(node), variantGate.js). Nodes without notebook
-// sessions aren't offered at all.
+// Why a node can't host a GPU notebook, as short reasons, [] when it can:
+// - it has no GPUs;
+// - it is a basic-mode node. GPU sessions run as EC2 tasks on the node's GPU
+//   instances, and ECS can't give such a task its own public IP, which the
+//   basic-mode gateway connects to. Secure and compliant nodes reach
+//   sessions through the node's private session proxy, GPU ones too
+//   (workflow-service WFS-5 and the provisioner PROV-2 refuse basic only);
+// - its provisioner fails the variant gate (gateReason(node),
+//   variantGate.js).
+// Only notebooks: GPU workflow steps run on any node with GPU instances.
+// Nodes without notebook sessions aren't offered at all.
+export const BASIC_GPU_REASON = "Basic mode: GPU notebooks need a secure or compliant node";
+export const BASIC_GPU_NOTE =
+  "GPU sessions run on the node's GPU instances, which the basic-mode gateway can't reach. CPU notebooks and GPU workflow steps work on this node.";
 export function gpuSessionUnfit(node, gateReason = () => "") {
   const reasons = [];
   if (!((node?.maxGpuInstances || 0) > 0)) reasons.push("No GPUs");
   const mode = String(node?.deploymentMode || "basic").toLowerCase();
-  if (mode !== "secure") reasons.push(mode === "compliant" ? "Compliant node" : "Basic-mode node: GPU notebooks need secure mode");
+  if (mode === "basic") reasons.push(BASIC_GPU_REASON);
   const gate = gateReason(node);
   if (gate) reasons.push(gate);
   return reasons;
 }
+
+// The longer note behind a reason, where there is one (the basic-mode one).
+export const gpuReasonNote = (reasons) => ((reasons || []).includes(BASIC_GPU_REASON) ? BASIC_GPU_NOTE : "");
 
 // Whether a run (as GET /runs/{id} returns it) runs its session on a GPU:
 // a processor step whose execution target, compute type or stamped compute

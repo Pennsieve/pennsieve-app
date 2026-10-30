@@ -9,6 +9,8 @@ import {
   kernelCards,
   cardOf,
   gpuSessionUnfit,
+  gpuReasonNote,
+  BASIC_GPU_REASON,
   notebookGpu,
   runOnGpu,
 } from "./notebookHelpers";
@@ -115,7 +117,13 @@ describe("CPU and GPU kernels", () => {
     const fit = { maxGpuInstances: 2, deploymentMode: "secure" };
     expect(gpuSessionUnfit(fit)).toEqual([]);
     expect(gpuSessionUnfit({ maxGpuInstances: 0, deploymentMode: "secure" })).toEqual(["No GPUs"]);
-    expect(gpuSessionUnfit({ maxGpuInstances: 1 })).toEqual(["Basic-mode node: GPU notebooks need secure mode"]);
+    expect(gpuSessionUnfit({ maxGpuInstances: 1 })).toEqual(["Basic mode: GPU notebooks need a secure or compliant node"]);
+    expect(gpuSessionUnfit({ maxGpuInstances: 1, deploymentMode: "basic" })).toEqual([BASIC_GPU_REASON]);
+    // Compliant nodes reach sessions through their private proxy, GPU ones too.
+    expect(gpuSessionUnfit({ maxGpuInstances: 1, deploymentMode: "compliant" })).toEqual([]);
+    expect(gpuSessionUnfit({ maxGpuInstances: 1, deploymentMode: "Secure" })).toEqual([]);
+    expect(gpuReasonNote(gpuSessionUnfit({ maxGpuInstances: 1 }))).toMatch(/basic-mode gateway can't reach.*GPU workflow steps work on this node/);
+    expect(gpuReasonNote(["No GPUs"])).toBe("");
     expect(gpuSessionUnfit(fit, () => "Provisioner v1.24.0; update")).toEqual(["Provisioner v1.24.0; update"]);
     expect(notebookGpu({ notebook: { gpu: true } })).toBe(true);
     expect(notebookGpu({ notebook: {} })).toBe(false);

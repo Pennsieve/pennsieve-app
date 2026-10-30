@@ -31,6 +31,7 @@ import {
   cardOf,
   notebookGpu,
   gpuSessionUnfit,
+  gpuReasonNote,
 } from "./notebookHelpers";
 import { fetchVariantGate, provisionerGateReason } from "./variantGate";
 import RuntimeMark from "../WorkflowGraph/RuntimeMark.vue";
@@ -164,13 +165,17 @@ const hasVisibleTargetParams = computed(() =>
 );
 
 /* ------------------------------------------------------------ hardware ---- */
-// A GPU kernel (the session app's gpu variant) needs a node with GPUs, in
-// secure mode, whose provisioner passes the variant gate; other nodes stay
-// listed, greyed out with why. Starting one takes a few minutes, and the
-// instance is billed while the notebook is open.
+// A GPU kernel (the session app's gpu variant) runs on the node's GPU
+// instance: it needs a node with GPUs, in secure or compliant mode (the
+// basic-mode gateway can't reach GPU instances), whose provisioner passes
+// the variant gate; other nodes stay listed, greyed out with why. Starting
+// one can take a few minutes, and the instance is billed while the notebook
+// is open.
 const isGpu = computed(() => notebookGpu(selectedWorkflow.value));
 const GPU_LABEL = "GPU (NVIDIA T4)";
 const GPU_NOTE = "Starting takes a few minutes; the instance is billed while the notebook is open.";
+const GPU_HELP =
+  "Runs on the node's GPU instance (NVIDIA T4). Needs a secure or compliant node with GPUs. Slower to start (an instance may need to launch) and billed while the session is open.";
 const variantGate = ref(null);
 const nodeReasons = (cn) =>
   isGpu.value ? gpuSessionUnfit(cn, (n) => provisionerGateReason(n, variantGate.value || {})) : [];
@@ -750,7 +755,7 @@ const STEP_ABOUT = [
 ];
 const stepAbout = computed(() =>
   step.value === 1 && isGpu.value
-    ? "The compute node the session runs on. A GPU notebook needs a node with GPUs, in secure mode."
+    ? "The compute node the session runs on. A GPU notebook needs a secure or compliant node with GPUs."
     : STEP_ABOUT[step.value] || ""
 );
 const soFar = computed(() => {
@@ -962,13 +967,14 @@ async function execute() {
             </div>
           </div>
         </div>
-        <p v-if="isGpu" class="resource-hint">{{ GPU_LABEL }}. {{ GPU_NOTE }}</p>
+        <!-- GPU picked: where it runs and what that takes -->
+        <p v-if="isGpu" class="resource-hint">{{ GPU_HELP }}</p>
       </div>
 
       <!-- Step 1: Compute node -->
       <div v-if="step === 1" class="wizard-step">
         <p class="wizard-step-desc">
-          Select a compute node with notebook sessions enabled<template v-if="isGpu">, GPUs and secure mode</template>.
+          Select a compute node with notebook sessions enabled<template v-if="isGpu">, GPUs, and secure or compliant mode</template>.
         </p>
         <div v-if="selectedComputeNode" class="wizard-selection">
           <div class="wizard-selection-header">
@@ -1002,7 +1008,10 @@ async function execute() {
                 {{ cn.description }}
               </div>
               <!-- A GPU kernel: why this node can't host it -->
-              <div v-if="nodeReasons(cn).length" class="wizard-card-why">{{ nodeReasons(cn).join(" · ") }}</div>
+              <div v-if="nodeReasons(cn).length" class="wizard-card-why" :title="gpuReasonNote(nodeReasons(cn)) || undefined">
+                {{ nodeReasons(cn).join(" · ") }}
+                <span v-if="gpuReasonNote(nodeReasons(cn))" class="wizard-card-note">{{ gpuReasonNote(nodeReasons(cn)) }}</span>
+              </div>
             </div>
             <div v-if="filteredComputeNodes.length === 0" class="wizard-cards-loading">
               No compute nodes available.
@@ -1743,6 +1752,11 @@ async function execute() {
   margin-top: 4px;
   font-size: 12px;
   color: theme.$gray_5;
+}
+.wizard-card-note {
+  display: block;
+  margin-top: 2px;
+  color: theme.$gray_4;
 }
 
 .wizard-cards {

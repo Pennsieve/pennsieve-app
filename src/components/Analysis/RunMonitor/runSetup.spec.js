@@ -14,6 +14,18 @@ describe("nodeUnfit", () => {
     expect(nodeUnfit({ status: "Enabled", enableLLMAccess: true }, steps, llm)).toEqual([]);
   });
 
+  it("refuses GPU notebooks on basic nodes, but not GPU workflow steps", () => {
+    const gpu = (id) => (id === "b" ? "gpu" : "standard");
+    const node = { status: "Enabled", maxGpuInstances: 2, maxInteractiveSessions: 2 };
+    // A batch GPU step: any node with GPUs, basic included.
+    expect(nodeUnfit(node, steps, () => null, gpu)).toEqual([]);
+    // A GPU notebook: secure or compliant only.
+    const session = (id) => (id === "b" ? { runtime: { interactive: true } } : null);
+    expect(nodeUnfit(node, steps, session, gpu)).toEqual(["Basic mode: GPU notebooks need a secure or compliant node"]);
+    expect(nodeUnfit({ ...node, deploymentMode: "secure" }, steps, session, gpu)).toEqual([]);
+    expect(nodeUnfit({ ...node, deploymentMode: "compliant" }, steps, session, gpu)).toEqual([]);
+  });
+
   it("says why a node can't", () => {
     expect(nodeUnfit({ status: "Paused", enableLLMAccess: false }, steps, llm)).toEqual(["Paused", "No LLM access"]);
     expect(nodeUnfit({ status: "Enabled" }, steps, () => ({ runtime: { interactive: true } }))).toEqual(["No notebook sessions"]);
