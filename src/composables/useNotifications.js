@@ -3,9 +3,11 @@
 // BE endpoints (api2):
 //   GET    /notification/topics
 //   GET    /notification/subscriptions
-//   POST   /notification/topic/{topicId}/subscription  — body: the context, flat
+//   POST   /notification/topic/{topicId}/subscription?organization_id={org node id}
+//          — body: the context, flat
 //          (e.g. { organizationId, datasetId }), plus optional notification_channels
-//   PATCH  /notification/subscription/{subscriptionId} — body: { enabled: boolean }
+//   PATCH  /notification/subscription/{subscriptionId}?organization_id={org node id}
+//          — body: { enabled: boolean }
 //   GET    /notification/messages                      — all notifications for the user
 //
 // Subscriptions are disabled rather than deleted (history is kept).
@@ -35,18 +37,24 @@ export async function fetchSubscriptions() {
   return useSendXhr(`${BASE_URL}/subscriptions`, { header })
 }
 
-export async function subscribe(topicId, context) {
+// The gateway authorizer only sees the URL, so writes name the workspace
+// there too (as its node ID); the body's numeric organizationId is for the
+// service.
+const workspaceQuery = (organizationNodeId) =>
+  `organization_id=${encodeURIComponent(organizationNodeId)}`
+
+export async function subscribe(topicId, context, organizationNodeId) {
   const header = await authHeader()
-  return useSendXhr(`${BASE_URL}/topic/${topicId}/subscription`, {
+  return useSendXhr(`${BASE_URL}/topic/${topicId}/subscription?${workspaceQuery(organizationNodeId)}`, {
     method: 'POST',
     header,
     body: context,
   })
 }
 
-export async function toggleSubscription(subscriptionId, enabled) {
+export async function toggleSubscription(subscriptionId, enabled, organizationNodeId) {
   const header = await authHeader()
-  return useSendXhr(`${BASE_URL}/subscription/${subscriptionId}`, {
+  return useSendXhr(`${BASE_URL}/subscription/${subscriptionId}?${workspaceQuery(organizationNodeId)}`, {
     method: 'PATCH',
     header,
     body: { enabled },
