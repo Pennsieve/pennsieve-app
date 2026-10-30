@@ -1834,7 +1834,7 @@ async function execute() {
   gap: 4px;
   padding: 2px 10px;
   border: 1px solid theme.$gray_3;
-  border-radius: 12px;
+  border-radius: 3px;
   background: #fff;
   font-size: 12px;
   line-height: 18px;
