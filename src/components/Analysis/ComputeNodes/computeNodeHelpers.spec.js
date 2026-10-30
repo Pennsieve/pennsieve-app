@@ -99,7 +99,7 @@ describe("a node's GPU", () => {
 
   it("takes what a GPU task gets from its tier, exact where the tiers say", () => {
     const g = nodeGpu({ maxGpuInstances: 2, gpuTier: "medium" }, TIERS);
-    expect(g).toEqual({ tier: "medium", model: "NVIDIA L4", vramGB: 24, instanceType: "g6.2xlarge", vcpu: 8, memoryGB: 30, approx: false, maxInstances: 2 });
+    expect(g).toEqual({ tier: "medium", model: "NVIDIA L4", vramGB: 24, instanceType: "g6.2xlarge", vcpu: 8, memoryGB: 30, approx: false, pricePerHour: 0.978, maxInstances: 2 });
     expect(gpuName(g)).toBe("NVIDIA L4 · 24 GB");
     expect(gpuOffer(g)).toBe("GPU: NVIDIA L4 · 24 GB · up to 2 instances");
     expect(gpuTaskResources(g)).toBe("8 vCPU / 30 GB");

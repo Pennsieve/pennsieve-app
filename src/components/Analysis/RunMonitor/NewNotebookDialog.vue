@@ -49,7 +49,7 @@ import {
   gpuSessionHelp,
   gpuReviewResources,
 } from "./notebookHelpers";
-import { nodeGpu, gpuOffer, gpuName } from "../ComputeNodes/computeNodeHelpers";
+import { nodeGpu, gpuOffer, gpuName, gpuTaskResources } from "../ComputeNodes/computeNodeHelpers";
 import { useComputeResourcesStore } from "@/stores/computeResourcesStore";
 import { fetchVariantGate, provisionerGateReason } from "./variantGate";
 import RuntimeMark from "../WorkflowGraph/RuntimeMark.vue";
@@ -872,7 +872,7 @@ const stepHasChoices = computed(() => iface.value && (step.value === S.INPUT || 
 const STEP_ABOUT = [
   "A notebook is a live Jupyter session on a compute node. Choose its language.",
   "The compute node the session runs on. Only nodes with notebook sessions are offered; each says whether it has a GPU.",
-  "What the session runs on, of what this node offers. A GPU session gets the node's whole GPU instance.",
+  "CPU, or the node's GPU when it has one. A GPU notebook gets the whole GPU instance.",
   "The CPU and memory the session gets. Memory follows the CPU unless you set it.",
   "The dataset the notebook works with.",
   "The files copied into the notebook's input/ folder before it starts.",
@@ -1144,29 +1144,35 @@ async function execute() {
         </template>
       </div>
 
-      <!-- Hardware: what the chosen node can run -->
+      <!-- Hardware: what the chosen node can run, as cards to compare -->
       <div v-if="step === S.HARDWARE" class="wizard-step">
-        <p class="wizard-step-desc">Choose what the session runs on, of what {{ selectedComputeNode?.name || "the node" }} offers.</p>
-        <div class="hardware-chips" role="radiogroup" aria-label="Hardware">
+        <p class="wizard-step-desc">Where should this notebook run?</p>
+        <div class="hardware-grid" role="radiogroup" aria-label="Hardware">
           <button
             v-for="o in nodeHardware"
             :key="o.workflowId + '|' + o.variant"
             type="button"
             role="radio"
-            class="hardware-chip"
-            :class="{ 'is-active': o === currentHardware }"
+            class="hardware-card"
+            :class="{ selected: o === currentHardware }"
             :aria-checked="o === currentHardware"
-            :title="o.description || undefined"
             @click="pickHardware(o)"
           >
-            <RuntimeMark v-if="o.gpu" runtime="gpu" compact />{{ hardwareOptionLabel(o, selectedGpu) }}
+            <span class="hardware-card__name"><RuntimeMark v-if="o.gpu" runtime="gpu" compact />{{ o.gpu ? "GPU" : o.name || "CPU" }}</span>
+            <template v-if="o.gpu && selectedGpu">
+              <span class="hardware-card__main">{{ gpuName(selectedGpu) }} GPU memory</span>
+              <span class="hardware-card__line">{{ gpuTaskResources(selectedGpu, " · ") }}, the whole instance<template v-if="selectedGpu.instanceType"> ({{ selectedGpu.instanceType }})</template></span>
+              <span class="hardware-card__meta">Starts in 2–3 minutes<template v-if="selectedGpu.pricePerHour"> · about ${{ selectedGpu.pricePerHour.toFixed(2) }}/h while open</template></span>
+            </template>
+            <template v-else-if="!o.gpu && !(o.cpu || o.memory)">
+              <span class="hardware-card__main">Fargate task</span>
+              <span class="hardware-card__line">You choose CPU and memory next</span>
+              <span class="hardware-card__meta">Starts in about a minute</span>
+            </template>
+            <span v-else-if="o.description" class="hardware-card__line">{{ o.description }}</span>
           </button>
         </div>
         <p v-if="noGpuHere" class="resource-hint">{{ noGpuHere }}</p>
-        <!-- GPU picked: where it runs and what that takes; another variant:
-             what it is -->
-        <p v-if="isGpu" class="resource-hint">{{ gpuSessionHelp(selectedGpu) }}</p>
-        <p v-else-if="currentHardware?.description" class="resource-hint">{{ currentHardware.description }}</p>
       </div>
 
       <!-- Compute resources (CPU sessions) -->
@@ -1891,35 +1897,51 @@ async function execute() {
   align-items: center;
   gap: 6px;
 }
-.hardware-chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
+.hardware-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 12px;
   margin-bottom: 12px;
 }
-.hardware-chip {
-  display: inline-flex;
-  align-items: center;
+.hardware-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
   gap: 4px;
-  padding: 6px 12px;
-  border: 1px solid theme.$gray_3;
+  border: 1px solid theme.$gray_2;
   border-radius: 3px;
+  padding: 16px;
   background: #fff;
-  font-size: 13px;
-  line-height: 18px;
-  color: theme.$gray_6;
+  text-align: left;
   cursor: pointer;
 }
-.hardware-chip:hover {
+.hardware-card:hover {
   border-color: theme.$purple_1;
+  background: theme.$gray_1;
 }
-.hardware-chip.is-active {
+.hardware-card.selected {
   border-color: theme.$purple_1;
-  background: theme.$purple_1;
-  color: #fff;
+  background: theme.$purple_tint;
 }
-.hardware-chip.is-active :deep(.runtime-mark) {
-  color: #fff;
+.hardware-card__name {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 700;
+  font-size: 16px;
+  color: theme.$gray_6;
+}
+.hardware-card__main {
+  font-size: 14px;
+  color: theme.$gray_6;
+}
+.hardware-card__line {
+  font-size: 13px;
+  color: theme.$gray_5;
+}
+.hardware-card__meta {
+  font-size: 12px;
+  color: theme.$gray_4;
 }
 .wizard-card.is-unfit {
   cursor: not-allowed;
