@@ -23,6 +23,7 @@ import { useGetToken } from "@/composables/useGetToken";
 import { useSendXhr } from "@/mixins/request/request_composable";
 import toQueryParams from "@/utils/toQueryParams";
 import LayerNameSelector from "./LayerNameSelector.vue";
+import { placeRunNodes, workflowLayouts } from "./runLayout";
 
 const ASSET_TYPE_OPTIONS = ["timeseries-zarr","ome-zarr", "thumb"];
 const ASSET_TYPE_CUSTOM = "__custom__";
@@ -335,6 +336,10 @@ const allDataSourcesHaveFiles = computed(() => {
 /*
   DAG Layout
 */
+// The shown run's workflow's saved layout (null: none, or not read): a run
+// is drawn as its workflow is laid out now (runLayout.js).
+const runWorkflowLayout = ref(null);
+
 const autoLayout = () => {
   if (nodes.value.length === 0) return;
   const g = new dagre.graphlib.Graph();
@@ -397,7 +402,8 @@ const definitionToNodesAndEdges = (definition) => {
 const runToNodesAndEdges = (run) => {
   const dag = run.dag || [];
   if (dag.length === 0) return { nodes: [], edges: [], needsAutoLayout: true };
-  const hasSavedPositions = dag.some((d) => d.position && typeof d.position.x === "number");
+  // The workflow's layout as saved now, else the run's own (runLayout.js).
+  const placed = placeRunNodes(dag, runWorkflowLayout.value, { box: { width: NODE_WIDTH, height: NODE_HEIGHT } });
   const runDataSources = run.dataSources || {};
   const runDataTargets = run.dataTargets || {};
   const runProcessorConfigs = run.processorConfigs || [];
@@ -435,9 +441,7 @@ const runToNodesAndEdges = (run) => {
         completedAt: d.completedAt,
         ...extra,
       },
-      position: hasSavedPositions && d.position && typeof d.position.x === "number"
-        ? { x: d.position.x, y: d.position.y }
-        : { x: 0, y: 0 },
+      position: placed.positions[d.id] || { x: 0, y: 0 },
     };
   });
   const dagMap = Object.fromEntries(dag.map((d) => [d.id, d]));
@@ -454,7 +458,7 @@ const runToNodesAndEdges = (run) => {
       });
     }
   }
-  return { nodes: resultNodes, edges: resultEdges, needsAutoLayout: !hasSavedPositions };
+  return { nodes: resultNodes, edges: resultEdges, needsAutoLayout: placed.needsAutoLayout };
 };
 
 /*
@@ -547,6 +551,12 @@ const loadRun = async (runId) => {
     await store.dispatch("analysisModule/setSelectedWorkflowActivity", run);
     const activity = selectedWorkflowActivity.value;
     if (activity && activity.dag && activity.dag.length > 0) {
+      // Laid out as its workflow is now (cached per workflow).
+      const layout = await workflowLayouts.get(activity.workflowUuid, (uuid) =>
+        store.dispatch("analysisModule/fetchWorkflowDefinition", uuid)
+      );
+      if (selectedWorkflowActivity.value?.uuid !== activity.uuid) return;
+      runWorkflowLayout.value = layout;
       const result = runToNodesAndEdges(activity);
       nodes.value = result.nodes;
       edges.value = result.edges;
