@@ -2881,6 +2881,22 @@ onUnmounted(() => {
             </div>
           </div>
 
+          <div v-if="runMetrics.costEstimate.gpu?.taskCount" class="receipt-cost-group">
+            <div class="receipt-cost-group-title">GPU</div>
+            <div class="receipt-row">
+              <span>Instance</span>
+              <span>{{ runMetrics.costEstimate.gpu.instanceType || 'default tier' }}</span>
+            </div>
+            <div class="receipt-row">
+              <span>Instance Hours</span>
+              <span>{{ runMetrics.costEstimate.gpu.instanceHours?.toFixed(4) }}</span>
+            </div>
+            <div class="receipt-row receipt-row-cost">
+              <span>Subtotal</span>
+              <span>{{ formatCost(runMetrics.costEstimate.gpu.estimatedCost) }}</span>
+            </div>
+          </div>
+
           <div v-if="runMetrics.costEstimate.stepFunctions" class="receipt-cost-group">
             <div class="receipt-cost-group-title">Step Functions</div>
             <div class="receipt-row">
@@ -2905,19 +2921,19 @@ onUnmounted(() => {
             </div>
           </div>
 
-          <div v-if="runMetrics.costEstimate.efsThroughput" class="receipt-cost-group">
-            <div class="receipt-cost-group-title">EFS Throughput</div>
+          <div v-if="runMetrics.costEstimate.efsStorage" class="receipt-cost-group">
+            <div class="receipt-cost-group-title">EFS Storage</div>
             <div class="receipt-row">
-              <span>Read</span>
-              <span>{{ formatBytes(runMetrics.costEstimate.efsThroughput.readBytes) }}</span>
+              <span>Stored</span>
+              <span>{{ runMetrics.costEstimate.efsStorage.storageGB?.toFixed(2) }} GB</span>
             </div>
             <div class="receipt-row">
-              <span>Write</span>
-              <span>{{ formatBytes(runMetrics.costEstimate.efsThroughput.writeBytes) }}</span>
+              <span>Hours</span>
+              <span>{{ runMetrics.costEstimate.efsStorage.durationHours?.toFixed(2) }}</span>
             </div>
             <div class="receipt-row receipt-row-cost">
               <span>Subtotal</span>
-              <span>{{ formatCost(runMetrics.costEstimate.efsThroughput.estimatedCost) }}</span>
+              <span>{{ formatCost(runMetrics.costEstimate.efsStorage.estimatedCost) }}</span>
             </div>
           </div>
 
@@ -2925,7 +2941,7 @@ onUnmounted(() => {
             <div class="receipt-cost-group-title">CloudWatch Logs</div>
             <div class="receipt-row">
               <span>Ingest</span>
-              <span>{{ runMetrics.costEstimate.cloudWatchLogs.estimatedIngestGB?.toFixed(6) }} GB</span>
+              <span>{{ runMetrics.costEstimate.cloudWatchLogs.ingestGB?.toFixed(6) }} GB</span>
             </div>
             <div class="receipt-row receipt-row-cost">
               <span>Subtotal</span>
@@ -2933,7 +2949,7 @@ onUnmounted(() => {
             </div>
           </div>
 
-          <div v-if="runMetrics.costEstimate.llm" class="receipt-cost-group">
+          <div v-if="runMetrics.costEstimate.llm?.requestCount" class="receipt-cost-group">
             <div class="receipt-cost-group-title">LLM</div>
             <div class="receipt-row">
               <span>Model</span>
