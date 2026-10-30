@@ -43,7 +43,7 @@ import { useAppManifest } from "@/composables/useAppManifest";
 import BuilderBar from "./BuilderBar.vue";
 import BuilderPalette from "./BuilderPalette.vue";
 import ParamField from "./ParamField.vue";
-import { ioLine, sessionTypeOf, versionManifest, shortMediaType } from "./appManifestInfo";
+import { ioLine, sessionTypeOf, versionManifest, shortMediaType, stepVariant } from "./appManifestInfo";
 import { domainOfTag, domainColors } from "../Applications/appDomains";
 import { diffLines, manifestDiff, versionWarnings } from "./manifestDiff";
 import { builderReadiness, readinessLabel } from "./builderReadiness";
@@ -118,6 +118,7 @@ const workflowName = ref("");
 const workflowDescription = ref("");
 const draggedApp = ref(null);
 const draggedType = ref(null); // 'application', 'data-source', or 'data-target'
+const draggedVariant = ref(""); // a palette variant chip's id, else the default
 
 // Mode & workflow list state
 const mode = ref("browse"); // 'browse' (a saved workflow, read-only) | 'edit' (its owner editing it) | 'create'
@@ -147,7 +148,7 @@ const selectedNodeParamSchema = computed(() => {
   // In browse mode: use paramSchema from the workflow definition DAG node
   if (node.data?.paramSchema?.length > 0) return node.data.paramSchema;
   // Else the pinned version's app.yml (per-version manifests)
-  const manifestParams = versionManifest(node.data?.application, node.data?.tag)?.parameters;
+  const manifestParams = versionManifest(node.data?.application, node.data?.tag, node.data?.variant)?.parameters;
   if (manifestParams?.length) return toParamSchema(manifestParams);
   // In create mode: use params from the application (flat key-value object)
   const appParams = node.data?.application?.params;
@@ -284,7 +285,7 @@ watch(selectedNode, (n) => {
 const stepManifest = computed(() => {
   const node = selectedNode.value;
   if (node?.type !== "default") return null;
-  return versionManifest(node.data?.application, node.data?.tag);
+  return versionManifest(node.data?.application, node.data?.tag, node.data?.variant);
 });
 const manifestsKnown = computed(() =>
   (availableApplications.value || []).some((a) => (a.versions || []).some((v) => v.manifest)),
@@ -363,13 +364,18 @@ const updateLines = computed(() => {
   const node = selectedNode.value;
   if (!newerVersion.value) return [];
   return diffLines(
-    manifestDiff(versionManifest(node.data.application, node.data.tag), versionManifest(node.data.application, newerVersion.value)),
+    manifestDiff(
+      versionManifest(node.data.application, node.data.tag, node.data.variant),
+      versionManifest(node.data.application, newerVersion.value, node.data.variant),
+    ),
   );
 });
 
 const applyVersion = (node, tag) => {
   node.data.tag = tag;
-  const m = versionManifest(node.data.application, tag);
+  // A variant the version doesn't have: the version's default.
+  if (!stepVariant(node.data.application, tag, node.data.variant)) delete node.data.variant;
+  const m = versionManifest(node.data.application, tag, node.data.variant);
   if (m) {
     node.data.paramSchema = toParamSchema(m.parameters || []);
     node.data.manifestPorts = { inputs: m.inputs || [], outputs: m.outputs || [] };
@@ -382,7 +388,7 @@ const requestVersion = async (tag) => {
   const node = selectedNode.value;
   if (!node || !tag || tag === node.data.tag) return;
   const app = node.data.application;
-  const d = manifestDiff(versionManifest(app, node.data.tag), versionManifest(app, tag));
+  const d = manifestDiff(versionManifest(app, node.data.tag, node.data.variant), versionManifest(app, tag, node.data.variant));
   const lines = diffLines(d);
   const warnings = versionWarnings(d, node.data.defaultParams || {});
   if (lines.length || warnings.length) {
@@ -540,22 +546,29 @@ const applyManifestDefaults = async (nodeId, application) => {
   if (!node) return;
 
   const { schema } = parsed;
+  // A step of a variant: its runtime and parameter defaults are the
+  // variant's (the version's resolved manifest for it), not app.yml's top
+  // level. Inputs and outputs are the same for every variant.
+  const variant = node.data.variant ? versionManifest(application, node.data.tag, node.data.variant) : null;
+  const runtime = variant?.runtime || {};
 
   // computeType — first declared type that the builder actually supports.
-  const declared = schema.runtime?.computeTypes || [];
+  const declared = runtime.computeTypes?.length ? runtime.computeTypes : schema.runtime?.computeTypes || [];
   const supported = declared.find((t) => DEFAULT_COMPUTE_TYPES.includes(t));
   if (supported) node.data.computeType = supported;
 
   // cpu / memory — only when the manifest declares them and the node has none.
-  if (!node.data.cpu && schema.resources?.cpu != null) {
-    node.data.cpu = String(schema.resources.cpu);
+  const cpu = runtime.cpu || schema.resources?.cpu;
+  const memory = runtime.memory || schema.resources?.memory;
+  if (!node.data.cpu && cpu != null) {
+    node.data.cpu = String(cpu);
   }
-  if (!node.data.memory && schema.resources?.memory != null) {
-    node.data.memory = String(schema.resources.memory);
+  if (!node.data.memory && memory != null) {
+    node.data.memory = String(memory);
   }
 
   // Parameters — feeds both the parameter list and its editable defaults.
-  const paramSchema = toParamSchema(schema.parameters);
+  const paramSchema = toParamSchema(variant?.parameters?.length ? variant.parameters : schema.parameters);
   if (paramSchema.length) node.data.paramSchema = paramSchema;
 
   setManifestPorts(node, parsed);
@@ -855,6 +868,8 @@ const definitionToNodesAndEdges = (workflow, applications) => {
         paramSchema: p.paramSchema || [],
         resolvedParams: p.resolvedParams || {},
         tag: p.tag || latestVersion(matchedApplication)?.version || "",
+        // The app variant the step runs; none for the version's default.
+        ...(p.variant && { variant: p.variant }),
         // An input's or output's own name and settings (its panel).
         ...(p.name && { name: p.name }),
         ...(p.input?.optional && { optional: true }),
@@ -1124,10 +1139,11 @@ const generateNodeId = () => {
 
 const dragOffset = ref({ x: 0, y: 0 });
 
-const onDragStart = (item, event, type = "application") => {
+const onDragStart = (item, event, type = "application", variant = "") => {
   if (isReadOnly.value) return;
   draggedType.value = type;
   draggedApp.value = type === "application" ? item : null;
+  draggedVariant.value = type === "application" ? variant || "" : "";
 
   // Capture where within the element the user clicked
   const rect = event.target.getBoundingClientRect();
@@ -1161,9 +1177,10 @@ const onDrop = (event) => {
   };
 
   const type = draggedType.value === "application" ? "default" : draggedType.value;
-  if (type !== "default" || draggedApp.value) addNode(type, draggedApp.value, position);
+  if (type !== "default" || draggedApp.value) addNode(type, draggedApp.value, position, draggedVariant.value);
 
   draggedApp.value = null;
+  draggedVariant.value = "";
   draggedType.value = null;
 };
 
@@ -1180,8 +1197,10 @@ const onDrop = (event) => {
 // processor's own.
 // Whether a step's app calls language models through Pennsieve: its version's
 // app.yml declares runtime.llm (LLM access is opt-in). Shown as an icon.
-const usesLLM = (data) => !!versionManifest(data?.application, data?.tag)?.runtime?.llm;
-const makeNode = (type, app, position) => {
+const usesLLM = (data) => !!versionManifest(data?.application, data?.tag, data?.variant)?.runtime?.llm;
+// variant: the app variant to run (a palette chip's id); none, or the
+// default, runs the version's default.
+const makeNode = (type, app, position, variant = "") => {
   const id = generateNodeId();
   if (type === "data-source") {
     return { id, type, data: { label: "Input data" }, position };
@@ -1204,6 +1223,11 @@ const makeNode = (type, app, position) => {
       position,
     };
   }
+  const tag = latestVersion(app)?.version || "";
+  const chosen = stepVariant(app, tag, variant);
+  // Where it runs, until its app.yml is read (applyManifestDefaults): a GPU
+  // variant on a GPU from the start.
+  const runsOn = (versionManifest(app, tag, chosen)?.runtime?.computeTypes || []).find((t) => DEFAULT_COMPUTE_TYPES.includes(t));
   return {
     id,
     type: "default",
@@ -1212,20 +1236,21 @@ const makeNode = (type, app, position) => {
       application: app,
       // A notebook kernel: a human-in-the-loop step, run as a live session.
       ...(sessionTypeOf(app) && { interactive: true, sessionType: sessionTypeOf(app) }),
-      computeType: "standard",
+      computeType: (chosen && runsOn) || "standard",
       cpu: "",
       memory: "",
       defaultParams: {},
       paramSchema: [],
       hasManifest: false,
-      tag: latestVersion(app)?.version || "",
+      tag,
+      ...(chosen && { variant: chosen }),
     },
     position,
   };
 };
 
-const addNode = (type, app, position) => {
-  const node = makeNode(type, app, position);
+const addNode = (type, app, position, variant = "") => {
+  const node = makeNode(type, app, position, variant);
   nodes.value.push(node);
   // Fire-and-forget: patches the node in place once app.yml is read.
   if (app) applyManifestDefaults(node.id, app);
@@ -1297,7 +1322,7 @@ const selectOnly = (id) => {
 // Adds a step after another (the selected one when not given), or below the
 // whole graph, connects it when the types allow, selects it and lays the
 // graph out.
-const addStep = (type, app, afterId = selectedNode.value?.id) => {
+const addStep = (type, app, afterId = selectedNode.value?.id, variant = "") => {
   if (isReadOnly.value) return null;
   const after = nodes.value.find((n) => n.id === afterId) ||
     [...nodes.value].filter((n) => n.type !== "data-target").sort((a, b) => b.position.y - a.position.y)[0];
@@ -1305,7 +1330,7 @@ const addStep = (type, app, afterId = selectedNode.value?.id) => {
   const position = after
     ? { x: after.position.x, y: after.position.y + gap.height + gap.ranksep }
     : { x: 0, y: 0 };
-  const node = addNode(type, app, position);
+  const node = addNode(type, app, position, variant);
   if (after) connectNodes(after.id, node.id);
   selectOnly(node.id);
   nextTick(() => autoLayout());
@@ -2143,6 +2168,8 @@ const serializeProcessors = () => {
     // Which input each link feeds, and from which output (ports)
     const inputs = linksOf(node, edges.value);
     if (inputs.length) proc.inputs = inputs;
+    // The app variant, when not the version's default (empty: the default).
+    if (node.data.variant) proc.variant = node.data.variant;
     if (node.data.cpu) proc.cpu = node.data.cpu;
     if (node.data.memory) proc.memory = node.data.memory;
     if (node.data.interactive) {
@@ -2654,8 +2681,8 @@ const openNodeSettings = (id) => {
         :step-ports="selectedNode?.type === 'default' ? selectedNode.data?.manifestPorts || null : null"
         :step-label="nodeName(selectedNode)"
         :loading="isLoading"
-        @add="(type, app) => addStep(type, app)"
-        @dragstart="(app, event, type) => onDragStart(app, event, type)"
+        @add="(type, app, variant) => addStep(type, app, undefined, variant)"
+        @dragstart="(app, event, type, variant) => onDragStart(app, event, type, variant)"
         @fold="togglePanel('palette')"
       />
 

@@ -16,14 +16,88 @@ export function sessionTypeOf(app) {
 const newestFirst = (versions) =>
   [...(versions || [])].sort((a, b) => (Date.parse(b.createdAt) || 0) - (Date.parse(a.createdAt) || 0));
 
-// The manifest of a version (by tag), else of the newest version that has one.
-export function versionManifest(app, tag) {
+// The version a tag names, else the newest version that has a manifest.
+function versionOf(app, tag) {
   const versions = newestFirst(app?.versions);
   if (tag) {
     const v = versions.find((x) => x.version === tag);
-    if (v) return v.manifest || null;
+    if (v) return v;
   }
-  return versions.find((v) => v.manifest)?.manifest || null;
+  return versions.find((v) => v.manifest) || null;
+}
+
+/*
+  Variants (app.yml variants: docs/app-variants.md in workflow-service): one
+  release builds several images of the app, e.g. a CPU and a GPU one. A
+  version that has them carries defaultVariant, variantOrder and variants,
+  either as stored (a map by id: { name, description, manifest, build }) or as
+  a list ([{ id, name, description, default, manifest }], in order); its
+  manifest is the default variant's. A version without them is one variant.
+*/
+const variantList = (version) => {
+  const raw = version?.variants;
+  if (!raw || typeof raw !== "object") return [];
+  if (Array.isArray(raw)) return raw.filter((v) => v && v.id);
+  const order = (version.variantOrder || []).filter((id) => raw[id]);
+  const rest = Object.keys(raw).filter((id) => !order.includes(id)).sort();
+  return [...order, ...rest].map((id) => ({ ...raw[id], id }));
+};
+
+// A version's variants, in order, each { id, name, description, default,
+// manifest, computeTypes, gpu }; [] when it has none. The version is the
+// tag's, else the newest with a manifest (as versionManifest).
+export function variantsOf(app, tag) {
+  const version = versionOf(app, tag);
+  const list = variantList(version);
+  if (!list.length) return [];
+  const declared = list.find((v) => v.id === version.defaultVariant) || list.find((v) => v.default) || list[0];
+  return list.map((v) => {
+    const manifest = v.manifest || null;
+    const computeTypes = manifest?.runtime?.computeTypes || [];
+    return {
+      id: v.id,
+      name: v.name || manifest?.variant?.name || v.id,
+      description: v.description || manifest?.variant?.description || "",
+      default: v.id === declared.id,
+      manifest,
+      computeTypes,
+      gpu: computeTypes.includes("gpu"),
+    };
+  });
+}
+
+// The id of a version's default variant; "" when it has no variants.
+export function defaultVariant(app, tag) {
+  return variantsOf(app, tag).find((v) => v.default)?.id || "";
+}
+
+// The variants the palette offers as chips: an app's, when it has two or
+// more (one variant is just the app).
+export function paletteVariants(app) {
+  const list = variantsOf(app);
+  return list.length > 1 ? list : [];
+}
+
+// The variant a step keeps for its pinned version: the id, or "" for the
+// default (which isn't written, so the version's default runs) and for one
+// the version doesn't have.
+export function stepVariant(app, tag, variant) {
+  if (!variant) return "";
+  const v = variantsOf(app, tag).find((x) => x.id === variant);
+  return v && !v.default ? v.id : "";
+}
+
+// The manifest of a version (by tag), else of the newest version that has
+// one; of its variant when one is given (and the version has it), else the
+// default's, which is what the version's manifest is.
+export function versionManifest(app, tag, variant) {
+  const version = versionOf(app, tag);
+  if (!version) return null;
+  if (variant) {
+    const v = variantList(version).find((x) => x.id === variant);
+    if (v?.manifest) return v.manifest;
+  }
+  return version.manifest || null;
 }
 
 // Whether the platform serves manifests at all: until it does, no app can be
@@ -95,8 +169,8 @@ export function paletteGroups(apps, { stepPorts = null, me = "", name = (a) => a
   return groups.filter((g) => g.apps.length || g.key === "fits");
 }
 
-// Whether an app matches a search: name, description, tags, repository and
-// the media types it takes and produces.
+// Whether an app matches a search: name, description, tags, repository,
+// its variants' names, and the media types it takes and produces.
 export function matchesApp(app, query, name = (a) => a.name) {
   const q = (query || "").trim().toLowerCase();
   if (!q) return true;
@@ -104,6 +178,8 @@ export function matchesApp(app, query, name = (a) => a.name) {
   const text = [
     name(app),
     m?.description || app.description,
+    // Its variants' names and descriptions ("gpu", "ONCET").
+    ...variantsOf(app).flatMap((v) => [v.id, v.name, v.description]),
     ...(m?.tags || []),
     app.sourceUrl,
     ioLine(m),
