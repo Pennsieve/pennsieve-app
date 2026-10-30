@@ -13,6 +13,15 @@ import {
   BASIC_GPU_REASON,
   notebookGpu,
   runOnGpu,
+  runVariants,
+  offersRunVariants,
+  defaultRunVariant,
+  variantLabel,
+  variantSetsResources,
+  variantResources,
+  variantNodeUnfit,
+  sessionStepId,
+  cardSelection,
 } from "./notebookHelpers";
 
 // workflow-service's computed field: a notebook only when a step's app.yml
@@ -136,5 +145,117 @@ describe("CPU and GPU kernels", () => {
     expect(runOnGpu({ dag: [{ ...step, computeType: "standard", runtimeConfig: { computeTypes: ["gpu"] } }] })).toBe(false);
     expect(runOnGpu({ dag: [step] })).toBe(false);
     expect(runOnGpu(null)).toBe(false);
+  });
+});
+
+describe("variants per run", () => {
+  const session = { id: "s", type: "processor", sourceUrl: "https://github.com/Pennsieve/pennsieve-jupyter-session" };
+  // workflow-service's notebook.variants for pennsieve-jupyter-session v0.2.0.
+  const VARIANTS = [
+    { id: "cpu", name: "CPU", default: true, description: "A CPU kernel on Fargate.", computeTypes: ["standard"] },
+    { id: "gpu", name: "GPU", gpu: true, computeTypes: ["gpu"], cpu: 4096, memory: 14336 },
+  ];
+  const nb = (uuid, notebook = {}, extra = {}) => ({
+    uuid,
+    name: uuid,
+    dag: [session],
+    inputs: [{ name: "files" }],
+    outputs: [{ name: "results" }],
+    ...extra,
+    notebook: { kernel: "python", savesTo: "download", ...notebook },
+  });
+  const iface = nb("py", { variant: "cpu", variants: VARIANTS });
+  const twin = nb("py-gpu", { variant: "gpu", gpu: true, variants: VARIANTS });
+  const oldCpu = nb("old-cpu", { variant: "cpu" });
+  const oldGpu = nb("old-gpu", { variant: "gpu", gpu: true });
+
+  it("offers a choice only with two or more variants", () => {
+    expect(runVariants(iface)).toBe(VARIANTS);
+    expect(offersRunVariants(iface)).toBe(true);
+    expect(runVariants(nb("one", { variant: "cpu", variants: [VARIANTS[0]] }))).toEqual([]);
+    expect(runVariants(oldCpu)).toEqual([]);
+    expect(runVariants(null)).toEqual([]);
+  });
+
+  it("preselects what the workflow runs, else the default", () => {
+    expect(defaultRunVariant(iface)).toBe("cpu");
+    expect(defaultRunVariant(twin)).toBe("gpu");
+    expect(defaultRunVariant(nb("x", { variants: VARIANTS }))).toBe("cpu");
+    expect(defaultRunVariant(nb("x", { variant: "tpu", variants: [VARIANTS[1], { id: "big" }] }))).toBe("gpu");
+    expect(defaultRunVariant(oldCpu)).toBe("");
+  });
+
+  it("names variants and their resources", () => {
+    expect(variantLabel(VARIANTS[1])).toBe("GPU");
+    expect(variantLabel({ id: "big" })).toBe("big");
+    expect(variantSetsResources(VARIANTS[0])).toBe(false);
+    expect(variantSetsResources(VARIANTS[1])).toBe(true);
+    expect(variantSetsResources({ id: "big", memory: 30720 })).toBe(true);
+    expect(variantSetsResources(null)).toBe(false);
+    expect(variantResources(VARIANTS[1])).toBe("4 vCPU · 14 GB");
+    expect(variantResources(VARIANTS[0])).toBe("");
+  });
+
+  it("applies the node rules of the chosen variant", () => {
+    const basicOld = { maxGpuInstances: 1, deploymentMode: "basic", provisionerImageTag: "v1.24.0" };
+    const gate = (n) => (n.provisionerImageTag === "v1.24.0" ? "Provisioner v1.24.0; update" : "");
+    expect(variantNodeUnfit(basicOld, VARIANTS[0], gate)).toEqual([]);
+    expect(variantNodeUnfit(basicOld, VARIANTS[1], gate)).toEqual([BASIC_GPU_REASON, "Provisioner v1.24.0; update"]);
+    expect(variantNodeUnfit({ maxGpuInstances: 0, deploymentMode: "secure" }, VARIANTS[1])).toEqual(["No GPUs"]);
+    // A non-default CPU variant needs only the provisioner gate.
+    expect(variantNodeUnfit(basicOld, { id: "big" }, gate)).toEqual(["Provisioner v1.24.0; update"]);
+    expect(variantNodeUnfit(basicOld, null, gate)).toEqual([]);
+  });
+
+  it("finds the session step for the pick", () => {
+    expect(sessionStepId([{ id: "src", type: "data-source" }, { id: "s", type: "processor" }])).toBe("s");
+    expect(
+      sessionStepId([
+        { id: "a", type: "processor" },
+        { id: "s", type: "processor", runtimeConfig: { interactive: true } },
+      ])
+    ).toBe("s");
+    expect(sessionStepId([])).toBe("");
+  });
+
+  it("shows one card for a workflow with variants per run, and hides its twin", () => {
+    const r = nb("r", { kernel: "r" });
+    const cards = kernelCards([twin, iface, r]);
+    expect(cards.map((c) => [c.cpu?.uuid, c.gpu?.uuid || null, c.perRun?.uuid || null])).toEqual([
+      ["py", null, "py"],
+      ["r", null, null],
+    ]);
+    expect(cards[0].twins).toEqual(["py-gpu"]);
+    expect(cardOf(cards, "py-gpu")).toBe(cards[0]);
+  });
+
+  it("keeps pairing twins when no workflow offers variants per run", () => {
+    const cards = kernelCards([oldCpu, oldGpu]);
+    expect(cards.map((c) => [c.cpu?.uuid, c.gpu?.uuid, c.perRun])).toEqual([["old-cpu", "old-gpu", null]]);
+  });
+
+  it("opens a link to a hidden twin on the per-run kernel with the twin's variant", () => {
+    const kernels = [iface, twin];
+    const cards = kernelCards(kernels);
+    expect(cardSelection(cards, "py-gpu", kernels)).toEqual({ workflowId: "py", variant: "gpu" });
+    expect(cardSelection(cards, "py", kernels)).toEqual({ workflowId: "py", variant: "cpu" });
+    expect(cardSelection(cards, "nope", kernels)).toBeNull();
+    const old = kernelCards([oldCpu, oldGpu]);
+    expect(cardSelection(old, "old-gpu", [oldCpu, oldGpu])).toEqual({ workflowId: "old-gpu", variant: "" });
+  });
+
+  it("marks a run whose session the run put on the GPU variant", () => {
+    // The CPU workflow (saved computeType standard) run on gpu: the server
+    // stamps the variant, clears the computeType and targets gpu.
+    const run = {
+      dag: [{ ...session, variant: "gpu", runtimeConfig: { interactive: true, computeTypes: ["gpu"] } }],
+      processorConfigs: [{ nodeId: "s", executionTarget: "gpu", variant: "gpu" }],
+    };
+    expect(runOnGpu(run)).toBe(true);
+    const cpuRun = {
+      dag: [{ ...session, variant: "cpu", computeType: "standard", runtimeConfig: { computeTypes: ["standard"] } }],
+      processorConfigs: [{ nodeId: "s", executionTarget: "standard" }],
+    };
+    expect(runOnGpu(cpuRun)).toBe(false);
   });
 });

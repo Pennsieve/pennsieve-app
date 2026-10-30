@@ -97,35 +97,145 @@ const sessionApp = (wf) => {
   return String(step?.sourceUrl || "").replace(/\.git$/, "").replace(/\/+$/, "").toLowerCase();
 };
 
-// The kernel cards: [{ key, cpu, gpu }], each the CPU and GPU workflow of
-// one kernel (either may be null), in the kernels' order. Workflows pair
-// when they are variants (notebook.variant) of the same kernel, session app
-// and results; one without variants is a card of its own (cpu).
+/*
+  Variants per run. workflow-service lists, on a notebook whose session app
+  version has variants, the variants a run can pick (notebook.variants:
+  [{ id, name, description, default, gpu, computeTypes, cpu, memory }]),
+  and takes the pick as the session step's processorConfigs variant. One
+  workflow per kernel then serves CPU and GPU: the wizard shows a Hardware
+  choice on its card instead of pairing twin workflows. Older
+  workflow-services don't list them, and the twins pair as before.
+*/
+
+// The variants a run of a notebook workflow can pick, when there's a choice
+// (two or more); [] otherwise.
+export function runVariants(wf) {
+  const variants = wf?.notebook?.variants || [];
+  return variants.length > 1 ? variants : [];
+}
+
+// Whether a notebook workflow offers its variants per run.
+export const offersRunVariants = (wf) => runVariants(wf).length > 0;
+
+// The variant a run of wf picks unless the user picks another: the one the
+// workflow runs (notebook.variant), else the version's default, else the
+// first. "" when it offers none.
+export function defaultRunVariant(wf) {
+  const variants = runVariants(wf);
+  if (!variants.length) return "";
+  const own = wf.notebook.variant;
+  if (own && variants.some((v) => v.id === own)) return own;
+  return (variants.find((v) => v.default) || variants[0]).id;
+}
+
+// A variant's name for people: its name, else its id.
+export const variantLabel = (v) => v?.name || v?.id || "";
+
+// Whether a variant sets the session's resources itself (a GPU one runs on
+// the GPU instance's; one whose app.yml declares cpu or memory), so the
+// wizard asks for no CPU and memory.
+export const variantSetsResources = (v) => !!v && (v.gpu === true || (v.cpu || 0) > 0 || (v.memory || 0) > 0);
+
+// A variant's declared resources in a few words ("4 vCPU · 14 GB"), or "".
+export function variantResources(v) {
+  const parts = [];
+  if ((v?.cpu || 0) > 0) parts.push(`${+(v.cpu / 1024).toFixed(2)} vCPU`);
+  if ((v?.memory || 0) > 0) parts.push(`${+(v.memory / 1024).toFixed(1)} GB`);
+  return parts.join(" · ");
+}
+
+// Why a node can't run a session on variant v, as short reasons, [] when it
+// can: a GPU variant needs what gpuSessionUnfit says; another non-default
+// variant only a provisioner that passes the variant gate (gateReason); the
+// default runs anywhere notebooks do.
+export function variantNodeUnfit(node, v, gateReason = () => "") {
+  if (!v) return [];
+  if (v.gpu) return gpuSessionUnfit(node, gateReason);
+  if (v.default) return [];
+  const gate = gateReason(node);
+  return gate ? [gate] : [];
+}
+
+// The id of a workflow definition's session step (the one that takes the
+// run's variant): its interactive step, else its first processor; "" when
+// it has none.
+export function sessionStepId(dag = []) {
+  const steps = (dag || []).filter((d) => d.type === "processor");
+  const live = steps.find((d) => d.runtimeConfig?.interactive || d.runtimeConfig?.sessionType || d.interactive);
+  return (live || steps[0])?.id || "";
+}
+
+// The kernel cards: [{ key, cpu, gpu, perRun, twins }], in the kernels'
+// order.
+// - A card of a workflow that offers its variants per run (perRun) is that
+//   workflow alone (cpu: it, gpu: null). Its twins, the same kernel's
+//   workflows of the same session app and results that pin one variant
+//   each (the GPU workflow published before variants per run), are left
+//   out: their uuids are in twins, so a link to one still finds the card.
+//   Of several such workflows, the one that runs the default variant is
+//   preferred.
+// - Otherwise each card holds the CPU and GPU workflow of one kernel
+//   (either may be null). Workflows pair when they are variants
+//   (notebook.variant) of the same kernel, session app and results; one
+//   without variants is a card of its own (cpu).
 export function kernelCards(kernels = []) {
   const cards = [];
   const byKey = new Map();
   for (const wf of kernels) {
     if (!wf?.notebook?.variant) {
-      cards.push({ key: wf.uuid, cpu: wf, gpu: null });
+      cards.push({ key: wf.uuid, cpu: wf, gpu: null, perRun: null, twins: [] });
       continue;
     }
     const io = (wf.inputs?.length || 0) + (wf.outputs?.length || 0) > 0 ? "interface" : wf.notebook.savesTo || "";
     const key = [notebookKernel(wf), sessionApp(wf), io].join("|");
     let card = byKey.get(key);
     if (!card) {
-      card = { key, cpu: null, gpu: null };
+      card = { key, cpu: null, gpu: null, members: [] };
       byKey.set(key, card);
       cards.push(card);
     }
-    const side = notebookGpu(wf) ? "gpu" : "cpu";
-    if (!card[side]) card[side] = wf;
+    card.members.push(wf);
   }
-  return cards;
+  return cards.map((card) => {
+    if (!card.members) return card;
+    const { members, ...rest } = card;
+    const perRun = members.filter(offersRunVariants);
+    if (perRun.length) {
+      const runsDefault = (wf) => runVariants(wf).find((v) => v.id === wf.notebook.variant)?.default === true;
+      const pick = perRun.find(runsDefault) || perRun[0];
+      return { ...rest, cpu: pick, gpu: null, perRun: pick, twins: members.filter((wf) => wf !== pick).map((wf) => wf.uuid) };
+    }
+    const out = { ...rest, perRun: null, twins: [] };
+    for (const wf of members) {
+      const side = notebookGpu(wf) ? "gpu" : "cpu";
+      if (!out[side]) out[side] = wf;
+    }
+    return out;
+  });
 }
 
-// The card a workflow is on.
+// The card a workflow is on (also a twin a per-run card stands for).
 export const cardOf = (cards, workflowId) =>
-  (cards || []).find((c) => c.cpu?.uuid === workflowId || c.gpu?.uuid === workflowId) || null;
+  (cards || []).find(
+    (c) => c.cpu?.uuid === workflowId || c.gpu?.uuid === workflowId || (c.twins || []).includes(workflowId)
+  ) || null;
+
+// What starting workflowId (a link's ?start=) selects: { workflowId,
+// variant } — a twin a per-run card stands for selects that card's
+// workflow with the twin's variant; any other workflow itself, with its
+// default run variant. null when no card has it.
+export function cardSelection(cards, workflowId, kernels = []) {
+  const card = cardOf(cards, workflowId);
+  if (!card) return null;
+  if (card.perRun && card.perRun.uuid !== workflowId) {
+    const twin = (kernels || []).find((k) => k.uuid === workflowId);
+    const variant = twin?.notebook?.variant;
+    const offered = runVariants(card.perRun).some((v) => v.id === variant);
+    return { workflowId: card.perRun.uuid, variant: offered ? variant : defaultRunVariant(card.perRun) };
+  }
+  const wf = card.perRun || [card.cpu, card.gpu].find((w) => w?.uuid === workflowId);
+  return { workflowId, variant: defaultRunVariant(wf) };
+}
 
 // Why a node can't host a GPU notebook, as short reasons, [] when it can:
 // - it has no GPUs;
