@@ -173,9 +173,12 @@ async function fetchNotebookWorkflows() {
 }
 
 /* ------------------------------------------------------ notebook runs ------- */
+// Sessions of the official kernels, and any other interactive run here: the
+// Official rule guards which kernels are offered, not which running sessions
+// you see (a hidden session keeps billing, e.g. on a GPU).
 const notebookRuns = computed(() => {
   const ids = notebookWorkflowIds.value;
-  return workflowInstances.value.filter((r) => ids.has(r.workflowUuid));
+  return workflowInstances.value.filter((r) => ids.has(r.workflowUuid) || r.interactive === true);
 });
 const activeNotebookRuns = computed(() =>
   notebookRuns.value
