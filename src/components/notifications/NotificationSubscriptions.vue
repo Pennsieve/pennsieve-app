@@ -115,10 +115,11 @@ async function handleToggle(topic, enabled) {
     subscriptions.value.push(tempSub)
 
     try {
-      const created = await subscribe(topicId, {
-        ...context,
-        notification_channels: EMAIL_ONLY,
-      })
+      const created = await subscribe(
+        topicId,
+        { ...context, notification_channels: EMAIL_ONLY },
+        store.state.activeOrganization?.organization?.id
+      )
       const idx = subscriptions.value.indexOf(tempSub)
       if (idx !== -1) {
         subscriptions.value.splice(idx, 1, created)
@@ -135,7 +136,11 @@ async function handleToggle(topic, enabled) {
     existing.enabled = false
 
     try {
-      await toggleSubscription(existing.subscription_id, false)
+      await toggleSubscription(
+        existing.subscription_id,
+        false,
+        store.state.activeOrganization?.organization?.id
+      )
     } catch {
       existing.enabled = true
       ElMessage.error('Failed to disable subscription. Please try again.')
