@@ -44,8 +44,9 @@ const variantList = (version) => {
 };
 
 // A version's variants, in order, each { id, name, description, default,
-// manifest, computeTypes, gpu }; [] when it has none. The version is the
-// tag's, else the newest with a manifest (as versionManifest).
+// manifest, computeTypes, gpu, status, failureReason }; [] when it has
+// none. The version is the tag's, else the newest with a manifest (as
+// versionManifest).
 export function variantsOf(app, tag) {
   const version = versionOf(app, tag);
   const list = variantList(version);
@@ -62,6 +63,10 @@ export function variantsOf(app, tag) {
       manifest,
       computeTypes,
       gpu: computeTypes.includes("gpu"),
+      // Its build (app-deploy-service): registering, deployed, error or
+      // disabled, and why it failed; "" where not given.
+      status: v.status || "",
+      failureReason: v.failureReason || "",
     };
   });
 }

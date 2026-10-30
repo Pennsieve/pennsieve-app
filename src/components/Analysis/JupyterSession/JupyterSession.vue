@@ -13,6 +13,10 @@ import FileBrowser from "./FileBrowser.vue";
 import InputsPanel from "./InputsPanel.vue";
 import EnvironmentPanel from "./EnvironmentPanel.vue";
 import { sessionPathCode } from "./pathCode";
+import RuntimeMark from "../WorkflowGraph/RuntimeMark.vue";
+import { fetchRun } from "../RunMonitor/runDetails";
+import { runOnGpu } from "../RunMonitor/notebookHelpers";
+import * as siteConfig from "@/site-config/site.json";
 import {
   VideoPlay,
   DArrowRight,
@@ -28,6 +32,21 @@ import {
 const props = defineProps({
   runId: { type: String, required: true },
 });
+
+// A GPU session (the session app's gpu variant): marked in the header, and
+// the environment panel warns about environments that bring their own
+// torch, tensorflow or jax. Read from the run; a CPU session until it is.
+const onGpu = ref(false);
+watch(
+  () => props.runId,
+  async (id) => {
+    onGpu.value = false;
+    if (!id) return;
+    const run = await fetchRun(siteConfig.api2Url, id);
+    if (id === props.runId) onGpu.value = runOnGpu(run);
+  },
+  { immediate: true }
+);
 
 // The run's page: where ending the session leads, since the run carries on
 // (its next steps, e.g. a download target's zip, show there). In its
@@ -748,6 +767,7 @@ const kernelPill = computed(() => {
           :clear-environment="clearEnvironment"
           :ready="status === 'ready'"
           :kernel-name="kernelName"
+          :gpu="onGpu"
         />
         <InputsPanel
           :run-id="runId"
@@ -853,6 +873,10 @@ const kernelPill = computed(() => {
           </span>
 
           <span class="nb-spacer" />
+
+          <span v-if="onGpu" class="nb-gpu" title="This notebook runs on a GPU (NVIDIA T4)">
+            <RuntimeMark runtime="gpu" compact /><template v-if="!compactToolbar">GPU (T4)</template>
+          </span>
 
           <span
             class="nb-kernel"
@@ -1026,6 +1050,13 @@ const kernelPill = computed(() => {
   color: #6b87b3; /* muted navy */
 }
 .nb-source__icon { font-size: 13px; }
+.nb-gpu {
+  display: inline-flex;
+  align-items: center;
+  font-size: 12px;
+  color: #4d4d4d; /* gray_5 */
+  margin-right: 8px;
+}
 .nb-kernel {
   display: inline-flex;
   align-items: center;

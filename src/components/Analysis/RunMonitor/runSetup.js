@@ -7,12 +7,16 @@
 import { interactiveCapable } from "./notebookHelpers";
 import { targetWritesToDataset } from "./dataTargets";
 import { hasInterface, worksWithoutDataset } from "./workflowInterface";
+import { provisionerGateReason } from "./variantGate";
 
 // Why a node can't run a workflow, as short reasons ("Paused", "No LLM
 // access"), [] when it can. steps: the workflow's DAG; manifestOf(stepId):
 // the step's app.yml (or null); computeTypeOf(stepId): where the step will
-// run (standard, lambda, gpu).
-export function nodeUnfit(node, steps, manifestOf = () => null, computeTypeOf = () => "") {
+// run (standard, lambda, gpu). With app variants: nonDefaultVariant(stepId)
+// says a step runs a variant other than its version's default, which needs
+// the node's provisioner to pass the gate ({ min, allowUnversioned },
+// variantGate.js).
+export function nodeUnfit(node, steps, manifestOf = () => null, computeTypeOf = () => "", { nonDefaultVariant = () => false, gate = null } = {}) {
   if (!node) return ["Unknown node"];
   const reasons = [];
   if (node.status && node.status !== "Enabled") reasons.push(node.status === "Paused" ? "Paused" : node.status);
@@ -23,6 +27,10 @@ export function nodeUnfit(node, steps, manifestOf = () => null, computeTypeOf = 
   if (!((node.maxGpuInstances || 0) > 0) && apps.some((s) => computeTypeOf(s.id) === "gpu")) reasons.push("No GPU");
   if (node.deploymentMode === "compliant" && (steps || []).some((s) => computeTypeOf(s.id) === "lambda")) {
     reasons.push("Compliant nodes don't run Lambda steps");
+  }
+  if (gate && apps.some((s) => nonDefaultVariant(s.id))) {
+    const why = provisionerGateReason(node, gate);
+    if (why) reasons.push(why);
   }
   return reasons;
 }

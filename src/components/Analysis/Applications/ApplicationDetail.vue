@@ -16,6 +16,8 @@ import ShareAppDialog from "./ShareAppDialog.vue";
 import { accessEntries, accessSummary, makeNamer } from "./appSharing";
 import { useWorkspaceMembers } from "./useWorkspaceMembers";
 import { fetchReleaseStatus, releaseNudge } from "./release";
+import { releaseProgress, variantDetails, versionVariants } from "./versionVariants";
+import RuntimeMark from "../WorkflowGraph/RuntimeMark.vue";
 import AppArchiveToggle from "../../user/code/AppArchiveToggle.vue";
 import { useGetToken } from "@/composables/useGetToken";
 import { useSendXhr } from "@/mixins/request/request_composable";
@@ -136,21 +138,30 @@ const stopReleaseWatch = () => {
   if (releaseWatch) clearTimeout(releaseWatch);
   releaseWatch = null;
 };
+// The tag just released here: for an app with variants, its builds'
+// progress (one per variant) shows until they've all finished.
+const releasedTag = ref("");
+const progress = computed(() => (releasedTag.value ? releaseProgress(detail.value, releasedTag.value) : null));
 const onReleased = ({ tag }) => {
   stopReleaseWatch();
   loadReleaseStatus();
-  const bare = (s) => String(s || "").replace(/^v/, "");
+  releasedTag.value = tag;
   let tries = 0;
-  // Every 20 s for up to 10 minutes, until the app store has the version.
+  // Every 20 s for up to 10 minutes, until the app store has the version
+  // and its builds have finished.
   const check = async () => {
     tries += 1;
-    await loadDetail(props.uuid);
-    const there = (detail.value?.versions || []).some((v) => bare(v.version) === bare(tag));
-    if (!there && tries < 30) releaseWatch = setTimeout(check, 20000);
+    await loadDetail(props.uuid, { quiet: true });
+    const p = progress.value;
+    // An app with variants: until each variant's build has finished.
+    if ((!p || (p.variants && !p.done)) && tries < 30) releaseWatch = setTimeout(check, 20000);
     else releaseWatch = null;
   };
   releaseWatch = setTimeout(check, 20000);
 };
+// The newest version's variants: the Variants section, and the release
+// dialog's check of "--" in a tag.
+const newestVariants = computed(() => variantDetails(detail.value, sortedVersions.value[0]?.version));
 onBeforeUnmount(stopReleaseWatch);
 
 // Permissions only apply to private applications.
@@ -530,13 +541,17 @@ const ensureOrgData = async () => {
 /*
   Fetch application detail
 */
-const loadDetail = async (uuid) => {
-  detail.value = null;
-  readmeHtml.value = "";
+// quiet: a refresh in place (a release's progress), without clearing the
+// page while it loads.
+const loadDetail = async (uuid, { quiet = false } = {}) => {
+  if (!quiet) {
+    detail.value = null;
+    readmeHtml.value = "";
+    versionsPage.value = 1;
+  }
   detailError.value = "";
-  versionsPage.value = 1;
   if (!uuid) return;
-  detailLoading.value = true;
+  if (!quiet) detailLoading.value = true;
   try {
     const [detailResult, permissionsResult] = await Promise.allSettled([
       store.dispatch("analysisModule/fetchApplication", uuid),
@@ -1118,10 +1133,38 @@ watch(
 
           </el-collapse-item>
 
+          <!-- The newest version's variants (a CPU and a GPU build): what
+               each is and runs with -->
+          <el-collapse-item v-if="newestVariants.length" :title="`Variants (${newestVariants.length})`" name="variants">
+            <div v-for="v in newestVariants" :key="v.id" class="variant-card">
+              <div class="version-header">
+                <span class="version-tag"><RuntimeMark v-if="v.gpu" runtime="gpu" compact />{{ v.name }}</span>
+                <span class="status-badge" :class="statusBadgeClass(v.status)">{{ v.status ? statusLabel(v.status) : "Not built" }}</span>
+              </div>
+              <p v-if="v.description" class="variant-desc">{{ v.description }}</p>
+              <div class="variant-facts">
+                <span class="variant-fact"><span class="variant-fact-label">Id</span> {{ v.id }}<template v-if="v.default"> (default)</template></span>
+                <span v-if="v.runsOn" class="variant-fact"><span class="variant-fact-label">Runs on</span> {{ v.runsOn }}</span>
+                <span v-if="v.timeout" class="variant-fact"><span class="variant-fact-label">Timeout</span> {{ v.timeout }}</span>
+                <span v-for="p in v.params" :key="p.name" class="variant-fact"><span class="variant-fact-label">{{ p.label }}</span> {{ p.value }}</span>
+              </div>
+              <p v-if="v.failureReason" class="variant-why">{{ v.failureReason }}</p>
+            </div>
+          </el-collapse-item>
+
           <el-collapse-item
             :title="`Versions (${sortedVersions.length})`"
             name="versions"
           >
+            <!-- A release from here: its builds, until they've finished -->
+            <div v-if="progress?.variants" class="release-progress">
+              <div class="release-progress-title">{{ progress.done ? `${progress.tag} is built` : `Building ${progress.tag}…` }}</div>
+              <div v-for="r in progress.rows" :key="r.id || r.name" class="version-variant" :title="r.failureReason || ''">
+                <span class="version-variant-name">{{ r.name }}</span>
+                <span class="status-badge status-badge-sm" :class="statusBadgeClass(r.status)">{{ r.status ? statusLabel(r.status) : "Waiting" }}</span>
+                <span v-if="r.failureReason" class="version-variant-why">{{ r.failureReason }}</span>
+              </div>
+            </div>
             <div v-if="sortedVersions.length === 0" class="empty-versions">
               No versions yet
             </div>
@@ -1141,6 +1184,19 @@ watch(
               </div>
               <div class="version-meta">
                 <span>Released {{ formatDate(version.createdAt) }}</span>
+              </div>
+              <!-- Each variant's build; the version's status is the default's -->
+              <div v-if="versionVariants(detail, version.version).length" class="version-variants">
+                <div
+                  v-for="v in versionVariants(detail, version.version)"
+                  :key="v.id"
+                  class="version-variant"
+                  :title="v.failureReason || v.description || ''"
+                >
+                  <span class="version-variant-name"><RuntimeMark v-if="v.gpu" runtime="gpu" compact />{{ v.name }}<template v-if="v.default"> (default)</template></span>
+                  <span class="status-badge status-badge-sm" :class="statusBadgeClass(v.status)">{{ v.status ? statusLabel(v.status) : "Not built" }}</span>
+                  <span v-if="v.failureReason" class="version-variant-why">{{ v.failureReason }}</span>
+                </div>
               </div>
               <!-- Deployments hidden for now -->
               <!--
@@ -1213,6 +1269,8 @@ watch(
       :known-tags="knownTags"
       :status="releaseStatus"
       :default-branch="releaseStatus?.target || ''"
+      :has-variants="newestVariants.length > 0"
+      :progress="progress?.variants ? progress : null"
       @released="onReleased"
     />
   </div>
@@ -2197,6 +2255,65 @@ p.access-ask {
   font-size: 11px;
   color: theme.$gray_4;
   margin-bottom: 8px;
+}
+
+.version-variants {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 4px;
+}
+.version-variant {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-size: 12px;
+  color: theme.$gray_6;
+}
+.version-variant-name {
+  display: inline-flex;
+  align-items: center;
+}
+.version-variant-why,
+.variant-why {
+  flex-basis: 100%;
+  font-size: 11px;
+  color: theme.$red_2;
+}
+.variant-card {
+  background: theme.$gray_1;
+  border: 1px solid theme.$gray_2;
+  border-radius: 4px;
+  padding: 10px 12px;
+  margin-bottom: 10px;
+}
+.variant-desc {
+  margin: 0 0 6px;
+  font-size: 12px;
+  color: theme.$gray_5;
+}
+.variant-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  font-size: 12px;
+  color: theme.$gray_6;
+}
+.variant-fact-label {
+  color: theme.$gray_4;
+}
+.release-progress {
+  border: 1px solid theme.$gray_2;
+  border-radius: 4px;
+  padding: 10px 12px;
+  margin-bottom: 10px;
+}
+.release-progress-title {
+  margin-bottom: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: theme.$gray_6;
 }
 
 .deployments-list {

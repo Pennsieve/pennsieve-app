@@ -6,7 +6,8 @@ import { useRouter, useRoute } from "vue-router";
 import IconAnalysis from "../../icons/IconAnalysis.vue";
 import AppBanner from "./AppBanner.vue";
 import { appDomain, appFields, domainColors, domainCounts, fieldCounts } from "./appDomains";
-import { versionManifest } from "../WorkflowBuilder/appManifestInfo";
+import { paletteVariants, versionManifest } from "../WorkflowBuilder/appManifestInfo";
+import RuntimeMark from "../WorkflowGraph/RuntimeMark.vue";
 import {
   APP_SORTS,
   appTitle,
@@ -419,7 +420,14 @@ const goToManifestBuilder = () => {
             <p class="app-description">
               {{ appDescription(app) || readmeSummary(app) || "No description." }}
             </p>
-            <div v-if="appTags(app).length" class="app-tags">
+            <!-- Its variants (a CPU and a GPU build), then its tags -->
+            <div v-if="appTags(app).length || paletteVariants(app).length" class="app-tags">
+              <span
+                v-for="v in paletteVariants(app)"
+                :key="`v:${v.id}`"
+                class="app-tag app-variant"
+                :title="[v.name, v.description, v.gpu && 'Runs on a GPU'].filter(Boolean).join(' · ')"
+              ><RuntimeMark v-if="v.gpu" runtime="gpu" compact />{{ v.name }}</span>
               <span v-for="t in appTags(app)" :key="t" class="app-tag">{{ t }}</span>
             </div>
             <div class="app-meta">
@@ -746,6 +754,12 @@ $card-height: 172px;
   background: theme.$gray_0;
   font-size: 11px;
   color: theme.$gray_5;
+}
+.app-variant {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid theme.$gray_2;
+  background: theme.$white;
 }
 .app-body {
   display: flex;

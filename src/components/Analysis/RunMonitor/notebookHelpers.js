@@ -78,3 +78,78 @@ export function nonSavingAlternative(kernels = [], wf) {
   const others = kernels.filter((k) => k.uuid !== wf.uuid && notebookKernel(k) === kernel);
   return others.find((k) => k.notebook?.savesTo === "download") || others.find((k) => k.notebook?.savesTo === "none") || null;
 }
+
+/*
+  CPU and GPU kernels (app variants, docs/app-variants.md section 6a). The
+  session app has a cpu and a gpu variant, and Pennsieve publishes one
+  official notebook workflow per kernel and variant; workflow-service marks
+  each with notebook.variant and notebook.gpu. The wizard shows them as one
+  kernel card with a Hardware toggle.
+*/
+
+// Whether a notebook workflow starts a GPU session.
+export const notebookGpu = (wf) => wf?.notebook?.gpu === true;
+
+// The session app a notebook workflow runs (its session step's sourceUrl),
+// when the definition lists its steps; "" otherwise.
+const sessionApp = (wf) => {
+  const step = (wf?.dag || wf?.processors || []).find((d) => d.type === "processor" && d.sourceUrl);
+  return String(step?.sourceUrl || "").replace(/\.git$/, "").replace(/\/+$/, "").toLowerCase();
+};
+
+// The kernel cards: [{ key, cpu, gpu }], each the CPU and GPU workflow of
+// one kernel (either may be null), in the kernels' order. Workflows pair
+// when they are variants (notebook.variant) of the same kernel, session app
+// and results; one without variants is a card of its own (cpu).
+export function kernelCards(kernels = []) {
+  const cards = [];
+  const byKey = new Map();
+  for (const wf of kernels) {
+    if (!wf?.notebook?.variant) {
+      cards.push({ key: wf.uuid, cpu: wf, gpu: null });
+      continue;
+    }
+    const io = (wf.inputs?.length || 0) + (wf.outputs?.length || 0) > 0 ? "interface" : wf.notebook.savesTo || "";
+    const key = [notebookKernel(wf), sessionApp(wf), io].join("|");
+    let card = byKey.get(key);
+    if (!card) {
+      card = { key, cpu: null, gpu: null };
+      byKey.set(key, card);
+      cards.push(card);
+    }
+    const side = notebookGpu(wf) ? "gpu" : "cpu";
+    if (!card[side]) card[side] = wf;
+  }
+  return cards;
+}
+
+// The card a workflow is on.
+export const cardOf = (cards, workflowId) =>
+  (cards || []).find((c) => c.cpu?.uuid === workflowId || c.gpu?.uuid === workflowId) || null;
+
+// Why a node can't host a GPU session, as short reasons, [] when it can: it
+// has no GPUs; it is a basic-mode node (a GPU task gets no public address for
+// the platform gateway, so v1 needs secure mode); its provisioner fails the
+// variant gate (gateReason(node), variantGate.js). Nodes without notebook
+// sessions aren't offered at all.
+export function gpuSessionUnfit(node, gateReason = () => "") {
+  const reasons = [];
+  if (!((node?.maxGpuInstances || 0) > 0)) reasons.push("No GPUs");
+  const mode = String(node?.deploymentMode || "basic").toLowerCase();
+  if (mode !== "secure") reasons.push(mode === "compliant" ? "Compliant node" : "Basic-mode node: GPU notebooks need secure mode");
+  const gate = gateReason(node);
+  if (gate) reasons.push(gate);
+  return reasons;
+}
+
+// Whether a run (as GET /runs/{id} returns it) runs its session on a GPU:
+// a processor step whose execution target, compute type or stamped compute
+// types say gpu.
+export function runOnGpu(run) {
+  const configs = run?.processorConfigs || run?.workflowInstanceConfiguration?.processorConfigs || [];
+  return (run?.dag || []).some((d) => {
+    if (d.type !== "processor") return false;
+    const target = configs.find((c) => c.nodeId === d.id)?.executionTarget || d.computeType || d.runtimeConfig?.computeTypes?.[0];
+    return target === "gpu";
+  });
+}
