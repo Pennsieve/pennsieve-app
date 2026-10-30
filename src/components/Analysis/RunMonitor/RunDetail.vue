@@ -3636,6 +3636,26 @@ onUnmounted(() => {
             </div>
           </div>
 
+          <div v-if="runMetrics.costEstimate.efsThroughput?.readBytes || runMetrics.costEstimate.efsThroughput?.writeBytes" class="receipt-cost-group">
+            <div class="receipt-cost-group-title">EFS I/O</div>
+            <div class="receipt-row">
+              <span>Read</span>
+              <span>{{ formatBytes(runMetrics.costEstimate.efsThroughput.readBytes + (runMetrics.costEstimate.efsThroughput.metadataBytes || 0)) }}</span>
+            </div>
+            <div class="receipt-row">
+              <span>Written</span>
+              <span>{{ formatBytes(runMetrics.costEstimate.efsThroughput.writeBytes) }}</span>
+            </div>
+            <div v-if="runMetrics.costEstimate.efsThroughput.maxConcurrentRuns > 1" class="receipt-row">
+              <span>Shared with</span>
+              <span>up to {{ runMetrics.costEstimate.efsThroughput.maxConcurrentRuns - 1 }} other run(s)</span>
+            </div>
+            <div class="receipt-row receipt-row-cost">
+              <span>Subtotal</span>
+              <span>{{ formatCost(runMetrics.costEstimate.efsThroughput.estimatedCost) }}</span>
+            </div>
+          </div>
+
           <div v-if="runMetrics.costEstimate.cloudWatchLogs" class="receipt-cost-group">
             <div class="receipt-cost-group-title">CloudWatch Logs</div>
             <div class="receipt-row">

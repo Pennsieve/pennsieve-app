@@ -48,6 +48,7 @@ const PARTS = {
   lambda: "Lambda",
   data: "Data transfer",
   efsStorage: "Storage",
+  efsThroughput: "Storage I/O",
   cloudWatchLogs: "Logs",
   stepFunctions: "Orchestration",
   llm: "LLM",
