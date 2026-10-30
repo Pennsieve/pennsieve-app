@@ -94,7 +94,10 @@ watch(() => route.query.run, openRunFromQuery);
       <!-- Live's one action is running a workflow; the Library's cards each
            have their own Run, and building one is the Builder tab's (a
            "+ New Workflow" here was taken for running one). -->
-      <div v-if="view === 'live'" class="wf-actions">
+      <div v-if="view === 'library'" class="wf-actions">
+        <el-checkbox v-model="includeNotebooks" size="small">Include notebooks</el-checkbox>
+      </div>
+      <div v-else-if="view === 'live'" class="wf-actions">
         <el-checkbox v-model="includeNotebooks" size="small">Include notebooks</el-checkbox>
         <bf-button @click="runsRef?.openWizardDialog()">+ Run Workflow</bf-button>
       </div>
@@ -105,7 +108,7 @@ watch(() => route.query.run, openRunFromQuery);
     <!-- Nothing until a first visit knows whether to open on Live -->
     <div v-if="view" class="wf-body">
       <div v-if="view === 'library'" class="wf-library">
-        <WorkflowsGrid embedded />
+        <WorkflowsGrid embedded :include-notebooks="includeNotebooks" />
       </div>
       <RunsOverview
         v-else-if="view === 'live'"
