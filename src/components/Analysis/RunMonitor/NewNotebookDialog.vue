@@ -29,9 +29,16 @@ import {
   nonSavingAlternative,
   kernelCards,
   cardOf,
+  cardSelection,
   notebookGpu,
-  gpuSessionUnfit,
   gpuReasonNote,
+  runVariants,
+  defaultRunVariant,
+  variantLabel,
+  variantSetsResources,
+  variantResources,
+  variantNodeUnfit,
+  sessionStepId,
 } from "./notebookHelpers";
 import { fetchVariantGate, provisionerGateReason } from "./variantGate";
 import RuntimeMark from "../WorkflowGraph/RuntimeMark.vue";
@@ -83,7 +90,9 @@ const config = computed(() => store.state.config);
 
 /* ----------------------------------------------------------- wizard state --- */
 const step = ref(0);
-const form = ref({ workflowId: "", computeNodeId: "", datasetId: "" });
+// variant: the session step's app variant the run picks, for a kernel that
+// offers its variants per run (notebook.variants); "" otherwise.
+const form = ref({ workflowId: "", variant: "", computeNodeId: "", datasetId: "" });
 const runName = ref("");
 const computeNodeSearch = ref("");
 const datasetOptions = ref([]);
@@ -171,14 +180,35 @@ const hasVisibleTargetParams = computed(() =>
 // the variant gate; other nodes stay listed, greyed out with why. Starting
 // one can take a few minutes, and the instance is billed while the notebook
 // is open.
-const isGpu = computed(() => notebookGpu(selectedWorkflow.value));
+// A kernel that offers its variants per run (one workflow for CPU and GPU)
+// shows them as Hardware chips on its card; the pick is sent as the session
+// step's variant. Twin workflows (one per variant, from before) keep the
+// CPU|GPU toggle between them.
+const hardwareChoices = computed(() => runVariants(selectedWorkflow.value));
+const selectedVariant = computed(() => hardwareChoices.value.find((v) => v.id === form.value.variant) || null);
+const isGpu = computed(() =>
+  hardwareChoices.value.length ? selectedVariant.value?.gpu === true : notebookGpu(selectedWorkflow.value)
+);
+// The variant the session runs, for the node rules: the pick, else the
+// twin's (GPU, a non-default variant; CPU, the default).
+const runVariant = computed(() =>
+  selectedVariant.value || (selectedWorkflow.value ? { gpu: isGpu.value, default: !isGpu.value } : null)
+);
+// Its resources are the variant's (a GPU one, or one that declares them):
+// no CPU and memory to choose.
+const variantResourcesSet = computed(() => isGpu.value || variantSetsResources(selectedVariant.value));
 const GPU_LABEL = "GPU (NVIDIA T4)";
+// The hardware row of the summary: the picked variant's name, or the GPU
+// twin's label; "" for a kernel without a choice.
+const hardwareLabel = computed(() =>
+  selectedVariant.value ? variantLabel(selectedVariant.value) : isGpu.value ? GPU_LABEL : ""
+);
 const GPU_NOTE = "Starting takes a few minutes; the instance is billed while the notebook is open.";
 const GPU_HELP =
   "Runs on the node's GPU instance (NVIDIA T4). Needs a secure or compliant node with GPUs. Slower to start (an instance may need to launch) and billed while the session is open.";
 const variantGate = ref(null);
 const nodeReasons = (cn) =>
-  isGpu.value ? gpuSessionUnfit(cn, (n) => provisionerGateReason(n, variantGate.value || {})) : [];
+  variantNodeUnfit(cn, runVariant.value, (n) => provisionerGateReason(n, variantGate.value || {}));
 // The kernel card's toggle: the same kernel's other workflow.
 const setHardware = (card, gpu) => {
   const wf = gpu ? card.gpu : card.cpu;
@@ -188,6 +218,20 @@ const pickCard = (card) => {
   if (cardOf([card], form.value.workflowId)) return;
   form.value.workflowId = (card.cpu || card.gpu).uuid;
 };
+// A Hardware chip of a per-run card: picks the card too.
+const pickVariant = (card, id) => {
+  pickCard(card);
+  form.value.variant = id;
+};
+// Another kernel: its own default pick, unless it offers the one chosen.
+watch(
+  () => form.value.workflowId,
+  () => {
+    if (!hardwareChoices.value.some((v) => v.id === form.value.variant)) {
+      form.value.variant = defaultRunVariant(selectedWorkflow.value);
+    }
+  }
+);
 const cardWorkflow = (card) => (cardOf([card], form.value.workflowId) ? selectedWorkflow.value : card.cpu || card.gpu);
 
 /* --------------------------------------------------------- compute nodes ---- */
@@ -216,7 +260,7 @@ const selectedComputeNode = computed(
   () => computeNodes.value.find((cn) => cn.uuid === form.value.computeNodeId) || null
 );
 // A node chosen for a CPU kernel that can't host the GPU one: chosen again.
-watch(isGpu, () => {
+watch(runVariant, () => {
   if (selectedComputeNode.value && nodeReasons(selectedComputeNode.value).length) form.value.computeNodeId = "";
 });
 const selectedDataset = computed(
@@ -678,7 +722,7 @@ function onFileSelect(selectedFiles, parentId) {
 
 /* ----------------------------------------------------------- wizard nav ----- */
 function reset() {
-  form.value = { workflowId: "", computeNodeId: "", datasetId: "" };
+  form.value = { workflowId: "", variant: "", computeNodeId: "", datasetId: "" };
   nameTouched.value = false;
   computeNodeSearch.value = "";
   datasetSearchQuery.value = "";
@@ -697,12 +741,18 @@ function reset() {
   store.commit("analysisModule/CLEAR_SELECTED_FILES");
   // Preselect the kernel asked for, or the only one if there's just one — but
   // keep the step visible.
-  if (props.initialWorkflowId && kernelChoices.value.some((w) => w.uuid === props.initialWorkflowId)) {
-    form.value.workflowId = props.initialWorkflowId;
+  // A link to a GPU twin a per-run kernel stands for opens that kernel on
+  // the twin's variant.
+  const linked = props.initialWorkflowId && cardSelection(cards.value, props.initialWorkflowId, kernelChoices.value);
+  if (linked) {
+    form.value.workflowId = linked.workflowId;
+    form.value.variant = linked.variant;
   } else if (cards.value.length === 1) {
     // One kernel card (its CPU workflow, when it has CPU and GPU ones).
     form.value.workflowId = (cards.value[0].cpu || cards.value[0].gpu).uuid;
   }
+  // (Set here too: reopening on the same kernel doesn't change workflowId.)
+  if (!form.value.variant) form.value.variant = defaultRunVariant(selectedWorkflow.value);
   // Seed the suggested name ({kernel}-{user}-{date}) now that the kernel (if any)
   // is selected; the watcher keeps it current until the user edits it.
   runName.value = defaultRunName.value;
@@ -726,7 +776,7 @@ const INPUT_FILES_STEP = 4;
 const RESOURCES_STEP = 2;
 const skipsStep = (i) =>
   (i === INPUT_FILES_STEP && (iface.value ? inputChoice.value !== "dataset" : props.personal)) ||
-  (i === RESOURCES_STEP && isGpu.value);
+  (i === RESOURCES_STEP && variantResourcesSet.value);
 
 const next = async () => {
   if (step.value === 3) await loadDefinition(); // leaving Dataset → load inputs
@@ -761,9 +811,9 @@ const stepAbout = computed(() =>
 const soFar = computed(() => {
   const rows = [];
   if (step.value > 0 && selectedWorkflow.value) rows.push({ label: "Kernel", value: kernelLabel(notebookKernel(selectedWorkflow.value)) });
-  if (step.value > 0 && isGpu.value) rows.push({ label: "Hardware", value: GPU_LABEL });
+  if (step.value > 0 && hardwareLabel.value) rows.push({ label: "Hardware", value: hardwareLabel.value });
   if (step.value > 1 && selectedComputeNode.value) rows.push({ label: "Compute node", value: selectedComputeNode.value.name });
-  if (step.value > 2 && !isGpu.value) {
+  if (step.value > 2 && !variantResourcesSet.value) {
     rows.push({ label: "Resources", value: `${cpuLabel(resourceCpu.value)} · ${isAutoMemory.value ? memoryLabel(autoMemoryForCpu(resourceCpu.value)) : memoryLabel(resourceMemory.value)}` });
   }
   if (step.value > 3) {
@@ -830,16 +880,20 @@ async function execute() {
 
     // The session step is live because its app.yml says so; the run only sets
     // its resources.
-    // A GPU kernel: its variant's resources (no CPU and memory chosen).
+    // A GPU kernel, or a variant that declares its resources: the
+    // variant's (no CPU and memory chosen). A kernel that offers its
+    // variants per run gets the pick on its session step.
     const processorConfigs = [];
+    const sessionId = selectedVariant.value ? sessionStepId(dag) : "";
     for (const node of dag) {
-      if (isGpu.value) break;
       if (node.type === "data-source" || node.type === "data-target") continue;
-      processorConfigs.push({
-        nodeId: node.id,
-        cpu: resourceCpu.value,
-        memory: resolvedMemory.value,
-      });
+      const pc = { nodeId: node.id };
+      if (node.id === sessionId) pc.variant = selectedVariant.value.id;
+      if (!variantResourcesSet.value) {
+        pc.cpu = resourceCpu.value;
+        pc.memory = resolvedMemory.value;
+      }
+      if (Object.keys(pc).length > 1) processorConfigs.push(pc);
     }
 
     // Outside a workspace, the public dataset is the first data source's view.
@@ -947,13 +1001,32 @@ async function execute() {
           >
             <span class="kernel-name">
               {{ kernelLabel(notebookKernel(cardWorkflow(card))) }}
-              <RuntimeMark v-if="notebookGpu(cardWorkflow(card))" runtime="gpu" />
+              <RuntimeMark v-if="cardOf([card], form.workflowId) ? isGpu : notebookGpu(cardWorkflow(card))" runtime="gpu" />
             </span>
             <!-- Where results go tells kernels apart only when it's fixed: a
                  notebook with an input and output chooses it later -->
             <span class="kernel-sub">{{ hasInterface(cardWorkflow(card)) ? cardWorkflow(card).summary || "You choose its input and results next" : kernelOutput(cardWorkflow(card)) || cardWorkflow(card).name }}</span>
-            <!-- CPU and GPU builds of the kernel (app variants) -->
-            <div v-if="card.cpu && card.gpu" class="kernel-hardware" @click.stop>
+            <!-- The kernel's variants, picked per run (app variants) -->
+            <div v-if="runVariants(card.perRun).length" class="kernel-hardware" @click.stop>
+              <span class="kernel-hardware__label">Hardware</span>
+              <div class="hardware-chips" role="radiogroup" aria-label="Hardware">
+                <button
+                  v-for="v in runVariants(card.perRun)"
+                  :key="v.id"
+                  type="button"
+                  role="radio"
+                  class="hardware-chip"
+                  :class="{ 'is-active': cardOf([card], form.workflowId) && form.variant === v.id }"
+                  :aria-checked="!!(cardOf([card], form.workflowId) && form.variant === v.id)"
+                  :title="v.description || undefined"
+                  @click="pickVariant(card, v.id)"
+                >
+                  <RuntimeMark v-if="v.gpu" runtime="gpu" compact />{{ variantLabel(v) }}
+                </button>
+              </div>
+            </div>
+            <!-- CPU and GPU builds of the kernel (twin workflows) -->
+            <div v-else-if="card.cpu && card.gpu" class="kernel-hardware" @click.stop>
               <span class="kernel-hardware__label">Hardware</span>
               <el-radio-group
                 :model-value="cardOf([card], form.workflowId) && notebookGpu(selectedWorkflow) ? 'gpu' : 'cpu'"
@@ -967,8 +1040,10 @@ async function execute() {
             </div>
           </div>
         </div>
-        <!-- GPU picked: where it runs and what that takes -->
+        <!-- GPU picked: where it runs and what that takes; another variant:
+             what it is -->
         <p v-if="isGpu" class="resource-hint">{{ GPU_HELP }}</p>
+        <p v-else-if="selectedVariant?.description" class="resource-hint">{{ selectedVariant.description }}</p>
       </div>
 
       <!-- Step 1: Compute node -->
@@ -1425,11 +1500,15 @@ async function execute() {
             <span class="wizard-summary-label">Compute Node</span>
             <span class="wizard-summary-value">{{ selectedComputeNode?.name }}</span>
           </div>
-          <div v-if="isGpu" class="wizard-summary-row">
+          <div v-if="hardwareLabel" class="wizard-summary-row">
             <span class="wizard-summary-label">Hardware</span>
-            <span class="wizard-summary-value"><RuntimeMark runtime="gpu" compact />{{ GPU_LABEL }}</span>
+            <span class="wizard-summary-value"><RuntimeMark v-if="isGpu" runtime="gpu" compact />{{ hardwareLabel }}</span>
           </div>
-          <div v-else class="wizard-summary-row">
+          <div v-if="variantResourcesSet && variantResources(selectedVariant)" class="wizard-summary-row">
+            <span class="wizard-summary-label">Resources</span>
+            <span class="wizard-summary-value">{{ variantResources(selectedVariant) }} (set by the kernel)</span>
+          </div>
+          <div v-else-if="!variantResourcesSet" class="wizard-summary-row">
             <span class="wizard-summary-label">Resources</span>
             <span class="wizard-summary-value">
               {{ cpuLabel(resourceCpu) }} ·
@@ -1476,7 +1555,7 @@ async function execute() {
             </span>
           </div>
         </div>
-        <p v-if="isGpu" class="resource-hint">{{ GPU_LABEL }}. {{ GPU_NOTE }}</p>
+        <p v-if="isGpu" class="resource-hint">{{ hardwareLabel }}. {{ GPU_NOTE }}</p>
         <p v-if="showPublicInput && publicDataset && !dataSourceNodes.length" class="public-warning">
           This notebook has no input to attach {{ publicDataset.name }} to, so
           it would start without it.
@@ -1743,6 +1822,35 @@ async function execute() {
 .kernel-hardware__label {
   font-size: 12px;
   color: theme.$gray_5;
+}
+.hardware-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.hardware-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 10px;
+  border: 1px solid theme.$gray_3;
+  border-radius: 12px;
+  background: #fff;
+  font-size: 12px;
+  line-height: 18px;
+  color: theme.$gray_6;
+  cursor: pointer;
+}
+.hardware-chip:hover {
+  border-color: theme.$purple_1;
+}
+.hardware-chip.is-active {
+  border-color: theme.$purple_1;
+  background: theme.$purple_1;
+  color: #fff;
+}
+.hardware-chip.is-active :deep(.runtime-mark) {
+  color: #fff;
 }
 .wizard-card.is-unfit {
   cursor: not-allowed;

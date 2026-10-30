@@ -31,7 +31,7 @@ import {
   runDisplayName,
   getUserName as getUserNameFn,
 } from "./runHelpers";
-import { isNotebookWorkflow, notebookGpu } from "./notebookHelpers";
+import { isNotebookWorkflow, notebookGpu, runOnGpu } from "./notebookHelpers";
 import RuntimeMark from "../WorkflowGraph/RuntimeMark.vue";
 import RunHistory from "./RunHistory.vue";
 import NotebookUsage from "./NotebookUsage.vue";
@@ -122,11 +122,14 @@ const view = computed({
 const notebookWorkflowIds = computed(
   () => new Set(notebookWorkflows.value.map((w) => w.uuid))
 );
-// GPU notebooks (the official GPU kernel workflows) carry the GPU mark.
+// GPU notebooks carry the GPU mark: where the run carries its snapshot,
+// when its session ran on a GPU (a GPU variant picked per run too); else
+// runs of a GPU kernel workflow.
 const gpuWorkflowIds = computed(
   () => new Set(notebookWorkflows.value.filter(notebookGpu).map((w) => w.uuid))
 );
-const runRuntime = (run) => (gpuWorkflowIds.value.has(run.workflowUuid) ? "gpu" : "");
+const runRuntime = (run) =>
+  (run?.dag?.length ? runOnGpu(run) : gpuWorkflowIds.value.has(run.workflowUuid)) ? "gpu" : "";
 
 async function fetchDefinitions(query) {
   const token = await useGetToken();
