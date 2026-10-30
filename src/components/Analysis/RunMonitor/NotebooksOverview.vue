@@ -31,7 +31,8 @@ import {
   runDisplayName,
   getUserName as getUserNameFn,
 } from "./runHelpers";
-import { isNotebookWorkflow } from "./notebookHelpers";
+import { isNotebookWorkflow, notebookGpu } from "./notebookHelpers";
+import RuntimeMark from "../WorkflowGraph/RuntimeMark.vue";
 import RunHistory from "./RunHistory.vue";
 import NotebookUsage from "./NotebookUsage.vue";
 
@@ -121,6 +122,11 @@ const view = computed({
 const notebookWorkflowIds = computed(
   () => new Set(notebookWorkflows.value.map((w) => w.uuid))
 );
+// GPU notebooks (the official GPU kernel workflows) carry the GPU mark.
+const gpuWorkflowIds = computed(
+  () => new Set(notebookWorkflows.value.filter(notebookGpu).map((w) => w.uuid))
+);
+const runRuntime = (run) => (gpuWorkflowIds.value.has(run.workflowUuid) ? "gpu" : "");
 
 async function fetchDefinitions(query) {
   const token = await useGetToken();
@@ -389,6 +395,7 @@ onBeforeUnmount(() => {
               </div>
               <div class="active-run-name">
                 {{ runDisplayName(run) || "Unnamed notebook" }}
+                <RuntimeMark v-if="runRuntime(run)" :runtime="runRuntime(run)" compact class="active-run-mark" />
               </div>
               <div class="active-run-subtitle">
                 {{ getUserName(run.createdBy) }}
@@ -420,6 +427,7 @@ onBeforeUnmount(() => {
           search-placeholder="Search notebooks…"
           :node-name="nodeName"
           :user-name="getUserName"
+          :runtime-of="runRuntime"
           @load-more="loadMoreRuns"
         />
       </template>
@@ -592,6 +600,10 @@ onBeforeUnmount(() => {
    right to optically center within the button. */
 .active-run-action--play svg {
   transform: translateX(4px);
+}
+.active-run-mark {
+  vertical-align: -2px;
+  margin-left: 4px;
 }
 .active-run-name {
   font-weight: 600;

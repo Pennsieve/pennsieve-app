@@ -1,5 +1,17 @@
 import { describe, it, expect } from "vitest";
-import { launchableKernels, kernelOutput, notebookKernel, isNotebookWorkflow, kernelLabel, nonSavingAlternative } from "./notebookHelpers";
+import {
+  launchableKernels,
+  kernelOutput,
+  notebookKernel,
+  isNotebookWorkflow,
+  kernelLabel,
+  nonSavingAlternative,
+  kernelCards,
+  cardOf,
+  gpuSessionUnfit,
+  notebookGpu,
+  runOnGpu,
+} from "./notebookHelpers";
 
 // workflow-service's computed field: a notebook only when a step's app.yml
 // declares an interactive Jupyter session.
@@ -59,5 +71,62 @@ describe("nonSavingAlternative", () => {
   it("offers nothing for a notebook that doesn't save to a dataset, or with no same-language one", () => {
     expect(nonSavingAlternative([pyDataset, pyDownload], pyDownload)).toBeNull();
     expect(nonSavingAlternative([pyDataset, rDownload], pyDataset)).toBeNull();
+  });
+});
+
+describe("CPU and GPU kernels", () => {
+  const nb = (uuid, extra = {}, notebook = {}) => ({
+    uuid,
+    name: uuid,
+    dag: [{ id: "s", type: "processor", sourceUrl: "https://github.com/Pennsieve/pennsieve-jupyter-session" }],
+    ...extra,
+    notebook: { kernel: "python", savesTo: "download", ...notebook },
+  });
+
+  it("pairs a kernel's CPU and GPU workflows into one card", () => {
+    const cpu = nb("py-cpu", {}, { variant: "cpu" });
+    const gpu = nb("py-gpu", {}, { variant: "gpu", gpu: true });
+    const r = nb("r", {}, { kernel: "r" });
+    const cards = kernelCards([cpu, r, gpu]);
+    expect(cards.map((c) => [c.cpu?.uuid || null, c.gpu?.uuid || null])).toEqual([
+      ["py-cpu", "py-gpu"],
+      ["r", null],
+    ]);
+    expect(cardOf(cards, "py-gpu")).toBe(cards[0]);
+    expect(cardOf(cards, "nope")).toBeNull();
+  });
+
+  it("keeps workflows without variants as they were, one card each", () => {
+    const a = nb("a");
+    const b = nb("b", {}, { savesTo: "dataset" });
+    expect(kernelCards([a, b]).map((c) => [c.cpu.uuid, c.gpu])).toEqual([
+      ["a", null],
+      ["b", null],
+    ]);
+  });
+
+  it("doesn't pair kernels whose results go elsewhere", () => {
+    const cpu = nb("cpu", {}, { variant: "cpu" });
+    const gpu = nb("gpu", {}, { variant: "gpu", gpu: true, savesTo: "dataset" });
+    expect(kernelCards([cpu, gpu]).length).toBe(2);
+  });
+
+  it("says why a node can't host a GPU session", () => {
+    const fit = { maxGpuInstances: 2, deploymentMode: "secure" };
+    expect(gpuSessionUnfit(fit)).toEqual([]);
+    expect(gpuSessionUnfit({ maxGpuInstances: 0, deploymentMode: "secure" })).toEqual(["No GPUs"]);
+    expect(gpuSessionUnfit({ maxGpuInstances: 1 })).toEqual(["Basic-mode node: GPU notebooks need secure mode"]);
+    expect(gpuSessionUnfit(fit, () => "Provisioner v1.24.0; update")).toEqual(["Provisioner v1.24.0; update"]);
+    expect(notebookGpu({ notebook: { gpu: true } })).toBe(true);
+    expect(notebookGpu({ notebook: {} })).toBe(false);
+  });
+
+  it("knows a run's session runs on a GPU", () => {
+    const step = { id: "s", type: "processor" };
+    expect(runOnGpu({ dag: [step], processorConfigs: [{ nodeId: "s", executionTarget: "gpu" }] })).toBe(true);
+    expect(runOnGpu({ dag: [{ ...step, runtimeConfig: { computeTypes: ["gpu"] } }] })).toBe(true);
+    expect(runOnGpu({ dag: [{ ...step, computeType: "standard", runtimeConfig: { computeTypes: ["gpu"] } }] })).toBe(false);
+    expect(runOnGpu({ dag: [step] })).toBe(false);
+    expect(runOnGpu(null)).toBe(false);
   });
 });

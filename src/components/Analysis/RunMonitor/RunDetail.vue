@@ -89,6 +89,8 @@ import RuntimeMark from "../WorkflowGraph/RuntimeMark.vue";
 import { inputHandleId } from "../WorkflowBuilder/inputPorts";
 import { portHandleId, portOfHandle } from "../WorkflowBuilder/outputPorts";
 import { stepNames } from "../WorkflowBuilder/stepNames";
+import { modelLine, modelLineText, variantName } from "../WorkflowBuilder/appVariants";
+import { fetchVariantGate, runsNonDefaultVariant } from "./variantGate";
 
 // Shown in a workspace (/:orgId/analysis/runs/...) and in My Workspace
 // (/my-workspace/analysis/runs/...), where there's no organization and a run
@@ -582,6 +584,21 @@ const stepManifest = (dag, id) => {
   };
 };
 
+// An app step's variant (app variants), on its card and in its details:
+// its name, and the line of the parameters its variants set differently
+// ("Detector: oncet") with the values given (a run's, else the defaults).
+// A run's step carries the variant that ran (workflow-service stamps it);
+// a workflow's names one only when it isn't the default. Nothing for an
+// app without variants.
+const variantFacts = (d, params) => {
+  const app = d?.type === "processor" ? findMatchedApp(d.sourceUrl) : null;
+  if (!app) return {};
+  const name = variantName(app, d.tag, d.variant);
+  if (!name) return {};
+  return { variantName: name, modelLine: modelLineText(modelLine(app, d.tag, d.variant, params)) };
+};
+const withVariant = (label, facts) => (facts?.variantName && label ? `${label} · ${facts.variantName}` : label);
+
 // The edges: in the detailed view, each link on the ports it joins (two
 // links between the same steps are two lines); in compact, one line per
 // dependency.
@@ -676,11 +693,13 @@ const definitionToNodesAndEdges = (definition) => {
   const hasSavedPositions = dag.some((d) => d.position && typeof d.position.x === "number");
   const resultNodes = dag.map((d) => {
     const nodeType = d.type === "data-source" ? "data-source" : d.type === "data-target" ? "data-target" : "default";
+    const variant = variantFacts(d, d.defaultParams);
     return {
       id: d.id,
       type: nodeType,
       data: {
-        label: labelForDagNode(d, availableApplications.value, targetTypes.value, dag),
+        label: withVariant(labelForDagNode(d, availableApplications.value, targetTypes.value, dag), variant),
+        ...variant,
         nodeType: d.type,
         sourceUrl: d.sourceUrl,
         targetType: d.targetType || null,
@@ -739,12 +758,13 @@ const runToNodesAndEdges = (run) => {
       extra.memory = cfg?.memory || null;
       const nodeParams = runProcessorParams[d.id] || {};
       extra.params = Object.entries(nodeParams).map(([key, value]) => ({ key, value: String(value) }));
+      Object.assign(extra, variantFacts(d, nodeParams));
     }
     return {
       id: d.id,
       type: nodeType,
       data: {
-        label: labelForDagNode(d, availableApplications.value, targetTypes.value, dag),
+        label: withVariant(labelForDagNode(d, availableApplications.value, targetTypes.value, dag), extra),
         status: d.status || "NOT_STARTED",
         processorType: d.type,
         sourceUrl: d.sourceUrl,
@@ -1940,7 +1960,18 @@ const setupComputeTypeOf = (stepId) => {
   const dagNode = (configDefinition.value?.dag || []).find((n) => n.id === stepId);
   return nodeConfigs[stepId]?.executionTarget || dagNode?.computeType || "";
 };
-const unfitReasons = (node) => nodeUnfit(node, configDefinition.value?.dag || [], setupManifestOf.value, setupComputeTypeOf);
+// A step of a variant other than its version's default needs a node whose
+// provisioner passes it on (variantGate.js); the minimum is workflow-service's.
+const variantGate = ref(null);
+const setupNonDefaultVariant = (stepId) => {
+  const d = (configDefinition.value?.dag || []).find((n) => n.id === stepId);
+  return runsNonDefaultVariant(d, d && findMatchedApp(d.sourceUrl));
+};
+const unfitReasons = (node) =>
+  nodeUnfit(node, configDefinition.value?.dag || [], setupManifestOf.value, setupComputeTypeOf, {
+    nonDefaultVariant: setupNonDefaultVariant,
+    gate: variantGate.value,
+  });
 const setupNodeChoices = computed(() =>
   computeNodes.value
     .map((n) => ({ node: n, reasons: unfitReasons(n) }))
@@ -2137,6 +2168,8 @@ onMounted(async () => {
     analyticsChannel.bind("workflow-processor-status", onProcessorStatusUpdate);
   }
 
+  // The variant gate's minimum: read alongside, never waited on.
+  fetchVariantGate(config.value.api2Url, useGetToken).then((g) => (variantGate.value = g));
   await Promise.all([
     // Forced in My Workspace: the cached list may be a workspace's nodes
     store.dispatch("analysisModule/fetchComputeNodes", { force: isMyWorkspace.value }),
@@ -2397,6 +2430,8 @@ onUnmounted(() => {
                   <div v-if="mode === 'browse' && processorFacts(id, data).length" class="node-facts">
                     {{ processorFacts(id, data).join(" · ") }}
                   </div>
+                  <!-- An app with variants: what they set differently ("Detector: oncet") -->
+                  <div v-if="data.modelLine" class="node-facts" :title="data.modelLine">{{ data.modelLine }}</div>
                   <div v-if="(mode === 'browse' && data.params?.length > 0) || (mode === 'configure' && nodeConfigs[id])" class="node-config-summary">
                     <div v-if="mode === 'browse' && data.params?.length > 0" class="param-preview">
                       <div v-for="(p, i) in data.params.slice(0, 3)" :key="i" class="param-row">
@@ -3133,6 +3168,14 @@ onUnmounted(() => {
                 <div v-if="selectedNode.data?.version" class="info-row">
                   <span class="info-label">Version</span>
                   <span class="info-value">{{ selectedNode.data.version }}</span>
+                </div>
+                <div v-if="selectedNode.data?.variantName" class="info-row">
+                  <span class="info-label">Variant</span>
+                  <span class="info-value">{{ selectedNode.data.variantName }}</span>
+                </div>
+                <div v-if="selectedNode.data?.modelLine" class="info-row">
+                  <span class="info-label">Set by variant</span>
+                  <span class="info-value">{{ selectedNode.data.modelLine }}</span>
                 </div>
                 <div v-if="selectedNode.data?.datasetId" class="info-row">
                   <span class="info-label">Writes to</span>

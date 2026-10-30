@@ -68,3 +68,25 @@ describe("usageSidebar", () => {
     expect(usageSidebar(null)).toBeNull();
   });
 });
+
+describe("usage by variant", () => {
+  const sampled = { samples: 4, p50: 900, p95: 1000, max: 1100 };
+  it("names the variant beside the version", () => {
+    const usage = {
+      runs: 3,
+      steps: 3,
+      versions: [
+        { version: "v0.3.0", variant: "gpu", runs: 1, steps: 1, memoryGivenMiB: 14336, memoryUsedMiB: sampled },
+        { version: "v0.3.0", variant: "cpu", runs: 2, steps: 2 },
+        { version: "v0.2.2", runs: 1, steps: 1 },
+      ],
+    };
+    expect(usageRows(usage).map((r) => [r.version, r.variant])).toEqual([
+      ["v0.3.0 · gpu", "gpu"],
+      ["v0.3.0 · cpu", "cpu"],
+      ["v0.2.2", ""],
+    ]);
+    expect(usageSidebar(usage).caption).toBe("Measured over 1 run of v0.3.0 · gpu");
+    expect(sizingHint(usage.versions[0])).toMatch(/^v0\.3\.0 · gpu is given/);
+  });
+});

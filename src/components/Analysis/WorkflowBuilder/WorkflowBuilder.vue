@@ -44,6 +44,19 @@ import BuilderBar from "./BuilderBar.vue";
 import BuilderPalette from "./BuilderPalette.vue";
 import ParamField from "./ParamField.vue";
 import { ioLine, sessionTypeOf, versionManifest, shortMediaType, stepVariant } from "./appManifestInfo";
+import {
+  modelLine,
+  modelLineText,
+  nodesHaveGpus,
+  switchableVariants,
+  switchVariant,
+  titleWithVariant,
+  effectiveVariant,
+  variantFallback,
+  variantParamNote,
+  variantSetParams,
+  variantUnavailable,
+} from "./appVariants";
 import { domainOfTag, domainColors } from "../Applications/appDomains";
 import { diffLines, manifestDiff, versionWarnings } from "./manifestDiff";
 import { builderReadiness, readinessLabel } from "./builderReadiness";
@@ -373,9 +386,12 @@ const updateLines = computed(() => {
 });
 
 const applyVersion = (node, tag) => {
+  // A variant the version doesn't have: the version's default, and a word
+  // that it is ("v0.2.2 has no GPU variant; using the default").
+  const fallback = variantFallback(node.data.application, node.data.tag, tag, node.data.variant);
   node.data.tag = tag;
-  // A variant the version doesn't have: the version's default.
   if (!stepVariant(node.data.application, tag, node.data.variant)) delete node.data.variant;
+  if (fallback) ElMessage({ type: "info", showClose: true, message: `${fallback}.` });
   const m = versionManifest(node.data.application, tag, node.data.variant);
   if (m) {
     node.data.paramSchema = toParamSchema(m.parameters || []);
@@ -408,6 +424,87 @@ const requestVersion = async (tag) => {
   }
   applyVersion(node, tag);
 };
+
+/*
+  A step's app variant (docs/app-variants.md, section 6): a switch beside the
+  version when its version has two or more (a CPU and a GPU build). The
+  compute type, cpu and memory and the parameters the step didn't set follow
+  the variant (appVariants.switchVariant); values it set stay, with a note.
+  Ports are the same for every variant; should they differ, the switch asks
+  first, as a version change does. GPU variants are off where no compute
+  node has GPUs. Apps without variants show none of this.
+*/
+const computeNodesHere = computed(() => store.getters["analysisModule/computeNodes"] || []);
+const gpusHere = computed(() => nodesHaveGpus(computeNodesHere.value));
+const stepVariants = computed(() => {
+  const node = selectedNode.value;
+  if (node?.type !== "default") return [];
+  return switchableVariants(node.data?.application, node.data?.tag);
+});
+const stepVariantId = computed(() => {
+  const node = selectedNode.value;
+  return effectiveVariant(node?.data?.application, node?.data?.tag, node?.data?.variant)?.id || "";
+});
+const stepVariantInfo = computed(() => stepVariants.value.find((v) => v.id === stepVariantId.value) || null);
+const variantOptionTitle = (v) =>
+  [v.description, v.gpu && "Runs on a GPU", variantUnavailable(v, { gpus: gpusHere.value })].filter(Boolean).join("\n");
+// Notes from the last switch: values the step set that differ from the new
+// variant's default.
+const variantNotes = ref([]);
+watch(
+  () => selectedNode.value?.id,
+  () => (variantNotes.value = [])
+);
+
+const requestVariant = async (id) => {
+  const node = selectedNode.value;
+  if (!node || !id || id === stepVariantId.value) return;
+  const app = node.data.application;
+  const s = switchVariant(node.data, app, id);
+  if (s.portLines.length) {
+    try {
+      await ElMessageBox.confirm(
+        h("div", { class: "version-change" }, [h("ul", s.portLines.map((l) => h("li", l)))]),
+        "This variant's inputs and outputs differ",
+        { confirmButtonText: "Switch", cancelButtonText: "Keep current", type: "warning" },
+      );
+    } catch {
+      return;
+    }
+  }
+  if (s.variant) node.data.variant = s.variant;
+  else delete node.data.variant;
+  node.data.computeType = s.computeType;
+  node.data.cpu = s.cpu;
+  node.data.memory = s.memory;
+  if (s.manifest) {
+    node.data.paramSchema = toParamSchema(s.manifest.parameters || []);
+    node.data.manifestPorts = { inputs: s.manifest.inputs || [], outputs: s.manifest.outputs || [] };
+  }
+  variantNotes.value = s.kept.map(
+    (k) => `${k.label} stays ${k.value}, as you set it; this variant's default is ${k.variantDefault || "unset"}.`,
+  );
+  revalidateEdges();
+};
+
+// The parameters the step's variants set differently (DynaSD's Detector):
+// shown first, under the variant switch, each with what every variant
+// defaults it to; the rest under Parameters.
+const variantParamNames = computed(() => {
+  const node = selectedNode.value;
+  if (node?.type !== "default") return [];
+  return variantSetParams(node.data?.application, node.data?.tag);
+});
+const variantParams = computed(() =>
+  variantParamNames.value.map((name) => selectedNodeParamSchema.value.find((p) => p.name === name)).filter(Boolean),
+);
+const otherParams = computed(() => selectedNodeParamSchema.value.filter((p) => !variantParamNames.value.includes(p.name)));
+const variantParamNoteOf = (name) => {
+  const node = selectedNode.value;
+  return variantParamNote(node?.data?.application, node?.data?.tag, node?.data?.variant, name);
+};
+// The card's line of those values ("Detector: oncet"), or "".
+const stepModelLine = (data) => modelLineText(modelLine(data?.application, data?.tag, data?.variant, data?.defaultParams));
 
 // app.yml as written, in a dialog.
 const appYml = ref(null); // { title, text }
@@ -2531,6 +2628,8 @@ const baseName = (n) => {
   if ((n?.type === "data-source" || n?.type === "data-target") && n.data?.name) return n.data.name;
   if (n?.type === "data-source") return sourceLabel(n.id, linkedSteps.value);
   if (n?.type === "data-target") return n.data?.targetType ? getTargetTypeLabel(n.data.targetType) : "Output";
+  // An app with variants: "<app> · <variant>" (the step can't be renamed).
+  if (n?.type === "default") return titleWithVariant(n.data?.label || "", n.data?.application, n.data?.tag, n.data?.variant);
   return n?.data?.label || "";
 };
 // Names that tell steps apart, numbered when two share one (stepNames.js),
@@ -2914,6 +3013,9 @@ const openNodeSettings = (id) => {
                       :title="`This step uses ${data.tag}; ${latestVersion(data.application).version} is the latest`"
                     >update: {{ latestVersion(data.application).version }}</span>
                   </div>
+                  <!-- An app with variants: the values they set differently
+                       ("Detector: oncet"), so the model is always in sight -->
+                  <div v-if="stepModelLine(data)" class="node-meta node-model" :title="stepModelLine(data)">{{ stepModelLine(data) }}</div>
                   <div
                     v-if="data.manifestPorts?.outputs?.length"
                     class="node-ports node-ports--out"
@@ -3316,6 +3418,46 @@ const openNodeSettings = (id) => {
                   </ul>
                   <p v-else class="update-lines-none">No changes declared in app.yml.</p>
                 </div>
+                <!-- The app's variants (a CPU and a GPU build): which one
+                     the step runs, and the parameters they set differently -->
+                <template v-if="stepVariants.length">
+                  <h4 class="sidebar-section-title">Variant</h4>
+                  <el-radio-group
+                    v-if="canEditConfig"
+                    :model-value="stepVariantId"
+                    size="small"
+                    class="step-variants"
+                    aria-label="Variant"
+                    @update:model-value="requestVariant"
+                  >
+                    <el-radio-button
+                      v-for="v in stepVariants"
+                      :key="v.id"
+                      :value="v.id"
+                      :disabled="!!variantUnavailable(v, { gpus: gpusHere }) && v.id !== stepVariantId"
+                      :title="variantOptionTitle(v)"
+                    >
+                      <span class="step-variant-label"><RuntimeMark v-if="v.gpu" runtime="gpu" compact />{{ v.name }}</span>
+                    </el-radio-button>
+                  </el-radio-group>
+                  <span v-else class="step-version-text">{{ stepVariantInfo?.name }}</span>
+                  <p v-if="stepVariantInfo?.description" class="step-variant-desc">{{ stepVariantInfo.description }}</p>
+                  <p v-if="!gpusHere && stepVariants.some((v) => v.gpu)" class="step-variant-desc">
+                    No compute node here has GPUs, so the GPU variants can't be picked.
+                  </p>
+                  <p v-for="n in variantNotes" :key="n" class="step-variant-note">{{ n }}</p>
+                  <div v-if="variantParams.length" class="info-card step-variant-params">
+                    <template v-for="param in variantParams" :key="param.name">
+                      <ParamField
+                        :param="param"
+                        :editable="canEditConfig"
+                        :model-value="selectedNode.data.defaultParams?.[param.name]"
+                        @update:model-value="(v) => setDefaultParam(param.name, v)"
+                      />
+                      <p class="step-variant-param-note">{{ variantParamNoteOf(param.name) }}</p>
+                    </template>
+                  </div>
+                </template>
                 </template>
 
                 <!-- About: read only, from the app.yml and the canvas -->
@@ -3600,13 +3742,13 @@ const openNodeSettings = (id) => {
                 v-if="
                   selectedNode.type === 'default' &&
                   stepTab === 'settings' &&
-                  selectedNodeParamSchema.length > 0
+                  otherParams.length > 0
                 "
               >
                 <h4 class="sidebar-section-title">Parameters</h4>
                 <div class="info-card">
                   <ParamField
-                    v-for="param in selectedNodeParamSchema"
+                    v-for="param in otherParams"
                     :key="param.name"
                     :param="param"
                     :editable="canEditConfig"
@@ -4060,6 +4202,33 @@ const openNodeSettings = (id) => {
   overflow: hidden;
 }
 
+.step-variants {
+  display: flex;
+  flex-wrap: wrap;
+  margin-top: 2px;
+}
+.step-variant-label {
+  display: inline-flex;
+  align-items: center;
+}
+.step-variant-desc,
+.step-variant-note,
+.step-variant-param-note {
+  margin: 6px 0 0;
+  font-size: 12px;
+  line-height: 1.4;
+  color: theme.$gray_5;
+}
+.step-variant-note {
+  color: theme.$gray_6;
+}
+.step-variant-params {
+  margin-top: 8px;
+}
+.step-variant-param-note {
+  margin: -2px 0 8px;
+  color: theme.$gray_4;
+}
 .update-note {
   margin-top: 8px;
   padding: 8px 10px;
@@ -4724,6 +4893,11 @@ kbd {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+// The variant-set parameters' values: one more muted line, cut to the card.
+.node-model {
+  display: block;
+  color: theme.$gray_5;
 }
 /* Edit and remove: on hover or when the step is selected. */
 :deep(.vue-flow__node:not(.selected):not(:hover)) .node-action {
