@@ -123,6 +123,7 @@ export function nodeGpu(node, gpuTiers = []) {
     vcpu: exact ? t.taskCpu / 1024 : t.vcpus || 0,
     memoryGB: exact ? t.taskMemoryMiB / 1024 : Math.floor(((t.memoryGB || 0) * 15) / 16),
     approx: !exact,
+    pricePerHour: t.pricePerHour || 0,
     maxInstances,
   };
 }
