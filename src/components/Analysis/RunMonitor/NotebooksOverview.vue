@@ -31,7 +31,10 @@ import {
   runDisplayName,
   getUserName as getUserNameFn,
 } from "./runHelpers";
-import { isNotebookWorkflow } from "./notebookHelpers";
+import { isNotebookWorkflow, notebookGpu, runOnGpu, runNodeId, gpuMarkTitle } from "./notebookHelpers";
+import { nodeGpu } from "../ComputeNodes/computeNodeHelpers";
+import { useComputeResourcesStore } from "@/stores/computeResourcesStore";
+import RuntimeMark from "../WorkflowGraph/RuntimeMark.vue";
 import RunHistory from "./RunHistory.vue";
 import NotebookUsage from "./NotebookUsage.vue";
 
@@ -121,6 +124,23 @@ const view = computed({
 const notebookWorkflowIds = computed(
   () => new Set(notebookWorkflows.value.map((w) => w.uuid))
 );
+// GPU notebooks carry the GPU mark: where the run carries its snapshot,
+// when its session ran on a GPU (a GPU variant picked per run too); else
+// runs of a GPU kernel workflow.
+const gpuWorkflowIds = computed(
+  () => new Set(notebookWorkflows.value.filter(notebookGpu).map((w) => w.uuid))
+);
+const runRuntime = (run) =>
+  (run?.dag?.length ? runOnGpu(run) : gpuWorkflowIds.value.has(run.workflowUuid)) ? "gpu" : "";
+// The GPU mark's title: the run's node's GPU (its GPU tier), where known.
+const gpuTiers = ref([]);
+const computeResourcesStore = useComputeResourcesStore();
+const runRuntimeTitle = (run) => {
+  if (runRuntime(run) !== "gpu") return "";
+  const id = runNodeId(run);
+  const node = id && (store.getters["analysisModule/computeNodes"] || []).find((n) => n.uuid === id);
+  return gpuMarkTitle(nodeGpu(node, gpuTiers.value));
+};
 
 async function fetchDefinitions(query) {
   const token = await useGetToken();
@@ -167,9 +187,12 @@ async function fetchNotebookWorkflows() {
 }
 
 /* ------------------------------------------------------ notebook runs ------- */
+// Sessions of the official kernels, and any other interactive run here: the
+// Official rule guards which kernels are offered, not which running sessions
+// you see (a hidden session keeps billing, e.g. on a GPU).
 const notebookRuns = computed(() => {
   const ids = notebookWorkflowIds.value;
-  return workflowInstances.value.filter((r) => ids.has(r.workflowUuid));
+  return workflowInstances.value.filter((r) => ids.has(r.workflowUuid) || r.interactive === true);
 });
 const activeNotebookRuns = computed(() =>
   notebookRuns.value
@@ -312,6 +335,10 @@ onMounted(async () => {
     isLoading.value = false;
   }
   openFromQuery();
+  computeResourcesStore
+    .fetchGpuTiers(store.getters.activeOrganization?.organization?.id)
+    .then((t) => (gpuTiers.value = t || []))
+    .catch(() => {});
   // Live updates for every run in the workspace (or the user's own runs)
   if (realtime) {
     analyticsChannel = realtime.subscribe(
@@ -389,6 +416,7 @@ onBeforeUnmount(() => {
               </div>
               <div class="active-run-name">
                 {{ runDisplayName(run) || "Unnamed notebook" }}
+                <RuntimeMark v-if="runRuntime(run)" :runtime="runRuntime(run)" :label="runRuntimeTitle(run)" compact class="active-run-mark" />
               </div>
               <div class="active-run-subtitle">
                 {{ getUserName(run.createdBy) }}
@@ -420,6 +448,8 @@ onBeforeUnmount(() => {
           search-placeholder="Search notebooks…"
           :node-name="nodeName"
           :user-name="getUserName"
+          :runtime-of="runRuntime"
+          :runtime-title-of="runRuntimeTitle"
           @load-more="loadMoreRuns"
         />
       </template>
@@ -592,6 +622,10 @@ onBeforeUnmount(() => {
    right to optically center within the button. */
 .active-run-action--play svg {
   transform: translateX(4px);
+}
+.active-run-mark {
+  vertical-align: -2px;
+  margin-left: 4px;
 }
 .active-run-name {
   font-weight: 600;

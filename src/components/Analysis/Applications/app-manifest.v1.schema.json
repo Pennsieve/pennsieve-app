@@ -34,6 +34,17 @@
       "if": { "minItems": 2 },
       "then": { "items": { "properties": { "name": { "pattern": "^[a-z0-9][a-z0-9-]*$" } } } }
     },
+    "build": { "$ref": "#/$defs/build" },
+    "variants": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 8,
+      "description": "Flavours of the app built from the same repository and release, each its own image (e.g. a CPU and a GPU build). Each variant is the top-level manifest with its own overrides; inputs, outputs, the parameter set, interactive/session settings and tags are always the top level's. The order is the display order. The default is the variant with default: true, otherwise the first; it keeps the app's usual image tag. Ids must be unique (checked on registration), and a release tag of an app with variants must not contain \"--\". See https://github.com/Pennsieve/app-deploy-service/blob/main/docs/app-manifest-variants.md.",
+      "items": { "$ref": "#/$defs/variant" },
+      "contains": { "type": "object", "required": ["default"], "properties": { "default": { "const": true } } },
+      "minContains": 0,
+      "maxContains": 1
+    },
     "commandArguments": {
       "type": "array",
       "deprecated": true,
@@ -165,6 +176,95 @@
           "then": { "required": ["sessionType"], "properties": { "sessionType": { "const": "jupyter" } } }
         }
       ]
+    },
+    "build": {
+      "type": "object",
+      "description": "How the image is built from the repository. At the top level it applies to the app's image (or to every variant); a variant's build is merged over it: its args over the top-level args, and its target and dockerfile replace the top level's.",
+      "additionalProperties": false,
+      "properties": {
+        "args": {
+          "type": "object",
+          "description": "Docker build arguments (ARG), passed as --build-arg NAME=value.",
+          "propertyNames": { "pattern": "^[A-Za-z_][A-Za-z0-9_]*$" },
+          "additionalProperties": { "$ref": "#/$defs/scalar" }
+        },
+        "target": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The Dockerfile stage to build (--target)."
+        },
+        "dockerfile": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The Dockerfile's path, relative to the repository root, without \"..\". Default: Dockerfile.",
+          "allOf": [
+            { "not": { "pattern": "^/" } },
+            { "not": { "pattern": "(^|/)\\.\\.(/|$)" } }
+          ]
+        }
+      }
+    },
+    "variant": {
+      "type": "object",
+      "description": "One variant: its id and what it changes.",
+      "additionalProperties": false,
+      "required": ["id"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9]([a-z0-9-]{0,30}[a-z0-9])?$",
+          "allOf": [
+            { "not": { "const": "default" } },
+            { "not": { "pattern": "--" } }
+          ],
+          "description": "Lowercase letters, numbers and single dashes inside (no leading, trailing or double dashes), at most 32 characters; \"default\" is reserved. Workflows refer to the variant by it, so keep it stable across releases."
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "description": "A short label, e.g. \"GPU (ONCET)\". Default: the id."
+        },
+        "description": {
+          "type": "string",
+          "description": "When to pick this variant, in a sentence."
+        },
+        "default": {
+          "type": "boolean",
+          "description": "This is the default variant. At most one variant sets it; without one, the first is the default."
+        },
+        "build": { "$ref": "#/$defs/build" },
+        "runtime": { "$ref": "#/$defs/variantRuntime" },
+        "parameters": {
+          "type": "object",
+          "description": "Overrides of existing top-level parameters, by name. A variant can't add or remove parameters.",
+          "propertyNames": { "minLength": 1 },
+          "additionalProperties": { "$ref": "#/$defs/parameterOverride" }
+        }
+      }
+    },
+    "variantRuntime": {
+      "type": "object",
+      "description": "The runtime fields a variant may set; each replaces the top-level value. interactive, sessionType and kernel stay the top level's.",
+      "additionalProperties": false,
+      "properties": {
+        "cpu": { "$ref": "#/$defs/runtime/properties/cpu" },
+        "memory": { "$ref": "#/$defs/runtime/properties/memory" },
+        "computeTypes": { "$ref": "#/$defs/runtime/properties/computeTypes" },
+        "timeoutSeconds": { "$ref": "#/$defs/runtime/properties/timeoutSeconds" },
+        "llm": { "$ref": "#/$defs/runtime/properties/llm" }
+      }
+    },
+    "parameterOverride": {
+      "type": "object",
+      "description": "What a variant changes about a top-level parameter. A defaultValue must be one of the validValues and within min and max, whether those are the variant's or the top level's.",
+      "additionalProperties": false,
+      "properties": {
+        "label": { "$ref": "#/$defs/parameter/properties/label" },
+        "description": { "$ref": "#/$defs/parameter/properties/description" },
+        "required": { "$ref": "#/$defs/parameter/properties/required" },
+        "defaultValue": { "$ref": "#/$defs/parameter/properties/defaultValue" },
+        "validValues": { "$ref": "#/$defs/parameter/properties/validValues" }
+      }
     },
     "scalar": {
       "type": ["string", "number", "boolean"]

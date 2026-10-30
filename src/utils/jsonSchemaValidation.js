@@ -7,9 +7,10 @@ import addFormats from 'ajv-formats'
 /**
  * An Ajv instance for our schemas. They declare JSON Schema 2020-12 but only
  * use keywords Ajv's default draft also has ($defs, if/then, const, …), so
- * the schema's own $schema isn't checked.
+ * the schema's own $schema isn't checked. Options are added to Ajv's (e.g.
+ * next: true for minContains/maxContains).
  */
-export function createSchemaValidator() {
+export function createSchemaValidator(options = {}) {
   const ajv = new Ajv({
     allErrors: true,
     strict: false, // Allow unknown keywords like $schema
@@ -17,6 +18,7 @@ export function createSchemaValidator() {
     loadSchema: false, // Don't try to load external schemas
     addUsedSchema: false, // Don't add schemas to internal storage
     missingRefs: 'ignore', // Ignore missing references instead of throwing errors
+    ...options,
   })
   // Try to add formats, but don't fail if it doesn't work
   try {

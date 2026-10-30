@@ -1,3 +1,12 @@
+<script>
+import { createExampleCache } from "./runExamples";
+import { exampleUnavailable } from "@/store/analysisModule";
+
+// The cards' examples, shared by the library's visits in this page load
+// (module scope), so where the feature isn't served it's found out once.
+const exampleCache = createExampleCache(exampleUnavailable);
+</script>
+
 <script setup>
 import { computed, ref, watch, onMounted } from "vue";
 import { interfaceDag } from "../RunMonitor/workflowInterface";
@@ -11,10 +20,14 @@ import WorkflowThumbnail from "../WorkflowGraph/WorkflowThumbnail.vue";
 import RunWizardDialog from "../RunMonitor/RunWizardDialog.vue";
 import { ioSummary, appNames, usageLine, cardText } from "./workflowSummary";
 import { applyFilters, libraryWorkflows, outputOptions, sortWorkflows, SORTS } from "./galleryFilter";
+import { isNotebookWorkflow } from "../RunMonitor/notebookHelpers";
+import { exampleLabel, openPdf, PDF_URL_FRESH_MS } from "./runExamples";
 
-defineProps({
+const props = defineProps({
   // Inside the Workflows tab's Library, whose bar has the New Workflow button.
   embedded: { type: Boolean, default: false },
+  // List notebook workflows too (the Workflows tab's "Include notebooks").
+  includeNotebooks: { type: Boolean, default: false },
 });
 
 const store = useStore();
@@ -91,7 +104,7 @@ function clearFilters() {
 
 const filteredWorkflows = computed(() =>
   sortWorkflows(
-    applyFilters(libraryWorkflows(workflows.value), {
+    applyFilters(libraryWorkflows(workflows.value, props.includeNotebooks), {
       query: searchQuery.value,
       input: inputFilter.value,
       output: outputFilter.value,
@@ -222,10 +235,48 @@ const fetchAllWorkflows = async () => {
 };
 
 
-// Run from a card: the run dialog, here, on this workflow (notebooks aren't
-// listed; they start on the Notebooks tab).
+// Run from a card: the run dialog, here, on this workflow. A notebook
+// workflow (listed only with Include notebooks) starts on the Notebooks tab.
 const runDialog = ref(null);
-const runWorkflow = (wf) => runDialog.value?.open(wf.uuid);
+const runWorkflow = (wf) =>
+  isNotebookWorkflow(wf)
+    ? router.push({ name: "notebooks", params: route.params })
+    : runDialog.value?.open(wf.uuid);
+
+// The cards' example PDFs (a run's summary per workflow), for the cards on
+// the page; none where the feature isn't served.
+const examples = ref({}); // uuid -> example
+watch(
+  paginatedWorkflows,
+  (list) => {
+    for (const wf of list || []) {
+      if (!wf?.uuid || wf.uuid in examples.value) continue;
+      examples.value = { ...examples.value, [wf.uuid]: null };
+      exampleCache
+        .get(wf.uuid, (uuid) => store.dispatch("analysisModule/fetchWorkflowExample", { uuid, strict: true }))
+        .then((example) => {
+          if (example) examples.value = { ...examples.value, [wf.uuid]: { ...example, fetchedAt: Date.now() } };
+        });
+    }
+  },
+  { immediate: true }
+);
+const cardExampleLabel = (example) => (example?.fromVersion ? `Example (v${example.fromVersion})` : "Example");
+const openExample = (wf) => {
+  const cached = examples.value[wf.uuid];
+  const fresh = cached?.pdfUrl && Date.now() - cached.fetchedAt < PDF_URL_FRESH_MS ? cached.pdfUrl : null;
+  openPdf(
+    fresh ||
+      (async () => {
+        exampleCache.forget(wf.uuid);
+        const example = await exampleCache.get(wf.uuid, (uuid) =>
+          store.dispatch("analysisModule/fetchWorkflowExample", { uuid, strict: true })
+        );
+        examples.value = { ...examples.value, [wf.uuid]: example ? { ...example, fetchedAt: Date.now() } : null };
+        return example?.pdfUrl || null;
+      })
+  );
+};
 
 // Re-fetch all when the status or scope filter changes
 watch([statusFilter, isPublicScope], () => {
@@ -357,6 +408,15 @@ onMounted(async () => {
               </span>
               <span class="wf-actions" @click.stop>
                 <button type="button" class="wf-action" @click="goToDetail(wf)">Open</button>
+                <button
+                  v-if="examples[wf.uuid]"
+                  type="button"
+                  class="wf-action"
+                  :title="`${exampleLabel(examples[wf.uuid])}: a PDF summary of a run (opens in a new tab)`"
+                  @click="openExample(wf)"
+                >
+                  {{ cardExampleLabel(examples[wf.uuid]) }}
+                </button>
                 <button v-if="wf.isActive" type="button" class="wf-action wf-action--run" @click="runWorkflow(wf)">
                   ▶ Run
                 </button>

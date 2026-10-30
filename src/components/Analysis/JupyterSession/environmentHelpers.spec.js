@@ -1,5 +1,14 @@
 import { describe, it, expect } from "vitest";
-import { environmentChoices, matchesQuery, packageName, packageSummary, switchBusy, switchLabel } from "./environmentHelpers";
+import {
+  environmentChoices,
+  gpuEnvironmentWarning,
+  gpuFrameworks,
+  matchesQuery,
+  packageName,
+  packageSummary,
+  switchBusy,
+  switchLabel,
+} from "./environmentHelpers";
 
 const py = (version, status = "ready", packages = ["numpy==2.1.0"], runtime = { language: "python", version: "3.12" }) => ({
   version, status, packages, runtime,
@@ -61,5 +70,19 @@ describe("switchLabel", () => {
     expect(switchBusy({ state: "downloading" })).toBe(true);
     expect(switchBusy({ state: "failed" })).toBe(false);
     expect(switchBusy(null)).toBe(false);
+  });
+});
+
+describe("environments on a GPU session", () => {
+  it("finds the frameworks that would shadow the image's CUDA build", () => {
+    expect(gpuFrameworks(["numpy==2.1", "torch==2.4.0", "jaxlib>=0.4", "jax", "tensorflow-cpu"])).toEqual(["torch", "jax", "tensorflow"]);
+    expect(gpuFrameworks(["pandas", "torchvision==0.19"])).toEqual([]);
+    expect(gpuFrameworks(null)).toEqual([]);
+  });
+
+  it("warns only when there is one", () => {
+    expect(gpuEnvironmentWarning(["pandas"])).toBe("");
+    expect(gpuEnvironmentWarning(["torch==2.4"])).toMatch(/^This environment brings its own torch\. .*Leave it out/);
+    expect(gpuEnvironmentWarning(["torch", "jax"])).toMatch(/own torch and jax\. .*Leave them out/);
   });
 });

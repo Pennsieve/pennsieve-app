@@ -31,4 +31,23 @@ describe("costParts", () => {
     ]);
     expect(costParts({})).toEqual([]);
   });
+
+  it("adds up to the total, storage, storage I/O and GPU included", () => {
+    // Run 7e355b88's estimate, as the finalizer sends it.
+    const costEstimate = {
+      ecs: { estimatedCost: 0.122045 },
+      gpu: { estimatedCost: 0 },
+      lambda: { estimatedCost: 0.002513 },
+      data: { estimatedCost: 0 },
+      stepFunctions: { estimatedCost: 0.0013 },
+      cloudWatchLogs: { estimatedCost: 0.000054 },
+      efsStorage: { estimatedCost: 0.000636 },
+      efsThroughput: { estimatedCost: 0.5243 },
+      llm: { estimatedCost: 0 },
+      totalEstimatedCost: 0.650848,
+    };
+    const sum = costParts({ metrics: { costEstimate } }).reduce((t, p) => t + p.cost, 0);
+    expect(sum).toBeCloseTo(costEstimate.totalEstimatedCost, 6);
+    expect(costParts({ metrics: { costEstimate: { gpu: { estimatedCost: 1.2 } } } })).toEqual([{ label: "GPU", cost: 1.2 }]);
+  });
 });
