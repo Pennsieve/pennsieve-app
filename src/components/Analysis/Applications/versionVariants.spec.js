@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { releaseProgress, variantDetails, variantTagWarning, versionVariants } from "./versionVariants";
+import { keepVariant, releaseProgress, variantDetails, variantManifestView, variantTagWarning, versionVariants } from "./versionVariants";
 
 const manifest = (variant, runtime, model) => ({
   name: "DynaSD",
@@ -73,5 +73,40 @@ describe("a release's progress", () => {
     expect(variantTagWarning("v1.0.0--rc", true)).toMatch(/can't contain "--"/);
     expect(variantTagWarning("v1.0.0--rc", false)).toBe("");
     expect(variantTagWarning("v1.0.0-rc.1", true)).toBe("");
+  });
+});
+
+describe("the app.yml tab's variants", () => {
+  const dynasd = app(variants("deployed"));
+
+  it("keeps the variant across versions that have it, else the default", () => {
+    expect(keepVariant(dynasd, "v0.3.0", "gpu")).toBe("gpu");
+    expect(keepVariant(dynasd, "v0.3.0", "")).toBe("cpu");
+    expect(keepVariant(dynasd, "v0.3.0", "tpu")).toBe("cpu");
+    expect(keepVariant(dynasd, "v0.2.2", "gpu")).toBe("");
+  });
+
+  it("shows a variant's resolved runtime and parameters, marking what the default doesn't have", () => {
+    const gpu = variantManifestView(dynasd, "v0.3.0", "gpu");
+    expect(gpu.variant.id).toBe("gpu");
+    expect(gpu.isDefault).toBe(false);
+    expect(gpu.runtime).toEqual({ computeTypes: ["gpu"], cpu: 4096, memory: 14336, timeoutSeconds: 14400 });
+    expect(gpu.differs).toEqual({ computeTypes: true, cpu: false, memory: true, timeoutSeconds: false });
+    const [model, device] = gpu.parameters;
+    expect(model).toMatchObject({ name: "MODEL", label: "Detector", defaultValue: "oncet", validValues: [] });
+    expect(model.differs).toMatchObject({ defaultValue: true, label: false, validValues: false });
+    expect(device.differs.defaultValue).toBe(false);
+  });
+
+  it("marks nothing on the default variant", () => {
+    const cpu = variantManifestView(dynasd, "v0.3.0", "");
+    expect(cpu.isDefault).toBe(true);
+    expect(Object.values(cpu.differs).some(Boolean)).toBe(false);
+    expect(cpu.parameters.some((p) => Object.values(p.differs).some(Boolean))).toBe(false);
+  });
+
+  it("is nothing for a version without variants", () => {
+    expect(variantManifestView(dynasd, "v0.2.2", "gpu")).toBeNull();
+    expect(variantManifestView(app(null), "v0.3.0", "")).toBeNull();
   });
 });
