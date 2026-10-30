@@ -25,6 +25,15 @@ describe("provisioner gate", () => {
     expect(provisionerGateReason({ provisionerImageTag: "v1.0.0" }, { min: "" })).toBe("");
     expect(provisionerGateReason({ provisionerImageTag: "v1.0.0" }, null)).toBe("");
   });
+
+  it("refuses every versioned node while the minimum is a placeholder, as the server does", () => {
+    const placeholder = { min: "TBD-PROV-1", allowUnversioned: false };
+    expect(provisionerGateReason({ provisionerImageTag: "v9.0.0" }, placeholder)).toBe(
+      "App variants aren't enabled on compute nodes yet"
+    );
+    expect(provisionerGateReason({ provisionerImageTag: "latest" }, placeholder)).toMatch(/^Provisioner latest;/);
+    expect(provisionerGateReason({ provisionerImageTag: "latest" }, { ...placeholder, allowUnversioned: true })).toBe("");
+  });
 });
 
 describe("non-default variants", () => {

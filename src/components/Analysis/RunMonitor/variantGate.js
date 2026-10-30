@@ -24,17 +24,21 @@ const before = (a, b) => {
 // Why a node can't run a non-default variant, or "": its provisioner is
 // older than the minimum, or has no version to compare. gate: { min,
 // allowUnversioned }; without a minimum (the gate off, or not known here)
-// nothing is refused.
+// nothing is refused. A minimum that isn't a version (workflow-service's
+// placeholder until the provisioner release is set) refuses every versioned
+// node, as the server does.
 export function provisionerGateReason(node, gate = {}) {
-  const min = parse(gate?.min);
-  if (!min) return "";
+  const configured = String(gate?.min || "").trim();
+  if (!configured) return "";
+  const min = parse(configured);
   const tag = String(node?.provisionerImageTag || "").trim();
   const running = parse(tag);
   if (!running) {
     if (gate.allowUnversioned) return "";
-    return `Provisioner ${tag || "version unknown"}; app variants need ${gate.min} or later, update the node`;
+    return `Provisioner ${tag || "version unknown"}; app variants need ${min ? configured : "a newer provisioner"}, update the node`;
   }
-  return before(running, min) ? `Provisioner ${tag}; app variants need ${gate.min} or later, update the node` : "";
+  if (!min) return "App variants aren't enabled on compute nodes yet";
+  return before(running, min) ? `Provisioner ${tag}; app variants need ${configured} or later, update the node` : "";
 }
 
 // Whether a workflow step runs a variant other than its version's default:
