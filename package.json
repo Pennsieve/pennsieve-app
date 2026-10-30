@@ -94,7 +94,7 @@
     "uuid": "^9.0.1",
     "valid-url": "^1.0.9",
     "vite": "^4.5.0",
-    "vue": "^3.5.17",
+    "vue": "^3.5.44",
     "vue-content-loader": "^2.0.1",
     "vue-draggable-next": "^2.2.1",
     "vue-jstree": "^2.1.6",
