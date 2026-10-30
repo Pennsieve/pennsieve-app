@@ -8,6 +8,8 @@ import AppBanner from "./AppBanner.vue";
 import { appDomain, domainColors, domainCounts } from "./appDomains";
 import { paletteVariants, versionManifest } from "../WorkflowBuilder/appManifestInfo";
 import RuntimeMark from "../WorkflowGraph/RuntimeMark.vue";
+import { versionsToWatch, withLiveStatus } from "./liveStatus";
+import { useAppStatusEvents } from "@/composables/useAppStatusEvents";
 import {
   APP_SORTS,
   appTitle,
@@ -63,9 +65,31 @@ const route = useRoute();
 const isMyWorkspace = computed(() => !route.params.orgId);
 const scopedRoute = (name, params = {}) => ({ name: isMyWorkspace.value ? `my-${name}` : name, params });
 
-const applications = computed(
-  () => store.state.analysisModule.applications || []
+// The apps as listed, with live build statuses over their newest versions
+// (liveStatus.js): a variant's build event moves that variant's chip only,
+// the version's event its status dot.
+const listedApps = computed(() => store.state.analysisModule.applications || []);
+const { live } = useAppStatusEvents((l) =>
+  listedApps.value.flatMap((app) => versionsToWatch(withLiveStatus(app, l), { latest: true }))
 );
+const applications = computed(() => listedApps.value.map((app) => withLiveStatus(app, live.value)));
+// A variant chip's state, without a badge: building or failed.
+const chipState = (v) => {
+  const s = String(v.status || "").toLowerCase();
+  if (s === "error" || s.startsWith("error")) return "app-variant--failed";
+  if (["registering", "building", "deploying", "pending"].includes(s)) return "app-variant--building";
+  return "";
+};
+const chipTitle = (v) =>
+  [
+    v.name,
+    v.description,
+    v.gpu && "Runs on a GPU",
+    chipState(v) === "app-variant--failed" && `Failed to build${v.failureReason ? `: ${v.failureReason}` : ""}`,
+    chipState(v) === "app-variant--building" && "Building",
+  ]
+    .filter(Boolean)
+    .join(" · ");
 
 /*
   Derived helpers
@@ -389,7 +413,8 @@ const goToManifestBuilder = () => {
                 v-for="v in paletteVariants(app)"
                 :key="`v:${v.id}`"
                 class="app-tag app-variant"
-                :title="[v.name, v.description, v.gpu && 'Runs on a GPU'].filter(Boolean).join(' · ')"
+                :class="chipState(v)"
+                :title="chipTitle(v)"
               ><RuntimeMark v-if="v.gpu" runtime="gpu" compact />{{ v.name }}</span>
               <span v-for="t in appTags(app)" :key="t" class="app-tag">{{ t }}</span>
             </div>
@@ -690,6 +715,15 @@ $card-height: 172px;
   align-items: center;
   border: 1px solid theme.$gray_2;
   background: theme.$white;
+}
+.app-variant--building {
+  border-style: dashed;
+  color: theme.$gray_4;
+}
+.app-variant--failed {
+  border-color: theme.$red_2;
+  color: theme.$red_2;
+  text-decoration: line-through;
 }
 .app-body {
   display: flex;

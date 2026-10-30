@@ -17,6 +17,8 @@ import { accessEntries, accessSummary, makeNamer } from "./appSharing";
 import { useWorkspaceMembers } from "./useWorkspaceMembers";
 import { fetchReleaseStatus, releaseNudge } from "./release";
 import { releaseProgress, variantDetails, versionVariants } from "./versionVariants";
+import { versionsToWatch, withLiveStatus } from "./liveStatus";
+import { useAppStatusEvents } from "@/composables/useAppStatusEvents";
 import RuntimeMark from "../WorkflowGraph/RuntimeMark.vue";
 import AppArchiveToggle from "../../user/code/AppArchiveToggle.vue";
 import { useGetToken } from "@/composables/useGetToken";
@@ -143,7 +145,7 @@ const stopReleaseWatch = () => {
 // The tag just released here: for an app with variants, its builds'
 // progress (one per variant) shows until they've all finished.
 const releasedTag = ref("");
-const progress = computed(() => (releasedTag.value ? releaseProgress(detail.value, releasedTag.value) : null));
+const progress = computed(() => (releasedTag.value ? releaseProgress(liveDetail.value, releasedTag.value) : null));
 const onReleased = ({ tag }) => {
   stopReleaseWatch();
   loadReleaseStatus();
@@ -163,7 +165,7 @@ const onReleased = ({ tag }) => {
 };
 // The newest version's variants: the Variants section, and the release
 // dialog's check of "--" in a tag.
-const newestVariants = computed(() => variantDetails(detail.value, sortedVersions.value[0]?.version));
+const newestVariants = computed(() => variantDetails(liveDetail.value, sortedVersions.value[0]?.version));
 onBeforeUnmount(stopReleaseWatch);
 
 // Permissions only apply to private applications.
@@ -223,8 +225,15 @@ const accessChips = computed(() =>
 // Visibility may change via the permissions editor — reload to reflect it.
 const reloadAfterPermissions = () => loadDetail(props.uuid);
 
+// The app with live build statuses over its versions (liveStatus.js), for
+// the versions still building: the version's event moves the version, a
+// variant's event only that variant (a failed GPU build leaves the version
+// deployed). Polling after a release reads the same statuses from the API.
+const { live: liveStatus } = useAppStatusEvents((l) => versionsToWatch(withLiveStatus(detail.value, l)));
+const liveDetail = computed(() => withLiveStatus(detail.value, liveStatus.value));
+
 const sortedVersions = computed(() => {
-  const versions = detail.value?.versions || [];
+  const versions = liveDetail.value?.versions || [];
   return [...versions].sort((a, b) => {
     const aTime = new Date(a.createdAt).getTime() || 0;
     const bTime = new Date(b.createdAt).getTime() || 0;
@@ -1213,9 +1222,9 @@ watch(
                 <span>Released {{ formatDate(version.createdAt) }}</span>
               </div>
               <!-- Each variant's build; the version's status is the default's -->
-              <div v-if="versionVariants(detail, version.version).length" class="version-variants">
+              <div v-if="versionVariants(liveDetail, version.version).length" class="version-variants">
                 <div
-                  v-for="v in versionVariants(detail, version.version)"
+                  v-for="v in versionVariants(liveDetail, version.version)"
                   :key="v.id"
                   class="version-variant"
                   :title="v.failureReason || v.description || ''"
