@@ -2,7 +2,7 @@
   Run examples: a workflow version's example is a PDF summary of one
   successful run of it, made when someone who can edit the workflow sets the
   run as its example (workflow-service POST /runs/{id}/example). Pure
-  helpers for the run page's Set as example action and the workflow page's
+  helpers for the run page's "Use as workflow sample output" action (the API's run example) and the workflow page's
   and library's Example links:
 
   - canEditWorkflow: whether the user may set or remove a workflow's example.
@@ -11,7 +11,8 @@
   - jobActive / jobStatusText: a generation job's state.
   - limitRows / exhaustedLimit: what's left of today's limits.
   - setExampleError: a refused request, said plainly.
-  - openPdf: opens a (fresh) signed PDF link in a new tab.
+  - openPdf: opens a (fresh) signed PDF link in a new tab (the viewer's "Open in a new tab").
+  - samplePdfFilename, downloadPdf: the viewer's Download.
   - createExampleCache: the examples the library's cards show, fetched once
     per workflow for a while, and not at all where the feature isn't served.
 */
@@ -41,21 +42,23 @@ export const canEditWorkflow = (workflow, profile) => {
 // The version an example is of.
 export const exampleVersion = (example) => example?.fromVersion || example?.version || null;
 
-// "Example", or "Example from version N" when it's of an older version than
+// "Sample output", or "Sample output from version N" when it's of an older version than
 // the one shown.
 export const exampleLabel = (example) =>
-  example?.fromVersion ? `Example from version ${example.fromVersion}` : "Example";
+  example?.fromVersion ? `Sample output from version ${example.fromVersion}` : "Sample output";
 
 export const jobStatusText = (job) => {
   switch (job?.status) {
     case "QUEUED":
-      return "Example PDF queued…";
+      return "Sample output queued…";
     case "GENERATING":
-      return "Generating the example PDF…";
+      return "Generating the sample output PDF…";
     case "READY":
-      return "Example PDF ready.";
+      return "Sample output PDF ready.";
     case "FAILED":
-      return job.error ? `The example PDF could not be made: ${job.error}` : "The example PDF could not be made.";
+      return job.error ? job.errorCode === "budget_blocked"
+        ? "Pennsieve's daily budget for generating sample outputs has been used. Try again after midnight UTC."
+        : `The sample output could not be generated: ${job.error}` : "The sample output could not be generated.";
     default:
       return "";
   }
@@ -77,6 +80,19 @@ export const limitRows = (limits) =>
       return { key, label: LIMIT_NAMES[key], used, limit, left: Math.max(0, limit - used) };
     });
 
+// How many more examples can be generated today, as one sentence about the
+// tightest limit (the one with the fewest left), or "" when there are no
+// limits or one is used up (exhaustedLimit and limitMessage cover that).
+const LIMIT_SCOPES = { workflow: "for this workflow", user: "by you", workspace: "in this workspace" };
+export const limitSentence = (limits) => {
+  const rows = limitRows(limits);
+  if (!rows.length) return "";
+  const tightest = rows.reduce((a, b) => (b.left < a.left ? b : a));
+  if (tightest.left <= 0) return "";
+  const n = tightest.left;
+  return `${n} more sample ${n === 1 ? "output" : "outputs"} can be generated ${LIMIT_SCOPES[tightest.key] || ""} today.`;
+};
+
 // The first limit with nothing left today, or null.
 export const exhaustedLimit = (limits) => limitRows(limits).find((r) => r.left <= 0) || null;
 
@@ -92,15 +108,15 @@ export const formatResetAt = (resetAt, now = new Date()) => {
 };
 
 const LIMIT_REACHED = {
-  workflow: "This workflow has had all the examples it can have made today.",
-  user: "You've made all the examples you can today.",
-  workspace: "This workspace has made all the examples it can today.",
-  platform: "Pennsieve's daily budget for making examples has been used.",
+  workflow: "This workflow has had all the sample outputs it can have generated today.",
+  user: "You've generated all the sample outputs you can today.",
+  workspace: "This workspace has generated all the sample outputs it can today.",
+  platform: "Pennsieve's daily budget for generating sample outputs has been used.",
 };
 
 // A rate limit (429 body { limit, resetAt }) said plainly.
 export const limitMessage = (limit, resetAt, now) => {
-  const what = LIMIT_REACHED[limit] || "A daily limit on making examples has been reached.";
+  const what = LIMIT_REACHED[limit] || "A daily limit on generating sample outputs has been reached.";
   const when = formatResetAt(resetAt, now);
   return when ? `${what} You can try again ${when}.` : `${what} Limits reset at midnight UTC.`;
 };
@@ -110,23 +126,23 @@ export const setExampleError = (err, now) => {
   const body = err?.body || {};
   switch (err?.status) {
     case 403:
-      return "You can't set this run as the example: that takes being able to edit the workflow and read every dataset the run wrote to.";
+      return "You can't use this run as the workflow sample output: that takes being able to edit the workflow and read every dataset the run wrote to.";
     case 404:
       return "This run wasn't found.";
     case 409: {
       const other = body.job?.runId || body.runId;
       return other
-        ? `An example is already being made for this workflow (from run ${other}). Try again when it's done.`
-        : "An example is already being made for this workflow. Try again when it's done.";
+        ? `A sample output is already being generated for this workflow (from run ${other}). Try again when it's done.`
+        : "A sample output is already being generated for this workflow. Try again when it's done.";
     }
     case 422:
       return body.message
-        ? `This run can't be an example: ${body.message}`
-        : "This run can't be an example: only a run that succeeded and wrote its outputs to a dataset can be.";
+        ? `This run can't be the sample output: ${body.message}`
+        : "This run can't be the sample output: only a run that succeeded and wrote its outputs to a dataset can be.";
     case 429:
       return limitMessage(body.limit, body.resetAt, now);
     default:
-      return err?.message ? `Could not set the example: ${err.message}` : "Could not set the example.";
+      return err?.message ? `Could not set the sample output: ${err.message}` : "Could not set the sample output.";
   }
 };
 
@@ -185,4 +201,42 @@ export const createExampleCache = (unavailable, ttlMs = PDF_URL_FRESH_MS) => {
       return off;
     },
   };
+};
+
+// The file name a downloaded sample output PDF is saved as, e.g.
+// "Single-cell Spatial Profiling - sample output v3.pdf". Characters file
+// systems refuse are dropped.
+export const samplePdfFilename = (workflowName, version) => {
+  const name = String(workflowName || "Workflow")
+    .replace(/[\\/:*?"<>|\u0000-\u001f]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 120);
+  return `${name || "Workflow"} - sample output${version ? ` v${version}` : ""}.pdf`;
+};
+
+// Saves the PDF at url as filename. The signed link is on another origin, so
+// an <a download> would be ignored; the PDF is fetched (CORS) and saved from a
+// blob. Where that fails, it opens in a new tab instead. Returns "saved" or
+// "opened".
+export const downloadPdf = async (url, filename, env = typeof window !== "undefined" ? window : null) => {
+  if (!env || !url) return null;
+  try {
+    const res = await env.fetch(url, { mode: "cors", credentials: "omit" });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const blob = await res.blob();
+    const href = env.URL.createObjectURL(blob);
+    const a = env.document.createElement("a");
+    a.href = href;
+    a.download = filename;
+    a.rel = "noopener";
+    env.document.body.appendChild(a);
+    a.click();
+    a.remove();
+    env.setTimeout(() => env.URL.revokeObjectURL(href), 10_000);
+    return "saved";
+  } catch {
+    env.open(url, "_blank", "noopener");
+    return "opened";
+  }
 };

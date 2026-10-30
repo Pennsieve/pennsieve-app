@@ -58,51 +58,77 @@ afterEach(() => vi.useRealTimers());
 describe("RunExampleAction", () => {
   it("is offered to an editor of the workflow of a succeeded run", async () => {
     const wrapper = await mountIt();
-    expect(button(wrapper, "Set as example")).toBeTruthy();
+    expect(button(wrapper, "Use as workflow sample output")).toBeTruthy();
   });
 
   it("isn't shown to someone who can't edit the workflow", async () => {
     handlers.definition.mockResolvedValue({ uuid: "wf-1", permissions: { canEdit: false } });
     const wrapper = await mountIt();
-    expect(wrapper.html()).not.toContain("Set as example");
+    expect(wrapper.html()).not.toContain("Use as workflow sample output");
     expect(handlers.status).not.toHaveBeenCalled();
   });
 
   it("isn't shown for a run that didn't succeed", async () => {
     const wrapper = await mountIt({ run: { ...run, status: "FAILED" } });
-    expect(wrapper.html()).not.toContain("Set as example");
+    expect(wrapper.html()).not.toContain("Use as workflow sample output");
     expect(handlers.definition).not.toHaveBeenCalled();
   });
 
   it("isn't shown where the feature isn't served", async () => {
     handlers.status.mockResolvedValue(null);
     const wrapper = await mountIt();
-    expect(wrapper.html()).not.toContain("Set as example");
+    expect(wrapper.html()).not.toContain("Use as workflow sample output");
   });
 
   it("says what's made, what it replaces and what's left today", async () => {
     const wrapper = await mountIt();
-    await button(wrapper, "Set as example").trigger("click");
+    await button(wrapper, "Use as workflow sample output").trigger("click");
     await flushPromises();
     const dialog = wrapper.find(".dialog-stub");
-    expect(dialog.text()).toContain("PDF summary of this run");
+    expect(dialog.text()).toContain("PDF summary of this run's outputs");
+    expect(dialog.text()).toContain("as its sample output");
     expect(dialog.text()).toContain("written by AI");
-    expect(dialog.text()).toContain("copied from the run's outputs");
-    expect(dialog.text()).toContain("version 4");
-    expect(dialog.text()).toContain("this workflow: 2 of 3");
-    expect(dialog.text()).toContain("you: 8 of 10");
-    expect(dialog.text()).toContain("this workspace: 15 of 20");
+    expect(dialog.text()).toContain("copied from the outputs the run saved");
+    expect(dialog.text()).toContain("Version 4 has no sample output yet");
+    // the tightest limit only (this workflow: 2 left of 3)
+    expect(dialog.text()).toContain("2 more sample outputs can be generated for this workflow today.");
+    expect(dialog.text()).not.toContain("Left today");
     expect(dialog.find(".checkbox-stub").exists()).toBe(false);
+  });
+
+  it("names the example it replaces, or that this run already is the example", async () => {
+    handlers.versionExample.mockResolvedValue({ runId: "run-other", runName: "Earlier run", version: 4 });
+    let wrapper = await mountIt();
+    await button(wrapper, "Use as workflow sample output").trigger("click");
+    await flushPromises();
+    expect(wrapper.find(".dialog-stub").text()).toContain("replaces the current sample output of version 4");
+    expect(wrapper.find(".dialog-stub").text()).toContain("from run Earlier run");
+
+  });
+
+  it("shows a run that is the sample output as such, with View PDF and Regenerate", async () => {
+    handlers.status.mockResolvedValue({ job: { status: "READY" }, limits });
+    handlers.versionExample.mockResolvedValue({ runId: "run-1", runName: "This run", version: 4, pdfUrl: "https://cdn/x.pdf" });
+    const wrapper = await mountIt();
+    const badge = button(wrapper, "Workflow sample output (version 4)");
+    expect(badge).toBeTruthy();
+    expect(badge.attributes("disabled")).toBeDefined();
+    expect(button(wrapper, "Use as workflow sample output")).toBeFalsy();
+    expect(button(wrapper, "View PDF")).toBeTruthy();
+    await button(wrapper, "Regenerate").trigger("click");
+    await flushPromises();
+    expect(wrapper.find(".dialog-stub").text()).toContain("This run is already the sample output of version 4");
+    expect(wrapper.find(".checkbox-stub input").element.checked).toBe(true);
   });
 
   it("offers Regenerate when the run already has a PDF", async () => {
     handlers.status.mockResolvedValue({ job: { status: "READY" }, limits });
     const wrapper = await mountIt();
-    await button(wrapper, "Set as example").trigger("click");
+    await button(wrapper, "Use as workflow sample output").trigger("click");
     await flushPromises();
     expect(wrapper.find(".checkbox-stub").text()).toContain("Regenerate");
     await wrapper.find(".checkbox-stub input").setValue(true);
-    await button(wrapper.find(".dialog-stub"), "Set as example").trigger("click");
+    await button(wrapper.find(".dialog-stub"), "Use as workflow sample output").trigger("click");
     await flushPromises();
     expect(handlers.set).toHaveBeenCalledWith({ runId: "run-1", refresh: true });
   });
@@ -110,28 +136,28 @@ describe("RunExampleAction", () => {
   it("can't be confirmed with a limit used up", async () => {
     handlers.status.mockResolvedValue({ job: null, limits: { ...limits, user: { used: 10, limit: 10 } } });
     const wrapper = await mountIt();
-    await button(wrapper, "Set as example").trigger("click");
+    await button(wrapper, "Use as workflow sample output").trigger("click");
     await flushPromises();
     const dialog = wrapper.find(".dialog-stub");
-    expect(dialog.text()).toContain("You've made all the examples you can today");
-    expect(button(dialog, "Set as example").attributes("disabled")).toBeDefined();
+    expect(dialog.text()).toContain("You've generated all the sample outputs you can today");
+    expect(button(dialog, "Use as workflow sample output").attributes("disabled")).toBeDefined();
   });
 
   it("shows a refusal in the dialog (429 names the limit)", async () => {
     handlers.set.mockRejectedValue(Object.assign(new Error("x"), { status: 429, body: { limit: "workspace" } }));
     const wrapper = await mountIt();
-    await button(wrapper, "Set as example").trigger("click");
+    await button(wrapper, "Use as workflow sample output").trigger("click");
     await flushPromises();
-    await button(wrapper.find(".dialog-stub"), "Set as example").trigger("click");
+    await button(wrapper.find(".dialog-stub"), "Use as workflow sample output").trigger("click");
     await flushPromises();
-    expect(wrapper.find(".dialog-stub").text()).toContain("This workspace has made all the examples it can today");
+    expect(wrapper.find(".dialog-stub").text()).toContain("This workspace has generated all the sample outputs it can today");
   });
 
   it("shows the job and checks it every 5 s until it's ready", async () => {
     const wrapper = await mountIt();
-    await button(wrapper, "Set as example").trigger("click");
+    await button(wrapper, "Use as workflow sample output").trigger("click");
     await flushPromises();
-    await button(wrapper.find(".dialog-stub"), "Set as example").trigger("click");
+    await button(wrapper.find(".dialog-stub"), "Use as workflow sample output").trigger("click");
     await flushPromises();
     expect(wrapper.find(".dialog-stub").exists()).toBe(false);
     expect(wrapper.find(".run-example__status").text()).toContain("queued");
@@ -145,7 +171,7 @@ describe("RunExampleAction", () => {
     await vi.advanceTimersByTimeAsync(5000);
     await flushPromises();
     expect(wrapper.find(".run-example__status").text()).toContain("ready");
-    expect(button(wrapper, "View example PDF")).toBeTruthy();
+    expect(button(wrapper, "View sample output PDF")).toBeTruthy();
     await vi.advanceTimersByTimeAsync(15000);
     expect(handlers.status.mock.calls.length).toBe(before + 2);
   });

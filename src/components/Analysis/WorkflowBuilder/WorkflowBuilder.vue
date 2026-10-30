@@ -2625,7 +2625,8 @@ const openNodeSettings = (id) => {
           v-if="selectedWorkflow?.uuid"
           :uuid="selectedWorkflow.uuid"
           :version="viewingVersion"
-          :can-edit="canEditExample"
+          :workflow-name="selectedWorkflow.name || ''"
+          variant="icon"
         />
         <bf-button v-if="!viewingVersion && selectedWorkflow?.isActive !== false" class="secondary" @click="runThis">
           ▶ Run
@@ -3734,6 +3735,15 @@ const openNodeSettings = (id) => {
                       selectedWorkflow.description || "No description"
                     }}</span>
                   </div>
+                  <!-- The example PDF (a run's summary); editors can remove it here -->
+                  <WorkflowExampleLink
+                    v-if="selectedWorkflow?.uuid"
+                    :uuid="selectedWorkflow.uuid"
+                    :version="viewingVersion"
+                    :can-edit="canEditExample"
+                    :workflow-name="selectedWorkflow.name || ''"
+                    variant="row"
+                  />
                   <div class="info-row">
                     <span class="info-label">Status</span>
                     <span class="info-value">
