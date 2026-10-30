@@ -1,6 +1,7 @@
 <script setup>
 // Self-contained "New Notebook" launcher. A guided flow:
-//   Kernel → Compute Node → Dataset → Input Files → Output → Review & Start.
+//   Kernel → Compute Node → Hardware → Resources (CPU) → Dataset → Input
+//   Files → Output → Review & Start.
 // Outside a workspace the dataset is a public one (see the `personal` prop).
 // It references a published notebook workflow (the recipe lives there), reuses
 // the standard file picker, and assembles the createRun payload directly —
@@ -20,7 +21,38 @@ import { useGetToken } from "@/composables/useGetToken";
 import { useSendXhr } from "@/mixins/request/request_composable";
 import toQueryParams from "@/utils/toQueryParams";
 import EventBus from "@/utils/event-bus";
-import { notebookKernel, kernelLabel, interactiveCapable, launchableKernels, kernelOutput, nonSavingAlternative } from "./notebookHelpers";
+import {
+  notebookKernel,
+  kernelLabel,
+  interactiveCapable,
+  launchableKernels,
+  kernelOutput,
+  nonSavingAlternative,
+  kernelCards,
+  cardOf,
+  cardSelection,
+  notebookGpu,
+  gpuReasonNote,
+  runVariants,
+  defaultRunVariant,
+  variantLabel,
+  variantSetsResources,
+  variantResources,
+  variantNodeUnfit,
+  sessionStepId,
+  hardwareOptions,
+  pickedOption,
+  optionsForNode,
+  nodeHardwareUnfit,
+  hardwareForNode,
+  hardwareLabel as hardwareOptionLabel,
+  gpuSessionHelp,
+  gpuReviewResources,
+} from "./notebookHelpers";
+import { nodeGpu, gpuOffer, gpuName, gpuTaskResources } from "../ComputeNodes/computeNodeHelpers";
+import { useComputeResourcesStore } from "@/stores/computeResourcesStore";
+import { fetchVariantGate, provisionerGateReason } from "./variantGate";
+import RuntimeMark from "../WorkflowGraph/RuntimeMark.vue";
 import { STANDARD_CPU_OPTIONS, getStandardMemoryOptions, getTargetTypeLabel } from "./runHelpers";
 import { sourceLabel } from "../WorkflowGraph/sourceInputs";
 import * as siteConfig from "@/site-config/site.json";
@@ -47,6 +79,9 @@ const emit = defineEmits(["update:modelValue", "created"]);
 // The kernels that can start here: in My Workspace, not those whose results
 // go to a dataset (there's none to write to).
 const kernelChoices = computed(() => launchableKernels(props.notebookWorkflows, { personal: props.personal }));
+// One card per kernel: its CPU and GPU workflows (app variants) together,
+// with a Hardware toggle when it has both.
+const cards = computed(() => kernelCards(kernelChoices.value));
 
 const store = useStore();
 
@@ -66,7 +101,9 @@ const config = computed(() => store.state.config);
 
 /* ----------------------------------------------------------- wizard state --- */
 const step = ref(0);
-const form = ref({ workflowId: "", computeNodeId: "", datasetId: "" });
+// variant: the session step's app variant the run picks, for a kernel that
+// offers its variants per run (notebook.variants); "" otherwise.
+const form = ref({ workflowId: "", variant: "", computeNodeId: "", datasetId: "" });
 const runName = ref("");
 const computeNodeSearch = ref("");
 const datasetOptions = ref([]);
@@ -75,9 +112,12 @@ const datasetSearchQuery = ref("");
 let datasetSearchTimer = null;
 const executing = ref(false);
 
+// The steps, in order (indices into stepTitles).
+const S = { KERNEL: 0, NODE: 1, HARDWARE: 2, RESOURCES: 3, INPUT: 4, FILES: 5, OUTPUT: 6, REVIEW: 7 };
 const stepTitles = computed(() => [
   "Select Kernel",
   "Select Compute Node",
+  "Hardware",
   "Compute Resources",
   iface.value ? "Input" : "Select Dataset",
   "Select Input Files",
@@ -147,6 +187,103 @@ const hasVisibleTargetParams = computed(() =>
   )
 );
 
+/* ------------------------------------------------------------ hardware ---- */
+// After the compute node, the Hardware step: the kernel's hardware options
+// (its variants picked per run, or its CPU and GPU twin workflows) that the
+// chosen node can run. A node without GPUs offers CPU only; a GPU one names
+// its GPU and what a session gets on it (the node's GPU tier: GPU tasks get
+// the instance's CPU and memory). A GPU session needs a node with GPUs, in
+// secure or compliant mode (the basic-mode gateway can't reach GPU
+// instances), whose provisioner passes the variant gate.
+// Hardware chosen before the node (a link to a GPU twin, a GPU-only kernel)
+// narrows the nodes the same way.
+const hardwareChoices = computed(() => runVariants(selectedWorkflow.value));
+const selectedVariant = computed(() => hardwareChoices.value.find((v) => v.id === form.value.variant) || null);
+const isGpu = computed(() =>
+  hardwareChoices.value.length ? selectedVariant.value?.gpu === true : notebookGpu(selectedWorkflow.value)
+);
+// The variant the session runs, for the node rules: the pick, else the
+// twin's (GPU, a non-default variant; CPU, the default).
+const runVariant = computed(() =>
+  selectedVariant.value || (selectedWorkflow.value ? { gpu: isGpu.value, default: !isGpu.value } : null)
+);
+// Its resources are the variant's (a GPU one, or one that declares them):
+// no CPU and memory to choose.
+const variantResourcesSet = computed(() => isGpu.value || variantSetsResources(selectedVariant.value));
+
+// The GPU tiers (GET /compute/resources/gpu-tiers), for what a node's GPU is.
+const computeResourcesStore = useComputeResourcesStore();
+const gpuTiers = ref([]);
+const gpuOf = (cn) => nodeGpu(cn, gpuTiers.value);
+
+const selectedCard = computed(() => cardOf(cards.value, form.value.workflowId));
+const allHardware = computed(() => hardwareOptions(selectedCard.value));
+const currentHardware = computed(() => pickedOption(allHardware.value, form.value.workflowId, form.value.variant));
+// Hardware chosen before the node: a link to a GPU twin or variant.
+const hardwarePinned = ref(false);
+const variantGate = ref(null);
+const gateReason = (n) => provisionerGateReason(n, variantGate.value || {});
+// The hardware a node must be able to run: the one chosen first, else any
+// of the kernel's options, else (no choice) the kernel's own.
+const nodeMustRun = computed(() => {
+  if (hardwarePinned.value && currentHardware.value) return [currentHardware.value];
+  if (allHardware.value.length) return allHardware.value;
+  return runVariant.value ? [runVariant.value] : [];
+});
+const nodeReasons = (cn) => nodeHardwareUnfit(cn, nodeMustRun.value, gateReason);
+// A GPU session decided before the node (chosen first, or the kernel's only).
+const gpuFirst = computed(() => isGpu.value && (hardwarePinned.value || !allHardware.value.length));
+// The hardware the chosen node can run.
+const nodeHardware = computed(() =>
+  selectedComputeNode.value ? optionsForNode(allHardware.value, selectedComputeNode.value, gateReason) : []
+);
+const selectedGpu = computed(() => gpuOf(selectedComputeNode.value));
+// Why the chosen node offers no GPU option, when the kernel has one.
+const noGpuHere = computed(() => {
+  const node = selectedComputeNode.value;
+  const gpuOpt = allHardware.value.find((o) => o.gpu);
+  if (!node || !gpuOpt || nodeHardware.value.some((o) => o.gpu)) return "";
+  if (!selectedGpu.value) return "This node has no GPUs, so its notebooks run on CPU.";
+  return `This node's GPU can't host notebooks: ${variantNodeUnfit(node, gpuOpt, gateReason).join(" · ")}.`;
+});
+const pickHardware = (o) => {
+  form.value.workflowId = o.workflowId;
+  form.value.variant = o.variant;
+  hardwarePinned.value = false;
+};
+// The hardware row of the summary: the pick, with the node's GPU on a GPU
+// one; "" for a kernel without a choice that runs on CPU.
+const hardwareLabel = computed(() => {
+  const o = currentHardware.value || (isGpu.value ? { gpu: true, name: "GPU" } : selectedVariant.value);
+  return o ? hardwareOptionLabel(o, selectedGpu.value) : "";
+});
+// The review's hardware row: on a GPU, its name and the node's GPU ("GPU ·
+// NVIDIA L4 · 24 GB"; the resources have their own row).
+const reviewHardware = computed(() => {
+  if (!isGpu.value) return hardwareLabel.value;
+  const name = currentHardware.value ? variantLabel(currentHardware.value) : selectedVariant.value ? variantLabel(selectedVariant.value) : "GPU";
+  return [name, gpuName(selectedGpu.value)].filter(Boolean).join(" · ");
+});
+const GPU_NOTE = "Starting takes a few minutes; the instance is billed while the notebook is open.";
+const pickCard = (card) => {
+  if (cardOf([card], form.value.workflowId)) return;
+  form.value.workflowId = (card.cpu || card.gpu).uuid;
+  hardwarePinned.value = false;
+};
+// Another kernel: its own default pick, unless it offers the one chosen.
+watch(
+  () => form.value.workflowId,
+  () => {
+    if (!hardwareChoices.value.some((v) => v.id === form.value.variant)) {
+      form.value.variant = defaultRunVariant(selectedWorkflow.value);
+    }
+  }
+);
+const cardWorkflow = (card) => (cardOf([card], form.value.workflowId) ? selectedWorkflow.value : card.cpu || card.gpu);
+// Whether a card's kernel can run on a GPU (marked on it).
+const cardOffersGpu = (card) =>
+  card.perRun ? runVariants(card.perRun).some((v) => v.gpu) : !!card.gpu;
+
 /* --------------------------------------------------------- compute nodes ---- */
 // A node can host a notebook only if it has interactive sessions enabled — only
 // those are offered (no fallback to the full list). Shared predicate so the
@@ -171,6 +308,24 @@ const selectedWorkflow = computed(
 );
 const selectedComputeNode = computed(
   () => computeNodes.value.find((cn) => cn.uuid === form.value.computeNodeId) || null
+);
+// A node that can't host what the kernel now runs (another kernel picked):
+// chosen again. On a node, the hardware it runs: the pick if it can, else
+// its default.
+watch(nodeMustRun, () => {
+  if (selectedComputeNode.value && nodeReasons(selectedComputeNode.value).length) form.value.computeNodeId = "";
+});
+watch(
+  () => [form.value.computeNodeId, allHardware.value],
+  () => {
+    const node = selectedComputeNode.value;
+    if (!node || !allHardware.value.length) return;
+    const keep = hardwareForNode(allHardware.value, node, currentHardware.value, gateReason);
+    if (keep && keep !== currentHardware.value) {
+      form.value.workflowId = keep.workflowId;
+      form.value.variant = keep.variant;
+    }
+  }
 );
 const selectedDataset = computed(
   () => datasetOptions.value.find((d) => d.content?.id === form.value.datasetId) || null
@@ -336,13 +491,15 @@ const dataTargetsComplete = computed(() =>
 
 const canNext = computed(() => {
   switch (step.value) {
-    case 0:
+    case S.KERNEL:
       return !!form.value.workflowId;
-    case 1:
-      return !!form.value.computeNodeId;
-    case 2:
+    case S.NODE:
+      return !!form.value.computeNodeId && !(selectedComputeNode.value && nodeReasons(selectedComputeNode.value).length);
+    case S.HARDWARE:
+      return !allHardware.value.length || nodeHardware.value.includes(currentHardware.value);
+    case S.RESOURCES:
       return true; // resources always have a valid default (1 vCPU)
-    case 3:
+    case S.INPUT:
       if (iface.value) {
         return inputChoice.value === "dataset"
           ? !!form.value.datasetId
@@ -351,9 +508,9 @@ const canNext = computed(() => {
           : inputChoice.value === "none";
       }
       return props.personal || !!form.value.datasetId;
-    case 4:
+    case S.FILES:
       return (props.personal && !iface.value) || dataSourcesComplete.value;
-    case 5:
+    case S.OUTPUT:
       if (iface.value && outputChoice.value === NO_DESTINATION) return true;
       return dataTargetsComplete.value && (!chooseResultsDataset.value || !!resultsDatasetId.value);
     default:
@@ -631,7 +788,7 @@ function onFileSelect(selectedFiles, parentId) {
 
 /* ----------------------------------------------------------- wizard nav ----- */
 function reset() {
-  form.value = { workflowId: "", computeNodeId: "", datasetId: "" };
+  form.value = { workflowId: "", variant: "", computeNodeId: "", datasetId: "" };
   nameTouched.value = false;
   computeNodeSearch.value = "";
   datasetSearchQuery.value = "";
@@ -650,11 +807,21 @@ function reset() {
   store.commit("analysisModule/CLEAR_SELECTED_FILES");
   // Preselect the kernel asked for, or the only one if there's just one — but
   // keep the step visible.
-  if (props.initialWorkflowId && kernelChoices.value.some((w) => w.uuid === props.initialWorkflowId)) {
-    form.value.workflowId = props.initialWorkflowId;
-  } else if (kernelChoices.value.length === 1) {
-    form.value.workflowId = kernelChoices.value[0].uuid;
+  // A link to a GPU twin a per-run kernel stands for opens that kernel on
+  // the twin's variant.
+  const linked = props.initialWorkflowId && cardSelection(cards.value, props.initialWorkflowId, kernelChoices.value);
+  hardwarePinned.value = false;
+  if (linked) {
+    form.value.workflowId = linked.workflowId;
+    form.value.variant = linked.variant;
+    // A link to the GPU one: the nodes offered are those that can run it.
+    hardwarePinned.value = !!pickedOption(hardwareOptions(cardOf(cards.value, linked.workflowId)), linked.workflowId, linked.variant)?.gpu;
+  } else if (cards.value.length === 1) {
+    // One kernel card (its CPU workflow, when it has CPU and GPU ones).
+    form.value.workflowId = (cards.value[0].cpu || cards.value[0].gpu).uuid;
   }
+  // (Set here too: reopening on the same kernel doesn't change workflowId.)
+  if (!form.value.variant) form.value.variant = defaultRunVariant(selectedWorkflow.value);
   // Seed the suggested name ({kernel}-{user}-{date}) now that the kernel (if any)
   // is selected; the watcher keeps it current until the user edits it.
   runName.value = defaultRunName.value;
@@ -664,6 +831,13 @@ function reset() {
 watch(visible, (open) => {
   if (open) {
     reset();
+    if (!variantGate.value) fetchVariantGate(config.value.api2Url, useGetToken).then((g) => (variantGate.value = g));
+    if (!gpuTiers.value.length) {
+      computeResourcesStore
+        .fetchGpuTiers(store.getters.activeOrganization?.organization?.id)
+        .then((t) => (gpuTiers.value = t || []))
+        .catch(() => {});
+    }
     if (!props.personal) fetchDatasetOptions();
     else if (publicInputs) searchPublicDatasets();
   }
@@ -671,11 +845,16 @@ watch(visible, (open) => {
 
 // Outside a workspace there are no input files to pick: the user downloads a
 // public dataset's files from the notebook itself.
-const INPUT_FILES_STEP = 4;
-const skipsStep = (i) => i === INPUT_FILES_STEP && (iface.value ? inputChoice.value !== "dataset" : props.personal);
+// A GPU kernel runs with its node's GPU instance's resources, and a variant
+// that declares its own with those: no CPU and memory to choose. A kernel
+// without a hardware choice has no Hardware step.
+const skipsStep = (i) =>
+  (i === S.FILES && (iface.value ? inputChoice.value !== "dataset" : props.personal)) ||
+  (i === S.HARDWARE && !allHardware.value.length) ||
+  (i === S.RESOURCES && variantResourcesSet.value);
 
 const next = async () => {
-  if (step.value === 3) await loadDefinition(); // leaving Dataset → load inputs
+  if (step.value === S.INPUT) await loadDefinition(); // leaving Dataset → load inputs
   let n = step.value + 1;
   while (skipsStep(n)) n++;
   if (n < stepTitles.value.length) step.value = n;
@@ -689,25 +868,31 @@ const back = () => {
 /* ------------------------------------------------------- info column ------ */
 // Input and Results show their own choices on the left (io-split); every
 // other step, what it's for and what's chosen so far.
-const stepHasChoices = computed(() => iface.value && (step.value === 3 || step.value === 5));
+const stepHasChoices = computed(() => iface.value && (step.value === S.INPUT || step.value === S.OUTPUT));
 const STEP_ABOUT = [
   "A notebook is a live Jupyter session on a compute node. Choose its language.",
-  "The compute node the session runs on. Only nodes with notebook sessions are offered.",
+  "The compute node the session runs on. Only nodes with notebook sessions are offered; each says whether it has a GPU.",
+  "CPU, or the node's GPU when it has one. A GPU notebook gets the whole GPU instance.",
   "The CPU and memory the session gets. Memory follows the CPU unless you set it.",
   "The dataset the notebook works with.",
   "The files copied into the notebook's input/ folder before it starts.",
   "Where the notebook's results go when the session ends.",
   "Check the session, name it, and start it.",
 ];
-const stepAbout = computed(() => STEP_ABOUT[step.value] || "");
+const stepAbout = computed(() =>
+  step.value === S.NODE && gpuFirst.value
+    ? "The compute node the session runs on. A GPU notebook needs a secure or compliant node with GPUs."
+    : STEP_ABOUT[step.value] || ""
+);
 const soFar = computed(() => {
   const rows = [];
   if (step.value > 0 && selectedWorkflow.value) rows.push({ label: "Kernel", value: kernelLabel(notebookKernel(selectedWorkflow.value)) });
-  if (step.value > 1 && selectedComputeNode.value) rows.push({ label: "Compute node", value: selectedComputeNode.value.name });
-  if (step.value > 2) {
+  if (step.value > S.NODE && selectedComputeNode.value) rows.push({ label: "Compute node", value: selectedComputeNode.value.name });
+  if ((step.value > S.HARDWARE || gpuFirst.value) && hardwareLabel.value) rows.push({ label: "Hardware", value: hardwareLabel.value });
+  if (step.value > S.RESOURCES && !variantResourcesSet.value) {
     rows.push({ label: "Resources", value: `${cpuLabel(resourceCpu.value)} · ${isAutoMemory.value ? memoryLabel(autoMemoryForCpu(resourceCpu.value)) : memoryLabel(resourceMemory.value)}` });
   }
-  if (step.value > 3) {
+  if (step.value > S.INPUT) {
     const input = iface.value
       ? inputChoice.value === "public"
         ? publicDataset.value?.name || "A public dataset"
@@ -719,10 +904,10 @@ const soFar = computed(() => {
       : selectedDataset.value?.content?.name;
     if (input) rows.push({ label: "Input", value: input });
   }
-  if (step.value > 4 && iface.value && inputChoice.value === "dataset") {
+  if (step.value > S.FILES && iface.value && inputChoice.value === "dataset") {
     rows.push({ label: "Files", value: String(dataSourceNodes.value.reduce((n, d) => n + fileCountForNode(d.id), 0)) });
   }
-  if (step.value > 5 && iface.value) rows.push({ label: "Results", value: outputLabel(outputChoice.value) });
+  if (step.value > S.OUTPUT && iface.value) rows.push({ label: "Results", value: outputLabel(outputChoice.value) });
   return rows;
 });
 
@@ -771,14 +956,20 @@ async function execute() {
 
     // The session step is live because its app.yml says so; the run only sets
     // its resources.
+    // A GPU kernel, or a variant that declares its resources: the
+    // variant's (no CPU and memory chosen). A kernel that offers its
+    // variants per run gets the pick on its session step.
     const processorConfigs = [];
+    const sessionId = selectedVariant.value ? sessionStepId(dag) : "";
     for (const node of dag) {
       if (node.type === "data-source" || node.type === "data-target") continue;
-      processorConfigs.push({
-        nodeId: node.id,
-        cpu: resourceCpu.value,
-        memory: resolvedMemory.value,
-      });
+      const pc = { nodeId: node.id };
+      if (node.id === sessionId) pc.variant = selectedVariant.value.id;
+      if (!variantResourcesSet.value) {
+        pc.cpu = resourceCpu.value;
+        pc.memory = resolvedMemory.value;
+      }
+      if (Object.keys(pc).length > 1) processorConfigs.push(pc);
     }
 
     // Outside a workspace, the public dataset is the first data source's view.
@@ -866,32 +1057,45 @@ async function execute() {
       </aside>
       <div class="nb-content">
 
-      <!-- Step 0: Kernel -->
-      <div v-if="step === 0" class="wizard-step">
+      <!-- Kernel -->
+      <div v-if="step === S.KERNEL" class="wizard-step">
         <p class="wizard-step-desc">Choose the kernel for this notebook.</p>
         <p v-if="!kernelChoices.length" class="wizard-step-desc">
           None of the notebook kernels can start outside a workspace yet: their results are saved to a dataset.
         </p>
         <div class="kernel-grid">
-          <button
-            v-for="wf in kernelChoices"
-            :key="wf.uuid"
+          <div
+            v-for="card in cards"
+            :key="card.key"
             class="kernel-card"
-            :class="{ selected: form.workflowId === wf.uuid }"
-            @click="form.workflowId = wf.uuid"
+            :class="{ selected: !!cardOf([card], form.workflowId) }"
+            role="button"
+            tabindex="0"
+            @click="pickCard(card)"
+            @keydown.enter.prevent="pickCard(card)"
+            @keydown.space.prevent="pickCard(card)"
           >
-            <span class="kernel-name">{{ kernelLabel(notebookKernel(wf)) }}</span>
+            <span class="kernel-name">
+              {{ kernelLabel(notebookKernel(cardWorkflow(card))) }}
+              <RuntimeMark v-if="cardOffersGpu(card)" runtime="gpu" />
+            </span>
             <!-- Where results go tells kernels apart only when it's fixed: a
                  notebook with an input and output chooses it later -->
-            <span class="kernel-sub">{{ hasInterface(wf) ? wf.summary || "You choose its input and results next" : kernelOutput(wf) || wf.name }}</span>
-          </button>
+            <span class="kernel-sub">{{ hasInterface(cardWorkflow(card)) ? cardWorkflow(card).summary || "You choose its input and results next" : kernelOutput(cardWorkflow(card)) || cardWorkflow(card).name }}</span>
+          </div>
         </div>
+        <p v-if="allHardware.some((o) => o.gpu)" class="resource-hint">
+          You choose CPU or GPU after the compute node: GPU where the node has one.
+        </p>
+        <p v-else-if="selectedWorkflow && isGpu" class="resource-hint">
+          This kernel runs on a GPU: the next step offers the nodes that can host it.
+        </p>
       </div>
 
-      <!-- Step 1: Compute node -->
-      <div v-if="step === 1" class="wizard-step">
+      <!-- Compute node -->
+      <div v-if="step === S.NODE" class="wizard-step">
         <p class="wizard-step-desc">
-          Select a compute node with notebook sessions enabled.
+          Select a compute node with notebook sessions enabled<template v-if="gpuFirst">, GPUs, and secure or compliant mode</template>.
         </p>
         <div v-if="selectedComputeNode" class="wizard-selection">
           <div class="wizard-selection-header">
@@ -903,6 +1107,7 @@ async function execute() {
           <div v-if="selectedComputeNode.description" class="wizard-selection-desc">
             {{ selectedComputeNode.description }}
           </div>
+          <div class="wizard-card-offer">{{ gpuOffer(selectedGpu) }}</div>
         </div>
         <template v-else>
           <el-input
@@ -916,11 +1121,20 @@ async function execute() {
               v-for="cn in filteredComputeNodes"
               :key="cn.uuid"
               class="wizard-card"
-              @click="form.computeNodeId = cn.uuid"
+              :class="{ 'is-unfit': nodeReasons(cn).length }"
+              :aria-disabled="nodeReasons(cn).length > 0"
+              @click="nodeReasons(cn).length || (form.computeNodeId = cn.uuid)"
             >
               <div class="wizard-card-name">{{ cn.name }}</div>
               <div v-if="cn.description" class="wizard-card-desc">
                 {{ cn.description }}
+              </div>
+              <!-- What it offers: its GPU (the node's tier), or CPU only -->
+              <div class="wizard-card-offer">{{ gpuOffer(gpuOf(cn)) }}</div>
+              <!-- Hardware chosen first (a GPU kernel): why this node can't host it -->
+              <div v-if="nodeReasons(cn).length" class="wizard-card-why" :title="gpuReasonNote(nodeReasons(cn)) || undefined">
+                {{ nodeReasons(cn).join(" · ") }}
+                <span v-if="gpuReasonNote(nodeReasons(cn))" class="wizard-card-note">{{ gpuReasonNote(nodeReasons(cn)) }}</span>
               </div>
             </div>
             <div v-if="filteredComputeNodes.length === 0" class="wizard-cards-loading">
@@ -930,8 +1144,39 @@ async function execute() {
         </template>
       </div>
 
-      <!-- Step 2: Compute resources -->
-      <div v-if="step === 2" class="wizard-step">
+      <!-- Hardware: what the chosen node can run, as cards to compare -->
+      <div v-if="step === S.HARDWARE" class="wizard-step">
+        <p class="wizard-step-desc">Where should this notebook run?</p>
+        <div class="hardware-grid" role="radiogroup" aria-label="Hardware">
+          <button
+            v-for="o in nodeHardware"
+            :key="o.workflowId + '|' + o.variant"
+            type="button"
+            role="radio"
+            class="hardware-card"
+            :class="{ selected: o === currentHardware }"
+            :aria-checked="o === currentHardware"
+            @click="pickHardware(o)"
+          >
+            <span class="hardware-card__name"><RuntimeMark v-if="o.gpu" runtime="gpu" compact />{{ o.gpu ? "GPU" : o.name || "CPU" }}</span>
+            <template v-if="o.gpu && selectedGpu">
+              <span class="hardware-card__main">{{ gpuName(selectedGpu) }} GPU memory</span>
+              <span class="hardware-card__line">{{ gpuTaskResources(selectedGpu, " · ") }}, the whole instance<template v-if="selectedGpu.instanceType"> ({{ selectedGpu.instanceType }})</template></span>
+              <span class="hardware-card__meta">Starts in 2–3 minutes<template v-if="selectedGpu.pricePerHour"> · about ${{ selectedGpu.pricePerHour.toFixed(2) }}/h while open</template></span>
+            </template>
+            <template v-else-if="!o.gpu && !(o.cpu || o.memory)">
+              <span class="hardware-card__main">Fargate task</span>
+              <span class="hardware-card__line">You choose CPU and memory next</span>
+              <span class="hardware-card__meta">Starts in about a minute</span>
+            </template>
+            <span v-else-if="o.description" class="hardware-card__line">{{ o.description }}</span>
+          </button>
+        </div>
+        <p v-if="noGpuHere" class="resource-hint">{{ noGpuHere }}</p>
+      </div>
+
+      <!-- Compute resources (CPU sessions) -->
+      <div v-if="step === S.RESOURCES" class="wizard-step">
         <p class="wizard-step-desc">
           Choose the CPU and memory for this notebook's compute task.
         </p>
@@ -969,8 +1214,8 @@ async function execute() {
         </p>
       </div>
 
-      <!-- Step 3: Input (a notebook with an input: what it starts with) -->
-      <div v-if="step === 3" :class="{ 'io-split': iface }">
+      <!-- Input (a notebook with an input: what it starts with) -->
+      <div v-if="step === S.INPUT" :class="{ 'io-split': iface }">
       <div v-if="iface" class="io-side">
       <div class="io-choices-label">Start with</div>
       <div class="io-choices">
@@ -988,11 +1233,11 @@ async function execute() {
       </div>
       </div>
       <div class="io-main">
-      <div v-if="step === 3 && iface && inputChoice === 'none'" class="wizard-step">
+      <div v-if="step === S.INPUT && iface && inputChoice === 'none'" class="wizard-step">
         <p class="wizard-step-desc">The notebook starts with an empty <code>input/</code> folder.</p>
       </div>
-      <!-- Step 3: Dataset -->
-      <div v-else-if="step === 3 && showPublicInput" class="wizard-step">
+      <!-- Dataset -->
+      <div v-else-if="step === S.INPUT && showPublicInput" class="wizard-step">
         <h4 v-if="iface" class="io-section-title">Choose a public dataset</h4>
         <p class="wizard-step-desc">
           Optionally choose a public dataset to work with. You pick which of
@@ -1083,7 +1328,7 @@ async function execute() {
           </div>
         </template>
       </div>
-      <div v-else-if="step === 3 && personal && !iface" class="wizard-step wizard-step--disabled">
+      <div v-else-if="step === S.INPUT && personal && !iface" class="wizard-step wizard-step--disabled">
         <p class="wizard-step-desc">
           Selecting a dataset isn't available outside a workspace yet. Public
           datasets, and datasets from your workspaces, will be selectable here.
@@ -1091,7 +1336,7 @@ async function execute() {
         </p>
         <el-input placeholder="Search datasets..." disabled class="wizard-search" />
       </div>
-      <div v-else-if="step === 3 && showDatasetInput" class="wizard-step">
+      <div v-else-if="step === S.INPUT && showDatasetInput" class="wizard-step">
         <h4 v-if="iface" class="io-section-title">Choose a dataset</h4>
         <p v-else class="wizard-step-desc">Select the dataset to work with.</p>
         <div v-if="selectedDataset" class="wizard-selection">
@@ -1158,8 +1403,8 @@ async function execute() {
       </div>
       </div>
 
-      <!-- Step 4: Input files -->
-      <div v-if="step === 4 && (!personal || iface)" class="wizard-step">
+      <!-- Input files -->
+      <div v-if="step === S.FILES && (!personal || iface)" class="wizard-step">
         <div v-if="definitionLoading" class="wizard-cards-loading">
           Loading notebook inputs...
         </div>
@@ -1210,8 +1455,8 @@ async function execute() {
         </template>
       </div>
 
-      <!-- Step 5: Output destination -->
-      <div v-if="step === 5" class="wizard-step">
+      <!-- Output destination -->
+      <div v-if="step === S.OUTPUT" class="wizard-step">
         <p class="wizard-step-desc">
           {{ iface ? "Where the notebook's results (its output/ folder) go when the session ends." : "Configure where the notebook's results are saved." }}
         </p>
@@ -1321,8 +1566,8 @@ async function execute() {
         </div>
       </div>
 
-      <!-- Step 6: Review -->
-      <div v-if="step === 6" class="wizard-step">
+      <!-- Review -->
+      <div v-if="step === S.REVIEW" class="wizard-step">
         <p class="wizard-step-desc">Review and start the notebook session.</p>
         <div class="wizard-summary">
           <div class="wizard-summary-row">
@@ -1335,7 +1580,20 @@ async function execute() {
             <span class="wizard-summary-label">Compute Node</span>
             <span class="wizard-summary-value">{{ selectedComputeNode?.name }}</span>
           </div>
-          <div class="wizard-summary-row">
+          <div v-if="reviewHardware" class="wizard-summary-row">
+            <span class="wizard-summary-label">Hardware</span>
+            <span class="wizard-summary-value"><RuntimeMark v-if="isGpu" runtime="gpu" compact />{{ reviewHardware }}</span>
+          </div>
+          <!-- A GPU session gets the node's GPU instance's CPU and memory -->
+          <div v-if="isGpu" class="wizard-summary-row">
+            <span class="wizard-summary-label">Resources</span>
+            <span class="wizard-summary-value">{{ gpuReviewResources(selectedGpu) }}</span>
+          </div>
+          <div v-else-if="variantResourcesSet && variantResources(selectedVariant)" class="wizard-summary-row">
+            <span class="wizard-summary-label">Resources</span>
+            <span class="wizard-summary-value">{{ variantResources(selectedVariant) }} (set by the kernel)</span>
+          </div>
+          <div v-else-if="!variantResourcesSet" class="wizard-summary-row">
             <span class="wizard-summary-label">Resources</span>
             <span class="wizard-summary-value">
               {{ cpuLabel(resourceCpu) }} ·
@@ -1382,6 +1640,7 @@ async function execute() {
             </span>
           </div>
         </div>
+        <p v-if="isGpu" class="resource-hint">{{ selectedGpu?.model ? `Runs on the node's ${selectedGpu.model}. ` : "" }}{{ GPU_NOTE }}</p>
         <p v-if="showPublicInput && publicDataset && !dataSourceNodes.length" class="public-warning">
           This notebook has no input to attach {{ publicDataset.name }} to, so
           it would start without it.
@@ -1633,6 +1892,71 @@ async function execute() {
   font-size: 12px;
   color: theme.$gray_4;
 }
+.kernel-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.hardware-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.hardware-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  border: 1px solid theme.$gray_2;
+  border-radius: 3px;
+  padding: 16px;
+  background: #fff;
+  text-align: left;
+  cursor: pointer;
+}
+.hardware-card:hover {
+  border-color: theme.$purple_1;
+  background: theme.$gray_1;
+}
+.hardware-card.selected {
+  border-color: theme.$purple_1;
+  background: theme.$purple_tint;
+}
+.hardware-card__name {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 700;
+  font-size: 16px;
+  color: theme.$gray_6;
+}
+.hardware-card__main {
+  font-size: 14px;
+  color: theme.$gray_6;
+}
+.hardware-card__line {
+  font-size: 13px;
+  color: theme.$gray_5;
+}
+.hardware-card__meta {
+  font-size: 12px;
+  color: theme.$gray_4;
+}
+.wizard-card.is-unfit {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+.wizard-card-why {
+  margin-top: 4px;
+  font-size: 12px;
+  color: theme.$gray_5;
+}
+.wizard-card-note {
+  display: block;
+  margin-top: 2px;
+  color: theme.$gray_4;
+}
 
 .wizard-cards {
   display: flex;
@@ -1691,6 +2015,11 @@ async function execute() {
 .wizard-card-desc {
   font-size: 12px;
   color: theme.$gray_4;
+  margin-top: 4px;
+}
+.wizard-card-offer {
+  font-size: 12px;
+  color: theme.$gray_5;
   margin-top: 4px;
 }
 .wizard-cards-loading {

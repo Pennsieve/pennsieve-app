@@ -52,6 +52,11 @@ describe("applyFilters", () => {
     expect(libraryWorkflows([spikes, jupyter])).toEqual([spikes]);
   });
 
+  it("lists notebooks too when asked (Include notebooks)", () => {
+    const jupyter = { name: "Pennsieve - Python Notebook - 3.12 (GPU)", notebook: { kernel: "python", variant: "gpu", gpu: true } };
+    expect(libraryWorkflows([spikes, jupyter], true)).toEqual([spikes, jupyter]);
+  });
+
   it("offers the outputs the list has", () => {
     expect(outputOptions(all, targetTypes)).toEqual([
       { value: "download", label: "Download" },

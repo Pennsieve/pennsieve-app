@@ -96,3 +96,57 @@ describe('FileDetails while a scan is in progress', () => {
     expect(cmp.packageSourceFiles).toEqual([source('pending')])
   })
 })
+
+describe('FileDetails once the scan verdict lands', () => {
+  const { refreshStateAfterScan } = FileDetails.methods
+  const { getDisplayFileStatus } = FileDetails.computed
+
+  function details(state, scanStatus) {
+    const cmp = component({
+      isFile: true,
+      stateRefreshedFor: '',
+      proxyRecord: { content: { id: 'N:package:1', state } },
+      packageSourceFiles: [source(scanStatus)],
+      getInstanceDetails: vi.fn(),
+    })
+    return cmp
+  }
+
+  it('re-fetches the package once for its new state', () => {
+    const cmp = details('UPLOADED', 'clean')
+    refreshStateAfterScan.call(cmp)
+    refreshStateAfterScan.call(cmp)
+    expect(cmp.getInstanceDetails).toHaveBeenCalledTimes(1)
+  })
+
+  it('waits while the scan is still running, and leaves a READY package alone', () => {
+    const scanning = details('UPLOADED', 'pending')
+    refreshStateAfterScan.call(scanning)
+    expect(scanning.getInstanceDetails).not.toHaveBeenCalled()
+    const ready = details('READY', 'clean')
+    refreshStateAfterScan.call(ready)
+    expect(ready.getInstanceDetails).not.toHaveBeenCalled()
+  })
+
+  it('labels the file by state and verdict', () => {
+    expect(getDisplayFileStatus.call(details('UPLOADED', 'pending'))).toBe('Scanning…')
+    expect(getDisplayFileStatus.call(details('READY', 'clean'))).toBe('')
+    expect(getDisplayFileStatus.call(details('ERROR', 'infected'))).toBe('Quarantined')
+    expect(getDisplayFileStatus.call(details('ERROR', 'failed'))).toBe('Failed')
+  })
+})
+
+describe('FileDetails for a quarantined file', () => {
+  const { getDisplayFileStatus } = FileDetails.computed
+  const label = (state, scanStatus) =>
+    getDisplayFileStatus.call(component({
+      proxyRecord: { content: { id: 'N:package:1', state } },
+      packageSourceFiles: [source(scanStatus)],
+    }))
+
+  it('reads INFECTED as quarantined and a final scan failure as failed', () => {
+    expect(label('INFECTED', 'infected')).toBe('Quarantined')
+    expect(label('ERROR', 'failed')).toBe('Failed')
+    expect(label('ERROR', 'infected'), 'legacy ERROR with an infected file').toBe('Quarantined')
+  })
+})
