@@ -16,12 +16,14 @@ import { useRouter, useRoute } from "vue-router";
 import BfButton from "../../shared/bf-button/BfButton.vue";
 import IconAnalysis from "../../icons/IconAnalysis.vue";
 import IconPennsieveMark from "../../icons/IconPennsieveMark.vue";
+import IconPDF from "../../icons/IconPDF.vue";
 import WorkflowThumbnail from "../WorkflowGraph/WorkflowThumbnail.vue";
 import RunWizardDialog from "../RunMonitor/RunWizardDialog.vue";
 import { ioSummary, appNames, usageLine, cardText } from "./workflowSummary";
 import { applyFilters, libraryWorkflows, outputOptions, sortWorkflows, SORTS } from "./galleryFilter";
 import { isNotebookWorkflow } from "../RunMonitor/notebookHelpers";
-import { exampleLabel, openPdf, PDF_URL_FRESH_MS } from "./runExamples";
+import { exampleLabel, exampleVersion, PDF_URL_FRESH_MS } from "./runExamples";
+import SampleOutputViewer from "./SampleOutputViewer.vue";
 
 const props = defineProps({
   // Inside the Workflows tab's Library, whose bar has the New Workflow button.
@@ -261,21 +263,44 @@ watch(
   },
   { immediate: true }
 );
-const cardExampleLabel = (example) => (example?.fromVersion ? `Example (v${example.fromVersion})` : "Example");
+const cardExampleLabel = (example) => (example?.fromVersion ? `Sample output (v${example.fromVersion})` : "Sample output");
+const viewer = ref({ open: false, source: null, name: "", version: null, subtitle: "" });
+const exampleSubtitle = (example) => {
+  if (!example) return "";
+  const parts = [];
+  const v = exampleVersion(example);
+  if (v) parts.push(`Version ${v}`);
+  if (example.runName || example.runId) parts.push(`run ${example.runName || example.runId}`);
+  if (example.pages) parts.push(`${example.pages} page${example.pages === 1 ? "" : "s"}`);
+  return parts.join(" · ");
+};
 const openExample = (wf) => {
   const cached = examples.value[wf.uuid];
   const fresh = cached?.pdfUrl && Date.now() - cached.fetchedAt < PDF_URL_FRESH_MS ? cached.pdfUrl : null;
-  openPdf(
-    fresh ||
-      (async () => {
-        exampleCache.forget(wf.uuid);
-        const example = await exampleCache.get(wf.uuid, (uuid) =>
-          store.dispatch("analysisModule/fetchWorkflowExample", { uuid, strict: true })
-        );
-        examples.value = { ...examples.value, [wf.uuid]: example ? { ...example, fetchedAt: Date.now() } : null };
-        return example?.pdfUrl || null;
-      })
-  );
+  const refetch = async () => {
+    exampleCache.forget(wf.uuid);
+    const example = await exampleCache.get(wf.uuid, (uuid) =>
+      store.dispatch("analysisModule/fetchWorkflowExample", { uuid, strict: true })
+    );
+    examples.value = { ...examples.value, [wf.uuid]: example ? { ...example, fetchedAt: Date.now() } : null };
+    return example?.pdfUrl || null;
+  };
+  let first = true;
+  viewer.value = {
+    open: true,
+    // The card's link the first time where it's fresh; a new one after that.
+    source: async () => {
+      if (first && fresh) {
+        first = false;
+        return fresh;
+      }
+      first = false;
+      return refetch();
+    },
+    name: wf.name || "",
+    version: exampleVersion(cached),
+    subtitle: exampleSubtitle(cached),
+  };
 };
 
 // Re-fetch all when the status or scope filter changes
@@ -408,15 +433,20 @@ onMounted(async () => {
               </span>
               <span class="wf-actions" @click.stop>
                 <button type="button" class="wf-action" @click="goToDetail(wf)">Open</button>
-                <button
+                <el-tooltip
                   v-if="examples[wf.uuid]"
-                  type="button"
-                  class="wf-action"
-                  :title="`${exampleLabel(examples[wf.uuid])}: a PDF summary of a run (opens in a new tab)`"
-                  @click="openExample(wf)"
+                  :content="`${cardExampleLabel(examples[wf.uuid])}: a PDF summary of a run`"
+                  placement="top"
                 >
-                  {{ cardExampleLabel(examples[wf.uuid]) }}
-                </button>
+                  <button
+                    type="button"
+                    class="wf-action wf-action--icon"
+                    :aria-label="`${exampleLabel(examples[wf.uuid])}: a PDF summary of a run (opens in a new tab)`"
+                    @click="openExample(wf)"
+                  >
+                    <IconPDF :width="16" :height="16" color="currentColor" />
+                  </button>
+                </el-tooltip>
                 <button v-if="wf.isActive" type="button" class="wf-action wf-action--run" @click="runWorkflow(wf)">
                   ▶ Run
                 </button>
@@ -453,6 +483,13 @@ onMounted(async () => {
       />
     </div>
     <RunWizardDialog ref="runDialog" />
+    <SampleOutputViewer
+      v-model="viewer.open"
+      :source="viewer.source"
+      :workflow-name="viewer.name"
+      :version="viewer.version"
+      :subtitle="viewer.subtitle"
+    />
   </div>
 </template>
 
@@ -816,6 +853,12 @@ $card-height: 172px;
     border-color: theme.$purple_1;
     color: theme.$purple_3;
   }
+}
+.wf-action--icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3px 6px;
 }
 .wf-action--run {
   border-color: theme.$purple_3;

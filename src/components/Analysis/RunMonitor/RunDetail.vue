@@ -2298,6 +2298,11 @@ onUnmounted(() => {
           </bf-button>
           <bf-button class="primary" @click="openNotebook">Open Notebook</bf-button>
         </div>
+        <!-- A succeeded run as its workflow's sample output (the API's run example), for
+             whoever can edit the workflow, where it's served: the page's primary action. -->
+        <div v-else class="header-actions">
+          <RunExampleAction :run="selectedWorkflowActivity" placement="header" />
+        </div>
       </template>
     </div>
 
@@ -3396,9 +3401,6 @@ onUnmounted(() => {
                 {{ downloadingLogs ? 'Downloading...' : 'Download Logs & Configuration' }}
               </bf-button>
 
-              <!-- A succeeded run as its workflow version's example PDF
-                   (for whoever can edit the workflow, where it's served) -->
-              <RunExampleAction :run="selectedWorkflowActivity" />
             </template>
 
             <div v-else class="info-empty">
