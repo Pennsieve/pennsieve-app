@@ -36,6 +36,7 @@ import PublicFilesPicker from "./PublicFilesPicker.vue";
 import { picksKey } from "./publicPicks";
 import IoPill from "../WorkflowGraph/IoPill.vue";
 import { withInterfaceNodes, destinationChoices, NO_DESTINATION } from "./workflowInterface";
+import { placeRunNodes, workflowLayouts } from "./runLayout";
 import { importStatusUrl, importSummary, importStillMoving, isDatasetImport } from "./runImports";
 import { nodeUnfit, rememberedSetup, rememberSetup, defaultNode, needsDataset } from "./runSetup";
 import DownloadItem from "@/components/downloads/DownloadItem.vue";
@@ -68,8 +69,7 @@ import {
   formatModelName,
   formatBytes,
   formatDurationSec,
-  formatMetricKey,
-  formatMetricValue,
+  nodeMetricRows,
   formatResourceLabel,
   computeNodeName as computeNodeNameFn,
   getUserName as getUserNameFn,
@@ -535,14 +535,28 @@ const autoLayout = () => {
 
 // This page saves no positions, so a graph is laid out for its node size:
 // compact always gets a tight layout of its own; detailed keeps the
-// definition's saved positions, where it has them.
+// definition's saved positions, where it has them (a run's, the workflow's
+// as saved now: runLayout.js).
 const needsLayout = (result) => result.needsAutoLayout || !detailed.value;
+
+// The shown run's workflow's saved layout (null: none, or not read).
+const runWorkflowLayout = ref(null);
 
 const changeDensity = (value) => {
   if (value === detailed.value) return;
   setDetailed(value);
   redrawGraph();
-  autoLayout();
+  // Back to detailed: the saved positions again, where the graph has them.
+  const result = value && mode.value === "browse" && selectedWorkflowActivity.value?.dag?.length
+    ? runToNodesAndEdges(selectedWorkflowActivity.value)
+    : null;
+  if (result && !needsLayout(result)) {
+    const at = new Map(result.nodes.map((n) => [n.id, n.position]));
+    nodes.value = nodes.value.map((n) => ({ ...n, position: at.get(n.id) || n.position }));
+    setTimeout(() => fitView({ padding: 0.2, maxZoom: 1 }), 50);
+  } else {
+    autoLayout();
+  }
 };
 
 // The graph's nodes and edges again from what it shows (the run, or the
@@ -690,7 +704,8 @@ const definitionToNodesAndEdges = (definition) => {
 const runToNodesAndEdges = (run) => {
   const dag = run.dag || [];
   if (dag.length === 0) return { nodes: [], edges: [], needsAutoLayout: true };
-  const hasSavedPositions = dag.some((d) => d.position && typeof d.position.x === "number");
+  // The workflow's layout as saved now, else the run's own (runLayout.js).
+  const placed = placeRunNodes(dag, runWorkflowLayout.value, { box: DETAILED_BOX });
   const runDataSources = run.dataSources || {};
   const runDataTargets = run.dataTargets || {};
   const runProcessorConfigs = run.processorConfigs || [];
@@ -738,16 +753,18 @@ const runToNodesAndEdges = (run) => {
         completedAt: d.completedAt,
         progress: d.progress || null,
         errorMessage: d.errorMessage || "",
+        reason: d.reason || null,
+        exitCode: d.exitCode ?? null,
+        cpuUnits: d.cpuUnits || null,
+        memoryMiB: d.memoryMiB || null,
         ...extra,
       },
-      position: hasSavedPositions && d.position && typeof d.position.x === "number"
-        ? { x: d.position.x, y: d.position.y }
-        : { x: 0, y: 0 },
+      position: placed.positions[d.id] || { x: 0, y: 0 },
     };
   });
   const dagMap = Object.fromEntries(dag.map((d) => [d.id, d]));
   const resultEdges = graphEdges(dag, resultNodes, (src) => nodeBorderColor(dagMap[src]?.type, dagMap[src]?.status));
-  return { nodes: resultNodes, edges: resultEdges, needsAutoLayout: !hasSavedPositions };
+  return { nodes: resultNodes, edges: resultEdges, needsAutoLayout: placed.needsAutoLayout };
 };
 
 /*
@@ -868,6 +885,12 @@ const loadRun = async (runId) => {
     await store.dispatch("analysisModule/setSelectedWorkflowActivity", run);
     const activity = selectedWorkflowActivity.value;
     if (activity && activity.dag && activity.dag.length > 0) {
+      // Laid out as its workflow is now (cached per workflow).
+      const layout = await workflowLayouts.get(activity.workflowUuid, (uuid) =>
+        store.dispatch("analysisModule/fetchWorkflowDefinition", uuid)
+      );
+      if (selectedWorkflowActivity.value?.uuid !== activity.uuid) return;
+      runWorkflowLayout.value = layout;
       const result = runToNodesAndEdges(activity);
       nodes.value = result.nodes;
       edges.value = result.edges;
@@ -1851,6 +1874,32 @@ const viewSourceLabel = (view) => {
     .join(" · ");
 };
 
+/*
+  Why a step ended, in a sentence, from the reason the compute node reported
+  (OUT_OF_MEMORY, EXIT_CODE, IMAGE_PULL, TIMEOUT, STOPPED, UPSTREAM, ERROR),
+  with what to do about it where there is something to do.
+*/
+function failureSummary(data) {
+  if (!data?.reason) return null;
+  const mem = data.memoryMiB ? `${data.memoryMiB} MiB` : "its memory";
+  switch (data.reason) {
+    case "OUT_OF_MEMORY":
+      return `Killed for memory at ${mem}. Raise runtime.memory in the app's app.yml, or the step's memory for the run.`;
+    case "EXIT_CODE":
+      return `The app exited with code ${data.exitCode}. See its logs.`;
+    case "IMAGE_PULL":
+      return "The app's image could not be pulled, twice. Check the app's release, then run again.";
+    case "TIMEOUT":
+      return "The step ran past its time limit.";
+    case "STOPPED":
+      return "Stopped because another step failed.";
+    case "UPSTREAM":
+      return data.errorMessage ? `Not run: ${data.errorMessage}.` : "Not run: a step it depends on failed.";
+    default:
+      return data.errorMessage || "The step failed.";
+  }
+}
+
 const selectedNodeMetrics = computed(() => {
   if (!selectedNode.value || !runMetrics.value?.nodeMetrics) return null;
   return (
@@ -2393,6 +2442,7 @@ onUnmounted(() => {
                   :unmet="nodeUnmetCount(id, 'data-source')"
                   :off="isLeftOut(id)"
                   :running="inputStaging(data)"
+                  :done="mode === 'browse' && data.status === 'SUCCEEDED'"
                   :failed="mode === 'browse' && data.status === 'FAILED'"
                 />
                 <Handle id="source" type="source" :position="Position.Bottom" />
@@ -2410,6 +2460,7 @@ onUnmounted(() => {
                   :mark="statusMark(data)"
                   :mark-title="statusLabel(data.status)"
                   :running="mode === 'browse' && data.status === 'STARTED'"
+                  :done="mode === 'browse' && data.status === 'SUCCEEDED'"
                   :failed="mode === 'browse' && data.status === 'FAILED'"
                   :unmet="nodeUnmetCount(id, 'data-target')"
                   :off="isUnsaved(id)"
@@ -3067,6 +3118,14 @@ onUnmounted(() => {
                     {{ statusLabel(selectedNode.data?.status) }}
                   </span>
                 </div>
+                <div v-if="failureSummary(selectedNode.data)" class="info-row node-failure">
+                  <span class="info-label">Why</span>
+                  <span class="info-value">{{ failureSummary(selectedNode.data) }}</span>
+                </div>
+                <div v-if="selectedNode.data?.cpuUnits && selectedNode.data?.memoryMiB" class="info-row">
+                  <span class="info-label">Ran with</span>
+                  <span class="info-value">{{ (selectedNode.data.cpuUnits / 1024).toFixed(1) }} vCPU, {{ selectedNode.data.memoryMiB }} MiB</span>
+                </div>
                 <div v-if="selectedNode.data?.processorType" class="info-row">
                   <span class="info-label">Type</span>
                   <span class="info-value">{{ selectedNode.data.processorType }}</span>
@@ -3469,7 +3528,11 @@ onUnmounted(() => {
             </div>
             <div v-if="nm.maxMemoryUsedMiB != null" class="receipt-row">
               <span>Memory Used</span>
-              <span>{{ nm.maxMemoryUsedMiB }} / {{ nm.memoryConfiguredMiB }} MiB</span>
+              <span>{{ Math.round(nm.maxMemoryUsedMiB) }} / {{ nm.memoryConfiguredMiB }} MiB</span>
+            </div>
+            <div v-if="nm.maxCpuUtilized != null && nm.cpuUnits" class="receipt-row">
+              <span>CPU Used</span>
+              <span>{{ (nm.maxCpuUtilized / 1024).toFixed(2) }} / {{ (nm.cpuUnits / 1024).toFixed(1) }} vCPU</span>
             </div>
             <div class="receipt-row">
               <span>Status</span>
@@ -3682,16 +3745,13 @@ onUnmounted(() => {
         </div>
 
         <div class="receipt-section">
-          <div
-            v-for="(value, key) in selectedNodeMetrics"
-            :key="key"
-            class="receipt-row"
-          >
-            <template v-if="key !== 'nodeId'">
-              <span>{{ formatMetricKey(key) }}</span>
-              <span>{{ formatMetricValue(key, value) }}</span>
-            </template>
-          </div>
+          <template v-for="(row, i) in nodeMetricRows(selectedNodeMetrics)" :key="i">
+            <div v-if="row.note" class="receipt-note">{{ row.note }}</div>
+            <div v-else class="receipt-row" :class="{ 'receipt-row-cost': row.cost }">
+              <span>{{ row.label }}</span>
+              <span class="receipt-value" :title="row.title">{{ row.value }}</span>
+            </div>
+          </template>
         </div>
       </div>
 
@@ -4307,11 +4367,26 @@ onUnmounted(() => {
   }
 
   &.gray-node { border-color: theme.$gray_4; }
-  // Running: the type strip pulses; the card and its border stay still.
-  &.blue-node::before { animation: strip-pulse 1.6s ease-in-out infinite; }
-  // Succeeded: no colour, the ✓ by the title says it (graphStatusColor).
-  &.green-node { border-color: theme.$gray_3; }
-  &.red-node { border-color: theme.$status_red; }
+  // Running: a teal border and a breathing teal glow around the card, the
+  // same teal as its connectors, so the steps at work stand out across the
+  // graph; the type strip pulses too. The animation keeps the glow on hover.
+  &.blue-node {
+    border-color: #06b6d4;
+    animation: node-running-glow 1.6s ease-in-out infinite;
+    &::before { animation: strip-pulse 1.6s ease-in-out infinite; }
+  }
+  // Succeeded: a green border and a still, soft green ring, settled once
+  // (a short fade-in when the step just finished), beside the ✓ by the
+  // title. Only a running step moves.
+  &.green-node {
+    border-color: theme.$status_green;
+    box-shadow: 0 0 0 2px rgba(23, 187, 98, 0.22), 0 0 8px rgba(23, 187, 98, 0.25);
+    animation: node-done-settle 1.2s ease-out 1;
+  }
+  &.red-node {
+    border-color: theme.$status_red;
+    box-shadow: 0 0 0 2px rgba(233, 75, 75, 0.2), 0 0 8px rgba(233, 75, 75, 0.25);
+  }
 
   &.data-source-node {
     --type-strip: #6366f1;
@@ -4360,6 +4435,14 @@ onUnmounted(() => {
 @keyframes strip-pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.25; }
+}
+@keyframes node-done-settle {
+  0% { box-shadow: 0 0 0 5px rgba(23, 187, 98, 0.35), 0 0 24px rgba(23, 187, 98, 0.7); }
+  100% { box-shadow: 0 0 0 2px rgba(23, 187, 98, 0.22), 0 0 8px rgba(23, 187, 98, 0.25); }
+}
+@keyframes node-running-glow {
+  0%, 100% { box-shadow: 0 0 0 2px rgba(6, 182, 212, 0.35), 0 0 10px rgba(6, 182, 212, 0.35); }
+  50% { box-shadow: 0 0 0 5px rgba(6, 182, 212, 0.2), 0 0 24px rgba(6, 182, 212, 0.65); }
 }
 
 /* Chosen files a source's inputs don't take, in its panel. */
@@ -5013,12 +5096,27 @@ onUnmounted(() => {
   border-bottom: 1px solid theme.$gray_2;
 }
 
+.receipt-note {
+  margin-top: 6px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: theme.$gray_4;
+}
 .receipt-row {
   display: flex;
   justify-content: space-between;
+  gap: 12px;
   padding: 3px 0;
   font-size: 13px;
   color: theme.$gray_5;
+
+  .receipt-value {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    text-align: right;
+  }
 
   &.receipt-row-cost {
     font-weight: 600;

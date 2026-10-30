@@ -10,7 +10,6 @@ import { versionManifest } from "../WorkflowBuilder/appManifestInfo";
 import {
   APP_SORTS,
   appTitle,
-  computeLabel,
   githubRepo,
   matchesAppSearch,
   appDescription,
@@ -115,12 +114,8 @@ const visibilityLabel = (app) => {
   Filtered & sorted applications (newest first, matching workflows)
 */
 // Where an app runs (from its runtime config), and the choices the list has.
-const computeFilter = ref("any");
 // A domain's key, or null for every app: the colour legend above the cards.
 const domainFilter = ref(null);
-const computeChoices = computed(() => [
-  ...new Set(applications.value.flatMap((a) => a.runtimeConfig?.computeTypes || [])),
-]);
 
 // The sort is the viewer's, kept in this browser.
 const SORT_KEY = "pennsieve.gallery.appSort";
@@ -154,12 +149,11 @@ const githubUrl = (app) => {
 
 const filtersSet = computed(
   () =>
-    !!searchQuery.value.trim() || visibilityFilter.value !== "all" || computeFilter.value !== "any" || !!domainFilter.value
+    !!searchQuery.value.trim() || visibilityFilter.value !== "all" || !!domainFilter.value
 );
 function clearFilters() {
   searchQuery.value = "";
   visibilityFilter.value = "all";
-  computeFilter.value = "any";
   domainFilter.value = null;
 }
 
@@ -188,9 +182,6 @@ const filteredApplications = computed(() => {
   }
 
   list = list.filter((app) => matchesAppSearch(app, searchQuery.value, readmeSummary(app)));
-  if (computeFilter.value !== "any") {
-    list = list.filter((app) => (app.runtimeConfig?.computeTypes || []).includes(computeFilter.value));
-  }
 
   if (visibilityFilter.value !== "all") {
     list = list.filter(
@@ -335,10 +326,6 @@ const goToManifestBuilder = () => {
             {{ option.label }}
           </button>
         </div>
-        <el-select v-model="computeFilter" size="small" class="io-select" aria-label="Runs on">
-          <el-option label="Runs anywhere" value="any" />
-          <el-option v-for="t in computeChoices" :key="t" :label="`Runs on ${computeLabel(t)}`" :value="t" />
-        </el-select>
         <label v-if="searchInBar" class="sort-control filter-sort">
           Sort
           <el-select v-model="sortBy" size="small" class="sort-select">
@@ -597,8 +584,6 @@ const goToManifestBuilder = () => {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding-right: 12px;
-  border-right: 1px solid theme.$gray_2;
 }
 .filter-btn {
   height: 24px;

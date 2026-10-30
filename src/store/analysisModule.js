@@ -883,6 +883,11 @@ const actions = {
           // An input's download while the run's inputs are staged.
           progress: statusEntry.progress || null,
           errorMessage: statusEntry.errorMessage || "",
+          // Why a step ended, and the size its task had (compute node contract §4.3).
+          reason: statusEntry.reason || null,
+          exitCode: statusEntry.exitCode ?? null,
+          cpuUnits: statusEntry.cpuUnits || null,
+          memoryMiB: statusEntry.memoryMiB || null,
         };
       });
 
