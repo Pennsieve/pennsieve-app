@@ -88,3 +88,69 @@ export function variantTagWarning(tag, hasVariants) {
   if (!hasVariants || !String(tag || "").includes("--")) return "";
   return "This app has variants, so its versions can't contain \"--\": the app store would refuse the release.";
 }
+
+// The variant a view keeps for a version: the one it had, when the version
+// has it, else the version's default; "" for a version without variants.
+export function keepVariant(app, tag, variant) {
+  const list = versionVariants(app, tag);
+  if (!list.length) return "";
+  return (list.find((v) => v.id === variant) || list.find((v) => v.default) || list[0]).id;
+}
+
+const num = (v) => (v == null || v === "" || Number(v) === 0 ? null : Number(v));
+const same = (a, b) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
+const PARAM_FIELDS = ["defaultValue", "validValues", "label", "description", "required"];
+
+/*
+  What the app.yml tab shows for one of a version's variants: its resolved
+  manifest's runtime and parameters, each value marked (differs) where it
+  isn't the default variant's (DynaSD gpu: compute types, memory 14336,
+  MODEL default oncet). Null for a version without variants (the tab shows
+  app.yml as before).
+  { variant, isDefault, runtime: { computeTypes, cpu, memory, timeoutSeconds },
+    differs: { computeTypes, cpu, memory, timeoutSeconds },
+    parameters: [{ name, type, label, description, required, defaultValue,
+    validValues, differs: { defaultValue, validValues, label, description,
+    required } }] }
+*/
+export function variantManifestView(app, tag, variant) {
+  const list = versionVariants(app, tag);
+  if (!list.length) return null;
+  const chosen = list.find((v) => v.id === variant) || list.find((v) => v.default) || list[0];
+  const base = list.find((v) => v.default) || list[0];
+  const rt = chosen.manifest?.runtime || {};
+  const baseRt = base.manifest?.runtime || {};
+  const runtime = {
+    computeTypes: rt.computeTypes || [],
+    cpu: num(rt.cpu),
+    memory: num(rt.memory),
+    timeoutSeconds: num(rt.timeoutSeconds),
+  };
+  const baseRuntime = {
+    computeTypes: baseRt.computeTypes || [],
+    cpu: num(baseRt.cpu),
+    memory: num(baseRt.memory),
+    timeoutSeconds: num(baseRt.timeoutSeconds),
+  };
+  const differs = Object.fromEntries(Object.keys(runtime).map((k) => [k, !same(runtime[k], baseRuntime[k])]));
+  const baseParams = base.manifest?.parameters || [];
+  const parameters = (chosen.manifest?.parameters || [])
+    .filter((p) => p?.name)
+    .map((p) => {
+      const b = baseParams.find((x) => x.name === p.name) || {};
+      const norm = (x) => ({ ...x, validValues: Array.isArray(x.validValues) ? x.validValues : [], required: !!x.required });
+      const pn = norm(p);
+      const bn = norm(b);
+      return {
+        name: pn.name,
+        type: pn.type || "string",
+        label: pn.label || "",
+        description: pn.description || "",
+        required: pn.required,
+        defaultValue: pn.defaultValue,
+        validValues: pn.validValues,
+        differs: Object.fromEntries(PARAM_FIELDS.map((f) => [f, !same(pn[f], bn[f])])),
+      };
+    });
+  return { variant: chosen, isDefault: chosen.id === base.id, runtime, differs, parameters };
+}

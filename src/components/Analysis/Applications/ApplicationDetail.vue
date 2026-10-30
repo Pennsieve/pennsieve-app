@@ -16,7 +16,7 @@ import ShareAppDialog from "./ShareAppDialog.vue";
 import { accessEntries, accessSummary, makeNamer } from "./appSharing";
 import { useWorkspaceMembers } from "./useWorkspaceMembers";
 import { fetchReleaseStatus, releaseNudge } from "./release";
-import { releaseProgress, variantDetails, versionVariants } from "./versionVariants";
+import { keepVariant, releaseProgress, variantDetails, variantManifestView, versionVariants } from "./versionVariants";
 import { versionsToWatch, withLiveStatus } from "./liveStatus";
 import { useAppStatusEvents } from "@/composables/useAppStatusEvents";
 import RuntimeMark from "../WorkflowGraph/RuntimeMark.vue";
@@ -166,6 +166,7 @@ const onReleased = ({ tag }) => {
 // The newest version's variants: the Variants section, and the release
 // dialog's check of "--" in a tag.
 const newestVariants = computed(() => variantDetails(liveDetail.value, sortedVersions.value[0]?.version));
+
 onBeforeUnmount(stopReleaseWatch);
 
 // Permissions only apply to private applications.
@@ -240,6 +241,41 @@ const sortedVersions = computed(() => {
     return bTime - aTime;
   });
 });
+/*
+  The app.yml tab for a version with variants (the newest, whose app.yml the
+  tab shows): a switch between them, and Runtime and Parameters from the
+  chosen variant's resolved manifest, with what differs from the default
+  marked. The choice stays across a new version that has the variant, else
+  goes back to the default. A version without variants: app.yml as is.
+*/
+const appYmlVariant = ref("");
+watch(
+  () => [sortedVersions.value[0]?.version, newestVariants.value.map((v) => v.id).join(",")],
+  ([tag]) => {
+    appYmlVariant.value = keepVariant(liveDetail.value, tag, appYmlVariant.value);
+  },
+  { immediate: true }
+);
+const variantView = computed(() => variantManifestView(liveDetail.value, sortedVersions.value[0]?.version, appYmlVariant.value));
+const typeLabel = (t) => (t === "gpu" ? "GPU" : t.charAt(0).toUpperCase() + t.slice(1));
+// What Runtime and Parameters show: the variant's, else app.yml's.
+const shownRuntime = computed(() => {
+  const v = variantView.value;
+  if (v) return { computeTypes: v.runtime.computeTypes.map(typeLabel), cpu: v.runtime.cpu, memory: v.runtime.memory, timeoutSeconds: v.runtime.timeoutSeconds };
+  const s = manifestSchema.value;
+  return {
+    computeTypes: computeTypeLabels.value,
+    cpu: s?.resources?.cpu,
+    memory: s?.resources?.memory,
+    timeoutSeconds: manifestMeta.value?.timeoutSeconds,
+  };
+});
+const shownParams = computed(() => variantView.value?.parameters || manifestSchema.value?.parameters || []);
+// "set by variant": a value the chosen (non-default) variant sets itself.
+const setByVariant = (field) => !!variantView.value && !variantView.value.isDefault && !!variantView.value.differs[field];
+const paramSetByVariant = (param) =>
+  !!variantView.value && !variantView.value.isDefault && Object.values(param.differs || {}).some(Boolean);
+
 
 // The newest version's license: read by app-deploy-service from the
 // repository's LICENSE file at that release (an SPDX id), not from app.yml.
@@ -776,6 +812,17 @@ watch(
               <p class="manifest-error-detail">{{ manifestParsed.error }}</p>
             </div>
             <div v-else class="manifest-detail">
+              <!-- A version with variants: which one Runtime and Parameters show -->
+              <div v-if="newestVariants.length" class="manifest-variant-switch">
+                <el-radio-group v-model="appYmlVariant" size="small" aria-label="Variant">
+                  <el-radio-button v-for="v in newestVariants" :key="v.id" :value="v.id" :title="v.description || v.name">
+                    <span class="manifest-variant-name"><RuntimeMark v-if="v.gpu" runtime="gpu" compact />{{ v.name }}</span>
+                  </el-radio-button>
+                </el-radio-group>
+                <span class="manifest-license-note">
+                  {{ variantView?.isDefault ? "The default variant" : "Values this variant sets are marked" }}
+                </span>
+              </div>
               <!-- The newest version's schema problems, if registration found any -->
               <section v-if="manifestProblems.length" class="manifest-block manifest-problems">
                 <h4 class="manifest-block-title">
@@ -829,6 +876,16 @@ watch(
                     {{ tag }}
                   </span>
                 </div>
+                <!-- Its variants: one build each, the default first -->
+                <div v-if="newestVariants.length" class="manifest-variants">
+                  <span class="manifest-field-label">Variants</span>
+                  <div v-for="v in newestVariants" :key="v.id" class="manifest-variant-line">
+                    <span class="manifest-field-value manifest-variant-name"><RuntimeMark v-if="v.gpu" runtime="gpu" compact />{{ v.name }}</span>
+                    <span v-if="v.default" class="manifest-license-note">default</span>
+                    <span v-if="v.runsOn" class="manifest-license-note">{{ v.runsOn }}</span>
+                    <span v-if="v.description" class="manifest-variant-desc">{{ v.description }}</span>
+                  </div>
+                </div>
               </section>
 
               <!-- Runtime -->
@@ -838,23 +895,29 @@ watch(
                   <div class="manifest-field">
                     <span class="manifest-field-label">Compute types</span>
                     <span class="manifest-field-value">
-                      {{ computeTypeLabels.join(", ") || "—" }}
+                      {{ shownRuntime.computeTypes.join(", ") || "—" }}
+                      <span v-if="setByVariant('computeTypes')" class="manifest-variant-mark">set by variant</span>
                     </span>
                   </div>
-                  <div v-if="manifestSchema.resources.cpu != null" class="manifest-field">
+                  <div v-if="shownRuntime.cpu != null" class="manifest-field">
                     <span class="manifest-field-label">CPU</span>
-                    <span class="manifest-field-value">{{ manifestSchema.resources.cpu }}</span>
+                    <span class="manifest-field-value">
+                      {{ shownRuntime.cpu }}
+                      <span v-if="setByVariant('cpu')" class="manifest-variant-mark">set by variant</span>
+                    </span>
                   </div>
-                  <div v-if="manifestSchema.resources.memory != null" class="manifest-field">
+                  <div v-if="shownRuntime.memory != null" class="manifest-field">
                     <span class="manifest-field-label">Memory</span>
                     <span class="manifest-field-value">
-                      {{ manifestSchema.resources.memory }} MB
+                      {{ shownRuntime.memory }} MB
+                      <span v-if="setByVariant('memory')" class="manifest-variant-mark">set by variant</span>
                     </span>
                   </div>
-                  <div v-if="manifestMeta.timeoutSeconds != null" class="manifest-field">
+                  <div v-if="shownRuntime.timeoutSeconds != null" class="manifest-field">
                     <span class="manifest-field-label">Timeout</span>
                     <span class="manifest-field-value">
-                      {{ manifestMeta.timeoutSeconds }}s
+                      {{ shownRuntime.timeoutSeconds }}s
+                      <span v-if="setByVariant('timeoutSeconds')" class="manifest-variant-mark">set by variant</span>
                     </span>
                   </div>
                 </div>
@@ -898,9 +961,9 @@ watch(
               </section>
 
               <!-- Parameters -->
-              <section v-if="manifestSchema.parameters.length" class="manifest-block">
+              <section v-if="shownParams.length" class="manifest-block">
                 <h4 class="manifest-block-title">
-                  Parameters ({{ manifestSchema.parameters.length }})
+                  Parameters ({{ shownParams.length }})
                 </h4>
                 <div class="manifest-table-scroll">
                   <table class="manifest-table">
@@ -914,8 +977,13 @@ watch(
                       </tr>
                     </thead>
                     <tbody>
-                      <tr v-for="param in manifestSchema.parameters" :key="param.name">
-                        <td class="manifest-mono">{{ param.name }}</td>
+                      <tr v-for="param in shownParams" :key="param.name">
+                        <td class="manifest-mono">
+                          {{ param.name }}
+                          <!-- A variant's view: its label, and a mark when it sets the parameter -->
+                          <span v-if="variantView && param.label" class="manifest-param-label">{{ param.label }}</span>
+                          <span v-if="paramSetByVariant(param)" class="manifest-variant-mark">set by variant</span>
+                        </td>
                         <td>{{ paramTypeLabel(param.type) }}</td>
                         <td class="manifest-mono">
                           {{ formatDefaultValue(param.defaultValue) }}
@@ -2459,6 +2527,46 @@ p.access-ask {
   margin-left: 8px;
   font-size: 12px;
   color: theme.$gray_4;
+}
+.manifest-variant-switch {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.manifest-variant-name {
+  display: inline-flex;
+  align-items: center;
+}
+.manifest-variant-mark {
+  margin-left: 6px;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 400;
+  color: theme.$gray_4;
+}
+.manifest-param-label {
+  display: block;
+  font-family: inherit;
+  font-size: 11px;
+  color: theme.$gray_4;
+}
+.manifest-variants {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 10px;
+}
+.manifest-variant-line {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+}
+.manifest-variant-desc {
+  flex-basis: 100%;
+  font-size: 12px;
+  color: theme.$gray_5;
 }
 </style>
 
