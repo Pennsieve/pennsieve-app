@@ -32,6 +32,7 @@ const makeStore = () =>
           fetchRunExample: (_, runId) => handlers.status(runId),
           setRunExample: (_, args) => handlers.set(args),
           fetchWorkflowVersionExample: (_, args) => handlers.versionExample(args),
+          fetchAppExample: (_, sourceUrl) => handlers.appExample(sourceUrl),
         },
       },
     },
@@ -51,6 +52,7 @@ beforeEach(() => {
     status: vi.fn(async () => ({ job: null, limits })),
     set: vi.fn(async () => ({ job: { status: "QUEUED" }, example: null })),
     versionExample: vi.fn(async () => null),
+    appExample: vi.fn(async () => null),
   };
 });
 afterEach(() => vi.useRealTimers());
@@ -183,5 +185,47 @@ describe("RunExampleAction", () => {
     wrapper.unmount();
     await vi.advanceTimersByTimeAsync(20000);
     expect(handlers.status.mock.calls.length).toBe(calls);
+  });
+});
+
+describe("RunExampleAction on an app run", () => {
+  const appRun = {
+    uuid: "run-app",
+    status: "SUCCEEDED",
+    workflowUuid: "",
+    app: { sourceUrl: "https://github.com/pennsieve-apps/st-niches", name: "st-niches", tag: "v0.1.0" },
+  };
+
+  it("is offered to the app's owner (the status call allows it), worded for the app", async () => {
+    const wrapper = await mountIt({ run: appRun });
+    expect(handlers.definition).not.toHaveBeenCalled();
+    expect(handlers.status).toHaveBeenCalledWith("run-app");
+    expect(handlers.appExample).toHaveBeenCalledWith("https://github.com/pennsieve-apps/st-niches");
+    const btn = button(wrapper, "Use as app sample output");
+    expect(btn).toBeTruthy();
+    await btn.trigger("click");
+    await flushPromises();
+    const text = wrapper.find(".dialog-stub").text().replace(/\s+/g, " ");
+    expect(text).toContain("PDF summary of this run's inputs and results");
+    expect(text).toContain("kept 3 days");
+    expect(text).toContain("The app has no sample output yet");
+    expect(text).toContain("for this app today");
+  });
+
+  it("isn't shown to anyone else", async () => {
+    handlers.status = vi.fn(async () => {
+      const err = new Error("only the app's owner can set its sample output");
+      err.status = 403;
+      throw err;
+    });
+    const wrapper = await mountIt({ run: appRun });
+    expect(button(wrapper, "Use as app sample output")).toBeFalsy();
+  });
+
+  it("shows a run that is the app's sample output as such", async () => {
+    handlers.appExample = vi.fn(async () => ({ runId: "run-app", app: appRun.app, pdfUrl: "https://cdn/x.pdf" }));
+    const wrapper = await mountIt({ run: appRun, placement: "header" });
+    expect(wrapper.text()).toContain("App sample output");
+    expect(button(wrapper, "Use as app sample output")).toBeFalsy();
   });
 });

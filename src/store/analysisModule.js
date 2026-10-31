@@ -644,6 +644,43 @@ export const actions = {
       throw err;
     }
   },
+  // fetchAppRunDefinition: { sourceUrl, tag, variant? } -> the one-step
+  // workflow an app run of that app version runs (RunMonitor/appRuns.js).
+  fetchAppRunDefinition: async ({ rootState }, { sourceUrl, tag, variant } = {}) => {
+    const params = new URLSearchParams({ sourceUrl, tag });
+    if (variant) params.set("variant", variant);
+    return workflowRequest(rootState, `apps/run-definition?${params}`);
+  },
+  // listWorkflowDefinitions: { visibility, cursor, limit } -> { workflows,
+  // nextCursor }, the workspace's (or with visibility "public", the public
+  // catalog's) workflow definitions, without touching the library's list.
+  listWorkflowDefinitions: async ({ rootState }, { visibility, cursor, limit = 100 } = {}) => {
+    const params = new URLSearchParams();
+    if (visibility === "public") params.set("visibility", "public");
+    else {
+      const orgId = rootState.activeOrganization?.organization?.id;
+      if (orgId) params.set("organization_id", orgId);
+    }
+    if (limit) params.set("limit", limit);
+    if (cursor) params.set("cursor", cursor);
+    const result = await workflowRequest(rootState, `definitions?${params}`);
+    return Array.isArray(result)
+      ? { workflows: result, nextCursor: "" }
+      : { workflows: result?.workflows || [], nextCursor: result?.nextCursor || "" };
+  },
+  // fetchAppExample: sourceUrl -> the app's sample output (a PDF of one of
+  // its app runs, example.app set), or null.
+  // sourceUrl, or { sourceUrl, strict } (strict rejects where the route
+  // isn't there too, so the App Store's cache stops asking).
+  fetchAppExample: async ({ rootState }, arg) => {
+    const { sourceUrl, strict = false } = typeof arg === "string" ? { sourceUrl: arg } : arg || {};
+    try {
+      return (await workflowRequest(rootState, `apps/example?sourceUrl=${encodeURIComponent(sourceUrl)}`)).example || null;
+    } catch (err) {
+      if (!strict && exampleUnavailable(err)) return null;
+      throw err;
+    }
+  },
   // fetchWorkflowVersionExample: { uuid, version } -> that version's example, or null.
   fetchWorkflowVersionExample: async ({ rootState }, { uuid, version }) => {
     try {

@@ -84,13 +84,15 @@ export const limitRows = (limits) =>
 // tightest limit (the one with the fewest left), or "" when there are no
 // limits or one is used up (exhaustedLimit and limitMessage cover that).
 const LIMIT_SCOPES = { workflow: "for this workflow", user: "by you", workspace: "in this workspace" };
-export const limitSentence = (limits) => {
+// subject: "workflow", or "app" for an app run (the per-workflow limit counts per app).
+export const limitSentence = (limits, subject = "workflow") => {
   const rows = limitRows(limits);
   if (!rows.length) return "";
   const tightest = rows.reduce((a, b) => (b.left < a.left ? b : a));
   if (tightest.left <= 0) return "";
   const n = tightest.left;
-  return `${n} more sample ${n === 1 ? "output" : "outputs"} can be generated ${LIMIT_SCOPES[tightest.key] || ""} today.`;
+  const scope = tightest.key === "workflow" && subject === "app" ? "for this app" : LIMIT_SCOPES[tightest.key] || "";
+  return `${n} more sample ${n === 1 ? "output" : "outputs"} can be generated ${scope} today.`;
 };
 
 // The first limit with nothing left today, or null.
@@ -122,18 +124,22 @@ export const limitMessage = (limit, resetAt, now) => {
 };
 
 // A refused POST /runs/{id}/example (workflowRequest's error: status, body).
-export const setExampleError = (err, now) => {
+export const setExampleError = (err, now, subject = "workflow") => {
   const body = err?.body || {};
+  const app = subject === "app";
   switch (err?.status) {
     case 403:
-      return "You can't use this run as the workflow sample output: that takes being able to edit the workflow and read every dataset the run wrote to.";
+      return app
+        ? "You can't use this run as the app's sample output: that takes owning the app, having run it yourself, and being able to read its input files."
+        : "You can't use this run as the workflow sample output: that takes being able to edit the workflow and read every dataset the run wrote to.";
     case 404:
       return "This run wasn't found.";
     case 409: {
       const other = body.job?.runId || body.runId;
+      if (app && !other && body.message) return body.message; // e.g. the results are still being packaged
       return other
-        ? `A sample output is already being generated for this workflow (from run ${other}). Try again when it's done.`
-        : "A sample output is already being generated for this workflow. Try again when it's done.";
+        ? `A sample output is already being generated for this ${subject} (from run ${other}). Try again when it's done.`
+        : `A sample output is already being generated for this ${subject}. Try again when it's done.`;
     }
     case 422:
       return body.message

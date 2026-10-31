@@ -16,6 +16,7 @@ import IconCheck from "../../icons/IconCheck.vue";
 import IconPDF from "../../icons/IconPDF.vue";
 import IconRotateRight from "../../icons/IconRotateRight.vue";
 import SampleOutputViewer from "../Workflows/SampleOutputViewer.vue";
+import { appRunLabel } from "./appRuns";
 import {
   canEditWorkflow,
   exhaustedLimit,
@@ -59,6 +60,18 @@ const stopPolling = () => {
 const runId = computed(() => props.run?.uuid || "");
 const succeeded = computed(() => props.run?.status === "SUCCEEDED");
 const version = computed(() => props.run?.workflowVersion || null);
+// An app run's app: its sample output is the app's (one per app), not a
+// workflow version's.
+const appRun = computed(() => props.run?.app || null);
+const subject = computed(() => (appRun.value ? "app" : "workflow"));
+// The subject's sample output now (null: none; undefined: can't tell).
+const fetchCurrentSample = () => {
+  if (appRun.value?.sourceUrl) return store.dispatch("analysisModule/fetchAppExample", appRun.value.sourceUrl);
+  if (version.value && props.run?.workflowUuid) {
+    return store.dispatch("analysisModule/fetchWorkflowVersionExample", { uuid: props.run.workflowUuid, version: version.value });
+  }
+  return Promise.resolve(undefined);
+};
 // The version's current example (null: none, undefined: not known yet), for the dialog's wording.
 const versionExample = ref(undefined);
 const versionExampleIsThisRun = computed(() => !!versionExample.value && versionExample.value.runId === runId.value);
@@ -67,12 +80,9 @@ const isCurrentSample = computed(
   () => !!currentSample.value && currentSample.value.runId === runId.value && !jobActive(job.value)
 );
 const loadCurrentSample = async (seq) => {
-  if (!version.value || !props.run?.workflowUuid) return;
   try {
-    const found = await store.dispatch("analysisModule/fetchWorkflowVersionExample", {
-      uuid: props.run.workflowUuid,
-      version: version.value,
-    });
+    const found = await fetchCurrentSample();
+    if (found === undefined) return;
     if (seq === undefined || seq === loadSeq) currentSample.value = found || null;
   } catch {
     // shown as not the sample output
@@ -81,7 +91,7 @@ const loadCurrentSample = async (seq) => {
 const shown = computed(() => succeeded.value && canEdit.value && available.value);
 const hasPdf = computed(() => job.value?.status === "READY");
 const exhausted = computed(() => exhaustedLimit(limits.value));
-const limitText = computed(() => limitSentence(limits.value));
+const limitText = computed(() => limitSentence(limits.value, subject.value));
 
 const schedulePoll = (seq) => {
   stopPolling();
@@ -115,12 +125,18 @@ const load = async () => {
   currentSample.value = null;
   openError.value = "";
   const run = props.run;
-  if (!run?.uuid || run.status !== "SUCCEEDED" || !run.workflowUuid) return;
+  if (!run?.uuid || run.status !== "SUCCEEDED" || (!run.workflowUuid && !run.app)) return;
   try {
-    const workflow = await store.dispatch("analysisModule/fetchWorkflowDefinition", run.workflowUuid);
-    if (seq !== loadSeq) return;
-    canEdit.value = canEditWorkflow(workflow, store.state.profile);
-    if (!canEdit.value) return;
+    if (run.app) {
+      // An app run: offered to the app's owner, which the status call
+      // checks (it refuses anyone else).
+      canEdit.value = true;
+    } else {
+      const workflow = await store.dispatch("analysisModule/fetchWorkflowDefinition", run.workflowUuid);
+      if (seq !== loadSeq) return;
+      canEdit.value = canEditWorkflow(workflow, store.state.profile);
+      if (!canEdit.value) return;
+    }
     const status = await store.dispatch("analysisModule/fetchRunExample", run.uuid);
     if (seq !== loadSeq || !status) return;
     job.value = status.job;
@@ -135,7 +151,7 @@ const load = async () => {
 };
 
 watch(
-  () => [runId.value, props.run?.status, props.run?.workflowUuid],
+  () => [runId.value, props.run?.status, props.run?.workflowUuid, props.run?.app?.sourceUrl],
   load,
   { immediate: true }
 );
@@ -150,13 +166,10 @@ const openDialog = async (regenerate = false) => {
   refresh.value = regenerate === true;
   versionExample.value = undefined;
   dialogOpen.value = true;
-  // Whether the version has an example now, and from which run.
-  if (version.value && props.run?.workflowUuid) {
-    store
-      .dispatch("analysisModule/fetchWorkflowVersionExample", { uuid: props.run.workflowUuid, version: version.value })
-      .then((found) => (versionExample.value = found || null))
-      .catch(() => (versionExample.value = undefined));
-  }
+  // Whether the version (or app) has a sample output now, and from which run.
+  fetchCurrentSample()
+    .then((found) => (versionExample.value = found === undefined ? undefined : found || null))
+    .catch(() => (versionExample.value = undefined));
   // The limits as they are now.
   try {
     const status = await store.dispatch("analysisModule/fetchRunExample", runId.value);
@@ -185,7 +198,7 @@ const confirm = async () => {
     dialogOpen.value = false;
     schedulePoll(loadSeq);
   } catch (err) {
-    dialogError.value = setExampleError(err);
+    dialogError.value = setExampleError(err, undefined, subject.value);
     // A limit or a job in flight: show what's current.
     if (err?.status === 429 || err?.status === 409) {
       store
@@ -204,11 +217,8 @@ const confirm = async () => {
 const pdfUrl = async () => {
   const cached = example.value;
   if (cached?.pdfUrl && Date.now() - cached.fetchedAt < 10 * 60 * 1000) return cached.pdfUrl;
-  if (version.value && props.run?.workflowUuid) {
-    const current = await store.dispatch("analysisModule/fetchWorkflowVersionExample", {
-      uuid: props.run.workflowUuid,
-      version: version.value,
-    });
+  {
+    const current = await fetchCurrentSample();
     if (current?.runId === runId.value && current.pdfUrl) {
       example.value = { ...current, fetchedAt: Date.now() };
       return current.pdfUrl;
@@ -225,7 +235,10 @@ const pdfUrl = async () => {
 
 const viewerOpen = ref(false);
 const viewerSubtitle = computed(() =>
-  [version.value ? `Version ${version.value}` : "", `run ${(props.run?.name || "").trim() || runId.value}`]
+  [
+    appRun.value ? appRunLabel(appRun.value) : version.value ? `Version ${version.value}` : "",
+    `run ${(props.run?.name || "").trim() || runId.value}`,
+  ]
     .filter(Boolean)
     .join(" · ")
 );
@@ -253,15 +266,20 @@ defineExpose({ openDialog });
           </button>
         </el-tooltip>
       </span>
-      <el-tooltip :content="`This run is the sample output of version ${version} of the workflow.`" placement="bottom">
+      <el-tooltip
+        :content="appRun ? `This run is the sample output of ${appRunLabel(appRun)}.` : `This run is the sample output of version ${version} of the workflow.`"
+        placement="bottom"
+      >
         <span class="run-example__pill" role="status">
           <IconCheck :width="14" :height="14" color="currentColor" />
-          Workflow sample output
+          {{ appRun ? "App sample output" : "Workflow sample output" }}
         </span>
       </el-tooltip>
     </template>
     <template v-else-if="isCurrentSample">
-      <bf-button class="secondary run-example__btn" disabled>✓ Workflow sample output (version {{ version }})</bf-button>
+      <bf-button class="secondary run-example__btn" disabled>
+        ✓ {{ appRun ? "App sample output" : `Workflow sample output (version ${version})` }}
+      </bf-button>
       <div class="run-example__status" role="status">
         <span>This run is the workflow's sample output.</span>
         <button type="button" class="run-example__link" @click="viewPdf">View PDF</button>
@@ -274,7 +292,7 @@ defineExpose({ openDialog });
         :disabled="jobActive(job)"
         @click="openDialog()"
       >
-        Use as workflow sample output
+        {{ appRun ? "Use as app sample output" : "Use as workflow sample output" }}
       </bf-button>
       <div v-if="job" class="run-example__status" role="status" :class="`is-${(job.status || '').toLowerCase()}`">
         <span>{{ jobStatusText(job) }}</span>
@@ -286,14 +304,14 @@ defineExpose({ openDialog });
     <SampleOutputViewer
       v-model="viewerOpen"
       :source="pdfUrl"
-      :workflow-name="run?.workflowName || ''"
+      :workflow-name="run?.workflowName || appRun?.name || ''"
       :version="version"
       :subtitle="viewerSubtitle"
     />
 
     <el-dialog
       v-model="dialogOpen"
-      title="Use as workflow sample output"
+:title="appRun ? 'Use as app sample output' : 'Use as workflow sample output'"
       width="520px"
       :close-on-click-modal="!submitting"
       :show-close="!submitting"
@@ -301,16 +319,33 @@ defineExpose({ openDialog });
       append-to-body
     >
       <div class="run-example__dialog">
-        <p>
+        <p v-if="appRun">
+          Pennsieve will generate a <strong>PDF summary of this run's inputs and results</strong> and show it on the
+          app's page as its sample output: a representative example of what {{ appRun.name }} does.
+        </p>
+        <p v-else>
           Pennsieve will generate a <strong>PDF summary of this run's outputs</strong> and show it with the
           workflow as its sample output: a representative example of what the workflow produces.
         </p>
         <ul>
-          <li>Figures and data are copied from the outputs the run saved to datasets; nothing is redrawn or recomputed.</li>
+          <li v-if="appRun">
+            Figures and data are copied from the run's results download and its input files; nothing is redrawn or
+            recomputed. The results must still be available to download (they're kept 3 days).
+          </li>
+          <li v-else>Figures and data are copied from the outputs the run saved to datasets; nothing is redrawn or recomputed.</li>
           <li>Captions and a short overview are written by AI and labelled as such in the PDF.</li>
           <li>Generating it takes about a minute.</li>
         </ul>
-        <p class="run-example__target">
+        <p v-if="appRun" class="run-example__target">
+          <template v-if="versionExampleIsThisRun">This run is already the app's sample output.</template>
+          <template v-else-if="versionExample">
+            It replaces the app's current sample output (from run {{ versionExample.runName || versionExample.runId }}).
+          </template>
+          <template v-else-if="versionExample === null">The app has no sample output yet; this summary becomes it.</template>
+          <template v-else>It becomes the app's sample output.</template>
+          Everyone who can see the app can open it.
+        </p>
+        <p v-else class="run-example__target">
           <template v-if="!version">It becomes the sample output of this run's workflow version.</template>
           <template v-else-if="versionExampleIsThisRun">
             This run is already the sample output of <strong>version {{ version }}</strong>.
@@ -348,7 +383,7 @@ defineExpose({ openDialog });
           :disabled="!!exhausted || jobActive(job)"
           @click="confirm"
         >
-          {{ hasPdf && !refresh ? "Use this run's PDF" : "Use as workflow sample output" }}
+          {{ hasPdf && !refresh ? "Use this run's PDF" : appRun ? "Use as app sample output" : "Use as workflow sample output" }}
         </bf-button>
         </div>
       </template>

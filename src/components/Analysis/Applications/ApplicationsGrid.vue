@@ -1,3 +1,11 @@
+<script>
+import { createExampleCache } from "../Workflows/runExamples";
+import { exampleUnavailable } from "@/store/analysisModule";
+
+// The apps' own sample outputs, kept a while per app across visits.
+const appSampleCache = createExampleCache(exampleUnavailable);
+</script>
+
 <script setup>
 import { computed, onMounted, ref, watch } from "vue";
 import { useStore } from "vuex";
@@ -8,6 +16,9 @@ import AppBanner from "./AppBanner.vue";
 import { appDomain, appFields, domainColors, domainCounts, fieldCounts } from "./appDomains";
 import { paletteVariants, versionManifest } from "../WorkflowBuilder/appManifestInfo";
 import RuntimeMark from "../WorkflowGraph/RuntimeMark.vue";
+import IconPDF from "../../icons/IconPDF.vue";
+import SampleOutputViewer from "../Workflows/SampleOutputViewer.vue";
+import { PDF_URL_FRESH_MS } from "../Workflows/runExamples";
 import { versionsToWatch, withLiveStatus } from "./liveStatus";
 import { useAppStatusEvents } from "@/composables/useAppStatusEvents";
 import {
@@ -234,6 +245,49 @@ const paginatedApplications = computed(() => {
   return filteredApplications.value.slice(start, start + pageSize);
 });
 
+// The apps' own sample outputs (a PDF of one of their app runs), for the
+// cards on the page: a chip on the card opens it.
+const appSamples = ref({}); // sourceUrl -> example (null: none)
+const fetchAppSample = (sourceUrl) => store.dispatch("analysisModule/fetchAppExample", { sourceUrl, strict: true });
+watch(
+  paginatedApplications,
+  (list) => {
+    for (const app of list || []) {
+      const url = app?.sourceUrl;
+      if (!url || url in appSamples.value) continue;
+      appSamples.value = { ...appSamples.value, [url]: null };
+      appSampleCache.get(url, fetchAppSample).then((example) => {
+        if (example) appSamples.value = { ...appSamples.value, [url]: { ...example, fetchedAt: Date.now() } };
+      });
+    }
+  },
+  { immediate: true }
+);
+const sampleViewer = ref({ open: false, source: null, name: "", subtitle: "" });
+const openAppSample = (app) => {
+  const url = app.sourceUrl;
+  const cached = appSamples.value[url];
+  let first = true;
+  sampleViewer.value = {
+    open: true,
+    source: async () => {
+      if (first && cached?.pdfUrl && Date.now() - cached.fetchedAt < PDF_URL_FRESH_MS) {
+        first = false;
+        return cached.pdfUrl;
+      }
+      first = false;
+      appSampleCache.forget(url);
+      const again = await appSampleCache.get(url, fetchAppSample);
+      appSamples.value = { ...appSamples.value, [url]: again ? { ...again, fetchedAt: Date.now() } : null };
+      return again?.pdfUrl || null;
+    },
+    name: appTitle(app),
+    subtitle: [cached?.app?.tag, cached?.runName && `run ${cached.runName}`, cached?.pages && `${cached.pages} pages`]
+      .filter(Boolean)
+      .join(" · "),
+  };
+};
+
 watch(filteredApplications, () => {
   currentPage.value = 1;
 });
@@ -459,6 +513,16 @@ const goToManifestBuilder = () => {
                   class="app-action"
                 >GitHub</a>
                 <button type="button" class="app-action app-action--open" @click="goToDetail(app)">Open</button>
+                <el-tooltip v-if="appSamples[app.sourceUrl]" content="Sample output: a PDF summary of a run of this app" placement="top">
+                  <button
+                    type="button"
+                    class="app-action app-action--icon"
+                    aria-label="Sample output: a PDF summary of a run of this app"
+                    @click="openAppSample(app)"
+                  >
+                    <IconPDF :width="16" :height="16" color="currentColor" />
+                  </button>
+                </el-tooltip>
               </span>
             </div>
           </div>
@@ -485,6 +549,12 @@ const goToManifestBuilder = () => {
         @current-change="currentPage = $event"
       />
     </div>
+    <SampleOutputViewer
+      v-model="sampleViewer.open"
+      :source="sampleViewer.source"
+      :workflow-name="sampleViewer.name"
+      :subtitle="sampleViewer.subtitle"
+    />
   </div>
 </template>
 
@@ -873,6 +943,12 @@ $card-height: 172px;
   gap: 6px;
   opacity: 0;
   transition: opacity 0.15s ease;
+}
+.app-action--icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3px 6px;
 }
 .app-action {
   padding: 3px 10px;
