@@ -983,9 +983,11 @@ onNodeClick(({ node }) => {
   selectedNode.value = node;
 
   if (mode.value === "configure") {
-    // In My Workspace an input takes only public files, and where there are
+    // An input without files opens the picker; one with files shows its
+    // panel (its files and where they land), where they can be changed. In
+    // My Workspace an input takes only public files, and where there are
     // none (no views-service) its panel says so instead of an empty picker.
-    if (node.type === "data-source" && (!isMyWorkspace.value || publicInputs)) {
+    if (node.type === "data-source" && !fileCountForNode(node.id) && (!isMyWorkspace.value || publicInputs)) {
       openFilePicker(node.id);
       return;
     }
