@@ -49,6 +49,8 @@ describe("SampleOutputViewer", () => {
     renderPdfPages.mockRejectedValue(new Error("no CORS"));
     const wrapper = await mountIt({ modelValue: true, source: "https://cdn/x.pdf" });
     expect(wrapper.find("iframe").attributes("src")).toBe("https://cdn/x.pdf");
+    await wrapper.setProps({ initialPage: 5 });
+    expect(wrapper.find("iframe").attributes("src")).toBe("https://cdn/x.pdf#page=5");
   });
 
   it("asks for the link only when opened", async () => {
