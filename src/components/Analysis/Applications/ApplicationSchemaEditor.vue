@@ -6,7 +6,8 @@
         <label class="field-label">Tags <field-hint text="What the app is for; it colours its card and helps people find it." /></label>
         <div class="field-control">
           <!-- Preferred tags first (a domain's own, colouring the card), then
-               the aliases that colour it the same way. -->
+               the aliases that colour it the same way, then the research
+               fields (a filter, no colour). -->
           <el-select
             :model-value="schema.tags"
             multiple
@@ -50,14 +51,28 @@
                 </span>
               </el-option>
             </el-option-group>
+            <el-option-group v-if="fieldOptions.length" label="Research field">
+              <el-option v-for="o in fieldOptions" :key="o.tag" :label="o.tag" :value="o.tag">
+                <span class="tag-option tag-option--field">
+                  <span class="tag-name">{{ o.tag }}</span>
+                  <span class="tag-meta">{{ o.field.label }}</span>
+                </span>
+              </el-option>
+            </el-option-group>
           </el-select>
           <p v-for="m in at('application.tags')" :key="m" class="field-error">{{ m }}</p>
-          <p v-if="tagNudge" class="tag-note">
-            Also add <strong>{{ tagNudge.tag }}</strong>, the preferred tag for this domain?
+          <!-- A domain's nudge first, then a grey card's note, then a field's
+               nudge: the colour matters more than the filter. -->
+          <p v-if="tagNudge?.domain" class="tag-note">
+            Also add <strong>{{ tagNudge.tag }}</strong>, the preferred tag for {{ tagNudge.label }}?
             <button type="button" class="tag-note-action" @click="setTags([...schema.tags, tagNudge.tag])">Add</button>
           </p>
           <p v-else-if="!hasDomainTag(schema.tags)" class="tag-note">
             No domain tag, so the card is grey. Pick one from Preferred.
+          </p>
+          <p v-else-if="tagNudge" class="tag-note">
+            Also add <strong>{{ tagNudge.tag }}</strong>, the tag for {{ tagNudge.label }}?
+            <button type="button" class="tag-note-action" @click="setTags([...schema.tags, tagNudge.tag])">Add</button>
           </p>
         </div>
       </div>
@@ -507,6 +522,7 @@ const tagQuery = ref("");
 const tagGroups = preferredTagGroups();
 const preferredOptions = computed(() => tagGroups.preferred.filter((o) => tagOptionMatches(o, tagQuery.value, { preferred: true })));
 const aliasOptions = computed(() => tagGroups.aliases.filter((o) => tagOptionMatches(o, tagQuery.value)));
+const fieldOptions = computed(() => tagGroups.fields.filter((o) => tagOptionMatches(o, tagQuery.value, { preferred: true })));
 const tagNudge = computed(() => tagDomainNudge(schema.value.tags || []));
 // A chip in its domain's colours, as on the Apps tab; neutral without one.
 const tagChipStyle = (tag) => {

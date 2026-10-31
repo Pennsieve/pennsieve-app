@@ -115,7 +115,7 @@ const applicationFields = [
   { name: "description", type: "string", required: false, desc: "Short description of what the application does." },
   { name: "version", type: "string", required: false, desc: "Informational: the version Pennsieve shows is the release's tag." },
   { name: "maintainers", type: "object[]", required: false, desc: "Who maintains the application: a name, and optionally an email and an ORCID iD (0000-0002-1825-0097; the https://orcid.org/ form works too)." },
-  { name: "tags", type: "string[]", required: false, desc: "What the application is for, for search, filtering and its app card. A tag that names a domain (eeg, imaging, spike-sorting, genomics, visualization, conversion, statistics, …) colours the card; subjects (what it's about) come before tasks (what it does). The builder suggests them." },
+  { name: "tags", type: "string[]", required: false, desc: "What the application is for, for search, filtering and its app card. A tag that names a domain (eeg, imaging, cytometry, spike-sorting, genomics, visualization, conversion, statistics, …) colours the card; subjects (what it's about) come before tasks (what it does). A tag that names a research field (neuroscience, immunology, oncology, …) lets people filter by it. The builder suggests both." },
 ];
 
 const runtimeFields = [
