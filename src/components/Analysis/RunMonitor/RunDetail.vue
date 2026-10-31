@@ -35,6 +35,8 @@ import DatasetOptionRow from "./DatasetOptionRow.vue";
 import RunExampleAction from "./RunExampleAction.vue";
 import PublicFilesPicker from "./PublicFilesPicker.vue";
 import { picksKey } from "./publicPicks";
+import FilePlacementChoice from "./FilePlacementChoice.vue";
+import { FILE_PATHS_SELECTION, FILE_PATHS_SOURCE, filePathsOf, filePathsField, sharedNames } from "./inputFilePaths";
 import IoPill from "../WorkflowGraph/IoPill.vue";
 import { withInterfaceNodes, destinationChoices, NO_DESTINATION } from "./workflowInterface";
 import { placeRunNodes, workflowLayouts } from "./runLayout";
@@ -134,6 +136,24 @@ const dataSourceFiles = reactive({});
 // An input takes a workspace dataset's files or public files, not both.
 const publicInputs = !!viewsServiceUrl();
 const publicPicks = reactive({});
+// Where each input's workspace files land in a step's input folder
+// (inputFilePaths.js): the inputs set to "source"; the others are as selected.
+// Public files come as a view, which keeps its own paths.
+const dataSourceFilePaths = reactive({});
+const filePathsFor = (nodeId) => dataSourceFilePaths[nodeId] || FILE_PATHS_SELECTION;
+const setFilePaths = (nodeId, choice) => {
+  if (choice === FILE_PATHS_SOURCE) dataSourceFilePaths[nodeId] = choice;
+  else delete dataSourceFilePaths[nodeId];
+};
+// The folders each chosen package is in, from the dataset's top, as the file
+// picker had them when it was chosen: for the picture of where it lands.
+const pickedPaths = reactive({});
+const placementItems = (nodeId) =>
+  (dataSourceFiles[nodeId] || []).map((f) => ({
+    name: f.content?.name || "",
+    folder: f.content?.packageType === "Collection",
+    path: pickedPaths[f.content?.id] ?? null,
+  }));
 // The file picker's side: a workspace dataset or public datasets.
 const pickerSide = ref("workspace");
 // What choosing on the picker's side would replace: the input's files from
@@ -745,6 +765,7 @@ const runToNodesAndEdges = (run) => {
       } else {
         extra.packageIds = src?.packageIds || [];
         extra.packageCount = extra.packageIds.length;
+        extra.filePaths = filePathsOf(src);
       }
     } else if (d.type === "data-target") {
       extra.targetType = d.targetType || null;
@@ -962,9 +983,11 @@ onNodeClick(({ node }) => {
   selectedNode.value = node;
 
   if (mode.value === "configure") {
-    // In My Workspace an input takes only public files, and where there are
+    // An input without files opens the picker; one with files shows its
+    // panel (its files and where they land), where they can be changed. In
+    // My Workspace an input takes only public files, and where there are
     // none (no views-service) its panel says so instead of an empty picker.
-    if (node.type === "data-source" && (!isMyWorkspace.value || publicInputs)) {
+    if (node.type === "data-source" && !fileCountForNode(node.id) && (!isMyWorkspace.value || publicInputs)) {
       openFilePicker(node.id);
       return;
     }
@@ -1007,6 +1030,8 @@ const initiateWorkflowFromConfig = async (pendingConfig) => {
 
     Object.keys(dataSourceFiles).forEach((k) => delete dataSourceFiles[k]);
     Object.keys(publicPicks).forEach((k) => delete publicPicks[k]);
+    Object.keys(dataSourceFilePaths).forEach((k) => delete dataSourceFilePaths[k]);
+    Object.keys(pickedPaths).forEach((k) => delete pickedPaths[k]);
     Object.keys(sourceDatasets).forEach((k) => delete sourceDatasets[k]);
     Object.keys(leftOutInputs).forEach((k) => delete leftOutInputs[k]);
     Object.keys(nodeConfigs).forEach((k) => delete nodeConfigs[k]);
@@ -1020,9 +1045,11 @@ const initiateWorkflowFromConfig = async (pendingConfig) => {
       const srcParams = sourceParams[d.id] || {};
 
       if (d.type === "data-source") {
-        // A rerun reads from the same datasets; its files are chosen again.
+        // A rerun reads from the same datasets, and its files land where the
+        // run's did; its files are chosen again.
         const own = source?.dataSources?.[d.id]?.datasetId;
         if (own && own !== datasetId) sourceDatasets[d.id] = own;
+        setFilePaths(d.id, filePathsOf(source?.dataSources?.[d.id]));
       }
       if (d.type === "data-target") {
         // An output's destination is the run being rerun's (its target's
@@ -1123,6 +1150,8 @@ const cancelConfigure = () => {
   configLayers.value = [];
   Object.keys(dataSourceFiles).forEach((k) => delete dataSourceFiles[k]);
   Object.keys(publicPicks).forEach((k) => delete publicPicks[k]);
+  Object.keys(dataSourceFilePaths).forEach((k) => delete dataSourceFilePaths[k]);
+  Object.keys(pickedPaths).forEach((k) => delete pickedPaths[k]);
   Object.keys(sourceDatasets).forEach((k) => delete sourceDatasets[k]);
   Object.keys(nodeConfigs).forEach((k) => delete nodeConfigs[k]);
   nodes.value = [];
@@ -1246,7 +1275,11 @@ const executeWorkflow = async () => {
     Object.entries(dataSourceFiles).forEach(([nodeId, files]) => {
       const ids = files.map((f) => f.content?.id).filter(Boolean);
       const own = sourceDatasetOf(nodeId);
-      dataSources[nodeId] = own && own !== runDatasetId.value ? { packageIds: ids, datasetId: own } : { packageIds: ids };
+      dataSources[nodeId] = {
+        packageIds: ids,
+        ...(own && own !== runDatasetId.value ? { datasetId: own } : {}),
+        ...filePathsField(filePathsFor(nodeId)),
+      };
     });
     // Public files: one view per input, kept for the run.
     const views = await publicInputViews(dag);
@@ -1455,6 +1488,12 @@ const onFileSelect = (selectedFiles, parentId) => {
 
   // Update the store so navigating folders preserves selections
   store.commit("analysisModule/SET_SELECTED_FILES", { selectedFiles, parentId: parentId || "root" });
+  const at = [...filePickerAncestorList.value, filePickerCurrentFile.value]
+    .map((a) => a?.content?.name)
+    .filter(Boolean);
+  for (const f of selectedFiles) {
+    if (f.content?.id) pickedPaths[f.content.id] = at;
+  }
 
   // Rebuild dataSourceFiles from the full store state
   const allFiles = [];
@@ -2992,7 +3031,10 @@ onUnmounted(() => {
                 {{ canLeaveOut(selectedNode.id) ? "Leave this input out, or run the workflow from a workspace." : "Run this workflow from a workspace." }}
               </p>
               <template v-else>
-              <h4 class="sidebar-section-title">Source Files</h4>
+              <div class="section-title-row">
+                <h4 class="sidebar-section-title">Source Files</h4>
+                <button class="text-link-btn" @click="openFilePicker(selectedNode.id)">{{ fileCountForNode(selectedNode.id) > 0 ? 'Change files' : 'Select files' }}</button>
+              </div>
               <p v-if="mismatchLine(selectedNode.id)" class="files-mismatch">
                 ⚠ {{ mismatchLine(selectedNode.id) }}: {{ hintLine(sourceHints(selectedNode.id, configDefinition?.dag || [], portsOfStep(configDefinition?.dag || [], availableApplications))) }}.
               </p>
@@ -3027,9 +3069,27 @@ onUnmounted(() => {
               <div v-else class="selected-files-empty">
                 No files selected yet.
               </div>
-              <div class="info-actions">
-                <button class="text-link-btn" @click="openFilePicker(selectedNode.id)">{{ fileCountForNode(selectedNode.id) > 0 ? 'Change files' : 'Select files' }}</button>
-              </div>
+              <template v-if="!publicPicks[selectedNode.id]?.length">
+                <h4 class="sidebar-section-title">Where the files land</h4>
+                <FilePlacementChoice
+                  :model-value="filePathsFor(selectedNode.id)"
+                  :items="placementItems(selectedNode.id)"
+                  @update:model-value="setFilePaths(selectedNode.id, $event)"
+                />
+                <p
+                  v-if="filePathsFor(selectedNode.id) === FILE_PATHS_SELECTION && sharedNames(dataSourceFiles[selectedNode.id]).length"
+                  class="files-mismatch"
+                  role="alert"
+                >
+                  ⚠ More than one selected item is named {{ sharedNames(dataSourceFiles[selectedNode.id]).join(", ") }}:
+                  as selected they'd land on the same path. Choose <strong>As in the source</strong>, or select the folder that holds them.
+                </p>
+                <p v-else class="configure-hint">
+                  {{ filePathsFor(selectedNode.id) === FILE_PATHS_SOURCE
+                    ? "Each file keeps the folders it's in at the source, from the top."
+                    : "Each selected file goes at the top of the step's input folder; a selected folder goes there with what's in it." }}
+                </p>
+              </template>
               </template>
             </template>
 
@@ -3166,6 +3226,10 @@ onUnmounted(() => {
                 <div class="info-row">
                   <span class="info-label">Files</span>
                   <span class="info-value">{{ selectedNode.data?.packageCount || 0 }} file{{ selectedNode.data?.packageCount !== 1 ? 's' : '' }}</span>
+                </div>
+                <div class="info-row">
+                  <span class="info-label">Placed</span>
+                  <span class="info-value">{{ selectedNode.data?.filePaths === FILE_PATHS_SOURCE ? "As in the source" : "As selected" }}</span>
                 </div>
               </div>
               <h4 class="sidebar-section-title">Source Files</h4>
@@ -5067,6 +5131,23 @@ onUnmounted(() => {
 }
 
 /* Info actions */
+// A section's heading with its action on the right.
+.section-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 10px 0 6px;
+
+  .sidebar-section-title {
+    margin: 0;
+  }
+  .text-link-btn {
+    padding: 0;
+    font-size: 12px;
+  }
+}
+
 .info-actions {
   display: flex;
   align-items: center;
