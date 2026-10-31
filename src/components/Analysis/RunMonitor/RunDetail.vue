@@ -3067,7 +3067,7 @@ onUnmounted(() => {
                 No files selected yet.
               </div>
               <div class="info-actions">
-                <button class="text-link-btn" @click="openFilePicker(selectedNode.id)">{{ fileCountForNode(selectedNode.id) > 0 ? 'Change files' : 'Select files' }}</button>
+                <bf-button class="secondary compact" @click="openFilePicker(selectedNode.id)">{{ fileCountForNode(selectedNode.id) > 0 ? 'Change files' : 'Select files' }}</bf-button>
               </div>
               <template v-if="!publicPicks[selectedNode.id]?.length">
                 <h4 class="sidebar-section-title">Where the files land</h4>
