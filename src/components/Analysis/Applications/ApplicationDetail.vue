@@ -15,6 +15,7 @@ import ReleaseDialog from "./ReleaseDialog.vue";
 import AppReferences from "./AppReferences.vue";
 import AppSampleOutputs from "./AppSampleOutputs.vue";
 import { useAppSampleOutputs } from "./useAppSampleOutputs";
+import { tryableVersion } from "../RunMonitor/appRuns";
 import ShareAppDialog from "./ShareAppDialog.vue";
 import { accessEntries, accessSummary, makeNamer } from "./appSharing";
 import { useWorkspaceMembers } from "./useWorkspaceMembers";
@@ -567,6 +568,23 @@ watch(hasReferences, (has) => {
   if (!has && activeTab.value === "references") activeTab.value = "readme";
 });
 
+// "Try this app": a one-off run of the newest deployed version on files the
+// person picks, configured on the run page (RunMonitor/appRuns.js). Not for
+// an interactive app.
+const tryVersion = computed(() => (detail.value?.sourceUrl ? tryableVersion(sortedVersions.value) : null));
+const tryApp = () => {
+  const v = tryVersion.value;
+  if (!v) return;
+  store.commit("analysisModule/SET_PENDING_RUN_CONFIG", {
+    workflowId: "",
+    app: { sourceUrl: detail.value.sourceUrl, tag: v.version },
+    computeNodeId: "",
+    datasetId: "",
+    rerunSource: null,
+  });
+  router.push({ name: route.params.orgId ? "run-configure" : "my-run-configure" });
+};
+
 // The Sample outputs tab: only when a workflow the app is in has a sample
 // output (loaded in the background).
 const { entries: sampleEntries, more: moreSampleWorkflows } = useAppSampleOutputs(
@@ -666,7 +684,16 @@ watch(
         </template>
       </span>
       <!-- The page's main action: publish a release (the app store follows) -->
-      <div v-if="detail && (canRelease || isAppOwner)" class="header-actions">
+      <div v-if="detail && (canRelease || isAppOwner || tryVersion)" class="header-actions">
+        <el-tooltip
+          v-if="tryVersion"
+          :content="`Run ${tryVersion.version} once on files you pick; its results come back as a download.`"
+          placement="bottom"
+        >
+          <span>
+            <bf-button :class="['compact', 'flex', { secondary: canRelease }]" @click="tryApp">Try this app</bf-button>
+          </span>
+        </el-tooltip>
         <bf-button v-if="isAppOwner" class="compact flex secondary" @click="shareOpen = true">Share</bf-button>
         <template v-if="canRelease">
         <span v-if="nudge" class="release-nudge">{{ nudge }}</span>

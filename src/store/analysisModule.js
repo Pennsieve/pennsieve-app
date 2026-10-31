@@ -644,6 +644,13 @@ export const actions = {
       throw err;
     }
   },
+  // fetchAppRunDefinition: { sourceUrl, tag, variant? } -> the one-step
+  // workflow an app run of that app version runs (RunMonitor/appRuns.js).
+  fetchAppRunDefinition: async ({ rootState }, { sourceUrl, tag, variant } = {}) => {
+    const params = new URLSearchParams({ sourceUrl, tag });
+    if (variant) params.set("variant", variant);
+    return workflowRequest(rootState, `apps/run-definition?${params}`);
+  },
   // listWorkflowDefinitions: { visibility, cursor, limit } -> { workflows,
   // nextCursor }, the workspace's (or with visibility "public", the public
   // catalog's) workflow definitions, without touching the library's list.
