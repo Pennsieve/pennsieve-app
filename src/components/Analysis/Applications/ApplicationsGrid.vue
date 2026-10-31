@@ -481,12 +481,6 @@ const goToManifestBuilder = () => {
               <span v-if="latestVersion(app)?.version" class="app-version">{{ versionLabel(latestVersion(app).version) }}</span>
               <span v-if="app.status === 'archived'" class="app-badge">Archived</span>
               <span v-else-if="visibilityLabel(app)" class="app-badge">{{ visibilityLabel(app) }}</span>
-              <el-tooltip v-if="appSamples[app.sourceUrl]" content="Sample output: a PDF summary of a run of this app" placement="top">
-                <button type="button" class="app-sample-chip" @click.stop="openAppSample(app)" @keydown.enter.stop>
-                  <IconPDF :width="13" :height="13" color="currentColor" />
-                  Sample output
-                </button>
-              </el-tooltip>
             </div>
             <p class="app-description">
               {{ appDescription(app) || readmeSummary(app) || "No description." }}
@@ -519,6 +513,16 @@ const goToManifestBuilder = () => {
                   class="app-action"
                 >GitHub</a>
                 <button type="button" class="app-action app-action--open" @click="goToDetail(app)">Open</button>
+                <el-tooltip v-if="appSamples[app.sourceUrl]" content="Sample output: a PDF summary of a run of this app" placement="top">
+                  <button
+                    type="button"
+                    class="app-action app-action--icon"
+                    aria-label="Sample output: a PDF summary of a run of this app"
+                    @click="openAppSample(app)"
+                  >
+                    <IconPDF :width="16" :height="16" color="currentColor" />
+                  </button>
+                </el-tooltip>
               </span>
             </div>
           </div>
@@ -940,23 +944,11 @@ $card-height: 172px;
   opacity: 0;
   transition: opacity 0.15s ease;
 }
-.app-sample-chip {
+.app-action--icon {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  padding: 1px 8px;
-  border: 1px solid theme.$purple_1;
-  border-radius: 10px;
-  background: theme.$white;
-  font: inherit;
-  font-size: 11px;
-  color: theme.$purple_3;
-  cursor: pointer;
-
-  &:hover {
-    background: theme.$purple_3;
-    color: theme.$white;
-  }
+  justify-content: center;
+  padding: 3px 6px;
 }
 .app-action {
   padding: 3px 10px;
