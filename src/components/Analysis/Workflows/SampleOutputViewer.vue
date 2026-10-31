@@ -20,6 +20,8 @@ const props = defineProps({
   version: { type: Number, default: null },
   // A line under the title, e.g. "Version 3 · run brave-otter · 18 pages".
   subtitle: { type: String, default: "" },
+  // The page to show first (1-based), e.g. where an app's step starts.
+  initialPage: { type: Number, default: null },
 });
 const emit = defineEmits(["update:modelValue"]);
 
@@ -71,12 +73,29 @@ const drawPages = async (href, mine) => {
         if (mine === seq) pagesShown.value = true;
       },
     });
-    if (mine === seq) rendered = result;
-    else result?.destroy?.();
+    if (mine === seq) {
+      rendered = result;
+      await nextTick(); // the loading line gone, so the offsets are final
+      showPage(host, props.initialPage);
+    } else result?.destroy?.();
   } catch {
     if (mine === seq) useFrame.value = true;
   }
 };
+
+// Scrolls the viewer to page n (its place is there before it's drawn).
+const showPage = (host, n) => {
+  const page = n > 1 ? host.children[n - 1] : null;
+  if (!page) return;
+  const scroller = host.closest(".sample-viewer__scroll");
+  if (scroller) scroller.scrollTop = page.offsetTop - 16;
+  else page.scrollIntoView?.({ block: "start" });
+};
+
+// The browser's viewer opens at a page with #page=n.
+const frameSrc = computed(() =>
+  src.value && props.initialPage > 1 ? `${src.value}#page=${props.initialPage}` : src.value
+);
 
 const load = async () => {
   const mine = ++seq;
@@ -182,7 +201,7 @@ const openInTab = async () => {
     </template>
 
     <div class="sample-viewer__body">
-      <iframe v-if="src && useFrame" class="sample-viewer__frame" :src="src" :title="title" />
+      <iframe v-if="src && useFrame" class="sample-viewer__frame" :src="frameSrc" :title="title" />
       <div v-else class="sample-viewer__scroll">
         <p v-if="!pagesShown && !error" class="sample-viewer__state">Loading the PDF…</p>
         <div ref="pagesEl" class="sample-viewer__pages" role="document" :aria-label="title" />
@@ -281,6 +300,7 @@ const openInTab = async () => {
   background: theme.$gray_1;
 }
 .sample-viewer__scroll {
+  position: relative; // the pages' offsetTop is within it
   height: 100%;
   overflow-y: auto;
 }

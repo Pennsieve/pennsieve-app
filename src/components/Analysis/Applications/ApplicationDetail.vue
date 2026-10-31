@@ -13,6 +13,8 @@ import BfButton from "../../shared/bf-button/BfButton.vue";
 import { fetchRepository, canUpdateManifest } from "./githubRepository";
 import ReleaseDialog from "./ReleaseDialog.vue";
 import AppReferences from "./AppReferences.vue";
+import AppSampleOutputs from "./AppSampleOutputs.vue";
+import { useAppSampleOutputs } from "./useAppSampleOutputs";
 import ShareAppDialog from "./ShareAppDialog.vue";
 import { accessEntries, accessSummary, makeNamer } from "./appSharing";
 import { useWorkspaceMembers } from "./useWorkspaceMembers";
@@ -565,6 +567,18 @@ watch(hasReferences, (has) => {
   if (!has && activeTab.value === "references") activeTab.value = "readme";
 });
 
+// The Sample outputs tab: only when a workflow running the app has a sample
+// output that includes it (loaded in the background).
+const { entries: sampleEntries, more: moreSampleWorkflows } = useAppSampleOutputs(
+  computed(() => detail.value?.sourceUrl || "")
+);
+watch(
+  () => sampleEntries.value.length,
+  (n) => {
+    if (!n && activeTab.value === "samples") activeTab.value = "readme";
+  }
+);
+
 
 // Members and teams power friendly-name resolution for the owner badge.
 // They are not always preloaded when navigating directly to this page;
@@ -753,6 +767,17 @@ watch(
               >
                 References
               </button>
+              <button
+                v-if="sampleEntries.length"
+                type="button"
+                role="tab"
+                class="detail-tab"
+                :class="{ 'detail-tab-active': activeTab === 'samples' }"
+                :aria-selected="activeTab === 'samples'"
+                @click="activeTab = 'samples'"
+              >
+                Sample outputs
+              </button>
             </div>
             <div class="readme-header-actions">
               <bf-button v-if="activeTab === 'manifest' && canUpdate" class="compact flex" @click="openBuilder">{{ builderLabel }}</bf-button>
@@ -794,6 +819,14 @@ watch(
 
           <!-- References tab: how to cite, authors, related works (CITATION.cff) -->
           <AppReferences v-else-if="activeTab === 'references'" :versions="sortedVersions" />
+
+          <!-- Sample outputs tab: workflow sample PDFs, at the pages this app's step produced -->
+          <AppSampleOutputs
+            v-else-if="activeTab === 'samples'"
+            :entries="sampleEntries"
+            :more="moreSampleWorkflows"
+            :app-name="detail?.name || ''"
+          />
 
           <!-- app.yml tab -->
           <template v-else>
