@@ -145,6 +145,15 @@ const setFilePaths = (nodeId, choice) => {
   if (choice === FILE_PATHS_SOURCE) dataSourceFilePaths[nodeId] = choice;
   else delete dataSourceFilePaths[nodeId];
 };
+// The folders each chosen package is in, from the dataset's top, as the file
+// picker had them when it was chosen: for the picture of where it lands.
+const pickedPaths = reactive({});
+const placementItems = (nodeId) =>
+  (dataSourceFiles[nodeId] || []).map((f) => ({
+    name: f.content?.name || "",
+    folder: f.content?.packageType === "Collection",
+    path: pickedPaths[f.content?.id] ?? null,
+  }));
 // The file picker's side: a workspace dataset or public datasets.
 const pickerSide = ref("workspace");
 // What choosing on the picker's side would replace: the input's files from
@@ -1020,6 +1029,7 @@ const initiateWorkflowFromConfig = async (pendingConfig) => {
     Object.keys(dataSourceFiles).forEach((k) => delete dataSourceFiles[k]);
     Object.keys(publicPicks).forEach((k) => delete publicPicks[k]);
     Object.keys(dataSourceFilePaths).forEach((k) => delete dataSourceFilePaths[k]);
+    Object.keys(pickedPaths).forEach((k) => delete pickedPaths[k]);
     Object.keys(sourceDatasets).forEach((k) => delete sourceDatasets[k]);
     Object.keys(leftOutInputs).forEach((k) => delete leftOutInputs[k]);
     Object.keys(nodeConfigs).forEach((k) => delete nodeConfigs[k]);
@@ -1139,6 +1149,7 @@ const cancelConfigure = () => {
   Object.keys(dataSourceFiles).forEach((k) => delete dataSourceFiles[k]);
   Object.keys(publicPicks).forEach((k) => delete publicPicks[k]);
   Object.keys(dataSourceFilePaths).forEach((k) => delete dataSourceFilePaths[k]);
+  Object.keys(pickedPaths).forEach((k) => delete pickedPaths[k]);
   Object.keys(sourceDatasets).forEach((k) => delete sourceDatasets[k]);
   Object.keys(nodeConfigs).forEach((k) => delete nodeConfigs[k]);
   nodes.value = [];
@@ -1475,6 +1486,12 @@ const onFileSelect = (selectedFiles, parentId) => {
 
   // Update the store so navigating folders preserves selections
   store.commit("analysisModule/SET_SELECTED_FILES", { selectedFiles, parentId: parentId || "root" });
+  const at = [...filePickerAncestorList.value, filePickerCurrentFile.value]
+    .map((a) => a?.content?.name)
+    .filter(Boolean);
+  for (const f of selectedFiles) {
+    if (f.content?.id) pickedPaths[f.content.id] = at;
+  }
 
   // Rebuild dataSourceFiles from the full store state
   const allFiles = [];
@@ -3054,6 +3071,7 @@ onUnmounted(() => {
                 <h4 class="sidebar-section-title">Where the files land</h4>
                 <FilePlacementChoice
                   :model-value="filePathsFor(selectedNode.id)"
+                  :items="placementItems(selectedNode.id)"
                   @update:model-value="setFilePaths(selectedNode.id, $event)"
                 />
                 <p
