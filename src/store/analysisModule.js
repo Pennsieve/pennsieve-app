@@ -670,11 +670,14 @@ export const actions = {
   },
   // fetchAppExample: sourceUrl -> the app's sample output (a PDF of one of
   // its app runs, example.app set), or null.
-  fetchAppExample: async ({ rootState }, sourceUrl) => {
+  // sourceUrl, or { sourceUrl, strict } (strict rejects where the route
+  // isn't there too, so the App Store's cache stops asking).
+  fetchAppExample: async ({ rootState }, arg) => {
+    const { sourceUrl, strict = false } = typeof arg === "string" ? { sourceUrl: arg } : arg || {};
     try {
       return (await workflowRequest(rootState, `apps/example?sourceUrl=${encodeURIComponent(sourceUrl)}`)).example || null;
     } catch (err) {
-      if (exampleUnavailable(err)) return null;
+      if (!strict && exampleUnavailable(err)) return null;
       throw err;
     }
   },

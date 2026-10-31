@@ -34,7 +34,7 @@ const viewButtons = (wrapper) => wrapper.findAll("button").filter((b) => b.text(
 describe("AppSampleOutputs", () => {
   it("lists the sample output of each workflow the app is in", () => {
     const text = mountIt().text().replace(/\s+/g, " ");
-    expect(text).toContain("PDF summaries of runs of st-niches: on its own, and in the workflows that use it.");
+    expect(text).toContain("Sample outputs of workflows that use st-niches");
     expect(text).toContain("Spatial Profiling");
     expect(text).toContain("Version 3 · run Xenium demo · 17 pages");
     expect(text).toContain("Domain Mapping");
@@ -56,27 +56,5 @@ describe("AppSampleOutputs", () => {
     await viewButtons(wrapper)[1].trigger("click");
     expect(await wrapper.findComponent(viewerStub).props("source")()).toBe("https://cdn/new.pdf");
     expect(fetchWorkflowExample.mock.calls.at(-1)[1]).toBe("wf-2");
-  });
-});
-
-describe("AppSampleOutputs, the app's own", () => {
-  it("lists it first and opens it, refreshing an old link from the app", async () => {
-    const fetchAppExample = vi.fn(async () => ({ app: { tag: "v0.1.0" }, runId: "r", pdfUrl: "https://cdn/own-new.pdf" }));
-    const own = { own: true, workflow: null, example: { app: { sourceUrl: "https://github.com/x/st-niches", tag: "v0.1.0" }, runName: "try", pages: 9, pdfUrl: "https://cdn/own.pdf", fetchedAt: 0 } };
-    const wrapper = mount(AppSampleOutputs, {
-      props: { entries: [own, ...structuredClone(entries)], appName: "st-niches" },
-      global: {
-        plugins: [createStore({ modules: { analysisModule: { namespaced: true, actions: { fetchWorkflowExample, fetchAppExample } } } })],
-        stubs: { SampleOutputViewer: viewerStub, "router-link": { props: ["to"], template: "<a><slot /></a>" } },
-      },
-    });
-    const text = wrapper.text().replace(/\s+/g, " ");
-    expect(text.indexOf("st-niches on its own")).toBeLessThan(text.indexOf("Spatial Profiling"));
-    expect(text).toContain("v0.1.0 · run try · 9 pages");
-    await viewButtons(wrapper)[0].trigger("click");
-    const viewer = wrapper.findComponent(viewerStub);
-    expect(viewer.props("workflowName")).toBe("st-niches");
-    expect(await viewer.props("source")()).toBe("https://cdn/own-new.pdf");
-    expect(fetchAppExample.mock.calls[0][1]).toBe("https://github.com/x/st-niches");
   });
 });

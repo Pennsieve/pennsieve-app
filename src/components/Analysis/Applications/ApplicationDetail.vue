@@ -14,6 +14,9 @@ import { fetchRepository, canUpdateManifest } from "./githubRepository";
 import ReleaseDialog from "./ReleaseDialog.vue";
 import AppReferences from "./AppReferences.vue";
 import AppSampleOutputs from "./AppSampleOutputs.vue";
+import AppSampleCard from "./AppSampleCard.vue";
+import { useAppSample } from "./useAppSample";
+import IconPDF from "../../icons/IconPDF.vue";
 import { useAppSampleOutputs } from "./useAppSampleOutputs";
 import { tryableVersion } from "../RunMonitor/appRuns";
 import ShareAppDialog from "./ShareAppDialog.vue";
@@ -585,7 +588,13 @@ const tryApp = () => {
   router.push({ name: route.params.orgId ? "run-configure" : "my-run-configure" });
 };
 
-// The Sample outputs tab: only when a workflow the app is in has a sample
+// The app's own sample output (a PDF of one of its app runs): first on the
+// page, and the header's PDF button.
+const { sample: appSample, pdfSource: appSamplePdf } = useAppSample(computed(() => detail.value?.sourceUrl || ""));
+const sampleCard = ref(null);
+const openAppSample = () => sampleCard.value?.open();
+
+// The Workflow samples tab: only when a workflow the app is in has a sample
 // output (loaded in the background).
 const { entries: sampleEntries, more: moreSampleWorkflows } = useAppSampleOutputs(
   computed(() => detail.value?.sourceUrl || "")
@@ -684,7 +693,12 @@ watch(
         </template>
       </span>
       <!-- The page's main action: publish a release (the app store follows) -->
-      <div v-if="detail && (canRelease || isAppOwner || tryVersion)" class="header-actions">
+      <div v-if="detail && (canRelease || isAppOwner || tryVersion || appSample)" class="header-actions">
+        <el-tooltip v-if="appSample" content="Sample output: a PDF summary of a run of this app" placement="bottom">
+          <button type="button" class="header-sample-btn" aria-label="View the app's sample output" @click="openAppSample">
+            <IconPDF :width="20" :height="20" color="currentColor" />
+          </button>
+        </el-tooltip>
         <el-tooltip
           v-if="tryVersion"
           :content="`Run ${tryVersion.version} once on files you pick; its results come back as a download.`"
@@ -727,6 +741,14 @@ watch(
     <div v-else class="builder-content">
       <!-- Left: Main Panel -->
       <div class="main-panel">
+        <!-- The app's own sample output, first: what the app produces -->
+        <AppSampleCard
+          v-if="appSample"
+          ref="sampleCard"
+          :sample="appSample"
+          :app-name="repoName"
+          :source="appSamplePdf"
+        />
         <!-- Metrics -->
         <div class="metrics-section">
           <MetricsDashboard
@@ -803,7 +825,7 @@ watch(
                 :aria-selected="activeTab === 'samples'"
                 @click="activeTab = 'samples'"
               >
-                Sample outputs
+                Workflow samples
               </button>
             </div>
             <div class="readme-header-actions">
@@ -847,7 +869,7 @@ watch(
           <!-- References tab: how to cite, authors, related works (CITATION.cff) -->
           <AppReferences v-else-if="activeTab === 'references'" :versions="sortedVersions" />
 
-          <!-- Sample outputs tab: the sample PDFs of workflows this app is in -->
+          <!-- Workflow samples tab: the sample PDFs of workflows this app is in -->
           <AppSampleOutputs
             v-else-if="activeTab === 'samples'"
             :entries="sampleEntries"
@@ -1511,7 +1533,23 @@ watch(
     color: theme.$black;
   }
 
-  .header-actions {
+  .header-sample-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid theme.$gray_3;
+  border-radius: 4px;
+  background: theme.$white;
+  color: theme.$purple_3;
+  cursor: pointer;
+
+  &:hover {
+    border-color: theme.$purple_1;
+  }
+}
+.header-actions {
     margin-left: auto;
     display: flex;
     align-items: center;

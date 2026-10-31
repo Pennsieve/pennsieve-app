@@ -66,15 +66,3 @@ describe("useAppSampleOutputs", () => {
     expect(result.more.value).toBe(1);
   });
 });
-
-describe("useAppSampleOutputs, the app's own", () => {
-  it("comes first", async () => {
-    const { result } = await run({
-      workspace: [[wf("a", "A", URL)]],
-      publicList: [],
-      examples: { a: { version: 2 } },
-      own: { app: { tag: "v1" }, runId: "r" },
-    });
-    expect(result.entries.value.map((e) => (e.own ? "own" : e.workflow.uuid))).toEqual(["own", "a"]);
-  });
-});
