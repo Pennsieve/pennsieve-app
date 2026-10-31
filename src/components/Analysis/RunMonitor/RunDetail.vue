@@ -2902,7 +2902,7 @@ onUnmounted(() => {
               <template v-else>
               <div class="section-title-row">
                 <h4 class="sidebar-section-title">Source Files</h4>
-                <bf-button class="secondary compact" @click="openFilePicker(selectedNode.id)">{{ fileCountForNode(selectedNode.id) > 0 ? 'Change files' : 'Select files' }}</bf-button>
+                <button class="text-link-btn" @click="openFilePicker(selectedNode.id)">{{ fileCountForNode(selectedNode.id) > 0 ? 'Change files' : 'Select files' }}</button>
               </div>
               <p v-if="mismatchLine(selectedNode.id)" class="files-mismatch">
                 ⚠ {{ mismatchLine(selectedNode.id) }}: {{ hintLine(sourceHints(selectedNode.id, configDefinition?.dag || [], portsOfStep(configDefinition?.dag || [], availableApplications))) }}.
@@ -4933,8 +4933,8 @@ onUnmounted(() => {
   .sidebar-section-title {
     margin: 0;
   }
-  .bf-button.compact {
-    padding: 4px 10px;
+  .text-link-btn {
+    padding: 0;
     font-size: 12px;
   }
 }
