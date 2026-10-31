@@ -2,11 +2,12 @@
 import { ref, onBeforeMount } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import * as config from "@/site-config/site.json";
-import { confirmSignIn, fetchAuthSession, signIn, signOut } from "aws-amplify/auth";
+import { confirmSignIn, fetchAuthSession, signIn } from "aws-amplify/auth";
 import QrcodeVue from "qrcode.vue";
 import BfButton from "@/components/shared/bf-button/BfButton.vue";
 import AuthLayout from "@/components/shared/AuthLayout/AuthLayout.vue";
 import { DEFAULT_LANDING_PATH, safeRedirectPath } from "@/utils/auth-redirect";
+import { endSession } from "@/utils/auth-session";
 
 const route = useRoute();
 const router = useRouter();
@@ -75,8 +76,9 @@ async function sendLoginRequest() {
   isLoggingIn.value = true;
   errorMessage.value = "";
   try {
-    // Clears any stale tokens so Amplify doesn't reject the sign-in as already authenticated.
-    await signOut();
+    // Clears any stale session so Amplify doesn't reject the sign-in as
+    // already authenticated, even one whose refresh token has expired.
+    await endSession(config.app_domain);
 
     const result = await signIn({
       username: logInForm.value.email.trim(),
@@ -115,7 +117,7 @@ async function handleNextStep(result) {
     // Completing an invitation also creates the Pennsieve user record, which only
     // the setup-profile flow does, so the new password can't be set here.
     case "CONFIRM_SIGN_IN_WITH_NEW_PASSWORD_REQUIRED":
-      await signOut();
+      await endSession(config.app_domain);
       logInState.value = states.LOG_IN;
       errorMessage.value =
         "Your account setup isn't finished. Use the link in your invitation email to set up your profile.";
@@ -127,7 +129,7 @@ async function handleNextStep(result) {
 
     default:
       console.warn("Unsupported sign-in step:", signInStep);
-      await signOut();
+      await endSession(config.app_domain);
       logInState.value = states.LOG_IN;
       errorMessage.value =
         "We couldn't complete sign in for this account. Please contact support.";
