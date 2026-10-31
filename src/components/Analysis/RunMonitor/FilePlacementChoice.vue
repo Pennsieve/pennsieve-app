@@ -1,43 +1,40 @@
 <script setup>
 // Where an input's files land in a step's input folder (inputFilePaths.js):
-// two cards, each a small picture of the input folder that choice gives.
-import { FILE_PATHS_SELECTION, FILE_PATHS_SOURCE } from "./inputFilePaths";
+// two cards, each a small picture of the input folder that choice gives, of
+// the input's chosen items, or of an example while there are none.
+import { computed } from "vue";
+import { FILE_PATHS_SELECTION, FILE_PATHS_SOURCE, placementRows } from "./inputFilePaths";
 
 const props = defineProps({
   modelValue: { type: String, default: FILE_PATHS_SELECTION },
+  // The chosen files and folders: { name, folder, path } (placementRows).
+  items: { type: Array, default: () => [] },
   disabled: { type: Boolean, default: false },
 });
 const emit = defineEmits(["update:modelValue"]);
 
 const ROW = 13;
-// Each picture: the input folder's rows, { depth, folder, label }.
-const choices = [
-  {
-    value: FILE_PATHS_SELECTION,
-    label: "As selected",
-    hint: "Files at the top; a selected folder keeps what's in it",
-    rows: [
-      { depth: 0, folder: true, label: "input" },
-      { depth: 1, label: "electrodes.tsv" },
-      { depth: 1, label: "run-01.edf" },
-    ],
-  },
-  {
-    value: FILE_PATHS_SOURCE,
-    label: "As in the source",
-    hint: "Files keep the folders they're in at the source",
-    rows: [
-      { depth: 0, folder: true, label: "input" },
-      { depth: 1, folder: true, label: "sub-01" },
-      { depth: 2, folder: true, label: "ieeg" },
-      { depth: 3, label: "electrodes.tsv" },
-      { depth: 3, label: "run-01.edf" },
-    ],
-  },
+const EXAMPLE = [
+  { name: "electrodes.tsv", path: ["sub-01", "ieeg"] },
+  { name: "run-01.edf", path: ["sub-01", "ieeg"] },
 ];
+const choices = computed(() => {
+  const items = props.items.length ? props.items : EXAMPLE;
+  return [
+    { value: FILE_PATHS_SELECTION, label: "As selected", hint: "Files at the top; a selected folder keeps what's in it" },
+    { value: FILE_PATHS_SOURCE, label: "As in the source", hint: "Files keep the folders they're in at the source" },
+  ].map((c) => ({ ...c, rows: placementRows(c.value, items) }));
+});
 
 const x = (depth) => 4 + depth * 8;
 const y = (i) => 10 + i * ROW;
+// A label cut to the picture's width (about 3.9 units a character).
+const fit = (r) => {
+  const label = r.folder ? `${r.label}/` : r.label;
+  const room = Math.floor((100 - x(r.depth) - (r.more ? 0 : 11)) / 3.9);
+  return label.length > room ? `${label.slice(0, room - 1)}…` : label;
+};
+const rowClass = (r) => [r.more ? "tree-more" : r.folder ? "tree-folder" : "tree-file", { "tree-item": r.item }];
 // The elbow from a row up to its folder's row.
 const elbow = (rows, i) => {
   const r = rows[i];
@@ -54,8 +51,9 @@ const pick = (value) => {
 const onKey = (e) => {
   if (!["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(e.key)) return;
   e.preventDefault();
-  const i = choices.findIndex((c) => c.value === props.modelValue);
-  const next = choices[(i + (e.key === "ArrowLeft" || e.key === "ArrowUp" ? choices.length - 1 : 1)) % choices.length];
+  const i = choices.value.findIndex((c) => c.value === props.modelValue);
+  const n = choices.value.length;
+  const next = choices.value[(i + (e.key === "ArrowLeft" || e.key === "ArrowUp" ? n - 1 : 1)) % n];
   pick(next.value);
   e.currentTarget.querySelector(`[data-value="${next.value}"]`)?.focus();
 };
@@ -78,14 +76,15 @@ const onKey = (e) => {
       @click="pick(c.value)"
     >
       <svg class="placement-picture" viewBox="0 0 100 74" aria-hidden="true">
-        <path v-for="(r, i) in c.rows.slice(1)" :key="`l${i}`" class="tree-line" :d="elbow(c.rows, i + 1)" />
-        <g v-for="(r, i) in c.rows" :key="i" :class="r.folder ? 'tree-folder' : 'tree-file'">
-          <path
-            v-if="r.folder"
-            :d="`M${x(r.depth)} ${y(i) - 3}h3l1 1h4v6h-8z`"
-          />
-          <path v-else :d="`M${x(r.depth)} ${y(i) - 4}h5l2 2v7h-7z`" />
-          <text :x="x(r.depth) + 11" :y="y(i) + 3">{{ r.folder ? `${r.label}/` : r.label }}</text>
+        <template v-for="(r, i) in c.rows.slice(1)" :key="`l${i}`">
+          <path v-if="!r.more" class="tree-line" :d="elbow(c.rows, i + 1)" />
+        </template>
+        <g v-for="(r, i) in c.rows" :key="i" :class="rowClass(r)">
+          <template v-if="!r.more">
+            <path v-if="r.folder" :d="`M${x(r.depth)} ${y(i) - 3}h3l1 1h4v6h-8z`" />
+            <path v-else :d="`M${x(r.depth)} ${y(i) - 4}h5l2 2v7h-7z`" />
+          </template>
+          <text :x="x(r.depth) + (r.more ? 0 : 11)" :y="y(i) + 3">{{ fit(r) }}</text>
         </g>
       </svg>
       <span class="placement-label">{{ c.label }}</span>
@@ -158,10 +157,15 @@ const onKey = (e) => {
       fill: theme.$gray_4;
     }
   }
+  .tree-more text {
+    fill: theme.$gray_4;
+    font-style: italic;
+  }
 }
 
-// The files are what moves between the two: they stand out on the chosen card.
-.is-chosen .placement-picture .tree-file {
+// The chosen items are what moves between the two: they stand out on the
+// chosen card.
+.is-chosen .placement-picture .tree-item {
   fill: theme.$purple_2;
   text {
     fill: theme.$purple_3;
