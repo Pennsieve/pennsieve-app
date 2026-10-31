@@ -1,8 +1,8 @@
 <script setup>
 /*
-  The app page's Sample outputs tab: the app's own sample output (a PDF of
-  one of its app runs, its inputs and results), then those of the workflows
-  the app is in; each opened in the viewer.
+  The app page's Workflow samples tab: the sample output PDFs (a summary of
+  one run each) of the workflows the app is in, opened in the viewer. The
+  app's own sample output is above, on the page (AppSampleCard).
 */
 import { ref } from "vue";
 import { useRoute } from "vue-router";
@@ -28,8 +28,7 @@ const workflowRoute = (uuid) => ({
 const viewer = ref({ open: false, source: null, name: "", version: null, subtitle: "" });
 const runLabel = (example) => example.runName || example.runId || "";
 const meta = (example) => {
-  const version = example.app ? example.app.tag : `Version ${exampleVersion(example)}`;
-  const parts = [version, `run ${runLabel(example)}`];
+  const parts = [`Version ${exampleVersion(example)}`, `run ${runLabel(example)}`];
   if (example.pages) parts.push(`${example.pages} page${example.pages === 1 ? "" : "s"}`);
   return parts.join(" · ");
 };
@@ -46,14 +45,12 @@ const open = (entry) => {
         return fresh;
       }
       first = false;
-      const again = entry.own
-        ? await store.dispatch("analysisModule/fetchAppExample", ex.app?.sourceUrl)
-        : await store.dispatch("analysisModule/fetchWorkflowExample", entry.workflow.uuid);
+      const again = await store.dispatch("analysisModule/fetchWorkflowExample", entry.workflow.uuid);
       if (again) entry.example = { ...again, fetchedAt: Date.now() };
       return again?.pdfUrl || null;
     },
-    name: entry.own ? props.appName || ex.app?.name || "App" : entry.workflow.name,
-    version: entry.own ? null : exampleVersion(ex),
+    name: entry.workflow.name,
+    version: exampleVersion(ex),
     subtitle: meta(ex),
   };
 };
@@ -62,13 +59,12 @@ const open = (entry) => {
 <template>
   <div class="app-samples">
     <p class="app-samples__intro">
-      PDF summaries of runs of {{ appName || "this app" }}: on its own, and in the workflows that use it.
+      Sample outputs of workflows that use {{ appName || "this app" }}: a PDF summary of one run of each.
     </p>
     <ul class="app-samples__list">
-      <li v-for="entry in entries" :key="entry.own ? 'own' : entry.workflow.uuid" class="app-sample" :class="{ 'app-sample--own': entry.own }">
+      <li v-for="entry in entries" :key="entry.workflow.uuid" class="app-sample">
         <div class="app-sample__text">
-          <span v-if="entry.own" class="app-sample__name">{{ appName || "This app" }} on its own</span>
-          <router-link v-else :to="workflowRoute(entry.workflow.uuid)" class="app-sample__name">{{ entry.workflow.name }}</router-link>
+          <router-link :to="workflowRoute(entry.workflow.uuid)" class="app-sample__name">{{ entry.workflow.name }}</router-link>
           <span class="app-sample__meta">{{ meta(entry.example) }}</span>
         </div>
         <button type="button" class="app-sample__open" @click="open(entry)">
@@ -119,9 +115,6 @@ const open = (entry) => {
   border-radius: 6px;
   padding: 10px 16px;
   background: theme.$white;
-}
-.app-sample--own {
-  border-color: theme.$purple_1;
 }
 .app-sample__text {
   display: flex;
