@@ -567,8 +567,8 @@ watch(hasReferences, (has) => {
   if (!has && activeTab.value === "references") activeTab.value = "readme";
 });
 
-// The Sample outputs tab: only when a workflow running the app has a sample
-// output that includes it (loaded in the background).
+// The Sample outputs tab: only when a workflow the app is in has a sample
+// output (loaded in the background).
 const { entries: sampleEntries, more: moreSampleWorkflows } = useAppSampleOutputs(
   computed(() => detail.value?.sourceUrl || "")
 );
@@ -820,7 +820,7 @@ watch(
           <!-- References tab: how to cite, authors, related works (CITATION.cff) -->
           <AppReferences v-else-if="activeTab === 'references'" :versions="sortedVersions" />
 
-          <!-- Sample outputs tab: workflow sample PDFs, at the pages this app's step produced -->
+          <!-- Sample outputs tab: the sample PDFs of workflows this app is in -->
           <AppSampleOutputs
             v-else-if="activeTab === 'samples'"
             :entries="sampleEntries"
