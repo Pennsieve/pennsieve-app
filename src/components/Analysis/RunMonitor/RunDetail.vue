@@ -3031,7 +3031,10 @@ onUnmounted(() => {
                 {{ canLeaveOut(selectedNode.id) ? "Leave this input out, or run the workflow from a workspace." : "Run this workflow from a workspace." }}
               </p>
               <template v-else>
-              <h4 class="sidebar-section-title">Source Files</h4>
+              <div class="section-title-row">
+                <h4 class="sidebar-section-title">Source Files</h4>
+                <bf-button class="secondary compact" @click="openFilePicker(selectedNode.id)">{{ fileCountForNode(selectedNode.id) > 0 ? 'Change files' : 'Select files' }}</bf-button>
+              </div>
               <p v-if="mismatchLine(selectedNode.id)" class="files-mismatch">
                 ⚠ {{ mismatchLine(selectedNode.id) }}: {{ hintLine(sourceHints(selectedNode.id, configDefinition?.dag || [], portsOfStep(configDefinition?.dag || [], availableApplications))) }}.
               </p>
@@ -3065,9 +3068,6 @@ onUnmounted(() => {
               </div>
               <div v-else class="selected-files-empty">
                 No files selected yet.
-              </div>
-              <div class="info-actions">
-                <bf-button class="secondary compact" @click="openFilePicker(selectedNode.id)">{{ fileCountForNode(selectedNode.id) > 0 ? 'Change files' : 'Select files' }}</bf-button>
               </div>
               <template v-if="!publicPicks[selectedNode.id]?.length">
                 <h4 class="sidebar-section-title">Where the files land</h4>
@@ -5131,6 +5131,23 @@ onUnmounted(() => {
 }
 
 /* Info actions */
+// A section's heading with its action on the right.
+.section-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 10px 0 6px;
+
+  .sidebar-section-title {
+    margin: 0;
+  }
+  .bf-button.compact {
+    padding: 4px 10px;
+    font-size: 12px;
+  }
+}
+
 .info-actions {
   display: flex;
   align-items: center;
