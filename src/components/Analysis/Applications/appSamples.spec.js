@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { appSampleEntry, sameRepo, sortEntries, workflowsUsingApp } from "./appSamples";
+import { appSampleEntry, ownSampleEntry, sameRepo, sortEntries, workflowsUsingApp } from "./appSamples";
 
 const URL = "https://github.com/pennsieve-apps/st-niches";
 const wf = (uuid, name, urls) => ({
@@ -38,5 +38,15 @@ describe("entries", () => {
     expect(appSampleEntry(wf("a", "Spatial", [URL]), null)).toBe(null);
     const e = (name) => ({ workflow: { name } });
     expect(sortEntries([e("Z"), e("A")]).map((x) => x.workflow.name)).toEqual(["A", "Z"]);
+  });
+});
+
+describe("the app's own", () => {
+  it("is an entry without a workflow, sorted first", () => {
+    expect(ownSampleEntry(null)).toBe(null);
+    const own = ownSampleEntry({ app: { tag: "v1" } });
+    expect(own).toEqual({ own: true, workflow: null, example: { app: { tag: "v1" } } });
+    const e = (name) => ({ workflow: { name } });
+    expect(sortEntries([e("B"), own, e("A")]).map((x) => (x.own ? "own" : x.workflow.name))).toEqual(["own", "A", "B"]);
   });
 });

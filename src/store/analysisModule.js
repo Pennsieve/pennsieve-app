@@ -668,6 +668,16 @@ export const actions = {
       ? { workflows: result, nextCursor: "" }
       : { workflows: result?.workflows || [], nextCursor: result?.nextCursor || "" };
   },
+  // fetchAppExample: sourceUrl -> the app's sample output (a PDF of one of
+  // its app runs, example.app set), or null.
+  fetchAppExample: async ({ rootState }, sourceUrl) => {
+    try {
+      return (await workflowRequest(rootState, `apps/example?sourceUrl=${encodeURIComponent(sourceUrl)}`)).example || null;
+    } catch (err) {
+      if (exampleUnavailable(err)) return null;
+      throw err;
+    }
+  },
   // fetchWorkflowVersionExample: { uuid, version } -> that version's example, or null.
   fetchWorkflowVersionExample: async ({ rootState }, { uuid, version }) => {
     try {
