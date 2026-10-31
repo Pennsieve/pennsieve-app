@@ -1,7 +1,7 @@
 /*
   The app page's sample outputs (appSamples.js): lists the workspace's
-  and the public catalog's workflows (a few pages of each), keeps those that
-  run the app, and asks each for its sample output. Loads in the background;
+  and the public catalog's workflows (a few pages of each), keeps those the
+  app is in, and asks each for its sample output. Loads in the background;
   nothing shows until there's something to show.
 */
 import { ref, watch } from "vue";
@@ -45,7 +45,7 @@ export function useAppSampleOutputs(sourceUrl, { maxPages = 5, maxWorkflows = 12
         asked.map((wf) =>
           store
             .dispatch("analysisModule/fetchWorkflowExample", wf.uuid)
-            .then((example) => appSampleEntry(wf, example && { ...example, fetchedAt: Date.now() }, url))
+            .then((example) => appSampleEntry(wf, example && { ...example, fetchedAt: Date.now() }))
             .catch(() => null)
         )
       );

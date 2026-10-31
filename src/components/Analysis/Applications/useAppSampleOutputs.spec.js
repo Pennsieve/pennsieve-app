@@ -37,17 +37,16 @@ const run = async ({ workspace, publicList, examples, maxWorkflows }) => {
 };
 
 describe("useAppSampleOutputs", () => {
-  it("finds the workspace's and public workflows running the app that have a sample", async () => {
-    const step = { step: "s", sourceUrl: URL, figures: 1, outputs: 0, pages: [3] };
+  it("finds the workspace's and public workflows the app is in that have a sample", async () => {
     const { result, list, fetchExample } = await run({
       workspace: [[wf("a", "A", URL), wf("x", "X", "https://github.com/pennsieve-apps/other")], [wf("b", "B", URL)]],
       publicList: [[wf("a", "A", URL), wf("c", "C", URL)]],
-      examples: { a: { version: 2, steps: [step] }, b: null, c: new Error("boom") },
+      examples: { a: { version: 2 }, b: null, c: new Error("boom") },
     });
     expect(list).toHaveBeenCalledTimes(3); // two workspace pages, one public
     expect(fetchExample.mock.calls.map((c) => c[1]).sort()).toEqual(["a", "b", "c"]);
     expect(result.entries.value.map((e) => e.workflow.uuid)).toEqual(["a"]);
-    expect(result.entries.value[0].steps).toEqual([step]);
+    expect(result.entries.value[0].example.version).toBe(2);
     expect(result.loading.value).toBe(false);
   });
 

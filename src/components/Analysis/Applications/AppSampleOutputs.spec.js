@@ -1,64 +1,60 @@
 import { describe, it, expect, vi } from "vitest";
-import { mount, flushPromises } from "@vue/test-utils";
+import { mount } from "@vue/test-utils";
 import { createStore } from "vuex";
 import AppSampleOutputs from "./AppSampleOutputs.vue";
 
 vi.mock("vue-router", () => ({ useRoute: () => ({ params: { orgId: "N:organization:1" } }) }));
 
-const URL = "https://github.com/pennsieve-apps/st-niches";
 const viewerStub = {
   name: "SampleOutputViewer",
-  props: ["modelValue", "source", "workflowName", "version", "subtitle", "initialPage"],
+  props: ["modelValue", "source", "workflowName", "version", "subtitle"],
   template: '<div v-if="modelValue" class="viewer-stub">{{ subtitle }}</div>',
 };
 const entries = [
   {
     workflow: { uuid: "wf-1", name: "Spatial Profiling" },
-    indexed: true,
     example: { version: 3, runName: "Xenium demo", pages: 17, pdfUrl: "https://cdn/x.pdf", fetchedAt: Date.now() },
-    steps: [{ step: "niches", app: "st-niches", sourceUrl: URL, version: "v0.1.0", figures: 3, outputs: 1, notStored: 0, pages: [4, 5, 8] }],
   },
   {
-    workflow: { uuid: "wf-2", name: "Older" },
-    indexed: false,
-    example: { version: 1, runId: "run-9", pdfUrl: "https://cdn/y.pdf", fetchedAt: Date.now() },
-    steps: [],
+    workflow: { uuid: "wf-2", name: "Domain Mapping" },
+    example: { version: 1, runId: "run-9", pdfUrl: "https://cdn/old.pdf", fetchedAt: 0 },
   },
 ];
+const fetchWorkflowExample = vi.fn(async () => ({ version: 1, runId: "run-9", pdfUrl: "https://cdn/new.pdf" }));
 const mountIt = () =>
   mount(AppSampleOutputs, {
-    props: { entries, appName: "st-niches", more: 2 },
+    props: { entries: structuredClone(entries), appName: "st-niches", more: 2 },
     global: {
-      plugins: [createStore({ modules: { analysisModule: { namespaced: true, actions: { fetchWorkflowExample: vi.fn() } } } })],
+      plugins: [createStore({ modules: { analysisModule: { namespaced: true, actions: { fetchWorkflowExample } } } })],
       stubs: { SampleOutputViewer: viewerStub, "router-link": { props: ["to"], template: "<a><slot /></a>" } },
     },
   });
+const viewButtons = (wrapper) => wrapper.findAll("button").filter((b) => b.text() === "View PDF");
 
 describe("AppSampleOutputs", () => {
-  it("lists each workflow's sample with what it shows of the app's step", () => {
+  it("lists the sample output of each workflow the app is in", () => {
     const text = mountIt().text().replace(/\s+/g, " ");
+    expect(text).toContain("Sample outputs of workflows that use st-niches");
     expect(text).toContain("Spatial Profiling");
-    expect(text).toContain("Sample output of version 3 · run Xenium demo · 17 pages");
-    expect(text).toContain("Step niches");
-    expect(text).toContain("3 figures · 1 output · pages 4–5, 8");
-    expect(text).toContain("made before PDFs recorded which pages");
+    expect(text).toContain("Version 3 · run Xenium demo · 17 pages");
+    expect(text).toContain("Domain Mapping");
+    expect(text).toContain("Version 1 · run run-9");
     expect(text).toContain("2 more workflows use this app");
   });
 
-  it("opens the PDF at the step's first page", async () => {
+  it("opens a workflow's PDF in the viewer", async () => {
     const wrapper = mountIt();
-    await wrapper.findAll("button").find((b) => b.text().includes("View pages 4–5, 8")).trigger("click");
-    await flushPromises();
+    await viewButtons(wrapper)[0].trigger("click");
     const viewer = wrapper.findComponent(viewerStub);
-    expect(viewer.props("initialPage")).toBe(4);
     expect(viewer.props("workflowName")).toBe("Spatial Profiling");
-    expect(viewer.props("subtitle")).toContain("Step niches (st-niches v0.1.0) on pages 4–5, 8");
+    expect(viewer.props("version")).toBe(3);
     expect(await viewer.props("source")()).toBe("https://cdn/x.pdf");
   });
 
-  it("opens an older sample at its start", async () => {
+  it("asks for a fresh link where the one in hand is old", async () => {
     const wrapper = mountIt();
-    await wrapper.findAll("button").find((b) => b.text() === "View PDF").trigger("click");
-    expect(wrapper.findComponent(viewerStub).props("initialPage")).toBe(null);
+    await viewButtons(wrapper)[1].trigger("click");
+    expect(await wrapper.findComponent(viewerStub).props("source")()).toBe("https://cdn/new.pdf");
+    expect(fetchWorkflowExample.mock.calls.at(-1)[1]).toBe("wf-2");
   });
 });
