@@ -11,7 +11,7 @@ const wf = (uuid, name, url) => ({
   dag: [{ id: "in", type: "data-source" }, { id: "s", type: "processor", sourceUrl: url, dependsOn: ["in"] }],
 });
 
-const run = async ({ workspace, publicList, examples, maxWorkflows }) => {
+const run = async ({ workspace, publicList, examples, maxWorkflows, own = null }) => {
   const list = vi.fn(async (_, { visibility, cursor }) => {
     const pages = visibility === "public" ? publicList : workspace;
     const i = cursor ? Number(cursor) : 0;
@@ -22,7 +22,12 @@ const run = async ({ workspace, publicList, examples, maxWorkflows }) => {
     return examples[uuid] ?? null;
   });
   const store = createStore({
-    modules: { analysisModule: { namespaced: true, actions: { listWorkflowDefinitions: list, fetchWorkflowExample: fetchExample } } },
+    modules: {
+      analysisModule: {
+        namespaced: true,
+        actions: { listWorkflowDefinitions: list, fetchWorkflowExample: fetchExample, fetchAppExample: async () => own },
+      },
+    },
   });
   let result;
   const C = defineComponent({
@@ -59,5 +64,17 @@ describe("useAppSampleOutputs", () => {
     });
     expect(fetchExample).toHaveBeenCalledTimes(2);
     expect(result.more.value).toBe(1);
+  });
+});
+
+describe("useAppSampleOutputs, the app's own", () => {
+  it("comes first", async () => {
+    const { result } = await run({
+      workspace: [[wf("a", "A", URL)]],
+      publicList: [],
+      examples: { a: { version: 2 } },
+      own: { app: { tag: "v1" }, runId: "r" },
+    });
+    expect(result.entries.value.map((e) => (e.own ? "own" : e.workflow.uuid))).toEqual(["own", "a"]);
   });
 });

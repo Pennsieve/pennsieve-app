@@ -24,4 +24,9 @@ export const workflowsUsingApp = (workflows, sourceUrl) => {
 export const appSampleEntry = (wf, example) =>
   wf && example ? { workflow: { uuid: wf.uuid, name: wf.name || "Workflow" }, example } : null;
 
-export const sortEntries = (entries) => [...entries].sort((a, b) => a.workflow.name.localeCompare(b.workflow.name));
+// The app's own sample output (a PDF of one of its app runs), or null.
+export const ownSampleEntry = (example) => (example ? { own: true, workflow: null, example } : null);
+
+// The app's own first, then the workflows' by name.
+export const sortEntries = (entries) =>
+  [...entries].sort((a, b) => (b.own ? 1 : 0) - (a.own ? 1 : 0) || (a.workflow?.name || "").localeCompare(b.workflow?.name || ""));

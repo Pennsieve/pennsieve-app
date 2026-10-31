@@ -1,12 +1,13 @@
 /*
-  The app page's sample outputs (appSamples.js): lists the workspace's
+  The app page's sample outputs (appSamples.js): the app's own (from one of
+  its app runs), then the workflows'. For those it lists the workspace's
   and the public catalog's workflows (a few pages of each), keeps those the
   app is in, and asks each for its sample output. Loads in the background;
   nothing shows until there's something to show.
 */
 import { ref, watch } from "vue";
 import { useStore } from "vuex";
-import { appSampleEntry, sortEntries, workflowsUsingApp } from "./appSamples";
+import { appSampleEntry, ownSampleEntry, sortEntries, workflowsUsingApp } from "./appSamples";
 
 export function useAppSampleOutputs(sourceUrl, { maxPages = 5, maxWorkflows = 12 } = {}) {
   const store = useStore();
@@ -35,6 +36,10 @@ export function useAppSampleOutputs(sourceUrl, { maxPages = 5, maxWorkflows = 12
     if (!url) return;
     loading.value = true;
     try {
+      const own = store
+        .dispatch("analysisModule/fetchAppExample", url)
+        .then((example) => ownSampleEntry(example && { ...example, fetchedAt: Date.now() }))
+        .catch(() => null);
       const lists = await Promise.allSettled([listAll(), listAll("public")]);
       const using = workflowsUsingApp(
         lists.flatMap((r) => (r.status === "fulfilled" ? r.value : [])),
@@ -49,8 +54,9 @@ export function useAppSampleOutputs(sourceUrl, { maxPages = 5, maxWorkflows = 12
             .catch(() => null)
         )
       );
+      const ownEntry = await own;
       if (mine !== seq) return;
-      entries.value = sortEntries(found.filter(Boolean));
+      entries.value = sortEntries([ownEntry, ...found].filter(Boolean));
       more.value = using.length - asked.length;
     } finally {
       if (mine === seq) loading.value = false;
