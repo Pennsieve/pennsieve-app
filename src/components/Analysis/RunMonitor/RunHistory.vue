@@ -9,6 +9,7 @@ import { useRoute } from "vue-router";
 import { useStore } from "vuex";
 import { formatCost, formatDuration, formatTime, runDisplayName, statusDotClass, statusLabel } from "./runHelpers";
 import { costOf, costParts, fetchRun } from "./runDetails";
+import { appRunLabel } from "./appRuns";
 
 const props = defineProps({
   title: { type: String, required: true },
@@ -38,7 +39,7 @@ const shown = computed(() => {
   const q = query.value.trim().toLowerCase();
   if (!q) return props.runs;
   return props.runs.filter((r) =>
-    [runDisplayName(r), r.workflowName].some((s) => (s || "").toLowerCase().includes(q))
+    [runDisplayName(r), r.workflowName, appRunLabel(r.app)].some((s) => (s || "").toLowerCase().includes(q))
   );
 });
 
@@ -99,6 +100,7 @@ const errorOf = (run) => run.errorMessage || details.value[run.uuid]?.errorMessa
           <span class="rh-name">
             {{ runDisplayName(run) || "Unnamed" }}
             <span v-if="showWorkflow && run.name && run.workflowName" class="rh-workflow">{{ run.workflowName }}</span>
+            <span v-else-if="showWorkflow && run.app" class="rh-workflow" title="A one-off run of an app">App run · {{ appRunLabel(run.app) }}</span>
           </span>
           <span class="rh-status">{{ statusLabel(run.status) }}</span>
           <span class="rh-time">{{ formatTime(run.completedAt || run.startedAt) }}</span>
@@ -116,6 +118,10 @@ const errorOf = (run) => run.errorMessage || details.value[run.uuid]?.errorMessa
             <template v-if="showWorkflow && run.workflowName">
               <dt>Workflow</dt>
               <dd>{{ run.workflowName }}</dd>
+            </template>
+            <template v-else-if="showWorkflow && run.app">
+              <dt>App</dt>
+              <dd>{{ appRunLabel(run.app) }}</dd>
             </template>
             <template v-if="nodeName(run.computeNodeUuid)">
               <dt>Compute node</dt>
