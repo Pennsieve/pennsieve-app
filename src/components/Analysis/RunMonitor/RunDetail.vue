@@ -1130,9 +1130,11 @@ const initiateWorkflowFromConfig = async (pendingConfig) => {
   }
 };
 
-const cancelConfigure = () => {
+// Leaves configure mode: the form and its graph cleared.
+const leaveConfigure = () => {
   mode.value = "browse";
   configDefinition.value = null;
+  configApp.value = null;
   configLayers.value = [];
   Object.keys(dataSourceFiles).forEach((k) => delete dataSourceFiles[k]);
   Object.keys(publicPicks).forEach((k) => delete publicPicks[k]);
@@ -1141,6 +1143,10 @@ const cancelConfigure = () => {
   nodes.value = [];
   edges.value = [];
   selectedNode.value = null;
+};
+
+const cancelConfigure = () => {
+  leaveConfigure();
   router.push(scopedRoute("runs"));
 };
 
@@ -1326,15 +1332,17 @@ const executeWorkflow = async () => {
       ...initiateForm.value,
       datasetId: runDatasetId.value,
     });
-    if (app && created?.executionRunId) {
-      // An app run opens on its own page, where its results arrive.
-      EventBus.$emit("toast", { detail: { type: "success", msg: `${appRunLabel(app)} is running. Its results appear here when it finishes.` } });
+    // The new run's page, where it's followed live (and an app run's results
+    // arrive); the runs list if the response named no run.
+    const msg = app
+      ? `${appRunLabel(app)} is running. Its results appear here when it finishes.`
+      : "The run has started.";
+    EventBus.$emit("toast", { detail: { type: "success", msg } });
+    if (created?.executionRunId) {
       router.push(scopedRoute("run-detail", { runId: created.executionRunId }));
-      return;
+    } else {
+      router.push(scopedRoute("runs"));
     }
-    EventBus.$emit("toast", { detail: { type: "success", msg: "Workflow executed successfully." } });
-
-    router.push(scopedRoute("runs"));
   } catch (err) {
     console.error("Failed to execute workflow:", err);
     const msg = err?.message || "Failed to execute workflow.";
@@ -2259,6 +2267,18 @@ onMounted(async () => {
   }
 
 });
+
+// Another run on the same page (the router reuses it, e.g. configure → the
+// run just started, or one run → another): show that run, live.
+watch(
+  () => props.runId,
+  async (runId, before) => {
+    if (!runId || runId === before) return;
+    if (mode.value === "configure") leaveConfigure();
+    await loadRun(runId);
+    scheduleRunPoll();
+  }
+);
 
 // Handle same-component navigation (e.g. run-detail → run-configure)
 watch(
