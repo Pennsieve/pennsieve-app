@@ -38,11 +38,6 @@ export const useComputeResourcesStore = defineStore('computeResources', () => {
   const allowedProcessorsLoaded = ref({})     // { [nodeId]: boolean }
   const isLoadingAllowedProcessors = ref({})
 
-  // Layers cache - keyed by nodeId
-  const nodeLayers = ref({})                  // { [nodeId]: { layers: [], totalSizeGB, totalEstimatedMonthlyCostUsd } }
-  const layersLoaded = ref({})                // { [nodeId]: boolean }
-  const isLoadingLayers = ref({})
-
   // Cache timeout (5 minutes)
   const CACHE_TIMEOUT = 5 * 60 * 1000
 
@@ -117,14 +112,6 @@ export const useComputeResourcesStore = defineStore('computeResources', () => {
     return isLoadingAllowedProcessors.value[nodeId] || false
   })
 
-  const getNodeLayers = computed(() => (nodeId) => {
-    return nodeLayers.value[nodeId] || { layers: [], totalSizeGB: 0, totalEstimatedMonthlyCostUsd: 0 }
-  })
-
-  const isNodeLayersLoading = computed(() => (nodeId) => {
-    return isLoadingLayers.value[nodeId] || false
-  })
-
   const isComputeAccountsCacheValid = computed(() => {
     if (!computeAccountsLastFetched.value) return false
     return (Date.now() - computeAccountsLastFetched.value) < CACHE_TIMEOUT
@@ -176,9 +163,6 @@ export const useComputeResourcesStore = defineStore('computeResources', () => {
     nodeAllowedProcessors.value = {}
     allowedProcessorsLoaded.value = {}
     isLoadingAllowedProcessors.value = {}
-    nodeLayers.value = {}
-    layersLoaded.value = {}
-    isLoadingLayers.value = {}
 
     nodeSecrets.value = {}
     nodeSharedSecrets.value = {}
@@ -1487,99 +1471,6 @@ export const useComputeResourcesStore = defineStore('computeResources', () => {
     }
   }
 
-  // Persistent Layers (uses workflow service base path)
-  const fetchNodeLayers = async (nodeId, forceRefresh = false) => {
-    if (!forceRefresh && layersLoaded.value[nodeId]) {
-      return nodeLayers.value[nodeId]
-    }
-    isLoadingLayers.value[nodeId] = true
-    try {
-      const token = await useGetToken()
-      const url = `${siteConfig.api2Url}/compute/workflows/compute-nodes/${nodeId}/layers`
-      const response = await fetch(url, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      })
-      if (response.ok) {
-        const data = await response.json()
-        nodeLayers.value[nodeId] = {
-          layers: data.layers || [],
-          totalSizeGB: data.totalSizeGB || 0,
-          totalEstimatedMonthlyCostUsd: data.totalEstimatedMonthlyCostUsd || 0
-        }
-        layersLoaded.value[nodeId] = true
-        return nodeLayers.value[nodeId]
-      } else if (response.status === 403) {
-        nodeLayers.value[nodeId] = { layers: [], totalSizeGB: 0, totalEstimatedMonthlyCostUsd: 0 }
-        layersLoaded.value[nodeId] = true
-        return nodeLayers.value[nodeId]
-      } else {
-        console.error('Failed to fetch layers:', response.status)
-        return Promise.reject(new Error(`Failed to fetch layers: ${response.statusText}`))
-      }
-    } catch (error) {
-      console.error('Failed to fetch layers:', error)
-      return Promise.reject(error)
-    } finally {
-      isLoadingLayers.value[nodeId] = false
-    }
-  }
-
-  const createNodeLayer = async (nodeId, { layerName, description, layerType }) => {
-    try {
-      const token = await useGetToken()
-      const url = `${siteConfig.api2Url}/compute/workflows/compute-nodes/${nodeId}/layers`
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ layerName, description, ...(layerType && { layerType }) })
-      })
-      if (response.ok) {
-        await fetchNodeLayers(nodeId, true)
-        return true
-      } else if (response.status === 409) {
-        return Promise.reject(new Error('A layer with that name already exists'))
-      } else {
-        const errorText = await response.text()
-        console.error('Failed to create layer:', response.status, errorText)
-        return Promise.reject(new Error(`Failed to create layer: ${response.statusText}`))
-      }
-    } catch (error) {
-      console.error('Failed to create layer:', error)
-      return Promise.reject(error)
-    }
-  }
-
-  const deleteNodeLayer = async (nodeId, layerName) => {
-    try {
-      const token = await useGetToken()
-      const url = `${siteConfig.api2Url}/compute/workflows/compute-nodes/${nodeId}/layers/${encodeURIComponent(layerName)}`
-      const response = await fetch(url, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      })
-      if (response.ok) {
-        await fetchNodeLayers(nodeId, true)
-        return true
-      } else {
-        console.error('Failed to delete layer:', response.status)
-        return Promise.reject(new Error(`Failed to delete layer: ${response.statusText}`))
-      }
-    } catch (error) {
-      console.error('Failed to delete layer:', error)
-      return Promise.reject(error)
-    }
-  }
-
   return {
     // Connecting an AWS account
     requestRoleSetup,
@@ -1661,19 +1552,10 @@ export const useComputeResourcesStore = defineStore('computeResources', () => {
     fetchAllowedProcessors,
     updateAllowedProcessors,
 
-    // Getters - Layers
-    getNodeLayers,
-    isNodeLayersLoading,
-
     // Actions - Infrastructure Config
     updateComputeNodeConfig,
     gpuTiers,
     fetchGpuTiers,
-
-    // Actions - Layers
-    fetchNodeLayers,
-    createNodeLayer,
-    deleteNodeLayer,
 
     // Actions - Accounts
     fetchComputeAccounts,

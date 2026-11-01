@@ -6,7 +6,6 @@ export const NODE_TABS = [
   { key: "overview", label: "Overview" },
   { key: "access", label: "Access" },
   { key: "settings", label: "Settings" },
-  { key: "reference-data", label: "Reference data" },
   { key: "advanced", label: "Advanced" },
 ];
 
@@ -16,7 +15,6 @@ const HASH_TABS = {
   "#llm-budget": "settings",
   "#quotas": "settings",
   "#pipeline-budget": "settings",
-  "#reference-data": "reference-data",
 };
 
 // The tab to show: the one in the URL, else the one a section link is on,

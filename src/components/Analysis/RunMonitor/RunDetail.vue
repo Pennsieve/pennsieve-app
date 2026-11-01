@@ -28,7 +28,6 @@ import { layoutBox, useGraphDensity } from "../WorkflowGraph/graphDensity";
 import { formatResources, formatRunTime, nodeDurationSec } from "../WorkflowGraph/nodeFacts";
 import { useSendXhr } from "@/mixins/request/request_composable";
 import toQueryParams from "@/utils/toQueryParams";
-import LayerNameSelector from "./LayerNameSelector.vue";
 import TargetDatasetField from "./TargetDatasetField.vue";
 import { targetWritesToDataset, targetParamFields, buildDataTargets, targetDatasetId, datasetName, shownTargetParams, datasetSummary, sortDatasets, isPathPrefixParam } from "./dataTargets";
 import DatasetOptionRow from "./DatasetOptionRow.vue";
@@ -189,10 +188,6 @@ const isExecuting = ref(false);
 const errorBanner = ref("");
 const errorBannerNodeId = ref("");
 const rerunSource = ref(null);
-// The node's data layers the source run mounted (set through the API; the
-// app doesn't attach any itself). Carried over on a rerun so "Rerun with
-// configuration" doesn't silently drop them.
-const configLayers = ref([]);
 
 // File picker dialog state
 const filePickerVisible = ref(false);
@@ -985,8 +980,6 @@ const initiateWorkflowFromConfig = async (pendingConfig) => {
   configApp.value = appOf(pendingConfig) || appOf(source);
   initiateForm.value = { workflowId: workflowId || "", computeNodeId, datasetId, name: "" };
   runNameError.value = "";
-  // Preserve any data layers from the source run so the rerun re-attaches them.
-  configLayers.value = Array.isArray(source?.layers) ? [...source.layers] : [];
 
   try {
     // A workflow's inputs and outputs shown as the source and target nodes a
@@ -1120,7 +1113,6 @@ const leaveConfigure = () => {
   mode.value = "browse";
   configDefinition.value = null;
   configApp.value = null;
-  configLayers.value = [];
   Object.keys(dataSourceFiles).forEach((k) => delete dataSourceFiles[k]);
   Object.keys(publicPicks).forEach((k) => delete publicPicks[k]);
   Object.keys(dataSourceFilePaths).forEach((k) => delete dataSourceFilePaths[k]);
@@ -1313,7 +1305,6 @@ const executeWorkflow = async () => {
       ...(trimmedName && { name: trimmedName }),
       ...(Object.keys(dataTargets).length > 0 && { dataTargets }),
       ...(Object.keys(processorParams).length > 0 && { processorParams }),
-      ...(configLayers.value.length > 0 && { layers: configLayers.value }),
     };
 
     const app = configApp.value;
@@ -2860,13 +2851,8 @@ onUnmounted(() => {
                       <span v-if="param.required" class="target-param-required">required</span>
                     </div>
                     <div v-if="param.description" class="target-param-description">{{ param.description }}</div>
-                    <LayerNameSelector
-                      v-if="nodeConfigs[selectedNode.id].targetType === 'persistent-layer' && param.name === 'layerName'"
-                      v-model="param.value"
-                      :compute-node-id="initiateForm.computeNodeId"
-                    />
                     <el-select
-                      v-else-if="nodeConfigs[selectedNode.id].targetType === 'download' && param.name === 'notify'"
+                      v-if="nodeConfigs[selectedNode.id].targetType === 'download' && param.name === 'notify'"
                       v-model="param.value"
                       size="small"
                       style="width: 100%"
@@ -3081,10 +3067,6 @@ onUnmounted(() => {
                     </el-option>
                   </el-select>
                   <span v-if="setupNodeUnfit.length" class="run-name-error">Can't run this workflow: {{ setupNodeUnfit.join(", ") }}</span>
-                </div>
-                <div v-if="configLayers.length" class="info-row">
-                  <span class="info-label">Reference data</span>
-                  <span class="info-value">{{ configLayers.join(', ') }}</span>
                 </div>
               </div>
               <p class="configure-hint">
