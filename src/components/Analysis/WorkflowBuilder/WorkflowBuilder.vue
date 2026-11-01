@@ -68,6 +68,9 @@ import { sourceLabel, sourceHints, hintLine } from "../WorkflowGraph/sourceInput
 import { canvasDefinition, toInterfaceDefinition } from "./builderInterface";
 import { workflowLayouts } from "../RunMonitor/runLayout";
 import IoPill from "../WorkflowGraph/IoPill.vue";
+import ReferencePickerDialog from "../RunMonitor/ReferencePickerDialog.vue";
+import { findReferences, environmentsServiceUrl } from "@/utils/environmentsService";
+import { referenceInputs, referenceLabel, catalogQuery, isAppDefault, formatSize } from "../RunMonitor/referenceSources";
 import { isFeatureEnabled } from "@/utils/features";
 import { useGraphHistory, snapshot } from "./graphHistory";
 import { workflowPermissions } from "./workflowPermissions";
@@ -672,6 +675,110 @@ const applyManifestDefaults = async (nodeId, application) => {
   if (paramSchema.length) node.data.paramSchema = paramSchema;
 
   setManifestPorts(node, parsed);
+  addReferenceSources(node);
+};
+
+/*
+  Reference sources
+  -----------------
+  An app input filled from Pennsieve's reference catalog (app.yml
+  inputs[].reference) takes a reference source: input data linked to it,
+  shown as the reference it names. Adding such an app adds one per reference
+  input, set to the app's default, so the workflow runs as it is; its panel
+  changes it (ReferencePickerDialog). Saved as an optional input, whose
+  default is the reference chosen when it isn't the app's (none: a run takes
+  the app's default). Which sources are references is read from their links
+  and the apps' ports, so nothing else is saved.
+*/
+const referencesOn = isFeatureEnabled("workflowInterface") && !!environmentsServiceUrl();
+
+const addReferenceSources = (node) => {
+  if (!referencesOn || isReadOnly.value) return;
+  const routed = routedInputs(node.data.manifestPorts).length > 0;
+  referenceInputs(node.data.manifestPorts?.inputs).forEach((port, i) => {
+    const fed = edges.value.some((e) => e.target === node.id && edgeLink(e, node, edges.value)?.input === port.name);
+    if (fed) return;
+    const source = makeNode("data-source", null, { x: node.position.x - 260, y: node.position.y - 60 + i * 70 });
+    source.data = { ...source.data, label: "Reference data", optional: true };
+    nodes.value.push(source);
+    connectNodes(source.id, node.id, "source", routed ? inputHandleId(port.name) : undefined);
+  });
+};
+
+// The step input a source fills from the catalog: { step, port }, or null
+// for ordinary input data.
+const referenceTargetOf = (sourceId) => {
+  for (const e of edges.value) {
+    if (e.source !== sourceId) continue;
+    const step = nodes.value.find((n) => n.id === e.target);
+    if (step?.type !== "default") continue;
+    const input = edgeLink(e, step, edges.value)?.input;
+    const port = (step.data?.manifestPorts?.inputs || []).find((p) => p.name === input && p.reference);
+    if (port) return { step, port };
+  }
+  return null;
+};
+
+// Catalog references the canvas names, by id, for their labels.
+const knownReferences = ref({});
+const rememberReferences = (entries) => {
+  const next = { ...knownReferences.value };
+  for (const e of entries || []) next[e.id] = e;
+  knownReferences.value = next;
+};
+// Looks up the references a reopened workflow chose, once per input kind.
+const loadChosenReferences = async () => {
+  const missing = nodes.value
+    .filter((n) => n.type === "data-source" && n.data?.referenceId && !knownReferences.value[n.data.referenceId])
+    .map((n) => referenceTargetOf(n.id))
+    .filter(Boolean);
+  const queries = [...new Map(missing.map((t) => [JSON.stringify(catalogQuery(t.port.reference)), t.port.reference])).values()];
+  await Promise.all(queries.map((r) => findReferences(catalogQuery(r)).then(rememberReferences).catch(() => {})));
+};
+watch(
+  () => nodes.value.filter((n) => n.type === "data-source" && n.data?.referenceId).map((n) => n.data.referenceId).join(),
+  (ids) => {
+    if (ids && referencesOn) loadChosenReferences();
+  }
+);
+
+// What a reference source fills its input with: the reference chosen, else
+// the app's default.
+const referenceChoice = (sourceId) => {
+  const target = referenceTargetOf(sourceId);
+  if (!target) return null;
+  const node = nodes.value.find((n) => n.id === sourceId);
+  const chosen = node?.data?.referenceId ? knownReferences.value[node.data.referenceId] : null;
+  const reference = target.port.reference;
+  const pinned = reference.choice === "app" ? reference : reference.default;
+  return {
+    ...target,
+    chosen,
+    isDefault: !node?.data?.referenceId,
+    label: chosen ? referenceLabel(chosen) : node?.data?.referenceId ? "Chosen reference" : pinned ? referenceLabel(pinned) : "",
+  };
+};
+const referenceSub = (sourceId) => {
+  const c = referenceChoice(sourceId);
+  if (!c) return "";
+  return c.isDefault ? `${c.label || "App default"}${c.label ? " (default)" : ""}` : c.label;
+};
+
+const referencePickerOpen = ref(false);
+const referencePickerFor = ref(null);
+const openReferencePicker = (sourceId) => {
+  const c = referenceChoice(sourceId);
+  if (!c) return;
+  referencePickerFor.value = { sourceId, ...c, stepName: nodeName(c.step), inputName: c.port.name };
+  referencePickerOpen.value = true;
+};
+const onReferencePicked = (entry) => {
+  const target = referencePickerFor.value;
+  const node = target && nodes.value.find((n) => n.id === target.sourceId);
+  if (!node) return;
+  rememberReferences([entry]);
+  // The app's default is what an unbound input takes: nothing to save.
+  node.data.referenceId = isAppDefault(entry, target.port.reference) ? "" : entry.id;
 };
 
 // Ports live on the node so connection checks stay synchronous.
@@ -973,6 +1080,8 @@ const definitionToNodesAndEdges = (workflow, applications) => {
         // An input's or output's own name and settings (its panel).
         ...(p.name && { name: p.name }),
         ...(p.input?.optional && { optional: true }),
+        // A reference source's chosen reference (its input's default).
+        ...(p.input?.default?.kind === "reference" && p.input.default.environmentId && { referenceId: p.input.default.environmentId }),
         ...(p.output?.accepts?.length && { accepts: [...p.output.accepts] }),
         ...(p.output?.required && { required: true }),
       },
@@ -2217,7 +2326,8 @@ const definitionPayload = () => {
     routedPortsOf: (id) => routedOutputs(byId.get(id)?.data?.manifestPorts).map((p) => p.name),
     extrasOf: (id) => {
       const d = byId.get(id)?.data || {};
-      return { optional: !!d.optional, accepts: d.accepts || [], required: !!d.required };
+      const reference = d.referenceId && referenceTargetOf(id) ? d.referenceId : "";
+      return { optional: !!d.optional, accepts: d.accepts || [], required: !!d.required, referenceId: reference };
     },
   });
   return iface || { processors };
@@ -3209,6 +3319,7 @@ const openNodeSettings = (id) => {
                   class="data-source-node"
                   :class="connectClass(id)"
                   :name="nodeName({ id, type: 'data-source', data })"
+                  :sub="referenceSub(id)"
                   :title="sourceFeeds(id) || undefined"
                 >
                   <button v-if="!isReadOnly" class="remove-btn io-node__remove" title="Remove" @click.stop="removeNode(id)">&times;</button>
@@ -3297,7 +3408,9 @@ const openNodeSettings = (id) => {
                 <div class="info-row">
                   <span class="info-label">Kind</span>
                   <span class="info-value">{{
-                    { "data-source": "Input data", "data-target": "Output", default: "App" }[selectedNode.type] || selectedNode.type
+                    selectedNode.type === "data-source" && referenceTargetOf(selectedNode.id)
+                      ? "Reference data"
+                      : { "data-source": "Input data", "data-target": "Output", default: "App" }[selectedNode.type] || selectedNode.type
                   }}</span>
                 </div>
                 <!-- An input's and output's own name and settings, saved with
@@ -3307,7 +3420,7 @@ const openNodeSettings = (id) => {
                     <label class="info-label" for="io-name">Called</label>
                     <el-input id="io-name" v-model="selectedNode.data.name" size="small" class="info-inline-select" :placeholder="baseName({ ...selectedNode, data: { ...selectedNode.data, name: '' } })" />
                   </div>
-                  <div v-if="selectedNode.type === 'data-source'" class="info-row">
+                  <div v-if="selectedNode.type === 'data-source' && !referenceTargetOf(selectedNode.id)" class="info-row">
                     <span class="info-label">Optional</span>
                     <el-checkbox v-model="selectedNode.data.optional">A run may leave it out</el-checkbox>
                   </div>
@@ -3316,6 +3429,31 @@ const openNodeSettings = (id) => {
                   <span class="info-label">Feeds</span>
                   <span class="info-value">{{ sourceFeeds(selectedNode.id) }}</span>
                 </div>
+                <!-- A reference source: the catalog reference it fills its
+                     input with (the app's default unless changed) -->
+                <template v-if="selectedNode.type === 'data-source' && referenceChoice(selectedNode.id)">
+                  <div class="info-row">
+                    <span class="info-label">Reference</span>
+                    <span class="info-value">{{ referenceChoice(selectedNode.id).label || "The app's default" }}</span>
+                  </div>
+                  <div class="info-row">
+                    <span class="info-label">Release</span>
+                    <span class="info-value">{{ referenceChoice(selectedNode.id).isDefault ? "The app's default, newest version" : "Newest version" }}</span>
+                  </div>
+                  <div v-if="referenceChoice(selectedNode.id).chosen?.version?.archive?.sizeBytes" class="info-row">
+                    <span class="info-label">Download</span>
+                    <span class="info-value">{{ formatSize(referenceChoice(selectedNode.id).chosen.version.archive.sizeBytes) }}</span>
+                  </div>
+                  <div v-if="!isReadOnly" class="info-row">
+                    <button type="button" class="text-link-btn" @click="openReferencePicker(selectedNode.id)">Change reference</button>
+                    <button
+                      v-if="!referenceChoice(selectedNode.id).isDefault"
+                      type="button"
+                      class="text-link-btn"
+                      @click="selectedNode.data.referenceId = ''"
+                    >Use the app's default</button>
+                  </div>
+                </template>
                 <template v-if="selectedNode.data?.application?.description">
                   <div class="info-row">
                     <span class="info-label">Description</span>
@@ -4121,6 +4259,14 @@ const openNodeSettings = (id) => {
       <pre class="app-yml">{{ appYml?.text }}</pre>
     </el-dialog>
     <RunWizardDialog ref="runDialog" />
+    <ReferencePickerDialog
+      v-model="referencePickerOpen"
+      :reference="referencePickerFor?.port?.reference || null"
+      :step-name="referencePickerFor?.stepName || ''"
+      :input-name="referencePickerFor?.inputName || ''"
+      :selected-id="referencePickerFor?.chosen?.id || ''"
+      @pick="onReferencePicked"
+    />
   </div>
 </template>
 
