@@ -79,6 +79,21 @@ export function buildLog(id, version, options = {}) {
   return environmentsRequest(`/${encodeURIComponent(id)}/versions/${version}/log`, options)
 }
 
+// Official references (kind genome) matching query (kind, assetClass,
+// toolVersion ranges such as ">=2 <3", taxonomyId, assembly, ...), each with
+// its newest ready version: { id, name, description, license, citation,
+// latestVersion, version: { version, spec, archive: { sha256, sizeBytes,
+// unpackedBytes } } }. The catalog is public; the token is sent anyway, as
+// on every call here.
+export async function findReferences(query = {}, options = {}) {
+  const params = new URLSearchParams()
+  for (const [k, v] of Object.entries(query)) {
+    if (v !== undefined && v !== null && v !== '') params.set(k, String(v))
+  }
+  const data = await environmentsRequest(`/catalog?${params}`, options)
+  return data.genomes || []
+}
+
 // Environment names: lowercase letters, digits and dashes, at most 63.
 export const ENVIRONMENT_NAME = /^[a-z0-9][a-z0-9-]{0,62}$/
 

@@ -29,6 +29,18 @@ describe("toInterfaceDefinition", () => {
     expect(def.processors[0].inputs).toEqual([{ from: "signals", input: "data" }]);
   });
 
+  it("saves a reference source's chosen reference as the input's default", () => {
+    const def = toInterfaceDefinition(canvas, {
+      nameOf: (id) => names[id],
+      extrasOf: (id) => (id === "node_1_abc" ? { optional: true, referenceId: "50e2981e" } : {}),
+    });
+    expect(def.inputs).toEqual([{
+      id: "signals", name: "Signals", optional: true,
+      default: { kind: "reference", environmentId: "50e2981e" },
+      position: { x: 0, y: 0 },
+    }]);
+  });
+
   it("keeps ids it didn't generate, and tells same names apart", () => {
     const two = [
       { id: "files", type: "data-source", dependsOn: [] },
