@@ -36,6 +36,7 @@ import RunExampleAction from "./RunExampleAction.vue";
 import PublicFilesPicker from "./PublicFilesPicker.vue";
 import { picksKey } from "./publicPicks";
 import IoPill from "../WorkflowGraph/IoPill.vue";
+import { warningHeadline } from "./runDetails";
 import { withInterfaceNodes, destinationChoices, NO_DESTINATION } from "./workflowInterface";
 import { placeRunNodes, workflowLayouts } from "./runLayout";
 import { importStatusUrl, importSummary, importStillMoving, isDatasetImport } from "./runImports";
@@ -668,6 +669,8 @@ const targetSubOf = (id, data) => {
     const t = nodeConfigs[id]?.targetType;
     return t ? `to ${getTargetTypeLabel(t, targetTypes.value)}` : "";
   }
+  // A target that worked with nothing to save says so instead.
+  if (data.warning) return `⚠ ${warningHeadline(data.warning)}`;
   return importLineOf(id)?.text || targetFacts(data).join(" · ") || getTargetTypeLabel(data.targetType, targetTypes.value);
 };
 
@@ -777,6 +780,7 @@ const runToNodesAndEdges = (run) => {
         completedAt: d.completedAt,
         progress: d.progress || null,
         errorMessage: d.errorMessage || "",
+        warning: d.warning || "",
         reason: d.reason || null,
         exitCode: d.exitCode ?? null,
         cpuUnits: d.cpuUnits || null,
@@ -3203,6 +3207,10 @@ onUnmounted(() => {
                   <span class="info-label">Why</span>
                   <span class="info-value">{{ failureSummary(selectedNode.data) }}</span>
                 </div>
+                <div v-if="selectedNode.data?.warning" class="info-row node-warning">
+                  <span class="info-label">Note</span>
+                  <span class="info-value">{{ selectedNode.data.warning }}</span>
+                </div>
                 <div v-if="selectedNode.data?.cpuUnits && selectedNode.data?.memoryMiB" class="info-row">
                   <span class="info-label">Ran with</span>
                   <span class="info-value">{{ (selectedNode.data.cpuUnits / 1024).toFixed(1) }} vCPU, {{ selectedNode.data.memoryMiB }} MiB</span>
@@ -4572,6 +4580,11 @@ onUnmounted(() => {
 }
 
 /* Chosen files a source's inputs don't take, in its panel. */
+// A step that worked, with something to know (its warning).
+.node-warning .info-value {
+  color: #92400e;
+}
+
 .files-mismatch {
   margin: 0 0 8px;
   padding: 8px 10px;
