@@ -2,7 +2,7 @@
 // A compute node's page, in a workspace (/:orgId/analysis/compute-nodes/:nodeId)
 // or in My Workspace (/my-workspace/compute-nodes/:nodeId), which has no
 // orgId. A header (name, status, where it runs) over tabs like the other
-// Analysis pages': Overview, Access, Settings, Reference data and Advanced.
+// Analysis pages': Overview, Access, Settings and Advanced.
 // The tab is in the URL (?tab=); older section links (#quotas) land on the
 // tab that section is on.
 import { ref, computed, onMounted, nextTick } from 'vue'
@@ -17,7 +17,6 @@ import ComputeNodeAccess from './ComputeNodeAccess.vue'
 import ComputeNodeAllowedApps from './ComputeNodeAllowedApps.vue'
 import ComputeNodeAdvanced from './ComputeNodeAdvanced.vue'
 import ComputeNodeSecrets from './ComputeNodeSecrets.vue'
-import ComputeNodeLayers from './ComputeNodeLayers.vue'
 import ComputeNodeLLMBudget from './ComputeNodeLLMBudget.vue'
 import ComputeNodePipelineBudget from './ComputeNodePipelineBudget.vue'
 import AnalysisViewBar from '../AnalysisViewBar.vue'
@@ -226,10 +225,6 @@ const STATUS_TEXT = { Enabled: 'Running', Paused: 'Paused', Pending: 'Setting up
           </p>
         </template>
       </div>
-
-      <section v-else-if="tab === 'reference-data'" id="reference-data" class="cn-section">
-        <ComputeNodeLayers :node-id="nodeUuid" :is-owner="isNodeOwner" />
-      </section>
 
       <ComputeNodeAdvanced
         v-else-if="tab === 'advanced'"
