@@ -37,6 +37,7 @@ import { picksKey } from "./publicPicks";
 import FilePlacementChoice from "./FilePlacementChoice.vue";
 import { FILE_PATHS_SELECTION, FILE_PATHS_SOURCE, filePathsOf, filePathsField, sharedNames } from "./inputFilePaths";
 import IoPill from "../WorkflowGraph/IoPill.vue";
+import { warningHeadline } from "./runDetails";
 import { withInterfaceNodes, destinationChoices, NO_DESTINATION } from "./workflowInterface";
 import { importStatusUrl, importSummary, importStillMoving, isDatasetImport } from "./runImports";
 import { nodeUnfit, rememberedSetup, rememberSetup, defaultNode, needsDataset } from "./runSetup";
@@ -653,6 +654,8 @@ const targetSubOf = (id, data) => {
     const t = nodeConfigs[id]?.targetType;
     return t ? `to ${getTargetTypeLabel(t, targetTypes.value)}` : "";
   }
+  // A target that worked with nothing to save says so instead.
+  if (data.warning) return `⚠ ${warningHeadline(data.warning)}`;
   return importLineOf(id)?.text || targetFacts(data).join(" · ") || getTargetTypeLabel(data.targetType, targetTypes.value);
 };
 
@@ -759,6 +762,7 @@ const runToNodesAndEdges = (run) => {
         completedAt: d.completedAt,
         progress: d.progress || null,
         errorMessage: d.errorMessage || "",
+        warning: d.warning || "",
         ...extra,
       },
       position: hasSavedPositions && d.position && typeof d.position.x === "number"
@@ -3131,6 +3135,10 @@ onUnmounted(() => {
                     {{ statusLabel(selectedNode.data?.status) }}
                   </span>
                 </div>
+                <div v-if="selectedNode.data?.warning" class="info-row node-warning">
+                  <span class="info-label">Note</span>
+                  <span class="info-value">{{ selectedNode.data.warning }}</span>
+                </div>
                 <div v-if="selectedNode.data?.processorType" class="info-row">
                   <span class="info-label">Type</span>
                   <span class="info-value">{{ selectedNode.data.processorType }}</span>
@@ -4424,6 +4432,11 @@ onUnmounted(() => {
 @keyframes strip-pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.25; }
+}
+
+// A step that worked, with something to know (its warning).
+.node-warning .info-value {
+  color: #92400e;
 }
 
 /* Chosen files a source's inputs don't take, in its panel. */

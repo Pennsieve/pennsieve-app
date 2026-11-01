@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { fetchRunCost, clearRunCosts, costParts } from "./runDetails";
+import { fetchRunCost, clearRunCosts, costParts, warningHeadline } from "./runDetails";
 
 const getToken = () => Promise.resolve("tok");
 const ok = (body) => ({ ok: true, json: () => Promise.resolve(body) });
@@ -30,5 +30,20 @@ describe("costParts", () => {
       { label: "Data transfer", cost: 0.01 },
     ]);
     expect(costParts({})).toEqual([]);
+  });
+});
+
+describe("warningHeadline", () => {
+  it("keeps the part before the colon", () => {
+    expect(warningHeadline("Nothing to import: the steps before this target produced no files.")).toBe("Nothing to import");
+  });
+  it("is empty without a warning", () => {
+    expect(warningHeadline("")).toBe("");
+    expect(warningHeadline(undefined)).toBe("");
+  });
+  it("cuts a long one", () => {
+    const h = warningHeadline("x".repeat(60));
+    expect(h).toHaveLength(40);
+    expect(h.endsWith("…")).toBe(true);
   });
 });
