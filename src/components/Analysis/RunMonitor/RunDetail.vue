@@ -37,6 +37,7 @@ import PublicFilesPicker from "./PublicFilesPicker.vue";
 import { picksKey } from "./publicPicks";
 import IoPill from "../WorkflowGraph/IoPill.vue";
 import { withInterfaceNodes, destinationChoices, NO_DESTINATION } from "./workflowInterface";
+import { appOf, appRunLabel, appRunPayload, appStepId, setupKey } from "./appRuns";
 import { placeRunNodes, workflowLayouts } from "./runLayout";
 import { importStatusUrl, importSummary, importStillMoving, isDatasetImport } from "./runImports";
 import { nodeUnfit, rememberedSetup, rememberSetup, defaultNode, needsDataset } from "./runSetup";
@@ -357,6 +358,9 @@ const runWorkflowName = computed(() => {
   const activity = selectedWorkflowActivity.value;
   return activity?.workflowName || "";
 });
+
+// The app an app run ran (no workflow), or null.
+const runApp = computed(() => selectedWorkflowActivity.value?.app || null);
 
 const runName = computed(() => {
   const activity = selectedWorkflowActivity.value;
@@ -992,9 +996,13 @@ onPaneClick(() => {
 /*
   Configure mode — initiate workflow from pending config
 */
+// The app an app run ("Try this app") runs, or null for a workflow's run.
+const configApp = ref(null);
+
 const initiateWorkflowFromConfig = async (pendingConfig) => {
   const { workflowId, computeNodeId, datasetId, rerunSource: source } = pendingConfig;
-  initiateForm.value = { workflowId, computeNodeId, datasetId, name: "" };
+  configApp.value = appOf(pendingConfig) || appOf(source);
+  initiateForm.value = { workflowId: workflowId || "", computeNodeId, datasetId, name: "" };
   runNameError.value = "";
   // Preserve any data layers from the source run so the rerun re-attaches them.
   configLayers.value = Array.isArray(source?.layers) ? [...source.layers] : [];
@@ -1002,7 +1010,12 @@ const initiateWorkflowFromConfig = async (pendingConfig) => {
   try {
     // A workflow's inputs and outputs shown as the source and target nodes a
     // run of it has (workflowInterface.js); its DAG as is otherwise.
-    const definition = withInterfaceNodes(await store.dispatch("analysisModule/fetchWorkflowDefinition", workflowId));
+    // An app run's is the app's one-step workflow (appRuns.js).
+    const definition = withInterfaceNodes(
+      configApp.value
+        ? await store.dispatch("analysisModule/fetchAppRunDefinition", configApp.value)
+        : await store.dispatch("analysisModule/fetchWorkflowDefinition", workflowId)
+    );
     configDefinition.value = definition;
 
     Object.keys(dataSourceFiles).forEach((k) => delete dataSourceFiles[k]);
@@ -1117,9 +1130,11 @@ const initiateWorkflowFromConfig = async (pendingConfig) => {
   }
 };
 
-const cancelConfigure = () => {
+// Leaves configure mode: the form and its graph cleared.
+const leaveConfigure = () => {
   mode.value = "browse";
   configDefinition.value = null;
+  configApp.value = null;
   configLayers.value = [];
   Object.keys(dataSourceFiles).forEach((k) => delete dataSourceFiles[k]);
   Object.keys(publicPicks).forEach((k) => delete publicPicks[k]);
@@ -1128,6 +1143,10 @@ const cancelConfigure = () => {
   nodes.value = [];
   edges.value = [];
   selectedNode.value = null;
+};
+
+const cancelConfigure = () => {
+  leaveConfigure();
   router.push(scopedRoute("runs"));
 };
 
@@ -1306,11 +1325,24 @@ const executeWorkflow = async () => {
       ...(configLayers.value.length > 0 && { layers: configLayers.value }),
     };
 
-    await store.dispatch("analysisModule/createRun", payload);
-    rememberSetup(route.params.orgId || "", initiateForm.value.workflowId, { ...initiateForm.value, datasetId: runDatasetId.value });
-    EventBus.$emit("toast", { detail: { type: "success", msg: "Workflow executed successfully." } });
-
-    router.push(scopedRoute("runs"));
+    const app = configApp.value;
+    const sent = app ? appRunPayload(payload, app, appStepId(configDefinition.value)) : payload;
+    const created = await store.dispatch("analysisModule/createRun", sent);
+    rememberSetup(route.params.orgId || "", setupKey({ workflowId: initiateForm.value.workflowId, app }), {
+      ...initiateForm.value,
+      datasetId: runDatasetId.value,
+    });
+    // The new run's page, where it's followed live (and an app run's results
+    // arrive); the runs list if the response named no run.
+    const msg = app
+      ? `${appRunLabel(app)} is running. Its results appear here when it finishes.`
+      : "The run has started.";
+    EventBus.$emit("toast", { detail: { type: "success", msg } });
+    if (created?.executionRunId) {
+      router.push(scopedRoute("run-detail", { runId: created.executionRunId }));
+    } else {
+      router.push(scopedRoute("runs"));
+    }
   } catch (err) {
     console.error("Failed to execute workflow:", err);
     const msg = err?.message || "Failed to execute workflow.";
@@ -1951,6 +1983,8 @@ const rerunFromRun = async () => {
   if (!activity) return;
   store.commit("analysisModule/SET_PENDING_RUN_CONFIG", {
     workflowId: activity.workflowUuid || "",
+    // An app run runs its app again.
+    ...(appOf(activity) && { app: appOf(activity) }),
     computeNodeId: activity.computeNodeUuid || "",
     datasetId: activity.datasetId || "",
     rerunSource: activity,
@@ -2030,7 +2064,10 @@ const ensureDatasetOption = async (datasetId) => {
 };
 
 function applySetupDefaults(definition) {
-  const remembered = rememberedSetup(route.params.orgId || "", definition?.uuid || initiateForm.value.workflowId);
+  const remembered = rememberedSetup(
+    route.params.orgId || "",
+    configApp.value ? setupKey({ app: configApp.value }) : definition?.uuid || initiateForm.value.workflowId
+  );
   if (!initiateForm.value.computeNodeId) {
     initiateForm.value.computeNodeId = defaultNode("", remembered.computeNodeId, computeNodes.value, (n) => unfitReasons(n).length === 0);
   }
@@ -2231,6 +2268,18 @@ onMounted(async () => {
 
 });
 
+// Another run on the same page (the router reuses it, e.g. configure → the
+// run just started, or one run → another): show that run, live.
+watch(
+  () => props.runId,
+  async (runId, before) => {
+    if (!runId || runId === before) return;
+    if (mode.value === "configure") leaveConfigure();
+    await loadRun(runId);
+    scheduleRunPoll();
+  }
+);
+
 // Handle same-component navigation (e.g. run-detail → run-configure)
 watch(
   () => route.name,
@@ -2277,7 +2326,7 @@ onUnmounted(() => {
             :disabled="isExecuting"
             @click="executeWorkflow"
           >
-            {{ isExecuting ? 'Executing...' : 'Execute Workflow' }}
+            {{ isExecuting ? 'Executing...' : configApp ? 'Run app' : 'Execute Workflow' }}
           </bf-button>
         </div>
       </template>
@@ -3055,12 +3104,20 @@ onUnmounted(() => {
                     Up to {{ RUN_NAME_MAX_LENGTH }} characters — letters, numbers, spaces, hyphens, underscores, periods.
                   </span>
                 </div>
-                <div class="info-row">
+                <div v-if="configApp" class="info-row">
+                  <span class="info-label">App</span>
+                  <span class="info-value">{{ appRunLabel(configApp) }}</span>
+                </div>
+                <div v-else class="info-row">
                   <span class="info-label">Workflow</span>
                   <span class="info-value">{{ configDefinition?.name || 'N/A' }}</span>
                 </div>
+                <p v-if="configApp" class="app-run-note">
+                  A one-off run of the app on the files you pick. Everything it writes comes back as a zip to
+                  download, here and on your Downloads page, for 3 days. Nothing is saved to a dataset.
+                </p>
                 <p v-if="needsDatasetHere" class="run-name-error">
-                  This workflow reads from or writes to a dataset, so it runs in a workspace, not in My Workspace.
+                  This {{ configApp ? "run" : "workflow" }} reads from or writes to a dataset, so it runs in a workspace, not in My Workspace.
                 </p>
                 <div class="info-row info-row-stacked">
                   <label class="info-label" for="setup-node">Compute node</label>
@@ -3309,6 +3366,20 @@ onUnmounted(() => {
                       {{ runWorkflowName }}
                     </router-link>
                     <span v-else class="truncate-text" :title="runWorkflowName">{{ runWorkflowName }}</span>
+                  </span>
+                </div>
+                <div v-if="runApp" class="info-row">
+                  <span class="info-label">App</span>
+                  <span class="info-value truncate-value">
+                    <router-link
+                      v-if="runApp.applicationId"
+                      :to="scopedRoute('application-detail', { uuid: runApp.applicationId })"
+                      :title="appRunLabel(runApp)"
+                      class="truncate-text"
+                    >
+                      {{ appRunLabel(runApp) }}
+                    </router-link>
+                    <span v-else class="truncate-text" :title="appRunLabel(runApp)">{{ appRunLabel(runApp) }}</span>
                   </span>
                 </div>
                 <div v-if="selectedWorkflowActivity.datasetId" class="info-row">
@@ -5483,5 +5554,12 @@ onUnmounted(() => {
   margin: 0 0 8px;
   font-size: 13px;
   color: #6b7280;
+}
+
+.app-run-note {
+  margin: 4px 0 8px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: theme.$gray_5;
 }
 </style>
