@@ -1102,7 +1102,7 @@ variants:
   })
 })
 
-describe('review, references and relations (kept, not edited)', () => {
+describe('review, relations and reference inputs (kept, not edited)', () => {
   const yaml = `
 application:
   name: rnaseq-quant
@@ -1110,17 +1110,21 @@ application:
     10.1038/nmeth.4197: IsDerivedFrom
 runtime:
   computeTypes: [standard]
+inputs:
+  - name: reads
+    placement: subfolder
+  - name: index
+    placement: subfolder
+    reference:
+      kind: genome
+      assetClass: salmon-index
+      toolVersion: ">=2 <3"
+      choice: user
+      organisms: [9606, 10090]
 review:
   version: 1
   generate:
     command: python -m tests.make_fixture "$REVIEW_INPUT_DIR"
-references:
-  - name: SALMON_INDEX
-    kind: genome
-    assetClass: salmon-index
-    toolVersion: ">=2 <3"
-    choice: user
-    organisms: [9606, 10090]
 `
 
   it('reads them as they are and writes them back', () => {
@@ -1128,15 +1132,15 @@ references:
     const { meta, schema } = parseManifest(yaml)
     const again = loadYaml(manifestToYaml(buildManifest(schema, meta)))
     expect(again.review).toEqual(doc.review)
-    expect(again.references).toEqual(doc.references)
     expect(again.application.relations).toEqual(doc.application.relations)
+    expect(again.inputs[1].reference).toEqual(doc.inputs[1].reference)
+    expect(again.inputs[0]).not.toHaveProperty('reference')
   })
 
   it('writes none when the app.yml has none', () => {
     const { meta, schema } = parseManifest('application:\n  name: a\n')
     const out = buildManifest(schema, meta)
     expect(out).not.toHaveProperty('review')
-    expect(out).not.toHaveProperty('references')
     expect(out.application).not.toHaveProperty('relations')
   })
 })

@@ -50,12 +50,7 @@
       "deprecated": true,
       "description": "Deprecated and not read from app.yml."
     },
-    "review": { "$ref": "#/$defs/review" },
-    "references": {
-      "type": "array",
-      "description": "Shared, published data the app needs besides its inputs, such as a genome index: described by public identifiers and where to get it, so the app isn't tied to one platform. The processor reads each from a folder path in the variable it names. On Pennsieve each resolves to a reference in the catalog (checked on registration); elsewhere, mount a copy and set the variable. See https://github.com/Pennsieve/app-deploy-service/blob/main/docs/app-manifest-references.md.",
-      "items": { "$ref": "#/$defs/reference" }
-    }
+    "review": { "$ref": "#/$defs/review" }
   },
   "$defs": {
     "application": {
@@ -383,6 +378,7 @@
           "default": "root",
           "description": "Where an input's data is placed. root (the default): at the root of INPUT_DIR. subfolder: in its own folder, INPUT_DIR/<name>/, so inputs that would collide (two BIDS trees) stay apart; the name must then be folder-safe (lowercase letters, numbers, dashes). Inputs of different media types can share the root (the app tells them apart by type); inputs that share a type, take any file, or are a layout need their own folders."
         },
+        "reference": { "$ref": "#/$defs/portReference" },
         "required": { "type": "boolean", "description": "For an input: whether a run must give it something. For an output: false when a run may leave it empty (e.g. a section only made for some inputs); outputs are otherwise expected to receive files, which a review checks." },
         "dataType": {
           "type": "string",
@@ -396,18 +392,12 @@
         }
       }
     },
-    "reference": {
+    "portReference": {
       "type": "object",
-      "description": "One reference the app reads. choice: app pins one (by assembly or seqcol, and annotation); choice: user lets a run pick among the matching ones (optionally of the given organisms), with a default.",
+      "description": "An input filled from Pennsieve's reference catalog: shared, published data such as a genome index, described by public identifiers so the app isn't tied to one platform. A run's reference source fills it (the app's default when the workflow has none); the reference is unpacked into the input's folder. choice: app pins one (by assembly or seqcol, and annotation); choice: user lets a run pick among the matching ones (optionally of the given organisms), with a default. Elsewhere, put a copy in the input's folder. See https://github.com/Pennsieve/app-deploy-service/blob/main/docs/app-manifest-references.md.",
       "additionalProperties": false,
-      "required": ["name", "kind", "assetClass", "choice"],
+      "required": ["kind", "assetClass", "choice"],
       "properties": {
-        "name": {
-          "type": "string",
-          "pattern": "^[A-Z][A-Z0-9_]*$",
-          "description": "The environment variable the processor reads: the reference's folder path."
-        },
-        "description": { "type": "string", "description": "What the app uses it for." },
         "kind": { "type": "string", "enum": ["genome"], "description": "genome: a genome asset, such as a FASTA or an aligner index." },
         "assetClass": {
           "type": "string",
