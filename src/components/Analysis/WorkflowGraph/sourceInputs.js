@@ -36,7 +36,7 @@ export function sourceHints(sourceId, steps, portsOf) {
       return {
         step,
         input,
-        types: [...new Set((port.mediaTypes || []).map(shortMediaType))],
+        types: [...new Set([...(port.mediaTypes || []).map(shortMediaType), ...(port.formats || []).map((f) => EDAM_TYPES[f]).filter(Boolean)])],
         layout: layout.length ? String(layout[layout.length - 1]).split("@")[0].toUpperCase() : "",
         description: port.description || "",
       };
@@ -78,9 +78,23 @@ export function missingFilesMessage(missingIds, dag) {
   return `Select files for ${n === 1 ? "data source" : `${n} data sources`}`;
 }
 
+// EDAM formats (app.yml formats) by the names files' extensions give them,
+// for the scientific formats without a media type; others can't be checked.
+const EDAM_TYPES = {
+  format_1930: "FASTQ",
+  format_1929: "FASTA",
+  format_2572: "BAM",
+  format_2573: "SAM",
+  format_3016: "VCF",
+};
+// Extensions of those formats, compressed or not (reads.fastq.gz is FASTQ).
+const FORMAT_EXTENSIONS = { fastq: "FASTQ", fq: "FASTQ", fasta: "FASTA", fa: "FASTA", fna: "FASTA", bam: "BAM", sam: "SAM", vcf: "VCF" };
+
 // A file's type as the input hints name types ("CSV", "JSON", "NIFTI"), from
 // its extension; a few extensions differ from their media type's name.
 const EXTENSION_TYPES = {
+  gz: "GZIP",
+  xlsx: "SHEET",
   nii: "NIFTI",
   "nii.gz": "NIFTI",
   tif: "TIFF",
@@ -102,6 +116,16 @@ export function fileShortType(name) {
   return EXTENSION_TYPES[ext] || ext.toUpperCase();
 }
 
+// Every type a file may be taken as: its own (fileShortType), and for a
+// compressed file the format inside ("reads.fastq.gz": GZIP and FASTQ).
+export function fileShortTypes(name) {
+  const parts = String(name || "").toLowerCase().split(".");
+  const types = new Set([fileShortType(name)]);
+  if (parts.length > 2 && parts[parts.length - 1] === "gz") parts.pop();
+  if (parts.length >= 2 && FORMAT_EXTENSIONS[parts[parts.length - 1]]) types.add(FORMAT_EXTENSIONS[parts[parts.length - 1]]);
+  return [...types].filter(Boolean);
+}
+
 // The chosen files a source's inputs don't take, by what they take (its
 // hints): { names, expected: "JSON" }, or null when they all fit, when an
 // input takes any file or a folder layout, or when its app declares no types
@@ -109,7 +133,7 @@ export function fileShortType(name) {
 export function fileTypeMismatches(fileNames, hints) {
   const accepted = acceptedFileTypes(hints);
   if (!accepted) return null;
-  const names = (fileNames || []).filter((n) => !accepted.has(fileShortType(n)));
+  const names = (fileNames || []).filter((n) => !fileShortTypes(n).some((t) => accepted.has(t)));
   return names.length ? { names, expected: [...accepted].join(" or ") } : null;
 }
 

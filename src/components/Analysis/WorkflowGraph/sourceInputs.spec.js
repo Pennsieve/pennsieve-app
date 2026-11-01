@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { inputsFedBy, sourceLabel, sourceHints, hintLine, portsOfStep, missingFilesMessage, fileShortType, fileTypeMismatches, acceptedFileTypes, linkHints } from "./sourceInputs";
+import { inputsFedBy, sourceLabel, sourceHints, hintLine, portsOfStep, missingFilesMessage, fileShortType, fileShortTypes, fileTypeMismatches, acceptedFileTypes, linkHints } from "./sourceInputs";
 
 // Four sources into test-ports-processor: two linked to its inputs, two to
 // "all inputs".
@@ -72,6 +72,11 @@ describe("file types against an input", () => {
     expect(fileShortType("scan.nii.gz")).toBe("NIFTI");
     expect(fileShortType("x.JSON")).toBe("JSON");
     expect(fileShortType("README")).toBe("");
+    // A compressed file is GZIP, and the format inside when it's known.
+    expect(fileShortTypes("test_rnaseq_1.fastq.gz")).toEqual(["GZIP", "FASTQ"]);
+    expect(fileShortTypes("reads.fq")).toEqual(["FQ", "FASTQ"]);
+    expect(fileShortTypes("samples.xlsx")).toEqual(["SHEET"]);
+    expect(fileShortTypes("scan.nii.gz")).toEqual(["NIFTI"]);
   });
 
   it("finds the files an input doesn't take", () => {
@@ -114,5 +119,26 @@ describe("acceptedFileTypes", () => {
     expect(acceptedFileTypes([{ types: ["CSV"], layout: "BIDS" }])).toBeNull();
     expect(acceptedFileTypes([{ types: ["Any"] }])).toBeNull();
     expect(acceptedFileTypes([])).toBeNull();
+  });
+});
+
+// rnaseq-quant's reads input: gzip, CSV and spreadsheet media types plus the
+// FASTQ EDAM format. Its FASTQs, compressed or not, and its sample sheets fit.
+describe("an input's media types and EDAM formats", () => {
+  const reads = {
+    name: "reads",
+    mediaTypes: ["application/gzip", "text/csv", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"],
+    formats: ["format_1930"],
+  };
+  const dag = [{ id: "quant", inputs: [{ from: "src", input: "reads" }] }];
+  const hints = sourceHints("src", dag, () => ({ inputs: [reads] }));
+
+  it("names them all", () => {
+    expect(hints[0].types).toEqual(["GZIP", "CSV", "SHEET", "FASTQ"]);
+  });
+
+  it("takes FASTQs and sample sheets", () => {
+    expect(fileTypeMismatches(["test_rnaseq_1.fastq.gz", "a_R2.fq.gz", "b.fastq", "samples.csv", "samples.xlsx"], hints)).toBeNull();
+    expect(fileTypeMismatches(["notes.pdf"], hints)).toEqual({ names: ["notes.pdf"], expected: "GZIP or CSV or SHEET or FASTQ" });
   });
 });
