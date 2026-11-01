@@ -18,7 +18,6 @@ import { useGetToken } from "@/composables/useGetToken";
 import { useSendXhr } from "@/mixins/request/request_composable";
 import { useMetricsCounters } from "@/composables/useMetricsCounters";
 import toQueryParams from "@/utils/toQueryParams";
-import LayerNameSelector from "./LayerNameSelector.vue";
 import TargetDatasetField from "./TargetDatasetField.vue";
 import { targetWritesToDataset, targetParamFields, buildDataTargets, targetDatasetId, datasetName } from "./dataTargets";
 import { validateRunName, runDisplayName, RUN_NAME_MAX_LENGTH, targetTypeName,
@@ -2202,13 +2201,7 @@ onUnmounted(() => {
                       <span v-if="param.required" class="target-param-required">required</span>
                     </div>
                     <div v-if="param.description" class="target-param-description">{{ param.description }}</div>
-                    <LayerNameSelector
-                      v-if="nodeConfigs[selectedNode.id].targetType === 'persistent-layer' && param.name === 'layerName'"
-                      v-model="param.value"
-                      :compute-node-id="initiateForm.computeNodeId"
-                    />
                     <el-input
-                      v-else
                       v-model="param.value"
                       size="small"
                       :placeholder="param.required ? 'Required' : 'Optional'"
