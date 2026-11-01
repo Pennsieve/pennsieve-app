@@ -1101,3 +1101,42 @@ variants:
     expect(buildManifest(schema, { ...meta, variants: [], build: null })).not.toHaveProperty('variants')
   })
 })
+
+describe('review, references and relations (kept, not edited)', () => {
+  const yaml = `
+application:
+  name: rnaseq-quant
+  relations:
+    10.1038/nmeth.4197: IsDerivedFrom
+runtime:
+  computeTypes: [standard]
+review:
+  version: 1
+  generate:
+    command: python -m tests.make_fixture "$REVIEW_INPUT_DIR"
+references:
+  - name: SALMON_INDEX
+    kind: genome
+    assetClass: salmon-index
+    toolVersion: ">=2 <3"
+    choice: user
+    organisms: [9606, 10090]
+`
+
+  it('reads them as they are and writes them back', () => {
+    const doc = loadYaml(yaml)
+    const { meta, schema } = parseManifest(yaml)
+    const again = loadYaml(manifestToYaml(buildManifest(schema, meta)))
+    expect(again.review).toEqual(doc.review)
+    expect(again.references).toEqual(doc.references)
+    expect(again.application.relations).toEqual(doc.application.relations)
+  })
+
+  it('writes none when the app.yml has none', () => {
+    const { meta, schema } = parseManifest('application:\n  name: a\n')
+    const out = buildManifest(schema, meta)
+    expect(out).not.toHaveProperty('review')
+    expect(out).not.toHaveProperty('references')
+    expect(out.application).not.toHaveProperty('relations')
+  })
+})

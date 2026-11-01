@@ -744,6 +744,7 @@ export const buildManifest = (schema, meta = {}) => {
 
   const mTags = asArray(s.tags).map(str).filter(Boolean);
   if (mTags.length) application.tags = mTags;
+  if (isPlainObject(meta.relations)) application.relations = clone(meta.relations);
 
   if (Object.keys(application).length) manifest.application = application;
 
@@ -766,8 +767,8 @@ export const buildManifest = (schema, meta = {}) => {
     if (runtime.sessionType === "jupyter") runtime.kernel = s.runtime.kernel || "python";
   }
   manifest.runtime = runtime;
-  // Blocks the form doesn't edit (build, variants) are written back as they
-  // were read (parseManifest's meta.build, meta.variants).
+  // Blocks the form doesn't edit (build, variants, review, references) are
+  // written back as they were read (parseManifest's meta).
   if (isPlainObject(meta.build)) manifest.build = clone(meta.build);
 
   const mParams = asArray(s.parameters).filter((p) => (p.name || "").trim());
@@ -778,6 +779,8 @@ export const buildManifest = (schema, meta = {}) => {
   if (mInputs.length) manifest.inputs = mInputs.map(manifestPort);
   if (mOutputs.length) manifest.outputs = mOutputs.map(manifestPort);
   if (asArray(meta.variants).length) manifest.variants = clone(meta.variants);
+  if (isPlainObject(meta.review)) manifest.review = clone(meta.review);
+  if (asArray(meta.references).length) manifest.references = clone(meta.references);
 
   return manifest;
 };
@@ -918,9 +921,13 @@ export const parseManifest = (source) => {
       typeof runtime.timeoutSeconds === "number" ? runtime.timeoutSeconds : null,
     shape: earlier ? MANIFEST_SHAPES.FLAT : MANIFEST_SHAPES.NESTED,
     // Not edited by the form, kept as they are so buildManifest writes them
-    // back: how the image is built, and the app's variants.
+    // back: how the image is built, the app's variants, how a release is
+    // reviewed, the references it reads, and its CITATION.cff relations.
     ...(!earlier && isPlainObject(manifest.build) && { build: manifest.build }),
     ...(!earlier && Array.isArray(manifest.variants) && manifest.variants.length && { variants: manifest.variants }),
+    ...(!earlier && isPlainObject(manifest.review) && { review: manifest.review }),
+    ...(!earlier && Array.isArray(manifest.references) && manifest.references.length && { references: manifest.references }),
+    ...(!earlier && isPlainObject(app.relations) && { relations: app.relations }),
   };
 
   const schema = earlier
