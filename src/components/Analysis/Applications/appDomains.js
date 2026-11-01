@@ -5,129 +5,18 @@
 // and punctuation. An app whose tags match none is grey: a colour always
 // means a domain. The same tags also name research fields (FIELDS, below),
 // which filter but never colour.
+//
+// The table itself is app-domains v1 (app-domains.v1.json, a copy of
+// app-deploy-service's lambda/service/appdomains/app-domains.v1.json, published
+// at https://schemas.pennsieve.io/app-domains/v1.json): github-service draws
+// the same banner for an app's Discover page from it, so the two match.
 import { versionManifest, shortMediaType, sessionTypeOf } from "../WorkflowBuilder/appManifestInfo";
+import APP_DOMAINS from "./app-domains.v1.json";
 
 // A domain is a subject (what the app is about: EEG, imaging, genomics…) or
 // a task (what it does with it: visualization, conversion, statistics…).
 // The icon is an SVG path on a 24×24 grid, drawn as a stroke.
-export const DOMAINS = [
-  {
-    key: "ephys",
-    subject: true,
-    label: "Electrophysiology",
-    tag: "electrophysiology",
-    hue: 245,
-    aliases: ["eeg", "ieeg", "seeg", "ecog", "ephys", "lfp", "emg", "ecg", "ekg", "meg", "neurophysiology", "edf", "signal-processing", "time-series", "timeseries"],
-    icon: "M2 12h4l2-6 4 12 3-9 2 3h5",
-  },
-  {
-    key: "spikes",
-    subject: true,
-    label: "Spike sorting",
-    tag: "spike-sorting",
-    hue: 340,
-    aliases: ["spikes", "spike", "spike-detection", "single-unit", "kilosort"],
-    icon: "M3 18h18M6 18V8M10 18v-6M14 18V4M18 18v-8",
-  },
-  {
-    key: "imaging",
-    subject: true,
-    label: "Imaging",
-    tag: "imaging",
-    hue: 185,
-    aliases: ["image", "images", "neuroimaging", "microscopy", "mri", "fmri", "ct", "pet", "dicom", "nifti", "histology", "segmentation", "registration", "calcium-imaging", "image-processing"],
-    icon: "M4 5h16v14H4zM4 16l5-5 4 4 2-2 5 5M15.5 9.5h.01",
-  },
-  {
-    key: "genomics",
-    subject: true,
-    label: "Genomics",
-    tag: "genomics",
-    hue: 135,
-    aliases: ["sequencing", "rna-seq", "rnaseq", "scrna-seq", "dna", "rna", "omics", "transcriptomics", "proteomics", "genetics", "bioinformatics", "single-cell", "scrna", "seurat"],
-    icon: "M7 3c0 6 10 6 10 12s-10 6-10 6M17 3c0 6-10 6-10 12M9 7h6M9 17h6",
-  },
-  {
-    // Cells counted one by one as they flow past (or fly, in mass
-    // cytometry): a subject of its own, not imaging, though both see cells.
-    key: "cytometry",
-    subject: true,
-    label: "Cytometry",
-    tag: "cytometry",
-    // Magenta: the widest gap between the subjects' strong hues (indigo
-    // 245, crimson 340); the tasks near it (280, 315) are muted.
-    hue: 300,
-    aliases: ["flow-cytometry", "flow", "spectral-flow", "spectral-cytometry", "mass-cytometry", "cytof", "fcs", "immunophenotyping"],
-    // Three cells, each with a nucleus.
-    icon: "M4 9a4 4 0 1 0 8 0a4 4 0 1 0-8 0M8 9h.01M13 16a3 3 0 1 0 6 0a3 3 0 1 0-6 0M16 16h.01M4 18a2 2 0 1 0 4 0a2 2 0 1 0-4 0M18 5h.01",
-  },
-  {
-    key: "ml",
-    label: "Machine learning",
-    tag: "machine-learning",
-    hue: 280,
-    aliases: ["ml", "ai", "deep-learning", "neural-network", "llm", "classification", "prediction", "inference"],
-    // A small network in layers (3, 2, 1), left to right: not an X, which
-    // in a round badge reads as a close button.
-    icon: "M4 6h.01M4 12h.01M4 18h.01M12 9h.01M12 15h.01M20 12h.01M4 6l8 3M4 12l8-3M4 12l8 3M4 18l8-3M12 9l8 3M12 15l8-3",
-  },
-  {
-    key: "stats",
-    label: "Statistics",
-    tag: "statistics",
-    hue: 20,
-    aliases: ["stats", "analytics", "regression", "quantification"],
-    icon: "M4 20V10M10 20V4M16 20v-7M22 20H2",
-  },
-  {
-    key: "viz",
-    label: "Visualization",
-    tag: "visualization",
-    hue: 45,
-    aliases: ["viz", "visualisation", "plotting", "plots", "figures", "dashboard"],
-    icon: "M3 3v18h18M7 15l4-5 3 3 5-7",
-  },
-  {
-    key: "convert",
-    label: "Conversion",
-    tag: "conversion",
-    hue: 210,
-    aliases: ["convert", "converter", "format-conversion", "etl", "ingest", "ingestion", "bids"],
-    icon: "M4 8h14l-4-4M20 16H6l4 4",
-  },
-  {
-    key: "qc",
-    label: "Quality control",
-    tag: "quality-control",
-    hue: 85,
-    aliases: ["qc", "qa", "validation", "validate", "curation", "cleaning"],
-    icon: "M12 3l8 3v6c0 5-4 8-8 9-4-1-8-4-8-9V6zM8.5 12l2.5 2.5 4.5-5",
-  },
-  {
-    key: "preprocessing",
-    label: "Preprocessing",
-    tag: "preprocessing",
-    hue: 165,
-    aliases: ["preprocess", "pre-processing", "filtering", "filter", "denoising", "artifact-removal", "normalization", "resampling", "re-referencing"],
-    icon: "M3 5h18l-7 8v6l-4 2v-8z",
-  },
-  {
-    key: "report",
-    label: "Report",
-    tag: "report",
-    hue: 315,
-    aliases: ["reports", "reporting", "summary", "summarize", "pdf-report"],
-    icon: "M6 3h9l4 4v14H6zM14 3v5h5M9 13h7M9 17h5",
-  },
-  {
-    key: "notebook",
-    label: "Notebook",
-    tag: "notebook",
-    hue: 225,
-    aliases: ["notebooks", "interactive", "jupyter", "rstudio", "human-in-the-loop"],
-    icon: "M4 4h16v16H4zM8 10l3 2-3 2M13 15h4",
-  },
-];
+export const DOMAINS = APP_DOMAINS.domains;
 
 // "Spike Sorting", "spike_sorting", "spikesorting" -> "spikesorting".
 const normalize = (t) => String(t || "").toLowerCase().replace(/[^a-z0-9]/g, "");
@@ -156,38 +45,7 @@ export function domainOf(manifest) {
 // and Neuroscience. An app can have several fields, and they never colour
 // anything: a colour always means a domain. Some tags count for both axes
 // ("neuroimaging", "immunophenotyping"); each axis matches on its own.
-export const FIELDS = [
-  {
-    key: "neuroscience",
-    label: "Neuroscience",
-    tag: "neuroscience",
-    aliases: ["neuro", "neuroimaging", "neurology", "brain", "epilepsy", "neurophysiology", "cognitive-neuroscience"],
-  },
-  {
-    key: "immunology",
-    label: "Immunology",
-    tag: "immunology",
-    aliases: ["immune", "immune-health", "immunophenotyping", "immune-profiling", "immuno-oncology"],
-  },
-  {
-    key: "oncology",
-    label: "Oncology",
-    tag: "oncology",
-    aliases: ["cancer", "tumor", "tumour"],
-  },
-  {
-    key: "cardiology",
-    label: "Cardiology",
-    tag: "cardiology",
-    aliases: ["cardiac", "cardiovascular", "heart"],
-  },
-  {
-    key: "clinical",
-    label: "Clinical research",
-    tag: "clinical-research",
-    aliases: ["clinical", "clinical-trial", "clinical-trials"],
-  },
-];
+export const FIELDS = APP_DOMAINS.fields;
 
 const FIELD_BY_TAG = new Map();
 for (const f of FIELDS) for (const t of [f.tag, f.key, f.label, ...f.aliases]) FIELD_BY_TAG.set(normalize(t), f);
@@ -263,23 +121,17 @@ export function canonicalTag(tag) {
 // so what an app is about reads first. bg: the banner; tile: the app's tile;
 // ink: text and icons on them; line: chip borders and edges; accent: the
 // domain's mark elsewhere (a canvas step's strip, a filter chip's dot).
+const hsl = (h, { s, l }) => `hsl(${h}, ${s}%, ${l}%)`;
+const paletteOf = (h, p) => ({ bg: hsl(h, p.bg), tile: hsl(h, p.tile), ink: hsl(h, p.ink), line: hsl(h, p.line), accent: p.accent ? hsl(h, p.accent) : null });
+
 export function domainColors(domain) {
   if (!domain) return NEUTRAL_COLORS;
-  const h = domain.hue;
-  return domain.subject
-    ? { bg: `hsl(${h}, 65%, 96%)`, tile: `hsl(${h}, 60%, 88%)`, ink: `hsl(${h}, 55%, 30%)`, line: `hsl(${h}, 40%, 72%)`, accent: `hsl(${h}, 60%, 45%)` }
-    : { bg: `hsl(${h}, 30%, 96%)`, tile: `hsl(${h}, 28%, 88%)`, ink: `hsl(${h}, 30%, 32%)`, line: `hsl(${h}, 20%, 74%)`, accent: `hsl(${h}, 35%, 50%)` };
+  return paletteOf(domain.hue, domain.subject ? APP_DOMAINS.colors.subject : APP_DOMAINS.colors.task);
 }
 
 // An app with no domain is grey: a colour always means a domain. Its accent
 // is none, so a canvas step keeps the processor's own colour.
-export const NEUTRAL_COLORS = Object.freeze({
-  bg: "hsl(220, 12%, 96%)",
-  tile: "hsl(220, 10%, 89%)",
-  ink: "hsl(220, 9%, 35%)",
-  line: "hsl(220, 8%, 78%)",
-  accent: null,
-});
+export const NEUTRAL_COLORS = Object.freeze(paletteOf(APP_DOMAINS.colors.neutral.hue, APP_DOMAINS.colors.neutral));
 
 // The domain of an app (of a version, by tag), from its app.yml.
 export const appDomain = (app, tag) => domainOf(versionManifest(app, tag));
