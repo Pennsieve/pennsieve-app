@@ -439,6 +439,9 @@ const parsePort = (raw) =>
     container: raw?.container === "directory" || raw?.container === "file" ? raw.container : "",
     placement: raw?.placement === "root" || raw?.placement === "subfolder" ? raw.placement : "",
     cardinality: typeof raw?.cardinality === "string" ? raw.cardinality : "",
+    // Filled from Pennsieve's reference catalog: not edited by the form,
+    // kept as read so manifestPort writes it back.
+    ...(isPlainObject(raw?.reference) && { reference: raw.reference }),
   });
 
 /**
@@ -634,6 +637,7 @@ const manifestPort = (port) => {
   else if (structures.length > 1) out.conformsTo = structures;
   if (port.container === "directory" || port.container === "file") out.container = port.container;
   if (port.placement === "root" || port.placement === "subfolder") out.placement = port.placement;
+  if (isPlainObject(port.reference)) out.reference = clone(port.reference);
   if (port.required) out.required = true;
   return out;
 };
@@ -769,8 +773,8 @@ export const buildManifest = (schema, meta = {}) => {
     if (runtime.sessionType === "jupyter") runtime.kernel = s.runtime.kernel || "python";
   }
   manifest.runtime = runtime;
-  // Blocks the form doesn't edit (build, variants, review, references) are
-  // written back as they were read (parseManifest's meta).
+  // Blocks the form doesn't edit (build, variants, review) are written back
+  // as they were read (parseManifest's meta).
   if (isPlainObject(meta.build)) manifest.build = clone(meta.build);
 
   const mParams = asArray(s.parameters).filter((p) => (p.name || "").trim());
@@ -782,7 +786,6 @@ export const buildManifest = (schema, meta = {}) => {
   if (mOutputs.length) manifest.outputs = mOutputs.map(manifestPort);
   if (asArray(meta.variants).length) manifest.variants = clone(meta.variants);
   if (isPlainObject(meta.review)) manifest.review = clone(meta.review);
-  if (asArray(meta.references).length) manifest.references = clone(meta.references);
 
   return manifest;
 };
@@ -921,11 +924,10 @@ export const parseManifest = (source) => {
     shape: earlier ? MANIFEST_SHAPES.FLAT : MANIFEST_SHAPES.NESTED,
     // Not edited by the form, kept as they are so buildManifest writes them
     // back: how the image is built, the app's variants, how a release is
-    // reviewed, the references it reads, and its CITATION.cff relations.
+    // reviewed, and its CITATION.cff relations.
     ...(!earlier && isPlainObject(manifest.build) && { build: manifest.build }),
     ...(!earlier && Array.isArray(manifest.variants) && manifest.variants.length && { variants: manifest.variants }),
     ...(!earlier && isPlainObject(manifest.review) && { review: manifest.review }),
-    ...(!earlier && Array.isArray(manifest.references) && manifest.references.length && { references: manifest.references }),
     ...(!earlier && isPlainObject(app.relations) && { relations: app.relations }),
   };
 
