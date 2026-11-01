@@ -107,9 +107,10 @@ export const findAppByUrl = (sourceUrl, applications) => {
   );
 };
 
-// What the app calls a target type where the registry's label is out of date:
-// node layers are shown as reference data, never as "layers".
-const TARGET_TYPE_NAMES = { "persistent-layer": "Reference data" };
+// What the app calls a target type where the registry's label is out of date.
+// Node layers are retired (runs can't choose them any more), but older runs
+// and workflows still name the target.
+const TARGET_TYPE_NAMES = { "persistent-layer": "Node layer" };
 
 // A target type's name for people: ours, else the registry's label, else the
 // type itself.

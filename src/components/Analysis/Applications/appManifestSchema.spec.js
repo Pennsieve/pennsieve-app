@@ -30,6 +30,23 @@ describe('the app.yml schema', () => {
     expect(schemaJson.$id).toBe(MANIFEST_SCHEMA_URL)
   })
 
+  it('accepts a reference input in public identifiers, and refuses a malformed one', () => {
+    const doc = {
+      schemaVersion: '1.0',
+      application: { name: 'rnaseq-quant', type: 'processor' },
+      inputs: [{
+        name: 'index', placement: 'subfolder',
+        reference: {
+          kind: 'genome', assetClass: 'salmon-index', toolVersion: '>=2 <3', choice: 'user', organisms: [9606, 10090],
+          default: { taxonomyId: 9606, assembly: 'GCA_000001405.29', annotation: { provider: 'GENCODE', version: '50' } },
+        },
+      }],
+    }
+    expect(validate(doc), problems()).toBe(true)
+    doc.inputs[0].reference.toolVersion = 'latest'
+    expect(validate(doc)).toBe(false)
+  })
+
   it('accepts what the builder writes', () => {
     const schema = createApplicationSchema({
       resources: { cpu: 1024, memory: 2048 },

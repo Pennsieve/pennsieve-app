@@ -2,7 +2,8 @@
   A run's data targets: which dataset each writes to and which part of its
   input it takes. A target writes to its own dataset (dataTargets[nodeId].
   datasetId) or, when it names none, to the run's; the built-in download and
-  persistent-layer targets write no dataset. Every target can take only the
+  persistent-layer targets write no dataset (node layers are retired: runs
+  can't choose one, but older runs name it). Every target can take only the
   files below a path prefix (PATH_PREFIX on a container target, pathPrefix on
   a built-in one), without it. See compute-node-aws-provisioner-v2's api
   contract §3.2.
