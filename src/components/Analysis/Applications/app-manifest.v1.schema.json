@@ -38,6 +38,12 @@
       "type": "array",
       "deprecated": true,
       "description": "Deprecated and not read from app.yml."
+    },
+    "review": { "$ref": "#/$defs/review" },
+    "references": {
+      "type": "array",
+      "description": "Shared, published data the app needs besides its inputs, such as a genome index: described by public identifiers and where to get it, so the app isn't tied to one platform. The processor reads each from a folder path in the variable it names. On Pennsieve each resolves to a reference in the catalog (checked on registration); elsewhere, mount a copy and set the variable. See https://github.com/Pennsieve/app-deploy-service/blob/main/docs/app-manifest-references.md.",
+      "items": { "$ref": "#/$defs/reference" }
     }
   },
   "$defs": {
@@ -78,6 +84,22 @@
           "type": "array",
           "description": "Keywords (schema.org keywords) that say what the app is for, e.g. eeg, spikes, visualization. A known subject or task places the app in the Gallery's colours and filters.",
           "items": { "type": "string", "minLength": 1 }
+        },
+        "relations": {
+          "type": "object",
+          "description": "How the app relates to works listed in the repository's CITATION.cff, for those that aren't plain references. CITATION.cff (Citation File Format 1.2.0, at the repository root) is where an app keeps its authors, how to cite it (preferred-citation) and the works it builds on (references). Pennsieve reads it at release and gives each listed work a DataCite relation type: the preferred citation IsDescribedBy, every reference References. Map a work's DOI (10.1038/nbt.4314; https://doi.org/ and doi: forms are accepted) to another relation type here, e.g. IsDerivedFrom for a dataset the app's model was trained on. Each DOI must be listed in CITATION.cff. Cites is not a relation type; a plain reference is References.",
+          "propertyNames": {
+            "pattern": "^((https?://(dx\\.)?doi\\.org/)|([dD][oO][iI]: ?))?10\\.[0-9]{4,9}/\\S+$"
+          },
+          "additionalProperties": {
+            "type": "string",
+            "enum": [
+              "Describes", "Documents", "IsCitedBy", "IsDerivedFrom",
+              "IsDescribedBy", "IsDocumentedBy", "IsMetadataFor", "IsReferencedBy",
+              "IsRequiredBy", "IsSourceOf", "IsSupplementedBy", "IsSupplementTo",
+              "IsOriginalFormOf", "IsVariantFormOf", "References", "Requires"
+            ]
+          }
         },
         "categories": {
           "type": "array",
@@ -261,7 +283,7 @@
           "default": "root",
           "description": "Where an input's data is placed. root (the default): at the root of INPUT_DIR. subfolder: in its own folder, INPUT_DIR/<name>/, so inputs that would collide (two BIDS trees) stay apart; the name must then be folder-safe (lowercase letters, numbers, dashes). Inputs of different media types can share the root (the app tells them apart by type); inputs that share a type, take any file, or are a layout need their own folders."
         },
-        "required": { "type": "boolean", "description": "Whether a run must give it something." },
+        "required": { "type": "boolean", "description": "For an input: whether a run must give it something. For an output: false when a run may leave it empty (e.g. a section only made for some inputs); outputs are otherwise expected to receive files, which a review checks." },
         "dataType": {
           "type": "string",
           "deprecated": true,
@@ -271,6 +293,168 @@
           "type": "string",
           "deprecated": true,
           "description": "Deprecated and unused."
+        }
+      }
+    },
+    "reference": {
+      "type": "object",
+      "description": "One reference the app reads. choice: app pins one (by assembly or seqcol, and annotation); choice: user lets a run pick among the matching ones (optionally of the given organisms), with a default.",
+      "additionalProperties": false,
+      "required": ["name", "kind", "assetClass", "choice"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^[A-Z][A-Z0-9_]*$",
+          "description": "The environment variable the processor reads: the reference's folder path."
+        },
+        "description": { "type": "string", "description": "What the app uses it for." },
+        "kind": { "type": "string", "enum": ["genome"], "description": "genome: a genome asset, such as a FASTA or an aligner index." },
+        "assetClass": {
+          "type": "string",
+          "minLength": 1,
+          "description": "What the reference is, such as salmon-index; it names the files it holds.",
+          "examples": ["salmon-index"]
+        },
+        "toolVersion": {
+          "type": "string",
+          "pattern": "^\\s*(?:(?:>=|<=|==|>|<|=)?[0-9][0-9A-Za-z.]*\\s*)+$",
+          "description": "For an index: the versions of its tool the app can read, as space-separated comparisons that must all hold.",
+          "examples": [">=2 <3", ">=2.7.10a <2.8", "2.8.0"]
+        },
+        "choice": {
+          "type": "string",
+          "enum": ["app", "user"],
+          "description": "app: the app pins the reference. user: a run picks among the matching references."
+        },
+        "taxonomyId": { "type": "integer", "minimum": 1, "description": "choice app: the organism's NCBI taxonomy id." },
+        "assembly": { "$ref": "#/$defs/referenceAssembly" },
+        "seqcol": { "type": "string", "minLength": 1, "description": "The assembly's GA4GH sequence-collection digest." },
+        "annotation": { "$ref": "#/$defs/referenceAnnotation" },
+        "organisms": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "description": "choice user: the NCBI taxonomy ids a run may pick from. Default: any.",
+          "items": { "type": "integer", "minimum": 1 }
+        },
+        "default": {
+          "type": "object",
+          "description": "choice user: the reference preselected for a run.",
+          "additionalProperties": false,
+          "properties": {
+            "taxonomyId": { "type": "integer", "minimum": 1 },
+            "assembly": { "$ref": "#/$defs/referenceAssembly" },
+            "seqcol": { "type": "string", "minLength": 1 },
+            "annotation": { "$ref": "#/$defs/referenceAnnotation" }
+          }
+        },
+        "source": { "type": "string", "description": "Where to get it outside Pennsieve: a URL, or how to build it." },
+        "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$", "description": "Of the pinned reference's archive, when the app pins one exact build." },
+        "license": { "type": "string", "description": "An SPDX id or expression; LicenseRef-<name> for other terms." }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "choice": { "const": "app" } } },
+          "then": { "required": ["annotation"], "anyOf": [{ "required": ["assembly"] }, { "required": ["seqcol"] }] }
+        }
+      ]
+    },
+    "referenceAssembly": {
+      "type": "string",
+      "pattern": "^GC[AF]_[0-9]{9}\\.[0-9]+$",
+      "description": "An assembly accession, such as GCA_000001405.29 (GRCh38).",
+      "examples": ["GCA_000001405.29"]
+    },
+    "referenceAnnotation": {
+      "type": "object",
+      "description": "An annotation release: its provider and version, such as GENCODE 50.",
+      "additionalProperties": false,
+      "required": ["provider", "version"],
+      "properties": {
+        "provider": { "type": "string", "minLength": 1, "examples": ["GENCODE", "Ensembl"] },
+        "version": { "type": "string", "minLength": 1, "examples": ["50", "M39"] }
+      }
+    },
+    "review": {
+      "type": "object",
+      "description": "How the app is tested when a release is reviewed before it is made public: the inputs a review run uses and the parameters it sets. A review run must write files to every output except those with required: false. Reviews run the app with no network and no Pennsieve credentials. Port and parameter names must be the app's own (checked on registration). See https://github.com/Pennsieve/app-deploy-service/blob/main/docs/app-manifest-review.md.",
+      "additionalProperties": false,
+      "required": ["version"],
+      "properties": {
+        "version": { "const": 1, "description": "The version of this block's format: 1." },
+        "generate": {
+          "$ref": "#/$defs/reviewGenerate",
+          "description": "A command that writes the whole input directory, as the app reads INPUT_DIR. Ports listed under inputs are taken from there instead."
+        },
+        "inputs": {
+          "type": "object",
+          "description": "Per input port (by name), where a review run gets its data, instead of (or without) review.generate.",
+          "minProperties": 1,
+          "additionalProperties": { "$ref": "#/$defs/reviewInput" }
+        },
+        "parameters": {
+          "type": "object",
+          "description": "Parameter values for review runs only (by name), e.g. a smaller sample. Others keep their defaultValue.",
+          "additionalProperties": { "$ref": "#/$defs/scalar" }
+        }
+      }
+    },
+    "reviewInput": {
+      "type": "object",
+      "description": "One source for an input port's review data: generate (a command that writes it), files (committed in the repository) or dataset (a public dataset).",
+      "minProperties": 1,
+      "maxProperties": 1,
+      "additionalProperties": false,
+      "properties": {
+        "generate": { "$ref": "#/$defs/reviewGenerate" },
+        "files": {
+          "type": "array",
+          "minItems": 1,
+          "description": "Files or glob patterns, relative to the repository root, e.g. tests/fixtures/*.fcs.",
+          "items": { "type": "string", "minLength": 1, "not": { "pattern": "^/|(^|/)\\.\\.(/|$)" }, "$comment": "Relative, without .. segments." }
+        },
+        "dataset": { "$ref": "#/$defs/reviewDataset" }
+      }
+    },
+    "reviewGenerate": {
+      "type": "object",
+      "description": "A command that writes review input into $REVIEW_INPUT_DIR, run from the repository root (read-only) in a platform generator image, with no network. Under review it writes the whole input directory (every port, in subfolders for placement: subfolder ports); under review.inputs.<port> it writes that port's input.",
+      "additionalProperties": false,
+      "required": ["command"],
+      "properties": {
+        "image": {
+          "type": "string",
+          "enum": ["python", "r"],
+          "default": "python",
+          "description": "The platform generator image: python (Python 3.12 with numpy 2, pandas, scipy, h5py, anndata, zarr, scanpy, FlowIO, edfio, nibabel, pyarrow and openpyxl) or r (base R). The image version a review used is recorded with it."
+        },
+        "command": { "type": "string", "minLength": 1, "description": "The command, run with sh -c, e.g. python tests/make_fixture.py \"$REVIEW_INPUT_DIR\". It writes into $REVIEW_INPUT_DIR and must not delete or replace that directory." },
+        "root": {
+          "type": "string",
+          "minLength": 1,
+          "default": ".",
+          "not": { "pattern": "^/|(^|/)\\.\\.(/|$)" },
+          "description": "The folder within what the command wrote that is used, e.g. linked when a generator writes linked/ and flat/ layouts. Default: all of it."
+        },
+        "source": {
+          "$ref": "#/$defs/reviewDataset",
+          "description": "A public dataset the generator reads, e.g. to subsample: fetched by the platform first and mounted read-only at $REVIEW_SOURCE_DIR."
+        }
+      }
+    },
+    "reviewDataset": {
+      "type": "object",
+      "description": "A public dataset, fetched by the platform from an allowed host (Zenodo, Figshare, OSF, OpenNeuro): its DOI or HTTPS URL, and optionally which of its files.",
+      "additionalProperties": false,
+      "oneOf": [{ "required": ["doi"] }, { "required": ["url"] }],
+      "properties": {
+        "doi": { "type": "string", "pattern": "^10\\.\\d{4,9}/\\S+$", "description": "e.g. 10.5281/zenodo.15388817" },
+        "url": { "type": "string", "format": "uri", "pattern": "^https://", "description": "An HTTPS URL of the dataset or a file in it." },
+        "files": {
+          "type": "array",
+          "minItems": 1,
+          "description": "Files or glob patterns within the dataset; default: all of it.",
+          "items": { "type": "string", "minLength": 1 }
         }
       }
     }

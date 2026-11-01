@@ -1036,3 +1036,107 @@ describe('EDAM from the media type', () => {
   })
 })
 
+
+describe('variants and build (kept, not edited)', () => {
+  const yaml = `
+application:
+  name: Seizure Onset (DynaSD)
+runtime:
+  cpu: 4096
+  memory: 8192
+build:
+  args:
+    DYNASD_COMMIT: 48b2b95
+parameters:
+  - name: MODEL
+    type: string
+    defaultValue: lindda
+    validValues: [lindda, oncet]
+variants:
+  - id: cpu
+    name: CPU
+    default: true
+    build:
+      args:
+        TORCH_FLAVOUR: cpu
+    runtime:
+      computeTypes: [standard]
+  - id: gpu
+    name: GPU (ONCET)
+    build:
+      args:
+        TORCH_FLAVOUR: cuda
+    runtime:
+      computeTypes: [gpu]
+      memory: 14336
+    parameters:
+      MODEL:
+        defaultValue: oncet
+`
+
+  it('reads them as they are and writes them back', () => {
+    const doc = loadYaml(yaml)
+    const { meta, schema } = parseManifest(yaml)
+    expect(meta.variants).toEqual(doc.variants)
+    expect(meta.build).toEqual(doc.build)
+    const out = buildManifest(schema, meta)
+    expect(out.variants).toEqual(doc.variants)
+    expect(out.build).toEqual(doc.build)
+    // Through YAML too, variants last.
+    const again = loadYaml(manifestToYaml(out))
+    expect(again.variants).toEqual(doc.variants)
+    expect(Object.keys(again).pop()).toBe('variants')
+    // A copy: editing the form's manifest doesn't change what was read.
+    out.variants[0].name = 'changed'
+    expect(meta.variants[0].name).toBe('CPU')
+  })
+
+  it('writes none when the app.yml has none', () => {
+    const { meta, schema } = parseManifest('application:\n  name: a\n')
+    expect(meta).not.toHaveProperty('variants')
+    expect(meta).not.toHaveProperty('build')
+    const out = buildManifest(schema, meta)
+    expect(out).not.toHaveProperty('variants')
+    expect(out).not.toHaveProperty('build')
+    expect(buildManifest(schema, { ...meta, variants: [], build: null })).not.toHaveProperty('variants')
+  })
+})
+
+describe('review, references and relations (kept, not edited)', () => {
+  const yaml = `
+application:
+  name: rnaseq-quant
+  relations:
+    10.1038/nmeth.4197: IsDerivedFrom
+runtime:
+  computeTypes: [standard]
+review:
+  version: 1
+  generate:
+    command: python -m tests.make_fixture "$REVIEW_INPUT_DIR"
+references:
+  - name: SALMON_INDEX
+    kind: genome
+    assetClass: salmon-index
+    toolVersion: ">=2 <3"
+    choice: user
+    organisms: [9606, 10090]
+`
+
+  it('reads them as they are and writes them back', () => {
+    const doc = loadYaml(yaml)
+    const { meta, schema } = parseManifest(yaml)
+    const again = loadYaml(manifestToYaml(buildManifest(schema, meta)))
+    expect(again.review).toEqual(doc.review)
+    expect(again.references).toEqual(doc.references)
+    expect(again.application.relations).toEqual(doc.application.relations)
+  })
+
+  it('writes none when the app.yml has none', () => {
+    const { meta, schema } = parseManifest('application:\n  name: a\n')
+    const out = buildManifest(schema, meta)
+    expect(out).not.toHaveProperty('review')
+    expect(out).not.toHaveProperty('references')
+    expect(out.application).not.toHaveProperty('relations')
+  })
+})
