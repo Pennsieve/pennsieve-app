@@ -132,17 +132,6 @@ export default {
         }
       }
 
-      // Publishing sub-pages
-      if (this.isPublishingSection) {
-        if (routeName === 'open-repositories') {
-          return [{ name: 'Repositories' }];
-        }
-        if (routeName === 'dataset-proposals') {
-          return [{ name: 'Proposals' }];
-        }
-        return [];
-      }
-
       // Collections sub-pages
       if (this.isCollectionsSection) {
         if (routeName === 'collection-details') {
@@ -248,8 +237,7 @@ export default {
     },
 
     isPublishingSection() {
-      const publishingPages = ['data-publishing', 'open-repositories', 'dataset-proposals'];
-      return publishingPages.includes(this.routeName);
+      return this.routeName === 'data-publishing';
     },
 
     isCollectionsSection() {

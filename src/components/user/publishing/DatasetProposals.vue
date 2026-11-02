@@ -1,31 +1,5 @@
 <template>
   <div class="dataset-proposals">
-    <div class="page-header">
-      <div class="header-row">
-        <p class="page-intro">
-          Propose your datasets to open repositories and follow them through review.
-        </p>
-        <bf-button class="primary" @click="startNewProposal">
-          <template #prefix>
-            <IconPlus :width="14" :height="14" color="currentColor" />
-          </template>
-          New Proposal
-        </bf-button>
-      </div>
-
-      <ul class="workflow-steps">
-        <li v-for="step in workflowSteps" :key="step.title" class="workflow-step">
-          <span class="step-icon">
-            <component :is="step.icon" :width="20" :height="20" color="currentColor" />
-          </span>
-          <div class="step-text">
-            <h3 class="step-title">{{ step.title }}</h3>
-            <p class="step-description">{{ step.description }}</p>
-          </div>
-        </li>
-      </ul>
-    </div>
-
     <div class="proposals-content">
       <!-- Loading State -->
       <div v-if="isLoading" class="loading-state">
@@ -72,8 +46,8 @@
           </div>
           <h2>No Dataset Proposals Yet</h2>
           <p>
-            You haven't created any dataset proposals yet. Click <strong>New Proposal</strong> to submit
-            a dataset to an open repository for review and publication.
+            Explore the open repositories to find the right home for your data, then click
+            <strong>New Proposal</strong> to propose a dataset for review.
           </p>
         </div>
       </div>
@@ -123,9 +97,6 @@ import IconUndoLine from '@/components/icons/IconUndoLine.vue'
 import IconSendLine from '@/components/icons/IconSendLine.vue'
 import ConfirmDialog from '@/components/shared/ConfirmDialog/ConfirmDialog.vue'
 import IconDocument from '@/components/icons/IconDocument.vue'
-import IconPlus from '@/components/icons/IconPlus.vue'
-import IconPencil from '@/components/icons/IconPencil.vue'
-import IconEyeball from '@/components/icons/IconEyeball.vue'
 import { useProposalSave } from '@/composables/useProposalSave'
 import { getProposalErrorMessage, isStaleProposalError } from '@/utils/proposalErrorMessages'
 
@@ -134,25 +105,6 @@ const proposalStore = useProposalStore()
 const router = useRouter()
 const route = useRoute()
 const { isSavingProposal, saveProposal } = useProposalSave()
-
-// Static content; icons are components so they're kept out of reactivity
-const workflowSteps = [
-  {
-    icon: IconPlus,
-    title: 'Propose a dataset',
-    description: 'Start a new proposal and choose the open repository it should go to.',
-  },
-  {
-    icon: IconPencil,
-    title: 'Edit drafts',
-    description: 'Drafts stay editable until you submit them for review.',
-  },
-  {
-    icon: IconEyeball,
-    title: 'Track status',
-    description: 'Follow each proposal from submission through acceptance.',
-  },
-]
 
 // Reactive data
 const isLoading = ref(false)
@@ -210,6 +162,9 @@ const startNewProposal = () => {
   selectedRepository.value = repositories.value[0] || {} // Default to first available repository
   showProposalDialog.value = true
 }
+
+// The page header owns the only New Proposal button
+defineExpose({ startNewProposal })
 
 const handleSaveProposal = async (proposalData) => {
   if (await saveProposal(proposalData)) {
@@ -398,70 +353,6 @@ watch(repositories, (newRepositories) => {
   margin: 0;
 }
 
-.page-header {
-  margin-bottom: 40px;
-
-  .header-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 24px;
-    margin-bottom: 24px;
-  }
-
-  .page-intro {
-    font-size: 18px;
-    color: theme.$gray_6;
-    line-height: 1.5;
-    margin: 0;
-  }
-}
-
-.workflow-steps {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  gap: 16px;
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
-
-.workflow-step {
-  display: flex;
-  align-items: flex-start;
-  gap: 16px;
-  padding: 16px;
-  background: theme.$gray_1;
-  border: 1px solid theme.$gray_2;
-  border-radius: 8px;
-
-  .step-icon {
-    flex-shrink: 0;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 40px;
-    height: 40px;
-    border-radius: 8px;
-    background: theme.$purple_tint;
-    color: theme.$purple_3;
-  }
-
-  .step-title {
-    font-size: 15px;
-    font-weight: 500;
-    color: theme.$gray_6;
-    margin: 0 0 4px 0;
-  }
-
-  .step-description {
-    font-size: 14px;
-    color: theme.$gray_5;
-    line-height: 1.5;
-    margin: 0;
-  }
-}
-
 .proposals-content {
   min-height: 400px;
 }
@@ -559,15 +450,6 @@ watch(repositories, (newRepositories) => {
 
 // Responsive Design
 @media (max-width: 768px) {
-  .dataset-proposals {
-    padding: 20px;
-  }
-  
-  .page-header .header-row {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-  
   .proposals-grid {
     gap: 12px;
   }

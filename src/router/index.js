@@ -141,8 +141,6 @@ const UserNavigation = () => import('../components/user-navigation/UserNavigatio
 const UserNavigationSecondary = () => import('../components/user-navigation-secondary/UserNavigationSecondary.vue')
 const ComingSoon = () => import('../components/user/coming-soon/ComingSoon.vue')
 const MyAnalysis = () => import('../components/user/analysis/MyAnalysis.vue')
-const OpenRepositories = () => import('../components/user/publishing/OpenRepositories.vue')
-const DatasetProposals = () => import('../components/user/publishing/DatasetProposals.vue')
 
 /**
  * Analytics Components 
@@ -474,40 +472,17 @@ const router = createRouter({
           meta: {
             hideSecondaryNav: true,
             title: 'Data Publishing',
-            description: 'Manage your dataset publishing proposals.'
-          },
-          children: [
-            {
-              name: 'open-repositories',
-              path: 'repositories',
-              components: {
-                stage: OpenRepositories,
-                navigation: UserNavigation,
-              },
-              props: true,
-              meta: {
-                hideSecondaryNav: true,
-                title: 'Pennsieve Repositories',
-                description: 'Browse repositories powered by Pennsieve and submit dataset proposals.',
-                breadcrumbParent: 'data-publishing'
-              }
-            },
-            {
-              name: 'dataset-proposals',
-              path: 'proposals',
-              components: {
-                stage: DatasetProposals,
-                navigation: UserNavigation,
-              },
-              props: true,
-              meta: {
-                hideSecondaryNav: true,
-                title: 'Dataset Proposals',
-                description: 'Submit and manage your dataset proposals and requests.',
-                breadcrumbParent: 'data-publishing'
-              }
-            }
-          ]
+            description: 'Propose datasets to open repositories and track their review.'
+          }
+        },
+        // Repositories and proposals were merged into one page; keep old links working
+        {
+          path: 'publishing/repositories',
+          redirect: to => ({ name: 'data-publishing', query: to.query })
+        },
+        {
+          path: 'publishing/proposals',
+          redirect: to => ({ name: 'data-publishing', query: to.query })
         },
         {
           name: 'my-code',

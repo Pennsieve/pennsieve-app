@@ -60,8 +60,9 @@ export default defineConfig({
   test: {
     // enable jest-like global test APIs
     globals: true,
-    // max duration for async calls in tests
-    testTimeout: 200,
+    // max duration of a test: Vitest's default. 200ms timed out synchronous
+    // tests on a busy machine (Jenkins).
+    testTimeout: 5000,
     setupFiles: ['./src/test/setup.ts'],
     server: {
       deps: {

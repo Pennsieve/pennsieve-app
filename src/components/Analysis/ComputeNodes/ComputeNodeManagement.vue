@@ -44,7 +44,12 @@ const isLoading = ref(true)
 const loadError = ref('')
 const gpuTiers = ref([])
 
-const isNodeOwner = computed(() => computeNode.value?.ownerId === profile.value?.id)
+// The platform node (account-service marks it) is editable only from its
+// home workspace, the one that owns it. Listed everywhere, it would otherwise
+// hand its owner the settings from any workspace, or from My Workspace.
+const isHomeWorkspace = computed(() =>
+  !computeNode.value?.platform || orgId.value === computeNode.value.organizationId)
+const isNodeOwner = computed(() => isHomeWorkspace.value && computeNode.value?.ownerId === profile.value?.id)
 const hasAdminRights = computed(() => {
   if (activeOrganization.value) {
     return activeOrganization.value.isAdmin || activeOrganization.value.isOwner
@@ -54,7 +59,7 @@ const hasAdminRights = computed(() => {
 // Mirrors the API: the node owner, the account owner, or a workspace admin
 // when the account is Admin Managed in that workspace.
 const canManage = computed(() => {
-  if (!computeNode.value) return false
+  if (!computeNode.value || !isHomeWorkspace.value) return false
   return isNodeOwner.value ||
     (!!profile.value?.id && computeNode.value.account?.ownerId === profile.value.id) ||
     (hasAdminRights.value && computeResourcesStore.isNodeAdminManaged(computeNode.value))
@@ -164,6 +169,8 @@ const STATUS_TEXT = { Enabled: 'Running', Paused: 'Paused', Pending: 'Setting up
            goes next to it. -->
       <Teleport defer to="#page-title-extra">
         <span class="cn-pill" :class="STATUS_PILL[status]">{{ STATUS_TEXT[status] }}{{ status === 'Updating' && computeNode?.pendingProvisionerImageTag ? ` to ${computeNode.pendingProvisionerImageTag}` : '' }}</span>
+        <!-- The platform node, Pennsieve's, usable by everyone (account-service marks it). -->
+        <span v-if="computeNode?.platform" class="cn-pill">Pennsieve</span>
       </Teleport>
       <AnalysisViewBar v-model="tab" :views="NODE_TABS">
         <!-- Pausing in Pennsieve's warning style (red outline), resuming in
@@ -189,6 +196,14 @@ const STATUS_TEXT = { Enabled: 'Running', Paused: 'Paused', Pending: 'Setting up
         @updated="fetchComputeNode"
       />
 
+      <!-- The platform node is open to every user by designation: grants on
+           it change nothing, so there is nothing to edit here. A user is cut
+           off through their budget (Settings), not through access. -->
+      <section v-else-if="tab === 'access' && computeNode?.platform" class="cn-section">
+        <h3 class="cn-section-title">Access</h3>
+        <p class="cn-muted">The Pennsieve compute node is open to every Pennsieve user, in every workspace and in My Workspace. Access can't be narrowed; to stop a user from running on it, set their budget on this node to zero under Settings.</p>
+      </section>
+
       <ComputeNodeAccess
         v-else-if="tab === 'access'"
         :node="computeNode"
@@ -197,9 +212,15 @@ const STATUS_TEXT = { Enabled: 'Running', Paused: 'Paused', Pending: 'Setting up
       />
 
       <div v-else-if="tab === 'settings'" class="node-settings">
-        <section class="cn-section">
+        <!-- No secrets on the platform node: it runs every user's work
+             under one role, and account-service refuses them. -->
+        <section v-if="!computeNode?.platform" class="cn-section">
           <h3 class="cn-section-title">Secrets</h3>
           <ComputeNodeSecrets :node-id="nodeUuid" :is-owner="isNodeOwner" />
+        </section>
+        <section v-else class="cn-section">
+          <h3 class="cn-section-title">Secrets</h3>
+          <p class="cn-muted">Secrets can't be configured on the Pennsieve compute node, which runs every user's work.</p>
         </section>
 
         <ComputeNodeAllowedApps v-if="isNodeOwner" :node-id="nodeUuid" />
