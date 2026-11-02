@@ -51,6 +51,21 @@
             <span class="tag update">Update available</span>
           </el-tooltip>
         </div>
+        <!-- What the caller has left to spend on this node, once known. Only
+             nodes with spend caps show it (the meter hides itself otherwise),
+             so a customer's own uncapped node stays as it was. -->
+        <PipelineBudgetMeter
+          v-if="meterBudget"
+          class="node-budget"
+          :budget="meterBudget"
+          :spend-axes="meterSpendAxes"
+          :concurrency-axes="meterConcurrencyAxes"
+          :level="meterLevel"
+          :per-run-usd="meterPerRunUsd"
+          :loading="meterLoading"
+          :error="meterError"
+          @click.stop
+        />
       </div>
       <div class="node-header-actions">
         <div class="node-status-badge" @click.stop v-if="canManagePermissions && !['Pending', 'Updating', 'Destroying', 'Failed'].includes(getStatusForNode(node))">
@@ -104,11 +119,13 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, onMounted } from 'vue'
 import { useStore } from 'vuex'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { useComputeResourcesStore } from '@/stores/computeResourcesStore'
+import { usePipelineBudgetStore } from '@/stores/pipelineBudgetStore'
+import PipelineBudgetMeter from './PipelineBudgetMeter.vue'
 
 const props = defineProps({
   node: {
@@ -130,6 +147,19 @@ const computeResourcesStore = useComputeResourcesStore()
 const profile = computed(() => store.state.profile)
 
 const isUpdatingPermissions = computed(() => computeResourcesStore.isNodeUpdating(props.node.uuid))
+
+// The caller's remaining pipeline budget on this node, from the same read the
+// run-creation gate uses (pipelineBudgetStore). Fetched per card; the store
+// dedupes and keeps stale numbers on a failed refresh.
+const budgetStore = usePipelineBudgetStore()
+const meterBudget = computed(() => budgetStore.getBudget(props.node.uuid))
+const meterSpendAxes = computed(() => budgetStore.spendAxes(props.node.uuid))
+const meterConcurrencyAxes = computed(() => budgetStore.concurrencyAxes(props.node.uuid))
+const meterLevel = computed(() => budgetStore.warningLevel(props.node.uuid))
+const meterPerRunUsd = computed(() => budgetStore.perRunUsd(props.node.uuid))
+const meterLoading = computed(() => budgetStore.isLoading(props.node.uuid))
+const meterError = computed(() => budgetStore.getError(props.node.uuid))
+onMounted(() => budgetStore.fetch(props.node.uuid))
 
 // Link to the node's page in the current context: the workspace's route under
 // /:orgId, or My Workspace's when there is no workspace.
@@ -330,6 +360,11 @@ async function updateNode() {
       color: theme.$orange_2;
     }
   }
+}
+
+.node-budget {
+  margin-top: 10px;
+  max-width: 440px;
 }
 
 .node-owner {
