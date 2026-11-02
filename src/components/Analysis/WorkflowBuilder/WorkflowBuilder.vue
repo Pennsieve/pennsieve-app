@@ -2802,6 +2802,7 @@ const openNodeSettings = (id) => {
           v-model:description="workflowDescription"
           :readiness="readiness"
           :started="started"
+          :landing="landing"
           :saving="saving"
           @save="saveWorkflow"
           @start-over="startOver"
