@@ -15,7 +15,11 @@ import {
   referenceKindText,
   referenceTargetIn,
   runReferences,
+  defaultIdentity,
+  choiceLabel,
+  createReferenceCatalog,
 } from "./referenceSources";
+import { ref } from "vue";
 
 // Catalog entries as environments-service's /catalog returns them.
 const entry = (id, taxonomyId, organism, assembly, version) => ({
@@ -170,5 +174,39 @@ describe("template references", () => {
     // choice user (unset), no organisms: any match fits.
     expect(fitsInput(mni("2"), { kind: "template", assetClass: "brain-template" })).toBe(true);
     expect(referenceKindText(pinned)).toBe("Brain templates");
+  });
+});
+
+describe("choices and the catalog cache", () => {
+  it("labels what a source fills its input with", () => {
+    expect(defaultIdentity(index)).toBe(index.default);
+    expect(choiceLabel({ reference: index })).toBe("Human · GRCh38 · GENCODE 50");
+    expect(choiceLabel({ entry: mouse, reference: index })).toBe("Mouse · GRCm39 · GENCODE M39");
+    // Chosen but not loaded yet: not the default's name.
+    expect(choiceLabel({ chosenId: "m", reference: index })).toBe("The chosen reference");
+    expect(choiceLabel({ reference: { kind: "genome", assetClass: "salmon-index" } })).toBe("The app's default");
+  });
+
+  it("matches no entry with an empty default", () => {
+    expect(isAppDefault(human, { ...index, default: {} })).toBe(false);
+  });
+
+  it("loads each input's candidates once, in parallel", async () => {
+    let calls = 0;
+    const cat = createReferenceCatalog(async () => {
+      calls++;
+      return [human, mouse];
+    }, ref);
+    await Promise.all([cat.ensureLoaded([index, index]), cat.ensureLoaded([index])]);
+    expect(calls).toBe(1);
+    expect(Object.keys(cat.known.value).sort()).toEqual(["h", "m"]);
+    // A failed load is tried again next time.
+    const flaky = createReferenceCatalog(async () => {
+      calls++;
+      throw new Error("down");
+    }, ref);
+    await flaky.ensureLoaded([index]);
+    await flaky.ensureLoaded([index]);
+    expect(calls).toBe(3);
   });
 });

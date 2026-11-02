@@ -45,17 +45,23 @@ const error = ref("");
 const pickedId = ref("");
 const organism = ref(0);
 
+// Each open loads the input's candidates; a load an earlier open started
+// that finishes later is ignored.
+let loadSeq = 0;
 const load = async () => {
+  const seq = ++loadSeq;
   loading.value = true;
   error.value = "";
   try {
     const found = await findReferences(catalogQuery(props.reference));
+    if (seq !== loadSeq) return;
     entries.value = sortReferences(found.filter((e) => fitsInput(e, props.reference)), props.reference);
   } catch (e) {
+    if (seq !== loadSeq) return;
     entries.value = [];
     error.value = e?.message || "Couldn't load the reference catalog.";
   } finally {
-    loading.value = false;
+    if (seq === loadSeq) loading.value = false;
   }
 };
 
@@ -140,20 +146,21 @@ const confirm = (entry = picked.value) => {
       <div class="rp__main">
         <p class="rp__desc">{{ what }}. The step downloads the one you choose when it runs; each run records the exact version it used.</p>
         <div v-if="organisms.length > 1" class="rp__filters" role="group" aria-label="Organism">
-          <button type="button" class="rp__filter" :class="{ on: !organism }" @click="organism = 0">All</button>
-          <button v-for="o in organisms" :key="o.id" type="button" class="rp__filter" :class="{ on: organism === o.id }" @click="organism = o.id">
+          <button type="button" class="rp__filter" :class="{ on: !organism }" :aria-pressed="!organism" @click="organism = 0">All</button>
+          <button v-for="o in organisms" :key="o.id" type="button" class="rp__filter" :class="{ on: organism === o.id }" :aria-pressed="organism === o.id" @click="organism = o.id">
             {{ o.name }}
           </button>
         </div>
         <div class="rp__cards">
-          <div v-if="loading" class="rp__cards-empty">Loading the reference catalog...</div>
-          <div v-else-if="error" class="rp__cards-empty">{{ error }}</div>
+          <div v-if="loading" class="rp__cards-empty" role="status" aria-live="polite">Loading the reference catalog...</div>
+          <div v-else-if="error" class="rp__cards-empty" role="alert">{{ error }}</div>
           <button
             v-for="e in listed"
             :key="e.id"
             type="button"
             class="rp__card"
             :class="{ picked: picked && e.id === picked.id }"
+            :aria-pressed="!!picked && e.id === picked.id"
             @click="pickedId = e.id"
             @dblclick="confirm(e)"
           >

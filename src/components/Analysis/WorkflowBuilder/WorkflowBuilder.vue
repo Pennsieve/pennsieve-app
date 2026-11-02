@@ -70,7 +70,7 @@ import { workflowLayouts } from "../RunMonitor/runLayout";
 import IoPill from "../WorkflowGraph/IoPill.vue";
 import ReferencePickerDialog from "../RunMonitor/ReferencePickerDialog.vue";
 import { findReferences, environmentsServiceUrl } from "@/utils/environmentsService";
-import { referenceInputs, referenceLabel, catalogQuery, isAppDefault, formatSize } from "../RunMonitor/referenceSources";
+import { referenceInputs, isAppDefault, formatSize, choiceLabel, createReferenceCatalog } from "../RunMonitor/referenceSources";
 import { isFeatureEnabled } from "@/utils/features";
 import { useGraphHistory, snapshot } from "./graphHistory";
 import { workflowPermissions } from "./workflowPermissions";
@@ -719,49 +719,43 @@ const referenceTargetOf = (sourceId) => {
   return null;
 };
 
-// Catalog references the canvas names, by id, for their labels.
-const knownReferences = ref({});
-const rememberReferences = (entries) => {
-  const next = { ...knownReferences.value };
-  for (const e of entries || []) next[e.id] = e;
-  knownReferences.value = next;
-};
-// Looks up the references a reopened workflow chose, once per input kind.
-const loadChosenReferences = async () => {
-  const missing = nodes.value
-    .filter((n) => n.type === "data-source" && n.data?.referenceId && !knownReferences.value[n.data.referenceId])
-    .map((n) => referenceTargetOf(n.id))
-    .filter(Boolean);
-  const queries = [...new Map(missing.map((t) => [JSON.stringify(catalogQuery(t.port.reference)), t.port.reference])).values()];
-  await Promise.all(queries.map((r) => findReferences(catalogQuery(r)).then(rememberReferences).catch(() => {})));
-};
+// Catalog references the canvas names, by id, for their labels: each
+// input's candidates loaded once.
+const referenceCatalog = createReferenceCatalog(findReferences, ref);
 watch(
   () => nodes.value.filter((n) => n.type === "data-source" && n.data?.referenceId).map((n) => n.data.referenceId).join(),
   (ids) => {
-    if (ids && referencesOn) loadChosenReferences();
+    if (!ids || !referencesOn) return;
+    const refs = nodes.value.filter((n) => n.type === "data-source" && n.data?.referenceId).map((n) => referenceTargetOf(n.id)?.port.reference);
+    referenceCatalog.ensureLoaded(refs.filter(Boolean));
   }
 );
 
-// What a reference source fills its input with: the reference chosen, else
-// the app's default.
-const referenceChoice = (sourceId) => {
-  const target = referenceTargetOf(sourceId);
-  if (!target) return null;
-  const node = nodes.value.find((n) => n.id === sourceId);
-  const chosen = node?.data?.referenceId ? knownReferences.value[node.data.referenceId] : null;
-  const reference = target.port.reference;
-  const pinned = reference.choice === "app" ? reference : reference.default;
-  return {
-    ...target,
-    chosen,
-    isDefault: !node?.data?.referenceId,
-    label: chosen ? referenceLabel(chosen) : node?.data?.referenceId ? "Chosen reference" : pinned ? referenceLabel(pinned) : "",
-  };
-};
+// What each reference source fills its input with: the reference chosen,
+// else the app's default.
+const referenceChoices = computed(() => {
+  const out = {};
+  for (const node of nodes.value) {
+    if (node.type !== "data-source") continue;
+    const target = referenceTargetOf(node.id);
+    if (!target) continue;
+    const chosenId = node.data?.referenceId || "";
+    const chosen = (chosenId && referenceCatalog.known.value[chosenId]) || null;
+    out[node.id] = {
+      ...target,
+      chosenId,
+      chosen,
+      isDefault: !chosenId,
+      label: choiceLabel({ entry: chosen, chosenId, reference: target.port.reference }),
+    };
+  }
+  return out;
+});
+const referenceChoice = (sourceId) => referenceChoices.value[sourceId] || null;
 const referenceSub = (sourceId) => {
   const c = referenceChoice(sourceId);
   if (!c) return "";
-  return c.isDefault ? `${c.label || "App default"}${c.label ? " (default)" : ""}` : c.label;
+  return c.isDefault ? `${c.label} (default)` : c.label;
 };
 
 const referencePickerOpen = ref(false);
@@ -776,7 +770,7 @@ const onReferencePicked = (entry) => {
   const target = referencePickerFor.value;
   const node = target && nodes.value.find((n) => n.id === target.sourceId);
   if (!node) return;
-  rememberReferences([entry]);
+  referenceCatalog.remember([entry]);
   // The app's default is what an unbound input takes: nothing to save.
   node.data.referenceId = isAppDefault(entry, target.port.reference) ? "" : entry.id;
 };
@@ -3434,7 +3428,7 @@ const openNodeSettings = (id) => {
                 <template v-if="selectedNode.type === 'data-source' && referenceChoice(selectedNode.id)">
                   <div class="info-row">
                     <span class="info-label">Reference</span>
-                    <span class="info-value">{{ referenceChoice(selectedNode.id).label || "The app's default" }}</span>
+                    <span class="info-value">{{ referenceChoice(selectedNode.id).label }}</span>
                   </div>
                   <div class="info-row">
                     <span class="info-label">Release</span>
@@ -3444,7 +3438,7 @@ const openNodeSettings = (id) => {
                     <span class="info-label">Download</span>
                     <span class="info-value">{{ formatSize(referenceChoice(selectedNode.id).chosen.version.archive.sizeBytes) }}</span>
                   </div>
-                  <div v-if="!isReadOnly" class="info-row">
+                  <div v-if="!isReadOnly" class="info-row reference-actions">
                     <button type="button" class="text-link-btn" @click="openReferencePicker(selectedNode.id)">Change reference</button>
                     <button
                       v-if="!referenceChoice(selectedNode.id).isDefault"
@@ -4264,7 +4258,7 @@ const openNodeSettings = (id) => {
       :reference="referencePickerFor?.port?.reference || null"
       :step-name="referencePickerFor?.stepName || ''"
       :input-name="referencePickerFor?.inputName || ''"
-      :selected-id="referencePickerFor?.chosen?.id || ''"
+      :selected-id="referencePickerFor?.chosenId || ''"
       @pick="onReferencePicked"
     />
   </div>
@@ -5982,6 +5976,12 @@ kbd {
   display: flex;
   flex-direction: column;
   gap: 8px;
+}
+
+.reference-actions {
+  justify-content: flex-start;
+  flex-wrap: wrap;
+  gap: 4px 16px;
 }
 
 .text-link-btn {
