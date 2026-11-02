@@ -164,6 +164,8 @@ const STATUS_TEXT = { Enabled: 'Running', Paused: 'Paused', Pending: 'Setting up
            goes next to it. -->
       <Teleport defer to="#page-title-extra">
         <span class="cn-pill" :class="STATUS_PILL[status]">{{ STATUS_TEXT[status] }}{{ status === 'Updating' && computeNode?.pendingProvisionerImageTag ? ` to ${computeNode.pendingProvisionerImageTag}` : '' }}</span>
+        <!-- The platform node, Pennsieve's, usable by everyone (account-service marks it). -->
+        <span v-if="computeNode?.platform" class="cn-pill">Pennsieve</span>
       </Teleport>
       <AnalysisViewBar v-model="tab" :views="NODE_TABS">
         <!-- Pausing in Pennsieve's warning style (red outline), resuming in
@@ -197,9 +199,15 @@ const STATUS_TEXT = { Enabled: 'Running', Paused: 'Paused', Pending: 'Setting up
       />
 
       <div v-else-if="tab === 'settings'" class="node-settings">
-        <section class="cn-section">
+        <!-- No secrets on the platform node: it runs every user's work
+             under one role, and account-service refuses them. -->
+        <section v-if="!computeNode?.platform" class="cn-section">
           <h3 class="cn-section-title">Secrets</h3>
           <ComputeNodeSecrets :node-id="nodeUuid" :is-owner="isNodeOwner" />
+        </section>
+        <section v-else class="cn-section">
+          <h3 class="cn-section-title">Secrets</h3>
+          <p class="cn-muted">Secrets can't be configured on the Pennsieve compute node, which runs every user's work.</p>
         </section>
 
         <ComputeNodeAllowedApps v-if="isNodeOwner" :node-id="nodeUuid" />
