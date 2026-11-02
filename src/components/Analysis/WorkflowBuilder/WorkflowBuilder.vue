@@ -5944,10 +5944,11 @@ kbd {
   gap: 4px;
 }
 .info-tag {
-  padding: 0 6px;
+  padding: 2px 8px;
   border-radius: 3px;
   background: theme.$gray_0;
   font-size: 11px;
+  line-height: 1.4;
   color: theme.$gray_5;
 }
 
