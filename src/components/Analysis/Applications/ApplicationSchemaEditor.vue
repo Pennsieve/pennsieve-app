@@ -252,14 +252,70 @@
                 <label class="field-label">{{ block.key === "inputs" ? "It takes" : "It writes" }}</label>
                 <div class="field-control">
                   <el-radio-group :model-value="portMode(port)" size="small" :aria-label="`What the ${block.singular} is made of`" @update:model-value="(v) => setPortMode(port, v)">
-                    <el-radio-button v-for="m in PORT_MODES" :key="m.value" :value="m.value">{{ m.label }}</el-radio-button>
+                    <el-radio-button v-for="m in portModes(block.key, port)" :key="m.value" :value="m.value">{{ m.label }}</el-radio-button>
                   </el-radio-group>
                   <p class="field-hint">{{ PORT_MODES.find((m) => m.value === portMode(port)).hint }}</p>
                 </div>
               </div>
 
+              <!-- Reference data: a catalog entry, not files -->
+              <div v-if="portMode(port) === 'reference'" class="field-row full-width">
+                <label class="field-label">Reference</label>
+                <div class="field-control">
+                  <p v-if="referenceCatalogState === 'failed'" class="field-error">The reference catalog couldn't be loaded.</p>
+                  <p v-else-if="!hasReferenceCatalog" class="field-static">
+                    {{ referenceKindText(port.reference) }} · {{ referenceLabel(port.reference.choice === "app" ? port.reference : port.reference.default || {}) || "any" }}
+                    <span class="field-hint">Kept as written in app.yml.</span>
+                  </p>
+                  <template v-else>
+                    <el-select
+                      :model-value="referenceEntryOf(port)?.id || ''"
+                      class="full"
+                      filterable
+                      :loading="referenceCatalogState === 'loading'"
+                      :placeholder="port.reference ? 'Not in the catalog: choose one to replace it' : 'Choose a reference'"
+                      @change="(id) => pickReference(port, id)"
+                    >
+                      <el-option-group v-for="g in referenceGroups" :key="g.kind" :label="g.label">
+                        <el-option v-for="e in g.entries" :key="e.id" :label="referenceLabel(e)" :value="e.id">
+                          <span>{{ referenceLabel(e) }}</span>
+                          <span class="reference-option-meta">{{ assetClassName(e.version?.spec?.assetClass) }}</span>
+                        </el-option>
+                      </el-option-group>
+                    </el-select>
+                    <p class="field-hint">
+                      <router-link :to="{ name: 'reference-catalog' }" target="_blank">Browse reference data</router-link>
+                    </p>
+                  </template>
+                </div>
+              </div>
+              <div v-if="portMode(port) === 'reference' && port.reference" class="field-row full-width">
+                <label class="field-label">Who picks it</label>
+                <div class="field-control">
+                  <el-radio-group
+                    :model-value="port.reference.choice === 'app' ? 'app' : 'user'"
+                    size="small"
+                    aria-label="Who picks the reference"
+                    :disabled="!referenceEntryOf(port)"
+                    @update:model-value="(c) => setReferenceChoice(port, c)"
+                  >
+                    <el-radio-button value="app">Always this one</el-radio-button>
+                    <el-radio-button value="user">Runs can choose</el-radio-button>
+                  </el-radio-group>
+                  <el-checkbox-group
+                    v-if="port.reference.choice !== 'app' && port.reference.kind === 'genome' && organismOptions(port).length > 1"
+                    :model-value="port.reference.organisms || []"
+                    class="reference-organisms"
+                    @update:model-value="(o) => setOrganisms(port, o)"
+                  >
+                    <el-checkbox v-for="t in organismOptions(port)" :key="t" :value="t">{{ organismLabel(t) }}</el-checkbox>
+                  </el-checkbox-group>
+                  <p class="field-hint">{{ referenceChoiceHint(port.reference) }}</p>
+                </div>
+              </div>
+
               <!-- A file or a folder: its format -->
-              <div v-if="portMode(port) !== 'layout'" class="field-row full-width" :data-field="`${block.key}.${index}.mediaTypes`" :class="{ 'has-problem': formatProblems(port, `${block.key}.${index}.mediaTypes`).length > 0 }">
+              <div v-if="portMode(port) === 'file' || portMode(port) === 'folder'" class="field-row full-width" :data-field="`${block.key}.${index}.mediaTypes`" :class="{ 'has-problem': formatProblems(port, `${block.key}.${index}.mediaTypes`).length > 0 }">
                 <label class="field-label">{{ portMode(port) === "folder" ? "Folder format" : "Media type" }}</label>
                 <div class="field-control">
                   <!-- Searchable by format name, extension or media type -->
@@ -396,7 +452,14 @@
                   </p>
                 </div>
               </div>
-              <div v-if="block.key === 'inputs'" class="field-row full-width">
+              <div v-if="block.key === 'inputs' && portMode(port) === 'reference'" class="field-row full-width">
+                <label class="field-label">Placed at</label>
+                <div class="field-control">
+                  <span class="field-static"><code>$INPUT_DIR/{{ port.name || "&lt;name&gt;" }}/</code></span>
+                  <p class="field-hint">A reference is unpacked into the input's own folder.</p>
+                </div>
+              </div>
+              <div v-else-if="block.key === 'inputs'" class="field-row full-width">
                 <label class="field-label">Placed at</label>
                 <div class="field-control">
                   <el-radio-group :model-value="port.placement || 'root'" size="small" aria-label="Where the input is placed" @update:model-value="(v) => (port.placement = v === 'root' ? '' : v)">
@@ -411,71 +474,6 @@
                   <p v-else-if="port.placement === 'subfolder' && port.name && !/^[a-z0-9][a-z0-9-]*$/.test(port.name)" class="field-error">
                     As a folder name, the name can only have lowercase letters, numbers and dashes.
                   </p>
-                </div>
-              </div>
-              <!-- Filled from Pennsieve's reference catalog -->
-              <div v-if="block.key === 'inputs' && (hasReferenceCatalog || port.reference)" class="field-row full-width">
-                <label class="field-label">Reference data <span class="label-helper">optional</span></label>
-                <div class="field-control">
-                  <el-switch
-                    :model-value="showsReference(port)"
-                    :disabled="!hasReferenceCatalog"
-                    aria-label="Filled from reference data"
-                    @update:model-value="(on) => setReferenceData(port, on)"
-                  />
-                  <span class="reference-switch-label">Filled from Pennsieve's reference data</span>
-                  <template v-if="showsReference(port)">
-                    <p v-if="referenceCatalogState === 'failed'" class="field-error">The reference catalog couldn't be loaded.</p>
-                    <p v-else-if="!hasReferenceCatalog && port.reference" class="field-hint">
-                      {{ referenceKindText(port.reference) }} · {{ referenceLabel(port.reference.choice === "app" ? port.reference : port.reference.default || {}) || "any" }}. Kept as written in app.yml.
-                    </p>
-                    <template v-else>
-                      <el-select
-                        :model-value="referenceEntryOf(port)?.id || ''"
-                        class="full reference-select"
-                        filterable
-                        :loading="referenceCatalogState === 'loading'"
-                        :placeholder="port.reference ? 'Not in the catalog: choose one to replace it' : 'Choose a reference'"
-                        @change="(id) => pickReference(port, id)"
-                      >
-                        <el-option-group v-for="g in referenceGroups" :key="g.kind" :label="g.label">
-                          <el-option v-for="e in g.entries" :key="e.id" :label="referenceLabel(e)" :value="e.id">
-                            <span>{{ referenceLabel(e) }}</span>
-                            <span class="reference-option-meta">{{ assetClassName(e.version?.spec?.assetClass) }}</span>
-                          </el-option>
-                        </el-option-group>
-                      </el-select>
-                      <template v-if="port.reference">
-                        <el-radio-group
-                          :model-value="port.reference.choice === 'app' ? 'app' : 'user'"
-                          size="small"
-                          class="reference-choice"
-                          aria-label="Who chooses the reference"
-                          :disabled="!referenceEntryOf(port)"
-                          @update:model-value="(c) => setReferenceChoice(port, c)"
-                        >
-                          <el-radio-button value="app">Always this one</el-radio-button>
-                          <el-radio-button value="user">Runs can choose</el-radio-button>
-                        </el-radio-group>
-                        <el-checkbox-group
-                          v-if="port.reference.choice !== 'app' && port.reference.kind === 'genome' && organismOptions(port).length > 1"
-                          :model-value="port.reference.organisms || []"
-                          class="reference-organisms"
-                          @update:model-value="(o) => setOrganisms(port, o)"
-                        >
-                          <el-checkbox v-for="t in organismOptions(port)" :key="t" :value="t">{{ organismLabel(t) }}</el-checkbox>
-                        </el-checkbox-group>
-                        <p class="field-hint">
-                          <template v-if="port.reference.choice === 'app'">Every run gets this reference.</template>
-                          <template v-else>
-                            Runs get this one unless they pick another {{ referenceKindText(port.reference).toLowerCase() }} entry<template v-if="port.reference.kind === 'genome'"> ({{ port.reference.organisms?.length ? "of the organisms checked" : "of any organism" }})</template>.
-                          </template>
-                          It's unpacked into <code>$INPUT_DIR/{{ port.name || "&lt;name&gt;" }}/</code>.
-                          <router-link :to="{ name: 'reference-catalog' }" target="_blank">Browse reference data</router-link>
-                        </p>
-                      </template>
-                    </template>
-                  </template>
                 </div>
               </div>
               <div v-if="block.key === 'inputs'" class="field-row">
@@ -639,14 +637,13 @@ const referenceGroups = computed(() =>
 // Inputs turned on but with no entry picked yet: nothing is written until one is.
 const wantsReference = reactive(new WeakSet());
 const showsReference = (port) => !!port.reference || wantsReference.has(toRaw(port));
-const setReferenceData = (port, on) => {
-  if (on) {
-    wantsReference.add(toRaw(port));
-    loadReferenceCatalog();
-  } else {
-    wantsReference.delete(toRaw(port));
-    delete port.reference;
-  }
+// What the choice means for a run.
+const referenceChoiceHint = (reference) => {
+  if (reference.choice === "app") return "Every run gets this reference.";
+  if (reference.kind !== "genome") return "Runs get this one unless they pick another of the same kind.";
+  return reference.organisms?.length
+    ? "Runs get this one unless they pick another of the same kind, of the organisms checked."
+    : "Runs get this one unless they pick another of the same kind, of any organism.";
 };
 // The catalog entry an input's block takes by default, if the catalog has it.
 const referenceEntryOf = (port) =>
@@ -808,7 +805,11 @@ const PORT_MODES = [
   { value: "file", label: "Files", hint: "Each item is one file: an EDF recording, a DICOM slice, a CSV table. A folder of them is fine; paths are kept." },
   { value: "folder", label: "Folders of a format", hint: "Each item is a folder that is one thing, in a folder format: an .ome.zarr image, a .mefd session." },
   { value: "layout", label: "One folder with a set layout", hint: "One folder tree laid out by a standard, such as BIDS or a Pennsieve published dataset." },
+  { value: "reference", label: "Reference data", hint: "Data Pennsieve keeps for apps, such as a genome index or a brain template: no files to select, the run gets it from the catalog." },
 ];
+// Reference data is for inputs, where the site has the catalog (or the app.yml already uses it).
+const portModes = (blockKey, port) =>
+  PORT_MODES.filter((m) => m.value !== "reference" || (blockKey === "inputs" && (hasReferenceCatalog || port.reference)));
 // Where an input's data goes in INPUT_DIR (app.yml placement).
 const PLACEMENTS = [
   { value: "root", label: "Root of INPUT_DIR" },
@@ -821,12 +822,30 @@ const formatTouched = reactive(new WeakSet());
 const formatProblems = (port, key) =>
   portMode(port) === "folder" && port.dataType === "any" && !formatTouched.has(toRaw(port)) ? [] : at(key);
 const portMode = (port) => {
+  if (showsReference(port)) return "reference";
   if (conformsToList(port.conformsTo).length) return "layout";
   if (port.container === "directory") return "folder";
   return chosenModes.get(toRaw(port)) || "file";
 };
 const setPortMode = (port, mode) => {
   if (portMode(port) === mode) return;
+  if (mode === "reference") {
+    // No files: the block (once an entry is picked) is all there is.
+    wantsReference.add(toRaw(port));
+    loadReferenceCatalog();
+    chosenModes.delete(toRaw(port));
+    port.conformsTo = [];
+    port.container = "";
+    port.dataType = "any";
+    port.mediaTypes = [];
+    port.formats = [];
+    port.placement = "subfolder";
+    return;
+  }
+  if (portMode(port) === "reference") {
+    wantsReference.delete(toRaw(port));
+    delete port.reference;
+  }
   const before = optionFor(port.dataType);
   chosenModes.set(toRaw(port), mode);
   port.conformsTo = [];
@@ -969,21 +988,12 @@ const removePort = (key, i) => schema.value[key].splice(i, 1);
   line-height: 1.4;
   color: theme.$red_2;
 }
-.reference-switch-label {
-  margin-left: 8px;
-  font-size: 13px;
-  color: theme.$gray_6;
-}
-.reference-select {
-  margin-top: 8px;
-}
 .reference-option-meta {
   float: right;
   margin-left: 12px;
   font-size: 12px;
   color: theme.$gray_4;
 }
-.reference-choice,
 .reference-organisms {
   display: flex;
   margin-top: 8px;
