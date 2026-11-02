@@ -333,7 +333,22 @@
 
                         <span class="reference-grid-label">Organism</span>
                         <div>
-                          <el-input :model-value="referenceIdentity(port).taxonomyId ?? ''" placeholder="NCBI taxonomy id, e.g. 9606 (human)" @update:model-value="(v) => setIdentityField(port, 'taxonomyId', v)" />
+                          <el-select
+                            :model-value="referenceIdentity(port).taxonomyId || ''"
+                            class="full"
+                            filterable
+                            remote
+                            clearable
+                            :remote-method="searchOrganisms"
+                            :loading="organismSearching"
+                            placeholder="Search species, e.g. zebrafish or Danio rerio"
+                            @change="(v) => setIdentityField(port, 'taxonomyId', v)"
+                          >
+                            <el-option v-for="o in organismOptions(port)" :key="o.taxonomyId" :label="o.label" :value="o.taxonomyId">
+                              <span>{{ o.label }}</span>
+                              <span class="reference-option-meta">{{ o.common || `NCBITaxon:${o.taxonomyId}` }}</span>
+                            </el-option>
+                          </el-select>
                           <p v-for="m in identityProblems(port, index, 'taxonomyId')" :key="m" class="field-error">{{ m }}</p>
                         </div>
 
@@ -598,13 +613,14 @@
 </template>
 
 <script setup>
-import { computed, onMounted, reactive, ref, toRaw } from "vue";
+import { computed, onMounted, reactive, ref, toRaw, watch } from "vue";
 import { useStore } from "vuex";
 import MoreOptions from "./MoreOptions.vue";
 import FieldHint from "./FieldHint.vue";
 import { PARAM_TYPES, PARAM_TYPE_OPTIONS, createParameter, createPort, portDataTypeOptions, STANDARD_CPU_OPTIONS, getStandardMemoryOptions, isNumericType, mediaTypeMatches, structureId, structureOptionsFor, structureMatches, isStructureLink, conformsToList, rootInputCollisions } from "./applicationSchema";
 import { environmentsServiceUrl, findReferences } from "@/utils/environmentsService";
-import { REFERENCE_KINDS, assetClassName, isAppDefault, organismName, referenceBlock, referenceKindText, referenceLabel } from "../RunMonitor/referenceSources";
+import { useOntologyStore } from "@/stores/ontologyStore";
+import { REFERENCE_KINDS, assetClassName, isAppDefault, organismName, referenceBlock, referenceKindText, referenceLabel, taxonFromTerm } from "../RunMonitor/referenceSources";
 import { canonicalTag, preferredTagGroups, tagOptionMatches, tagDomainNudge, hasDomainTag, domainOfTag, domainColors } from "./appDomains";
 
 /**
@@ -814,6 +830,68 @@ const writeProperties = (port, rows) => {
 const setPropertyRow = (port, i, change) => writeProperties(port, propertyRows(port).map((r, j) => (j === i ? { ...r, ...change } : r)));
 const addPropertyRow = (port) => writeProperties(port, [...propertyRows(port), { name: "", value: "" }]);
 const removePropertyRow = (port, i) => writeProperties(port, propertyRows(port).filter((_, j) => j !== i));
+/*
+  The organism, picked by name from the NCBITaxon ontology (the ontology
+  browser's), written as its taxonomy id. A number typed in is taken as an
+  id when the ontology can't be searched.
+*/
+const ontology = useOntologyStore();
+const organismResults = ref([]);
+const organismSearching = ref(false);
+const taxonNames = reactive({}); // taxonomy id -> { label, common }
+const remember = (taxa) => {
+  for (const t of taxa) taxonNames[t.taxonomyId] = { label: t.label, common: t.common };
+};
+let organismQuery = 0;
+const searchOrganisms = async (q) => {
+  const term = String(q || "").trim();
+  const asked = ++organismQuery;
+  if (!term) {
+    organismResults.value = [];
+    organismSearching.value = false;
+    return;
+  }
+  organismSearching.value = true;
+  let taxa = [];
+  try {
+    taxa = (await ontology.search(term, { limit: 12, ontologies: ["NCBITaxon"] })).map(taxonFromTerm).filter(Boolean);
+  } catch {
+    taxa = []; // ontology slices unavailable: an id typed in still works
+  }
+  if (/^\d+$/.test(term) && !taxa.some((t) => t.taxonomyId === Number(term))) {
+    taxa.unshift({ taxonomyId: Number(term), label: taxonNames[term]?.label || `NCBITaxon:${term}`, common: "" });
+  }
+  if (asked !== organismQuery) return; // a newer search is on its way (and clears the spinner)
+  remember(taxa);
+  organismResults.value = taxa;
+  organismSearching.value = false;
+};
+// The search's results, and the organism the input already names.
+const organismOptions = (port) => {
+  const id = referenceIdentity(port).taxonomyId;
+  const current =
+    id && !organismResults.value.some((o) => o.taxonomyId === id)
+      ? [{ taxonomyId: id, label: taxonNames[id]?.label || organismName(id) || `NCBITaxon:${id}`, common: taxonNames[id]?.common || "" }]
+      : [];
+  return [...current, ...organismResults.value];
+};
+// Names for the organisms the app.yml already has, from the ontology.
+watch(
+  () => [...new Set((schema.value.inputs || []).map((p) => Number(referenceIdentity(p).taxonomyId)).filter(Boolean))].join(","),
+  async (ids) => {
+    for (const id of ids ? ids.split(",") : []) {
+      if (taxonNames[id]) continue;
+      try {
+        const hit = (await ontology.search(`NCBITaxon:${id}`, { limit: 1, ontologies: ["NCBITaxon"] })).map(taxonFromTerm).find((t) => t?.taxonomyId === Number(id));
+        if (hit) remember([hit]);
+      } catch {
+        return;
+      }
+    }
+  },
+  { immediate: true }
+);
+
 // What it is: the catalog's asset classes of the kind, and the input's own.
 const assetClassOptions = (port) => {
   const kind = port.reference?.kind || "genome";

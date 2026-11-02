@@ -23,6 +23,7 @@ import {
   referenceSnippet,
   referenceBlock,
   catalogLacks,
+  taxonFromTerm,
   assetClassName,
 } from "./referenceSources";
 import { ref } from "vue";
@@ -332,5 +333,17 @@ describe("references the catalog doesn't have", () => {
     }, ref);
     await failing.ensureLoaded([index]);
     expect(failing.isLoaded(index)).toBe(false);
+  });
+});
+
+describe("organisms from the ontology", () => {
+  it("reads NCBITaxon terms", () => {
+    expect(taxonFromTerm({ curie: "NCBITaxon:7955", label: "Danio rerio", synonyms: "zebrafish|Danio rerio|zebra fish|Brachydanio rerio" })).toEqual({
+      taxonomyId: 7955,
+      label: "Danio rerio",
+      common: "zebrafish, zebra fish",
+    });
+    expect(taxonFromTerm({ curie: "NCBITaxon:9606", label: "Homo sapiens", synonyms: "" }).common).toBe("");
+    expect(taxonFromTerm({ curie: "UBERON:0000955", label: "brain" })).toBe(null);
   });
 });

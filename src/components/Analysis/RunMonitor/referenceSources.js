@@ -48,6 +48,21 @@ export const referenceKindText = (reference) => {
 export const organismName = (taxonomyId, organism = "") =>
   ORGANISMS[taxonomyId] || organism || (taxonomyId ? `Taxon ${taxonomyId}` : "");
 
+// An organism from an NCBITaxon ontology term (the ontology store's search
+// row): { taxonomyId, label (scientific name), common (a few synonyms) }, or
+// null for a term that isn't a taxon.
+export const taxonFromTerm = (term) => {
+  const m = String(term?.curie || "").match(/^NCBITaxon:(\d+)$/);
+  if (!m) return null;
+  const common = String(term.synonyms || "")
+    .split("|")
+    .map((x) => x.trim())
+    .filter((x) => x && x.toLowerCase() !== String(term.label || "").toLowerCase())
+    .slice(0, 2)
+    .join(", ");
+  return { taxonomyId: Number(m[1]), label: term.label || `NCBITaxon:${m[1]}`, common };
+};
+
 export const assemblyName = (accession) => ASSEMBLIES[accession] || accession || "";
 
 export const annotationName = (annotation) =>
