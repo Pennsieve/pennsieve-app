@@ -1211,9 +1211,8 @@ export const actions = {
 
       if (resp.ok) {
         const raw = await resp.json();
-        // Node layers are retired: runs can't write to one, so the registry's
-        // persistent-layer type isn't offered (runHelpers still names it for
-        // older runs).
+        // Node layers are retired: the persistent-layer target type is never
+        // offered, even from a registry that still lists it.
         const result = raw.filter((tt) => tt.targetType !== "persistent-layer").map((tt) => {
           const rc = tt.runtimeConfig || {};
           return {

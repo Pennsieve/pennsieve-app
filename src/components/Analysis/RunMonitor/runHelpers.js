@@ -107,15 +107,8 @@ export const findAppByUrl = (sourceUrl, applications) => {
   );
 };
 
-// What the app calls a target type where the registry's label is out of date.
-// Node layers are retired (runs can't choose them any more), but older runs
-// and workflows still name the target.
-const TARGET_TYPE_NAMES = { "persistent-layer": "Node layer" };
-
-// A target type's name for people: ours, else the registry's label, else the
-// type itself.
+// A target type's name for people: the registry's label, else the type itself.
 export const targetTypeName = (targetType, targetTypes = []) => {
-  if (TARGET_TYPE_NAMES[targetType]) return TARGET_TYPE_NAMES[targetType];
   const tt = targetTypes.find((t) => t.targetType === targetType);
   return tt?.label || targetType;
 };

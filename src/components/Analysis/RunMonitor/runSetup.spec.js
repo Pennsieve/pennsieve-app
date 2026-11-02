@@ -59,10 +59,9 @@ describe("defaultNode", () => {
 });
 
 describe("needsDataset", () => {
-  it("is true for a data source or a dataset target, not for a layer target", () => {
+  it("is true for a data source or a dataset target, not for a download", () => {
     expect(needsDataset({ dag: [{ type: "data-source" }] })).toBe(true);
     expect(needsDataset({ dag: [{ type: "data-target", targetType: "pennsieve-dataset" }] })).toBe(true);
-    expect(needsDataset({ dag: [{ type: "processor" }, { type: "data-target", targetType: "persistent-layer" }] })).toBe(false);
     expect(needsDataset(null)).toBe(false);
     expect(needsDataset({ dag: [{ type: "processor" }, { type: "data-target", targetType: "download" }] })).toBe(false);
   });
