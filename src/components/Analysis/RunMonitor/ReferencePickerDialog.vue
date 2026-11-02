@@ -124,6 +124,7 @@ const confirm = (entry = picked.value) => {
               <template v-if="details.assembly"><dt>Assembly</dt><dd>{{ details.assembly }}</dd></template>
               <template v-if="details.annotation"><dt>Annotation</dt><dd>{{ details.annotation }}</dd></template>
               <template v-if="details.tool"><dt>Built with</dt><dd>{{ details.tool }}</dd></template>
+              <template v-for="p in details.properties" :key="p.name"><dt>{{ p.name }}</dt><dd>{{ p.value }}</dd></template>
               <template v-if="details.unpackedBytes"><dt>On the step's disk</dt><dd>{{ formatSize(details.unpackedBytes) }}</dd></template>
               <template v-if="details.license"><dt>License</dt><dd>{{ details.license }}</dd></template>
             </dl>
