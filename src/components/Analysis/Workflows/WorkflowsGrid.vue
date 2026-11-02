@@ -346,7 +346,7 @@ onMounted(async () => {
       <div class="list-toolbar">
         <el-input
           v-model="searchQuery"
-          placeholder="Search by name, app, input or output…"
+          placeholder="Search by name, tag, app, input or output…"
           clearable
           class="workflows-search-input toolbar-search"
         />
@@ -448,6 +448,9 @@ onMounted(async () => {
               <span v-if="appNames(wf, applications).length > 3" class="wf-app wf-app--more">
                 +{{ appNames(wf, applications).length - 3 }}
               </span>
+            </div>
+            <div v-if="wf.tags?.length" class="wf-tags">
+              <span v-for="t in wf.tags.slice(0, 4)" :key="t" class="wf-tag">{{ t }}</span>
             </div>
             <div class="wf-foot">
               <span class="wf-usage">
@@ -869,6 +872,21 @@ $card-height: 172px;
 }
 .wf-app--more {
   background: theme.$gray_0;
+  color: theme.$gray_5;
+}
+/* The workflow's own tags, a few, as on an app's card: the rest are found
+   by search. */
+.wf-tags {
+  display: flex;
+  gap: 4px;
+  overflow: hidden;
+}
+.wf-tag {
+  flex-shrink: 0;
+  padding: 0 6px;
+  border-radius: 3px;
+  background: theme.$gray_0;
+  font-size: 11px;
   color: theme.$gray_5;
 }
 .wf-foot {

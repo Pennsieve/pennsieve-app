@@ -5,75 +5,9 @@
       <div class="field-row" data-field="application.tags" :class="{ 'has-problem': at('application.tags').length }">
         <label class="field-label">Tags <field-hint text="What the app is for; it colours its card and helps people find it." /></label>
         <div class="field-control">
-          <!-- Preferred tags first (a domain's own, colouring the card), then
-               the aliases that colour it the same way, then the research
-               fields (a filter, no colour). -->
-          <el-select
-            :model-value="schema.tags"
-            multiple
-            filterable
-            allow-create
-            default-first-option
-            :reserve-keyword="false"
-            :filter-method="(q) => (tagQuery = q)"
-            placeholder="Pick a preferred tag, or type your own"
-            class="full"
-            popper-class="tag-options"
-            @update:model-value="setTags"
-            @visible-change="(open) => open || (tagQuery = '')"
-          >
-            <template #tag>
-              <el-tag
-                v-for="t in schema.tags"
-                :key="t"
-                closable
-                disable-transitions
-                class="domain-tag-chip"
-                :style="tagChipStyle(t)"
-                @close="removeTag(t)"
-              >{{ t }}</el-tag>
-            </template>
-            <el-option-group v-if="preferredOptions.length" label="Preferred">
-              <el-option v-for="o in preferredOptions" :key="o.tag" :label="o.tag" :value="o.tag">
-                <span class="tag-option">
-                  <span class="tag-dot" :style="{ background: domainColors(o.domain).accent }" />
-                  <svg class="tag-icon" viewBox="0 0 24 24" aria-hidden="true"><path :d="o.domain.icon" /></svg>
-                  <span class="tag-name">{{ o.tag }}</span>
-                  <span class="tag-meta">{{ o.domain.label }}</span>
-                </span>
-              </el-option>
-            </el-option-group>
-            <el-option-group v-if="aliasOptions.length" label="Also recognised">
-              <el-option v-for="o in aliasOptions" :key="o.tag" :label="o.tag" :value="o.tag">
-                <span class="tag-option tag-option--alias">
-                  <span class="tag-name">{{ o.tag }}</span>
-                  <span class="tag-meta">→ {{ o.domain.label }}</span>
-                </span>
-              </el-option>
-            </el-option-group>
-            <el-option-group v-if="fieldOptions.length" label="Research field">
-              <el-option v-for="o in fieldOptions" :key="o.tag" :label="o.tag" :value="o.tag">
-                <span class="tag-option tag-option--field">
-                  <span class="tag-name">{{ o.tag }}</span>
-                  <span class="tag-meta">{{ o.field.label }}</span>
-                </span>
-              </el-option>
-            </el-option-group>
-          </el-select>
-          <p v-for="m in at('application.tags')" :key="m" class="field-error">{{ m }}</p>
-          <!-- A domain's nudge first, then a grey card's note, then a field's
-               nudge: the colour matters more than the filter. -->
-          <p v-if="tagNudge?.domain" class="tag-note">
-            Also add <strong>{{ tagNudge.tag }}</strong>, the preferred tag for {{ tagNudge.label }}?
-            <button type="button" class="tag-note-action" @click="setTags([...schema.tags, tagNudge.tag])">Add</button>
-          </p>
-          <p v-else-if="!hasDomainTag(schema.tags)" class="tag-note">
-            No domain tag, so the card is grey. Pick one from Preferred.
-          </p>
-          <p v-else-if="tagNudge" class="tag-note">
-            Also add <strong>{{ tagNudge.tag }}</strong>, the tag for {{ tagNudge.label }}?
-            <button type="button" class="tag-note-action" @click="setTags([...schema.tags, tagNudge.tag])">Add</button>
-          </p>
+          <domain-tags-input :model-value="schema.tags" colours @update:model-value="setTags">
+            <p v-for="m in at('application.tags')" :key="m" class="field-error">{{ m }}</p>
+          </domain-tags-input>
         </div>
       </div>
     </template>
@@ -622,7 +556,7 @@ import { PARAM_TYPES, PARAM_TYPE_OPTIONS, createParameter, createPort, portDataT
 import { environmentsServiceUrl, findReferences } from "@/utils/environmentsService";
 import { useOntologyStore } from "@/stores/ontologyStore";
 import { REFERENCE_KINDS, assetClassName, isAppDefault, organismName, referenceBlock, referenceKindText, referenceLabel, taxonFromTerm, rankOrganisms, COMMON_ORGANISMS } from "../RunMonitor/referenceSources";
-import { canonicalTag, preferredTagGroups, tagOptionMatches, tagDomainNudge, hasDomainTag, domainOfTag, domainColors } from "./appDomains";
+import DomainTagsInput from "./DomainTagsInput.vue";
 
 /**
  * One part of the app manifest builder's form, bound to an ApplicationSchema
@@ -648,28 +582,10 @@ const at = (key) => props.problems[key] || [];
 const rowClass = (key) => ({ "has-problem": at(key).length > 0 });
 const hasValue = (v) => v != null && v !== "";
 
-// A typed tag lands on the suggestion it spells ("EEG" -> "eeg"), so the
-// same thing gets one tag across apps.
+// The tags, as DomainTagsInput gives them (canonical, one of each).
 function setTags(tags) {
-  schema.value.tags = [...new Set((tags || []).map(canonicalTag).filter(Boolean))];
+  schema.value.tags = tags;
 }
-const removeTag = (tag) => setTags(schema.value.tags.filter((t) => t !== tag));
-
-// The tag options, filtered by what's typed; preferred tags also match their
-// domain's aliases, so "spike" offers spike-sorting first.
-const tagQuery = ref("");
-const tagGroups = preferredTagGroups();
-const preferredOptions = computed(() => tagGroups.preferred.filter((o) => tagOptionMatches(o, tagQuery.value, { preferred: true })));
-const aliasOptions = computed(() => tagGroups.aliases.filter((o) => tagOptionMatches(o, tagQuery.value)));
-const fieldOptions = computed(() => tagGroups.fields.filter((o) => tagOptionMatches(o, tagQuery.value, { preferred: true })));
-const tagNudge = computed(() => tagDomainNudge(schema.value.tags || []));
-// A chip in its domain's colours, as on the Apps tab; neutral without one.
-const tagChipStyle = (tag) => {
-  const d = domainOfTag(tag);
-  if (!d) return {};
-  const c = domainColors(d);
-  return { "--el-tag-bg-color": c.bg, "--el-tag-border-color": c.line, "--el-tag-text-color": c.ink };
-};
 
 /*
   A port's media type is a platform package format, not a vocabulary this form
@@ -1352,29 +1268,6 @@ const removePort = (key, i) => schema.value[key].splice(i, 1);
   font-size: 11px;
   color: theme.$gray_4;
 }
-.domain-tag-chip {
-  margin: 2px 4px 2px 0;
-  border-radius: 3px;
-  font-size: 12px;
-}
-.tag-note {
-  margin: 6px 0 0;
-  font-size: 12px;
-  color: theme.$gray_5;
-}
-.tag-note-action {
-  margin-left: 4px;
-  padding: 0;
-  border: none;
-  background: none;
-  font: inherit;
-  color: theme.$purple_3;
-  cursor: pointer;
-
-  &:hover {
-    text-decoration: underline;
-  }
-}
 </style>
 
 <style lang="scss">
@@ -1394,44 +1287,6 @@ const removePort = (key, i) => schema.value[key].splice(i, 1);
     -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
     overflow: hidden;
-  }
-}
-
-/* The tag dropdown is teleported, so its option styles can't be scoped. */
-.tag-options {
-  .tag-option {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 13px;
-  }
-  .tag-dot {
-    width: 8px;
-    height: 8px;
-    flex-shrink: 0;
-    border-radius: 50%;
-  }
-  .tag-icon {
-    width: 14px;
-    height: 14px;
-    flex-shrink: 0;
-    fill: none;
-    stroke: theme.$gray_5;
-    stroke-width: 2;
-    stroke-linecap: round;
-    stroke-linejoin: round;
-  }
-  .tag-name {
-    color: theme.$gray_6;
-  }
-  .tag-meta {
-    margin-left: auto;
-    padding-left: 12px;
-    font-size: 12px;
-    color: theme.$gray_4;
-  }
-  .tag-option--alias .tag-name {
-    color: theme.$gray_5;
   }
 }
 </style>

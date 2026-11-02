@@ -7,13 +7,13 @@ import { isNotebookWorkflow } from "../RunMonitor/notebookHelpers";
 import { interfaceDag } from "../RunMonitor/workflowInterface";
 import { fieldsOf } from "../Applications/appDomains";
 
-// Whether a workflow matches a search: its name, description, the apps it
-// runs, or what goes in and comes out ("spike" finds the one running
+// Whether a workflow matches a search: its name, description, tags, the
+// apps it runs, or what goes in and comes out ("spike" finds the one running
 // spike-detect; "download" the ones that produce a download).
 export function matchesSearch(wf, query, { applications = [], targetTypes = [] } = {}) {
   const q = (query || "").trim().toLowerCase();
   if (!q) return true;
-  const haystack = [wf.name, wf.description, ...appNames(wf, applications), ioSummary(wf, targetTypes)]
+  const haystack = [wf.name, wf.description, ...(wf.tags || []), ...appNames(wf, applications), ioSummary(wf, targetTypes)]
     .filter(Boolean)
     .join("\n")
     .toLowerCase();
@@ -45,10 +45,10 @@ function stepApps(wf, applications) {
     .map((n) => byUrl.get(normalizeUrl(n.sourceUrl)) || null);
 }
 
-// The research fields a workflow serves: those of its steps' apps, from
-// their app.yml tags, in step order.
+// The research fields a workflow serves: its own tags' first, then those of
+// its steps' apps, from their app.yml tags, in step order.
 export function workflowFields(wf, applications = []) {
-  return [...new Set(stepApps(wf, applications).flatMap((app) => fieldsOf(versionManifest(app))))];
+  return [...new Set([...fieldsOf(wf), ...stepApps(wf, applications).flatMap((app) => fieldsOf(versionManifest(app)))])];
 }
 
 // The field chips for a list: each field some workflow serves, with how

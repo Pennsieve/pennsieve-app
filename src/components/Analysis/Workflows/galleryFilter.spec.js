@@ -36,6 +36,13 @@ describe("matchesSearch", () => {
     expect(matchesSearch(zipper, "zip download", { targetTypes })).toBe(true);
     expect(matchesSearch(zipper, "zip pennsieve", { targetTypes })).toBe(false);
   });
+
+  it("matches the workflow's own tags", () => {
+    const tagged = { ...zipper, tags: ["quality-control", "Cytometry"] };
+    expect(matchesSearch(tagged, "cytometry")).toBe(true);
+    expect(matchesSearch(tagged, "quality zip")).toBe(true);
+    expect(matchesSearch(zipper, "cytometry")).toBe(false);
+  });
 });
 
 describe("applyFilters", () => {
@@ -81,6 +88,13 @@ describe("research fields", () => {
     expect(workflowFields(cyto, applications).map((f) => f.key)).toEqual(["immunology", "oncology"]);
     // An app not loaded, or without fields, adds none.
     expect(workflowFields(zipper, applications)).toEqual([]);
+  });
+
+  it("come from the workflow's own tags first", () => {
+    const tagged = { ...cyto, tags: ["oncology", "quality-control"] };
+    expect(workflowFields(tagged, applications).map((f) => f.key)).toEqual(["oncology", "immunology"]);
+    expect(workflowFields({ ...zipper, tags: ["Neuroscience"] }, applications).map((f) => f.key)).toEqual(["neuroscience"]);
+    expect(applyFilters([spikes, zipper, tagged], { field: "oncology", applications })).toEqual([tagged]);
   });
 
   it("offers the fields the list has, most common first", () => {

@@ -42,6 +42,7 @@ import {
 import { useAppManifest } from "@/composables/useAppManifest";
 import BuilderBar from "./BuilderBar.vue";
 import WorkflowExampleLink from "../Workflows/WorkflowExampleLink.vue";
+import DomainTagsInput from "../Applications/DomainTagsInput.vue";
 import BuilderPalette from "./BuilderPalette.vue";
 import ParamField from "./ParamField.vue";
 import { ioLine, sessionTypeOf, versionManifest, shortMediaType, stepVariant } from "./appManifestInfo";
@@ -148,6 +149,7 @@ const accordionActiveNames = ref(["workflows"]);
 const isEditingDetails = ref(false);
 const editName = ref("");
 const editDescription = ref("");
+const editTags = ref([]);
 const isSavingDetails = ref(false);
 const selectedNode = ref(null); // currently selected node on canvas
 const editingTargetNodes = reactive(new Set()); // track which data-target nodes are in edit mode
@@ -1118,6 +1120,7 @@ const startEditDetails = () => {
   if (!selectedWorkflow.value) return;
   editName.value = selectedWorkflow.value.name || "";
   editDescription.value = selectedWorkflow.value.description || "";
+  editTags.value = [...(selectedWorkflow.value.tags || [])];
   isEditingDetails.value = true;
 };
 
@@ -1134,12 +1137,14 @@ const saveDetails = async () => {
       payload: {
         name: editName.value,
         description: editDescription.value,
+        tags: editTags.value,
       },
     });
     selectedWorkflow.value = {
       ...selectedWorkflow.value,
       name: editName.value,
       description: editDescription.value,
+      tags: [...editTags.value],
     };
     isEditingDetails.value = false;
     EventBus.$emit("toast", {
@@ -4015,6 +4020,8 @@ const openNodeSettings = (id) => {
                     :rows="3"
                     size="small"
                   />
+                  <label class="info-edit-label">Tags</label>
+                  <domain-tags-input v-model="editTags" placeholder="What the workflow is for" />
                   <div class="info-edit-actions">
                     <bf-button class="secondary" @click="cancelEditDetails">
                       Cancel
@@ -4039,6 +4046,12 @@ const openNodeSettings = (id) => {
                     <span class="info-value">{{
                       selectedWorkflow.description || "No description"
                     }}</span>
+                  </div>
+                  <div v-if="selectedWorkflow.tags?.length" class="info-row">
+                    <span class="info-label">Tags</span>
+                    <span class="info-value info-tags">
+                      <span v-for="t in selectedWorkflow.tags" :key="t" class="info-tag">{{ t }}</span>
+                    </span>
                   </div>
                   <!-- The example PDF (a run's summary); editors can remove it here -->
                   <WorkflowExampleLink
@@ -4106,7 +4119,7 @@ const openNodeSettings = (id) => {
                 </div>
                 <div v-if="canEditWorkflow" class="info-actions">
                   <button class="text-link-btn" @click="startEditDetails">
-                    Edit name & description
+                    Edit details
                   </button>
                 </div>
               </template>
@@ -5922,6 +5935,20 @@ kbd {
   color: theme.$black;
   text-align: right;
   word-break: break-word;
+}
+/* The workflow's tags, as on its card. */
+.info-tags {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 4px;
+}
+.info-tag {
+  padding: 0 6px;
+  border-radius: 3px;
+  background: theme.$gray_0;
+  font-size: 11px;
+  color: theme.$gray_5;
 }
 
 .info-inline-select {
