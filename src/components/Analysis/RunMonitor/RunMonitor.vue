@@ -20,7 +20,9 @@ import { useMetricsCounters } from "@/composables/useMetricsCounters";
 import toQueryParams from "@/utils/toQueryParams";
 import TargetDatasetField from "./TargetDatasetField.vue";
 import { targetWritesToDataset, targetParamFields, buildDataTargets, targetDatasetId, datasetName } from "./dataTargets";
-import { validateRunName, runDisplayName, RUN_NAME_MAX_LENGTH, targetTypeName } from "./runHelpers";
+import { validateRunName, runDisplayName, RUN_NAME_MAX_LENGTH, targetTypeName,
+  nodeMetricRows,
+} from "./runHelpers";
 import { sourceLabel, sourceHints, hintLine, portsOfStep, missingFilesMessage } from "../WorkflowGraph/sourceInputs";
 
 const { onNodeClick, onPaneClick, fitView, updateNodeData } = useVueFlow();
@@ -2847,7 +2849,11 @@ onUnmounted(() => {
             </div>
             <div v-if="nm.maxMemoryUsedMiB != null" class="receipt-row">
               <span>Memory Used</span>
-              <span>{{ nm.maxMemoryUsedMiB }} / {{ nm.memoryConfiguredMiB }} MiB</span>
+              <span>{{ Math.round(nm.maxMemoryUsedMiB) }} / {{ nm.memoryConfiguredMiB }} MiB</span>
+            </div>
+            <div v-if="nm.maxCpuUtilized != null && nm.cpuUnits" class="receipt-row">
+              <span>CPU Used</span>
+              <span>{{ (nm.maxCpuUtilized / 1024).toFixed(2) }} / {{ (nm.cpuUnits / 1024).toFixed(1) }} vCPU</span>
             </div>
             <div class="receipt-row">
               <span>Status</span>
@@ -2896,6 +2902,22 @@ onUnmounted(() => {
             </div>
           </div>
 
+          <div v-if="runMetrics.costEstimate.gpu?.taskCount" class="receipt-cost-group">
+            <div class="receipt-cost-group-title">GPU</div>
+            <div class="receipt-row">
+              <span>Instance</span>
+              <span>{{ runMetrics.costEstimate.gpu.instanceType || 'default tier' }}</span>
+            </div>
+            <div class="receipt-row">
+              <span>Instance Hours</span>
+              <span>{{ runMetrics.costEstimate.gpu.instanceHours?.toFixed(4) }}</span>
+            </div>
+            <div class="receipt-row receipt-row-cost">
+              <span>Subtotal</span>
+              <span>{{ formatCost(runMetrics.costEstimate.gpu.estimatedCost) }}</span>
+            </div>
+          </div>
+
           <div v-if="runMetrics.costEstimate.stepFunctions" class="receipt-cost-group">
             <div class="receipt-cost-group-title">Step Functions</div>
             <div class="receipt-row">
@@ -2920,15 +2942,35 @@ onUnmounted(() => {
             </div>
           </div>
 
-          <div v-if="runMetrics.costEstimate.efsThroughput" class="receipt-cost-group">
-            <div class="receipt-cost-group-title">EFS Throughput</div>
+          <div v-if="runMetrics.costEstimate.efsStorage" class="receipt-cost-group">
+            <div class="receipt-cost-group-title">EFS Storage</div>
             <div class="receipt-row">
-              <span>Read</span>
-              <span>{{ formatBytes(runMetrics.costEstimate.efsThroughput.readBytes) }}</span>
+              <span>Stored</span>
+              <span>{{ runMetrics.costEstimate.efsStorage.storageGB?.toFixed(2) }} GB</span>
             </div>
             <div class="receipt-row">
-              <span>Write</span>
+              <span>Hours</span>
+              <span>{{ runMetrics.costEstimate.efsStorage.durationHours?.toFixed(2) }}</span>
+            </div>
+            <div class="receipt-row receipt-row-cost">
+              <span>Subtotal</span>
+              <span>{{ formatCost(runMetrics.costEstimate.efsStorage.estimatedCost) }}</span>
+            </div>
+          </div>
+
+          <div v-if="runMetrics.costEstimate.efsThroughput?.readBytes || runMetrics.costEstimate.efsThroughput?.writeBytes" class="receipt-cost-group">
+            <div class="receipt-cost-group-title">EFS I/O</div>
+            <div class="receipt-row">
+              <span>Read</span>
+              <span>{{ formatBytes(runMetrics.costEstimate.efsThroughput.readBytes + (runMetrics.costEstimate.efsThroughput.metadataBytes || 0)) }}</span>
+            </div>
+            <div class="receipt-row">
+              <span>Written</span>
               <span>{{ formatBytes(runMetrics.costEstimate.efsThroughput.writeBytes) }}</span>
+            </div>
+            <div v-if="runMetrics.costEstimate.efsThroughput.maxConcurrentRuns > 1" class="receipt-row">
+              <span>Shared with</span>
+              <span>up to {{ runMetrics.costEstimate.efsThroughput.maxConcurrentRuns - 1 }} other run(s)</span>
             </div>
             <div class="receipt-row receipt-row-cost">
               <span>Subtotal</span>
@@ -2940,7 +2982,7 @@ onUnmounted(() => {
             <div class="receipt-cost-group-title">CloudWatch Logs</div>
             <div class="receipt-row">
               <span>Ingest</span>
-              <span>{{ runMetrics.costEstimate.cloudWatchLogs.estimatedIngestGB?.toFixed(6) }} GB</span>
+              <span>{{ runMetrics.costEstimate.cloudWatchLogs.ingestGB?.toFixed(6) }} GB</span>
             </div>
             <div class="receipt-row receipt-row-cost">
               <span>Subtotal</span>
@@ -2948,7 +2990,7 @@ onUnmounted(() => {
             </div>
           </div>
 
-          <div v-if="runMetrics.costEstimate.llm" class="receipt-cost-group">
+          <div v-if="runMetrics.costEstimate.llm?.requestCount" class="receipt-cost-group">
             <div class="receipt-cost-group-title">LLM</div>
             <div class="receipt-row">
               <span>Model</span>
@@ -3062,16 +3104,13 @@ onUnmounted(() => {
         </div>
 
         <div class="receipt-section">
-          <div
-            v-for="(value, key) in selectedNodeMetrics"
-            :key="key"
-            class="receipt-row"
-          >
-            <template v-if="key !== 'nodeId'">
-              <span>{{ formatMetricKey(key) }}</span>
-              <span>{{ formatMetricValue(key, value) }}</span>
-            </template>
-          </div>
+          <template v-for="(row, i) in nodeMetricRows(selectedNodeMetrics)" :key="i">
+            <div v-if="row.note" class="receipt-note">{{ row.note }}</div>
+            <div v-else class="receipt-row" :class="{ 'receipt-row-cost': row.cost }">
+              <span>{{ row.label }}</span>
+              <span class="receipt-value" :title="row.title">{{ row.value }}</span>
+            </div>
+          </template>
         </div>
       </div>
 
@@ -4351,12 +4390,27 @@ onUnmounted(() => {
   border-bottom: 1px solid theme.$gray_2;
 }
 
+.receipt-note {
+  margin-top: 6px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: theme.$gray_4;
+}
 .receipt-row {
   display: flex;
   justify-content: space-between;
+  gap: 12px;
   padding: 3px 0;
   font-size: 13px;
   color: theme.$gray_5;
+
+  .receipt-value {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    text-align: right;
+  }
 
   &.receipt-row-cost {
     font-weight: 600;

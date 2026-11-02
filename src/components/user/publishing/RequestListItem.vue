@@ -9,10 +9,10 @@
             {{ datasetRequest.name || "Untitled Proposal" }}
           </h3>
           <div class="status-badges">
-            <span class="request-status" :class="statusClass">
+            <span class="status-badge" :class="statusBadgeClass">
               {{ statusDisplay }}
             </span>
-            <span v-if="!readyToSubmit && isDraft" class="incomplete-badge">
+            <span v-if="!readyToSubmit && isDraft" class="status-badge status-incomplete">
               Incomplete
             </span>
           </div>
@@ -49,20 +49,23 @@
             <template v-if="isDraft">
               <button
                 v-if="readyToSubmit"
-                class="text-link primary-action"
+                type="button"
+                class="action-button primary"
                 @click.stop="triggerRequest(DatasetProposalAction.SUBMIT)"
               >
                 Submit
               </button>
               <button
                 v-else
-                class="text-link"
+                type="button"
+                class="action-button secondary"
                 @click.stop="triggerRequest(DatasetProposalAction.EDIT)"
               >
                 Edit
               </button>
               <button
-                class="text-link secondary-action"
+                type="button"
+                class="action-button danger"
                 @click.stop="triggerRequest(DatasetProposalAction.REMOVE)"
               >
                 Remove
@@ -72,7 +75,8 @@
             <!-- Submitted actions -->
             <template v-else-if="isSubmitted">
               <button
-                class="text-link secondary-action"
+                type="button"
+                class="action-button danger"
                 @click.stop="triggerRequest(DatasetProposalAction.WITHDRAW)"
               >
                 Withdraw
@@ -82,32 +86,31 @@
             <!-- Accepted actions -->
             <template v-else-if="isAccepted">
               <button
-                class="text-link primary-action"
+                type="button"
+                class="action-button primary"
                 @click.stop="triggerRequest(DatasetProposalAction.OPEN_DATASET)"
               >
-                Open Dataset
+                <span>Open Dataset</span>
+                <span class="arrow">&rarr;</span>
               </button>
             </template>
 
-            <!-- Rejected actions -->
-            <template v-else-if="isRejected">
+            <template v-else-if="isRejected || isWithdrawn">
               <button
-                class="text-link"
-                @click.stop="triggerRequest(DatasetProposalAction.RESUBMIT)"
+                type="button"
+                class="action-button primary"
+                @click.stop="triggerRequest(DatasetProposalAction.COPY_TO_DRAFT)"
               >
-                Resubmit
+                Copy to new draft
+              </button>
+              <button
+                type="button"
+                class="action-button danger"
+                @click.stop="triggerRequest(DatasetProposalAction.REMOVE)"
+              >
+                Remove
               </button>
             </template>
-
-            <!-- Withdrawn actions -->
-            <!-- <template v-else-if="isWithdrawn">
-              <button 
-                class="text-link"
-                @click.stop="triggerRequest(DatasetProposalAction.EDIT)"
-              >
-                Edit & Resubmit
-              </button>
-            </template> -->
           </div>
         </div>
       </div>
@@ -119,6 +122,7 @@
 import { computed } from "vue";
 import { useProposalStore } from "@/stores/proposalStore";
 import { DatasetProposalAction } from "@/utils/constants";
+import { isValidProposalName, hasText } from "@/utils/proposalValidation";
 
 // Props
 const props = defineProps({
@@ -135,7 +139,7 @@ const emit = defineEmits([
   "submit",
   "withdraw",
   "open-dataset",
-  "resubmit",
+  "copy-to-draft",
 ]);
 
 // Store
@@ -173,7 +177,7 @@ const statusDisplay = computed(() => {
   );
 });
 
-const statusClass = computed(() => {
+const statusBadgeClass = computed(() => {
   const status = props.datasetRequest.proposalStatus?.toLowerCase();
   return `status-${status}`;
 });
@@ -208,35 +212,26 @@ const truncatedDescription = computed(() => {
 });
 
 const surveyComplete = computed(() => {
-  let result = false;
-  const organizationNodeId = props.datasetRequest.organizationNodeId;
-  const repo = repository.value;
-
-  if (
-    repo &&
-    repo.questions != null &&
-    props.datasetRequest &&
-    props.datasetRequest.survey != null
-  ) {
-    result = repo.questions
-      .map((q) => {
-        const answer = props.datasetRequest.survey.find(
-          (r) => r.questionId === q.id
-        );
-        return answer && answer.response !== "";
-      })
-      .reduce((a, c) => a && c, true);
+  const questions = repository.value?.questions;
+  const surveyResponses = props.datasetRequest.survey;
+  if (questions == null || surveyResponses == null) {
+    return false;
   }
-  return result;
+
+  return questions.every((question) => {
+    const answer = surveyResponses.find(
+      (response) => response.questionId === question.id
+    );
+    return hasText(answer?.response);
+  });
 });
 
 const readyToSubmit = computed(() => {
-  const validName =
-    props.datasetRequest.name !== null && props.datasetRequest.name !== "";
-  const validDescription =
-    props.datasetRequest.description !== null &&
-    props.datasetRequest.description !== "";
-  return validName && validDescription && surveyComplete.value;
+  return (
+    isValidProposalName(props.datasetRequest.name) &&
+    hasText(props.datasetRequest.description) &&
+    surveyComplete.value
+  );
 });
 
 // Methods
@@ -306,17 +301,10 @@ const displayDate = computed(() => {
 @use "../../../styles/_theme.scss";
 
 .request-list-item {
-  border-bottom: 1px solid theme.$gray_2;
+  border: 1px solid theme.$gray_3;
+  border-radius: 4px;
   background-color: white;
   transition: all 0.2s ease;
-
-  &:first-child {
-    border-top: none;
-  }
-
-  &:last-child {
-    border-bottom: none;
-  }
 
   &:hover {
     background-color: theme.$gray_1;
@@ -328,20 +316,20 @@ const displayDate = computed(() => {
 }
 
 .request-content {
-  padding: 16px;
+  padding: 24px 24px 12px;
 }
 
 .request-main {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 16px;
 }
 
 .request-header {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 16px;
 
   @media (max-width: 640px) {
     flex-direction: column;
@@ -361,32 +349,29 @@ const displayDate = computed(() => {
 .status-badges {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   flex-wrap: wrap;
 }
 
-.request-status {
-  display: inline-flex;
-  align-items: center;
-  padding: 4px 8px;
-  border-radius: 6px;
-  font-size: 11px;
-  font-weight: 500;
-  text-transform: capitalize;
+// Matches the status badges in Analysis > Applications
+.status-badge {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 4px;
   white-space: nowrap;
-
-  &.status-draft {
-    background: theme.$gray_1;
-    color: theme.$gray_5;
-  }
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  background: theme.$gray_2;
+  color: theme.$gray_5;
 
   &.status-submitted {
-    background: rgba(theme.$green_2, 0.1);
-    color: theme.$green_2;
+    background: theme.$purple_tint;
+    color: theme.$purple_3;
   }
 
   &.status-accepted {
-    background: rgba(theme.$green_1, 0.1);
+    background: rgba(theme.$green_1, 0.12);
     color: theme.$green_1;
   }
 
@@ -399,19 +384,11 @@ const displayDate = computed(() => {
     background: rgba(theme.$orange_1, 0.1);
     color: theme.$orange_1;
   }
-}
 
-.incomplete-badge {
-  display: inline-flex;
-  align-items: center;
-  padding: 2px 6px;
-  border-radius: 4px;
-  font-size: 10px;
-  font-weight: 500;
-  background: rgba(theme.$purple_1, 0.1);
-  color: theme.$purple_1;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
+  &.status-incomplete {
+    background: rgba(theme.$purple_1, 0.1);
+    color: theme.$purple_1;
+  }
 }
 
 .request-body {
@@ -455,37 +432,30 @@ const displayDate = computed(() => {
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  padding-top: 8px;
-  border-top: 1px solid theme.$gray_1;
+  padding-top: 12px;
+  border-top: 1px solid theme.$gray_3;
 
   @media (max-width: 640px) {
     flex-direction: column;
     align-items: flex-start;
-    gap: 12px;
+    gap: 16px;
   }
 }
 
 .request-metadata {
+  align-self: flex-start;
   display: flex;
   align-items: center;
   gap: 12px;
   font-size: 12px;
-  color: theme.$gray_4;
-
-  .warning-badge {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    color: theme.$orange_1;
-    font-weight: 500;
-  }
+  color: theme.$gray_5;
 }
 
 .action-buttons {
   display: flex;
   flex-direction: row;
-  align-items: flex-end;
-  gap: 4px;
+  align-items: center;
+  gap: 8px;
 
   @media (max-width: 640px) {
     width: 100%;
@@ -493,51 +463,70 @@ const displayDate = computed(() => {
   }
 }
 
-.text-link {
-  background: none;
-  border: none;
-  color: theme.$purple_2;
-  font-size: 13px;
+.action-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  height: 28px;
+  padding: 0 12px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  font-family: inherit;
+  font-size: 12px;
   font-weight: 500;
-  cursor: pointer;
-  padding: 3px 6px;
-  transition: all 0.15s ease;
+  line-height: 1;
   white-space: nowrap;
-  border-radius: 4px;
-  text-decoration: none;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
 
-  &:hover {
-    color: theme.$purple_3;
-    background: rgba(theme.$purple_2, 0.05);
+  &:focus-visible {
+    outline: 2px solid theme.$purple_2;
+    outline-offset: 2px;
   }
 
-  &.primary-action {
-    color: theme.$purple_2;
-    font-weight: 600;
+  &:active {
+    transform: translateY(1px);
+  }
+
+  &.primary {
+    background: theme.$purple_3;
+    color: theme.$white;
 
     &:hover {
-      color: darken(theme.$purple_2, 10%);
-      background: rgba(theme.$purple_2, 0.08);
+      background: theme.$purple_2;
     }
   }
 
-  &.secondary-action {
+  // White fill keeps it distinct from the card's gray hover background
+  &.secondary {
+    background: theme.$white;
+    border-color: theme.$gray_3;
+    color: theme.$gray_6;
+
+    &:hover {
+      background: theme.$gray_0;
+      border-color: theme.$gray_4;
+    }
+  }
+
+  &.danger {
+    background: theme.$white;
+    border-color: rgba(theme.$red_2, 0.4);
     color: theme.$red_2;
 
     &:hover {
-      color: darken(theme.$red_2, 10%);
-      background: rgba(theme.$red_2, 0.05);
+      background: rgba(theme.$red_2, 0.08);
+      border-color: theme.$red_2;
     }
   }
-}
 
-// Button overrides for compact size
-:deep(.bf-button) {
-  &.compact {
-    padding: 5px 12px;
-    font-size: 13px;
-    min-width: auto;
-    font-weight: 500;
+  .arrow {
+    transition: transform 0.15s ease;
+  }
+
+  &:hover .arrow {
+    transform: translateX(2px);
   }
 }
 </style>

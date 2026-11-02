@@ -70,7 +70,6 @@
             @delete="$emit('delete')"
             @move="$emit('move')"
             @download-file="onDownloadClick"
-            @process-file="processFile"
             @copy-url="getPresignedUrl"
             @open-office-file="onOpenOffice365"
           />
@@ -621,14 +620,6 @@ export default {
     downloadFile: function (file) {
       this.setFileMenuSelection(file);
       this.$emit("download", file);
-    },
-
-    /**
-     * Process file
-     * @param {Object} file
-     */
-    processFile: function (file) {
-      this.$emit("process", file);
     },
 
     /**

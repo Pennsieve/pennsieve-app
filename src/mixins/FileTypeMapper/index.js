@@ -1,4 +1,5 @@
 import {isNil, path, pathOr, propOr} from "ramda";
+import { hasTimeseriesChannels } from "@/composables/usePackageViewerData";
 
 export default {
   data: function() {
@@ -435,13 +436,25 @@ export default {
   },
 
   methods: {
+    /**
+     * The viewers for a package, chosen by the data that exists for it.
+     *
+     * Only a READY package (cleared by the malware scan) gets a viewer. A
+     * timeseries package needs its channels (on the single-package GET); one
+     * without them gets the UnknownViewer here, and ViewerPane adds the
+     * TimeseriesViewer when it finds a ready Zarr bundle. Slide tiles are
+     * checked by ViewerPane too.
+     */
     checkViewerType: function(pkg) {
       const packageState = path(['content', 'state'], pkg)
+      if (packageState !== 'READY') {
+        return ['UnknownViewer']
+      }
 
       const packageType = pathOr('unknown', ['content', 'packageType'], pkg)
       const packageProperties = propOr([], 'properties', pkg)
       let component = packageType.toLowerCase()
-      if ((isNil(this.typeMapper[packageType]) || packageState === 'ERROR')) {
+      if (isNil(this.typeMapper[packageType])) {
         component = 'unknown';
       }
 
@@ -484,10 +497,20 @@ export default {
         return vueViewerMap['parquet_umap_viewer']
       }
 
-      // A Persyst .lay header gets its own structured viewer only while the
-      // recording is unprocessed. 
-      if (this.isLayFile(pkg) && !this.isProcessedTimeseries(pkg)) {
+      // A Persyst .lay header gets its own structured viewer unless the
+      // recording has channels to stream.
+      if (this.isLayFile(pkg) && !hasTimeseriesChannels(pkg)) {
         return vueViewerMap['lay']
+      }
+
+      // Timeseries data without channels has nothing to stream; a Zarr
+      // bundle, if any, is added by ViewerPane.
+      if (
+        component === 'timeseries' &&
+        !this.isCollectionWithAViewer(pkg) &&
+        !hasTimeseriesChannels(pkg)
+      ) {
+        component = 'unknown'
       }
 
       const vueViewers = ['image', 'pdf', 'text', 'unknown', 'video', 'slide','timeseries', 'csv', 'xls', 'rds','mri', 'tabular', 'omeTiff']
@@ -535,11 +558,6 @@ export default {
     isLayFile: function(pkg) {
       const fileName = pathOr('', ['content', 'name'], pkg).toLowerCase()
       return fileName.endsWith('.lay')
-    },
-    isProcessedTimeseries: function(pkg) {
-      const packageType = pathOr('', ['content', 'packageType'], pkg).toLowerCase()
-      const state = pathOr('', ['content', 'state'], pkg).toUpperCase()
-      return packageType === 'timeseries' && state === 'READY'
     },
     isNifti: function(pkg) {
       const fileName = pathOr('', ['content', 'name'], pkg).toLowerCase()

@@ -38,6 +38,17 @@ describe('viewFileUrl', () => {
     expect(init.headers.Authorization).toBe('Bearer tok')
   })
 
+  it('asks for a short link for the Office viewer, on either path', async () => {
+    let fetchFn = respond(200, { url: 'https://api2.pennsieve.net/downloads/l/abcdefghijklmnopqrstuv' })
+    const url = await viewFileUrl({ datasetId: 'N:dataset:1', packageId: 'N:package:2', file: source, short: true }, { config, getToken, fetchFn })
+    expect(url).toBe('https://api2.pennsieve.net/downloads/l/abcdefghijklmnopqrstuv')
+    expect(JSON.parse(fetchFn.mock.calls[0][1].body)).toEqual({ packageId: 'N:package:2', purpose: 'view', short: true })
+
+    fetchFn = respond(200, { url: 'https://bit.ly/short' })
+    await viewFileUrl({ packageId: 'N:package:2', file: source, short: true }, { config, getToken, fetchFn })
+    expect(fetchFn.mock.calls[0][0]).toBe('https://api.pennsieve.net/packages/N:package:2/files/11?api_key=tok&short=true')
+  })
+
   it('rejects with scan_pending while the file is being scanned', async () => {
     const fetchFn = respond(409, { code: 'scan_pending', scanStatus: 'scanning', message: 'still being scanned' })
     const p = viewFileUrl({ datasetId: 'N:dataset:1', packageId: 'N:package:2', file: source }, { config, getToken, fetchFn })

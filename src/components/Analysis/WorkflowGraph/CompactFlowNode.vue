@@ -57,7 +57,7 @@ const tooltip = computed(() =>
 <template>
   <div
     class="cfn"
-    :class="[`cfn--${kind}`, { 'cfn--running': status === 'STARTED', 'cfn--failed': status === 'FAILED', 'cfn--actions-shown': !actionsOnHover }]"
+    :class="[`cfn--${kind}`, { 'cfn--running': status === 'STARTED', 'cfn--done': status === 'SUCCEEDED', 'cfn--failed': status === 'FAILED', 'cfn--actions-shown': !actionsOnHover }]"
     :style="{
       '--cfn-strip': stripColor,
       width: `${COMPACT_BOX.width}px`,
@@ -150,12 +150,31 @@ const tooltip = computed(() =>
     }
   }
 }
-// Running: the strip pulses; failed: a red border too (as detailed).
-.cfn--running::before {
-  animation: cfn-pulse 1.6s ease-in-out infinite;
+// Running: a teal border and a breathing teal glow, the strip pulsing too
+// (as the detailed cards); failed: a red border.
+.cfn--running {
+  border-color: #06b6d4;
+  animation: cfn-running-glow 1.6s ease-in-out infinite;
+  &::before {
+    animation: cfn-pulse 1.6s ease-in-out infinite;
+  }
+}
+.cfn--done {
+  border-color: theme.$status_green;
+  box-shadow: 0 0 0 2px rgba(23, 187, 98, 0.22), 0 0 6px rgba(23, 187, 98, 0.25);
+  animation: cfn-done-settle 1.2s ease-out 1;
 }
 .cfn--failed {
   border-color: theme.$status_red;
+  box-shadow: 0 0 0 2px rgba(233, 75, 75, 0.2), 0 0 6px rgba(233, 75, 75, 0.25);
+}
+@keyframes cfn-done-settle {
+  0% {
+    box-shadow: 0 0 0 4px rgba(23, 187, 98, 0.35), 0 0 18px rgba(23, 187, 98, 0.7);
+  }
+  100% {
+    box-shadow: 0 0 0 2px rgba(23, 187, 98, 0.22), 0 0 6px rgba(23, 187, 98, 0.25);
+  }
 }
 .cfn__mark {
   flex-shrink: 0;
@@ -187,6 +206,15 @@ const tooltip = computed(() =>
   }
   50% {
     opacity: 0.25;
+  }
+}
+@keyframes cfn-running-glow {
+  0%,
+  100% {
+    box-shadow: 0 0 0 2px rgba(6, 182, 212, 0.35), 0 0 8px rgba(6, 182, 212, 0.35);
+  }
+  50% {
+    box-shadow: 0 0 0 4px rgba(6, 182, 212, 0.2), 0 0 18px rgba(6, 182, 212, 0.65);
   }
 }
 </style>

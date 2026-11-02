@@ -9,6 +9,7 @@ import { useRoute } from "vue-router";
 import { useStore } from "vuex";
 import { formatCost, formatDuration, formatTime, runDisplayName, statusDotClass, statusLabel } from "./runHelpers";
 import { costOf, costParts, fetchRun } from "./runDetails";
+import RuntimeMark from "../WorkflowGraph/RuntimeMark.vue";
 import { appRunLabel } from "./appRuns";
 
 const props = defineProps({
@@ -28,6 +29,10 @@ const props = defineProps({
   // (id) -> name, for the details.
   nodeName: { type: Function, default: () => "" },
   userName: { type: Function, default: () => "" },
+  // (run) -> where it ran when that's worth a mark ("gpu"), else "".
+  runtimeOf: { type: Function, default: () => "" },
+  // (run) -> the mark's title (e.g. the GPU it ran on), "" for the default.
+  runtimeTitleOf: { type: Function, default: () => "" },
 });
 const emit = defineEmits(["load-more"]);
 
@@ -99,6 +104,7 @@ const errorOf = (run) => run.errorMessage || details.value[run.uuid]?.errorMessa
           <span class="run-status-dot" :class="statusDotClass(run.status)" />
           <span class="rh-name">
             {{ runDisplayName(run) || "Unnamed" }}
+            <RuntimeMark v-if="runtimeOf(run)" :runtime="runtimeOf(run)" :label="runtimeTitleOf(run)" compact class="rh-mark" />
             <span v-if="showWorkflow && run.name && run.workflowName" class="rh-workflow">{{ run.workflowName }}</span>
             <span v-else-if="showWorkflow && run.app" class="rh-workflow" title="A one-off run of an app">App run · {{ appRunLabel(run.app) }}</span>
           </span>
@@ -239,6 +245,10 @@ const errorOf = (run) => run.errorMessage || details.value[run.uuid]?.errorMessa
   &.dot-amber { background-color: #f59e0b; }
   &.dot-green { background-color: theme.$status_green; }
   &.dot-red { background-color: theme.$status_red; }
+}
+.rh-mark {
+  vertical-align: -2px;
+  margin-left: 4px;
 }
 .rh-name {
   min-width: 0;

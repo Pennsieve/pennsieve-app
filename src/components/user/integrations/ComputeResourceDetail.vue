@@ -57,13 +57,13 @@ const independentComputeNodes = computed(() => {
   return accountComputeNodes.value.filter(n => !n.organizationId)
 })
 
-// Admin workspaces
+// Workspaces where the user is an admin or owner (the API reports these as separate flags)
 const adminWorkspaces = computed(() => {
   const organizations = store.state.organizations || []
-  return organizations.filter(org => org.isAdmin === true).map(org => ({
+  return organizations.filter(org => org.isAdmin === true || org.isOwner === true).map(org => ({
     id: org.organization?.id || org.id,
     name: org.organization?.name || org.name,
-    role: org.role || (org.isAdmin ? 'admin' : 'viewer')
+    role: org.role || (org.isOwner ? 'owner' : 'admin')
   }))
 })
 

@@ -40,6 +40,7 @@ import IoPill from "../WorkflowGraph/IoPill.vue";
 import { warningHeadline } from "./runDetails";
 import { withInterfaceNodes, destinationChoices, NO_DESTINATION } from "./workflowInterface";
 import { appOf, appRunLabel, appRunPayload, appStepId, setupKey } from "./appRuns";
+import { placeRunNodes, workflowLayouts } from "./runLayout";
 import { importStatusUrl, importSummary, importStillMoving, isDatasetImport } from "./runImports";
 import { nodeUnfit, rememberedSetup, rememberSetup, defaultNode, needsDataset } from "./runSetup";
 import DownloadItem from "@/components/downloads/DownloadItem.vue";
@@ -72,8 +73,7 @@ import {
   formatModelName,
   formatBytes,
   formatDurationSec,
-  formatMetricKey,
-  formatMetricValue,
+  nodeMetricRows,
   formatResourceLabel,
   computeNodeName as computeNodeNameFn,
   getUserName as getUserNameFn,
@@ -96,6 +96,11 @@ import RuntimeMark from "../WorkflowGraph/RuntimeMark.vue";
 import { inputHandleId } from "../WorkflowBuilder/inputPorts";
 import { portHandleId, portOfHandle } from "../WorkflowBuilder/outputPorts";
 import { stepNames } from "../WorkflowBuilder/stepNames";
+import { modelLine, modelLineText, variantName } from "../WorkflowBuilder/appVariants";
+import { fetchVariantGate, runsNonDefaultVariant } from "./variantGate";
+import { gpuReasonNote } from "./notebookHelpers";
+import { nodeGpu, gpuOffer, gpuName, gpuTaskResources } from "../ComputeNodes/computeNodeHelpers";
+import { useComputeResourcesStore } from "@/stores/computeResourcesStore";
 
 // Shown in a workspace (/:orgId/analysis/runs/...) and in My Workspace
 // (/my-workspace/analysis/runs/...), where there's no organization and a run
@@ -559,14 +564,28 @@ const autoLayout = () => {
 
 // This page saves no positions, so a graph is laid out for its node size:
 // compact always gets a tight layout of its own; detailed keeps the
-// definition's saved positions, where it has them.
+// definition's saved positions, where it has them (a run's, the workflow's
+// as saved now: runLayout.js).
 const needsLayout = (result) => result.needsAutoLayout || !detailed.value;
+
+// The shown run's workflow's saved layout (null: none, or not read).
+const runWorkflowLayout = ref(null);
 
 const changeDensity = (value) => {
   if (value === detailed.value) return;
   setDetailed(value);
   redrawGraph();
-  autoLayout();
+  // Back to detailed: the saved positions again, where the graph has them.
+  const result = value && mode.value === "browse" && selectedWorkflowActivity.value?.dag?.length
+    ? runToNodesAndEdges(selectedWorkflowActivity.value)
+    : null;
+  if (result && !needsLayout(result)) {
+    const at = new Map(result.nodes.map((n) => [n.id, n.position]));
+    nodes.value = nodes.value.map((n) => ({ ...n, position: at.get(n.id) || n.position }));
+    setTimeout(() => fitView({ padding: 0.2, maxZoom: 1 }), 50);
+  } else {
+    autoLayout();
+  }
 };
 
 // The graph's nodes and edges again from what it shows (the run, or the
@@ -591,6 +610,21 @@ const stepManifest = (dag, id) => {
     llm: !!m?.runtime?.llm,
   };
 };
+
+// An app step's variant (app variants), on its card and in its details:
+// its name, and the line of the parameters its variants set differently
+// ("Detector: oncet") with the values given (a run's, else the defaults).
+// A run's step carries the variant that ran (workflow-service stamps it);
+// a workflow's names one only when it isn't the default. Nothing for an
+// app without variants.
+const variantFacts = (d, params) => {
+  const app = d?.type === "processor" ? findMatchedApp(d.sourceUrl) : null;
+  if (!app) return {};
+  const name = variantName(app, d.tag, d.variant);
+  if (!name) return {};
+  return { variantName: name, modelLine: modelLineText(modelLine(app, d.tag, d.variant, params)) };
+};
+const withVariant = (label, facts) => (facts?.variantName && label ? `${label} · ${facts.variantName}` : label);
 
 // The edges: in the detailed view, each link on the ports it joins (two
 // links between the same steps are two lines); in compact, one line per
@@ -690,11 +724,13 @@ const definitionToNodesAndEdges = (definition) => {
   const hasSavedPositions = dag.some((d) => d.position && typeof d.position.x === "number");
   const resultNodes = dag.map((d) => {
     const nodeType = d.type === "data-source" ? "data-source" : d.type === "data-target" ? "data-target" : "default";
+    const variant = variantFacts(d, d.defaultParams);
     return {
       id: d.id,
       type: nodeType,
       data: {
-        label: labelForDagNode(d, availableApplications.value, targetTypes.value, dag),
+        label: withVariant(labelForDagNode(d, availableApplications.value, targetTypes.value, dag), variant),
+        ...variant,
         nodeType: d.type,
         sourceUrl: d.sourceUrl,
         targetType: d.targetType || null,
@@ -718,7 +754,8 @@ const definitionToNodesAndEdges = (definition) => {
 const runToNodesAndEdges = (run) => {
   const dag = run.dag || [];
   if (dag.length === 0) return { nodes: [], edges: [], needsAutoLayout: true };
-  const hasSavedPositions = dag.some((d) => d.position && typeof d.position.x === "number");
+  // The workflow's layout as saved now, else the run's own (runLayout.js).
+  const placed = placeRunNodes(dag, runWorkflowLayout.value, { box: DETAILED_BOX });
   const runDataSources = run.dataSources || {};
   const runDataTargets = run.dataTargets || {};
   const runProcessorConfigs = run.processorConfigs || [];
@@ -753,12 +790,13 @@ const runToNodesAndEdges = (run) => {
       extra.memory = cfg?.memory || null;
       const nodeParams = runProcessorParams[d.id] || {};
       extra.params = Object.entries(nodeParams).map(([key, value]) => ({ key, value: String(value) }));
+      Object.assign(extra, variantFacts(d, nodeParams));
     }
     return {
       id: d.id,
       type: nodeType,
       data: {
-        label: labelForDagNode(d, availableApplications.value, targetTypes.value, dag),
+        label: withVariant(labelForDagNode(d, availableApplications.value, targetTypes.value, dag), extra),
         status: d.status || "NOT_STARTED",
         processorType: d.type,
         sourceUrl: d.sourceUrl,
@@ -768,16 +806,18 @@ const runToNodesAndEdges = (run) => {
         progress: d.progress || null,
         errorMessage: d.errorMessage || "",
         warning: d.warning || "",
+        reason: d.reason || null,
+        exitCode: d.exitCode ?? null,
+        cpuUnits: d.cpuUnits || null,
+        memoryMiB: d.memoryMiB || null,
         ...extra,
       },
-      position: hasSavedPositions && d.position && typeof d.position.x === "number"
-        ? { x: d.position.x, y: d.position.y }
-        : { x: 0, y: 0 },
+      position: placed.positions[d.id] || { x: 0, y: 0 },
     };
   });
   const dagMap = Object.fromEntries(dag.map((d) => [d.id, d]));
   const resultEdges = graphEdges(dag, resultNodes, (src) => nodeBorderColor(dagMap[src]?.type, dagMap[src]?.status));
-  return { nodes: resultNodes, edges: resultEdges, needsAutoLayout: !hasSavedPositions };
+  return { nodes: resultNodes, edges: resultEdges, needsAutoLayout: placed.needsAutoLayout };
 };
 
 /*
@@ -898,6 +938,12 @@ const loadRun = async (runId) => {
     await store.dispatch("analysisModule/setSelectedWorkflowActivity", run);
     const activity = selectedWorkflowActivity.value;
     if (activity && activity.dag && activity.dag.length > 0) {
+      // Laid out as its workflow is now (cached per workflow).
+      const layout = await workflowLayouts.get(activity.workflowUuid, (uuid) =>
+        store.dispatch("analysisModule/fetchWorkflowDefinition", uuid)
+      );
+      if (selectedWorkflowActivity.value?.uuid !== activity.uuid) return;
+      runWorkflowLayout.value = layout;
       const result = runToNodesAndEdges(activity);
       nodes.value = result.nodes;
       edges.value = result.edges;
@@ -2044,8 +2090,17 @@ onBeforeUnmount(() => clearTimeout(importTimer));
 const importLineOf = (id) => importSummary(importStatus[id]);
 
 const nodeRunTime = (data) => formatRunTime(nodeDurationSec(data, nowTick.value));
+// A GPU step runs with its node's GPU instance's CPU and memory (the node's
+// GPU tier), not the numbers it declares.
 const processorFacts = (id, data) =>
-  [data.version, formatResources(data.cpu, data.memory), nodeRunTime(data)].filter(Boolean);
+  [
+    data.version,
+    data.executionTarget === "gpu"
+      ? gpuTaskResources(nodeGpu(nodeById(selectedWorkflowActivity.value?.computeNodeUuid), gpuTiers.value), " · ") ||
+        formatResources(data.cpu, data.memory)
+      : formatResources(data.cpu, data.memory),
+    nodeRunTime(data),
+  ].filter(Boolean);
 const targetFacts = (data) => [nodeRunTime(data)].filter(Boolean);
 const viewSourceLabel = (view) => {
   const info = view && browseViewInfo.value[view.viewId];
@@ -2054,6 +2109,32 @@ const viewSourceLabel = (view) => {
     .filter(Boolean)
     .join(" · ");
 };
+
+/*
+  Why a step ended, in a sentence, from the reason the compute node reported
+  (OUT_OF_MEMORY, EXIT_CODE, IMAGE_PULL, TIMEOUT, STOPPED, UPSTREAM, ERROR),
+  with what to do about it where there is something to do.
+*/
+function failureSummary(data) {
+  if (!data?.reason) return null;
+  const mem = data.memoryMiB ? `${data.memoryMiB} MiB` : "its memory";
+  switch (data.reason) {
+    case "OUT_OF_MEMORY":
+      return `Killed for memory at ${mem}. Raise runtime.memory in the app's app.yml, or the step's memory for the run.`;
+    case "EXIT_CODE":
+      return `The app exited with code ${data.exitCode}. See its logs.`;
+    case "IMAGE_PULL":
+      return "The app's image could not be pulled, twice. Check the app's release, then run again.";
+    case "TIMEOUT":
+      return "The step ran past its time limit.";
+    case "STOPPED":
+      return "Stopped because another step failed.";
+    case "UPSTREAM":
+      return data.errorMessage ? `Not run: ${data.errorMessage}.` : "Not run: a step it depends on failed.";
+    default:
+      return data.errorMessage || "The step failed.";
+  }
+}
 
 const selectedNodeMetrics = computed(() => {
   if (!selectedNode.value || !runMetrics.value?.nodeMetrics) return null;
@@ -2097,10 +2178,38 @@ const setupComputeTypeOf = (stepId) => {
   const dagNode = (configDefinition.value?.dag || []).find((n) => n.id === stepId);
   return nodeConfigs[stepId]?.executionTarget || dagNode?.computeType || "";
 };
-const unfitReasons = (node) => nodeUnfit(node, configDefinition.value?.dag || [], setupManifestOf.value, setupComputeTypeOf);
+// A step of a variant other than its version's default needs a node whose
+// provisioner passes it on (variantGate.js); the minimum is workflow-service's.
+const variantGate = ref(null);
+const setupNonDefaultVariant = (stepId) => {
+  const d = (configDefinition.value?.dag || []).find((n) => n.id === stepId);
+  return runsNonDefaultVariant(d, d && findMatchedApp(d.sourceUrl));
+};
+const unfitReasons = (node) =>
+  nodeUnfit(node, configDefinition.value?.dag || [], setupManifestOf.value, setupComputeTypeOf, {
+    nonDefaultVariant: setupNonDefaultVariant,
+    gate: variantGate.value,
+  });
+// The GPU tiers (GET /compute/resources/gpu-tiers): what a node's GPU is.
+const computeResourcesStore = useComputeResourcesStore();
+const gpuTiers = ref([]);
+const nodeById = (id) => (id ? computeNodes.value.find((c) => c.uuid === id) || null : null);
+// A workflow with GPU steps: each node says what GPU it has.
+const setupHasGpuSteps = computed(() =>
+  (configDefinition.value?.dag || []).some((d) => d.type === "processor" && setupComputeTypeOf(d.id) === "gpu")
+);
+// What a GPU step gets on the chosen node: its GPU tier's instance.
+const setupGpu = computed(() => nodeGpu(nodeById(initiateForm.value.computeNodeId), gpuTiers.value));
+const gpuStepResources = computed(() => {
+  if (!initiateForm.value.computeNodeId) return "The chosen compute node's GPU instance";
+  const g = setupGpu.value;
+  if (!g) return "The chosen compute node has no GPUs";
+  const res = gpuTaskResources(g, " · ");
+  return `${res ? `${res} · ` : ""}${gpuName(g)} (the node's GPU instance)`;
+});
 const setupNodeChoices = computed(() =>
   computeNodes.value
-    .map((n) => ({ node: n, reasons: unfitReasons(n) }))
+    .map((n) => ({ node: n, reasons: unfitReasons(n), offer: setupHasGpuSteps.value ? gpuOffer(nodeGpu(n, gpuTiers.value)) : "" }))
     .sort((a, b) => (a.reasons.length > 0) - (b.reasons.length > 0) || String(a.node.name).localeCompare(String(b.node.name)))
 );
 // My Workspace runs have no dataset (see the run dialog's "Needs a dataset").
@@ -2297,6 +2406,12 @@ onMounted(async () => {
     analyticsChannel.bind("workflow-processor-status", onProcessorStatusUpdate);
   }
 
+  // The variant gate's minimum: read alongside, never waited on.
+  fetchVariantGate(config.value.api2Url, useGetToken).then((g) => (variantGate.value = g));
+  computeResourcesStore
+    .fetchGpuTiers(store.getters.activeOrganization?.organization?.id)
+    .then((t) => (gpuTiers.value = t || []))
+    .catch(() => {});
   await Promise.all([
     // Forced in My Workspace: the cached list may be a workspace's nodes
     store.dispatch("analysisModule/fetchComputeNodes", { force: isMyWorkspace.value }),
@@ -2583,6 +2698,8 @@ onUnmounted(() => {
                   <div v-if="mode === 'browse' && processorFacts(id, data).length" class="node-facts">
                     {{ processorFacts(id, data).join(" · ") }}
                   </div>
+                  <!-- An app with variants: what they set differently ("Detector: oncet") -->
+                  <div v-if="data.modelLine" class="node-facts" :title="data.modelLine">{{ data.modelLine }}</div>
                   <div v-if="(mode === 'browse' && data.params?.length > 0) || (mode === 'configure' && nodeConfigs[id])" class="node-config-summary">
                     <div v-if="mode === 'browse' && data.params?.length > 0" class="param-preview">
                       <div v-for="(p, i) in data.params.slice(0, 3)" :key="i" class="param-row">
@@ -2628,6 +2745,7 @@ onUnmounted(() => {
                   :unmet="nodeUnmetCount(id, 'data-source')"
                   :off="isLeftOut(id)"
                   :running="inputStaging(data)"
+                  :done="mode === 'browse' && data.status === 'SUCCEEDED'"
                   :failed="mode === 'browse' && data.status === 'FAILED'"
                 />
                 <Handle id="source" type="source" :position="Position.Bottom" />
@@ -2645,6 +2763,7 @@ onUnmounted(() => {
                   :mark="statusMark(data)"
                   :mark-title="statusLabel(data.status)"
                   :running="mode === 'browse' && data.status === 'STARTED'"
+                  :done="mode === 'browse' && data.status === 'SUCCEEDED'"
                   :failed="mode === 'browse' && data.status === 'FAILED'"
                   :unmet="nodeUnmetCount(id, 'data-target')"
                   :off="isUnsaved(id)"
@@ -2780,6 +2899,12 @@ onUnmounted(() => {
                     </el-select>
                   </div>
                 </template>
+
+                <!-- GPU: the node's GPU instance's CPU and memory (its tier) -->
+                <div v-if="nodeConfigs[selectedNode.id].executionTarget === 'gpu'" class="config-field">
+                  <label>Resources</label>
+                  <span class="version-hint">{{ gpuStepResources }}</span>
+                </div>
 
                 <!-- Lambda memory -->
                 <template v-if="nodeConfigs[selectedNode.id].executionTarget === 'lambda'">
@@ -3246,10 +3371,11 @@ onUnmounted(() => {
                       :disabled="c.reasons.length > 0"
                     >
                       <span class="setup-option-name" :title="c.node.name">{{ c.node.name }}</span>
-                      <span v-if="c.reasons.length" class="setup-option-why">{{ c.reasons.join(" · ") }}</span>
+                      <span v-if="c.reasons.length" class="setup-option-why" :title="gpuReasonNote(c.reasons) || undefined">{{ c.reasons.join(" · ") }}</span>
+                      <span v-else-if="c.offer" class="setup-option-why">{{ c.offer }}</span>
                     </el-option>
                   </el-select>
-                  <span v-if="setupNodeUnfit.length" class="run-name-error">Can't run this workflow: {{ setupNodeUnfit.join(", ") }}</span>
+                  <span v-if="setupNodeUnfit.length" class="run-name-error">Can't run this workflow: {{ setupNodeUnfit.join(", ") }}<template v-if="gpuReasonNote(setupNodeUnfit)">. {{ gpuReasonNote(setupNodeUnfit) }}</template></span>
                 </div>
               </div>
               <p class="configure-hint">
@@ -3384,9 +3510,17 @@ onUnmounted(() => {
                     {{ statusLabel(selectedNode.data?.status) }}
                   </span>
                 </div>
+                <div v-if="failureSummary(selectedNode.data)" class="info-row node-failure">
+                  <span class="info-label">Why</span>
+                  <span class="info-value">{{ failureSummary(selectedNode.data) }}</span>
+                </div>
                 <div v-if="selectedNode.data?.warning" class="info-row node-warning">
                   <span class="info-label">Note</span>
                   <span class="info-value">{{ selectedNode.data.warning }}</span>
+                </div>
+                <div v-if="selectedNode.data?.cpuUnits && selectedNode.data?.memoryMiB" class="info-row">
+                  <span class="info-label">Ran with</span>
+                  <span class="info-value">{{ (selectedNode.data.cpuUnits / 1024).toFixed(1) }} vCPU, {{ selectedNode.data.memoryMiB }} MiB</span>
                 </div>
                 <div v-if="selectedNode.data?.processorType" class="info-row">
                   <span class="info-label">Type</span>
@@ -3395,6 +3529,14 @@ onUnmounted(() => {
                 <div v-if="selectedNode.data?.version" class="info-row">
                   <span class="info-label">Version</span>
                   <span class="info-value">{{ selectedNode.data.version }}</span>
+                </div>
+                <div v-if="selectedNode.data?.variantName" class="info-row">
+                  <span class="info-label">Variant</span>
+                  <span class="info-value">{{ selectedNode.data.variantName }}</span>
+                </div>
+                <div v-if="selectedNode.data?.modelLine" class="info-row">
+                  <span class="info-label">Set by variant</span>
+                  <span class="info-value">{{ selectedNode.data.modelLine }}</span>
                 </div>
                 <div v-if="selectedNode.data?.datasetId" class="info-row">
                   <span class="info-label">Writes to</span>
@@ -3813,7 +3955,11 @@ onUnmounted(() => {
             </div>
             <div v-if="nm.maxMemoryUsedMiB != null" class="receipt-row">
               <span>Memory Used</span>
-              <span>{{ nm.maxMemoryUsedMiB }} / {{ nm.memoryConfiguredMiB }} MiB</span>
+              <span>{{ Math.round(nm.maxMemoryUsedMiB) }} / {{ nm.memoryConfiguredMiB }} MiB</span>
+            </div>
+            <div v-if="nm.maxCpuUtilized != null && nm.cpuUnits" class="receipt-row">
+              <span>CPU Used</span>
+              <span>{{ (nm.maxCpuUtilized / 1024).toFixed(2) }} / {{ (nm.cpuUnits / 1024).toFixed(1) }} vCPU</span>
             </div>
             <div class="receipt-row">
               <span>Status</span>
@@ -3861,6 +4007,22 @@ onUnmounted(() => {
             </div>
           </div>
 
+          <div v-if="runMetrics.costEstimate.gpu?.taskCount" class="receipt-cost-group">
+            <div class="receipt-cost-group-title">GPU</div>
+            <div class="receipt-row">
+              <span>Instance</span>
+              <span>{{ runMetrics.costEstimate.gpu.instanceType || 'default tier' }}</span>
+            </div>
+            <div class="receipt-row">
+              <span>Instance Hours</span>
+              <span>{{ runMetrics.costEstimate.gpu.instanceHours?.toFixed(4) }}</span>
+            </div>
+            <div class="receipt-row receipt-row-cost">
+              <span>Subtotal</span>
+              <span>{{ formatCost(runMetrics.costEstimate.gpu.estimatedCost) }}</span>
+            </div>
+          </div>
+
           <div v-if="runMetrics.costEstimate.stepFunctions" class="receipt-cost-group">
             <div class="receipt-cost-group-title">Step Functions</div>
             <div class="receipt-row">
@@ -3885,15 +4047,35 @@ onUnmounted(() => {
             </div>
           </div>
 
-          <div v-if="runMetrics.costEstimate.efsThroughput" class="receipt-cost-group">
-            <div class="receipt-cost-group-title">EFS Throughput</div>
+          <div v-if="runMetrics.costEstimate.efsStorage" class="receipt-cost-group">
+            <div class="receipt-cost-group-title">EFS Storage</div>
             <div class="receipt-row">
-              <span>Read</span>
-              <span>{{ formatBytes(runMetrics.costEstimate.efsThroughput.readBytes) }}</span>
+              <span>Stored</span>
+              <span>{{ runMetrics.costEstimate.efsStorage.storageGB?.toFixed(2) }} GB</span>
             </div>
             <div class="receipt-row">
-              <span>Write</span>
+              <span>Hours</span>
+              <span>{{ runMetrics.costEstimate.efsStorage.durationHours?.toFixed(2) }}</span>
+            </div>
+            <div class="receipt-row receipt-row-cost">
+              <span>Subtotal</span>
+              <span>{{ formatCost(runMetrics.costEstimate.efsStorage.estimatedCost) }}</span>
+            </div>
+          </div>
+
+          <div v-if="runMetrics.costEstimate.efsThroughput?.readBytes || runMetrics.costEstimate.efsThroughput?.writeBytes" class="receipt-cost-group">
+            <div class="receipt-cost-group-title">EFS I/O</div>
+            <div class="receipt-row">
+              <span>Read</span>
+              <span>{{ formatBytes(runMetrics.costEstimate.efsThroughput.readBytes + (runMetrics.costEstimate.efsThroughput.metadataBytes || 0)) }}</span>
+            </div>
+            <div class="receipt-row">
+              <span>Written</span>
               <span>{{ formatBytes(runMetrics.costEstimate.efsThroughput.writeBytes) }}</span>
+            </div>
+            <div v-if="runMetrics.costEstimate.efsThroughput.maxConcurrentRuns > 1" class="receipt-row">
+              <span>Shared with</span>
+              <span>up to {{ runMetrics.costEstimate.efsThroughput.maxConcurrentRuns - 1 }} other run(s)</span>
             </div>
             <div class="receipt-row receipt-row-cost">
               <span>Subtotal</span>
@@ -3905,7 +4087,7 @@ onUnmounted(() => {
             <div class="receipt-cost-group-title">CloudWatch Logs</div>
             <div class="receipt-row">
               <span>Ingest</span>
-              <span>{{ runMetrics.costEstimate.cloudWatchLogs.estimatedIngestGB?.toFixed(6) }} GB</span>
+              <span>{{ runMetrics.costEstimate.cloudWatchLogs.ingestGB?.toFixed(6) }} GB</span>
             </div>
             <div class="receipt-row receipt-row-cost">
               <span>Subtotal</span>
@@ -3913,7 +4095,7 @@ onUnmounted(() => {
             </div>
           </div>
 
-          <div v-if="runMetrics.costEstimate.llm" class="receipt-cost-group">
+          <div v-if="runMetrics.costEstimate.llm?.requestCount" class="receipt-cost-group">
             <div class="receipt-cost-group-title">LLM</div>
             <div class="receipt-row">
               <span>Model</span>
@@ -4026,16 +4208,13 @@ onUnmounted(() => {
         </div>
 
         <div class="receipt-section">
-          <div
-            v-for="(value, key) in selectedNodeMetrics"
-            :key="key"
-            class="receipt-row"
-          >
-            <template v-if="key !== 'nodeId'">
-              <span>{{ formatMetricKey(key) }}</span>
-              <span>{{ formatMetricValue(key, value) }}</span>
-            </template>
-          </div>
+          <template v-for="(row, i) in nodeMetricRows(selectedNodeMetrics)" :key="i">
+            <div v-if="row.note" class="receipt-note">{{ row.note }}</div>
+            <div v-else class="receipt-row" :class="{ 'receipt-row-cost': row.cost }">
+              <span>{{ row.label }}</span>
+              <span class="receipt-value" :title="row.title">{{ row.value }}</span>
+            </div>
+          </template>
         </div>
       </div>
 
@@ -4651,11 +4830,26 @@ onUnmounted(() => {
   }
 
   &.gray-node { border-color: theme.$gray_4; }
-  // Running: the type strip pulses; the card and its border stay still.
-  &.blue-node::before { animation: strip-pulse 1.6s ease-in-out infinite; }
-  // Succeeded: no colour, the ✓ by the title says it (graphStatusColor).
-  &.green-node { border-color: theme.$gray_3; }
-  &.red-node { border-color: theme.$status_red; }
+  // Running: a teal border and a breathing teal glow around the card, the
+  // same teal as its connectors, so the steps at work stand out across the
+  // graph; the type strip pulses too. The animation keeps the glow on hover.
+  &.blue-node {
+    border-color: #06b6d4;
+    animation: node-running-glow 1.6s ease-in-out infinite;
+    &::before { animation: strip-pulse 1.6s ease-in-out infinite; }
+  }
+  // Succeeded: a green border and a still, soft green ring, settled once
+  // (a short fade-in when the step just finished), beside the ✓ by the
+  // title. Only a running step moves.
+  &.green-node {
+    border-color: theme.$status_green;
+    box-shadow: 0 0 0 2px rgba(23, 187, 98, 0.22), 0 0 8px rgba(23, 187, 98, 0.25);
+    animation: node-done-settle 1.2s ease-out 1;
+  }
+  &.red-node {
+    border-color: theme.$status_red;
+    box-shadow: 0 0 0 2px rgba(233, 75, 75, 0.2), 0 0 8px rgba(233, 75, 75, 0.25);
+  }
 
   &.data-source-node {
     --type-strip: #6366f1;
@@ -4705,13 +4899,21 @@ onUnmounted(() => {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.25; }
 }
+@keyframes node-done-settle {
+  0% { box-shadow: 0 0 0 5px rgba(23, 187, 98, 0.35), 0 0 24px rgba(23, 187, 98, 0.7); }
+  100% { box-shadow: 0 0 0 2px rgba(23, 187, 98, 0.22), 0 0 8px rgba(23, 187, 98, 0.25); }
+}
+@keyframes node-running-glow {
+  0%, 100% { box-shadow: 0 0 0 2px rgba(6, 182, 212, 0.35), 0 0 10px rgba(6, 182, 212, 0.35); }
+  50% { box-shadow: 0 0 0 5px rgba(6, 182, 212, 0.2), 0 0 24px rgba(6, 182, 212, 0.65); }
+}
 
+/* Chosen files a source's inputs don't take, in its panel. */
 // A step that worked, with something to know (its warning).
 .node-warning .info-value {
   color: #92400e;
 }
 
-/* Chosen files a source's inputs don't take, in its panel. */
 .files-mismatch {
   margin: 0 0 8px;
   padding: 8px 10px;
@@ -5389,12 +5591,27 @@ onUnmounted(() => {
   border-bottom: 1px solid theme.$gray_2;
 }
 
+.receipt-note {
+  margin-top: 6px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: theme.$gray_4;
+}
 .receipt-row {
   display: flex;
   justify-content: space-between;
+  gap: 12px;
   padding: 3px 0;
   font-size: 13px;
   color: theme.$gray_5;
+
+  .receipt-value {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    text-align: right;
+  }
 
   &.receipt-row-cost {
     font-weight: 600;

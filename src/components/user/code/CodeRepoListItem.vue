@@ -88,6 +88,15 @@
       >
         {{ releaseLoading ? 'Checking…' : 'Release a version' }}
       </button>
+      <button
+        v-if="!repo.publishing_to_appstore && !repo.publishing_to_discover"
+        type="button"
+        class="card-action-link card-action-button card-action-setup"
+        title="Choose where its releases go, who can use the app, and release it"
+        @click="$emit('setup', repo)"
+      >
+        Set up publishing
+      </button>
       <span
         v-if="repo.publishing_to_appstore && !matchedAppRaw && !hasReleases"
         class="card-action-hint"
@@ -146,6 +155,8 @@ export default {
       default: () => ({})
     }
   },
+
+  emits: ['manage-settings', 'setup'],
 
   computed: {
     applications() {

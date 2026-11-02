@@ -62,7 +62,8 @@ export function portsOfStep(dag, applications) {
   return (stepId) => {
     const step = (dag || []).find((n) => n.id === stepId);
     const app = step?.sourceUrl && (applications || []).find((a) => norm(a.sourceUrl) === norm(step.sourceUrl));
-    return app ? versionManifest(app, step.tag) : null;
+    // The step's variant's (app variants), else the version's.
+    return app ? versionManifest(app, step.tag, step.variant) : null;
   };
 }
 

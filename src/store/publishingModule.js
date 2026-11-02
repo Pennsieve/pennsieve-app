@@ -360,7 +360,8 @@ export const actions = {
         if (isReviewQueue) {
           commit('UPDATE_PUBLISHING_TOTAL_COUNT', { type: PublicationTabs.PROPOSED, count: totalCount });
         }
-        commit('UPDATE_DATASETS', { type: router.currentRoute.value.name, datasets: proposals });
+        // The Go backend encodes an empty list as null
+        commit('UPDATE_DATASETS', { type: router.currentRoute.value.name, datasets: proposals ?? [] });
       } else {
         throw new Error(`Failed to fetch dataset proposals: ${response.status} ${response.statusText}`)
       }

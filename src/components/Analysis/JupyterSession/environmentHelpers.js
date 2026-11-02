@@ -62,3 +62,34 @@ export function switchLabel(sw) {
 }
 
 export const switchBusy = (sw) => !!sw && sw.state !== "done" && sw.state !== "failed";
+
+// The frameworks an environment brings that a GPU kernel's image already
+// has as CUDA builds: torch, tensorflow, jax (and their usual variants), by
+// name, in the environment's order. On a GPU session an environment's own
+// copy comes first on sys.path and can quietly replace the CUDA build with
+// a CPU one.
+const GPU_FRAMEWORKS = {
+  torch: "torch",
+  tensorflow: "tensorflow",
+  "tensorflow-cpu": "tensorflow",
+  "tensorflow-gpu": "tensorflow",
+  "tf-nightly": "tensorflow",
+  jax: "jax",
+  jaxlib: "jax",
+};
+export function gpuFrameworks(packages) {
+  const found = [];
+  for (const spec of packages || []) {
+    const name = GPU_FRAMEWORKS[packageName(spec).trim().toLowerCase().replace(/_/g, "-")];
+    if (name && !found.includes(name)) found.push(name);
+  }
+  return found;
+}
+
+// The warning for an environment on a GPU session, or "".
+export function gpuEnvironmentWarning(packages) {
+  const f = gpuFrameworks(packages);
+  if (!f.length) return "";
+  const names = f.length === 1 ? f[0] : `${f.slice(0, -1).join(", ")} and ${f[f.length - 1]}`;
+  return `This environment brings its own ${names}. On a GPU notebook it can replace the image's CUDA build, so your code may run on the CPU. Leave ${f.length === 1 ? "it" : "them"} out of the environment to use the GPU.`;
+}

@@ -530,7 +530,7 @@ export default {
       ).toLowerCase()
       return (
         (packageType === 'hdf5' || packageType === 'zip') &&
-        this.getFileStatus === 'Processed'
+        path(['content', 'state'], this.proxyRecord) === 'READY'
       )
     },
 
@@ -540,26 +540,6 @@ export default {
      */
     fileBreadcrumbText: function() {
       return 'Files'
-    },
-
-    /**
-     * Computed property to retrieve file status for source
-     * files in package
-     * @returns {String}
-     */
-    getFileStatus: function() {
-      const states = {
-        UPLOADED: 'Unprocessed',
-        ERROR: 'Failed',
-        PROCESSING: 'Processing',
-        RUNNING: 'Processing',
-        PENDING: 'Processing',
-        READY: 'Processed',
-        UNAVAILABLE: 'Uploading'
-      }
-
-      const fileState = path(['content', 'state'], this.proxyRecord)
-      return states[fileState]
     },
 
     /**
@@ -589,26 +569,6 @@ export default {
         this.proxyRecord
       )
       return Boolean(validUrl.isUri(location))
-    },
-
-    /**
-     * Generates function call for button on file details page
-     * based on file state
-     */
-    buttonMenu: function() {
-      let menu = {}
-      if (this.isMSOfficeFile){
-        menu = {
-          Unprocessed: this.processFile,
-          Processed: this.openMSOfficeFile
-        }
-      } else {
-      menu = {
-        Unprocessed: this.processFile,
-        Processed: this.openViewer
-       }
-      }
-      return menu[this.getFileStatus]
     },
 
     /**
@@ -855,20 +815,6 @@ export default {
         return `${this.config.conceptsUrl}/datasets/${datasetId}/relationships`
       }
       return ''
-    },
-
-    /**
-     * Computed property to generate API Url for Process File API
-     * @returns {String}
-     */
-    processFileUrl: async function() {
-      const packageId = this.fileId
-      return useGetToken()
-        .then(token => {
-          return `${this.config.apiUrl}/packages/${packageId}/process?api_key=${
-            token
-          }`
-        })
     },
 
     /**

@@ -45,9 +45,20 @@ const loadError = ref('')
 const gpuTiers = ref([])
 
 const isNodeOwner = computed(() => computeNode.value?.ownerId === profile.value?.id)
-// Changing the node is the owner's. (account-service also lets a workspace
-// admin change a node whose account is Admin Managed in that workspace.)
-const canManage = computed(() => isNodeOwner.value)
+const hasAdminRights = computed(() => {
+  if (activeOrganization.value) {
+    return activeOrganization.value.isAdmin || activeOrganization.value.isOwner
+  }
+  return false
+})
+// Mirrors the API: the node owner, the account owner, or a workspace admin
+// when the account is Admin Managed in that workspace.
+const canManage = computed(() => {
+  if (!computeNode.value) return false
+  return isNodeOwner.value ||
+    (!!profile.value?.id && computeNode.value.account?.ownerId === profile.value.id) ||
+    (hasAdminRights.value && computeResourcesStore.isNodeAdminManaged(computeNode.value))
+})
 // A node with no organization is the owner's alone: it can't be shared with
 // users, teams or a workspace, and the API refuses any attempt.
 const isPersonalNode = computed(() => !!computeNode.value && !computeNode.value.organizationId)
@@ -71,6 +82,10 @@ onMounted(async () => {
     computeResourcesStore.fetchGpuTiers(activeOrganization.value?.organization?.id).then(tiers => {
       gpuTiers.value = tiers || []
     }).catch(() => {}),
+    // Admins need the workspace's account enablements to know if this node is Admin Managed
+    hasAdminRights.value && computeNode.value?.organizationId
+      ? computeResourcesStore.fetchWorkspaceComputeAccounts(computeNode.value.organizationId).catch(() => {})
+      : Promise.resolve(),
   ])
   // A section link (#quotas) scrolls to its section once its tab is shown.
   if (route.hash) {

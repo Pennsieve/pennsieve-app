@@ -22,6 +22,8 @@ import {
   deleteRunArchive,
   agentDownloadCommand,
   agentFolderName,
+  agentSelectionCommand,
+  createSelection,
 } from './downloadService'
 import dev from '../site-config/dev.json'
 import prod from '../site-config/prod.json'
@@ -111,6 +113,12 @@ describe('getFileUrl', () => {
     const fetchFn = respond(200, {})
     await getFileUrl({ datasetId: 'N:dataset:1', packageId: 'N:package:1', fileId: 7, purpose: 'view' }, { config, getToken, fetchFn })
     expect(JSON.parse(fetchFn.mock.calls[0][1].body)).toEqual({ packageId: 'N:package:1', purpose: 'view' })
+  })
+
+  it('asks for a short link only when told to', async () => {
+    const fetchFn = respond(200, {})
+    await getFileUrl({ datasetId: 'N:dataset:1', packageId: 'N:package:1', purpose: 'view', short: true }, { config, getToken, fetchFn })
+    expect(JSON.parse(fetchFn.mock.calls[0][1].body)).toEqual({ packageId: 'N:package:1', purpose: 'view', short: true })
   })
 })
 
@@ -235,5 +243,24 @@ describe('published datasets', () => {
     const fetchFn = respond(413, { message: 'this selection is too large to download as one archive' })
     await expect(createPublicArchive({ datasetId: 1, paths: [''] }, { config: prod, getToken, fetchFn }))
       .rejects.toMatchObject({ status: 413, message: 'this selection is too large to download as one archive' })
+  })
+})
+
+describe('createSelection', () => {
+  it('saves the selected folders and packages of the dataset', async () => {
+    const fetchFn = respond(201, { id: 'sel_l2uw6ebgbzymzzusdedg64i5wm', count: 2, size: 30 })
+    const sel = await createSelection({ datasetId: 'N:dataset:1', nodeIds: ['N:collection:1', 'N:package:2'] }, { config, getToken, fetchFn })
+    expect(sel.id).toBe('sel_l2uw6ebgbzymzzusdedg64i5wm')
+    const [url, init] = fetchFn.mock.calls[0]
+    expect(url).toBe('https://api2.pennsieve.net/downloads/selections?dataset_id=N%3Adataset%3A1')
+    expect(init.method).toBe('POST')
+    expect(JSON.parse(init.body)).toEqual({ nodeIds: ['N:collection:1', 'N:package:2'] })
+  })
+})
+
+describe('agentSelectionCommand', () => {
+  it('downloads a saved selection into a new folder', () => {
+    expect(agentSelectionCommand({ selectionId: 'sel_l2uw6ebgbzymzzusdedg64i5wm', folderName: 'Mouse EEG (day 1)' }))
+      .toBe('pennsieve download selection sel_l2uw6ebgbzymzzusdedg64i5wm ./Mouse-EEG-day-1')
   })
 })

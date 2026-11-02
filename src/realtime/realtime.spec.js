@@ -4,6 +4,7 @@ import {
   applicationChannel,
   datasetChannel,
   pusherChannelName,
+  userNotificationsChannel,
   runChannel,
   runScopeChannel,
   stripNodePrefix,
@@ -25,6 +26,7 @@ describe('channels', () => {
     expect(runScopeChannel(`N:organization:${O}`, `N:user:${U}`)).toBe(`/runs/org-${O}/*`)
     expect(runScopeChannel('', `N:user:${U}`)).toBe(`/runs/user-${U}/*`)
     expect(runChannel(O, '', U)).toBe(`/runs/org-${O}/${U}`)
+    expect(userNotificationsChannel(42)).toBe('/users/42/notifications')
   })
 
   it('maps paths to the Pusher channels of today', () => {
@@ -32,6 +34,7 @@ describe('channels', () => {
     expect(pusherChannelName(`/applications/${U}`)).toBe(`application-${U}`)
     expect(pusherChannelName(`/runs/org-${O}/*`)).toBe(`organization-${O}-analytics`)
     expect(pusherChannelName(`/runs/user-${U}/*`)).toBe(`user-${U}-analytics`)
+    expect(pusherChannelName('/users/42/notifications')).toBe('user-42-notifications')
     expect(() => pusherChannelName('/orgs/x')).toThrow()
   })
 })

@@ -11,7 +11,7 @@ import { ArrowRight } from "@element-plus/icons-vue";
 import IconWarningCircle from "@/components/icons/IconWarningCircle.vue";
 import { environmentsServiceUrl, getEnvironment, listEnvironments } from "@/utils/environmentsService";
 import { SessionEnvironmentsUnavailable } from "@/composables/useJupyterSession";
-import { environmentChoices, matchesQuery, packageSummary, switchBusy, switchLabel } from "./environmentHelpers";
+import { environmentChoices, gpuEnvironmentWarning, gpuFrameworks, matchesQuery, packageSummary, switchBusy, switchLabel } from "./environmentHelpers";
 
 const props = defineProps({
   environmentState: { type: Function, required: true },
@@ -20,6 +20,9 @@ const props = defineProps({
   ready: { type: Boolean, default: false },
   // The kernel's language and version, e.g. "Python 3.12.3".
   kernelName: { type: String, default: "" },
+  // A GPU session: environments that bring torch, tensorflow or jax are
+  // warned about (their copy can replace the image's CUDA build).
+  gpu: { type: Boolean, default: false },
 });
 
 const available = ref(false); // the site has environments-service
@@ -52,8 +55,11 @@ const current = computed(() => {
     name: env?.name || "An environment",
     version: active.value.version,
     packages: packages ? packageSummary(packages) : "",
+    gpuWarning: props.gpu && packages ? gpuEnvironmentWarning(packages) : "",
   };
 });
+// On a GPU session, an option's frameworks that would shadow the image's.
+const optionGpuNote = (c) => (props.gpu ? gpuFrameworks(c.packages).join(", ") : "");
 
 const POLL_MS = 1500;
 let pollTimer = null;
@@ -128,7 +134,9 @@ async function use(id) {
   changing.value = false;
   if (!c || c.disabled || busy.value) return;
   if (active.value?.environmentId === c.id && active.value?.version === c.version) return;
-  if (!(await confirmRestart(`Use ${c.name}?`, RESTART_NOTE, "Use and restart"))) return;
+  // On a GPU session, the warning comes before the switch too.
+  const warning = props.gpu ? gpuEnvironmentWarning(c.packages) : "";
+  if (!(await confirmRestart(`Use ${c.name}?`, warning ? `${warning} ${RESTART_NOTE}` : RESTART_NOTE, "Use and restart"))) return;
   await send(() => props.switchEnvironment(c.id, c.version));
 }
 
@@ -182,6 +190,9 @@ onBeforeUnmount(() => clearTimeout(pollTimer));
           <div class="env__sub">
             Version {{ current.version }}<template v-if="current.packages"> · {{ current.packages }}</template>
           </div>
+          <p v-if="current.gpuWarning" class="env__msg env__msg--warn">
+            <IconWarningCircle :width="12" :height="12" class="env__warn" />{{ current.gpuWarning }}
+          </p>
         </template>
         <template v-else>
           <div class="env__name env__name--none">Image packages only</div>
@@ -230,6 +241,7 @@ onBeforeUnmount(() => clearTimeout(pollTimer));
               <span class="env__option-state">{{ c.disabled || `v${c.version}` }}</span>
             </div>
             <div v-if="c.packages.length" class="env__option-packages">{{ packageSummary(c.packages) }}</div>
+            <div v-if="optionGpuNote(c)" class="env__option-gpu">Brings its own {{ optionGpuNote(c) }}: may not use the GPU</div>
           </el-option>
         </el-select>
         <button v-if="changing && !busy" class="env__link env__link--quiet" @click="changing = false">Cancel</button>
@@ -388,6 +400,14 @@ onBeforeUnmount(() => clearTimeout(pollTimer));
   margin-left: auto;
   font-size: 11px;
   color: theme.$gray_4;
+}
+.env__option-gpu {
+  font-size: 11px;
+  line-height: 1.3;
+  color: theme.$red_2;
+}
+.env__msg--warn {
+  color: theme.$gray_6;
 }
 .env__option-packages {
   font-size: 11px;

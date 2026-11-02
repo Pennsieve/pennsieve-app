@@ -14,14 +14,16 @@ import { useRouter, useRoute } from "vue-router";
 import IconAnalysis from "../../icons/IconAnalysis.vue";
 import AppBanner from "./AppBanner.vue";
 import { appDomain, appFields, domainColors, domainCounts, fieldCounts } from "./appDomains";
-import { versionManifest } from "../WorkflowBuilder/appManifestInfo";
+import { paletteVariants, versionManifest } from "../WorkflowBuilder/appManifestInfo";
+import RuntimeMark from "../WorkflowGraph/RuntimeMark.vue";
 import IconPDF from "../../icons/IconPDF.vue";
 import SampleOutputViewer from "../Workflows/SampleOutputViewer.vue";
 import { PDF_URL_FRESH_MS } from "../Workflows/runExamples";
+import { versionsToWatch, withLiveStatus } from "./liveStatus";
+import { useAppStatusEvents } from "@/composables/useAppStatusEvents";
 import {
   APP_SORTS,
   appTitle,
-  computeLabel,
   githubRepo,
   matchesAppSearch,
   appDescription,
@@ -74,9 +76,31 @@ const route = useRoute();
 const isMyWorkspace = computed(() => !route.params.orgId);
 const scopedRoute = (name, params = {}) => ({ name: isMyWorkspace.value ? `my-${name}` : name, params });
 
-const applications = computed(
-  () => store.state.analysisModule.applications || []
+// The apps as listed, with live build statuses over their newest versions
+// (liveStatus.js): a variant's build event moves that variant's chip only,
+// the version's event its status dot.
+const listedApps = computed(() => store.state.analysisModule.applications || []);
+const { live } = useAppStatusEvents((l) =>
+  listedApps.value.flatMap((app) => versionsToWatch(withLiveStatus(app, l), { latest: true }))
 );
+const applications = computed(() => listedApps.value.map((app) => withLiveStatus(app, live.value)));
+// A variant chip's state, without a badge: building or failed.
+const chipState = (v) => {
+  const s = String(v.status || "").toLowerCase();
+  if (s === "error" || s.startsWith("error")) return "app-variant--failed";
+  if (["registering", "building", "deploying", "pending"].includes(s)) return "app-variant--building";
+  return "";
+};
+const chipTitle = (v) =>
+  [
+    v.name,
+    v.description,
+    v.gpu && "Runs on a GPU",
+    chipState(v) === "app-variant--failed" && `Failed to build${v.failureReason ? `: ${v.failureReason}` : ""}`,
+    chipState(v) === "app-variant--building" && "Building",
+  ]
+    .filter(Boolean)
+    .join(" · ");
 
 /*
   Derived helpers
@@ -126,14 +150,10 @@ const visibilityLabel = (app) => {
   Filtered & sorted applications (newest first, matching workflows)
 */
 // Where an app runs (from its runtime config), and the choices the list has.
-const computeFilter = ref("any");
 // A domain's key, or null for every app: the colour legend above the cards.
 const domainFilter = ref(null);
 // A research field's key, or null: combines with the domain (both must hold).
 const fieldFilter = ref(null);
-const computeChoices = computed(() => [
-  ...new Set(applications.value.flatMap((a) => a.runtimeConfig?.computeTypes || [])),
-]);
 
 // The sort is the viewer's, kept in this browser.
 const SORT_KEY = "pennsieve.gallery.appSort";
@@ -167,12 +187,11 @@ const githubUrl = (app) => {
 
 const filtersSet = computed(
   () =>
-    !!searchQuery.value.trim() || visibilityFilter.value !== "all" || computeFilter.value !== "any" || !!domainFilter.value || !!fieldFilter.value
+    !!searchQuery.value.trim() || visibilityFilter.value !== "all" || !!domainFilter.value || !!fieldFilter.value
 );
 function clearFilters() {
   searchQuery.value = "";
   visibilityFilter.value = "all";
-  computeFilter.value = "any";
   domainFilter.value = null;
   fieldFilter.value = null;
 }
@@ -205,9 +224,6 @@ const filteredApplications = computed(() => {
   }
 
   list = list.filter((app) => matchesAppSearch(app, searchQuery.value, readmeSummary(app)));
-  if (computeFilter.value !== "any") {
-    list = list.filter((app) => (app.runtimeConfig?.computeTypes || []).includes(computeFilter.value));
-  }
 
   if (visibilityFilter.value !== "all") {
     list = list.filter(
@@ -398,10 +414,6 @@ const goToManifestBuilder = () => {
             {{ option.label }}
           </button>
         </div>
-        <el-select v-model="computeFilter" size="small" class="io-select" aria-label="Runs on">
-          <el-option label="Runs anywhere" value="any" />
-          <el-option v-for="t in computeChoices" :key="t" :label="`Runs on ${computeLabel(t)}`" :value="t" />
-        </el-select>
         <label v-if="searchInBar" class="sort-control filter-sort">
           Sort
           <el-select v-model="sortBy" size="small" class="sort-select">
@@ -473,7 +485,15 @@ const goToManifestBuilder = () => {
             <p class="app-description">
               {{ appDescription(app) || readmeSummary(app) || "No description." }}
             </p>
-            <div v-if="appTags(app).length" class="app-tags">
+            <!-- Its variants (a CPU and a GPU build), then its tags -->
+            <div v-if="appTags(app).length || paletteVariants(app).length" class="app-tags">
+              <span
+                v-for="v in paletteVariants(app)"
+                :key="`v:${v.id}`"
+                class="app-tag app-variant"
+                :class="chipState(v)"
+                :title="chipTitle(v)"
+              ><RuntimeMark v-if="v.gpu" runtime="gpu" compact />{{ v.name }}</span>
               <span v-for="t in appTags(app)" :key="t" class="app-tag">{{ t }}</span>
             </div>
             <div class="app-meta">
@@ -722,8 +742,6 @@ const goToManifestBuilder = () => {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding-right: 12px;
-  border-right: 1px solid theme.$gray_2;
 }
 .filter-btn {
   height: 24px;
@@ -816,6 +834,21 @@ $card-height: 172px;
   background: theme.$gray_0;
   font-size: 11px;
   color: theme.$gray_5;
+}
+.app-variant {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid theme.$gray_2;
+  background: theme.$white;
+}
+.app-variant--building {
+  border-style: dashed;
+  color: theme.$gray_4;
+}
+.app-variant--failed {
+  border-color: theme.$red_2;
+  color: theme.$red_2;
+  text-decoration: line-through;
 }
 .app-body {
   display: flex;

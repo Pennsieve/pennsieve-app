@@ -433,7 +433,8 @@ export default {
         const statusRows = {
           'Processing': 'processing-row',
           'Failed': 'failed-row',
-          'Unprocessed': 'unprocessed-row',
+          'Quarantined': 'failed-row',
+          'Scanning…': 'unprocessed-row',
           'Uploading': 'unprocessed-row'
         }
         return statusRows[row.status] !== '' ? statusRows[row.status] : 'no-status-row'
@@ -495,30 +496,6 @@ export default {
       this.$emit('delete-files', [file])
     },
 
-    /**
-     * Used to process a file if state
-     * is set to 'Unprocessed'
-     */
-    process: function() {
-      if (this.processFileUrl === '') {
-        return
-      }
-      useGetToken()
-        .then(token => {
-          return useSendXhr(this.processFileUrl, {
-            method: 'PUT',
-            header: {
-              Authorization: `bearer ${token}`
-            }
-          })
-            .then(response => {
-              this.activeRow.status = 'Processing'
-            })
-
-        })
-        .catch(this.handleXhrError.bind(this))
-
-    },
 
     /**
      * Get the arrow direction based on section name and if it is active
@@ -881,7 +858,8 @@ export default {
 
               const fileStates = {
                 'ERROR': 'Failed',
-                'UPLOADED': 'Unprocessed',
+                'INFECTED': 'Quarantined',
+                'UPLOADED': 'Scanning…',
                 'PROCESSING': 'Processing',
                 'UNAVAILABLE': 'Uploading',
                 'RUNNING': 'Processing',

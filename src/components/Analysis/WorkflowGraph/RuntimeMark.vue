@@ -9,6 +9,8 @@ import { computed } from "vue";
 const props = defineProps({
   runtime: { type: String, default: "" },
   compact: { type: Boolean, default: false },
+  // A title instead of the kind's own (e.g. the GPU a session runs on).
+  label: { type: String, default: "" },
 });
 
 const TITLES = { lambda: "Runs as a Lambda function", gpu: "Runs on a GPU" };
@@ -20,8 +22,8 @@ const kind = computed(() => (TITLES[props.runtime] ? props.runtime : ""));
     v-if="kind"
     class="runtime-mark"
     :class="{ 'runtime-mark--compact': compact }"
-    :title="TITLES[kind]"
-    :aria-label="TITLES[kind]"
+    :title="label || TITLES[kind]"
+    :aria-label="label || TITLES[kind]"
   >
     <span v-if="kind === 'lambda'" class="runtime-mark__lambda" aria-hidden="true">λ</span>
     <svg v-else viewBox="0 0 16 16" aria-hidden="true">

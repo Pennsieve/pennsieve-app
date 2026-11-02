@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { isVersionTag, latestVersion, nextVersions, tagProblem, releaseOutcome, publishRelease, fetchReleaseStatus, releaseNudge } from "./release";
+import { isVersionTag, latestVersion, nextVersions, tagProblem, releaseOutcome, publishRelease, fetchReleaseStatus, releaseNudge, publishStoredRelease, storedReleaseOutcome } from "./release";
 
 describe("releases", () => {
   it("take version tags only", () => {
@@ -71,5 +71,25 @@ describe("releases", () => {
     expect(ok.mock.calls[0][0]).toBe("https://api2/repository/o/r/release");
     const missing = vi.fn().mockResolvedValue({ ok: false, json: async () => ({}) });
     expect(await fetchReleaseStatus("https://api2", { owner: "o", repo: "r" }, "t", missing)).toBeNull();
+  });
+});
+
+describe("publishStoredRelease", () => {
+  it("asks github-service to publish a release it can fetch, to the destinations given", async () => {
+    const calls = [];
+    const fetchImpl = async (url, init) => {
+      calls.push({ url, body: JSON.parse(init.body) });
+      return { status: 202, json: async () => ({ label: "v1.2.0", url: "https://github.com/lab/r" }) };
+    };
+    const outcome = await publishStoredRelease("https://api2", { owner: "lab", repo: "r" }, { label: "v1.2.0", destinations: ["appstore"] }, "tok", fetchImpl);
+    expect(outcome).toEqual({ kind: "accepted", label: "v1.2.0" });
+    expect(calls[0].url).toBe("https://api2/repository/lab/r/publish");
+    expect(calls[0].body).toEqual({ label: "v1.2.0", destinations: ["appstore"] });
+  });
+  it("reads why it was refused", () => {
+    expect(storedReleaseOutcome(422, { message: "no destinations" }).kind).toBe("noDestinations");
+    expect(storedReleaseOutcome(404, { message: "GitHub profile not found" }).kind).toBe("notLinked");
+    expect(storedReleaseOutcome(404, {}).kind).toBe("unavailable");
+    expect(storedReleaseOutcome(500, { message: "boom" })).toEqual({ kind: "error", message: "boom" });
   });
 });

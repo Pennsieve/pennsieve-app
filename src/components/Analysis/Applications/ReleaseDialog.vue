@@ -8,6 +8,7 @@ import { computed, ref, watch } from "vue";
 import BfButton from "@/components/shared/bf-button/BfButton.vue";
 import { useGetToken } from "@/composables/useGetToken";
 import { latestVersion, nextVersions, tagProblem, publishRelease } from "./release";
+import { variantTagWarning } from "./versionVariants";
 
 const props = defineProps({
   modelValue: { type: Boolean, default: false },
@@ -19,6 +20,12 @@ const props = defineProps({
   defaultBranch: { type: String, default: "" },
   // Where the branch stands against the latest release (fetchReleaseStatus).
   status: { type: Object, default: null },
+  // The app has variants (its newest version's app.yml): one release builds
+  // each, and a tag can't contain "--".
+  hasVariants: { type: Boolean, default: false },
+  // The release's builds, once the app store has it (versionVariants
+  // releaseProgress), for an app with variants; null otherwise.
+  progress: { type: Object, default: null },
 });
 const emit = defineEmits(["update:modelValue", "released"]);
 
@@ -65,6 +72,8 @@ const pickBump = (key) => {
 };
 
 const problem = computed(() => tagProblem(tag.value, props.knownTags, latest.value));
+const variantWarning = computed(() => variantTagWarning(tag.value, props.hasVariants));
+const statusText = (s) => (s ? s.charAt(0).toUpperCase() + s.slice(1).toLowerCase() : "Waiting");
 const released = computed(() => outcome.value?.kind === "released");
 
 const release = async () => {
@@ -94,6 +103,14 @@ const fullName = computed(() => `${props.repo.owner}/${props.repo.repo}`);
       <p class="rd-muted">
         The app store adds the version in a few minutes. This page shows it when it's there.
       </p>
+      <!-- An app with variants: one build each -->
+      <div v-if="progress && progress.tag" class="rd-progress">
+        <div v-for="r in progress.rows" :key="r.id || r.name" class="rd-progress-row">
+          <span>{{ r.name }}</span>
+          <span class="rd-muted">{{ statusText(r.status) }}<template v-if="r.failureReason">: {{ r.failureReason }}</template></span>
+        </div>
+      </div>
+      <p v-else-if="hasVariants" class="rd-muted">Each of the app's variants is built; their progress shows here once the version is listed.</p>
     </div>
 
     <template v-else>
@@ -113,6 +130,7 @@ const fullName = computed(() => `${props.repo.owner}/${props.repo.repo}`);
         </el-radio-group>
         <el-input v-model="tag" class="rd-tag" placeholder="v1.2.3" @input="bump = ''" />
         <p v-if="problem" class="rd-error">{{ problem }}</p>
+        <p v-else-if="variantWarning" class="rd-error">{{ variantWarning }}</p>
       </div>
 
       <div class="rd-field">
@@ -187,6 +205,17 @@ const fullName = computed(() => `${props.repo.owner}/${props.repo.repo}`);
 }
 .rd-tag {
   max-width: 200px;
+}
+.rd-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+}
+.rd-progress-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
 }
 .rd-muted {
   font-weight: 400;

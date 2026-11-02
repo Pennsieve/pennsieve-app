@@ -153,7 +153,6 @@
           @rename-cancel="cancelInlineRename"
           @move="showMove"
           @delete="showDeleteDialog"
-          @process="processFile"
           @copy-url="getPresignedUrl"
           @selection-change="setSelectedFiles"
           @click-file-label="onClickLabel"
@@ -242,7 +241,6 @@
 <script>
 import { mapGetters, mapActions, mapState } from "vuex";
 import {
-  assocPath,
   head,
   pathOr,
   propOr,
@@ -1557,34 +1555,6 @@ export default {
      */
     openUploadExternalFileDialog: function () {
       EventBus.$emit("open-external-file-modal");
-    },
-
-    /**
-     * Process file and update the state of the file
-     * @param {Object} file
-     */
-    processFile: function (file) {
-      const packageId = pathOr("", ["content", "id"], file);
-
-      useGetToken().then((token) => {
-        const url = `${this.config.apiUrl}/packages/${packageId}/process?api_key=${token}`;
-        this.sendXhr(url, {
-          method: "PUT",
-          header: {
-            Authorization: `bearer ${token}`,
-          },
-        })
-          .then(() => {
-            // Update the file's state to show that it is processing
-            const updatedFile = assocPath(
-              ["content", "state"],
-              "PROCESSING",
-              file
-            );
-            this.onUpdateUploadedFileState({ packageDTO: updatedFile });
-          })
-          .catch(this.handleXhrError.bind(this));
-      });
     },
 
     /**

@@ -79,6 +79,7 @@
 </template>
 
 <script>
+import { isPackageReady } from "@/utils/package-state";
 import { trackEvent, bucket } from "@/utils/analytics";
 import { mapGetters, mapState } from "vuex";
 import { pathOr } from "ramda";
@@ -252,34 +253,19 @@ export default {
         kind: fileDTOs ? 'files' : 'packages',
         count: bucket((fileDTOs || packageDTOs || []).length),
       });
-      // A package is downloadable only when its source data actually exists
-      // in storage and is retrievable. Deny by default: gating on READY
-      // alone was wrong (an uploaded package rests in UPLOADED indefinitely
-      // and only reaches READY when explicitly processed), but so is
-      // allowing anything that isn't a known-bad state — an unrecognized or
-      // future state (an ARCHIVED / SCANNING / quarantine-like state) must
-      // not silently become downloadable. Failing safe with a visible "not
-      // available yet" beats handing out a broken presigned URL or data
-      // that isn't meant to leave storage.
-      //
-      // Downloadable states (see PackageState.scala):
-      //   UPLOADED            - resting state of an uploaded, unprocessed package
-      //   READY               - processed
-      //   PROCESSING, RUNNING - source is uploaded and present during processing
-      // Everything else is blocked, including placeholders (optimistic
-      // upload rows) and UNAVAILABLE / PENDING / RESTORING / DELETING /
-      // DELETED / INFECTED / ERROR (UPLOAD_FAILED and PROCESSING_FAILED are
-      // serialized to ERROR in DTOs, so the frontend only ever sees ERROR).
-      const DOWNLOADABLE_STATES = new Set([
-        "UPLOADED",
-        "READY",
-        "PROCESSING",
-        "RUNNING",
-      ]);
+      // A package is downloadable only once the malware scan has cleared
+      // its file: READY means exactly that. Deny by default, so UPLOADED
+      // (still scanning), ERROR (quarantined or failed), placeholders
+      // (optimistic upload rows), UNAVAILABLE / RESTORING / DELETING /
+      // DELETED and any unknown future state are all held back. A folder
+      // downloads as an archive; download-service checks each file in it.
       const notDownloadable = (packageDTOs || []).filter(
         (p) =>
           (p && p._placeholder) ||
-          !DOWNLOADABLE_STATES.has(pathOr("", ["content", "state"], p))
+          !(
+            isPackageReady(p) ||
+            pathOr("", ["content", "packageType"], p) === "Collection"
+          )
       );
       if (notDownloadable.length > 0) {
         EventBus.$emit("toast", {

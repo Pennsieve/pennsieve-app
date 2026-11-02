@@ -106,3 +106,63 @@ describe("builderProblems", () => {
     expect(builderProblems(manifest)).toEqual([]);
   });
 });
+
+describe("variants and build", () => {
+  const withVariants = (variants, extra = {}) => ({ ...batch, build: { args: { COMMIT: "abc" } }, variants, ...extra });
+  const cpu = { id: "cpu", name: "CPU", build: { args: { TORCH_FLAVOUR: "cpu" } }, runtime: { computeTypes: ["standard"] } };
+  const gpu = {
+    id: "gpu",
+    name: "GPU",
+    description: "CUDA",
+    build: { args: { TORCH_FLAVOUR: "cuda" }, target: "gpu", dockerfile: "docker/Dockerfile" },
+    runtime: { computeTypes: ["gpu"], memory: 14336 },
+    parameters: { THRESHOLD: { defaultValue: 0.7 } },
+  };
+
+  it("accepts variants, with or without a marked default, and a build", () => {
+    expect(validateManifestDoc(withVariants([cpu, gpu]))).toEqual({ valid: true, problems: [] });
+    expect(validateManifestDoc(withVariants([{ ...cpu, default: true }, gpu])).valid).toBe(true);
+    expect(validateManifestDoc(withVariants([gpu, { ...cpu, default: true }])).valid).toBe(true);
+    expect(validateManifestDoc({ ...batch, build: { target: "runtime" } }).valid).toBe(true);
+  });
+
+  it("allows at most one default and eight variants", () => {
+    expect(messages(validateManifestDoc(withVariants([{ ...cpu, default: true }, { ...gpu, default: true }])))).toEqual([
+      "variants: can have at most one default variant (default: true)",
+    ]);
+    const nine = Array.from({ length: 9 }, (_, i) => ({ id: `v${i}` }));
+    expect(messages(validateManifestDoc(withVariants(nine)))).toEqual(["variants: can have at most 8 variants"]);
+  });
+
+  it("checks variant ids", () => {
+    expect(messages(validateManifestDoc(withVariants([{ id: "GPU" }])))).toEqual([
+      "variants.0.id: must be lowercase letters, numbers and single dashes inside, at most 32 characters",
+    ]);
+    expect(messages(validateManifestDoc(withVariants([{ id: "default" }])))).toEqual(['variants.0.id: can\'t be "default" or contain "--"']);
+    expect(messages(validateManifestDoc(withVariants([{ id: "a--b" }])))).toEqual(['variants.0.id: can\'t be "default" or contain "--"']);
+    expect(messages(validateManifestDoc(withVariants([{ name: "no id" }])))).toEqual(["variants.0: is missing id"]);
+  });
+
+  it("refuses what a variant can't change", () => {
+    expect(messages(validateManifestDoc(withVariants([{ ...cpu, inputs: [] }])))).toEqual(["variants.0.inputs: isn't a field app.yml knows: inputs"]);
+    expect(messages(validateManifestDoc(withVariants([{ ...cpu, runtime: { interactive: true } }])))).toEqual([
+      "variants.0.runtime.interactive: isn't a field app.yml knows: interactive",
+    ]);
+    expect(messages(validateManifestDoc(withVariants([{ ...cpu, parameters: { THRESHOLD: { type: "string" } } }])))).toEqual([
+      "variants.0.parameters.THRESHOLD.type: isn't a field app.yml knows: type",
+    ]);
+  });
+
+  it("checks build args and the Dockerfile's path", () => {
+    expect(messages(validateManifestDoc({ ...batch, build: { args: { "1BAD": "x" } } }))).toEqual([
+      "build.args: names build arguments: letters, numbers and _, not starting with a number",
+    ]);
+    expect(messages(validateManifestDoc({ ...batch, build: { dockerfile: "../Dockerfile" } }))).toEqual([
+      'build.dockerfile: must be a path inside the repository: relative, without ".."',
+    ]);
+    expect(messages(validateManifestDoc({ ...batch, build: { dockerfile: "/Dockerfile" } }))).toEqual([
+      'build.dockerfile: must be a path inside the repository: relative, without ".."',
+    ]);
+    expect(messages(validateManifestDoc({ ...batch, build: { args: { A: { nested: 1 } } } }))).toEqual(["build.args.A: must be a string, number or boolean"]);
+  });
+});

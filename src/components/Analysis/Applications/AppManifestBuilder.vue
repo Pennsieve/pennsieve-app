@@ -60,6 +60,10 @@ function load({ meta: m, schema: s }) {
     description: m.description,
     applicationType: m.applicationType,
     maintainers: (m.maintainers || []).map((x) => ({ name: "", email: "", orcid: "", ...x })),
+    // Kept as read and written back (no editor for them yet); cleared when
+    // the loaded app.yml has none.
+    build: m.build,
+    variants: m.variants,
   });
   schema.value = s;
 }

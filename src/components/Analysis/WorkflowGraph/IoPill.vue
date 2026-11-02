@@ -18,6 +18,7 @@ defineProps({
   mark: { type: Object, default: null },
   markTitle: { type: String, default: "" },
   running: { type: Boolean, default: false },
+  done: { type: Boolean, default: false },
   failed: { type: Boolean, default: false },
   // How many things it still needs (a red count, as on step cards).
   unmet: { type: Number, default: 0 },
@@ -29,7 +30,7 @@ defineProps({
 <template>
   <div
     class="io-pill"
-    :class="[`io-pill--${kind}`, { 'is-running': running, 'is-failed': failed, 'is-off': off }]"
+    :class="[`io-pill--${kind}`, { 'is-running': running, 'is-done': done, 'is-failed': failed, 'is-off': off }]"
   >
     <span v-if="unmet > 0" class="io-pill__unmet">{{ unmet }}</span>
     <span class="io-pill__icon" aria-hidden="true">
@@ -79,18 +80,29 @@ defineProps({
   &.is-failed {
     --io-border: #{theme.$status_red};
   }
+  // Running: a teal border that stays, and a breathing teal glow (as the
+  // step cards), instead of a border that blinked out.
+  &.is-done {
+    --io-border: #{theme.$status_green};
+    box-shadow: 0 0 0 2px rgba(23, 187, 98, 0.22), 0 0 6px rgba(23, 187, 98, 0.25);
+    animation: io-pill-settle 1.2s ease-out 1;
+  }
   &.is-running {
     --io-border: #06b6d4;
-    animation: io-pill-pulse 1.6s ease-in-out infinite;
+    animation: io-pill-glow 1.6s ease-in-out infinite;
   }
   &.is-off {
     opacity: 0.55;
     border-style: dashed;
   }
 }
-@keyframes io-pill-pulse {
-  0%, 100% { border-color: var(--io-border); }
-  50% { border-color: transparent; }
+@keyframes io-pill-settle {
+  0% { box-shadow: 0 0 0 4px rgba(23, 187, 98, 0.35), 0 0 18px rgba(23, 187, 98, 0.7); }
+  100% { box-shadow: 0 0 0 2px rgba(23, 187, 98, 0.22), 0 0 6px rgba(23, 187, 98, 0.25); }
+}
+@keyframes io-pill-glow {
+  0%, 100% { box-shadow: 0 0 0 2px rgba(6, 182, 212, 0.35), 0 0 8px rgba(6, 182, 212, 0.35); }
+  50% { box-shadow: 0 0 0 4px rgba(6, 182, 212, 0.2), 0 0 18px rgba(6, 182, 212, 0.65); }
 }
 .io-pill__icon {
   flex: 0 0 auto;

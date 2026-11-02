@@ -142,3 +142,42 @@ export function releaseNudge(status) {
   const n = status.commitsSince;
   return `${n} new commit${n === 1 ? "" : "s"} since ${status.latestTag}`;
 }
+
+// Building a release GitHub already has (github-service POST
+// /repository/{owner}/{repo}/publish): the publisher fetches the release,
+// stores it, and sends it to the destinations the repository has on, narrowed
+// to `destinations` when given. 202 means it's under way.
+//   accepted     { label }
+//   noDestinations  the repository has nothing turned on (422)
+//   notLinked    no GitHub account linked
+//   unavailable  no route here yet
+//   error        anything else: { message }
+export function storedReleaseOutcome(status, body = {}, label = "") {
+  if (status === 202 || status === 200) return { kind: "accepted", label: body?.label || label };
+  if (status === 422) return { kind: "noDestinations", message: body?.message || "" };
+  if (status === 404 && /profile/i.test(body?.message || "")) return { kind: "notLinked" };
+  if (status === 404 && !body?.message) return { kind: "unavailable" };
+  return { kind: "error", message: body?.message || `The request failed (${status}).` };
+}
+
+export async function publishStoredRelease(api2Url, repo, { label, destinations = [] }, token, fetchImpl = fetch) {
+  try {
+    const resp = await fetchImpl(
+      `${api2Url}/repository/${encodeURIComponent(repo.owner)}/${encodeURIComponent(repo.repo)}/publish`,
+      {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ label: String(label || "").trim(), ...(destinations.length && { destinations }) }),
+      }
+    );
+    let body = {};
+    try {
+      body = await resp.json();
+    } catch {
+      body = {};
+    }
+    return storedReleaseOutcome(resp.status, body, label);
+  } catch (err) {
+    return { kind: "error", message: err?.message || "The request failed." };
+  }
+}

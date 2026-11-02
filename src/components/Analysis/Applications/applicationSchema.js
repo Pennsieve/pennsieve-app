@@ -308,8 +308,6 @@ export const createApplicationSchema = (overrides = {}) => ({
  * ────────────────────────────────────────────────────────────────────────── */
 
 const asArray = (v) => (Array.isArray(v) ? v : []);
-const isPlainObject = (v) => !!v && typeof v === "object" && !Array.isArray(v);
-const clone = (v) => JSON.parse(JSON.stringify(v));
 
 /**
  * Coerce one raw parameter descriptor (from `paramSchema`) into a normalized
@@ -789,6 +787,9 @@ export const buildManifest = (schema, meta = {}) => {
 
   return manifest;
 };
+
+const isPlainObject = (v) => !!v && typeof v === "object" && !Array.isArray(v);
+const clone = (v) => JSON.parse(JSON.stringify(v));
 
 /* ──────────────────────────────────────────────────────────────────────────
  * YAML (de)serialization — manifest object  <->  app.yml text

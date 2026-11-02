@@ -5,6 +5,7 @@
         Connect your GitHub account to track and publish your repositories. Each time you create a release, 
         Pennsieve will archive the version, create a citable DOI, and generate a landing page.
       </p>
+      <bf-button v-if="hasGithubProfile && !isLoading" class="add-repository-button" @click="openAddRepository()">Add repository</bf-button>
     </div>
 
     <!-- GitHub Account Linking Section -->
@@ -74,21 +75,13 @@
                   <!-- Info Section -->
                   <div class="info-section">
                     <div class="info-card">
-                      <h3>Connected GitHub Repositories</h3>
                       <p>
-                        Manage publishing destinations for the repositories
-                        you've connected through GitHub. Toggle Discover or
-                        App Store publishing per repo, and each tagged
-                        release will fan out to the right place automatically.
+                        These are the repositories the Pennsieve GitHub App can see. Choose where each
+                        one's releases go: Discover, the App Store, or both.
                       </p>
-                      <div class="documentation-link">
-                        <router-link
-                          to="/my-workspace/settings/integrations/github"
-                          class="doc-link"
-                        >
-                          Manage GitHub Settings &rarr;
-                        </router-link>
-                      </div>
+                      <router-link to="/my-workspace/settings/integrations/github" class="doc-link">
+                        Manage GitHub settings &rarr;
+                      </router-link>
                     </div>
                   </div>
 
@@ -136,8 +129,9 @@
                       class="empty-state"
                     >
                       <p>
-                        No repositories found. Make sure you have repositories
-                        in your connected GitHub account.
+                        The Pennsieve GitHub App doesn't see any repository yet.
+                        <button type="button" class="link-button" @click="openAddRepository()">Add one</button>
+                        to publish it.
                       </p>
                     </div>
 
@@ -158,6 +152,7 @@
                           :key="repo.id"
                           :repo="repo"
                           @manage-settings="openPublishingDialog"
+                          @setup="openAddRepository"
                         />
                       </div>
 
@@ -208,6 +203,14 @@
       </div>
     </div>
 
+    <!-- Add a repository: access, destinations, sharing, a release -->
+    <add-repository-dialog
+      v-model="showAddRepository"
+      :initial-repo="addRepositoryInitial"
+      @saved="refreshRepositories"
+      @done="onRepositoryDone"
+    />
+
     <!-- Publishing Dialog -->
     <publishing-dialog
       v-if="showPublishingDialog"
@@ -229,6 +232,8 @@ import IconXCircle from '@/components/icons/IconXCircle.vue'
 import CodeRepoListItem from './CodeRepoListItem.vue'
 import PublishingDialog from './PublishingDialog.vue'
 import PublishedAppsList from './PublishedAppsList.vue'
+import AddRepositoryDialog from '@/components/Analysis/Applications/AddRepositoryDialog.vue'
+import { parseRepoInput } from '@/components/Analysis/Applications/addRepository'
 import { Refresh } from '@element-plus/icons-vue'
 
 export default {
@@ -241,6 +246,7 @@ export default {
     CodeRepoListItem,
     PublishingDialog,
     PublishedAppsList,
+    AddRepositoryDialog,
     Refresh
   },
 
@@ -262,8 +268,18 @@ export default {
       showPublishingDialog: false,
       selectedRepo: null,
       activeTab: 'repositories',
-      reposSearchQuery: ''
+      reposSearchQuery: '',
+
+      // The Add repository wizard, and the repository it opens on
+      // ({ owner, repo }) when started from a card or a link.
+      showAddRepository: false,
+      addRepositoryInitial: null,
+      refreshTimers: [],
     }
+  },
+
+  beforeUnmount() {
+    this.refreshTimers.forEach(clearTimeout)
   },
 
   computed: {
@@ -359,7 +375,7 @@ export default {
     if (this.$route.query.tab === 'published') {
       this.activeTab = 'published'
     }
-    this.fetchGithubProfile()
+    this.fetchGithubProfile().then(() => this.openFromQuery())
   },
 
   methods: {
@@ -470,6 +486,42 @@ export default {
       this.$store.commit('codeReposModule/SET_MY_REPOS_CURRENT_PAGE', page)
     },
 
+    // The wizard, on a repository when one is given (a card's "Set up", or
+    // a link's ?add=owner/repo); otherwise where the draft left off.
+    openAddRepository(repo = null) {
+      const full = repo?.full_name || (repo?.html_url || repo?.url || '')
+      this.addRepositoryInitial = parseRepoInput(full)
+      this.showAddRepository = true
+    },
+
+    // Opened from a link: ?add=owner/repo starts the wizard on that
+    // repository; GitHub's return after a change to the installation
+    // (?setup_action=...) resumes it. The query is dropped once used.
+    openFromQuery() {
+      if (!this.hasGithubProfile) return
+      const { add, setup_action: setupAction, installation_id: installationId, ...rest } = this.$route.query
+      if (add === undefined && setupAction === undefined) return
+      if (add) {
+        this.addRepositoryInitial = parseRepoInput(add)
+      } else {
+        this.addRepositoryInitial = null
+      }
+      this.showAddRepository = true
+      this.$router.replace({ query: rest }).catch(() => {})
+    },
+
+    // A release is under way: the App Store adds the app (or version) once
+    // its image is built, Discover its publication; look again in a while.
+    onRepositoryDone({ destinations = [] } = {}) {
+      this.refreshRepositories()
+      if (!destinations.includes('appstore')) return
+      for (const delay of [60000, 150000]) {
+        this.refreshTimers.push(setTimeout(() => {
+          this.$store.dispatch('analysisModule/fetchApplications', { force: true }).catch(() => {})
+        }, delay))
+      }
+    },
+
     openPublishingDialog(repo) {
       this.selectedRepo = repo
       this.showPublishingDialog = true
@@ -512,14 +564,22 @@ export default {
 }
 
 .github-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
   margin-bottom: 32px;
 
   .page-description {
     font-size: 16px;
     color: theme.$gray_5;
     line-height: 1.6;
-    margin: 0 0 24px 0;
+    margin: 0;
     max-width: 800px;
+  }
+
+  .add-repository-button {
+    flex-shrink: 0;
   }
 }
 
@@ -776,52 +836,37 @@ export default {
 }
 
 .info-section {
-  margin-bottom: 32px;
+  margin-bottom: 20px;
 }
 
 .info-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
   background: theme.$gray_1;
   border: 1px solid theme.$gray_2;
-  padding: 24px;
-
-  h3 {
-    font-size: 18px;
-    font-weight: 500;
-    color: theme.$gray_6;
-    margin: 0 0 12px 0;
-  }
+  padding: 12px 16px;
 
   p {
-    font-size: 14px;
+    font-size: 13px;
     color: theme.$gray_5;
     line-height: 1.5;
-    margin: 0 0 12px 0;
+    margin: 0;
   }
 
-  .documentation-link {
-    margin-top: 16px;
+  .doc-link {
+    flex-shrink: 0;
+    font-size: 13px;
+    font-weight: 500;
+    color: theme.$purple_3;
+    text-decoration: none;
+    white-space: nowrap;
 
-    .doc-link {
-      display: inline-flex;
-      align-items: center;
-      padding: 8px 16px;
-      background: theme.$purple_3;
-      color: white;
-      text-decoration: none;
-      border-radius: 4px;
-      font-size: 14px;
-      font-weight: 500;
-      transition: background 0.2s ease;
-
-      &:hover {
-        background: theme.$purple_2;
-      }
+    &:hover {
+      text-decoration: underline;
     }
   }
-}
-
-.repos-section {
-  margin-bottom: 48px;
 }
 
 .repos-section-header {
@@ -994,5 +1039,15 @@ export default {
 @keyframes spin {
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
+}
+
+.link-button {
+  border: none;
+  background: none;
+  padding: 0;
+  font: inherit;
+  color: theme.$purple_2;
+  text-decoration: underline;
+  cursor: pointer;
 }
 </style>
