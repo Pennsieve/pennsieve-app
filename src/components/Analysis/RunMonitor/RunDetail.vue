@@ -87,8 +87,8 @@ import {
 } from "./runHelpers";
 import { sourceLabel, sourceHints, hintLine, portsOfStep, missingFilesMessage, fileTypeMismatches, acceptedFileTypes, linkHints } from "../WorkflowGraph/sourceInputs";
 import ReferencePickerDialog from "./ReferencePickerDialog.vue";
-import { findReferences } from "@/utils/environmentsService";
-import { referenceTargetIn, runReferences, referenceLabel, referenceSource, catalogQuery, formatSize } from "./referenceSources";
+import { findReferences, environmentsServiceUrl } from "@/utils/environmentsService";
+import { referenceTargetIn, runReferences, referenceSource, formatSize, choiceLabel, createReferenceCatalog } from "./referenceSources";
 import { portEdges, stepPoints } from "../WorkflowGraph/runPorts";
 import PortChips from "../WorkflowGraph/PortChips.vue";
 import LlmMark from "../WorkflowGraph/LlmMark.vue";
@@ -1023,9 +1023,11 @@ const initiateWorkflowFromConfig = async (pendingConfig) => {
         const own = source?.dataSources?.[d.id]?.datasetId;
         if (own && own !== datasetId) sourceDatasets[d.id] = own;
         setFilePaths(d.id, filePathsOf(source?.dataSources?.[d.id]));
-        // A reference the run being rerun chose is chosen again.
-        const ref = source?.dataSources?.[d.id];
-        if (ref?.kind === "reference" && ref.environmentId) referencePicks[d.id] = { id: ref.environmentId };
+        // A reference the run being rerun chose is chosen again, and an input
+        // it filled with files (an own index) takes files again.
+        const given = source?.dataSources?.[d.id];
+        if (given?.kind === "reference" && given.environmentId) referencePicks[d.id] = { id: given.environmentId };
+        else if (given?.packageIds?.length || given?.kind === "viewVersion") ownReferenceData[d.id] = true;
       }
       if (d.type === "data-target") {
         // An output's destination is the run being rerun's (its target's
@@ -1130,8 +1132,7 @@ const leaveConfigure = () => {
   Object.keys(dataSourceFilePaths).forEach((k) => delete dataSourceFilePaths[k]);
   Object.keys(pickedPaths).forEach((k) => delete pickedPaths[k]);
   Object.keys(sourceDatasets).forEach((k) => delete sourceDatasets[k]);
-  Object.keys(referencePicks).forEach((k) => delete referencePicks[k]);
-  Object.keys(ownReferenceData).forEach((k) => delete ownReferenceData[k]);
+  for (const state of [referencePicks, ownReferenceData]) Object.keys(state).forEach((k) => delete state[k]);
   Object.keys(nodeConfigs).forEach((k) => delete nodeConfigs[k]);
   nodes.value = [];
   edges.value = [];
@@ -1526,63 +1527,63 @@ const fileCountForNode = (nodeId) => {
   leaving the rest to workflow-service. Browsing, the references the run
   used, as resolved at its start (each step's references).
 */
+// The reference input each source feeds (sourceId -> { step, input,
+// reference }), where the platform has a catalog.
+const referencesOn = !!environmentsServiceUrl();
+const referenceTargets = computed(() => {
+  if (!referencesOn || mode.value !== "configure") return {};
+  const dag = configDefinition.value?.dag || [];
+  const portsOf = portsOfStep(dag, availableApplications.value);
+  const out = {};
+  for (const d of dag) {
+    if (d.type !== "data-source") continue;
+    const t = referenceTargetIn(d.id, dag, portsOf);
+    if (t) out[d.id] = t;
+  }
+  return out;
+});
 // Reference inputs the runner fills with their own files instead (an index
 // in a dataset): an ordinary source for this run, with the file picker.
 const ownReferenceData = reactive({});
-const referenceOf = (nodeId) => {
-  if (mode.value !== "configure" || ownReferenceData[nodeId]) return null;
-  const dag = configDefinition.value?.dag || [];
-  return referenceTargetIn(nodeId, dag, portsOfStep(dag, availableApplications.value));
-};
+const referenceOf = (nodeId) => (ownReferenceData[nodeId] ? null : referenceTargets.value[nodeId] || null);
+const feedsReferenceInput = (nodeId) => !!referenceTargets.value[nodeId];
 const referencePicks = reactive({});
-// Whether a source feeds a reference input, whichever way it's filled.
-const feedsReferenceInput = (nodeId) => {
-  if (mode.value !== "configure") return false;
-  const dag = configDefinition.value?.dag || [];
-  return !!referenceTargetIn(nodeId, dag, portsOfStep(dag, availableApplications.value));
-};
 const useOwnReferenceData = (nodeId, own) => {
   if (own) {
     ownReferenceData[nodeId] = true;
     delete referencePicks[nodeId];
     openFilePicker(nodeId);
-  } else {
-    delete ownReferenceData[nodeId];
-    delete dataSourceFiles[nodeId];
+    return;
   }
+  // Back to the catalog: none of the files chosen meanwhile go in the run.
+  for (const state of [ownReferenceData, dataSourceFiles, publicPicks, sourceDatasets, leftOutInputs]) delete state[nodeId];
 };
-const knownReferences = ref({});
+const catalog = createReferenceCatalog(findReferences, ref);
 const workflowReferenceId = (nodeId) => dagNodeOf(nodeId)?.input?.default?.environmentId || "";
-const referenceChoiceOf = (nodeId) => {
-  const target = referenceOf(nodeId);
-  if (!target) return null;
-  const picked = referencePicks[nodeId] || null;
-  const workflowId = workflowReferenceId(nodeId);
-  const entry = (picked && (knownReferences.value[picked.id] || picked)) || (workflowId && knownReferences.value[workflowId]) || null;
-  const r = target.reference;
-  const pinned = r.choice === "app" ? r : r.default;
-  return {
-    ...target,
-    entry,
-    label: (entry && referenceLabel(entry)) || (entry ? "The chosen reference" : pinned ? referenceLabel(pinned) : "The app's default"),
-    from: picked ? "Chosen for this run" : workflowId ? "The workflow's choice" : "The app's default",
-  };
-};
-// The references the workflow's sources default to, for their names.
-watch(
-  () => mode.value === "configure" && (configDefinition.value?.dag || []).filter((d) => d.type === "data-source").map((d) => referenceOf(d.id)).filter(Boolean),
-  async (targets) => {
-    if (!targets || !targets.length) return;
-    const queries = [...new Map(targets.map((t) => [JSON.stringify(catalogQuery(t.reference)), t.reference])).values()];
-    for (const r of queries) {
-      try {
-        const found = await findReferences(catalogQuery(r));
-        knownReferences.value = { ...knownReferences.value, ...Object.fromEntries(found.map((e) => [e.id, e])) };
-      } catch {
-        // named by the app's default instead
-      }
-    }
+// What each reference source will use: chosen for this run, else the
+// workflow's default, else the app's.
+const referenceChoices = computed(() => {
+  const out = {};
+  for (const [nodeId, target] of Object.entries(referenceTargets.value)) {
+    if (ownReferenceData[nodeId]) continue;
+    const chosenId = referencePicks[nodeId]?.id || workflowReferenceId(nodeId);
+    const entry = (chosenId && catalog.known.value[chosenId]) || null;
+    out[nodeId] = {
+      ...target,
+      chosenId,
+      entry,
+      label: choiceLabel({ entry, chosenId, reference: target.reference }),
+      from: referencePicks[nodeId] ? "Chosen for this run" : workflowReferenceId(nodeId) ? "The workflow's choice" : "The app's default",
+    };
   }
+  return out;
+});
+const referenceChoiceOf = (nodeId) => referenceChoices.value[nodeId] || null;
+// The inputs' candidates, for their names: each query once.
+watch(
+  () => Object.values(referenceTargets.value).map((t) => JSON.stringify(t.reference)).sort().join("|"),
+  () => catalog.ensureLoaded(Object.values(referenceTargets.value).map((t) => t.reference)),
+  { immediate: true }
 );
 
 const referencePickerOpen = ref(false);
@@ -1601,7 +1602,7 @@ const openReferencePicker = (nodeId) => {
 const onReferencePicked = (entry) => {
   const id = referencePickerFor.value?.nodeId;
   if (!id) return;
-  knownReferences.value = { ...knownReferences.value, [entry.id]: entry };
+  catalog.remember([entry]);
   referencePicks[id] = entry;
 };
 
@@ -2394,7 +2395,7 @@ onUnmounted(() => {
       :reference="referencePickerFor?.reference || null"
       :step-name="referencePickerFor?.stepName || ''"
       :input-name="referencePickerFor?.input || ''"
-      :selected-id="referencePickerFor?.entry?.id || ''"
+      :selected-id="referencePickerFor?.chosenId || ''"
       @pick="onReferencePicked"
     />
 
@@ -3073,8 +3074,8 @@ onUnmounted(() => {
                   class="text-link-btn"
                   @click="delete referencePicks[selectedNode.id]"
                 >Use the default</button>
+                <button type="button" class="text-link-btn" @click="useOwnReferenceData(selectedNode.id, true)">Use your own files instead</button>
               </div>
-              <button type="button" class="text-link-btn" @click="useOwnReferenceData(selectedNode.id, true)">Use an index from a dataset instead</button>
             </template>
             <template v-else-if="mode === 'configure' && selectedNode && selectedNode.type === 'data-source'">
               <h4 class="sidebar-section-title">Data Source</h4>
@@ -4910,7 +4911,8 @@ onUnmounted(() => {
 
 .reference-actions {
   display: flex;
-  gap: 16px;
+  flex-wrap: wrap;
+  gap: 4px 16px;
 }
 .reference-checksum {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;

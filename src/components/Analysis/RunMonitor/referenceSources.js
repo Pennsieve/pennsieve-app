@@ -109,11 +109,15 @@ export const catalogQuery = (reference) => {
 const sameAnnotation = (a, b) =>
   !b || ((a?.provider || "") === (b.provider || "") && String(a?.version || "") === String(b.version || ""));
 
+// Whether an app.yml identity names anything (an empty default names none).
+const namesSomething = (id) =>
+  !!id && !!(id.taxonomyId || id.assembly || id.seqcol || id.annotation || Object.keys(id.properties || {}).length);
+
 // Whether a spec is the identity an app.yml names (taxonomyId, assembly or
 // seqcol, annotation, properties); fields the identity leaves out match
 // anything.
 const matchesIdentity = (s, id) =>
-  !!id &&
+  namesSomething(id) &&
   (!id.taxonomyId || Number(s.taxonomyId) === Number(id.taxonomyId)) &&
   (!id.assembly || s.assembly === id.assembly) &&
   (!id.seqcol || s.seqcol === id.seqcol) &&
@@ -129,10 +133,52 @@ export const fitsInput = (entry, reference) => {
   return !organisms.length || organisms.includes(Number(s.taxonomyId));
 };
 
+// The identity an input takes when nothing else is chosen: the reference it
+// pins (choice: app), else its default.
+export const defaultIdentity = (reference) => (reference?.choice === "app" ? reference : reference?.default) || null;
+
 // Whether a catalog entry is the app's default for the input (its default,
 // or the reference it pins).
-export const isAppDefault = (entry, reference) =>
-  matchesIdentity(specOf(entry), reference?.choice === "app" ? reference : reference?.default);
+export const isAppDefault = (entry, reference) => matchesIdentity(specOf(entry), defaultIdentity(reference));
+
+// What a reference source fills its input with, in words: the entry chosen
+// (by its title or identity), a chosen one not yet loaded, else the app's
+// default.
+export const choiceLabel = ({ entry = null, chosenId = "", reference = null } = {}) => {
+  if (entry) return referenceLabel(entry) || "The chosen reference";
+  if (chosenId) return "The chosen reference";
+  const id = defaultIdentity(reference);
+  return (id && referenceLabel(id)) || "The app's default";
+};
+
+// A cache of catalog entries by id, loading each input's candidates once:
+// { known (a ref of id -> entry), remember(entries), ensureLoaded(references) }.
+// find is environmentsService.findReferences; ref is Vue's.
+export const createReferenceCatalog = (find, ref) => {
+  const known = ref({});
+  const loaded = new Set();
+  const remember = (entries) => {
+    known.value = { ...known.value, ...Object.fromEntries((entries || []).map((e) => [e.id, e])) };
+  };
+  const ensureLoaded = async (references) => {
+    const pending = new Map();
+    for (const r of references || []) {
+      const key = JSON.stringify(catalogQuery(r));
+      if (!loaded.has(key)) pending.set(key, r);
+    }
+    await Promise.all(
+      [...pending].map(async ([key, r]) => {
+        loaded.add(key);
+        try {
+          remember(await find(catalogQuery(r)));
+        } catch {
+          loaded.delete(key); // named by the app's default meanwhile; tried again later
+        }
+      })
+    );
+  };
+  return { known, remember, ensureLoaded };
+};
 
 // The app's default among the candidates, or null.
 export const appDefault = (entries, reference) => (entries || []).find((e) => isAppDefault(e, reference)) || null;

@@ -91,7 +91,8 @@ export async function findReferences(query = {}, options = {}) {
     if (v !== undefined && v !== null && v !== '') params.set(k, String(v))
   }
   const data = await environmentsRequest(`/catalog?${params}`, options)
-  return data.genomes || []
+  // references: every kind; genomes: a catalog from before kinds.
+  return data.references || data.genomes || []
 }
 
 // Environment names: lowercase letters, digits and dashes, at most 63.
