@@ -26,6 +26,8 @@ import { useGetToken } from "@/composables/useGetToken";
 import { useAppUsage } from "@/composables/useAppUsage";
 import { usageSidebar } from "./appUsage";
 import { useSendXhr } from "@/mixins/request/request_composable";
+import { environmentsServiceUrl, findReferences } from "@/utils/environmentsService";
+import { appDefault, catalogQuery, choiceLabel, referenceInputs, referenceKindText, referenceLabel } from "../RunMonitor/referenceSources";
 
 
 const props = defineProps({
@@ -471,6 +473,42 @@ const manifestParsed = computed(() => {
 
 const manifestMeta = computed(() => manifestParsed.value.meta);
 const manifestSchema = computed(() => manifestParsed.value.schema);
+
+/*
+  Inputs filled from Pennsieve's reference catalog (app.yml inputs[].reference),
+  each with the catalog entry it takes by default, looked up once the manifest
+  is read. They link to Resources > Reference Data.
+*/
+const referencePorts = computed(() => referenceInputs(manifestSchema.value?.inputs));
+const referenceDefaults = ref({}); // port name -> catalog entry
+watch(
+  referencePorts,
+  async (ports) => {
+    referenceDefaults.value = {};
+    if (!ports.length || !environmentsServiceUrl()) return;
+    const found = await Promise.all(
+      ports.map((p) =>
+        findReferences(catalogQuery(p.reference))
+          .then((entries) => [p.name, appDefault(entries, p.reference)])
+          .catch(() => [p.name, null])
+      )
+    );
+    if (ports !== referencePorts.value) return; // another app's manifest meanwhile
+    referenceDefaults.value = Object.fromEntries(found.filter(([, e]) => e));
+  },
+  { immediate: true }
+);
+const referenceDefaultLabel = (port) => {
+  const entry = referenceDefaults.value[port.name];
+  return entry ? referenceLabel(entry) : choiceLabel({ reference: port.reference });
+};
+const referenceDataRoute = (port) => {
+  const entry = port && referenceDefaults.value[port.name];
+  const query = entry ? { entry: entry.id } : {};
+  return isMyWorkspace.value
+    ? { name: "reference-catalog", query }
+    : { name: "workspace-reference-catalog", params: { orgId: route.params.orgId }, query };
+};
 
 /** Compact figures for the sidebar card. */
 const manifestSummary = computed(() => {
@@ -1051,6 +1089,11 @@ watch(
                       <div v-if="port.description" class="manifest-port-desc">
                         {{ port.description }}
                       </div>
+                      <div v-if="port.reference" class="manifest-port-reference">
+                        From reference data: {{ referenceKindText(port.reference) }}.
+                        {{ port.reference.choice === "app" ? "Uses" : "Default" }}:
+                        <router-link :to="referenceDataRoute(port)" class="manifest-link">{{ referenceDefaultLabel(port) }}</router-link>
+                      </div>
                     </div>
                   </div>
 
@@ -1202,6 +1245,12 @@ watch(
                     <span class="manifest-summary-value">
                       {{ manifestSummary.inputs }} / {{ manifestSummary.outputs }}
                     </span>
+                  </div>
+                  <div v-for="port in referencePorts" :key="`ref-${port.name}`" class="manifest-summary-row">
+                    <span class="manifest-summary-label">Reference data</span>
+                    <router-link :to="referenceDataRoute(port)" class="manifest-summary-value manifest-link">
+                      {{ referenceDefaultLabel(port) }}
+                    </router-link>
                   </div>
                 </div>
                 <router-link :to="builderForApp" class="manifest-builder-link">Update in builder ›</router-link>
@@ -2032,6 +2081,12 @@ watch(
 }
 
 .manifest-port-desc {
+  margin-top: 4px;
+  font-size: 12px;
+  color: theme.$gray_5;
+}
+
+.manifest-port-reference {
   margin-top: 4px;
   font-size: 12px;
   color: theme.$gray_5;

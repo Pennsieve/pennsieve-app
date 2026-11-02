@@ -100,7 +100,7 @@
             <div v-else-if="!usedBy.length" class="rc-muted">No app in the App Store asks for this yet.</div>
             <ul v-else class="rc-uses">
               <li v-for="u in usedBy" :key="`${u.app.uuid}-${u.input}`">
-                <router-link v-if="orgId && u.app.uuid" :to="appRoute(u.app)">{{ appTitle(u.app) }}</router-link>
+                <router-link v-if="u.app.uuid" :to="appRoute(u.app)">{{ appTitle(u.app) }}</router-link>
                 <span v-else>{{ appTitle(u.app) }}</span>
                 <span class="rc-muted">
                   · input "{{ u.input }}"{{ u.pinned ? ', its default' : ', one of its choices' }}
@@ -183,7 +183,10 @@ const orgId = computed(() => route.params.orgId || null)
 const goBackToResources = () => {
   router.push(orgId.value ? { name: 'workspace-resources', params: { orgId: orgId.value } } : { name: 'resources' })
 }
-const appRoute = (app) => ({ name: 'application-detail', params: { orgId: orgId.value, uuid: app.uuid } })
+const appRoute = (app) =>
+  orgId.value
+    ? { name: 'application-detail', params: { orgId: orgId.value, uuid: app.uuid } }
+    : { name: 'my-application-detail', params: { uuid: app.uuid } }
 
 const available = !!environmentsServiceUrl()
 const term = ref('')
@@ -219,6 +222,20 @@ const open = (e) => {
   detailVisible.value = true
 }
 
+// ?entry=<id> (from an app's page) opens that entry, on its kind's tab.
+const openFromQuery = () => {
+  const id = route.query.entry
+  if (!id) return
+  for (const [kind, list] of Object.entries(entries.value)) {
+    const e = (list || []).find((x) => x.id === id)
+    if (e) {
+      activeKind.value = kind
+      open(e)
+      return
+    }
+  }
+}
+
 const copySnippet = async () => {
   try {
     await navigator.clipboard.writeText(snippet.value)
@@ -239,6 +256,7 @@ onMounted(async () => {
   try {
     const lists = await Promise.all(REFERENCE_KINDS.map((k) => findReferences({ kind: k.kind })))
     entries.value = Object.fromEntries(REFERENCE_KINDS.map((k, i) => [k.kind, lists[i]]))
+    openFromQuery()
   } catch (e) {
     error.value = "Reference data couldn't be loaded. Try again later."
     console.error('Reference data failed to load:', e)
