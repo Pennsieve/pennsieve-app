@@ -1129,6 +1129,7 @@ const cancelConfigure = () => {
   Object.keys(publicPicks).forEach((k) => delete publicPicks[k]);
   Object.keys(sourceDatasets).forEach((k) => delete sourceDatasets[k]);
   Object.keys(referencePicks).forEach((k) => delete referencePicks[k]);
+  Object.keys(ownReferenceData).forEach((k) => delete ownReferenceData[k]);
   Object.keys(nodeConfigs).forEach((k) => delete nodeConfigs[k]);
   nodes.value = [];
   edges.value = [];
@@ -1496,12 +1497,31 @@ const fileCountForNode = (nodeId) => {
   leaving the rest to workflow-service. Browsing, the references the run
   used, as resolved at its start (each step's references).
 */
+// Reference inputs the runner fills with their own files instead (an index
+// in a dataset): an ordinary source for this run, with the file picker.
+const ownReferenceData = reactive({});
 const referenceOf = (nodeId) => {
-  if (mode.value !== "configure") return null;
+  if (mode.value !== "configure" || ownReferenceData[nodeId]) return null;
   const dag = configDefinition.value?.dag || [];
   return referenceTargetIn(nodeId, dag, portsOfStep(dag, availableApplications.value));
 };
 const referencePicks = reactive({});
+// Whether a source feeds a reference input, whichever way it's filled.
+const feedsReferenceInput = (nodeId) => {
+  if (mode.value !== "configure") return false;
+  const dag = configDefinition.value?.dag || [];
+  return !!referenceTargetIn(nodeId, dag, portsOfStep(dag, availableApplications.value));
+};
+const useOwnReferenceData = (nodeId, own) => {
+  if (own) {
+    ownReferenceData[nodeId] = true;
+    delete referencePicks[nodeId];
+    openFilePicker(nodeId);
+  } else {
+    delete ownReferenceData[nodeId];
+    delete dataSourceFiles[nodeId];
+  }
+};
 const knownReferences = ref({});
 const workflowReferenceId = (nodeId) => dagNodeOf(nodeId)?.input?.default?.environmentId || "";
 const referenceChoiceOf = (nodeId) => {
@@ -3087,9 +3107,16 @@ onUnmounted(() => {
                   @click="delete referencePicks[selectedNode.id]"
                 >Use the default</button>
               </div>
+              <button type="button" class="text-link-btn" @click="useOwnReferenceData(selectedNode.id, true)">Use an index from a dataset instead</button>
             </template>
             <template v-else-if="mode === 'configure' && selectedNode && selectedNode.type === 'data-source'">
               <h4 class="sidebar-section-title">Data Source</h4>
+              <button
+                v-if="ownReferenceData[selectedNode.id] && feedsReferenceInput(selectedNode.id)"
+                type="button"
+                class="text-link-btn"
+                @click="useOwnReferenceData(selectedNode.id, false)"
+              >Use Pennsieve's reference data instead</button>
               <div class="info-card">
                 <div v-if="publicPicks[selectedNode.id]?.length" class="info-row">
                   <span class="info-label">From</span>
