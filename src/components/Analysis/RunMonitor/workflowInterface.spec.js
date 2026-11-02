@@ -23,7 +23,7 @@ describe("workflowInterface", () => {
     expect(destinationChoices(out)).toEqual(["download", "Pennsieve Dataset", NO_DESTINATION]);
     expect(destinationChoices(out, { myWorkspace: true })).toEqual(["download", NO_DESTINATION]);
     expect(destinationChoices({ ...out, required: true })).toEqual(["download", "Pennsieve Dataset"]);
-    expect(destinationChoices({ id: "o" }, { targetTypes: [{ targetType: "download" }, { targetType: "persistent-layer" }] })).toEqual(["download", "persistent-layer", NO_DESTINATION]);
+    expect(destinationChoices({ id: "o" }, { targetTypes: [{ targetType: "download" }, { targetType: "Pennsieve Dataset" }] })).toEqual(["download", "Pennsieve Dataset", NO_DESTINATION]);
   });
 
   it("works without a dataset when every required output can go elsewhere", () => {

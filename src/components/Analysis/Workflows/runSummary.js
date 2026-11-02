@@ -17,7 +17,6 @@ function takes(hints) {
 function outputWhere(node) {
   const params = node.defaultParams || {};
   if (node.targetType === "download") return "as a download";
-  if (node.targetType === "persistent-layer") return "into a node layer";
   const folder = String(params.TARGET_FOLDER || "").replace(/^\/+|\/+$/g, "");
   return folder ? `into ${folder}/` : "into the dataset";
 }
