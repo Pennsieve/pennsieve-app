@@ -949,9 +949,7 @@ $card-height: 172px;
 }
 .wf-tag {
   flex-shrink: 0;
-  /* A pixel more above than below: the line box's descender room would
-     otherwise leave the text sitting high. */
-  padding: 3px 8px 1px;
+  padding: 2px 8px;
   border: 1px solid transparent;
   border-radius: 3px;
   background: theme.$gray_0;
