@@ -73,7 +73,7 @@ export const COMMON_ORGANISMS = [
   { taxonomyId: 7227, label: "Drosophila melanogaster", common: "fruit fly", names: ["fruit fly", "fly"] },
   { taxonomyId: 6239, label: "Caenorhabditis elegans", common: "nematode worm", names: ["C. elegans", "worm", "nematode"] },
   { taxonomyId: 4932, label: "Saccharomyces cerevisiae", common: "baker's yeast", names: ["yeast", "baker's yeast", "brewer's yeast"] },
-  { taxonomyId: 3702, label: "Arabidopsis thaliana", common: "thale cress", names: ["thale cress", "mouse-ear cress"] },
+  { taxonomyId: 3702, label: "Arabidopsis thaliana", common: "thale cress", names: ["thale cress"] },
   { taxonomyId: 9544, label: "Macaca mulatta", common: "rhesus macaque", names: ["rhesus macaque", "rhesus monkey", "macaque"] },
   { taxonomyId: 9823, label: "Sus scrofa", common: "pig", names: ["pig", "wild boar"] },
   { taxonomyId: 9031, label: "Gallus gallus", common: "chicken", names: ["chicken"] },
@@ -92,7 +92,19 @@ export const rankOrganisms = (query, found) => {
     if (names.some((n) => n.split(/[\s,()-]+/).some((w) => w.startsWith(q)))) return /^[A-Z][a-z]+ [a-z]+$/.test(t.label) ? 1 : 3;
     return /^[A-Z][a-z]+ [a-z]+$/.test(t.label) ? 2 : 4;
   };
-  const common = q ? COMMON_ORGANISMS.filter((t) => namesOf(t).some((n) => n.startsWith(q) || n.split(/\s+/).some((w) => w.startsWith(q)))) : COMMON_ORGANISMS;
+  // A common organism a name of which starts with the query, then one with a word that does.
+  const commonScore = (t) => {
+    const names = namesOf(t);
+    if (names.some((n) => n === q)) return 0;
+    if (names.some((n) => n.startsWith(q))) return 1;
+    return names.some((n) => n.split(/\s+/).some((w) => w.startsWith(q))) ? 2 : 3;
+  };
+  const common = q
+    ? COMMON_ORGANISMS.map((t) => ({ t, s: commonScore(t) }))
+        .filter((x) => x.s < 3)
+        .sort((a, b) => a.s - b.s)
+        .map((x) => x.t)
+    : COMMON_ORGANISMS;
   const seen = new Set(common.map((t) => t.taxonomyId));
   const rest = (found || [])
     .filter((t) => !seen.has(t.taxonomyId) && seen.add(t.taxonomyId))

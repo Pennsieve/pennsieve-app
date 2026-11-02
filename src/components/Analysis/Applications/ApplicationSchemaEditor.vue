@@ -341,6 +341,7 @@
                             clearable
                             :remote-method="searchOrganisms"
                             :loading="organismSearching"
+                            @visible-change="(open) => open || searchOrganisms('')"
                             placeholder="Search species, e.g. zebrafish or Danio rerio"
                             @change="(v) => setIdentityField(port, 'taxonomyId', v)"
                           >
@@ -843,8 +844,10 @@ const remember = (taxa) => {
   for (const t of taxa) taxonNames[t.taxonomyId] = { label: t.label, common: t.common };
 };
 let organismQuery = 0;
+const organismTerm = ref(""); // what's typed in the organism search
 const searchOrganisms = async (q) => {
   const term = String(q || "").trim();
+  organismTerm.value = term;
   const asked = ++organismQuery;
   if (!term) {
     organismResults.value = COMMON_ORGANISMS;
@@ -867,11 +870,12 @@ const searchOrganisms = async (q) => {
   organismResults.value = taxa;
   organismSearching.value = false;
 };
-// The search's results, and the organism the input already names.
+// The search's results, and the organism the input already names (only
+// before anything is typed, so it can show as the selected value).
 const organismOptions = (port) => {
   const id = referenceIdentity(port).taxonomyId;
   const current =
-    id && !organismResults.value.some((o) => o.taxonomyId === id)
+    id && !organismTerm.value && !organismResults.value.some((o) => o.taxonomyId === id)
       ? [{ taxonomyId: id, label: taxonNames[id]?.label || organismName(id) || `NCBITaxon:${id}`, common: taxonNames[id]?.common || "" }]
       : [];
   return [...current, ...organismResults.value];
