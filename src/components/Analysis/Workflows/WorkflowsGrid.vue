@@ -411,15 +411,6 @@ onMounted(async () => {
 
       <div v-if="domainChips.length" class="domain-row" role="group" aria-label="What workflows are for">
         <button
-          type="button"
-          class="domain-chip domain-chip--all"
-          :class="{ active: domainFilter === 'any' }"
-          :aria-pressed="domainFilter === 'any'"
-          @click="domainFilter = 'any'"
-        >
-          All
-        </button>
-        <button
           v-for="{ domain, count } in domainChips"
           :key="domain.key"
           type="button"
@@ -438,15 +429,6 @@ onMounted(async () => {
 
       <div v-if="fieldChips.length" class="field-row" role="group" aria-label="Research field">
         <span class="field-label">Field</span>
-        <button
-          type="button"
-          class="field-chip"
-          :class="{ active: fieldFilter === 'any' }"
-          :aria-pressed="fieldFilter === 'any'"
-          @click="fieldFilter = 'any'"
-        >
-          All
-        </button>
         <button
           v-for="{ field, count } in fieldChips"
           :key="field.key"
@@ -780,13 +762,6 @@ onMounted(async () => {
     background: var(--chip-tile);
     font-weight: 600;
   }
-}
-/* "All": neutral, chosen while no domain is. */
-.domain-chip--all {
-  --chip-bg: #{theme.$gray_0};
-  --chip-tile: #{theme.$gray_1};
-  --chip-ink: #{theme.$gray_6};
-  --chip-line: #{theme.$gray_2};
 }
 .domain-dot {
   width: 8px;
