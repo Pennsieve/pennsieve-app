@@ -11,6 +11,7 @@ import {
   requirementsProblem,
   ENVIRONMENT_NAME,
   EnvironmentsServiceError,
+  findReferences,
 } from './environmentsService'
 import dev from '../site-config/dev.json'
 import prod from '../site-config/prod.json'
@@ -48,6 +49,24 @@ describe('listEnvironments', () => {
     expect(err).toBeInstanceOf(EnvironmentsServiceError)
     expect(err.status).toBe(401)
     expect(err.message).toBe('no')
+  })
+})
+
+describe('findReferences', () => {
+  it('asks the catalog by kind, asset class and properties, and reads references', async () => {
+    const fetchFn = respond(200, { references: [{ id: 't1' }] })
+    const got = await findReferences({ kind: 'template', assetClass: 'brain-template', 'property.space': 'MNI152NLin2009cAsym', toolVersion: '' }, { config, getToken, fetchFn })
+    expect(got).toEqual([{ id: 't1' }])
+    const url = new URL(fetchFn.mock.calls[0][0])
+    expect(url.pathname).toBe('/environments/catalog')
+    expect(url.searchParams.get('kind')).toBe('template')
+    expect(url.searchParams.get('property.space')).toBe('MNI152NLin2009cAsym')
+    expect(url.searchParams.has('toolVersion')).toBe(false)
+  })
+
+  it('reads genomes from a catalog before kinds', async () => {
+    expect(await findReferences({ kind: 'genome' }, { config, getToken, fetchFn: respond(200, { genomes: [{ id: 'g' }] }) })).toEqual([{ id: 'g' }])
+    expect(await findReferences({}, { config, getToken, fetchFn: respond(200, { references: [], genomes: [{ id: 'g' }] }) })).toEqual([])
   })
 })
 

@@ -42,16 +42,14 @@ export function edgeId(source, target, sourceHandle, targetHandle) {
   return out || input ? `e${source}:${out}-${target}:${input}` : `e${source}-${target}`;
 }
 
-// Whether a link may be drawn between these points: not the same one twice,
-// and an input takes one link. An output port goes to a data target or to
-// an input of an app, not to its "all inputs" point.
+// Whether a link may be drawn between these points: not the same one twice.
+// An input may take several links (fan-in): their folders land side by side
+// in it. An output port goes to a data target or to an input of an app, not
+// to its "all inputs" point.
 export function linkAllowed(src, tgt, sourceHandle, targetHandle, edges = []) {
   const input = inputOfHandle(targetHandle);
   if (input && !routedInputs(tgt?.data?.manifestPorts).some((p) => p.name === input)) {
     return { ok: false, reason: "unknown-input" };
-  }
-  if (input && edges.some((e) => e.target === tgt.id && inputOfHandle(e.targetHandle) === input)) {
-    return { ok: false, reason: "input-taken" };
   }
   const out = portOfHandle(sourceHandle);
   if (out && tgt?.type === "default" && !input && routedInputs(tgt?.data?.manifestPorts).length) {

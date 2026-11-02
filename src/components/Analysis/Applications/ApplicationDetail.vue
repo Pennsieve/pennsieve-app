@@ -13,6 +13,12 @@ import BfButton from "../../shared/bf-button/BfButton.vue";
 import { fetchRepository, canUpdateManifest } from "./githubRepository";
 import ReleaseDialog from "./ReleaseDialog.vue";
 import AppReferences from "./AppReferences.vue";
+import AppSampleOutputs from "./AppSampleOutputs.vue";
+import AppSampleCard from "./AppSampleCard.vue";
+import { useAppSample } from "./useAppSample";
+import IconPDF from "../../icons/IconPDF.vue";
+import { useAppSampleOutputs } from "./useAppSampleOutputs";
+import { tryableVersion } from "../RunMonitor/appRuns";
 import ShareAppDialog from "./ShareAppDialog.vue";
 import { accessEntries, accessSummary, makeNamer } from "./appSharing";
 import { useWorkspaceMembers } from "./useWorkspaceMembers";
@@ -26,6 +32,8 @@ import { useGetToken } from "@/composables/useGetToken";
 import { useAppUsage } from "@/composables/useAppUsage";
 import { usageSidebar } from "./appUsage";
 import { useSendXhr } from "@/mixins/request/request_composable";
+import { environmentsServiceUrl, findReferences } from "@/utils/environmentsService";
+import { appDefault, catalogQuery, choiceLabel, referenceInputs, referenceKindText, referenceLabel } from "../RunMonitor/referenceSources";
 
 
 const props = defineProps({
@@ -472,6 +480,42 @@ const manifestParsed = computed(() => {
 const manifestMeta = computed(() => manifestParsed.value.meta);
 const manifestSchema = computed(() => manifestParsed.value.schema);
 
+/*
+  Inputs filled from Pennsieve's reference catalog (app.yml inputs[].reference),
+  each with the catalog entry it takes by default, looked up once the manifest
+  is read. They link to Resources > Reference Data.
+*/
+const referencePorts = computed(() => referenceInputs(manifestSchema.value?.inputs));
+const referenceDefaults = ref({}); // port name -> catalog entry
+watch(
+  referencePorts,
+  async (ports) => {
+    referenceDefaults.value = {};
+    if (!ports.length || !environmentsServiceUrl()) return;
+    const found = await Promise.all(
+      ports.map((p) =>
+        findReferences(catalogQuery(p.reference))
+          .then((entries) => [p.name, appDefault(entries, p.reference)])
+          .catch(() => [p.name, null])
+      )
+    );
+    if (ports !== referencePorts.value) return; // another app's manifest meanwhile
+    referenceDefaults.value = Object.fromEntries(found.filter(([, e]) => e));
+  },
+  { immediate: true }
+);
+const referenceDefaultLabel = (port) => {
+  const entry = referenceDefaults.value[port.name];
+  return entry ? referenceLabel(entry) : choiceLabel({ reference: port.reference });
+};
+const referenceDataRoute = (port) => {
+  const entry = port && referenceDefaults.value[port.name];
+  const query = entry ? { entry: entry.id } : {};
+  return isMyWorkspace.value
+    ? { name: "reference-catalog", query }
+    : { name: "workspace-reference-catalog", params: { orgId: route.params.orgId }, query };
+};
+
 /** Compact figures for the sidebar card. */
 const manifestSummary = computed(() => {
   const s = manifestSchema.value;
@@ -565,6 +609,41 @@ watch(hasReferences, (has) => {
   if (!has && activeTab.value === "references") activeTab.value = "readme";
 });
 
+// "Try this app": a one-off run of the newest deployed version on files the
+// person picks, configured on the run page (RunMonitor/appRuns.js). Not for
+// an interactive app.
+const tryVersion = computed(() => (detail.value?.sourceUrl ? tryableVersion(sortedVersions.value) : null));
+const tryApp = () => {
+  const v = tryVersion.value;
+  if (!v) return;
+  store.commit("analysisModule/SET_PENDING_RUN_CONFIG", {
+    workflowId: "",
+    app: { sourceUrl: detail.value.sourceUrl, tag: v.version },
+    computeNodeId: "",
+    datasetId: "",
+    rerunSource: null,
+  });
+  router.push({ name: route.params.orgId ? "run-configure" : "my-run-configure" });
+};
+
+// The app's own sample output (a PDF of one of its app runs): first on the
+// page, and the header's PDF button.
+const { sample: appSample, pdfSource: appSamplePdf } = useAppSample(computed(() => detail.value?.sourceUrl || ""));
+const sampleCard = ref(null);
+const openAppSample = () => sampleCard.value?.open();
+
+// The Workflow samples tab: only when a workflow the app is in has a sample
+// output (loaded in the background).
+const { entries: sampleEntries, more: moreSampleWorkflows } = useAppSampleOutputs(
+  computed(() => detail.value?.sourceUrl || "")
+);
+watch(
+  () => sampleEntries.value.length,
+  (n) => {
+    if (!n && activeTab.value === "samples") activeTab.value = "readme";
+  }
+);
+
 
 // Members and teams power friendly-name resolution for the owner badge.
 // They are not always preloaded when navigating directly to this page;
@@ -652,7 +731,21 @@ watch(
         </template>
       </span>
       <!-- The page's main action: publish a release (the app store follows) -->
-      <div v-if="detail && (canRelease || isAppOwner)" class="header-actions">
+      <div v-if="detail && (canRelease || isAppOwner || tryVersion || appSample)" class="header-actions">
+        <el-tooltip v-if="appSample" content="Sample output: a PDF summary of a run of this app" placement="bottom">
+          <button type="button" class="header-sample-btn" aria-label="View the app's sample output" @click="openAppSample">
+            <IconPDF :width="20" :height="20" color="currentColor" />
+          </button>
+        </el-tooltip>
+        <el-tooltip
+          v-if="tryVersion"
+          :content="`Run ${tryVersion.version} once on files you pick; its results come back as a download.`"
+          placement="bottom"
+        >
+          <span>
+            <bf-button :class="['compact', 'flex', { secondary: canRelease }]" @click="tryApp">Try this app</bf-button>
+          </span>
+        </el-tooltip>
         <bf-button v-if="isAppOwner" class="compact flex secondary" @click="shareOpen = true">Share</bf-button>
         <template v-if="canRelease">
         <span v-if="nudge" class="release-nudge">{{ nudge }}</span>
@@ -686,6 +779,14 @@ watch(
     <div v-else class="builder-content">
       <!-- Left: Main Panel -->
       <div class="main-panel">
+        <!-- The app's own sample output, first: what the app produces -->
+        <AppSampleCard
+          v-if="appSample"
+          ref="sampleCard"
+          :sample="appSample"
+          :app-name="repoName"
+          :source="appSamplePdf"
+        />
         <!-- Metrics -->
         <div class="metrics-section">
           <MetricsDashboard
@@ -753,6 +854,17 @@ watch(
               >
                 References
               </button>
+              <button
+                v-if="sampleEntries.length"
+                type="button"
+                role="tab"
+                class="detail-tab"
+                :class="{ 'detail-tab-active': activeTab === 'samples' }"
+                :aria-selected="activeTab === 'samples'"
+                @click="activeTab = 'samples'"
+              >
+                Workflow samples
+              </button>
             </div>
             <div class="readme-header-actions">
               <bf-button v-if="activeTab === 'manifest' && canUpdate" class="compact flex" @click="openBuilder">{{ builderLabel }}</bf-button>
@@ -794,6 +906,14 @@ watch(
 
           <!-- References tab: how to cite, authors, related works (CITATION.cff) -->
           <AppReferences v-else-if="activeTab === 'references'" :versions="sortedVersions" />
+
+          <!-- Workflow samples tab: the sample PDFs of workflows this app is in -->
+          <AppSampleOutputs
+            v-else-if="activeTab === 'samples'"
+            :entries="sampleEntries"
+            :more="moreSampleWorkflows"
+            :app-name="detail?.name || ''"
+          />
 
           <!-- app.yml tab -->
           <template v-else>
@@ -1051,6 +1171,12 @@ watch(
                       <div v-if="port.description" class="manifest-port-desc">
                         {{ port.description }}
                       </div>
+                      <div v-if="port.reference" class="manifest-port-reference">
+                        A folder holding a reference ({{ referenceKindText(port.reference) }}).
+                        {{ port.reference.choice === "app" ? "Always" : "Default" }}:
+                        <router-link v-if="referenceDefaults[port.name]" :to="referenceDataRoute(port)" class="manifest-link">{{ referenceDefaultLabel(port) }}</router-link>
+                        <span v-else>{{ referenceDefaultLabel(port) }}, not in Pennsieve's reference data (runs take files)</span>
+                      </div>
                     </div>
                   </div>
 
@@ -1202,6 +1328,12 @@ watch(
                     <span class="manifest-summary-value">
                       {{ manifestSummary.inputs }} / {{ manifestSummary.outputs }}
                     </span>
+                  </div>
+                  <div v-for="port in referencePorts" :key="`ref-${port.name}`" class="manifest-summary-row">
+                    <span class="manifest-summary-label">Reference data</span>
+                    <router-link :to="referenceDataRoute(port)" class="manifest-summary-value manifest-link">
+                      {{ referenceDefaultLabel(port) }}
+                    </router-link>
                   </div>
                 </div>
                 <router-link :to="builderForApp" class="manifest-builder-link">Update in builder ›</router-link>
@@ -1451,7 +1583,23 @@ watch(
     color: theme.$black;
   }
 
-  .header-actions {
+  .header-sample-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid theme.$gray_3;
+  border-radius: 4px;
+  background: theme.$white;
+  color: theme.$purple_3;
+  cursor: pointer;
+
+  &:hover {
+    border-color: theme.$purple_1;
+  }
+}
+.header-actions {
     margin-left: auto;
     display: flex;
     align-items: center;
@@ -2032,6 +2180,12 @@ watch(
 }
 
 .manifest-port-desc {
+  margin-top: 4px;
+  font-size: 12px;
+  color: theme.$gray_5;
+}
+
+.manifest-port-reference {
   margin-top: 4px;
   font-size: 12px;
   color: theme.$gray_5;

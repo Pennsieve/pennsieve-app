@@ -34,8 +34,12 @@ import DatasetOptionRow from "./DatasetOptionRow.vue";
 import RunExampleAction from "./RunExampleAction.vue";
 import PublicFilesPicker from "./PublicFilesPicker.vue";
 import { picksKey } from "./publicPicks";
+import FilePlacementChoice from "./FilePlacementChoice.vue";
+import { FILE_PATHS_SELECTION, FILE_PATHS_SOURCE, filePathsOf, filePathsField, sharedNames } from "./inputFilePaths";
 import IoPill from "../WorkflowGraph/IoPill.vue";
+import { warningHeadline } from "./runDetails";
 import { withInterfaceNodes, destinationChoices, NO_DESTINATION } from "./workflowInterface";
+import { appOf, appRunLabel, appRunPayload, appStepId, setupKey } from "./appRuns";
 import { placeRunNodes, workflowLayouts } from "./runLayout";
 import { importStatusUrl, importSummary, importStillMoving, isDatasetImport } from "./runImports";
 import { nodeUnfit, rememberedSetup, rememberSetup, defaultNode, needsDataset } from "./runSetup";
@@ -82,6 +86,9 @@ import {
   RUN_NAME_MAX_LENGTH,
 } from "./runHelpers";
 import { sourceLabel, sourceHints, hintLine, portsOfStep, missingFilesMessage, fileTypeMismatches, acceptedFileTypes, linkHints } from "../WorkflowGraph/sourceInputs";
+import ReferencePickerDialog from "./ReferencePickerDialog.vue";
+import { findReferences, environmentsServiceUrl } from "@/utils/environmentsService";
+import { referenceTargetIn, runReferences, referenceSource, formatSize, choiceLabel, createReferenceCatalog, catalogLacks, defaultIdentity, referenceLabel, referenceKindText } from "./referenceSources";
 import { portEdges, stepPoints } from "../WorkflowGraph/runPorts";
 import PortChips from "../WorkflowGraph/PortChips.vue";
 import LlmMark from "../WorkflowGraph/LlmMark.vue";
@@ -133,6 +140,24 @@ const dataSourceFiles = reactive({});
 // An input takes a workspace dataset's files or public files, not both.
 const publicInputs = !!viewsServiceUrl();
 const publicPicks = reactive({});
+// Where each input's workspace files land in a step's input folder
+// (inputFilePaths.js): the inputs set to "source"; the others are as selected.
+// Public files come as a view, which keeps its own paths.
+const dataSourceFilePaths = reactive({});
+const filePathsFor = (nodeId) => dataSourceFilePaths[nodeId] || FILE_PATHS_SELECTION;
+const setFilePaths = (nodeId, choice) => {
+  if (choice === FILE_PATHS_SOURCE) dataSourceFilePaths[nodeId] = choice;
+  else delete dataSourceFilePaths[nodeId];
+};
+// The folders each chosen package is in, from the dataset's top, as the file
+// picker had them when it was chosen: for the picture of where it lands.
+const pickedPaths = reactive({});
+const placementItems = (nodeId) =>
+  (dataSourceFiles[nodeId] || []).map((f) => ({
+    name: f.content?.name || "",
+    folder: f.content?.packageType === "Collection",
+    path: pickedPaths[f.content?.id] ?? null,
+  }));
 // The file picker's side: a workspace dataset or public datasets.
 const pickerSide = ref("workspace");
 // What choosing on the picker's side would replace: the input's files from
@@ -352,6 +377,9 @@ const runWorkflowName = computed(() => {
   const activity = selectedWorkflowActivity.value;
   return activity?.workflowName || "";
 });
+
+// The app an app run ran (no workflow), or null.
+const runApp = computed(() => selectedWorkflowActivity.value?.app || null);
 
 const runName = computed(() => {
   const activity = selectedWorkflowActivity.value;
@@ -639,6 +667,8 @@ const statusMark = (data) => (mode.value === "browse" && statusMarkOf(data.statu
 // An input's and output's second line on the graph (IoPill): its files, or
 // where it goes and how that went.
 const sourceSubOf = (id, data) => {
+  if (mode.value === "configure" && referenceChoiceOf(id)) return referenceChoiceOf(id).label;
+  if (mode.value === "browse" && usedReferenceOf(id)) return usedReferenceOf(id).label || "Reference data";
   if (mode.value === "configure") {
     if (isLeftOut(id)) return "Left out";
     const n = fileCountForNode(id);
@@ -663,6 +693,8 @@ const targetSubOf = (id, data) => {
     const t = nodeConfigs[id]?.targetType;
     return t ? `to ${getTargetTypeLabel(t, targetTypes.value)}` : "";
   }
+  // A target that worked with nothing to save says so instead.
+  if (data.warning) return `⚠ ${warningHeadline(data.warning)}`;
   return importLineOf(id)?.text || targetFacts(data).join(" · ") || getTargetTypeLabel(data.targetType, targetTypes.value);
 };
 
@@ -740,6 +772,7 @@ const runToNodesAndEdges = (run) => {
       } else {
         extra.packageIds = src?.packageIds || [];
         extra.packageCount = extra.packageIds.length;
+        extra.filePaths = filePathsOf(src);
       }
     } else if (d.type === "data-target") {
       extra.targetType = d.targetType || null;
@@ -772,6 +805,7 @@ const runToNodesAndEdges = (run) => {
         completedAt: d.completedAt,
         progress: d.progress || null,
         errorMessage: d.errorMessage || "",
+        warning: d.warning || "",
         reason: d.reason || null,
         exitCode: d.exitCode ?? null,
         cpuUnits: d.cpuUnits || null,
@@ -957,9 +991,15 @@ onNodeClick(({ node }) => {
   selectedNode.value = node;
 
   if (mode.value === "configure") {
-    // In My Workspace an input takes only public files, and where there are
+    // An input without files opens the picker; one with files shows its
+    // panel (its files and where they land), where they can be changed. In
+    // My Workspace an input takes only public files, and where there are
     // none (no views-service) its panel says so instead of an empty picker.
-    if (node.type === "data-source" && (!isMyWorkspace.value || publicInputs)) {
+    if (node.type === "data-source" && referenceOf(node.id)) {
+      openReferencePicker(node.id);
+      return;
+    }
+    if (node.type === "data-source" && !fileCountForNode(node.id) && (!isMyWorkspace.value || publicInputs)) {
       openFilePicker(node.id);
       return;
     }
@@ -987,19 +1027,30 @@ onPaneClick(() => {
 /*
   Configure mode — initiate workflow from pending config
 */
+// The app an app run ("Try this app") runs, or null for a workflow's run.
+const configApp = ref(null);
+
 const initiateWorkflowFromConfig = async (pendingConfig) => {
   const { workflowId, computeNodeId, datasetId, rerunSource: source } = pendingConfig;
-  initiateForm.value = { workflowId, computeNodeId, datasetId, name: "" };
+  configApp.value = appOf(pendingConfig) || appOf(source);
+  initiateForm.value = { workflowId: workflowId || "", computeNodeId, datasetId, name: "" };
   runNameError.value = "";
 
   try {
     // A workflow's inputs and outputs shown as the source and target nodes a
     // run of it has (workflowInterface.js); its DAG as is otherwise.
-    const definition = withInterfaceNodes(await store.dispatch("analysisModule/fetchWorkflowDefinition", workflowId));
+    // An app run's is the app's one-step workflow (appRuns.js).
+    const definition = withInterfaceNodes(
+      configApp.value
+        ? await store.dispatch("analysisModule/fetchAppRunDefinition", configApp.value)
+        : await store.dispatch("analysisModule/fetchWorkflowDefinition", workflowId)
+    );
     configDefinition.value = definition;
 
     Object.keys(dataSourceFiles).forEach((k) => delete dataSourceFiles[k]);
     Object.keys(publicPicks).forEach((k) => delete publicPicks[k]);
+    Object.keys(dataSourceFilePaths).forEach((k) => delete dataSourceFilePaths[k]);
+    Object.keys(pickedPaths).forEach((k) => delete pickedPaths[k]);
     Object.keys(sourceDatasets).forEach((k) => delete sourceDatasets[k]);
     Object.keys(leftOutInputs).forEach((k) => delete leftOutInputs[k]);
     Object.keys(nodeConfigs).forEach((k) => delete nodeConfigs[k]);
@@ -1013,9 +1064,16 @@ const initiateWorkflowFromConfig = async (pendingConfig) => {
       const srcParams = sourceParams[d.id] || {};
 
       if (d.type === "data-source") {
-        // A rerun reads from the same datasets; its files are chosen again.
+        // A rerun reads from the same datasets, and its files land where the
+        // run's did; its files are chosen again.
         const own = source?.dataSources?.[d.id]?.datasetId;
         if (own && own !== datasetId) sourceDatasets[d.id] = own;
+        setFilePaths(d.id, filePathsOf(source?.dataSources?.[d.id]));
+        // A reference the run being rerun chose is chosen again, and an input
+        // it filled with files (an own index) takes files again.
+        const given = source?.dataSources?.[d.id];
+        if (given?.kind === "reference" && given.environmentId) referencePicks[d.id] = { id: given.environmentId };
+        else if (given?.packageIds?.length || given?.kind === "viewVersion") ownReferenceData[d.id] = true;
       }
       if (d.type === "data-target") {
         // An output's destination is the run being rerun's (its target's
@@ -1110,16 +1168,25 @@ const initiateWorkflowFromConfig = async (pendingConfig) => {
   }
 };
 
-const cancelConfigure = () => {
+// Leaves configure mode: the form and its graph cleared.
+const leaveConfigure = () => {
   mode.value = "browse";
   configDefinition.value = null;
+  configApp.value = null;
   Object.keys(dataSourceFiles).forEach((k) => delete dataSourceFiles[k]);
   Object.keys(publicPicks).forEach((k) => delete publicPicks[k]);
+  Object.keys(dataSourceFilePaths).forEach((k) => delete dataSourceFilePaths[k]);
+  Object.keys(pickedPaths).forEach((k) => delete pickedPaths[k]);
   Object.keys(sourceDatasets).forEach((k) => delete sourceDatasets[k]);
+  for (const state of [referencePicks, ownReferenceData]) Object.keys(state).forEach((k) => delete state[k]);
   Object.keys(nodeConfigs).forEach((k) => delete nodeConfigs[k]);
   nodes.value = [];
   edges.value = [];
   selectedNode.value = null;
+};
+
+const cancelConfigure = () => {
+  leaveConfigure();
   router.push(scopedRoute("runs"));
 };
 
@@ -1238,12 +1305,21 @@ const executeWorkflow = async () => {
     Object.entries(dataSourceFiles).forEach(([nodeId, files]) => {
       const ids = files.map((f) => f.content?.id).filter(Boolean);
       const own = sourceDatasetOf(nodeId);
-      dataSources[nodeId] = own && own !== runDatasetId.value ? { packageIds: ids, datasetId: own } : { packageIds: ids };
+      dataSources[nodeId] = {
+        packageIds: ids,
+        ...(own && own !== runDatasetId.value ? { datasetId: own } : {}),
+        ...filePathsField(filePathsFor(nodeId)),
+      };
     });
     // Public files: one view per input, kept for the run.
     const views = await publicInputViews(dag);
     if (!views) return;
     Object.assign(dataSources, views);
+    // A reference chosen for this run; the others take the workflow's
+    // default, else the app's.
+    for (const [nodeId, entry] of Object.entries(referencePicks)) {
+      if (entry?.id && referenceOf(nodeId)) dataSources[nodeId] = referenceSource(entry.id);
+    }
 
     const processorConfigs = [];
     Object.entries(nodeConfigs).forEach(([nodeId, cfg]) => {
@@ -1297,11 +1373,24 @@ const executeWorkflow = async () => {
       ...(Object.keys(processorParams).length > 0 && { processorParams }),
     };
 
-    await store.dispatch("analysisModule/createRun", payload);
-    rememberSetup(route.params.orgId || "", initiateForm.value.workflowId, { ...initiateForm.value, datasetId: runDatasetId.value });
-    EventBus.$emit("toast", { detail: { type: "success", msg: "Workflow executed successfully." } });
-
-    router.push(scopedRoute("runs"));
+    const app = configApp.value;
+    const sent = app ? appRunPayload(payload, app, appStepId(configDefinition.value)) : payload;
+    const created = await store.dispatch("analysisModule/createRun", sent);
+    rememberSetup(route.params.orgId || "", setupKey({ workflowId: initiateForm.value.workflowId, app }), {
+      ...initiateForm.value,
+      datasetId: runDatasetId.value,
+    });
+    // The new run's page, where it's followed live (and an app run's results
+    // arrive); the runs list if the response named no run.
+    const msg = app
+      ? `${appRunLabel(app)} is running. Its results appear here when it finishes.`
+      : "The run has started.";
+    EventBus.$emit("toast", { detail: { type: "success", msg } });
+    if (created?.executionRunId) {
+      router.push(scopedRoute("run-detail", { runId: created.executionRunId }));
+    } else {
+      router.push(scopedRoute("runs"));
+    }
   } catch (err) {
     console.error("Failed to execute workflow:", err);
     const msg = err?.message || "Failed to execute workflow.";
@@ -1446,6 +1535,12 @@ const onFileSelect = (selectedFiles, parentId) => {
 
   // Update the store so navigating folders preserves selections
   store.commit("analysisModule/SET_SELECTED_FILES", { selectedFiles, parentId: parentId || "root" });
+  const at = [...filePickerAncestorList.value, filePickerCurrentFile.value]
+    .map((a) => a?.content?.name)
+    .filter(Boolean);
+  for (const f of selectedFiles) {
+    if (f.content?.id) pickedPaths[f.content.id] = at;
+  }
 
   // Rebuild dataSourceFiles from the full store state
   const allFiles = [];
@@ -1464,8 +1559,125 @@ const closeFilePicker = () => {
 };
 
 const fileCountForNode = (nodeId) => {
+  // A reference source has no files to choose: it always has its reference.
+  if (referenceOf(nodeId)) return 1;
   return (dataSourceFiles[nodeId] || []).length + (publicPicks[nodeId] || []).length;
 };
+
+/*
+  Reference sources: inputs filled from Pennsieve's reference catalog (an
+  app input with a reference block). Configuring, each shows the reference
+  it will use: the one chosen for this run, else the workflow's default
+  (its input's default), else the app's; the run names only a reference
+  chosen here (dataSources[id] = { kind: "reference", environmentId }),
+  leaving the rest to workflow-service. Browsing, the references the run
+  used, as resolved at its start (each step's references).
+*/
+// The reference input each source feeds (sourceId -> { step, input,
+// reference }), where the platform has a catalog.
+const referencesOn = !!environmentsServiceUrl();
+const referenceTargets = computed(() => {
+  if (!referencesOn || mode.value !== "configure") return {};
+  const dag = configDefinition.value?.dag || [];
+  const portsOf = portsOfStep(dag, availableApplications.value);
+  const out = {};
+  for (const d of dag) {
+    if (d.type !== "data-source") continue;
+    const t = referenceTargetIn(d.id, dag, portsOf);
+    if (t) out[d.id] = t;
+  }
+  return out;
+});
+// Reference inputs the runner fills with their own files instead (an index
+// in a dataset): an ordinary source for this run, with the file picker.
+const ownReferenceData = reactive({});
+const referenceOf = (nodeId) => (ownReferenceData[nodeId] ? null : referenceTargets.value[nodeId] || null);
+const feedsReferenceInput = (nodeId) => !!referenceTargets.value[nodeId];
+const referencePicks = reactive({});
+const useOwnReferenceData = (nodeId, own) => {
+  if (own) {
+    ownReferenceData[nodeId] = true;
+    delete referencePicks[nodeId];
+    openFilePicker(nodeId);
+    return;
+  }
+  // Back to the catalog: none of the files chosen meanwhile go in the run.
+  for (const state of [ownReferenceData, dataSourceFiles, publicPicks, sourceDatasets, leftOutInputs, dataSourceFilePaths, pickedPaths]) delete state[nodeId];
+};
+const catalog = createReferenceCatalog(findReferences, ref);
+const workflowReferenceId = (nodeId) => dagNodeOf(nodeId)?.input?.default?.environmentId || "";
+// What each reference source will use: chosen for this run, else the
+// workflow's default, else the app's.
+const referenceChoices = computed(() => {
+  const out = {};
+  for (const [nodeId, target] of Object.entries(referenceTargets.value)) {
+    if (ownReferenceData[nodeId]) continue;
+    const chosenId = referencePicks[nodeId]?.id || workflowReferenceId(nodeId);
+    const entry = (chosenId && catalog.known.value[chosenId]) || null;
+    out[nodeId] = {
+      ...target,
+      chosenId,
+      entry,
+      label: choiceLabel({ entry, chosenId, reference: target.reference }),
+      from: referencePicks[nodeId] ? "Chosen for this run" : workflowReferenceId(nodeId) ? "The workflow's choice" : "The app's default",
+    };
+  }
+  return out;
+});
+const referenceChoiceOf = (nodeId) => referenceChoices.value[nodeId] || null;
+// The inputs' candidates, for their names: each query once.
+watch(
+  () => Object.values(referenceTargets.value).map((t) => JSON.stringify(t.reference)).sort().join("|"),
+  () => catalog.ensureLoaded(Object.values(referenceTargets.value).map((t) => t.reference)),
+  { immediate: true }
+);
+// Reference inputs the catalog can't fill when nothing is chosen (it doesn't
+// have the app's default): the reference describes the folder's contents,
+// so they take the runner's files, saying what's missing.
+const lackingReference = computed(() => {
+  const out = {};
+  const entries = Object.values(catalog.known.value);
+  for (const [nodeId, t] of Object.entries(referenceTargets.value)) {
+    if (referencePicks[nodeId] || workflowReferenceId(nodeId) || !catalog.isLoaded(t.reference)) continue;
+    if (catalogLacks(t.reference, entries)) {
+      out[nodeId] = referenceLabel(defaultIdentity(t.reference) || {}) || referenceKindText(t.reference).toLowerCase();
+    }
+  }
+  return out;
+});
+watch(
+  lackingReference,
+  (lacking) => {
+    for (const nodeId of Object.keys(lacking)) ownReferenceData[nodeId] = true;
+  },
+  { immediate: true }
+);
+
+const referencePickerOpen = ref(false);
+const referencePickerFor = ref(null);
+const openReferencePicker = (nodeId) => {
+  const choice = referenceChoiceOf(nodeId);
+  if (!choice) return;
+  const stepNode = (configDefinition.value?.dag || []).find((d) => d.id === choice.step);
+  referencePickerFor.value = {
+    nodeId,
+    ...choice,
+    stepName: stepNode ? labelForDagNode(stepNode, availableApplications.value, targetTypes.value, configDefinition.value?.dag || []) : "",
+  };
+  referencePickerOpen.value = true;
+};
+const onReferencePicked = (entry) => {
+  const id = referencePickerFor.value?.nodeId;
+  if (!id) return;
+  catalog.remember([entry]);
+  referencePicks[id] = entry;
+};
+
+// Browsing: the reference a run's source (or, unbound, its step's input)
+// used.
+const usedReferences = computed(() => (mode.value === "browse" ? runReferences(selectedWorkflowActivity.value?.dag || []) : []));
+const usedReferenceOf = (sourceId) => usedReferences.value.find((r) => r.source === sourceId) || null;
+const usedReferencesOfStep = (stepId) => usedReferences.value.filter((r) => r.step === stepId);
 
 // Chosen files a source's inputs don't take (by extension, against what its
 // inputs' app.yml declares), while configuring: marked on the link to the
@@ -1942,6 +2154,8 @@ const rerunFromRun = async () => {
   if (!activity) return;
   store.commit("analysisModule/SET_PENDING_RUN_CONFIG", {
     workflowId: activity.workflowUuid || "",
+    // An app run runs its app again.
+    ...(appOf(activity) && { app: appOf(activity) }),
     computeNodeId: activity.computeNodeUuid || "",
     datasetId: activity.datasetId || "",
     rerunSource: activity,
@@ -2021,7 +2235,10 @@ const ensureDatasetOption = async (datasetId) => {
 };
 
 function applySetupDefaults(definition) {
-  const remembered = rememberedSetup(route.params.orgId || "", definition?.uuid || initiateForm.value.workflowId);
+  const remembered = rememberedSetup(
+    route.params.orgId || "",
+    configApp.value ? setupKey({ app: configApp.value }) : definition?.uuid || initiateForm.value.workflowId
+  );
   if (!initiateForm.value.computeNodeId) {
     initiateForm.value.computeNodeId = defaultNode("", remembered.computeNodeId, computeNodes.value, (n) => unfitReasons(n).length === 0);
   }
@@ -2222,6 +2439,18 @@ onMounted(async () => {
 
 });
 
+// Another run on the same page (the router reuses it, e.g. configure → the
+// run just started, or one run → another): show that run, live.
+watch(
+  () => props.runId,
+  async (runId, before) => {
+    if (!runId || runId === before) return;
+    if (mode.value === "configure") leaveConfigure();
+    await loadRun(runId);
+    scheduleRunPoll();
+  }
+);
+
 // Handle same-component navigation (e.g. run-detail → run-configure)
 watch(
   () => route.name,
@@ -2268,7 +2497,7 @@ onUnmounted(() => {
             :disabled="isExecuting"
             @click="executeWorkflow"
           >
-            {{ isExecuting ? 'Executing...' : 'Execute Workflow' }}
+            {{ isExecuting ? 'Executing...' : configApp ? 'Run app' : 'Execute Workflow' }}
           </bf-button>
         </div>
       </template>
@@ -2296,6 +2525,15 @@ onUnmounted(() => {
         </div>
       </template>
     </div>
+
+    <ReferencePickerDialog
+      v-model="referencePickerOpen"
+      :reference="referencePickerFor?.reference || null"
+      :step-name="referencePickerFor?.stepName || ''"
+      :input-name="referencePickerFor?.input || ''"
+      :selected-id="referencePickerFor?.chosenId || ''"
+      @pick="onReferencePicked"
+    />
 
     <!-- End-session confirmation (Pennsieve dialog, not the browser prompt) -->
     <el-dialog
@@ -2957,8 +3195,45 @@ onUnmounted(() => {
             </template>
 
             <!-- CONFIGURE MODE: Selected data-source node -->
+            <template v-else-if="mode === 'configure' && selectedNode && selectedNode.type === 'data-source' && referenceChoiceOf(selectedNode.id)">
+              <h4 class="sidebar-section-title">Reference data</h4>
+              <div class="info-card">
+                <div class="info-row">
+                  <span class="info-label">Reference</span>
+                  <span class="info-value">{{ referenceChoiceOf(selectedNode.id).label }}</span>
+                </div>
+                <div class="info-row">
+                  <span class="info-label">Chosen by</span>
+                  <span class="info-value">{{ referenceChoiceOf(selectedNode.id).from }}</span>
+                </div>
+                <div v-if="referenceChoiceOf(selectedNode.id).entry?.version?.archive?.sizeBytes" class="info-row">
+                  <span class="info-label">Download</span>
+                  <span class="info-value">{{ formatSize(referenceChoiceOf(selectedNode.id).entry.version.archive.sizeBytes) }}</span>
+                </div>
+              </div>
+              <p class="configure-hint">The step downloads this reference when it runs; the run records the exact version it used.</p>
+              <div class="reference-actions">
+                <button type="button" class="text-link-btn" @click="openReferencePicker(selectedNode.id)">Change reference</button>
+                <button
+                  v-if="referencePicks[selectedNode.id]"
+                  type="button"
+                  class="text-link-btn"
+                  @click="delete referencePicks[selectedNode.id]"
+                >Use the default</button>
+                <button type="button" class="text-link-btn" @click="useOwnReferenceData(selectedNode.id, true)">Use your own files instead</button>
+              </div>
+            </template>
             <template v-else-if="mode === 'configure' && selectedNode && selectedNode.type === 'data-source'">
               <h4 class="sidebar-section-title">Data Source</h4>
+              <p v-if="lackingReference[selectedNode.id]" class="configure-hint">
+                Pennsieve's reference data has no {{ lackingReference[selectedNode.id] }}. Select the files for this input instead.
+              </p>
+              <button
+                v-else-if="ownReferenceData[selectedNode.id] && feedsReferenceInput(selectedNode.id)"
+                type="button"
+                class="text-link-btn"
+                @click="useOwnReferenceData(selectedNode.id, false)"
+              >Use Pennsieve's reference data instead</button>
               <div class="info-card">
                 <div v-if="publicPicks[selectedNode.id]?.length" class="info-row">
                   <span class="info-label">From</span>
@@ -2978,7 +3253,10 @@ onUnmounted(() => {
                 {{ canLeaveOut(selectedNode.id) ? "Leave this input out, or run the workflow from a workspace." : "Run this workflow from a workspace." }}
               </p>
               <template v-else>
-              <h4 class="sidebar-section-title">Source Files</h4>
+              <div class="section-title-row">
+                <h4 class="sidebar-section-title">Source Files</h4>
+                <button class="text-link-btn" @click="openFilePicker(selectedNode.id)">{{ fileCountForNode(selectedNode.id) > 0 ? 'Change files' : 'Select files' }}</button>
+              </div>
               <p v-if="mismatchLine(selectedNode.id)" class="files-mismatch">
                 ⚠ {{ mismatchLine(selectedNode.id) }}: {{ hintLine(sourceHints(selectedNode.id, configDefinition?.dag || [], portsOfStep(configDefinition?.dag || [], availableApplications))) }}.
               </p>
@@ -3013,9 +3291,27 @@ onUnmounted(() => {
               <div v-else class="selected-files-empty">
                 No files selected yet.
               </div>
-              <div class="info-actions">
-                <button class="text-link-btn" @click="openFilePicker(selectedNode.id)">{{ fileCountForNode(selectedNode.id) > 0 ? 'Change files' : 'Select files' }}</button>
-              </div>
+              <template v-if="!publicPicks[selectedNode.id]?.length">
+                <h4 class="sidebar-section-title">Where the files land</h4>
+                <FilePlacementChoice
+                  :model-value="filePathsFor(selectedNode.id)"
+                  :items="placementItems(selectedNode.id)"
+                  @update:model-value="setFilePaths(selectedNode.id, $event)"
+                />
+                <p
+                  v-if="filePathsFor(selectedNode.id) === FILE_PATHS_SELECTION && sharedNames(dataSourceFiles[selectedNode.id]).length"
+                  class="files-mismatch"
+                  role="alert"
+                >
+                  ⚠ More than one selected item is named {{ sharedNames(dataSourceFiles[selectedNode.id]).join(", ") }}:
+                  as selected they'd land on the same path. Choose <strong>As in the source</strong>, or select the folder that holds them.
+                </p>
+                <p v-else class="configure-hint">
+                  {{ filePathsFor(selectedNode.id) === FILE_PATHS_SOURCE
+                    ? "Each file keeps the folders it's in at the source, from the top."
+                    : "Each selected file goes at the top of the step's input folder; a selected folder goes there with what's in it." }}
+                </p>
+              </template>
               </template>
             </template>
 
@@ -3041,12 +3337,20 @@ onUnmounted(() => {
                     Up to {{ RUN_NAME_MAX_LENGTH }} characters — letters, numbers, spaces, hyphens, underscores, periods.
                   </span>
                 </div>
-                <div class="info-row">
+                <div v-if="configApp" class="info-row">
+                  <span class="info-label">App</span>
+                  <span class="info-value">{{ appRunLabel(configApp) }}</span>
+                </div>
+                <div v-else class="info-row">
                   <span class="info-label">Workflow</span>
                   <span class="info-value">{{ configDefinition?.name || 'N/A' }}</span>
                 </div>
+                <p v-if="configApp" class="app-run-note">
+                  A one-off run of the app on the files you pick. Everything it writes comes back as a zip to
+                  download, here and on your Downloads page, for 3 days. Nothing is saved to a dataset.
+                </p>
                 <p v-if="needsDatasetHere" class="run-name-error">
-                  This workflow reads from or writes to a dataset, so it runs in a workspace, not in My Workspace.
+                  This {{ configApp ? "run" : "workflow" }} reads from or writes to a dataset, so it runs in a workspace, not in My Workspace.
                 </p>
                 <div class="info-row info-row-stacked">
                   <label class="info-label" for="setup-node">Compute node</label>
@@ -3081,6 +3385,27 @@ onUnmounted(() => {
             </template>
 
             <!-- BROWSE MODE: Selected Data Source Node -->
+            <template v-else-if="mode === 'browse' && selectedNode && selectedNode.type === 'data-source' && usedReferenceOf(selectedNode.id)">
+              <h4 class="sidebar-section-title">Reference data</h4>
+              <div class="info-card">
+                <div class="info-row">
+                  <span class="info-label">Reference</span>
+                  <span class="info-value">{{ usedReferenceOf(selectedNode.id).label }}</span>
+                </div>
+                <div class="info-row">
+                  <span class="info-label">Version</span>
+                  <span class="info-value">{{ usedReferenceOf(selectedNode.id).version }}</span>
+                </div>
+                <div v-if="usedReferenceOf(selectedNode.id).sizeBytes" class="info-row">
+                  <span class="info-label">Download</span>
+                  <span class="info-value">{{ formatSize(usedReferenceOf(selectedNode.id).sizeBytes) }}</span>
+                </div>
+                <div v-if="usedReferenceOf(selectedNode.id).sha256" class="info-row">
+                  <span class="info-label">Checksum</span>
+                  <span class="info-value reference-checksum" :title="usedReferenceOf(selectedNode.id).sha256">sha256 {{ usedReferenceOf(selectedNode.id).sha256.slice(0, 12) }}…</span>
+                </div>
+              </div>
+            </template>
             <template v-else-if="mode === 'browse' && selectedNode && selectedNode.type === 'data-source'">
               <h4 class="sidebar-section-title">Data Source</h4>
               <!-- Its files while the run's inputs are staged, or why it
@@ -3149,6 +3474,10 @@ onUnmounted(() => {
                   <span class="info-label">Files</span>
                   <span class="info-value">{{ selectedNode.data?.packageCount || 0 }} file{{ selectedNode.data?.packageCount !== 1 ? 's' : '' }}</span>
                 </div>
+                <div class="info-row">
+                  <span class="info-label">Placed</span>
+                  <span class="info-value">{{ selectedNode.data?.filePaths === FILE_PATHS_SOURCE ? "As in the source" : "As selected" }}</span>
+                </div>
               </div>
               <h4 class="sidebar-section-title">Source Files</h4>
               <div v-if="selectedNode.data?.packageIds?.length > 0" class="selected-files-list">
@@ -3185,6 +3514,10 @@ onUnmounted(() => {
                   <span class="info-label">Why</span>
                   <span class="info-value">{{ failureSummary(selectedNode.data) }}</span>
                 </div>
+                <div v-if="selectedNode.data?.warning" class="info-row node-warning">
+                  <span class="info-label">Note</span>
+                  <span class="info-value">{{ selectedNode.data.warning }}</span>
+                </div>
                 <div v-if="selectedNode.data?.cpuUnits && selectedNode.data?.memoryMiB" class="info-row">
                   <span class="info-label">Ran with</span>
                   <span class="info-value">{{ (selectedNode.data.cpuUnits / 1024).toFixed(1) }} vCPU, {{ selectedNode.data.memoryMiB }} MiB</span>
@@ -3208,6 +3541,14 @@ onUnmounted(() => {
                 <div v-if="selectedNode.data?.datasetId" class="info-row">
                   <span class="info-label">Writes to</span>
                   <span class="info-value">{{ datasetName(selectedNode.data.datasetId, datasetOptions) }}</span>
+                </div>
+              </div>
+
+              <div v-if="usedReferencesOfStep(selectedNode.id).length" class="info-card params-card">
+                <h5 class="params-title">Reference data</h5>
+                <div v-for="r in usedReferencesOfStep(selectedNode.id)" :key="r.path" class="info-row">
+                  <span class="info-label">{{ r.path }}</span>
+                  <span class="info-value" :title="r.sha256 ? `sha256 ${r.sha256}` : undefined">{{ r.label }} · v{{ r.version }}{{ r.source ? "" : " (default)" }}</span>
                 </div>
               </div>
 
@@ -3291,6 +3632,20 @@ onUnmounted(() => {
                       {{ runWorkflowName }}
                     </router-link>
                     <span v-else class="truncate-text" :title="runWorkflowName">{{ runWorkflowName }}</span>
+                  </span>
+                </div>
+                <div v-if="runApp" class="info-row">
+                  <span class="info-label">App</span>
+                  <span class="info-value truncate-value">
+                    <router-link
+                      v-if="runApp.applicationId"
+                      :to="scopedRoute('application-detail', { uuid: runApp.applicationId })"
+                      :title="appRunLabel(runApp)"
+                      class="truncate-text"
+                    >
+                      {{ appRunLabel(runApp) }}
+                    </router-link>
+                    <span v-else class="truncate-text" :title="appRunLabel(runApp)">{{ appRunLabel(runApp) }}</span>
                   </span>
                 </div>
                 <div v-if="selectedWorkflowActivity.datasetId" class="info-row">
@@ -4554,6 +4909,11 @@ onUnmounted(() => {
 }
 
 /* Chosen files a source's inputs don't take, in its panel. */
+// A step that worked, with something to know (its warning).
+.node-warning .info-value {
+  color: #92400e;
+}
+
 .files-mismatch {
   margin: 0 0 8px;
   padding: 8px 10px;
@@ -4773,6 +5133,16 @@ onUnmounted(() => {
   text-align: left;
 
   &:hover { text-decoration: underline; }
+}
+
+.reference-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+}
+.reference-checksum {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
 }
 
 .setup-select {
@@ -5049,6 +5419,23 @@ onUnmounted(() => {
 }
 
 /* Info actions */
+// A section's heading with its action on the right.
+.section-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 10px 0 6px;
+
+  .sidebar-section-title {
+    margin: 0;
+  }
+  .text-link-btn {
+    padding: 0;
+    font-size: 12px;
+  }
+}
+
 .info-actions {
   display: flex;
   align-items: center;
@@ -5465,5 +5852,12 @@ onUnmounted(() => {
   margin: 0 0 8px;
   font-size: 13px;
   color: #6b7280;
+}
+
+.app-run-note {
+  margin: 4px 0 8px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: theme.$gray_5;
 }
 </style>
