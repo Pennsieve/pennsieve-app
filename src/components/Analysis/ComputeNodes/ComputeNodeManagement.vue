@@ -44,7 +44,12 @@ const isLoading = ref(true)
 const loadError = ref('')
 const gpuTiers = ref([])
 
-const isNodeOwner = computed(() => computeNode.value?.ownerId === profile.value?.id)
+// The platform node (account-service marks it) is editable only from its
+// home workspace, the one that owns it. Listed everywhere, it would otherwise
+// hand its owner the settings from any workspace, or from My Workspace.
+const isHomeWorkspace = computed(() =>
+  !computeNode.value?.platform || orgId.value === computeNode.value.organizationId)
+const isNodeOwner = computed(() => isHomeWorkspace.value && computeNode.value?.ownerId === profile.value?.id)
 const hasAdminRights = computed(() => {
   if (activeOrganization.value) {
     return activeOrganization.value.isAdmin || activeOrganization.value.isOwner
@@ -54,7 +59,7 @@ const hasAdminRights = computed(() => {
 // Mirrors the API: the node owner, the account owner, or a workspace admin
 // when the account is Admin Managed in that workspace.
 const canManage = computed(() => {
-  if (!computeNode.value) return false
+  if (!computeNode.value || !isHomeWorkspace.value) return false
   return isNodeOwner.value ||
     (!!profile.value?.id && computeNode.value.account?.ownerId === profile.value.id) ||
     (hasAdminRights.value && computeResourcesStore.isNodeAdminManaged(computeNode.value))
@@ -190,6 +195,14 @@ const STATUS_TEXT = { Enabled: 'Running', Paused: 'Paused', Pending: 'Setting up
         :gpu-tiers="gpuTiers"
         @updated="fetchComputeNode"
       />
+
+      <!-- The platform node is open to every user by designation: grants on
+           it change nothing, so there is nothing to edit here. A user is cut
+           off through their budget (Settings), not through access. -->
+      <section v-else-if="tab === 'access' && computeNode?.platform" class="cn-section">
+        <h3 class="cn-section-title">Access</h3>
+        <p class="cn-muted">The Pennsieve compute node is open to every Pennsieve user, in every workspace and in My Workspace. Access can't be narrowed; to stop a user from running on it, set their budget on this node to zero under Settings.</p>
+      </section>
 
       <ComputeNodeAccess
         v-else-if="tab === 'access'"
