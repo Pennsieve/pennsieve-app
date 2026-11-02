@@ -365,6 +365,10 @@ describe("ranking organisms", () => {
     expect(ids.indexOf(13158)).toBeLessThan(ids.indexOf(13157)); // a species before a genus
     expect(rankOrganisms("", []).length).toBeGreaterThan(5);
     expect(rankOrganisms("zebra", []).map((o) => o.taxonomyId)).toEqual([7955]);
+    // "mou": mouse only, not thale cress (no "mouse-ear cress"), nor a pig's "wild boar".
+    expect(rankOrganisms("mou", []).map((o) => o.taxonomyId)).toEqual([10090]);
+    // A name that starts with it before a word inside one: "rat" is the rat, before "brown rat" others.
+    expect(rankOrganisms("rat", [])[0].taxonomyId).toBe(10116);
     expect(rankOrganisms("sapiens", [t(9606, "Homo sapiens", ["human"])]).map((o) => o.taxonomyId)).toEqual([9606]);
   });
 });
