@@ -7,6 +7,7 @@
   workflow's default) and a run's configure page (this run's).
 */
 import { computed, ref, watch } from "vue";
+import { useRoute, useRouter } from "vue-router";
 import BfButton from "../../shared/bf-button/BfButton.vue";
 import { findReferences } from "@/utils/environmentsService";
 import {
@@ -33,6 +34,15 @@ const props = defineProps({
   selectedId: { type: String, default: "" },
 });
 const emit = defineEmits(["update:modelValue", "pick"]);
+
+// The whole catalog (Resources > Reference Data), opened beside the run setup
+// so nothing chosen here is lost.
+const route = useRoute();
+const router = useRouter();
+const catalogHref = computed(() => {
+  const orgId = route.params.orgId;
+  return router.resolve(orgId ? { name: "workspace-reference-catalog", params: { orgId } } : { name: "reference-catalog" }).href;
+});
 
 const visible = computed({
   get: () => props.modelValue,
@@ -177,8 +187,11 @@ const confirm = (entry = picked.value) => {
 
     <template #footer>
       <div class="rp__footer">
-        <bf-button class="secondary" @click="visible = false">Cancel</bf-button>
-        <bf-button :disabled="!picked" @click="confirm()">Use this reference</bf-button>
+        <a class="rp__browse" :href="catalogHref" target="_blank" rel="noopener">Browse all reference data</a>
+        <div class="rp__actions">
+          <bf-button class="secondary" @click="visible = false">Cancel</bf-button>
+          <bf-button :disabled="!picked" @click="confirm()">Use this reference</bf-button>
+        </div>
       </div>
     </template>
   </el-dialog>
@@ -364,6 +377,18 @@ const confirm = (entry = picked.value) => {
   justify-content: space-between;
   align-items: center;
   width: 100%;
+}
+.rp__actions {
+  display: flex;
+  gap: 8px;
+}
+.rp__browse {
+  font-size: 13px;
+  color: theme.$purple_2;
+  text-decoration: none;
+  &:hover {
+    text-decoration: underline;
+  }
 }
 </style>
 

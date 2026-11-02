@@ -29,6 +29,15 @@ const ASSET_CLASSES = {
   "brain-template": { name: "Brain templates", tool: "" },
 };
 
+// The catalog's kinds, in the order the reference data page lists them.
+export const REFERENCE_KINDS = [
+  { kind: "genome", label: "Genomes" },
+  { kind: "template", label: "Templates" },
+];
+
+// An asset class in words: "Salmon indexes", else its own name.
+export const assetClassName = (assetClass) => ASSET_CLASSES[assetClass]?.name || assetClass || "";
+
 // The kind of reference an input takes, in a sentence's words: "Salmon
 // indexes that salmon >=2 <3 can read".
 export const referenceKindText = (reference) => {
@@ -80,7 +89,63 @@ export const referenceDetails = (entry) => {
     citation: entry?.citation || "",
     // A template's (or any reference's) own terms: [{ name, value }].
     properties: Object.entries(s.properties || {}).map(([name, value]) => ({ name, value })),
+    // Where its files came from: { description, files: [{ path, url, sha256 }] }.
+    source: { description: v.source?.description || "", files: v.source?.files || [] },
   };
+};
+
+// Whether an app.yml reference input can take a catalog entry: the same kind
+// and asset class, the properties it asks for, and its organisms or the
+// identity it pins. Tool-version ranges are left to the catalog.
+export const inputTakes = (reference, entry) => {
+  const s = specOf(entry);
+  return (
+    !!reference &&
+    (reference.kind || "genome") === (entry?.kind || "genome") &&
+    (!reference.assetClass || reference.assetClass === s.assetClass) &&
+    Object.entries(reference.properties || {}).every(([k, v]) => String((s.properties || {})[k] ?? "") === String(v)) &&
+    fitsInput(entry, reference)
+  );
+};
+
+// The apps whose newest app.yml has an input that can take a catalog entry:
+// [{ app, input, pinned }], pinned when the input names this very reference
+// (choice: app). manifestOf is appManifestInfo's versionManifest.
+export const appsUsing = (entry, applications, manifestOf) =>
+  (applications || []).flatMap((app) =>
+    (manifestOf(app)?.inputs || [])
+      .filter((p) => inputTakes(p?.reference, entry))
+      .map((p) => ({ app, input: p.name, pinned: p.reference.choice === "app" }))
+  );
+
+// A string as YAML: quoted, so "1" stays a string and "GENCODE: 50" a scalar.
+const yamlString = (v) => JSON.stringify(String(v));
+
+// The app.yml input that pins a catalog entry, for an app's author to paste
+// under inputs: kind, asset class, the tool's major version for an index,
+// and the entry's identity (a genome's organism, assembly and annotation, or
+// its properties).
+export const referenceSnippet = (entry) => {
+  const s = specOf(entry);
+  const lines = [
+    "- name: reference",
+    `  description: ${yamlString(referenceLabel(entry) || "Reference data")}`,
+    "  placement: subfolder",
+    "  reference:",
+    `    kind: ${entry?.kind || "genome"}`,
+  ];
+  if (s.assetClass) lines.push(`    assetClass: ${s.assetClass}`);
+  const major = String(s.toolVersion || "").match(/^(\d+)/)?.[1];
+  if (major) lines.push(`    toolVersion: ${yamlString(`>=${major} <${Number(major) + 1}`)}`);
+  lines.push("    choice: app");
+  if (s.taxonomyId) lines.push(`    taxonomyId: ${Number(s.taxonomyId)}`);
+  if (s.assembly) lines.push(`    assembly: ${yamlString(s.assembly)}`);
+  if (s.annotation?.provider) {
+    lines.push(`    annotation: {provider: ${yamlString(s.annotation.provider)}, version: ${yamlString(s.annotation.version || "")}}`);
+  }
+  const props = Object.entries(s.properties || {});
+  if (props.length) lines.push(`    properties: {${props.map(([k, v]) => `${k}: ${yamlString(v)}`).join(", ")}}`);
+  return lines.join("\n");
 };
 
 // The ports of an app version that are filled from the catalog.

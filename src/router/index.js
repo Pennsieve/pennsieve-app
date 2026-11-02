@@ -12,6 +12,7 @@ import ModelSpecGenerator from "@/components/datasets/metadata/models/ModelSpecG
 import TemplateGallery from "@/components/datasets/metadata/models/TemplateGallery.vue";
 import CdeGallery from "@/components/datasets/metadata/models/CdeGallery.vue";
 import OntologyBrowser from "@/components/datasets/metadata/models/OntologyBrowser.vue";
+import ReferenceCatalog from "@/components/Analysis/ReferenceData/ReferenceCatalog.vue";
 import ListRecords from "@/components/datasets/metadata/records/ListRecords.vue";
 import RecordSpecViewer from "@/components/datasets/metadata/records/RecordSpecViewer.vue";
 import RecordSpecGenerator from "@/components/datasets/metadata/records/RecordSpecGenerator.vue";
@@ -445,6 +446,21 @@ const router = createRouter({
             backLink: { name: 'resources' },
             title: 'Ontology Browser',
             description: 'Explore standard biomedical ontologies and their hierarchy.'
+          }
+        },
+        {
+          name: 'reference-catalog',
+          path: 'resources/reference-data',
+          components: {
+            stage: ReferenceCatalog,
+            navigation: UserNavigation,
+          },
+          props: true,
+          meta: {
+            hideSecondaryNav: true,
+            backLink: { name: 'resources' },
+            title: 'Reference Data',
+            description: 'Browse the genomes, indexes and templates analysis apps use.'
           }
         },
         {
@@ -1908,6 +1924,14 @@ const router = createRouter({
           path: 'ontology-browser',
           components: {
             stage: OntologyBrowser
+          },
+          props: true
+        },
+        {
+          name: 'workspace-reference-catalog',
+          path: 'reference-data',
+          components: {
+            stage: ReferenceCatalog
           },
           props: true
         }
