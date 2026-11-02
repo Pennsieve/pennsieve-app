@@ -949,7 +949,9 @@ $card-height: 172px;
 }
 .wf-tag {
   flex-shrink: 0;
-  padding: 2px 8px;
+  /* A pixel more below than above: the font's ascent outweighs its descent,
+     so lowercase text sits low in an evenly padded box. */
+  padding: 1px 8px 3px;
   border: 1px solid transparent;
   border-radius: 3px;
   background: theme.$gray_0;
