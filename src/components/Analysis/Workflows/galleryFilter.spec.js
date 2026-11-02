@@ -90,11 +90,15 @@ describe("research fields", () => {
     expect(workflowFields(zipper, applications)).toEqual([]);
   });
 
-  it("come from the workflow's own tags first", () => {
+  it("are the workflow's own tags' when it has tags", () => {
+    // Tagged: its tags alone, so a tag can narrow what its apps would say.
     const tagged = { ...cyto, tags: ["oncology", "quality-control"] };
-    expect(workflowFields(tagged, applications).map((f) => f.key)).toEqual(["oncology", "immunology"]);
+    expect(workflowFields(tagged, applications).map((f) => f.key)).toEqual(["oncology"]);
     expect(workflowFields({ ...zipper, tags: ["Neuroscience"] }, applications).map((f) => f.key)).toEqual(["neuroscience"]);
+    // Tags that name no field: none, not the apps'.
+    expect(workflowFields({ ...cyto, tags: ["quality-control"] }, applications)).toEqual([]);
     expect(applyFilters([spikes, zipper, tagged], { field: "oncology", applications })).toEqual([tagged]);
+    expect(applyFilters([spikes, zipper, tagged], { field: "immunology", applications })).toEqual([]);
   });
 
   it("offers the fields the list has, most common first", () => {
@@ -123,22 +127,25 @@ describe("domains", () => {
   const step = (url) => ({ id: url, type: "processor", sourceUrl: url });
   const tumours = { name: "Tumours", tags: ["Visualization"], dag: [step("https://github.com/org/tumour-map")] };
 
-  it("are the workflow's own tags' domains, then its apps'", () => {
-    expect(workflowDomains(tumours, applications).map((d) => d.key)).toEqual(["viz", "imaging"]);
+  it("are the workflow's own tags' domains, else its apps'", () => {
+    // Tagged: its tags alone (the app is Imaging; the workflow says Visualization).
+    expect(workflowDomains(tumours, applications).map((d) => d.key)).toEqual(["viz"]);
+    // Untagged: its apps'.
     expect(workflowDomains(spikes, applications).map((d) => d.key)).toEqual(["ephys"]);
+    expect(workflowDomains({ ...tumours, tags: [] }, applications).map((d) => d.key)).toEqual(["imaging"]);
     expect(workflowDomains(zipper, applications)).toEqual([]);
   });
 
   it("offers the domains the list has, subjects first", () => {
     expect(domainOptions([spikes, zipper, tumours], applications).map((o) => [o.domain.key, o.count])).toEqual([
       ["ephys", 1],
-      ["imaging", 1],
       ["viz", 1],
     ]);
   });
 
   it("filters by domain, with the other filters", () => {
-    expect(applyFilters([spikes, zipper, tumours], { domain: "imaging", applications })).toEqual([tumours]);
+    expect(applyFilters([spikes, zipper, tumours], { domain: "viz", applications })).toEqual([tumours]);
+    expect(applyFilters([spikes, zipper, tumours], { domain: "imaging", applications })).toEqual([]);
     expect(applyFilters([spikes, zipper, tumours], { domain: "ephys", input: "none", applications })).toEqual([]);
     expect(applyFilters([spikes, zipper, tumours], { domain: "any", applications })).toEqual([spikes, zipper, tumours]);
   });

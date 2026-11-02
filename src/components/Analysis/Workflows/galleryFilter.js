@@ -45,19 +45,22 @@ function stepApps(wf, applications) {
     .map((n) => byUrl.get(normalizeUrl(n.sourceUrl)) || null);
 }
 
-// The research fields a workflow serves: its own tags' first, then those of
-// its steps' apps, from their app.yml tags, in step order.
+// A workflow with tags is what its tags say; one without is what its steps'
+// apps are (their app.yml tags, in step order), so a workflow nobody has
+// tagged yet still has a place in the filters.
+const tagged = (wf) => (wf?.tags || []).length > 0;
+
+// The research fields a workflow serves.
 export function workflowFields(wf, applications = []) {
-  return [...new Set([...fieldsOf(wf), ...stepApps(wf, applications).flatMap((app) => fieldsOf(versionManifest(app)))])];
+  if (tagged(wf)) return fieldsOf(wf);
+  return [...new Set(stepApps(wf, applications).flatMap((app) => fieldsOf(versionManifest(app))))];
 }
 
 // The domains a workflow is for (what it handles: imaging, visualization…,
-// appDomains.js): those its own tags name, then its steps' apps' (an app's
-// is the first its tags name), in step order.
+// appDomains.js); an app's is the first its tags name.
 export function workflowDomains(wf, applications = []) {
-  const own = (wf?.tags || []).map(domainOfTag).filter(Boolean);
-  const apps = stepApps(wf, applications).map((app) => appDomain(app)).filter(Boolean);
-  return [...new Set([...own, ...apps])];
+  if (tagged(wf)) return [...new Set((wf.tags || []).map(domainOfTag).filter(Boolean))];
+  return [...new Set(stepApps(wf, applications).map((app) => appDomain(app)).filter(Boolean))];
 }
 
 // The domain chips for a list: each domain some workflow is for, with how
