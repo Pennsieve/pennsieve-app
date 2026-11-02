@@ -32,7 +32,7 @@ export function canConnectFromHandle(src, tgt, handle) {
 }
 
 // The parameter a target type takes its path prefix in: container targets
-// read PATH_PREFIX, built-in ones (download, persistent layer) pathPrefix,
+// read PATH_PREFIX, built-in ones (download) pathPrefix,
 // and the provisioner refuses the other spelling. "" when the type has
 // neither, so it can't take a routed output.
 export const PREFIX_PARAMS = ["PATH_PREFIX", "pathPrefix"];

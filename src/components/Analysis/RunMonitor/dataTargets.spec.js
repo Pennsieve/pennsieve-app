@@ -27,7 +27,7 @@ describe("targetParamFields", () => {
     expect(fields[1].description).toBe("Only below this path");
   });
   it("marks params without a registry default required", () => {
-    const fields = targetParamFields([{ name: "layerName" }, { name: "notify", defaultValue: "auto" }]);
+    const fields = targetParamFields([{ name: "folder" }, { name: "notify", defaultValue: "auto" }]);
     expect(fields.map((f) => [f.required, f.value])).toEqual([[true, ""], [false, "auto"]]);
   });
 });
@@ -91,7 +91,7 @@ describe("the notebook launcher's target params", () => {
     expect(defaultsToRunName("download", "name")).toBe(true);
     expect(defaultsToRunName("pennsieve", "name")).toBe(false);
     expect(targetParamLabel("name")).toBe("Archive name");
-    expect(targetParamLabel("layerName")).toBe("layerName");
+    expect(targetParamLabel("folder")).toBe("folder");
   });
 
   it("writes only to datasets where the role is Editor or above", () => {
