@@ -1556,7 +1556,7 @@ const useOwnReferenceData = (nodeId, own) => {
     return;
   }
   // Back to the catalog: none of the files chosen meanwhile go in the run.
-  for (const state of [ownReferenceData, dataSourceFiles, publicPicks, sourceDatasets, leftOutInputs]) delete state[nodeId];
+  for (const state of [ownReferenceData, dataSourceFiles, publicPicks, sourceDatasets, leftOutInputs, dataSourceFilePaths, pickedPaths]) delete state[nodeId];
 };
 const catalog = createReferenceCatalog(findReferences, ref);
 const workflowReferenceId = (nodeId) => dagNodeOf(nodeId)?.input?.default?.environmentId || "";
