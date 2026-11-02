@@ -235,11 +235,12 @@ export const choiceLabel = ({ entry = null, chosenId = "", reference = null } = 
 };
 
 // A cache of catalog entries by id, loading each input's candidates once:
-// { known (a ref of id -> entry), remember(entries), ensureLoaded(references) }.
-// find is environmentsService.findReferences; ref is Vue's.
+// { known (a ref of id -> entry), remember(entries), ensureLoaded(references),
+// isLoaded(reference) }. find is environmentsService.findReferences; ref is Vue's.
 export const createReferenceCatalog = (find, ref) => {
   const known = ref({});
   const loaded = new Set();
+  const answered = ref({}); // query keys the catalog has answered (reactive)
   const remember = (entries) => {
     known.value = { ...known.value, ...Object.fromEntries((entries || []).map((e) => [e.id, e])) };
   };
@@ -254,13 +255,23 @@ export const createReferenceCatalog = (find, ref) => {
         loaded.add(key);
         try {
           remember(await find(catalogQuery(r)));
+          answered.value = { ...answered.value, [key]: true };
         } catch {
           loaded.delete(key); // named by the app's default meanwhile; tried again later
         }
       })
     );
   };
-  return { known, remember, ensureLoaded };
+  const isLoaded = (reference) => !!answered.value[JSON.stringify(catalogQuery(reference))];
+  return { known, remember, ensureLoaded, isLoaded };
+};
+
+// Whether the catalog lacks what an input takes when nothing is chosen: the
+// reference it pins or its default, else any it can take. The input then
+// takes files (its folder's contents, described by the reference).
+export const catalogLacks = (reference, entries) => {
+  const fits = (entries || []).filter((e) => inputTakes(reference, e));
+  return namesSomething(defaultIdentity(reference)) ? !fits.some((e) => isAppDefault(e, reference)) : !fits.length;
 };
 
 // The app's default among the candidates, or null.

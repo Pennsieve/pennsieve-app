@@ -22,6 +22,7 @@ import {
   appsUsing,
   referenceSnippet,
   referenceBlock,
+  catalogLacks,
   assetClassName,
 } from "./referenceSources";
 import { ref } from "vue";
@@ -307,5 +308,29 @@ describe("the reference data page", () => {
     expect(assetClassName("bowtie2-index")).toBe("bowtie2-index");
     expect(referenceDetails(mni).source.files[0].path).toBe("t1w.nii.gz");
     expect(referenceDetails(human).source).toEqual({ description: "", files: [] });
+  });
+});
+
+describe("references the catalog doesn't have", () => {
+  const genomes = [{ ...human, kind: "genome" }, { ...mouse, kind: "genome" }];
+  it("lacks a default or pinned reference it hasn't, or anything that fits", () => {
+    expect(catalogLacks(index, genomes)).toBe(false);
+    expect(catalogLacks({ ...index, default: { taxonomyId: 7955, assembly: "GCA_000002035.4" } }, genomes)).toBe(true);
+    expect(catalogLacks({ kind: "genome", assetClass: "salmon-index", choice: "user" }, genomes)).toBe(false);
+    expect(catalogLacks({ kind: "genome", assetClass: "star-index", choice: "user" }, genomes)).toBe(true);
+    expect(catalogLacks({ kind: "genome", assetClass: "salmon-index", choice: "app", taxonomyId: 7955 }, genomes)).toBe(true);
+    expect(catalogLacks(index, [])).toBe(true);
+  });
+
+  it("knows which queries the catalog answered", async () => {
+    const cat = createReferenceCatalog(async () => [], ref);
+    expect(cat.isLoaded(index)).toBe(false);
+    await cat.ensureLoaded([index]);
+    expect(cat.isLoaded(index)).toBe(true);
+    const failing = createReferenceCatalog(async () => {
+      throw new Error("down");
+    }, ref);
+    await failing.ensureLoaded([index]);
+    expect(failing.isLoaded(index)).toBe(false);
   });
 });

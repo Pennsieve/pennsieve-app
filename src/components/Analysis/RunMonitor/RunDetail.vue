@@ -84,7 +84,7 @@ import {
 import { sourceLabel, sourceHints, hintLine, portsOfStep, missingFilesMessage, fileTypeMismatches, acceptedFileTypes, linkHints } from "../WorkflowGraph/sourceInputs";
 import ReferencePickerDialog from "./ReferencePickerDialog.vue";
 import { findReferences, environmentsServiceUrl } from "@/utils/environmentsService";
-import { referenceTargetIn, runReferences, referenceSource, formatSize, choiceLabel, createReferenceCatalog } from "./referenceSources";
+import { referenceTargetIn, runReferences, referenceSource, formatSize, choiceLabel, createReferenceCatalog, catalogLacks, defaultIdentity, referenceLabel, referenceKindText } from "./referenceSources";
 import { portEdges, stepPoints } from "../WorkflowGraph/runPorts";
 import PortChips from "../WorkflowGraph/PortChips.vue";
 import LlmMark from "../WorkflowGraph/LlmMark.vue";
@@ -1554,6 +1554,27 @@ const referenceChoiceOf = (nodeId) => referenceChoices.value[nodeId] || null;
 watch(
   () => Object.values(referenceTargets.value).map((t) => JSON.stringify(t.reference)).sort().join("|"),
   () => catalog.ensureLoaded(Object.values(referenceTargets.value).map((t) => t.reference)),
+  { immediate: true }
+);
+// Reference inputs the catalog can't fill when nothing is chosen (it doesn't
+// have the app's default): the reference describes the folder's contents,
+// so they take the runner's files, saying what's missing.
+const lackingReference = computed(() => {
+  const out = {};
+  const entries = Object.values(catalog.known.value);
+  for (const [nodeId, t] of Object.entries(referenceTargets.value)) {
+    if (referencePicks[nodeId] || workflowReferenceId(nodeId) || !catalog.isLoaded(t.reference)) continue;
+    if (catalogLacks(t.reference, entries)) {
+      out[nodeId] = referenceLabel(defaultIdentity(t.reference) || {}) || referenceKindText(t.reference).toLowerCase();
+    }
+  }
+  return out;
+});
+watch(
+  lackingReference,
+  (lacking) => {
+    for (const nodeId of Object.keys(lacking)) ownReferenceData[nodeId] = true;
+  },
   { immediate: true }
 );
 
@@ -3112,8 +3133,11 @@ onUnmounted(() => {
             </template>
             <template v-else-if="mode === 'configure' && selectedNode && selectedNode.type === 'data-source'">
               <h4 class="sidebar-section-title">Data Source</h4>
+              <p v-if="lackingReference[selectedNode.id]" class="configure-hint">
+                Pennsieve's reference data has no {{ lackingReference[selectedNode.id] }}. Select the files for this input instead.
+              </p>
               <button
-                v-if="ownReferenceData[selectedNode.id] && feedsReferenceInput(selectedNode.id)"
+                v-else-if="ownReferenceData[selectedNode.id] && feedsReferenceInput(selectedNode.id)"
                 type="button"
                 class="text-link-btn"
                 @click="useOwnReferenceData(selectedNode.id, false)"

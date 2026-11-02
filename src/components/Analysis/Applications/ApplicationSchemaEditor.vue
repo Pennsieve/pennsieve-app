@@ -252,28 +252,30 @@
                 <label class="field-label">{{ block.key === "inputs" ? "It takes" : "It writes" }}</label>
                 <div class="field-control">
                   <el-radio-group :model-value="portMode(port)" size="small" :aria-label="`What the ${block.singular} is made of`" @update:model-value="(v) => setPortMode(port, v)">
-                    <el-radio-button v-for="m in portModes(block.key, port)" :key="m.value" :value="m.value">{{ m.label }}</el-radio-button>
+                    <el-radio-button v-for="m in portModes(block.key)" :key="m.value" :value="m.value">{{ m.label }}</el-radio-button>
                   </el-radio-group>
                   <p class="field-hint">{{ PORT_MODES.find((m) => m.value === portMode(port)).hint }}</p>
                 </div>
               </div>
 
-              <!-- Reference data: a catalog entry, not files -->
-              <div v-if="portMode(port) === 'reference'" class="field-row full-width">
-                <label class="field-label">Default reference</label>
-                <div class="field-control">
-                  <p v-if="referenceCatalogState === 'failed'" class="field-error">The reference catalog couldn't be loaded.</p>
-                  <p v-else-if="!hasReferenceCatalog" class="field-static">
-                    {{ referenceKindText(port.reference) }} · {{ referenceLabel(port.reference.choice === "app" ? port.reference : port.reference.default || {}) || "any" }}
-                    <span class="field-hint">Kept as written in app.yml.</span>
-                  </p>
-                  <template v-else>
+              <!--
+                Reference data: a folder whose contents are described in public
+                identifiers. Pennsieve's catalog can fill in the description
+                (and the folder, at run time); the author can also write it.
+              -->
+              <template v-if="portMode(port) === 'reference'">
+                <div v-if="hasReferenceCatalog" class="field-row full-width">
+                  <label class="field-label">Default reference</label>
+                  <div class="field-control">
+                    <p v-if="referenceCatalogState === 'failed'" class="field-error">Pennsieve's reference data couldn't be loaded; describe the reference below.</p>
                     <el-select
+                      v-else
                       :model-value="referenceEntryOf(port)?.id || ''"
                       class="full"
                       filterable
+                      clearable
                       :loading="referenceCatalogState === 'loading'"
-                      :placeholder="port.reference ? 'Not in the catalog: choose one to replace it' : 'Choose a reference'"
+                      :placeholder="port.reference ? 'Not in Pennsieve\'s reference data (described below)' : 'Choose from Pennsieve\'s reference data'"
                       @change="(id) => pickReference(port, id)"
                     >
                       <el-option-group v-for="g in referenceGroups" :key="g.kind" :label="g.label">
@@ -284,15 +286,91 @@
                       </el-option-group>
                     </el-select>
                     <p class="field-hint">
-                      Runs use this unless they pick another of the same kind from
-                      <router-link :to="{ name: 'reference-catalog' }" target="_blank">reference data</router-link>.
+                      Fills in the description from
+                      <router-link :to="{ name: 'reference-catalog' }" target="_blank">Pennsieve's reference data</router-link>.
+                      <button type="button" class="link-button" @click="toggleDescription(port)">
+                        {{ showsDescription(port) ? "Hide the description" : "Not there? Describe it" }}
+                      </button>
                     </p>
                     <p v-if="referenceRestriction(port.reference)" class="field-hint">
                       {{ referenceRestriction(port.reference) }} Choosing a reference here lets runs pick any.
                     </p>
-                  </template>
+                  </div>
                 </div>
-              </div>
+
+                <div v-if="showsDescription(port)" class="field-row full-width reference-description">
+                  <label class="field-label">What the folder holds</label>
+                  <div class="field-control">
+                    <div class="reference-grid">
+                      <span class="reference-grid-label">Kind</span>
+                      <el-radio-group :model-value="port.reference?.kind || 'genome'" size="small" aria-label="Kind of reference" @update:model-value="(k) => setReferenceKind(port, k)">
+                        <el-radio-button value="genome">Genome asset</el-radio-button>
+                        <el-radio-button value="template">Template or atlas</el-radio-button>
+                      </el-radio-group>
+
+                      <span class="reference-grid-label">What it is</span>
+                      <div>
+                        <el-select
+                          :model-value="port.reference?.assetClass || ''"
+                          class="full"
+                          filterable
+                          allow-create
+                          default-first-option
+                          :placeholder="(port.reference?.kind || 'genome') === 'template' ? 'e.g. brain-template' : 'e.g. salmon-index, star-index, fasta'"
+                          @change="(v) => setReferenceField(port, 'assetClass', identifierFrom(v))"
+                        >
+                          <el-option v-for="c in assetClassOptions(port)" :key="c" :label="assetClassName(c) === c ? c : `${assetClassName(c)} (${c})`" :value="c" />
+                        </el-select>
+                        <p v-for="m in at(`inputs.${index}.reference.assetClass`)" :key="m" class="field-error">{{ m }}</p>
+                      </div>
+
+                      <template v-if="(port.reference?.kind || 'genome') === 'genome'">
+                        <span class="reference-grid-label">Tool versions</span>
+                        <div>
+                          <el-input :model-value="port.reference?.toolVersion || ''" placeholder="For an index, e.g. >=2 <3 (optional)" @update:model-value="(v) => setReferenceField(port, 'toolVersion', v)" />
+                          <p v-for="m in at(`inputs.${index}.reference.toolVersion`)" :key="m" class="field-error">{{ m }}</p>
+                        </div>
+
+                        <span class="reference-grid-label">Organism</span>
+                        <div>
+                          <el-input :model-value="referenceIdentity(port).taxonomyId ?? ''" placeholder="NCBI taxonomy id, e.g. 9606 (human)" @update:model-value="(v) => setIdentityField(port, 'taxonomyId', v)" />
+                          <p v-for="m in identityProblems(port, index, 'taxonomyId')" :key="m" class="field-error">{{ m }}</p>
+                        </div>
+
+                        <span class="reference-grid-label">Assembly</span>
+                        <div>
+                          <el-input :model-value="referenceIdentity(port).assembly || ''" placeholder="Accession, e.g. GCA_000001405.29 (GRCh38)" @update:model-value="(v) => setIdentityField(port, 'assembly', v)" />
+                          <p v-for="m in identityProblems(port, index, 'assembly')" :key="m" class="field-error">{{ m }}</p>
+                        </div>
+
+                        <span class="reference-grid-label">Annotation</span>
+                        <div class="reference-pair">
+                          <el-input :model-value="referenceIdentity(port).annotation?.provider || ''" placeholder="Provider, e.g. GENCODE" @update:model-value="(v) => setAnnotation(port, 'provider', v)" />
+                          <el-input :model-value="referenceIdentity(port).annotation?.version || ''" placeholder="Release, e.g. 50" @update:model-value="(v) => setAnnotation(port, 'version', v)" />
+                        </div>
+                      </template>
+
+                      <template v-else>
+                        <span class="reference-grid-label">Properties</span>
+                        <div>
+                          <div v-for="(row, i) in propertyRows(port)" :key="i" class="reference-pair">
+                            <el-input :model-value="row.name" placeholder="Name, e.g. space" @update:model-value="(v) => setPropertyRow(port, i, { name: v })" />
+                            <el-input :model-value="row.value" placeholder="Value, e.g. MNI152NLin2009cAsym" @update:model-value="(v) => setPropertyRow(port, i, { value: v })" />
+                            <button type="button" class="link-button" @click="removePropertyRow(port, i)">Remove</button>
+                          </div>
+                          <button type="button" class="link-button" @click="addPropertyRow(port)">+ Add a property</button>
+                          <p class="field-hint">What identifies it, e.g. TemplateFlow's space, resolution and desc.</p>
+                        </div>
+                      </template>
+                    </div>
+                    <p v-for="m in at(`inputs.${index}.reference`)" :key="m" class="field-error">{{ m }}</p>
+                  </div>
+                </div>
+
+                <p class="field-hint reference-summary">
+                  The folder <code>$INPUT_DIR/{{ port.name || "&lt;name&gt;" }}/</code> holds this reference. On Pennsieve it's filled from reference data when there's a match, and runs may pick another of the same kind; otherwise a run takes the files, as it does anywhere else.
+                </p>
+              </template>
               <!-- A file or a folder: its format -->
               <div v-if="portMode(port) === 'file' || portMode(port) === 'folder'" class="field-row full-width" :data-field="`${block.key}.${index}.mediaTypes`" :class="{ 'has-problem': formatProblems(port, `${block.key}.${index}.mediaTypes`).length > 0 }">
                 <label class="field-label">{{ portMode(port) === "folder" ? "Folder format" : "Media type" }}</label>
@@ -628,13 +706,122 @@ const referenceEntryOf = (port) =>
   port.reference ? referenceEntries.value.find((e) => e.kind === (port.reference.kind || "genome") && isAppDefault(e, port.reference)) || null : null;
 const pickReference = (port, id) => {
   const entry = referenceEntries.value.find((e) => e.id === id);
-  if (!entry) return;
+  if (!entry) {
+    // Cleared: describe it instead, starting from what was there.
+    describing.add(toRaw(port));
+    return;
+  }
   // The app's default; a run may pick any other of its kind.
   port.reference = referenceBlock(entry, { choice: "user" });
+  propertyDrafts.delete(toRaw(port));
   // A reference is unpacked into the input's own folder.
   port.placement = "subfolder";
   if (!port.name) port.name = identifierFrom(entry.version?.spec?.assetClass || entry.kind);
   if (!port.description) port.description = referenceLabel(entry);
+};
+
+/*
+  Describing a reference by hand: its kind, what it is (asset class), and
+  its identity, which is the default's (choice user) or the pinned one's.
+  Nothing is written until a field has a value.
+*/
+const describing = reactive(new WeakSet());
+const showsDescription = (port) =>
+  describing.has(toRaw(port)) ||
+  !hasReferenceCatalog ||
+  referenceCatalogState.value === "failed" ||
+  (!!port.reference && referenceCatalogState.value === "loaded" && !referenceEntryOf(port));
+const toggleDescription = (port) => {
+  if (describing.has(toRaw(port))) describing.delete(toRaw(port));
+  else describing.add(toRaw(port));
+};
+const referenceOfPort = (port) => {
+  if (!port.reference) port.reference = { kind: "genome", assetClass: "", choice: "user" };
+  return port.reference;
+};
+// The identity the description edits (read-only here).
+const referenceIdentity = (port) => {
+  const r = port.reference;
+  if (!r) return {};
+  return r.choice === "app" ? r : r.default || {};
+};
+const writableIdentity = (port) => {
+  const r = referenceOfPort(port);
+  if (r.choice === "app") return r;
+  if (!r.default) r.default = {};
+  return r.default;
+};
+const dropEmptyDefault = (port) => {
+  const r = port.reference;
+  if (r?.default && !Object.keys(r.default).length) delete r.default;
+};
+const setReferenceField = (port, field, value) => {
+  const r = referenceOfPort(port);
+  const v = String(value ?? "").trim();
+  if (v) r[field] = v;
+  else if (field === "assetClass") r.assetClass = "";
+  else delete r[field];
+};
+const setReferenceKind = (port, kind) => {
+  const r = referenceOfPort(port);
+  if (r.kind === kind) return;
+  r.kind = kind;
+  // The other kind's fields don't apply.
+  const id = writableIdentity(port);
+  if (kind === "template") {
+    for (const f of ["taxonomyId", "assembly", "seqcol", "annotation"]) delete id[f];
+    delete r.toolVersion;
+    delete r.organisms;
+  } else {
+    delete id.properties;
+    propertyDrafts.delete(toRaw(port));
+  }
+  dropEmptyDefault(port);
+};
+const setIdentityField = (port, field, value) => {
+  const id = writableIdentity(port);
+  const v = String(value ?? "").trim();
+  if (field === "taxonomyId") {
+    const n = Number(v);
+    if (v && Number.isInteger(n) && n > 0) id.taxonomyId = n;
+    else delete id.taxonomyId;
+  } else if (v) id[field] = v;
+  else delete id[field];
+  dropEmptyDefault(port);
+};
+const setAnnotation = (port, part, value) => {
+  const id = writableIdentity(port);
+  const a = { provider: id.annotation?.provider || "", version: id.annotation?.version || "", [part]: String(value ?? "").trim() };
+  if (a.provider || a.version) id.annotation = a;
+  else delete id.annotation;
+  dropEmptyDefault(port);
+};
+// An identity field's problems, wherever the identity is (the default's, or the pinned one's).
+const identityProblems = (port, index, field) =>
+  at(`inputs.${index}.reference${port.reference?.choice === "app" ? "" : ".default"}.${field}`);
+// Properties are edited as rows, so a name can be typed before its value.
+const propertyDrafts = reactive(new WeakMap());
+const propertyRows = (port) =>
+  propertyDrafts.get(toRaw(port)) || Object.entries(referenceIdentity(port).properties || {}).map(([name, value]) => ({ name, value }));
+const writeProperties = (port, rows) => {
+  propertyDrafts.set(toRaw(port), rows);
+  const id = writableIdentity(port);
+  const props = Object.fromEntries(rows.filter((r) => r.name.trim() && r.value.trim()).map((r) => [r.name.trim(), r.value.trim()]));
+  if (Object.keys(props).length) id.properties = props;
+  else delete id.properties;
+  dropEmptyDefault(port);
+};
+const setPropertyRow = (port, i, change) => writeProperties(port, propertyRows(port).map((r, j) => (j === i ? { ...r, ...change } : r)));
+const addPropertyRow = (port) => writeProperties(port, [...propertyRows(port), { name: "", value: "" }]);
+const removePropertyRow = (port, i) => writeProperties(port, propertyRows(port).filter((_, j) => j !== i));
+// What it is: the catalog's asset classes of the kind, and the input's own.
+const assetClassOptions = (port) => {
+  const kind = port.reference?.kind || "genome";
+  return [
+    ...new Set(
+      [...referenceEntries.value.filter((e) => e.kind === kind).map((e) => e.version?.spec?.assetClass), port.reference?.assetClass].filter(Boolean)
+    ),
+  ];
 };
 
 // The media type search, shared by the selects (one is open at a time).
@@ -762,11 +949,10 @@ const PORT_MODES = [
   { value: "file", label: "Files", hint: "Each item is one file: an EDF recording, a DICOM slice, a CSV table. A folder of them is fine; paths are kept." },
   { value: "folder", label: "Folders of a format", hint: "Each item is a folder that is one thing, in a folder format: an .ome.zarr image, a .mefd session." },
   { value: "layout", label: "One folder with a set layout", hint: "One folder tree laid out by a standard, such as BIDS or a Pennsieve published dataset." },
-  { value: "reference", label: "Reference data", hint: "Data Pennsieve keeps for apps, such as a genome index or a brain template: no files to select, the run gets it from the catalog." },
+  { value: "reference", label: "Reference data", hint: "A folder whose contents are declared as a published reference, such as a genome index or a brain template, by public identifiers rather than by file type. Pennsieve can fill it from its reference data; otherwise a run takes files." },
 ];
-// Reference data is for inputs, where the site has the catalog (or the app.yml already uses it).
-const portModes = (blockKey, port) =>
-  PORT_MODES.filter((m) => m.value !== "reference" || (blockKey === "inputs" && (hasReferenceCatalog || port.reference)));
+// Reference data is for inputs.
+const portModes = (blockKey) => PORT_MODES.filter((m) => m.value !== "reference" || blockKey === "inputs");
 // Where an input's data goes in INPUT_DIR (app.yml placement).
 const PLACEMENTS = [
   { value: "root", label: "Root of INPUT_DIR" },
@@ -801,6 +987,8 @@ const setPortMode = (port, mode) => {
   }
   if (portMode(port) === "reference") {
     wantsReference.delete(toRaw(port));
+    describing.delete(toRaw(port));
+    propertyDrafts.delete(toRaw(port));
     delete port.reference;
   }
   const before = optionFor(port.dataType);
@@ -944,6 +1132,27 @@ const removePort = (key, i) => schema.value[key].splice(i, 1);
   font-size: 12px;
   line-height: 1.4;
   color: theme.$red_2;
+}
+.reference-grid {
+  display: grid;
+  grid-template-columns: 120px minmax(0, 1fr);
+  gap: 8px 12px;
+  align-items: start;
+}
+.reference-grid-label {
+  font-size: 13px;
+  line-height: 32px;
+  color: theme.$gray_5;
+}
+.reference-pair {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 6px;
+}
+.reference-summary {
+  grid-column: 1 / -1;
+  margin-bottom: 8px;
 }
 .reference-option-meta {
   float: right;

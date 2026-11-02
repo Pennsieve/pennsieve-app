@@ -1090,9 +1090,10 @@ watch(
                         {{ port.description }}
                       </div>
                       <div v-if="port.reference" class="manifest-port-reference">
-                        From reference data: {{ referenceKindText(port.reference) }}.
-                        {{ port.reference.choice === "app" ? "Uses" : "Default" }}:
-                        <router-link :to="referenceDataRoute(port)" class="manifest-link">{{ referenceDefaultLabel(port) }}</router-link>
+                        A folder holding a reference ({{ referenceKindText(port.reference) }}).
+                        {{ port.reference.choice === "app" ? "Always" : "Default" }}:
+                        <router-link v-if="referenceDefaults[port.name]" :to="referenceDataRoute(port)" class="manifest-link">{{ referenceDefaultLabel(port) }}</router-link>
+                        <span v-else>{{ referenceDefaultLabel(port) }}, not in Pennsieve's reference data (runs take files)</span>
                       </div>
                     </div>
                   </div>
