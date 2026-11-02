@@ -1,9 +1,3 @@
-global.localStorage = {
-  setItem: (key, val) => global.localStorage[key] = val,
-  getItem: (key) => global.localStorage[key],
-  removeItem: (key) => delete global.localStorage[key]
-}
-
 import Vuex from 'vuex'
 import { shallowMount } from '@vue/test-utils'
 import ConceptsList from './ConceptsList.vue'

@@ -23,7 +23,7 @@ node('executor') {
         stage("Build") {
             try {
                 sh """#!/bin/bash -ex
-                    . $HOME/.nvm/nvm.sh ; nvm use 18.17.1
+                    . $HOME/.nvm/nvm.sh ; nvm install 22.23.4
                     node -v
                     npm -v
                     npm install
@@ -39,7 +39,7 @@ node('executor') {
         stage("Test") {
             try {
                 sh """#!/bin/bash
-                    . $HOME/.nvm/nvm.sh ; nvm use 18.17.1
+                    . $HOME/.nvm/nvm.sh ; nvm install 22.23.4
                     xvfb-run --auto-servernum --server-args='-screen 0, 1024x768x16' npm test"""
             } catch (e) {
                 slackSend(color: '#b20000', message: "FAILED: Tests! '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL}) by ${authorName}")

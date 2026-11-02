@@ -18,7 +18,7 @@ export default defineConfig({
   css: {
     preprocessorOptions: {
       scss: {
-        additionalData: `@use "./src/styles/index.scss" as *;`,
+        additionalData: `@use "@/styles/index.scss" as *;`,
         silenceDeprecations: ['global-builtin', 'legacy-js-api', 'new-global', 'color-functions'],
       },
     },
@@ -53,8 +53,10 @@ export default defineConfig({
   // Need to build for esnext to support PDF Viewer which has a await statement that needs next es
   optimizeDeps: {
     exclude: ['@duckdb/duckdb-wasm'],
-    esbuildOptions: {
-      target: "esnext",
+    rolldownOptions: {
+      transform: {
+        target: "esnext",
+      },
     },
   },
   test: {
