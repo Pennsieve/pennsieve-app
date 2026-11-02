@@ -24,7 +24,10 @@ const ASSEMBLIES = {
 };
 
 // What an asset class is, in words, and the tool that reads it.
-const ASSET_CLASSES = { "salmon-index": { name: "Salmon indexes", tool: "salmon" } };
+const ASSET_CLASSES = {
+  "salmon-index": { name: "Salmon indexes", tool: "salmon" },
+  "brain-template": { name: "Brain templates", tool: "" },
+};
 
 // The kind of reference an input takes, in a sentence's words: "Salmon
 // indexes that salmon >=2 <3 can read".
@@ -44,14 +47,17 @@ export const annotationName = (annotation) =>
 // A catalog entry's spec (its version's), or a spec as given.
 const specOf = (entryOrSpec) => entryOrSpec?.version?.spec || entryOrSpec?.spec || entryOrSpec || {};
 
-// What a reference is, in a few words: "Human · GRCh38 · GENCODE 50". Takes a
-// catalog entry, a spec, or an app.yml identity (taxonomyId, assembly,
-// annotation).
+// What a reference is, in a few words: its title ("MNI152NLin2009cAsym, 1 mm,
+// brain"), else a genome's "Human · GRCh38 · GENCODE 50", else its
+// properties' values. Takes a catalog entry, a spec, or an app.yml identity
+// (taxonomyId, assembly, annotation, properties).
 export const referenceLabel = (entryOrSpec) => {
   const s = specOf(entryOrSpec);
-  return [organismName(s.taxonomyId, s.organism), assemblyName(s.assembly), annotationName(s.annotation)]
+  if (s.title) return s.title;
+  const genome = [organismName(s.taxonomyId, s.organism), assemblyName(s.assembly), annotationName(s.annotation)]
     .filter(Boolean)
     .join(" · ");
+  return genome || Object.values(s.properties || {}).filter(Boolean).join(" · ");
 };
 
 // A catalog entry's facts, for a details pane.
@@ -72,6 +78,8 @@ export const referenceDetails = (entry) => {
     license: entry?.license || "",
     description: entry?.description || "",
     citation: entry?.citation || "",
+    // A template's (or any reference's) own terms: [{ name, value }].
+    properties: Object.entries(s.properties || {}).map(([name, value]) => ({ name, value })),
   };
 };
 
@@ -87,12 +95,14 @@ export const offeredOrganisms = (reference) => {
 };
 
 // The catalog query for a reference input's candidates: its kind, asset
-// class and tool versions (the catalog matches the ranges, as runs do). The
-// organisms are filtered here (fitsInput), so one query serves them all.
+// class, tool versions (the catalog matches the ranges, as runs do) and the
+// properties every match has (property.<name>). The organisms are filtered
+// here (fitsInput), so one query serves them all.
 export const catalogQuery = (reference) => {
   const q = { kind: reference?.kind || "genome" };
   if (reference?.assetClass) q.assetClass = reference.assetClass;
   if (reference?.toolVersion) q.toolVersion = String(reference.toolVersion);
+  for (const [k, v] of Object.entries(reference?.properties || {})) q[`property.${k}`] = String(v);
   return q;
 };
 
@@ -100,13 +110,15 @@ const sameAnnotation = (a, b) =>
   !b || ((a?.provider || "") === (b.provider || "") && String(a?.version || "") === String(b.version || ""));
 
 // Whether a spec is the identity an app.yml names (taxonomyId, assembly or
-// seqcol, annotation); fields the identity leaves out match anything.
+// seqcol, annotation, properties); fields the identity leaves out match
+// anything.
 const matchesIdentity = (s, id) =>
   !!id &&
   (!id.taxonomyId || Number(s.taxonomyId) === Number(id.taxonomyId)) &&
   (!id.assembly || s.assembly === id.assembly) &&
   (!id.seqcol || s.seqcol === id.seqcol) &&
-  sameAnnotation(s.annotation, id.annotation);
+  sameAnnotation(s.annotation, id.annotation) &&
+  Object.entries(id.properties || {}).every(([k, v]) => String((s.properties || {})[k] ?? "") === String(v));
 
 // Whether a catalog entry can fill the input: one of its organisms, or the
 // one it pins.

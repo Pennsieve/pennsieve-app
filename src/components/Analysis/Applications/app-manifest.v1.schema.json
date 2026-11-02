@@ -394,16 +394,16 @@
     },
     "portReference": {
       "type": "object",
-      "description": "An input filled from Pennsieve's reference catalog: shared, published data such as a genome index, described by public identifiers so the app isn't tied to one platform. A run's reference source fills it (the app's default when the workflow has none); the reference is unpacked into the input's folder. choice: app pins one (by assembly or seqcol, and annotation); choice: user lets a run pick among the matching ones (optionally of the given organisms), with a default. Elsewhere, put a copy in the input's folder. See https://github.com/Pennsieve/app-deploy-service/blob/main/docs/app-manifest-references.md.",
+      "description": "An input filled from Pennsieve's reference catalog: shared, published data such as a genome index or a brain template, described by public identifiers so the app isn't tied to one platform. A run's reference source fills it (the app's default when the workflow has none); the reference is unpacked into the input's folder. choice: app pins one (a genome by assembly or seqcol and annotation, a template by its properties); choice: user, the default, lets a run pick among the matching ones (optionally of the given organisms), with a default. Elsewhere, put a copy in the input's folder. See https://github.com/Pennsieve/app-deploy-service/blob/main/docs/app-manifest-references.md.",
       "additionalProperties": false,
-      "required": ["kind", "assetClass", "choice"],
+      "required": ["kind", "assetClass"],
       "properties": {
-        "kind": { "type": "string", "enum": ["genome"], "description": "genome: a genome asset, such as a FASTA or an aligner index." },
+        "kind": { "type": "string", "enum": ["genome", "template"], "description": "genome: a genome asset, such as a FASTA or an aligner index. template: a template or atlas image, such as the MNI152 brain template." },
         "assetClass": {
           "type": "string",
           "minLength": 1,
-          "description": "What the reference is, such as salmon-index; it names the files it holds.",
-          "examples": ["salmon-index"]
+          "description": "What the reference is, such as salmon-index or brain-template; it names the files it holds.",
+          "examples": ["salmon-index", "brain-template"]
         },
         "toolVersion": {
           "type": "string",
@@ -414,12 +414,13 @@
         "choice": {
           "type": "string",
           "enum": ["app", "user"],
-          "description": "app: the app pins the reference. user: a run picks among the matching references."
+          "description": "app: the app pins the reference. user (the default): a run picks among the matching references."
         },
         "taxonomyId": { "type": "integer", "minimum": 1, "description": "choice app: the organism's NCBI taxonomy id." },
         "assembly": { "$ref": "#/$defs/referenceAssembly" },
         "seqcol": { "type": "string", "minLength": 1, "description": "The assembly's GA4GH sequence-collection digest." },
         "annotation": { "$ref": "#/$defs/referenceAnnotation" },
+        "properties": { "$ref": "#/$defs/referenceProperties" },
         "organisms": {
           "type": "array",
           "minItems": 1,
@@ -435,7 +436,8 @@
             "taxonomyId": { "type": "integer", "minimum": 1 },
             "assembly": { "$ref": "#/$defs/referenceAssembly" },
             "seqcol": { "type": "string", "minLength": 1 },
-            "annotation": { "$ref": "#/$defs/referenceAnnotation" }
+            "annotation": { "$ref": "#/$defs/referenceAnnotation" },
+            "properties": { "$ref": "#/$defs/referenceProperties" }
           }
         },
         "source": { "type": "string", "description": "Where to get it outside Pennsieve: a URL, or how to build it." },
@@ -444,10 +446,22 @@
       },
       "allOf": [
         {
-          "if": { "properties": { "choice": { "const": "app" } } },
+          "if": { "required": ["choice", "kind"], "properties": { "choice": { "const": "app" }, "kind": { "const": "genome" } } },
           "then": { "required": ["annotation"], "anyOf": [{ "required": ["assembly"] }, { "required": ["seqcol"] }] }
+        },
+        {
+          "if": { "required": ["choice", "kind"], "properties": { "choice": { "const": "app" }, "kind": { "const": "template" } } },
+          "then": { "required": ["properties"] }
         }
       ]
+    },
+    "referenceProperties": {
+      "type": "object",
+      "description": "What a reference is in its own terms, matched exactly: a template's space, resolution and desc (TemplateFlow's entities). On the reference, every match has them; on default, the default's.",
+      "maxProperties": 20,
+      "propertyNames": { "pattern": "^[a-zA-Z][a-zA-Z0-9_-]{0,39}$" },
+      "additionalProperties": { "type": "string", "minLength": 1, "maxLength": 200 },
+      "examples": [{ "space": "MNI152NLin2009cAsym", "resolution": "1", "desc": "brain" }]
     },
     "referenceAssembly": {
       "type": "string",

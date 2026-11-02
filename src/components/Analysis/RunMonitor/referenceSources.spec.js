@@ -127,3 +127,48 @@ describe("reference sources", () => {
     expect(formatSize(0)).toBe("");
   });
 });
+
+// A template: found by its properties, named by its title.
+describe("template references", () => {
+  const mni = (resolution) => ({
+    id: `mni-${resolution}`,
+    version: {
+      version: 1,
+      spec: {
+        assetClass: "brain-template",
+        title: `MNI152NLin2009cAsym, ${resolution} mm, brain`,
+        properties: { space: "MNI152NLin2009cAsym", resolution, desc: "brain" },
+      },
+      archive: { sha256: "cc", sizeBytes: 9000000, unpackedBytes: 9000000 },
+    },
+  });
+  const pinned = { kind: "template", assetClass: "brain-template", choice: "app", properties: { space: "MNI152NLin2009cAsym", resolution: "1" } };
+
+  it("is named by its title, else its properties", () => {
+    expect(referenceLabel(mni("1"))).toBe("MNI152NLin2009cAsym, 1 mm, brain");
+    expect(referenceLabel(pinned)).toBe("MNI152NLin2009cAsym · 1");
+    expect(referenceDetails(mni("2")).properties).toEqual([
+      { name: "space", value: "MNI152NLin2009cAsym" },
+      { name: "resolution", value: "2" },
+      { name: "desc", value: "brain" },
+    ]);
+  });
+
+  it("asks the catalog for its kind and properties", () => {
+    expect(catalogQuery(pinned)).toEqual({
+      kind: "template",
+      assetClass: "brain-template",
+      "property.space": "MNI152NLin2009cAsym",
+      "property.resolution": "1",
+    });
+  });
+
+  it("pins by properties", () => {
+    expect(fitsInput(mni("1"), pinned)).toBe(true);
+    expect(fitsInput(mni("2"), pinned)).toBe(false);
+    expect(isAppDefault(mni("1"), pinned)).toBe(true);
+    // choice user (unset), no organisms: any match fits.
+    expect(fitsInput(mni("2"), { kind: "template", assetClass: "brain-template" })).toBe(true);
+    expect(referenceKindText(pinned)).toBe("Brain templates");
+  });
+});
