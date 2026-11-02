@@ -136,8 +136,6 @@ const userRoutes = [
     'user-api',
     'data-publishing',
     'data-publishing-dashboard',
-    'open-repositories',
-    'dataset-proposals',
     'my-workspaces',
     'my-repositories',
     'shared-with-me'
