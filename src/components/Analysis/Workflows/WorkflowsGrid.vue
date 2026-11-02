@@ -949,11 +949,12 @@ $card-height: 172px;
 }
 .wf-tag {
   flex-shrink: 0;
-  padding: 0 6px;
+  padding: 1px 7px;
   border: 1px solid transparent;
   border-radius: 3px;
   background: theme.$gray_0;
   font-size: 11px;
+  line-height: 1.5;
   color: theme.$gray_5;
 }
 /* Inherited from the apps: outlined, not filled, in the same colours. */
