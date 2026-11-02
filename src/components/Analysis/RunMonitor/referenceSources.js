@@ -60,7 +60,46 @@ export const taxonFromTerm = (term) => {
     .filter((x) => x && x.toLowerCase() !== String(term.label || "").toLowerCase())
     .slice(0, 2)
     .join(", ");
-  return { taxonomyId: Number(m[1]), label: term.label || `NCBITaxon:${m[1]}`, common };
+  const names = String(term.synonyms || "").split("|").map((x) => x.trim()).filter(Boolean);
+  return { taxonomyId: Number(m[1]), label: term.label || `NCBITaxon:${m[1]}`, common, names };
+};
+
+// Organisms labs study most, offered before any search and ranked first.
+export const COMMON_ORGANISMS = [
+  { taxonomyId: 9606, label: "Homo sapiens", common: "human", names: ["human"] },
+  { taxonomyId: 10090, label: "Mus musculus", common: "house mouse", names: ["mouse", "house mouse"] },
+  { taxonomyId: 10116, label: "Rattus norvegicus", common: "Norway rat", names: ["rat", "Norway rat", "brown rat"] },
+  { taxonomyId: 7955, label: "Danio rerio", common: "zebrafish", names: ["zebrafish", "zebra fish"] },
+  { taxonomyId: 7227, label: "Drosophila melanogaster", common: "fruit fly", names: ["fruit fly", "fly"] },
+  { taxonomyId: 6239, label: "Caenorhabditis elegans", common: "nematode worm", names: ["C. elegans", "worm", "nematode"] },
+  { taxonomyId: 4932, label: "Saccharomyces cerevisiae", common: "baker's yeast", names: ["yeast", "baker's yeast", "brewer's yeast"] },
+  { taxonomyId: 3702, label: "Arabidopsis thaliana", common: "thale cress", names: ["thale cress", "mouse-ear cress"] },
+  { taxonomyId: 9544, label: "Macaca mulatta", common: "rhesus macaque", names: ["rhesus macaque", "rhesus monkey", "macaque"] },
+  { taxonomyId: 9823, label: "Sus scrofa", common: "pig", names: ["pig", "wild boar"] },
+  { taxonomyId: 9031, label: "Gallus gallus", common: "chicken", names: ["chicken"] },
+  { taxonomyId: 8355, label: "Xenopus laevis", common: "African clawed frog", names: ["African clawed frog", "frog"] },
+];
+
+// Organisms for a typed name, best first: the common ones it names, then the
+// ontology's matches ranked by an exact name, a whole word of a name starting
+// with it, then species (two-word names) before strains, viruses and groups.
+export const rankOrganisms = (query, found) => {
+  const q = String(query || "").trim().toLowerCase();
+  const namesOf = (t) => [t.label, ...(t.names || [])].map((n) => String(n).toLowerCase());
+  const score = (t) => {
+    const names = namesOf(t);
+    if (names.some((n) => n === q) || String(t.taxonomyId) === q) return 0;
+    if (names.some((n) => n.split(/[\s,()-]+/).some((w) => w.startsWith(q)))) return /^[A-Z][a-z]+ [a-z]+$/.test(t.label) ? 1 : 3;
+    return /^[A-Z][a-z]+ [a-z]+$/.test(t.label) ? 2 : 4;
+  };
+  const common = q ? COMMON_ORGANISMS.filter((t) => namesOf(t).some((n) => n.startsWith(q) || n.split(/\s+/).some((w) => w.startsWith(q)))) : COMMON_ORGANISMS;
+  const seen = new Set(common.map((t) => t.taxonomyId));
+  const rest = (found || [])
+    .filter((t) => !seen.has(t.taxonomyId) && seen.add(t.taxonomyId))
+    .map((t, i) => ({ t, i, s: score(t) }))
+    .sort((a, b) => a.s - b.s || a.i - b.i)
+    .map((x) => x.t);
+  return [...common, ...rest];
 };
 
 export const assemblyName = (accession) => ASSEMBLIES[accession] || accession || "";

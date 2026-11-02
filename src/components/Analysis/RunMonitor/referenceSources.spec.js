@@ -24,6 +24,7 @@ import {
   referenceBlock,
   catalogLacks,
   taxonFromTerm,
+  rankOrganisms,
   assetClassName,
 } from "./referenceSources";
 import { ref } from "vue";
@@ -342,8 +343,28 @@ describe("organisms from the ontology", () => {
       taxonomyId: 7955,
       label: "Danio rerio",
       common: "zebrafish, zebra fish",
+      names: ["zebrafish", "Danio rerio", "zebra fish", "Brachydanio rerio"],
     });
     expect(taxonFromTerm({ curie: "NCBITaxon:9606", label: "Homo sapiens", synonyms: "" }).common).toBe("");
     expect(taxonFromTerm({ curie: "UBERON:0000955", label: "brain" })).toBe(null);
+  });
+});
+
+describe("ranking organisms", () => {
+  const t = (taxonomyId, label, names = []) => ({ taxonomyId, label, common: names.join(", "), names });
+  it("puts the common organisms and species first", () => {
+    const found = [
+      t(13157, "Mougeotia"),
+      t(11757, "Mouse mammary tumor virus", ["MMTV"]),
+      t(13158, "Mougeotia scalaris"),
+      t(10090, "Mus musculus", ["house mouse", "mouse"]),
+    ];
+    const ids = rankOrganisms("mou", found).map((o) => o.taxonomyId);
+    expect(ids[0]).toBe(10090); // mouse, from the common list
+    expect(ids.filter((i) => i === 10090)).toHaveLength(1);
+    expect(ids.indexOf(13158)).toBeLessThan(ids.indexOf(13157)); // a species before a genus
+    expect(rankOrganisms("", []).length).toBeGreaterThan(5);
+    expect(rankOrganisms("zebra", []).map((o) => o.taxonomyId)).toEqual([7955]);
+    expect(rankOrganisms("sapiens", [t(9606, "Homo sapiens", ["human"])]).map((o) => o.taxonomyId)).toEqual([9606]);
   });
 });

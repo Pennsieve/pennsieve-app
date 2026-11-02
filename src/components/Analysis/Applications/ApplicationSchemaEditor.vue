@@ -620,7 +620,7 @@ import FieldHint from "./FieldHint.vue";
 import { PARAM_TYPES, PARAM_TYPE_OPTIONS, createParameter, createPort, portDataTypeOptions, STANDARD_CPU_OPTIONS, getStandardMemoryOptions, isNumericType, mediaTypeMatches, structureId, structureOptionsFor, structureMatches, isStructureLink, conformsToList, rootInputCollisions } from "./applicationSchema";
 import { environmentsServiceUrl, findReferences } from "@/utils/environmentsService";
 import { useOntologyStore } from "@/stores/ontologyStore";
-import { REFERENCE_KINDS, assetClassName, isAppDefault, organismName, referenceBlock, referenceKindText, referenceLabel, taxonFromTerm } from "../RunMonitor/referenceSources";
+import { REFERENCE_KINDS, assetClassName, isAppDefault, organismName, referenceBlock, referenceKindText, referenceLabel, taxonFromTerm, rankOrganisms, COMMON_ORGANISMS } from "../RunMonitor/referenceSources";
 import { canonicalTag, preferredTagGroups, tagOptionMatches, tagDomainNudge, hasDomainTag, domainOfTag, domainColors } from "./appDomains";
 
 /**
@@ -836,7 +836,7 @@ const removePropertyRow = (port, i) => writeProperties(port, propertyRows(port).
   id when the ontology can't be searched.
 */
 const ontology = useOntologyStore();
-const organismResults = ref([]);
+const organismResults = ref(COMMON_ORGANISMS);
 const organismSearching = ref(false);
 const taxonNames = reactive({}); // taxonomy id -> { label, common }
 const remember = (taxa) => {
@@ -847,14 +847,14 @@ const searchOrganisms = async (q) => {
   const term = String(q || "").trim();
   const asked = ++organismQuery;
   if (!term) {
-    organismResults.value = [];
+    organismResults.value = COMMON_ORGANISMS;
     organismSearching.value = false;
     return;
   }
   organismSearching.value = true;
   let taxa = [];
   try {
-    taxa = (await ontology.search(term, { limit: 12, ontologies: ["NCBITaxon"] })).map(taxonFromTerm).filter(Boolean);
+    taxa = (await ontology.search(term, { limit: 60, ontologies: ["NCBITaxon"] })).map(taxonFromTerm).filter(Boolean);
   } catch {
     taxa = []; // ontology slices unavailable: an id typed in still works
   }
@@ -862,6 +862,7 @@ const searchOrganisms = async (q) => {
     taxa.unshift({ taxonomyId: Number(term), label: taxonNames[term]?.label || `NCBITaxon:${term}`, common: "" });
   }
   if (asked !== organismQuery) return; // a newer search is on its way (and clears the spinner)
+  taxa = rankOrganisms(term, taxa).slice(0, 15);
   remember(taxa);
   organismResults.value = taxa;
   organismSearching.value = false;
