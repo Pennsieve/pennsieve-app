@@ -103,7 +103,7 @@ const outputChoices = computed(() => outputOptions(workflows.value, targetTypes.
 const domainChips = computed(() => domainOptions(libraryWorkflows(workflows.value), applications.value));
 const chipStyle = (domain) => {
   const c = domainColors(domain);
-  return { "--chip-bg": c.bg, "--chip-ink": c.ink, "--chip-line": c.line, "--chip-dot": c.accent };
+  return { "--chip-bg": c.bg, "--chip-tile": c.tile, "--chip-ink": c.ink, "--chip-line": c.line, "--chip-dot": c.accent };
 };
 const toggleDomain = (key) => (domainFilter.value = domainFilter.value === key ? "any" : key);
 const fieldChips = computed(() => fieldOptions(libraryWorkflows(workflows.value), applications.value));
@@ -411,6 +411,15 @@ onMounted(async () => {
 
       <div v-if="domainChips.length" class="domain-row" role="group" aria-label="What workflows are for">
         <button
+          type="button"
+          class="domain-chip domain-chip--all"
+          :class="{ active: domainFilter === 'any' }"
+          :aria-pressed="domainFilter === 'any'"
+          @click="domainFilter = 'any'"
+        >
+          All
+        </button>
+        <button
           v-for="{ domain, count } in domainChips"
           :key="domain.key"
           type="button"
@@ -429,6 +438,15 @@ onMounted(async () => {
 
       <div v-if="fieldChips.length" class="field-row" role="group" aria-label="Research field">
         <span class="field-label">Field</span>
+        <button
+          type="button"
+          class="field-chip"
+          :class="{ active: fieldFilter === 'any' }"
+          :aria-pressed="fieldFilter === 'any'"
+          @click="fieldFilter = 'any'"
+        >
+          All
+        </button>
         <button
           v-for="{ field, count } in fieldChips"
           :key="field.key"
@@ -755,11 +773,20 @@ onMounted(async () => {
   &:hover {
     background: var(--chip-bg);
   }
+  /* Chosen: filled in the domain's tile colour, so it can't be mistaken
+     for a chip that is merely coloured. */
   &.active {
     border-color: var(--chip-ink);
-    background: var(--chip-bg);
+    background: var(--chip-tile);
     font-weight: 600;
   }
+}
+/* "All": neutral, chosen while no domain is. */
+.domain-chip--all {
+  --chip-bg: #{theme.$gray_0};
+  --chip-tile: #{theme.$gray_1};
+  --chip-ink: #{theme.$gray_6};
+  --chip-line: #{theme.$gray_2};
 }
 .domain-dot {
   width: 8px;
@@ -802,6 +829,7 @@ onMounted(async () => {
   }
   &.active {
     border-color: theme.$gray_6;
+    background: theme.$gray_1;
     font-weight: 600;
   }
 }
