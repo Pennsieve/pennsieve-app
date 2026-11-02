@@ -21,6 +21,7 @@ import {
   inputTakes,
   appsUsing,
   referenceSnippet,
+  referenceBlock,
   assetClassName,
 } from "./referenceSources";
 import { ref } from "vue";
@@ -273,6 +274,32 @@ describe("the reference data page", () => {
     expect(genome).toContain('annotation: {provider: "GENCODE", version: "50"}');
     // A pinned snippet matches the entry it came from.
     expect(inputTakes({ kind: "template", assetClass: "brain-template", choice: "app", properties: mni.version.spec.properties }, mni)).toBe(true);
+  });
+
+  it("builds the app.yml block that takes an entry", () => {
+    const pinned = referenceBlock(mni);
+    expect(pinned).toEqual({
+      kind: "template",
+      assetClass: "brain-template",
+      choice: "app",
+      properties: { space: "MNI152NLin2009cAsym", resolution: "1", desc: "brain" },
+    });
+    const choose = referenceBlock({ ...human, kind: "genome" }, { choice: "user", organisms: [9606, 10090] });
+    expect(choose).toEqual({
+      kind: "genome",
+      assetClass: "salmon-index",
+      toolVersion: ">=2 <3",
+      choice: "user",
+      organisms: [9606, 10090],
+      default: { taxonomyId: 9606, assembly: "GCA_000001405.29", annotation: { provider: "GENCODE", version: "50" } },
+    });
+    // Either way, the entry is the input's default and fits it.
+    for (const [block, e] of [[pinned, mni], [choose, human], [referenceBlock(human), human]]) {
+      expect(isAppDefault(e, block)).toBe(true);
+      expect(inputTakes(block, { ...e, kind: block.kind })).toBe(true);
+    }
+    expect(inputTakes(choose, { ...mouse, kind: "genome" })).toBe(true);
+    expect(inputTakes(referenceBlock(human), { ...mouse, kind: "genome" })).toBe(false);
   });
 
   it("names asset classes and shows sources", () => {

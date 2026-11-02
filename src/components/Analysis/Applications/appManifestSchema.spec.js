@@ -19,6 +19,7 @@ import {
   MANIFEST_SCHEMA_URL,
   PARAM_TYPES,
 } from './applicationSchema'
+import { referenceBlock } from '../RunMonitor/referenceSources'
 
 const ajv = new Ajv2020({ allErrors: true, strict: false })
 addFormats(ajv)
@@ -45,6 +46,30 @@ describe('the app.yml schema', () => {
     expect(validate(doc), problems()).toBe(true)
     doc.inputs[0].reference.toolVersion = 'latest'
     expect(validate(doc)).toBe(false)
+  })
+
+  it("accepts the reference blocks the builder's Reference data control writes", () => {
+    const genome = {
+      kind: 'genome',
+      version: { spec: { organism: 'Homo sapiens', taxonomyId: 9606, assembly: 'GCA_000001405.29', annotation: { provider: 'GENCODE', version: '50' }, assetClass: 'salmon-index', tool: 'salmon', toolVersion: '2.8.0' } },
+    }
+    const template = {
+      kind: 'template',
+      version: { spec: { title: 'MNI152NLin2009cAsym, 1 mm, brain', assetClass: 'brain-template', properties: { space: 'MNI152NLin2009cAsym', resolution: '1', desc: 'brain' } } },
+    }
+    const blocks = [
+      referenceBlock(genome),
+      referenceBlock(genome, { choice: 'user' }),
+      referenceBlock(genome, { choice: 'user', organisms: [9606, 10090] }),
+      referenceBlock(template),
+      referenceBlock(template, { choice: 'user' }),
+    ]
+    for (const reference of blocks) {
+      const schema = createApplicationSchema({ inputs: [createPort({ name: 'reference', placement: 'subfolder', reference })] })
+      const m = buildManifest(schema, { name: 'Uses a reference', applicationType: 'processor' })
+      expect(validate(m), `${JSON.stringify(reference)}: ${problems()}`).toBe(true)
+      expect(m.inputs[0].reference).toEqual(reference)
+    }
   })
 
   it('accepts what the builder writes', () => {

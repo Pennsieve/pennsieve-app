@@ -118,33 +118,51 @@ export const appsUsing = (entry, applications, manifestOf) =>
       .map((p) => ({ app, input: p.name, pinned: p.reference.choice === "app" }))
   );
 
-// A string as YAML: quoted, so "1" stays a string and "GENCODE: 50" a scalar.
-const yamlString = (v) => JSON.stringify(String(v));
+// What a catalog entry is, as app.yml names it: a genome's organism,
+// assembly and annotation, and any properties.
+const identityOf = (entry) => {
+  const s = specOf(entry);
+  const id = {};
+  if (s.taxonomyId) id.taxonomyId = Number(s.taxonomyId);
+  if (s.assembly) id.assembly = s.assembly;
+  if (s.annotation?.provider) id.annotation = { provider: s.annotation.provider, version: String(s.annotation.version || "") };
+  if (Object.keys(s.properties || {}).length) id.properties = { ...s.properties };
+  return id;
+};
+
+// The app.yml reference block for an input filled from a catalog entry: kind,
+// asset class, the tool's major version for an index, and choice app pinning
+// the entry, or choice user with it as the default (and the organisms a run
+// may pick from; none: any).
+export const referenceBlock = (entry, { choice = "app", organisms = [] } = {}) => {
+  const s = specOf(entry);
+  const block = { kind: entry?.kind || "genome" };
+  if (s.assetClass) block.assetClass = s.assetClass;
+  const major = String(s.toolVersion || "").match(/^(\d+)/)?.[1];
+  if (major) block.toolVersion = `>=${major} <${Number(major) + 1}`;
+  block.choice = choice;
+  if (choice === "app") return { ...block, ...identityOf(entry) };
+  if (organisms.length) block.organisms = [...organisms];
+  return { ...block, default: identityOf(entry) };
+};
+
+// A YAML scalar: strings quoted, so "1" stays a string; numbers bare.
+const yamlValue = (v) => (typeof v === "number" ? String(v) : JSON.stringify(String(v)));
+const yamlFlow = (o) => `{${Object.entries(o).map(([k, v]) => `${k}: ${yamlValue(v)}`).join(", ")}}`;
 
 // The app.yml input that pins a catalog entry, for an app's author to paste
-// under inputs: kind, asset class, the tool's major version for an index,
-// and the entry's identity (a genome's organism, assembly and annotation, or
-// its properties).
+// under inputs.
 export const referenceSnippet = (entry) => {
-  const s = specOf(entry);
   const lines = [
     "- name: reference",
-    `  description: ${yamlString(referenceLabel(entry) || "Reference data")}`,
+    `  description: ${yamlValue(referenceLabel(entry) || "Reference data")}`,
     "  placement: subfolder",
     "  reference:",
-    `    kind: ${entry?.kind || "genome"}`,
   ];
-  if (s.assetClass) lines.push(`    assetClass: ${s.assetClass}`);
-  const major = String(s.toolVersion || "").match(/^(\d+)/)?.[1];
-  if (major) lines.push(`    toolVersion: ${yamlString(`>=${major} <${Number(major) + 1}`)}`);
-  lines.push("    choice: app");
-  if (s.taxonomyId) lines.push(`    taxonomyId: ${Number(s.taxonomyId)}`);
-  if (s.assembly) lines.push(`    assembly: ${yamlString(s.assembly)}`);
-  if (s.annotation?.provider) {
-    lines.push(`    annotation: {provider: ${yamlString(s.annotation.provider)}, version: ${yamlString(s.annotation.version || "")}}`);
+  for (const [k, v] of Object.entries(referenceBlock(entry))) {
+    const bare = k === "kind" || k === "assetClass" || k === "choice";
+    lines.push(`    ${k}: ${typeof v === "object" ? yamlFlow(v) : bare ? v : yamlValue(v)}`);
   }
-  const props = Object.entries(s.properties || {});
-  if (props.length) lines.push(`    properties: {${props.map(([k, v]) => `${k}: ${yamlString(v)}`).join(", ")}}`);
   return lines.join("\n");
 };
 
