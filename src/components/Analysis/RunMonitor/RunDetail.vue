@@ -86,6 +86,9 @@ import {
   RUN_NAME_MAX_LENGTH,
 } from "./runHelpers";
 import { sourceLabel, sourceHints, hintLine, portsOfStep, missingFilesMessage, fileTypeMismatches, acceptedFileTypes, linkHints } from "../WorkflowGraph/sourceInputs";
+import ReferencePickerDialog from "./ReferencePickerDialog.vue";
+import { findReferences, environmentsServiceUrl } from "@/utils/environmentsService";
+import { referenceTargetIn, runReferences, referenceSource, formatSize, choiceLabel, createReferenceCatalog, catalogLacks, defaultIdentity, referenceLabel, referenceKindText } from "./referenceSources";
 import { portEdges, stepPoints } from "../WorkflowGraph/runPorts";
 import PortChips from "../WorkflowGraph/PortChips.vue";
 import LlmMark from "../WorkflowGraph/LlmMark.vue";
@@ -664,6 +667,8 @@ const statusMark = (data) => (mode.value === "browse" && statusMarkOf(data.statu
 // An input's and output's second line on the graph (IoPill): its files, or
 // where it goes and how that went.
 const sourceSubOf = (id, data) => {
+  if (mode.value === "configure" && referenceChoiceOf(id)) return referenceChoiceOf(id).label;
+  if (mode.value === "browse" && usedReferenceOf(id)) return usedReferenceOf(id).label || "Reference data";
   if (mode.value === "configure") {
     if (isLeftOut(id)) return "Left out";
     const n = fileCountForNode(id);
@@ -990,6 +995,10 @@ onNodeClick(({ node }) => {
     // panel (its files and where they land), where they can be changed. In
     // My Workspace an input takes only public files, and where there are
     // none (no views-service) its panel says so instead of an empty picker.
+    if (node.type === "data-source" && referenceOf(node.id)) {
+      openReferencePicker(node.id);
+      return;
+    }
     if (node.type === "data-source" && !fileCountForNode(node.id) && (!isMyWorkspace.value || publicInputs)) {
       openFilePicker(node.id);
       return;
@@ -1060,6 +1069,11 @@ const initiateWorkflowFromConfig = async (pendingConfig) => {
         const own = source?.dataSources?.[d.id]?.datasetId;
         if (own && own !== datasetId) sourceDatasets[d.id] = own;
         setFilePaths(d.id, filePathsOf(source?.dataSources?.[d.id]));
+        // A reference the run being rerun chose is chosen again, and an input
+        // it filled with files (an own index) takes files again.
+        const given = source?.dataSources?.[d.id];
+        if (given?.kind === "reference" && given.environmentId) referencePicks[d.id] = { id: given.environmentId };
+        else if (given?.packageIds?.length || given?.kind === "viewVersion") ownReferenceData[d.id] = true;
       }
       if (d.type === "data-target") {
         // An output's destination is the run being rerun's (its target's
@@ -1164,6 +1178,7 @@ const leaveConfigure = () => {
   Object.keys(dataSourceFilePaths).forEach((k) => delete dataSourceFilePaths[k]);
   Object.keys(pickedPaths).forEach((k) => delete pickedPaths[k]);
   Object.keys(sourceDatasets).forEach((k) => delete sourceDatasets[k]);
+  for (const state of [referencePicks, ownReferenceData]) Object.keys(state).forEach((k) => delete state[k]);
   Object.keys(nodeConfigs).forEach((k) => delete nodeConfigs[k]);
   nodes.value = [];
   edges.value = [];
@@ -1300,6 +1315,11 @@ const executeWorkflow = async () => {
     const views = await publicInputViews(dag);
     if (!views) return;
     Object.assign(dataSources, views);
+    // A reference chosen for this run; the others take the workflow's
+    // default, else the app's.
+    for (const [nodeId, entry] of Object.entries(referencePicks)) {
+      if (entry?.id && referenceOf(nodeId)) dataSources[nodeId] = referenceSource(entry.id);
+    }
 
     const processorConfigs = [];
     Object.entries(nodeConfigs).forEach(([nodeId, cfg]) => {
@@ -1539,8 +1559,125 @@ const closeFilePicker = () => {
 };
 
 const fileCountForNode = (nodeId) => {
+  // A reference source has no files to choose: it always has its reference.
+  if (referenceOf(nodeId)) return 1;
   return (dataSourceFiles[nodeId] || []).length + (publicPicks[nodeId] || []).length;
 };
+
+/*
+  Reference sources: inputs filled from Pennsieve's reference catalog (an
+  app input with a reference block). Configuring, each shows the reference
+  it will use: the one chosen for this run, else the workflow's default
+  (its input's default), else the app's; the run names only a reference
+  chosen here (dataSources[id] = { kind: "reference", environmentId }),
+  leaving the rest to workflow-service. Browsing, the references the run
+  used, as resolved at its start (each step's references).
+*/
+// The reference input each source feeds (sourceId -> { step, input,
+// reference }), where the platform has a catalog.
+const referencesOn = !!environmentsServiceUrl();
+const referenceTargets = computed(() => {
+  if (!referencesOn || mode.value !== "configure") return {};
+  const dag = configDefinition.value?.dag || [];
+  const portsOf = portsOfStep(dag, availableApplications.value);
+  const out = {};
+  for (const d of dag) {
+    if (d.type !== "data-source") continue;
+    const t = referenceTargetIn(d.id, dag, portsOf);
+    if (t) out[d.id] = t;
+  }
+  return out;
+});
+// Reference inputs the runner fills with their own files instead (an index
+// in a dataset): an ordinary source for this run, with the file picker.
+const ownReferenceData = reactive({});
+const referenceOf = (nodeId) => (ownReferenceData[nodeId] ? null : referenceTargets.value[nodeId] || null);
+const feedsReferenceInput = (nodeId) => !!referenceTargets.value[nodeId];
+const referencePicks = reactive({});
+const useOwnReferenceData = (nodeId, own) => {
+  if (own) {
+    ownReferenceData[nodeId] = true;
+    delete referencePicks[nodeId];
+    openFilePicker(nodeId);
+    return;
+  }
+  // Back to the catalog: none of the files chosen meanwhile go in the run.
+  for (const state of [ownReferenceData, dataSourceFiles, publicPicks, sourceDatasets, leftOutInputs, dataSourceFilePaths, pickedPaths]) delete state[nodeId];
+};
+const catalog = createReferenceCatalog(findReferences, ref);
+const workflowReferenceId = (nodeId) => dagNodeOf(nodeId)?.input?.default?.environmentId || "";
+// What each reference source will use: chosen for this run, else the
+// workflow's default, else the app's.
+const referenceChoices = computed(() => {
+  const out = {};
+  for (const [nodeId, target] of Object.entries(referenceTargets.value)) {
+    if (ownReferenceData[nodeId]) continue;
+    const chosenId = referencePicks[nodeId]?.id || workflowReferenceId(nodeId);
+    const entry = (chosenId && catalog.known.value[chosenId]) || null;
+    out[nodeId] = {
+      ...target,
+      chosenId,
+      entry,
+      label: choiceLabel({ entry, chosenId, reference: target.reference }),
+      from: referencePicks[nodeId] ? "Chosen for this run" : workflowReferenceId(nodeId) ? "The workflow's choice" : "The app's default",
+    };
+  }
+  return out;
+});
+const referenceChoiceOf = (nodeId) => referenceChoices.value[nodeId] || null;
+// The inputs' candidates, for their names: each query once.
+watch(
+  () => Object.values(referenceTargets.value).map((t) => JSON.stringify(t.reference)).sort().join("|"),
+  () => catalog.ensureLoaded(Object.values(referenceTargets.value).map((t) => t.reference)),
+  { immediate: true }
+);
+// Reference inputs the catalog can't fill when nothing is chosen (it doesn't
+// have the app's default): the reference describes the folder's contents,
+// so they take the runner's files, saying what's missing.
+const lackingReference = computed(() => {
+  const out = {};
+  const entries = Object.values(catalog.known.value);
+  for (const [nodeId, t] of Object.entries(referenceTargets.value)) {
+    if (referencePicks[nodeId] || workflowReferenceId(nodeId) || !catalog.isLoaded(t.reference)) continue;
+    if (catalogLacks(t.reference, entries)) {
+      out[nodeId] = referenceLabel(defaultIdentity(t.reference) || {}) || referenceKindText(t.reference).toLowerCase();
+    }
+  }
+  return out;
+});
+watch(
+  lackingReference,
+  (lacking) => {
+    for (const nodeId of Object.keys(lacking)) ownReferenceData[nodeId] = true;
+  },
+  { immediate: true }
+);
+
+const referencePickerOpen = ref(false);
+const referencePickerFor = ref(null);
+const openReferencePicker = (nodeId) => {
+  const choice = referenceChoiceOf(nodeId);
+  if (!choice) return;
+  const stepNode = (configDefinition.value?.dag || []).find((d) => d.id === choice.step);
+  referencePickerFor.value = {
+    nodeId,
+    ...choice,
+    stepName: stepNode ? labelForDagNode(stepNode, availableApplications.value, targetTypes.value, configDefinition.value?.dag || []) : "",
+  };
+  referencePickerOpen.value = true;
+};
+const onReferencePicked = (entry) => {
+  const id = referencePickerFor.value?.nodeId;
+  if (!id) return;
+  catalog.remember([entry]);
+  referencePicks[id] = entry;
+};
+
+// Browsing: the reference a run's source (or, unbound, its step's input)
+// used.
+const usedReferences = computed(() => (mode.value === "browse" ? runReferences(selectedWorkflowActivity.value?.dag || []) : []));
+const usedReferenceOf = (sourceId) => usedReferences.value.find((r) => r.source === sourceId) || null;
+const usedReferencesOfStep = (stepId) => usedReferences.value.filter((r) => r.step === stepId);
 
 // Chosen files a source's inputs don't take (by extension, against what its
 // inputs' app.yml declares), while configuring: marked on the link to the
@@ -2389,6 +2526,15 @@ onUnmounted(() => {
       </template>
     </div>
 
+    <ReferencePickerDialog
+      v-model="referencePickerOpen"
+      :reference="referencePickerFor?.reference || null"
+      :step-name="referencePickerFor?.stepName || ''"
+      :input-name="referencePickerFor?.input || ''"
+      :selected-id="referencePickerFor?.chosenId || ''"
+      @pick="onReferencePicked"
+    />
+
     <!-- End-session confirmation (Pennsieve dialog, not the browser prompt) -->
     <el-dialog
       v-model="confirmEndOpen"
@@ -3049,8 +3195,45 @@ onUnmounted(() => {
             </template>
 
             <!-- CONFIGURE MODE: Selected data-source node -->
+            <template v-else-if="mode === 'configure' && selectedNode && selectedNode.type === 'data-source' && referenceChoiceOf(selectedNode.id)">
+              <h4 class="sidebar-section-title">Reference data</h4>
+              <div class="info-card">
+                <div class="info-row">
+                  <span class="info-label">Reference</span>
+                  <span class="info-value">{{ referenceChoiceOf(selectedNode.id).label }}</span>
+                </div>
+                <div class="info-row">
+                  <span class="info-label">Chosen by</span>
+                  <span class="info-value">{{ referenceChoiceOf(selectedNode.id).from }}</span>
+                </div>
+                <div v-if="referenceChoiceOf(selectedNode.id).entry?.version?.archive?.sizeBytes" class="info-row">
+                  <span class="info-label">Download</span>
+                  <span class="info-value">{{ formatSize(referenceChoiceOf(selectedNode.id).entry.version.archive.sizeBytes) }}</span>
+                </div>
+              </div>
+              <p class="configure-hint">The step downloads this reference when it runs; the run records the exact version it used.</p>
+              <div class="reference-actions">
+                <button type="button" class="text-link-btn" @click="openReferencePicker(selectedNode.id)">Change reference</button>
+                <button
+                  v-if="referencePicks[selectedNode.id]"
+                  type="button"
+                  class="text-link-btn"
+                  @click="delete referencePicks[selectedNode.id]"
+                >Use the default</button>
+                <button type="button" class="text-link-btn" @click="useOwnReferenceData(selectedNode.id, true)">Use your own files instead</button>
+              </div>
+            </template>
             <template v-else-if="mode === 'configure' && selectedNode && selectedNode.type === 'data-source'">
               <h4 class="sidebar-section-title">Data Source</h4>
+              <p v-if="lackingReference[selectedNode.id]" class="configure-hint">
+                Pennsieve's reference data has no {{ lackingReference[selectedNode.id] }}. Select the files for this input instead.
+              </p>
+              <button
+                v-else-if="ownReferenceData[selectedNode.id] && feedsReferenceInput(selectedNode.id)"
+                type="button"
+                class="text-link-btn"
+                @click="useOwnReferenceData(selectedNode.id, false)"
+              >Use Pennsieve's reference data instead</button>
               <div class="info-card">
                 <div v-if="publicPicks[selectedNode.id]?.length" class="info-row">
                   <span class="info-label">From</span>
@@ -3202,6 +3385,27 @@ onUnmounted(() => {
             </template>
 
             <!-- BROWSE MODE: Selected Data Source Node -->
+            <template v-else-if="mode === 'browse' && selectedNode && selectedNode.type === 'data-source' && usedReferenceOf(selectedNode.id)">
+              <h4 class="sidebar-section-title">Reference data</h4>
+              <div class="info-card">
+                <div class="info-row">
+                  <span class="info-label">Reference</span>
+                  <span class="info-value">{{ usedReferenceOf(selectedNode.id).label }}</span>
+                </div>
+                <div class="info-row">
+                  <span class="info-label">Version</span>
+                  <span class="info-value">{{ usedReferenceOf(selectedNode.id).version }}</span>
+                </div>
+                <div v-if="usedReferenceOf(selectedNode.id).sizeBytes" class="info-row">
+                  <span class="info-label">Download</span>
+                  <span class="info-value">{{ formatSize(usedReferenceOf(selectedNode.id).sizeBytes) }}</span>
+                </div>
+                <div v-if="usedReferenceOf(selectedNode.id).sha256" class="info-row">
+                  <span class="info-label">Checksum</span>
+                  <span class="info-value reference-checksum" :title="usedReferenceOf(selectedNode.id).sha256">sha256 {{ usedReferenceOf(selectedNode.id).sha256.slice(0, 12) }}…</span>
+                </div>
+              </div>
+            </template>
             <template v-else-if="mode === 'browse' && selectedNode && selectedNode.type === 'data-source'">
               <h4 class="sidebar-section-title">Data Source</h4>
               <!-- Its files while the run's inputs are staged, or why it
@@ -3337,6 +3541,14 @@ onUnmounted(() => {
                 <div v-if="selectedNode.data?.datasetId" class="info-row">
                   <span class="info-label">Writes to</span>
                   <span class="info-value">{{ datasetName(selectedNode.data.datasetId, datasetOptions) }}</span>
+                </div>
+              </div>
+
+              <div v-if="usedReferencesOfStep(selectedNode.id).length" class="info-card params-card">
+                <h5 class="params-title">Reference data</h5>
+                <div v-for="r in usedReferencesOfStep(selectedNode.id)" :key="r.path" class="info-row">
+                  <span class="info-label">{{ r.path }}</span>
+                  <span class="info-value" :title="r.sha256 ? `sha256 ${r.sha256}` : undefined">{{ r.label }} · v{{ r.version }}{{ r.source ? "" : " (default)" }}</span>
                 </div>
               </div>
 
@@ -4921,6 +5133,16 @@ onUnmounted(() => {
   text-align: left;
 
   &:hover { text-decoration: underline; }
+}
+
+.reference-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+}
+.reference-checksum {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
 }
 
 .setup-select {

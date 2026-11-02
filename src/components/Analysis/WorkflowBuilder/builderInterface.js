@@ -49,7 +49,8 @@ const GENERATED_ID = /^node_\d+_[a-z0-9]+$/;
 // processors: the canvas as serialized (steps, source and target nodes).
 // nameOf(id): the input's or output's name; routedPortsOf(stepId): the
 // names of the step's routed outputs; extrasOf(id): { optional, accepts,
-// required } set in its panel.
+// required, referenceId } set in its panel (referenceId: a reference
+// source's chosen catalog reference, saved as the input's default).
 export function toInterfaceDefinition(processors, { nameOf, routedPortsOf = () => [], extrasOf = () => ({}) }) {
   const steps = processors.filter((p) => p.type !== "data-source" && p.type !== "data-target");
   const stepIds = new Set(steps.map((s) => s.id));
@@ -71,6 +72,7 @@ export function toInterfaceDefinition(processors, { nameOf, routedPortsOf = () =
         id: idFor(p),
         name: nameOf(p.id),
         ...(extrasOf(p.id).optional && { optional: true }),
+        ...(extrasOf(p.id).referenceId && { default: { kind: "reference", environmentId: extrasOf(p.id).referenceId } }),
         ...(p.position && { position: p.position }),
       });
     } else if (p.type === "data-target") {
