@@ -196,3 +196,13 @@ describe("downloadPdf", () => {
     expect(await downloadPdf("https://cdn/x.pdf", "f.pdf", notOk)).toBe("opened");
   });
 });
+
+describe("app wording", () => {
+  it("names the app's limit and errors", () => {
+    expect(limitSentence({ workflow: { used: 1, limit: 3 }, user: { used: 0, limit: 10 } }, "app")).toBe(
+      "2 more sample outputs can be generated for this app today."
+    );
+    expect(setExampleError({ status: 403 }, undefined, "app")).toMatch(/owning the app/);
+    expect(setExampleError({ status: 409, body: { message: "the run's results are still being packaged" } }, undefined, "app")).toMatch(/packaged/);
+  });
+});

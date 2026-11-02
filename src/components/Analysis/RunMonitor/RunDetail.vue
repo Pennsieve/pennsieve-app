@@ -34,8 +34,12 @@ import DatasetOptionRow from "./DatasetOptionRow.vue";
 import RunExampleAction from "./RunExampleAction.vue";
 import PublicFilesPicker from "./PublicFilesPicker.vue";
 import { picksKey } from "./publicPicks";
+import FilePlacementChoice from "./FilePlacementChoice.vue";
+import { FILE_PATHS_SELECTION, FILE_PATHS_SOURCE, filePathsOf, filePathsField, sharedNames } from "./inputFilePaths";
 import IoPill from "../WorkflowGraph/IoPill.vue";
+import { warningHeadline } from "./runDetails";
 import { withInterfaceNodes, destinationChoices, NO_DESTINATION } from "./workflowInterface";
+import { appOf, appRunLabel, appRunPayload, appStepId, setupKey } from "./appRuns";
 import { placeRunNodes, workflowLayouts } from "./runLayout";
 import { importStatusUrl, importSummary, importStillMoving, isDatasetImport } from "./runImports";
 import { nodeUnfit, rememberedSetup, rememberSetup, defaultNode, needsDataset } from "./runSetup";
@@ -133,6 +137,24 @@ const dataSourceFiles = reactive({});
 // An input takes a workspace dataset's files or public files, not both.
 const publicInputs = !!viewsServiceUrl();
 const publicPicks = reactive({});
+// Where each input's workspace files land in a step's input folder
+// (inputFilePaths.js): the inputs set to "source"; the others are as selected.
+// Public files come as a view, which keeps its own paths.
+const dataSourceFilePaths = reactive({});
+const filePathsFor = (nodeId) => dataSourceFilePaths[nodeId] || FILE_PATHS_SELECTION;
+const setFilePaths = (nodeId, choice) => {
+  if (choice === FILE_PATHS_SOURCE) dataSourceFilePaths[nodeId] = choice;
+  else delete dataSourceFilePaths[nodeId];
+};
+// The folders each chosen package is in, from the dataset's top, as the file
+// picker had them when it was chosen: for the picture of where it lands.
+const pickedPaths = reactive({});
+const placementItems = (nodeId) =>
+  (dataSourceFiles[nodeId] || []).map((f) => ({
+    name: f.content?.name || "",
+    folder: f.content?.packageType === "Collection",
+    path: pickedPaths[f.content?.id] ?? null,
+  }));
 // The file picker's side: a workspace dataset or public datasets.
 const pickerSide = ref("workspace");
 // What choosing on the picker's side would replace: the input's files from
@@ -352,6 +374,9 @@ const runWorkflowName = computed(() => {
   const activity = selectedWorkflowActivity.value;
   return activity?.workflowName || "";
 });
+
+// The app an app run ran (no workflow), or null.
+const runApp = computed(() => selectedWorkflowActivity.value?.app || null);
 
 const runName = computed(() => {
   const activity = selectedWorkflowActivity.value;
@@ -663,6 +688,8 @@ const targetSubOf = (id, data) => {
     const t = nodeConfigs[id]?.targetType;
     return t ? `to ${getTargetTypeLabel(t, targetTypes.value)}` : "";
   }
+  // A target that worked with nothing to save says so instead.
+  if (data.warning) return `⚠ ${warningHeadline(data.warning)}`;
   return importLineOf(id)?.text || targetFacts(data).join(" · ") || getTargetTypeLabel(data.targetType, targetTypes.value);
 };
 
@@ -740,6 +767,7 @@ const runToNodesAndEdges = (run) => {
       } else {
         extra.packageIds = src?.packageIds || [];
         extra.packageCount = extra.packageIds.length;
+        extra.filePaths = filePathsOf(src);
       }
     } else if (d.type === "data-target") {
       extra.targetType = d.targetType || null;
@@ -772,6 +800,7 @@ const runToNodesAndEdges = (run) => {
         completedAt: d.completedAt,
         progress: d.progress || null,
         errorMessage: d.errorMessage || "",
+        warning: d.warning || "",
         reason: d.reason || null,
         exitCode: d.exitCode ?? null,
         cpuUnits: d.cpuUnits || null,
@@ -957,9 +986,11 @@ onNodeClick(({ node }) => {
   selectedNode.value = node;
 
   if (mode.value === "configure") {
-    // In My Workspace an input takes only public files, and where there are
+    // An input without files opens the picker; one with files shows its
+    // panel (its files and where they land), where they can be changed. In
+    // My Workspace an input takes only public files, and where there are
     // none (no views-service) its panel says so instead of an empty picker.
-    if (node.type === "data-source" && (!isMyWorkspace.value || publicInputs)) {
+    if (node.type === "data-source" && !fileCountForNode(node.id) && (!isMyWorkspace.value || publicInputs)) {
       openFilePicker(node.id);
       return;
     }
@@ -987,19 +1018,30 @@ onPaneClick(() => {
 /*
   Configure mode — initiate workflow from pending config
 */
+// The app an app run ("Try this app") runs, or null for a workflow's run.
+const configApp = ref(null);
+
 const initiateWorkflowFromConfig = async (pendingConfig) => {
   const { workflowId, computeNodeId, datasetId, rerunSource: source } = pendingConfig;
-  initiateForm.value = { workflowId, computeNodeId, datasetId, name: "" };
+  configApp.value = appOf(pendingConfig) || appOf(source);
+  initiateForm.value = { workflowId: workflowId || "", computeNodeId, datasetId, name: "" };
   runNameError.value = "";
 
   try {
     // A workflow's inputs and outputs shown as the source and target nodes a
     // run of it has (workflowInterface.js); its DAG as is otherwise.
-    const definition = withInterfaceNodes(await store.dispatch("analysisModule/fetchWorkflowDefinition", workflowId));
+    // An app run's is the app's one-step workflow (appRuns.js).
+    const definition = withInterfaceNodes(
+      configApp.value
+        ? await store.dispatch("analysisModule/fetchAppRunDefinition", configApp.value)
+        : await store.dispatch("analysisModule/fetchWorkflowDefinition", workflowId)
+    );
     configDefinition.value = definition;
 
     Object.keys(dataSourceFiles).forEach((k) => delete dataSourceFiles[k]);
     Object.keys(publicPicks).forEach((k) => delete publicPicks[k]);
+    Object.keys(dataSourceFilePaths).forEach((k) => delete dataSourceFilePaths[k]);
+    Object.keys(pickedPaths).forEach((k) => delete pickedPaths[k]);
     Object.keys(sourceDatasets).forEach((k) => delete sourceDatasets[k]);
     Object.keys(leftOutInputs).forEach((k) => delete leftOutInputs[k]);
     Object.keys(nodeConfigs).forEach((k) => delete nodeConfigs[k]);
@@ -1013,9 +1055,11 @@ const initiateWorkflowFromConfig = async (pendingConfig) => {
       const srcParams = sourceParams[d.id] || {};
 
       if (d.type === "data-source") {
-        // A rerun reads from the same datasets; its files are chosen again.
+        // A rerun reads from the same datasets, and its files land where the
+        // run's did; its files are chosen again.
         const own = source?.dataSources?.[d.id]?.datasetId;
         if (own && own !== datasetId) sourceDatasets[d.id] = own;
+        setFilePaths(d.id, filePathsOf(source?.dataSources?.[d.id]));
       }
       if (d.type === "data-target") {
         // An output's destination is the run being rerun's (its target's
@@ -1110,16 +1154,24 @@ const initiateWorkflowFromConfig = async (pendingConfig) => {
   }
 };
 
-const cancelConfigure = () => {
+// Leaves configure mode: the form and its graph cleared.
+const leaveConfigure = () => {
   mode.value = "browse";
   configDefinition.value = null;
+  configApp.value = null;
   Object.keys(dataSourceFiles).forEach((k) => delete dataSourceFiles[k]);
   Object.keys(publicPicks).forEach((k) => delete publicPicks[k]);
+  Object.keys(dataSourceFilePaths).forEach((k) => delete dataSourceFilePaths[k]);
+  Object.keys(pickedPaths).forEach((k) => delete pickedPaths[k]);
   Object.keys(sourceDatasets).forEach((k) => delete sourceDatasets[k]);
   Object.keys(nodeConfigs).forEach((k) => delete nodeConfigs[k]);
   nodes.value = [];
   edges.value = [];
   selectedNode.value = null;
+};
+
+const cancelConfigure = () => {
+  leaveConfigure();
   router.push(scopedRoute("runs"));
 };
 
@@ -1238,7 +1290,11 @@ const executeWorkflow = async () => {
     Object.entries(dataSourceFiles).forEach(([nodeId, files]) => {
       const ids = files.map((f) => f.content?.id).filter(Boolean);
       const own = sourceDatasetOf(nodeId);
-      dataSources[nodeId] = own && own !== runDatasetId.value ? { packageIds: ids, datasetId: own } : { packageIds: ids };
+      dataSources[nodeId] = {
+        packageIds: ids,
+        ...(own && own !== runDatasetId.value ? { datasetId: own } : {}),
+        ...filePathsField(filePathsFor(nodeId)),
+      };
     });
     // Public files: one view per input, kept for the run.
     const views = await publicInputViews(dag);
@@ -1297,11 +1353,24 @@ const executeWorkflow = async () => {
       ...(Object.keys(processorParams).length > 0 && { processorParams }),
     };
 
-    await store.dispatch("analysisModule/createRun", payload);
-    rememberSetup(route.params.orgId || "", initiateForm.value.workflowId, { ...initiateForm.value, datasetId: runDatasetId.value });
-    EventBus.$emit("toast", { detail: { type: "success", msg: "Workflow executed successfully." } });
-
-    router.push(scopedRoute("runs"));
+    const app = configApp.value;
+    const sent = app ? appRunPayload(payload, app, appStepId(configDefinition.value)) : payload;
+    const created = await store.dispatch("analysisModule/createRun", sent);
+    rememberSetup(route.params.orgId || "", setupKey({ workflowId: initiateForm.value.workflowId, app }), {
+      ...initiateForm.value,
+      datasetId: runDatasetId.value,
+    });
+    // The new run's page, where it's followed live (and an app run's results
+    // arrive); the runs list if the response named no run.
+    const msg = app
+      ? `${appRunLabel(app)} is running. Its results appear here when it finishes.`
+      : "The run has started.";
+    EventBus.$emit("toast", { detail: { type: "success", msg } });
+    if (created?.executionRunId) {
+      router.push(scopedRoute("run-detail", { runId: created.executionRunId }));
+    } else {
+      router.push(scopedRoute("runs"));
+    }
   } catch (err) {
     console.error("Failed to execute workflow:", err);
     const msg = err?.message || "Failed to execute workflow.";
@@ -1446,6 +1515,12 @@ const onFileSelect = (selectedFiles, parentId) => {
 
   // Update the store so navigating folders preserves selections
   store.commit("analysisModule/SET_SELECTED_FILES", { selectedFiles, parentId: parentId || "root" });
+  const at = [...filePickerAncestorList.value, filePickerCurrentFile.value]
+    .map((a) => a?.content?.name)
+    .filter(Boolean);
+  for (const f of selectedFiles) {
+    if (f.content?.id) pickedPaths[f.content.id] = at;
+  }
 
   // Rebuild dataSourceFiles from the full store state
   const allFiles = [];
@@ -1942,6 +2017,8 @@ const rerunFromRun = async () => {
   if (!activity) return;
   store.commit("analysisModule/SET_PENDING_RUN_CONFIG", {
     workflowId: activity.workflowUuid || "",
+    // An app run runs its app again.
+    ...(appOf(activity) && { app: appOf(activity) }),
     computeNodeId: activity.computeNodeUuid || "",
     datasetId: activity.datasetId || "",
     rerunSource: activity,
@@ -2021,7 +2098,10 @@ const ensureDatasetOption = async (datasetId) => {
 };
 
 function applySetupDefaults(definition) {
-  const remembered = rememberedSetup(route.params.orgId || "", definition?.uuid || initiateForm.value.workflowId);
+  const remembered = rememberedSetup(
+    route.params.orgId || "",
+    configApp.value ? setupKey({ app: configApp.value }) : definition?.uuid || initiateForm.value.workflowId
+  );
   if (!initiateForm.value.computeNodeId) {
     initiateForm.value.computeNodeId = defaultNode("", remembered.computeNodeId, computeNodes.value, (n) => unfitReasons(n).length === 0);
   }
@@ -2222,6 +2302,18 @@ onMounted(async () => {
 
 });
 
+// Another run on the same page (the router reuses it, e.g. configure → the
+// run just started, or one run → another): show that run, live.
+watch(
+  () => props.runId,
+  async (runId, before) => {
+    if (!runId || runId === before) return;
+    if (mode.value === "configure") leaveConfigure();
+    await loadRun(runId);
+    scheduleRunPoll();
+  }
+);
+
 // Handle same-component navigation (e.g. run-detail → run-configure)
 watch(
   () => route.name,
@@ -2268,7 +2360,7 @@ onUnmounted(() => {
             :disabled="isExecuting"
             @click="executeWorkflow"
           >
-            {{ isExecuting ? 'Executing...' : 'Execute Workflow' }}
+            {{ isExecuting ? 'Executing...' : configApp ? 'Run app' : 'Execute Workflow' }}
           </bf-button>
         </div>
       </template>
@@ -2978,7 +3070,10 @@ onUnmounted(() => {
                 {{ canLeaveOut(selectedNode.id) ? "Leave this input out, or run the workflow from a workspace." : "Run this workflow from a workspace." }}
               </p>
               <template v-else>
-              <h4 class="sidebar-section-title">Source Files</h4>
+              <div class="section-title-row">
+                <h4 class="sidebar-section-title">Source Files</h4>
+                <button class="text-link-btn" @click="openFilePicker(selectedNode.id)">{{ fileCountForNode(selectedNode.id) > 0 ? 'Change files' : 'Select files' }}</button>
+              </div>
               <p v-if="mismatchLine(selectedNode.id)" class="files-mismatch">
                 ⚠ {{ mismatchLine(selectedNode.id) }}: {{ hintLine(sourceHints(selectedNode.id, configDefinition?.dag || [], portsOfStep(configDefinition?.dag || [], availableApplications))) }}.
               </p>
@@ -3013,9 +3108,27 @@ onUnmounted(() => {
               <div v-else class="selected-files-empty">
                 No files selected yet.
               </div>
-              <div class="info-actions">
-                <button class="text-link-btn" @click="openFilePicker(selectedNode.id)">{{ fileCountForNode(selectedNode.id) > 0 ? 'Change files' : 'Select files' }}</button>
-              </div>
+              <template v-if="!publicPicks[selectedNode.id]?.length">
+                <h4 class="sidebar-section-title">Where the files land</h4>
+                <FilePlacementChoice
+                  :model-value="filePathsFor(selectedNode.id)"
+                  :items="placementItems(selectedNode.id)"
+                  @update:model-value="setFilePaths(selectedNode.id, $event)"
+                />
+                <p
+                  v-if="filePathsFor(selectedNode.id) === FILE_PATHS_SELECTION && sharedNames(dataSourceFiles[selectedNode.id]).length"
+                  class="files-mismatch"
+                  role="alert"
+                >
+                  ⚠ More than one selected item is named {{ sharedNames(dataSourceFiles[selectedNode.id]).join(", ") }}:
+                  as selected they'd land on the same path. Choose <strong>As in the source</strong>, or select the folder that holds them.
+                </p>
+                <p v-else class="configure-hint">
+                  {{ filePathsFor(selectedNode.id) === FILE_PATHS_SOURCE
+                    ? "Each file keeps the folders it's in at the source, from the top."
+                    : "Each selected file goes at the top of the step's input folder; a selected folder goes there with what's in it." }}
+                </p>
+              </template>
               </template>
             </template>
 
@@ -3041,12 +3154,20 @@ onUnmounted(() => {
                     Up to {{ RUN_NAME_MAX_LENGTH }} characters — letters, numbers, spaces, hyphens, underscores, periods.
                   </span>
                 </div>
-                <div class="info-row">
+                <div v-if="configApp" class="info-row">
+                  <span class="info-label">App</span>
+                  <span class="info-value">{{ appRunLabel(configApp) }}</span>
+                </div>
+                <div v-else class="info-row">
                   <span class="info-label">Workflow</span>
                   <span class="info-value">{{ configDefinition?.name || 'N/A' }}</span>
                 </div>
+                <p v-if="configApp" class="app-run-note">
+                  A one-off run of the app on the files you pick. Everything it writes comes back as a zip to
+                  download, here and on your Downloads page, for 3 days. Nothing is saved to a dataset.
+                </p>
                 <p v-if="needsDatasetHere" class="run-name-error">
-                  This workflow reads from or writes to a dataset, so it runs in a workspace, not in My Workspace.
+                  This {{ configApp ? "run" : "workflow" }} reads from or writes to a dataset, so it runs in a workspace, not in My Workspace.
                 </p>
                 <div class="info-row info-row-stacked">
                   <label class="info-label" for="setup-node">Compute node</label>
@@ -3149,6 +3270,10 @@ onUnmounted(() => {
                   <span class="info-label">Files</span>
                   <span class="info-value">{{ selectedNode.data?.packageCount || 0 }} file{{ selectedNode.data?.packageCount !== 1 ? 's' : '' }}</span>
                 </div>
+                <div class="info-row">
+                  <span class="info-label">Placed</span>
+                  <span class="info-value">{{ selectedNode.data?.filePaths === FILE_PATHS_SOURCE ? "As in the source" : "As selected" }}</span>
+                </div>
               </div>
               <h4 class="sidebar-section-title">Source Files</h4>
               <div v-if="selectedNode.data?.packageIds?.length > 0" class="selected-files-list">
@@ -3184,6 +3309,10 @@ onUnmounted(() => {
                 <div v-if="failureSummary(selectedNode.data)" class="info-row node-failure">
                   <span class="info-label">Why</span>
                   <span class="info-value">{{ failureSummary(selectedNode.data) }}</span>
+                </div>
+                <div v-if="selectedNode.data?.warning" class="info-row node-warning">
+                  <span class="info-label">Note</span>
+                  <span class="info-value">{{ selectedNode.data.warning }}</span>
                 </div>
                 <div v-if="selectedNode.data?.cpuUnits && selectedNode.data?.memoryMiB" class="info-row">
                   <span class="info-label">Ran with</span>
@@ -3291,6 +3420,20 @@ onUnmounted(() => {
                       {{ runWorkflowName }}
                     </router-link>
                     <span v-else class="truncate-text" :title="runWorkflowName">{{ runWorkflowName }}</span>
+                  </span>
+                </div>
+                <div v-if="runApp" class="info-row">
+                  <span class="info-label">App</span>
+                  <span class="info-value truncate-value">
+                    <router-link
+                      v-if="runApp.applicationId"
+                      :to="scopedRoute('application-detail', { uuid: runApp.applicationId })"
+                      :title="appRunLabel(runApp)"
+                      class="truncate-text"
+                    >
+                      {{ appRunLabel(runApp) }}
+                    </router-link>
+                    <span v-else class="truncate-text" :title="appRunLabel(runApp)">{{ appRunLabel(runApp) }}</span>
                   </span>
                 </div>
                 <div v-if="selectedWorkflowActivity.datasetId" class="info-row">
@@ -4554,6 +4697,11 @@ onUnmounted(() => {
 }
 
 /* Chosen files a source's inputs don't take, in its panel. */
+// A step that worked, with something to know (its warning).
+.node-warning .info-value {
+  color: #92400e;
+}
+
 .files-mismatch {
   margin: 0 0 8px;
   padding: 8px 10px;
@@ -5049,6 +5197,23 @@ onUnmounted(() => {
 }
 
 /* Info actions */
+// A section's heading with its action on the right.
+.section-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 10px 0 6px;
+
+  .sidebar-section-title {
+    margin: 0;
+  }
+  .text-link-btn {
+    padding: 0;
+    font-size: 12px;
+  }
+}
+
 .info-actions {
   display: flex;
   align-items: center;
@@ -5465,5 +5630,12 @@ onUnmounted(() => {
   margin: 0 0 8px;
   font-size: 13px;
   color: #6b7280;
+}
+
+.app-run-note {
+  margin: 4px 0 8px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: theme.$gray_5;
 }
 </style>

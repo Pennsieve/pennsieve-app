@@ -65,3 +65,13 @@ export function clearRunCosts() {
   runs.clear();
   pending.clear();
 }
+
+// A step's warning (it worked, with something to know), short enough for an
+// output's second line on the graph: the part before its colon, as in
+// "Nothing to import: the steps before this target produced no files.".
+export function warningHeadline(warning) {
+  const w = (warning || "").trim();
+  if (!w) return "";
+  const head = w.split(":")[0].trim();
+  return head.length <= 40 ? head : `${head.slice(0, 39)}…`;
+}

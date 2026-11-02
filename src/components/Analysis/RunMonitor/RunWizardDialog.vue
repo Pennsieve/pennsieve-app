@@ -6,6 +6,7 @@
   settings are all chosen on the run's configure page, which every Run goes
   to: open(workflowId) and rerun(run) go there at once, without the dialog.
 */
+import { appOf } from "./appRuns";
 import { computed, ref } from "vue";
 import { useStore } from "vuex";
 import { useRoute, useRouter } from "vue-router";
@@ -65,10 +66,12 @@ const loadLabels = () => {
   if (!targetTypes.value.length) store.dispatch("analysisModule/fetchTargetTypes").catch(() => {});
 };
 
-// The run's configure page, for a workflow (and a rerun's choices).
+// The run's configure page, for a workflow or an app run's app (and a
+// rerun's choices).
 const configure = (setup) => {
   store.commit("analysisModule/SET_PENDING_RUN_CONFIG", {
-    workflowId: setup.workflowId,
+    workflowId: setup.workflowId || "",
+    ...(setup.app && { app: setup.app }),
     computeNodeId: setup.computeNodeId || "",
     datasetId: setup.datasetId || "",
     rerunSource: setup.rerunSource || null,
@@ -96,7 +99,14 @@ const rerun = async (run) => {
   } catch {
     // the run as listed
   }
-  configure({ workflowId: run.workflowUuid, computeNodeId: run.computeNodeUuid, datasetId: run.datasetId, rerunSource: source });
+  configure({
+    workflowId: run.workflowUuid,
+    // An app run runs its app again.
+    app: appOf(run) || appOf(source),
+    computeNodeId: run.computeNodeUuid,
+    datasetId: run.datasetId,
+    rerunSource: source,
+  });
 };
 
 defineExpose({ open, rerun });
