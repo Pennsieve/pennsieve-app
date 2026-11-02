@@ -18,6 +18,10 @@ import {
   defaultIdentity,
   choiceLabel,
   createReferenceCatalog,
+  inputTakes,
+  appsUsing,
+  referenceSnippet,
+  assetClassName,
 } from "./referenceSources";
 import { ref } from "vue";
 
@@ -208,5 +212,73 @@ describe("choices and the catalog cache", () => {
     await flaky.ensureLoaded([index]);
     await flaky.ensureLoaded([index]);
     expect(calls).toBe(3);
+  });
+});
+
+describe("the reference data page", () => {
+  const mni = {
+    id: "mni",
+    kind: "template",
+    version: {
+      version: 1,
+      spec: {
+        assetClass: "brain-template",
+        title: "MNI152NLin2009cAsym, 1 mm, brain",
+        properties: { space: "MNI152NLin2009cAsym", resolution: "1", desc: "brain" },
+      },
+      source: { description: "TemplateFlow", files: [{ path: "t1w.nii.gz", url: "https://x/t1w.nii.gz", sha256: "97" }] },
+    },
+  };
+  const template = { kind: "template", assetClass: "brain-template", choice: "app", properties: { space: "MNI152NLin2009cAsym", resolution: "1" } };
+  const app = (name, inputs) => ({ name, manifest: { inputs } });
+  const manifestOf = (a) => a.manifest;
+
+  it("matches inputs by kind, asset class, properties and organisms", () => {
+    expect(inputTakes(template, mni)).toBe(true);
+    expect(inputTakes({ ...template, properties: { resolution: "2" } }, mni)).toBe(false);
+    expect(inputTakes({ ...template, kind: "genome" }, mni)).toBe(false);
+    expect(inputTakes(index, human)).toBe(true);
+    expect(inputTakes(index, zebrafish)).toBe(false);
+    expect(inputTakes(index, mni)).toBe(false);
+    expect(inputTakes(undefined, mni)).toBe(false);
+  });
+
+  it("lists the apps that use an entry", () => {
+    const apps = [
+      app("ants-mni", [{ name: "image" }, { name: "template", reference: template }]),
+      app("quant", [{ name: "index", reference: index }]),
+      app("plain", [{ name: "data" }]),
+      { name: "no manifest" },
+    ];
+    expect(appsUsing(mni, apps, manifestOf).map((u) => [u.app.name, u.input, u.pinned])).toEqual([["ants-mni", "template", true]]);
+    expect(appsUsing(mouse, apps, manifestOf).map((u) => [u.app.name, u.input, u.pinned])).toEqual([["quant", "index", false]]);
+  });
+
+  it("writes the app.yml input that pins an entry", () => {
+    expect(referenceSnippet(mni)).toBe(
+      [
+        "- name: reference",
+        '  description: "MNI152NLin2009cAsym, 1 mm, brain"',
+        "  placement: subfolder",
+        "  reference:",
+        "    kind: template",
+        "    assetClass: brain-template",
+        "    choice: app",
+        '    properties: {space: "MNI152NLin2009cAsym", resolution: "1", desc: "brain"}',
+      ].join("\n")
+    );
+    const genome = referenceSnippet({ ...human, kind: "genome" });
+    expect(genome).toContain('toolVersion: ">=2 <3"');
+    expect(genome).toContain("taxonomyId: 9606");
+    expect(genome).toContain('annotation: {provider: "GENCODE", version: "50"}');
+    // A pinned snippet matches the entry it came from.
+    expect(inputTakes({ kind: "template", assetClass: "brain-template", choice: "app", properties: mni.version.spec.properties }, mni)).toBe(true);
+  });
+
+  it("names asset classes and shows sources", () => {
+    expect(assetClassName("brain-template")).toBe("Brain templates");
+    expect(assetClassName("bowtie2-index")).toBe("bowtie2-index");
+    expect(referenceDetails(mni).source.files[0].path).toBe("t1w.nii.gz");
+    expect(referenceDetails(human).source).toEqual({ description: "", files: [] });
   });
 });
