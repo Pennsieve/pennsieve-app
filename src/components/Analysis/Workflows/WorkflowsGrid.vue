@@ -19,8 +19,9 @@ import IconPennsieveMark from "../../icons/IconPennsieveMark.vue";
 import IconPDF from "../../icons/IconPDF.vue";
 import WorkflowThumbnail from "../WorkflowGraph/WorkflowThumbnail.vue";
 import RunWizardDialog from "../RunMonitor/RunWizardDialog.vue";
-import { ioSummary, appNames, usageLine, cardText } from "./workflowSummary";
-import { applyFilters, fieldOptions, libraryWorkflows, outputOptions, sortWorkflows, SORTS } from "./galleryFilter";
+import { ioSummary, usageLine, cardText } from "./workflowSummary";
+import { domainColors, domainOfTag } from "../Applications/appDomains";
+import { applyFilters, domainOptions, fieldOptions, libraryWorkflows, outputOptions, sortWorkflows, SORTS } from "./galleryFilter";
 import { isNotebookWorkflow } from "../RunMonitor/notebookHelpers";
 import { exampleLabel, exampleVersion, PDF_URL_FRESH_MS } from "./runExamples";
 import SampleOutputViewer from "./SampleOutputViewer.vue";
@@ -46,6 +47,7 @@ const statusFilter = ref("active");
 const scopeFilter = ref("workspace"); // "workspace" | "public" | "pennsieve" (public, official only)
 const inputFilter = ref("any"); // "any" | "dataset" | "none"
 const outputFilter = ref("any"); // "any" | a target type
+const domainFilter = ref("any"); // "any" | a domain's key
 const fieldFilter = ref("any"); // "any" | a research field's key
 
 // The sort is the viewer's, kept in this browser.
@@ -96,17 +98,36 @@ const scopeOptions = computed(() => [
 const isPublicScope = computed(() => scopeFilter.value !== "workspace");
 
 const outputChoices = computed(() => outputOptions(workflows.value, targetTypes.value));
-// The research fields the workflows' apps serve, as chips, as on the Apps tab.
+// What the workflows are for (their tags' domains, and their apps'), as
+// coloured chips, and the research fields their apps serve, as on the Apps tab.
+const domainChips = computed(() => domainOptions(libraryWorkflows(workflows.value), applications.value));
+const chipStyle = (domain) => {
+  const c = domainColors(domain);
+  return { "--chip-bg": c.bg, "--chip-ink": c.ink, "--chip-line": c.line, "--chip-dot": c.accent };
+};
+const toggleDomain = (key) => (domainFilter.value = domainFilter.value === key ? "any" : key);
 const fieldChips = computed(() => fieldOptions(libraryWorkflows(workflows.value), applications.value));
 const toggleField = (key) => (fieldFilter.value = fieldFilter.value === key ? "any" : key);
+// A card's tag in its domain's colours; neutral without one.
+const tagStyle = (tag) => {
+  const d = domainOfTag(tag);
+  if (!d) return {};
+  const c = domainColors(d);
+  return { background: c.bg, borderColor: c.line, color: c.ink };
+};
 const filtersSet = computed(
   () =>
-    !!searchQuery.value.trim() || inputFilter.value !== "any" || outputFilter.value !== "any" || fieldFilter.value !== "any"
+    !!searchQuery.value.trim() ||
+    inputFilter.value !== "any" ||
+    outputFilter.value !== "any" ||
+    domainFilter.value !== "any" ||
+    fieldFilter.value !== "any"
 );
 function clearFilters() {
   searchQuery.value = "";
   inputFilter.value = "any";
   outputFilter.value = "any";
+  domainFilter.value = "any";
   fieldFilter.value = "any";
 }
 
@@ -116,6 +137,7 @@ const filteredWorkflows = computed(() =>
       query: searchQuery.value,
       input: inputFilter.value,
       output: outputFilter.value,
+      domain: domainFilter.value,
       field: fieldFilter.value,
       officialOnly: scopeFilter.value === "pennsieve",
       applications: applications.value,
@@ -386,6 +408,24 @@ onMounted(async () => {
         </el-select>
       </div>
 
+      <div v-if="domainChips.length" class="domain-row" role="group" aria-label="What workflows are for">
+        <button
+          v-for="{ domain, count } in domainChips"
+          :key="domain.key"
+          type="button"
+          class="domain-chip"
+          :class="{ active: domainFilter === domain.key }"
+          :style="chipStyle(domain)"
+          :aria-pressed="domainFilter === domain.key"
+          :title="domain.subject ? `About ${domain.label.toLowerCase()}` : `For ${domain.label.toLowerCase()}`"
+          @click="toggleDomain(domain.key)"
+        >
+          <span class="domain-dot" />
+          {{ domain.label }}
+          <span class="domain-count">{{ count }}</span>
+        </button>
+      </div>
+
       <div v-if="fieldChips.length" class="field-row" role="group" aria-label="Research field">
         <span class="field-label">Field</span>
         <button
@@ -443,14 +483,11 @@ onMounted(async () => {
             </div>
             <p class="wf-description">{{ cardText(wf) || "No description." }}</p>
             <div class="wf-io">{{ ioSummary(wf, targetTypes) }}</div>
-            <div v-if="appNames(wf, applications).length" class="wf-apps">
-              <span v-for="name in appNames(wf, applications).slice(0, 3)" :key="name" class="wf-app">{{ name }}</span>
-              <span v-if="appNames(wf, applications).length > 3" class="wf-app wf-app--more">
-                +{{ appNames(wf, applications).length - 3 }}
-              </span>
-            </div>
+            <!-- Its tags, a few, in their domains' colours; the steps are
+                 found by search and seen on the card's graph. -->
             <div v-if="wf.tags?.length" class="wf-tags">
-              <span v-for="t in wf.tags.slice(0, 4)" :key="t" class="wf-tag">{{ t }}</span>
+              <span v-for="t in wf.tags.slice(0, 4)" :key="t" class="wf-tag" :style="tagStyle(t)">{{ t }}</span>
+              <span v-if="wf.tags.length > 4" class="wf-tag">+{{ wf.tags.length - 4 }}</span>
             </div>
             <div class="wf-foot">
               <span class="wf-usage">
@@ -683,6 +720,45 @@ onMounted(async () => {
   border-right: 1px solid theme.$gray_2;
 }
 
+/* What the workflows are for, in their domains' colours, as on the Apps tab. */
+.domain-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: -4px 0 12px;
+}
+.domain-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border: 1px solid var(--chip-line);
+  border-radius: 3px;
+  background: theme.$white;
+  font: inherit;
+  font-size: 12px;
+  color: var(--chip-ink);
+  cursor: pointer;
+
+  &:hover {
+    background: var(--chip-bg);
+  }
+  &.active {
+    border-color: var(--chip-ink);
+    background: var(--chip-bg);
+    font-weight: 600;
+  }
+}
+.domain-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--chip-dot);
+}
+.domain-count {
+  color: theme.$gray_4;
+  font-weight: 400;
+}
 /* The research fields, outlined and grey as on the Apps tab. */
 .field-row {
   display: flex;
@@ -852,30 +928,8 @@ $card-height: 172px;
   color: theme.$gray_6;
 }
 /* One line: the first apps, then +n. */
-.wf-apps {
-  display: flex;
-  gap: 4px;
-  overflow: hidden;
-}
-.wf-app {
-  flex-shrink: 0;
-  max-width: 160px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  padding: 1px 7px;
-  border-radius: 3px;
-  background: rgba(224, 145, 42, 0.12);
-  color: #9a5c0f;
-  font-size: 11px;
-  font-weight: 500;
-}
-.wf-app--more {
-  background: theme.$gray_0;
-  color: theme.$gray_5;
-}
-/* The workflow's own tags, a few, as on an app's card: the rest are found
-   by search. */
+/* The workflow's tags, a few, in their domains' colours (grey without one);
+   the rest are found by search. */
 .wf-tags {
   display: flex;
   gap: 4px;
@@ -884,6 +938,7 @@ $card-height: 172px;
 .wf-tag {
   flex-shrink: 0;
   padding: 0 6px;
+  border: 1px solid transparent;
   border-radius: 3px;
   background: theme.$gray_0;
   font-size: 11px;

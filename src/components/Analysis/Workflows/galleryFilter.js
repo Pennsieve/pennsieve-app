@@ -5,7 +5,7 @@ import { normalizeUrl } from "../RunMonitor/runHelpers";
 import { versionManifest } from "../WorkflowBuilder/appManifestInfo";
 import { isNotebookWorkflow } from "../RunMonitor/notebookHelpers";
 import { interfaceDag } from "../RunMonitor/workflowInterface";
-import { fieldsOf } from "../Applications/appDomains";
+import { fieldsOf, domainOfTag, appDomain } from "../Applications/appDomains";
 
 // Whether a workflow matches a search: its name, description, tags, the
 // apps it runs, or what goes in and comes out ("spike" finds the one running
@@ -51,6 +51,25 @@ export function workflowFields(wf, applications = []) {
   return [...new Set([...fieldsOf(wf), ...stepApps(wf, applications).flatMap((app) => fieldsOf(versionManifest(app)))])];
 }
 
+// The domains a workflow is for (what it handles: imaging, visualization…,
+// appDomains.js): those its own tags name, then its steps' apps' (an app's
+// is the first its tags name), in step order.
+export function workflowDomains(wf, applications = []) {
+  const own = (wf?.tags || []).map(domainOfTag).filter(Boolean);
+  const apps = stepApps(wf, applications).map((app) => appDomain(app)).filter(Boolean);
+  return [...new Set([...own, ...apps])];
+}
+
+// The domain chips for a list: each domain some workflow is for, with how
+// many workflows; subjects first, then the most common.
+export function domainOptions(list, applications = []) {
+  const counts = new Map();
+  for (const wf of list || []) for (const d of workflowDomains(wf, applications)) counts.set(d, (counts.get(d) || 0) + 1);
+  return [...counts]
+    .map(([domain, count]) => ({ domain, count }))
+    .sort((a, b) => Number(!!b.domain.subject) - Number(!!a.domain.subject) || b.count - a.count || a.domain.label.localeCompare(b.domain.label));
+}
+
 // The field chips for a list: each field some workflow serves, with how
 // many workflows, most common first.
 export function fieldOptions(list, applications = []) {
@@ -61,13 +80,15 @@ export function fieldOptions(list, applications = []) {
     .sort((a, b) => b.count - a.count || a.field.label.localeCompare(b.field.label));
 }
 
-// officialOnly keeps Pennsieve's; field is a research field's key.
-export function applyFilters(list, { query, input = "any", output = "any", field = "any", officialOnly = false, ...context } = {}) {
+// officialOnly keeps Pennsieve's; domain is a domain's key, field a research
+// field's.
+export function applyFilters(list, { query, input = "any", output = "any", domain = "any", field = "any", officialOnly = false, ...context } = {}) {
   return list.filter(
     (wf) =>
       (!officialOnly || wf.official) &&
       (input === "any" || inputKind(wf) === input) &&
       (output === "any" || outputTypes(wf).includes(output)) &&
+      (domain === "any" || workflowDomains(wf, context.applications).some((d) => d.key === domain)) &&
       (field === "any" || workflowFields(wf, context.applications).some((f) => f.key === field)) &&
       matchesSearch(wf, query, context)
   );

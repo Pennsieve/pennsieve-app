@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { applyFilters, fieldOptions, libraryWorkflows, workflowFields, matchesSearch, outputOptions, sortWorkflows, workflowsView } from "./galleryFilter";
+import { applyFilters, domainOptions, fieldOptions, libraryWorkflows, workflowDomains, workflowFields, matchesSearch, outputOptions, sortWorkflows, workflowsView } from "./galleryFilter";
 
 const spikes = {
   name: "EEG spikes",
@@ -111,6 +111,36 @@ describe("research fields", () => {
     expect(applyFilters(all, { field: "neuroscience", input: "dataset", applications })).toEqual([spikes]);
     expect(applyFilters(all, { field: "neuroscience", input: "none", applications })).toEqual([]);
     expect(applyFilters(all, { field: "any", applications })).toEqual(all);
+  });
+});
+
+describe("domains", () => {
+  const app = (url, tags) => ({ sourceUrl: url, versions: [{ version: "v1", createdAt: "2026-01-01", manifest: { tags } }] });
+  const applications = [
+    app("https://github.com/org/spike-detect", ["electrophysiology", "epilepsy"]),
+    app("https://github.com/org/tumour-map", ["imaging", "visualization"]),
+  ];
+  const step = (url) => ({ id: url, type: "processor", sourceUrl: url });
+  const tumours = { name: "Tumours", tags: ["Visualization"], dag: [step("https://github.com/org/tumour-map")] };
+
+  it("are the workflow's own tags' domains, then its apps'", () => {
+    expect(workflowDomains(tumours, applications).map((d) => d.key)).toEqual(["viz", "imaging"]);
+    expect(workflowDomains(spikes, applications).map((d) => d.key)).toEqual(["ephys"]);
+    expect(workflowDomains(zipper, applications)).toEqual([]);
+  });
+
+  it("offers the domains the list has, subjects first", () => {
+    expect(domainOptions([spikes, zipper, tumours], applications).map((o) => [o.domain.key, o.count])).toEqual([
+      ["ephys", 1],
+      ["imaging", 1],
+      ["viz", 1],
+    ]);
+  });
+
+  it("filters by domain, with the other filters", () => {
+    expect(applyFilters([spikes, zipper, tumours], { domain: "imaging", applications })).toEqual([tumours]);
+    expect(applyFilters([spikes, zipper, tumours], { domain: "ephys", input: "none", applications })).toEqual([]);
+    expect(applyFilters([spikes, zipper, tumours], { domain: "any", applications })).toEqual([spikes, zipper, tumours]);
   });
 });
 
