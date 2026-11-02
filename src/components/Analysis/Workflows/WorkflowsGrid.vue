@@ -21,7 +21,7 @@ import WorkflowThumbnail from "../WorkflowGraph/WorkflowThumbnail.vue";
 import RunWizardDialog from "../RunMonitor/RunWizardDialog.vue";
 import { ioSummary, usageLine, cardText } from "./workflowSummary";
 import { domainColors, domainOfTag } from "../Applications/appDomains";
-import { applyFilters, domainOptions, fieldOptions, libraryWorkflows, outputOptions, sortWorkflows, SORTS } from "./galleryFilter";
+import { applyFilters, domainOptions, fieldOptions, inheritedTags, libraryWorkflows, outputOptions, sortWorkflows, SORTS } from "./galleryFilter";
 import { isNotebookWorkflow } from "../RunMonitor/notebookHelpers";
 import { exampleLabel, exampleVersion, PDF_URL_FRESH_MS } from "./runExamples";
 import SampleOutputViewer from "./SampleOutputViewer.vue";
@@ -108,12 +108,13 @@ const chipStyle = (domain) => {
 const toggleDomain = (key) => (domainFilter.value = domainFilter.value === key ? "any" : key);
 const fieldChips = computed(() => fieldOptions(libraryWorkflows(workflows.value), applications.value));
 const toggleField = (key) => (fieldFilter.value = fieldFilter.value === key ? "any" : key);
-// A card's tag in its domain's colours; neutral without one.
-const tagStyle = (tag) => {
+// A card's tag in its domain's colours (an inherited one outlined, not
+// filled); neutral without a domain.
+const tagStyle = (tag, inherited = false) => {
   const d = domainOfTag(tag);
   if (!d) return {};
   const c = domainColors(d);
-  return { background: c.bg, borderColor: c.line, color: c.ink };
+  return inherited ? { borderColor: c.line, color: c.ink } : { background: c.bg, borderColor: c.line, color: c.ink };
 };
 const filtersSet = computed(
   () =>
@@ -484,10 +485,21 @@ onMounted(async () => {
             <p class="wf-description">{{ cardText(wf) || "No description." }}</p>
             <div class="wf-io">{{ ioSummary(wf, targetTypes) }}</div>
             <!-- Its tags, a few, in their domains' colours; the steps are
-                 found by search and seen on the card's graph. -->
+                 found by search and seen on the card's graph. Without tags
+                 of its own, what its apps are for, dashed: why a chip
+                 filter finds it, and that it can be given its own. -->
             <div v-if="wf.tags?.length" class="wf-tags">
               <span v-for="t in wf.tags.slice(0, 4)" :key="t" class="wf-tag" :style="tagStyle(t)">{{ t }}</span>
               <span v-if="wf.tags.length > 4" class="wf-tag">+{{ wf.tags.length - 4 }}</span>
+            </div>
+            <div v-else-if="inheritedTags(wf, applications).length" class="wf-tags">
+              <span
+                v-for="t in inheritedTags(wf, applications).slice(0, 4)"
+                :key="t"
+                class="wf-tag wf-tag--inherited"
+                :style="tagStyle(t, true)"
+                title="From its apps. Edit the workflow to give it tags of its own."
+              >{{ t }}</span>
             </div>
             <div class="wf-foot">
               <span class="wf-usage">
@@ -943,6 +955,12 @@ $card-height: 172px;
   background: theme.$gray_0;
   font-size: 11px;
   color: theme.$gray_5;
+}
+/* Inherited from the apps: outlined, not filled, in the same colours. */
+.wf-tag--inherited {
+  border-style: dashed;
+  border-color: theme.$gray_3;
+  background: transparent;
 }
 .wf-foot {
   display: flex;

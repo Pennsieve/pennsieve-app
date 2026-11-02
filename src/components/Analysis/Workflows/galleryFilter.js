@@ -73,6 +73,14 @@ export function domainOptions(list, applications = []) {
     .sort((a, b) => Number(!!b.domain.subject) - Number(!!a.domain.subject) || b.count - a.count || a.domain.label.localeCompare(b.domain.label));
 }
 
+// What an untagged workflow's card shows in place of tags: the tags its apps'
+// domains and fields go by ("imaging", "neuroscience"), so a card says why a
+// chip filter matched it. Empty for a tagged workflow (its own tags show).
+export function inheritedTags(wf, applications = []) {
+  if (tagged(wf)) return [];
+  return [...new Set([...workflowDomains(wf, applications).map((d) => d.tag), ...workflowFields(wf, applications).map((f) => f.tag)])];
+}
+
 // The field chips for a list: each field some workflow serves, with how
 // many workflows, most common first.
 export function fieldOptions(list, applications = []) {

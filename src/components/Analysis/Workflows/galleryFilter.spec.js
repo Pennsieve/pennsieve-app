@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { applyFilters, domainOptions, fieldOptions, libraryWorkflows, workflowDomains, workflowFields, matchesSearch, outputOptions, sortWorkflows, workflowsView } from "./galleryFilter";
+import { applyFilters, domainOptions, fieldOptions, inheritedTags, libraryWorkflows, workflowDomains, workflowFields, matchesSearch, outputOptions, sortWorkflows, workflowsView } from "./galleryFilter";
 
 const spikes = {
   name: "EEG spikes",
@@ -141,6 +141,14 @@ describe("domains", () => {
       ["ephys", 1],
       ["viz", 1],
     ]);
+  });
+
+  it("shows an untagged workflow its apps' domains and fields as tags", () => {
+    expect(inheritedTags({ ...tumours, tags: [] }, applications)).toEqual(["imaging"]);
+    expect(inheritedTags(spikes, applications)).toEqual(["electrophysiology", "neuroscience"]);
+    expect(inheritedTags(zipper, applications)).toEqual([]);
+    // A tagged workflow shows its own.
+    expect(inheritedTags(tumours, applications)).toEqual([]);
   });
 
   it("filters by domain, with the other filters", () => {
