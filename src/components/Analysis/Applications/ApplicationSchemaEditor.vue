@@ -260,7 +260,7 @@
 
               <!-- Reference data: a catalog entry, not files -->
               <div v-if="portMode(port) === 'reference'" class="field-row full-width">
-                <label class="field-label">Reference</label>
+                <label class="field-label">Default reference</label>
                 <div class="field-control">
                   <p v-if="referenceCatalogState === 'failed'" class="field-error">The reference catalog couldn't be loaded.</p>
                   <p v-else-if="!hasReferenceCatalog" class="field-static">
@@ -284,36 +284,15 @@
                       </el-option-group>
                     </el-select>
                     <p class="field-hint">
-                      <router-link :to="{ name: 'reference-catalog' }" target="_blank">Browse reference data</router-link>
+                      Runs use this unless they pick another of the same kind from
+                      <router-link :to="{ name: 'reference-catalog' }" target="_blank">reference data</router-link>.
+                    </p>
+                    <p v-if="referenceRestriction(port.reference)" class="field-hint">
+                      {{ referenceRestriction(port.reference) }} Choosing a reference here lets runs pick any.
                     </p>
                   </template>
                 </div>
               </div>
-              <div v-if="portMode(port) === 'reference' && port.reference" class="field-row full-width">
-                <label class="field-label">Who picks it</label>
-                <div class="field-control">
-                  <el-radio-group
-                    :model-value="port.reference.choice === 'app' ? 'app' : 'user'"
-                    size="small"
-                    aria-label="Who picks the reference"
-                    :disabled="!referenceEntryOf(port)"
-                    @update:model-value="(c) => setReferenceChoice(port, c)"
-                  >
-                    <el-radio-button value="app">Always this one</el-radio-button>
-                    <el-radio-button value="user">Runs can choose</el-radio-button>
-                  </el-radio-group>
-                  <el-checkbox-group
-                    v-if="port.reference.choice !== 'app' && port.reference.kind === 'genome' && organismOptions(port).length > 1"
-                    :model-value="port.reference.organisms || []"
-                    class="reference-organisms"
-                    @update:model-value="(o) => setOrganisms(port, o)"
-                  >
-                    <el-checkbox v-for="t in organismOptions(port)" :key="t" :value="t">{{ organismLabel(t) }}</el-checkbox>
-                  </el-checkbox-group>
-                  <p class="field-hint">{{ referenceChoiceHint(port.reference) }}</p>
-                </div>
-              </div>
-
               <!-- A file or a folder: its format -->
               <div v-if="portMode(port) === 'file' || portMode(port) === 'folder'" class="field-row full-width" :data-field="`${block.key}.${index}.mediaTypes`" :class="{ 'has-problem': formatProblems(port, `${block.key}.${index}.mediaTypes`).length > 0 }">
                 <label class="field-label">{{ portMode(port) === "folder" ? "Folder format" : "Media type" }}</label>
@@ -637,13 +616,12 @@ const referenceGroups = computed(() =>
 // Inputs turned on but with no entry picked yet: nothing is written until one is.
 const wantsReference = reactive(new WeakSet());
 const showsReference = (port) => !!port.reference || wantsReference.has(toRaw(port));
-// What the choice means for a run.
-const referenceChoiceHint = (reference) => {
-  if (reference.choice === "app") return "Every run gets this reference.";
-  if (reference.kind !== "genome") return "Runs get this one unless they pick another of the same kind.";
-  return reference.organisms?.length
-    ? "Runs get this one unless they pick another of the same kind, of the organisms checked."
-    : "Runs get this one unless they pick another of the same kind, of any organism.";
+// What a block written elsewhere restricts, which the form doesn't offer:
+// pinning one reference, or the organisms a run may pick from.
+const referenceRestriction = (reference) => {
+  if (reference?.choice === "app") return "This app.yml pins the reference: runs can't pick another.";
+  if (reference?.organisms?.length) return `This app.yml limits runs to ${reference.organisms.map((t) => organismName(t)).join(", ")}.`;
+  return "";
 };
 // The catalog entry an input's block takes by default, if the catalog has it.
 const referenceEntryOf = (port) =>
@@ -651,33 +629,12 @@ const referenceEntryOf = (port) =>
 const pickReference = (port, id) => {
   const entry = referenceEntries.value.find((e) => e.id === id);
   if (!entry) return;
-  const choice = port.reference?.choice === "app" ? "app" : port.reference ? "user" : "app";
-  port.reference = referenceBlock(entry, { choice, organisms: choice === "user" ? port.reference?.organisms || [] : [] });
+  // The app's default; a run may pick any other of its kind.
+  port.reference = referenceBlock(entry, { choice: "user" });
   // A reference is unpacked into the input's own folder.
   port.placement = "subfolder";
   if (!port.name) port.name = identifierFrom(entry.version?.spec?.assetClass || entry.kind);
   if (!port.description) port.description = referenceLabel(entry);
-};
-const setReferenceChoice = (port, choice) => {
-  const entry = referenceEntryOf(port);
-  if (entry) port.reference = referenceBlock(entry, { choice, organisms: port.reference?.organisms || [] });
-};
-// The organisms a run may pick from: those the catalog has of the input's asset class.
-const organismOptions = (port) => [
-  ...new Set(
-    referenceEntries.value
-      .filter((e) => e.kind === (port.reference?.kind || "genome") && e.version?.spec?.assetClass === port.reference?.assetClass)
-      .map((e) => Number(e.version?.spec?.taxonomyId))
-      .filter(Boolean)
-  ),
-];
-const setOrganisms = (port, organisms) => {
-  if (organisms.length) port.reference.organisms = organisms.map(Number);
-  else delete port.reference.organisms;
-};
-const organismLabel = (taxonomyId) => {
-  const e = referenceEntries.value.find((x) => Number(x.version?.spec?.taxonomyId) === taxonomyId);
-  return organismName(taxonomyId, e?.version?.spec?.organism);
 };
 
 // The media type search, shared by the selects (one is open at a time).
@@ -993,10 +950,6 @@ const removePort = (key, i) => schema.value[key].splice(i, 1);
   margin-left: 12px;
   font-size: 12px;
   color: theme.$gray_4;
-}
-.reference-organisms {
-  display: flex;
-  margin-top: 8px;
 }
 .field-hint {
   margin: 2px 0 0;
