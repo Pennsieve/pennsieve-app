@@ -1,5 +1,4 @@
 <script setup>
-import { ref, computed, watch } from "vue";
 import { Close, Loading } from "@element-plus/icons-vue";
 import IconAlertLine from "@/components/icons/IconAlertLine.vue";
 
@@ -11,7 +10,6 @@ const {
   icon,
   confirmLabel = "Confirm",
   cancelLabel = "Cancel",
-  acknowledgements,
   processing = false,
 } = defineProps({
   title: { type: String },
@@ -25,24 +23,12 @@ const {
   icon: { type: Object, default: () => IconAlertLine },
   confirmLabel: { type: String },
   cancelLabel: { type: String },
-  acknowledgements: { type: Array, default: () => [] },
   // While true the dialog can't be dismissed, so the caller decides whether
   // to close it (success) or keep it open for a retry (failure)
   processing: { type: Boolean },
 });
 const emit = defineEmits(["confirm", "cancel"]);
 const isDialogVisible = defineModel("visible", { type: Boolean, default: false });
-
-const checkedAcknowledgements = ref([]);
-const canConfirm = computed(
-  () => checkedAcknowledgements.value.length === acknowledgements.length
-);
-
-watch(isDialogVisible, (isVisible) => {
-  if (isVisible) {
-    checkedAcknowledgements.value = [];
-  }
-});
 
 function cancel() {
   if (processing) {
@@ -53,7 +39,7 @@ function cancel() {
 }
 
 function confirm() {
-  if (canConfirm.value && !processing) {
+  if (!processing) {
     emit("confirm");
   }
 }
@@ -92,20 +78,6 @@ function confirm() {
       <h3 v-if="heading" class="confirm-heading">{{ heading }}</h3>
       <p v-if="message" class="confirm-message">{{ message }}</p>
       <slot />
-
-      <el-checkbox-group
-        v-if="acknowledgements.length > 0"
-        v-model="checkedAcknowledgements"
-        class="acknowledgements"
-      >
-        <el-checkbox
-          v-for="acknowledgement in acknowledgements"
-          :key="acknowledgement"
-          :value="acknowledgement"
-        >
-          {{ acknowledgement }}
-        </el-checkbox>
-      </el-checkbox-group>
     </div>
 
     <template #footer>
@@ -122,7 +94,7 @@ function confirm() {
           type="button"
           class="dialog-button"
           :class="variant === 'danger' ? 'danger' : 'primary'"
-          :disabled="!canConfirm || processing"
+          :disabled="processing"
           @click="confirm"
         >
           <el-icon v-if="processing" class="is-loading"><Loading /></el-icon>
@@ -245,23 +217,6 @@ function confirm() {
   font-size: 14px;
   line-height: 1.5;
   color: theme.$gray_5;
-}
-
-.acknowledgements {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 8px;
-  width: 100%;
-  margin-top: 16px;
-  text-align: left;
-
-  :deep(.el-checkbox) {
-    height: auto;
-    margin-right: 0;
-    align-items: flex-start;
-    white-space: normal;
-  }
 }
 
 .confirm-dialog-footer {
