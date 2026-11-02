@@ -5944,7 +5944,7 @@ kbd {
   gap: 4px;
 }
 .info-tag {
-  padding: 2px 8px;
+  padding: 3px 8px 1px;
   border-radius: 3px;
   background: theme.$gray_0;
   font-size: 11px;
