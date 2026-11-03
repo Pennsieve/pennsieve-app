@@ -588,9 +588,10 @@ h2 {
   }
 }
 
+/* As the Library's grid: cards side by side where there is room. */
 .nodes-grid {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
   gap: 16px;
 }
 
