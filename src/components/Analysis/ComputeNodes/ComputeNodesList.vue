@@ -1,5 +1,5 @@
 <script setup>
-import { reactive, ref, computed, onMounted } from 'vue'
+import { reactive, ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useStore } from 'vuex'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
@@ -41,6 +41,26 @@ const computeNodes = computed(() => {
   })
 })
 const isLoading = computed(() => computeResourcesStore.isScopeLoading(scope.value))
+
+// While a node is being created, updated or destroyed, refetch the list so
+// its card shows when that finishes (no realtime events for compute nodes).
+const TRANSITIONAL_STATUSES = new Set(['updating', 'pending', 'destroying'])
+const REFRESH_WHILE_TRANSITIONAL_MS = 30000
+const hasTransitionalNode = computed(() =>
+  computeNodes.value.some(n => TRANSITIONAL_STATUSES.has((n.status || '').toLowerCase()))
+)
+let transitionalRefresh = null
+watch(hasTransitionalNode, (active) => {
+  if (active && !transitionalRefresh) {
+    transitionalRefresh = setInterval(() => fetchComputeNodes(true), REFRESH_WHILE_TRANSITIONAL_MS)
+  } else if (!active && transitionalRefresh) {
+    clearInterval(transitionalRefresh)
+    transitionalRefresh = null
+  }
+}, { immediate: true })
+onBeforeUnmount(() => {
+  if (transitionalRefresh) clearInterval(transitionalRefresh)
+})
 
 const expandedNodes = ref(new Set())
 const editingNodes = ref(new Set())
@@ -357,7 +377,7 @@ async function confirmDeleteNode() {
         </div>
 
         <!-- Nodes List -->
-        <div class="nodes-section" v-loading="isLoading">
+        <div class="nodes-section" v-loading="isLoading && computeNodes.length === 0">
           <h3 class="nodes-title">Compute nodes</h3>
           
           <div v-if="showEmptyState" class="empty-state">

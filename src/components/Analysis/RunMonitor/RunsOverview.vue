@@ -318,9 +318,10 @@ const parseEventData = (data) => {
 
 const onRunStatusUpdate = async (raw) => {
   const data = parseEventData(raw);
-  store.commit("analysisModule/UPDATE_RUN_STATUS", {
+  store.dispatch("analysisModule/applyRunStatusEvent", {
     runId: data.runId,
     status: data.status,
+    fetchParams: getRunFilterParams(),
   });
 };
 

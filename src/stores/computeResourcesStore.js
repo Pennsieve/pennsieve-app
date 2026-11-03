@@ -1147,14 +1147,18 @@ export const useComputeResourcesStore = defineStore('computeResources', () => {
 
       if (response.ok) {
         const result = await response.json()
+        // The node is now being updated to the new version: the card shows
+        // "Updating to <tag>" from status and pendingProvisionerImageTag. Its
+        // provisionerImageTag stays the version it runs until the update is
+        // done; the node list refetches while a node is updating.
         for (const [scope, scopedNodes] of scopedComputeNodes.value.entries()) {
           const index = scopedNodes.findIndex(node => node.uuid === nodeUuid)
           if (index !== -1) {
             const updatedNodes = [...scopedNodes]
             updatedNodes[index] = {
               ...updatedNodes[index],
-              provisionerImage,
-              provisionerImageTag,
+              status: 'Updating',
+              pendingProvisionerImageTag: provisionerImageTag,
               updateAvailable: false
             }
             scopedComputeNodes.value.set(scope, updatedNodes)

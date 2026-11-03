@@ -22,6 +22,10 @@ const withWorkspace = (url, rootState) => {
   return `${url}${url.includes("?") ? "&" : "?"}organization_id=${encodeURIComponent(orgId)}`;
 };
 
+// Debounce for refetching the runs list when a status event names an unknown run
+let runListRefetchTimer = null;
+const RUN_LIST_REFETCH_DELAY_MS = 1500;
+
 const initialState = () => ({
   computeNodes: [],
   computeNodesLoaded: false,
@@ -873,6 +877,22 @@ export const actions = {
       return Promise.reject(err);
     }
   },
+  // Apply a workflow-run-status event: update a run in the list, or refetch the
+  // list (once per burst) when the run is not in it yet.
+  applyRunStatusEvent: ({ state, commit, dispatch }, { runId, status, fetchParams } = {}) => {
+    if (!runId) return;
+    if (state.workflowInstances.some((r) => r.uuid === runId)) {
+      commit("UPDATE_RUN_STATUS", { runId, status });
+      return;
+    }
+    clearTimeout(runListRefetchTimer);
+    runListRefetchTimer = setTimeout(() => {
+      runListRefetchTimer = null;
+      dispatch("fetchWorkflowInstances", fetchParams).catch((err) =>
+        console.error("Failed to refetch runs:", err)
+      );
+    }, RUN_LIST_REFETCH_DELAY_MS);
+  },
   fetchMoreWorkflowInstances: async ({ commit, state, rootState }, { status, workflowId, limit, startDate, endDate } = {}) => {
     const cursor = state.workflowInstancesCursor;
     if (!cursor) return;
@@ -1164,7 +1184,7 @@ export const actions = {
       throw err;
     }
   },
-  createRun: async ({ commit, rootState }, payload) => {
+  createRun: async ({ state, commit, rootState }, payload) => {
     const tokens = await useGetAllTokens();
     const url = `${rootState.config.api2Url}/compute/workflows/runs`;
     const resp = await fetch(url, {
@@ -1190,7 +1210,24 @@ export const actions = {
     if (payload?.name && newRun && !newRun.name) {
       newRun.name = payload.name;
     }
-    commit("PREPEND_WORKFLOW_INSTANCE", newRun);
+    // The response is not a run summary ({message, executionRunId, budget}),
+    // so add a list-shaped entry that status events and refetches can match.
+    const runId = newRun?.executionRunId || newRun?.uuid;
+    if (runId && !state.workflowInstances.some((r) => r.uuid === runId)) {
+      const cfg = payload?.workflowInstanceConfiguration || {};
+      const workflow = state.workflows.find((w) => w.uuid === cfg.workflowId);
+      commit("PREPEND_WORKFLOW_INSTANCE", {
+        uuid: runId,
+        name: newRun.name || payload?.name || "",
+        status: "NOT_STARTED",
+        startedAt: new Date().toISOString(),
+        workflowUuid: cfg.workflowId,
+        workflowName: workflow?.name,
+        computeNodeUuid: cfg.computeNodeId,
+        datasetId: payload?.datasetId,
+        createdBy: rootState.profile?.id,
+      });
+    }
     return newRun;
   },
   setSelectedProcessor: ({ commit, rootState }, processor) => {
