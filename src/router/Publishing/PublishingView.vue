@@ -37,7 +37,7 @@
         </p>
         <p class="publishers-only-copy">
           Proposals you have submitted to open repositories are under
-          <router-link :to="{ name: 'dataset-proposals' }">
+          <router-link :to="{ name: 'data-publishing' }">
             My Workspace &rsaquo; Data Publishing
           </router-link>.
         </p>
