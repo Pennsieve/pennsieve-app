@@ -266,6 +266,10 @@ watch(
   () => props.dialogVisible,
   (newVal) => {
     if (newVal) {
+      // Reset on open rather than close: the parent can close the dialog
+      // without going through closeDialog, and clearing on close blanks the
+      // form mid-fade
+      clearForm();
       populateForm();
       initializeSelectedRepository();
     }
@@ -283,42 +287,7 @@ async function scrollDialogToTop() {
   dialogElement?.closest(".el-overlay-dialog")?.scrollTo({ top: 0 });
 }
 
-// Watch for repository changes and save/restore survey responses
-watch(
-  () => selectedRepository.value.organizationNodeId,
-  (newNodeId, oldNodeId) => {
-    // Read-only reviews never switch repositories; re-running this on open
-    // would clear the responses we just populated
-    if (props.readOnly) return;
-
-    if (oldNodeId && newNodeId !== oldNodeId) {
-      // Save current survey answers before switching
-      if (oldNodeId) {
-        surveyAnswersByRepository.value[oldNodeId] = {
-          ...proposal.value.survey,
-        };
-      }
-
-      // Update the proposal's organizationNodeId to match the new repository
-      if (newNodeId) {
-        // This ensures the proposal will be saved to the correct repository
-        proposal.value.organizationNodeId = newNodeId;
-      }
-
-      // Restore saved answers for the new repository, or start with blank answers
-      if (newNodeId && surveyAnswersByRepository.value[newNodeId]) {
-        proposal.value.survey = {
-          ...surveyAnswersByRepository.value[newNodeId],
-        };
-      } else {
-        proposal.value.survey = {};
-      }
-    }
-  }
-);
-
 function closeDialog() {
-  clearForm();
   emit("close");
 }
 
@@ -328,6 +297,8 @@ function clearForm() {
     description: "",
     survey: {},
   };
+  surveyAnswersByRepository.value = {};
+  selectedRepository.value = {};
 }
 
 function initializeSelectedRepository() {
@@ -382,7 +353,19 @@ function rejectProposal() {
   emit("reject", props.proposal);
 }
 
+// Only user picks go through here. A watcher on selectedRepository also fired
+// when the dialog set it on open, caching answers under the wrong repository.
 function handleRepositoryChange(repository) {
+  const previousNodeId = currentRepository.value?.organizationNodeId;
+  const nextNodeId = repository?.organizationNodeId;
+  if (previousNodeId === nextNodeId) return;
+
+  // Keep each repository's answers so switching back restores them
+  if (previousNodeId) {
+    surveyAnswersByRepository.value[previousNodeId] = { ...proposal.value.survey };
+  }
+  proposal.value.survey = { ...(surveyAnswersByRepository.value[nextNodeId] || {}) };
+  proposal.value.organizationNodeId = nextNodeId;
   selectedRepository.value = repository;
 }
 
@@ -574,10 +557,10 @@ function submitProposal() {
           <div class="repository-selector" v-if="!readOnly">
             <label class="selector-label">Submitting to:</label>
             <el-select
-              v-model="selectedRepository"
+              :model-value="selectedRepository"
               placeholder="Select repository"
               class="repository-dropdown"
-              @change="handleRepositoryChange"
+              @update:model-value="handleRepositoryChange"
               value-key="organizationNodeId"
               size="large"
             >
