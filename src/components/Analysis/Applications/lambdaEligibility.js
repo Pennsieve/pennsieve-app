@@ -6,7 +6,7 @@
   lambda: { eligible, reasons, imageBytes, checkedAt }, absent until checked.
   A variant's record wins over its version's. Without a record, the old rule
   holds: the app.yml lists lambda in runtime.computeTypes. Either way an
-  author's runtime.lambda: false keeps it off Lambda. Pure.
+  author's runtime.optimize: false keeps it off Lambda. Pure.
 */
 import { versionOf } from "../WorkflowBuilder/appManifestInfo";
 
@@ -39,7 +39,7 @@ export function lambdaEligibility(version, variant) {
   const record = [v?.lambda, version.lambda, fallbackVariant?.lambda].find(isRecord) || null;
   const manifest = v?.manifest || version.manifest || null;
   const runtime = manifest?.runtime || {};
-  const optedOut = runtime.lambda === false;
+  const optedOut = runtime.optimize === false;
   if (record) {
     const reasons = record.eligible ? [] : (record.reasons || []).filter(Boolean);
     if (optedOut && !reasons.includes(LAMBDA_OPT_OUT_REASON)) reasons.push(LAMBDA_OPT_OUT_REASON);

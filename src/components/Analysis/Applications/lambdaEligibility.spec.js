@@ -38,12 +38,12 @@ describe("lambdaEligibility", () => {
   });
 
   it("honours the author's opt-out", () => {
-    expect(lambdaEligibility({ manifest: man({ computeTypes: ["lambda"], lambda: false }) })).toEqual({
+    expect(lambdaEligibility({ manifest: man({ computeTypes: ["lambda"], optimize: false }) })).toEqual({
       available: false,
       reasons: [LAMBDA_OPT_OUT_REASON],
       known: false,
     });
-    expect(lambdaEligibility({ lambda: rec(true), manifest: man({ lambda: false }) })).toEqual({
+    expect(lambdaEligibility({ lambda: rec(true), manifest: man({ optimize: false }) })).toEqual({
       available: false,
       reasons: [LAMBDA_OPT_OUT_REASON],
       known: true,

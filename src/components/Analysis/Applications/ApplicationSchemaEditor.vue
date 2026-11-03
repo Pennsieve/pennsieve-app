@@ -593,7 +593,7 @@
 
       <!-- Compute types, the advanced part. GPU is one of these; Lambda isn't
            (every image can run there when it fits): the author only opts out. -->
-      <more-options :force-open="schema.runtime.computeTypes.length > 1 || schema.runtime.allowLambda === false || !!at('runtime.computeTypes').length" label="More options">
+      <more-options :force-open="schema.runtime.computeTypes.length > 1 || schema.runtime.optimize === false || !!at('runtime.computeTypes').length" label="More options">
         <div class="field-row full-width" data-field="runtime.computeTypes" :class="rowClass('runtime.computeTypes')">
           <label class="field-label">Compute types</label>
           <div class="field-control">
@@ -606,11 +606,11 @@
             <p v-for="m in at('runtime.computeTypes')" :key="m" class="field-error">{{ m }}</p>
           </div>
         </div>
-        <div class="field-row full-width" data-field="runtime.lambda">
-          <label class="field-label">Lambda <field-hint text="Pennsieve checks each version for Lambda. Unchecked keeps the app off Lambda (lambda: false in app.yml)." /></label>
+        <div class="field-row full-width" data-field="runtime.optimize">
+          <label class="field-label">Faster runtime <field-hint text="Pennsieve checks each version for whether it fits a faster runtime, such as Lambda. Unchecked runs the app only as its compute types say (optimize: false in app.yml)." /></label>
           <div class="field-control">
-            <el-checkbox :model-value="schema.runtime.allowLambda !== false" @change="(c) => (schema.runtime.allowLambda = !!c)">
-              Can run on Lambda when it fits (15 min, 10 GB)
+            <el-checkbox :model-value="schema.runtime.optimize !== false" @change="(c) => (schema.runtime.optimize = !!c)">
+              Let Pennsieve run it on a faster runtime when it fits (Lambda: 15 min, 10 GB)
             </el-checkbox>
           </div>
         </div>

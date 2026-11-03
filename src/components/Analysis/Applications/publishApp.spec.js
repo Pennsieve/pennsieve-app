@@ -22,17 +22,17 @@ describe("appYmlFor", () => {
     expect(yml).toMatch(/computeTypes:\n\s+- standard\n\s+- gpu/);
     // Lambda isn't a compute type the author lists; it runs there when it fits.
     expect(yml).not.toMatch(/- lambda/);
-    expect(yml).not.toMatch(/lambda: false/);
+    expect(yml).not.toMatch(/optimize/);
     expect(yml).toMatch(/inputs:\n\s+- name: recordings/);
     expect(yml).toMatch(/outputs:\n\s+- name: spikes\n[\s\S]*- name: report/);
   });
 });
 
 describe("appYmlFor's Lambda opt-out", () => {
-  it("writes lambda: false only when the author unticks it", () => {
-    expect(appYmlFor({ ...newDraft(), name: "A" })).not.toMatch(/lambda/);
-    const yml = appYmlFor({ ...newDraft(), name: "A", allowLambda: false });
-    expect(yml).toMatch(/lambda: false/);
+  it("writes optimize: false only when the author unticks it", () => {
+    expect(appYmlFor({ ...newDraft(), name: "A" })).not.toMatch(/optimize|lambda/);
+    const yml = appYmlFor({ ...newDraft(), name: "A", optimize: false });
+    expect(yml).toMatch(/optimize: false/);
     expect(yml).not.toMatch(/- lambda/);
   });
 });

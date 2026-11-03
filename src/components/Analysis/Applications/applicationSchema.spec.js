@@ -1145,15 +1145,15 @@ review:
   })
 })
 
-describe("the Lambda opt-out", () => {
-  it("is allowed unless the app.yml says lambda: false, and keeps a listed lambda", () => {
+describe("the optimize opt-out", () => {
+  it("is allowed unless the app.yml says optimize: false, and keeps a listed lambda", () => {
     const listed = parseManifest("application:\n  name: A\nruntime:\n  computeTypes: [standard, lambda]\n").schema
     expect(listed.runtime.computeTypes).toEqual(["standard", "lambda"])
-    expect(listed.runtime.allowLambda).toBe(true)
+    expect(listed.runtime.optimize).toBe(true)
     expect(buildManifest(listed, { name: "A" }).runtime).toEqual({ computeTypes: ["standard", "lambda"] })
-    const out = parseManifest("application:\n  name: A\nruntime:\n  computeTypes: [standard]\n  lambda: false\n").schema
-    expect(out.runtime.allowLambda).toBe(false)
-    expect(buildManifest(out, { name: "A" }).runtime).toEqual({ computeTypes: ["standard"], lambda: false })
-    expect(createApplicationSchema().runtime.allowLambda).toBe(true)
+    const out = parseManifest("application:\n  name: A\nruntime:\n  computeTypes: [standard]\n  optimize: false\n").schema
+    expect(out.runtime.optimize).toBe(false)
+    expect(buildManifest(out, { name: "A" }).runtime).toEqual({ computeTypes: ["standard"], optimize: false })
+    expect(createApplicationSchema().runtime.optimize).toBe(true)
   })
 })
