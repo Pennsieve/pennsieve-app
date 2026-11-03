@@ -111,7 +111,7 @@ const isLoading = ref(false)
 const loadError = ref('')
 const showProposalDialog = ref(false)
 const selectedRepository = ref({})
-const activeProposal = ref({})
+const activeProposal = ref(null)
 const copySourceProposal = ref(null)
 const isConfirmDialogVisible = ref(false)
 const isConfirmProcessing = ref(false)
@@ -159,6 +159,7 @@ const fetchRepositories = async () => {
 const startNewProposal = () => {
   // Open ProposalSurvey dialog for new proposal
   activeProposal.value = null // Clear any existing proposal
+  copySourceProposal.value = null
   selectedRepository.value = repositories.value[0] || {} // Default to first available repository
   showProposalDialog.value = true
 }
@@ -178,15 +179,15 @@ const handleSubmitProposal = async (proposalData) => {
   }
 }
 
+// Only hide: clearing the proposal here would flip the dialog's title and
+// read-only state while it fades out. Each opener sets the state it needs.
 const closeProposalDialog = () => {
   showProposalDialog.value = false
-  selectedRepository.value = {}
-  activeProposal.value = {}
-  copySourceProposal.value = null
 }
 
 const editProposal = (proposal) => {
   activeProposal.value = proposal
+  copySourceProposal.value = null
 
   selectedRepository.value = repositories.value.find(repo =>
     repo.organizationNodeId === proposal.organizationNodeId
@@ -324,6 +325,7 @@ const handleQueryParameters = () => {
       // Set the repository and open modal
       selectedRepository.value = repository
       activeProposal.value = null
+      copySourceProposal.value = null
       showProposalDialog.value = true
       
       // Drop the query so a refresh doesn't reopen the dialog

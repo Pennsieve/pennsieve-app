@@ -266,9 +266,6 @@ watch(
   () => props.dialogVisible,
   (newVal) => {
     if (newVal) {
-      // Reset on open rather than close: the parent can close the dialog
-      // without going through closeDialog, and clearing on close blanks the
-      // form mid-fade
       clearForm();
       populateForm();
       initializeSelectedRepository();
