@@ -370,10 +370,12 @@ export const actions = {
           const rc = app.runtimeConfig || {};
           return {
             ...app,
+            // Lambda isn't assumed: whether a version may run there is its
+            // own (lambdaEligibility.js, from the version's lambda record).
             runtimeConfig: {
               cpu: rc.cpu || null,
               memory: rc.memory || null,
-              computeTypes: (rc.computeTypes && rc.computeTypes.length ? rc.computeTypes : ["standard", "lambda"])
+              computeTypes: (rc.computeTypes && rc.computeTypes.length ? rc.computeTypes : ["standard"])
                 .map((t) => (t === "ecs" ? "standard" : t)),
             },
           };

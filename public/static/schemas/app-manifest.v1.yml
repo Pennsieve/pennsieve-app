@@ -21,6 +21,9 @@ application:
 runtime:
   cpu: 1024
   memory: 2048
+  # standard and/or gpu. Lambda isn't listed: Pennsieve runs a version on
+  # Lambda when it fits (15 min, 10 GB); optimize: false keeps it to
+  # computeTypes.
   computeTypes:
     - standard
   timeoutSeconds: 300

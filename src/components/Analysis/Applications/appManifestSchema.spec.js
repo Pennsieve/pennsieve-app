@@ -116,6 +116,15 @@ describe('the app.yml schema', () => {
     expect(validate(yaml.load(text)), problems()).toBe(true)
   })
 
+  it("accepts the optimize opt-out at the top level and in a variant's runtime", () => {
+    const doc = buildManifest(createApplicationSchema({ runtime: { computeTypes: ['standard'], optimize: false } }), { name: 'x' })
+    expect(doc.runtime.optimize).toBe(false)
+    expect(validate(doc), problems()).toBe(true)
+    const withVariant = { ...doc, variants: [{ id: 'gpu', runtime: { computeTypes: ['gpu'], optimize: false } }] }
+    expect(validate(withVariant), problems()).toBe(true)
+    expect(validate({ ...doc, runtime: { optimize: 'no' } })).toBe(false)
+  })
+
   it('catches a typo', () => {
     expect(validate({ application: { name: 'x' }, runtime: { sesionType: 'jupyter' } })).toBe(false)
   })

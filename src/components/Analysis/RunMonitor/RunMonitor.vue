@@ -24,6 +24,7 @@ import { validateRunName, runDisplayName, RUN_NAME_MAX_LENGTH, targetTypeName,
   nodeMetricRows,
 } from "./runHelpers";
 import { sourceLabel, sourceHints, hintLine, portsOfStep, missingFilesMessage } from "../WorkflowGraph/sourceInputs";
+import { appLambdaEligibility, lambdaUnavailableHint, withLambdaChoice } from "../Applications/lambdaEligibility";
 
 const { onNodeClick, onPaneClick, fitView, updateNodeData } = useVueFlow();
 
@@ -162,11 +163,30 @@ const getComputeTypesForTarget = (targetType) => {
   return types && types.length ? withGpu(types) : [];
 };
 
+// An app step's choices: the app's, with GPU, and Lambda always listed (it
+// is disabled, with why, unless the pinned version fits Lambda).
 const getComputeTypesForProcessor = (sourceUrl) => {
   if (!sourceUrl) return DEFAULT_COMPUTE_TYPES;
-  const app = availableApplications.value.find((a) => a.source?.url === sourceUrl);
+  const app = findMatchedApp(sourceUrl);
   const types = app?.runtimeConfig?.computeTypes;
-  return types && types.length ? withGpu(types) : DEFAULT_COMPUTE_TYPES;
+  return withLambdaChoice(types && types.length ? withGpu(types) : DEFAULT_COMPUTE_TYPES);
+};
+
+// Whether a step's pinned version (and variant) may run on Lambda
+// (lambdaEligibility.js): app-deploy-service's check, else its app.yml.
+const stepLambda = (nodeId, sourceUrl, version) => {
+  const d = (configDefinition.value?.dag || []).find((n) => n.id === nodeId);
+  const app = findMatchedApp(sourceUrl || d?.sourceUrl);
+  return appLambdaEligibility(app, version ?? nodeConfigs[nodeId]?.version ?? d?.tag, d?.variant);
+};
+const isProcessorComputeTypeDisabled = (ct, nodeId) => ct === "lambda" && !stepLambda(nodeId).available;
+const processorComputeTypeHint = (ct, nodeId) => (ct === "lambda" ? lambdaUnavailableHint(stepLambda(nodeId)) : "");
+// A step left on Lambda when its version doesn't fit it runs standard.
+const processorTargetFor = (ct, nodeId, sourceUrl, version) =>
+  ct === "lambda" && !stepLambda(nodeId, sourceUrl, version).available ? "standard" : ct;
+const onStepVersionChange = (nodeId) => {
+  const cfg = nodeConfigs[nodeId];
+  if (cfg) cfg.executionTarget = processorTargetFor(cfg.executionTarget, nodeId);
 };
 
 /* Version helpers — match WorkflowBuilder */
@@ -1035,9 +1055,10 @@ const initiateWorkflow = async () => {
           .map(([key, value]) => ({ key, value: String(value) }));
 
         const matchedApp = findMatchedApp(d.sourceUrl);
+        const version = srcCfg?.version || d.tag || latestVersion(matchedApp)?.version || "";
         nodeConfigs[d.id] = {
-          executionTarget: srcCfg?.executionTarget || d.computeType || "standard",
-          version: srcCfg?.version || d.tag || latestVersion(matchedApp)?.version || "",
+          executionTarget: processorTargetFor(srcCfg?.executionTarget || d.computeType || "standard", d.id, d.sourceUrl, version),
+          version,
           cpu: srcCfg?.cpu || (d.runtimeConfig?.cpu ? String(d.runtimeConfig.cpu) : ""),
           memory: srcCfg?.memory || (d.runtimeConfig?.memory ? String(d.runtimeConfig.memory) : ""),
           schemaParams,
@@ -1986,7 +2007,16 @@ onUnmounted(() => {
                       :key="ct"
                       :label="formatComputeTypeLabel(ct)"
                       :value="ct"
-                    />
+                      :disabled="isProcessorComputeTypeDisabled(ct, selectedNode.id)"
+                    >
+                      <el-tooltip
+                        :disabled="!isProcessorComputeTypeDisabled(ct, selectedNode.id)"
+                        :content="processorComputeTypeHint(ct, selectedNode.id)"
+                        placement="right"
+                      >
+                        <span>{{ formatComputeTypeLabel(ct) }}</span>
+                      </el-tooltip>
+                    </el-option>
                   </el-select>
                 </div>
                 <div class="config-field">
@@ -1996,6 +2026,7 @@ onUnmounted(() => {
                     size="small"
                     style="width: 100%"
                     placeholder="latest"
+                    @change="() => onStepVersionChange(selectedNode.id)"
                     :disabled="sortedVersions(findMatchedApp(selectedNode.data?.sourceUrl)).length <= 1"
                   >
                     <el-option
