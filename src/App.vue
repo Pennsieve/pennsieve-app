@@ -37,7 +37,8 @@ let route = useRoute();
     </div>
   </div>
 
-  <notification-bell />
+  <!-- Hidden until in-app notifications ship (v1 is email only). -->
+  <!-- <notification-bell /> -->
 
   <!--  <bf-upload ref="bfUpload" />-->
 
