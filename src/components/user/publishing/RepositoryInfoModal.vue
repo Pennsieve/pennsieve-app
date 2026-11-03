@@ -17,28 +17,36 @@ const isDialogVisible = defineModel("dialogVisible", { type: Boolean, default: f
 const overviewText = ref("");
 const isLoadingOverview = ref(false);
 
-async function loadOverview() {
+async function loadOverview(abortSignal) {
   const fallbackText = repository.description || "No detailed information available for this repository.";
   if (!repository.overviewDocument) {
     overviewText.value = fallbackText;
+    isLoadingOverview.value = false;
     return;
   }
 
   isLoadingOverview.value = true;
   try {
-    const response = await fetch(repository.overviewDocument);
+    const response = await fetch(repository.overviewDocument, { signal: abortSignal });
     overviewText.value = response.ok ? await response.text() : fallbackText;
   } catch (error) {
+    // Cancelled because the dialog closed or reopened; the newer load owns the state
+    if (abortSignal.aborted) return;
     console.error("Error fetching repository overview:", error);
     overviewText.value = fallbackText;
-  } finally {
-    isLoadingOverview.value = false;
   }
+  isLoadingOverview.value = false;
 }
 
 // Only fetch when opened; the panel sets the repository and opens in one tick
-watch(isDialogVisible, (isVisible) => {
-  if (isVisible) loadOverview();
+watch(isDialogVisible, (isVisible, _wasVisible, onCleanup) => {
+  if (!isVisible) return;
+
+  // Cancel this fetch when the dialog closes, so a slow response for a
+  // previous repository can't overwrite the one now showing
+  const abortController = new AbortController();
+  onCleanup(() => abortController.abort());
+  loadOverview(abortController.signal);
 });
 </script>
 
