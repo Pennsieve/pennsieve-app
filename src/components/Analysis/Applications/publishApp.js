@@ -9,10 +9,18 @@ import { createApplicationSchema, createPort, serializeManifestYaml } from "./ap
 export const TEMPLATE_OWNER = "pennsieve-apps";
 export const TEMPLATE_REPO = "processor-template-python";
 
+// What the author picks besides a container: a GPU. Lambda isn't picked:
+// every image can run there, and Pennsieve checks each version for whether
+// it fits; allowLambda (checked by default) is the author's opt-out, written
+// as runtime.lambda: false.
 export const COMPUTE_CHOICES = Object.freeze([
-  { value: "lambda", label: "Also as a Lambda function", hint: "Starts in seconds. For steps that finish within 15 minutes and 10 GB." },
   { value: "gpu", label: "Also on a GPU", hint: "For steps that need one." },
 ]);
+export const LAMBDA_CHOICE = Object.freeze({
+  value: "allowLambda",
+  label: "Can run on Lambda when it fits (15 min, 10 GB)",
+  hint: "Starts in seconds. Pennsieve checks each version; uncheck to keep the app off Lambda.",
+});
 
 export const STEPS = Object.freeze(["describe", "runs", "create", "install", "manifest", "release"]);
 
@@ -21,7 +29,7 @@ export const newDraft = () => ({
   name: "",
   description: "",
   tags: "",
-  lambda: false,
+  allowLambda: true,
   gpu: false,
   cpu: "1024",
   memory: "2048",
@@ -59,11 +67,10 @@ const names = (text) =>
 // appYmlFor is the draft's app.yml.
 export const appYmlFor = (draft) => {
   const computeTypes = ["standard"];
-  if (draft.lambda) computeTypes.push("lambda");
   if (draft.gpu) computeTypes.push("gpu");
   const schema = createApplicationSchema({
     resources: { cpu: Number(draft.cpu) || null, memory: Number(draft.memory) || null },
-    runtime: { computeTypes, interactive: false, sessionType: "", kernel: "" },
+    runtime: { computeTypes, allowLambda: draft.allowLambda !== false, interactive: false, sessionType: "", kernel: "" },
     inputs: names(draft.inputs).map((name) => createPort({ name })),
     outputs: names(draft.outputs).map((name) => createPort({ name })),
     tags: names(draft.tags),

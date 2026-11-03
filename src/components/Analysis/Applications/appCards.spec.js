@@ -29,7 +29,12 @@ describe("app cards", () => {
   });
 
   it("says where it runs and how much it asks for", () => {
-    expect(runsOn(spike)).toBe("Standard, Lambda · 2 vCPU · 4 GB");
+    // Its record lists lambda, but no version says it fits Lambda.
+    expect(runsOn(spike)).toBe("Standard · 2 vCPU · 4 GB");
+    const checked = { ...spike, versions: [{ version: "v2", createdAt: "2026-07-01", lambda: { eligible: true, reasons: [] }, manifest: { runtime: { computeTypes: ["standard", "gpu"] } } }] };
+    expect(runsOn(checked)).toBe("Standard, Lambda, GPU · 2 vCPU · 4 GB");
+    const unfit = { ...checked, versions: [{ ...checked.versions[0], lambda: { eligible: false, reasons: ["too big"] } }] };
+    expect(runsOn(unfit)).toBe("Standard, GPU · 2 vCPU · 4 GB");
     expect(runsOn({})).toBe("");
     const declared = { ...spike, versions: [{ version: "v2", createdAt: "2026-07-01", manifest: { description: "From app.yml", runtime: { computeTypes: ["standard"], cpu: 4096 } } }] };
     expect(runsOn(declared)).toBe("Standard · 4 vCPU · 4 GB");

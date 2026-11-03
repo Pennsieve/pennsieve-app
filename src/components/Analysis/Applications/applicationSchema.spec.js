@@ -1144,3 +1144,16 @@ review:
     expect(out.application).not.toHaveProperty('relations')
   })
 })
+
+describe("the Lambda opt-out", () => {
+  it("is allowed unless the app.yml says lambda: false, and keeps a listed lambda", () => {
+    const listed = parseManifest("application:\n  name: A\nruntime:\n  computeTypes: [standard, lambda]\n").schema
+    expect(listed.runtime.computeTypes).toEqual(["standard", "lambda"])
+    expect(listed.runtime.allowLambda).toBe(true)
+    expect(buildManifest(listed, { name: "A" }).runtime).toEqual({ computeTypes: ["standard", "lambda"] })
+    const out = parseManifest("application:\n  name: A\nruntime:\n  computeTypes: [standard]\n  lambda: false\n").schema
+    expect(out.runtime.allowLambda).toBe(false)
+    expect(buildManifest(out, { name: "A" }).runtime).toEqual({ computeTypes: ["standard"], lambda: false })
+    expect(createApplicationSchema().runtime.allowLambda).toBe(true)
+  })
+})

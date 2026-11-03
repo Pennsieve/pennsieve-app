@@ -121,7 +121,8 @@ const applicationFields = [
 const runtimeFields = [
   { name: "cpu", type: "number", required: false, desc: "Default CPU units (1024 = 1 vCPU)." },
   { name: "memory", type: "number", required: false, desc: "Default memory reservation in MB." },
-  { name: "computeTypes", type: "string[]", required: false, desc: "Compute environments the application supports. A GPU application lists gpu here — there is no separate gpu block." },
+  { name: "computeTypes", type: "string[]", required: false, desc: "Compute environments the application supports: standard and/or gpu. A GPU application lists gpu here — there is no separate gpu block. Lambda needn't be listed (it is still accepted): Pennsieve checks each version and offers Lambda when it fits." },
+  { name: "lambda", type: "boolean", required: false, desc: "false keeps the app off Lambda; otherwise Pennsieve runs it on Lambda when it fits (15 minutes, 10 GB)." },
   { name: "timeoutSeconds", type: "number", required: false, desc: "How long a run may take before it is timed out." },
   { name: "interactive", type: "boolean", required: false, desc: "A live session people work in, such as a Jupyter notebook, rather than a batch step. In a workflow it runs as an interactive step, and the workflow waits until the session ends. The only place an app declares this: an app without an app.yml is never interactive." },
   { name: "sessionType", type: "string", required: false, desc: "The kind of live session. jupyter (the default) is a notebook, and makes workflows using this app notebooks; other kinds may come." },
@@ -265,7 +266,10 @@ const inputOutputFields = [
         <code>runtime</code> carries the defaults a run starts from. A GPU
         application declares <code>gpu</code> among its
         <code>computeTypes</code>; there is no standalone <code>gpu</code>
-        block.
+        block. Lambda isn't a compute type to list: every built image can
+        run there, and Pennsieve checks each version for whether it fits
+        (15 minutes, 10 GB). Set <code>lambda: false</code> to keep an app
+        off Lambda.
       </p>
       <table class="field-table">
         <thead>

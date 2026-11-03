@@ -17,7 +17,7 @@ const newestFirst = (versions) =>
   [...(versions || [])].sort((a, b) => (Date.parse(b.createdAt) || 0) - (Date.parse(a.createdAt) || 0));
 
 // The version a tag names, else the newest version that has a manifest.
-function versionOf(app, tag) {
+export function versionOf(app, tag) {
   const versions = newestFirst(app?.versions);
   if (tag) {
     const v = versions.find((x) => x.version === tag);
@@ -67,6 +67,9 @@ export function variantsOf(app, tag) {
       // disabled, and why it failed; "" where not given.
       status: v.status || "",
       failureReason: v.failureReason || "",
+      // Whether it fits Lambda, as app-deploy-service checked it
+      // (lambdaEligibility.js); null until checked.
+      lambda: v.lambda || null,
     };
   });
 }

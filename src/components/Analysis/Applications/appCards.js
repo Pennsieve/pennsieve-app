@@ -2,6 +2,7 @@
 // and sorted: pure, from the application records.
 import { normalizeUrl } from "../RunMonitor/runHelpers";
 import { versionManifest } from "../WorkflowBuilder/appManifestInfo";
+import { appLambdaEligibility } from "./lambdaEligibility";
 
 export function githubRepo(sourceUrl) {
   const m = (sourceUrl || "").match(/github\.com\/([^/]+)\/([^/\s.]+)/);
@@ -45,7 +46,9 @@ export function appDescription(app) {
 }
 
 // "Standard, Lambda · 2 vCPU · 4 GB": where it runs and what it asks for,
-// as its app.yml declares it, else as its record has it.
+// as its app.yml declares it, else as its record has it. Lambda only when
+// the version shown may run there (lambdaEligibility.js), whatever the list
+// says.
 export function runsOn(app) {
   const declared = versionManifest(app)?.runtime || {};
   const record = app?.runtimeConfig || {};
@@ -55,7 +58,11 @@ export function runsOn(app) {
     memory: declared.memory || record.memory,
   };
   const parts = [];
-  const types = (rc.computeTypes || []).map(computeLabel).filter(Boolean);
+  const listed = (rc.computeTypes || []).filter((t) => t !== "lambda");
+  const withLambda = appLambdaEligibility(app).available ? [...listed, "lambda"] : listed;
+  const order = ["standard", "lambda", "gpu"];
+  const sorted = [...withLambda].sort((a, b) => (order.indexOf(a) + 1 || 99) - (order.indexOf(b) + 1 || 99));
+  const types = sorted.map(computeLabel).filter(Boolean);
   if (types.length) parts.push(types.join(", "));
   const cpu = Number(rc.cpu);
   if (cpu > 0) parts.push(`${+(cpu / 1024).toFixed(2)} vCPU`);

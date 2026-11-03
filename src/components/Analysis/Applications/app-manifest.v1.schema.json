@@ -151,6 +151,10 @@
           "description": "The compute the app can run on: standard (a container), lambda, or gpu. Default: [standard].",
           "items": { "type": "string", "enum": ["standard", "lambda", "gpu"] }
         },
+        "lambda": {
+          "type": "boolean",
+          "description": "false keeps the app off Lambda; otherwise Pennsieve runs it on Lambda when it fits"
+        },
         "timeoutSeconds": {
           "type": "integer",
           "minimum": 1,
@@ -267,6 +271,7 @@
         "cpu": { "$ref": "#/$defs/runtime/properties/cpu" },
         "memory": { "$ref": "#/$defs/runtime/properties/memory" },
         "computeTypes": { "$ref": "#/$defs/runtime/properties/computeTypes" },
+        "lambda": { "$ref": "#/$defs/runtime/properties/lambda" },
         "timeoutSeconds": { "$ref": "#/$defs/runtime/properties/timeoutSeconds" },
         "llm": { "$ref": "#/$defs/runtime/properties/llm" }
       }

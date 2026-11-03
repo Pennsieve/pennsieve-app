@@ -30,6 +30,7 @@ import { STANDARD_CPU_OPTIONS, getStandardMemoryOptions } from "../RunMonitor/ru
 import { canonicalTag, domainColors, domainOfTag, hasDomainTag, preferredTagGroups, tagDomainNudge, tagOptionMatches } from "./appDomains";
 import {
   COMPUTE_CHOICES,
+  LAMBDA_CHOICE,
   STEPS,
   appYmlFor,
   clearDraft,
@@ -230,7 +231,7 @@ onBeforeUnmount(stopPolling);
 // What's chosen so far, for the left column.
 const runsAs = computed(() => {
   const kinds = ["container"];
-  if (draft.value.lambda) kinds.push("Lambda");
+  if (draft.value.allowLambda !== false) kinds.push("Lambda when it fits");
   if (draft.value.gpu) kinds.push("GPU");
   return kinds.join(", ");
 });
@@ -491,6 +492,10 @@ const close = () => {
                 <div v-for="c in COMPUTE_CHOICES" :key="c.value" class="wizard-choice">
                   <el-checkbox v-model="draft[c.value]">{{ c.label }}</el-checkbox>
                   <small>{{ c.hint }}</small>
+                </div>
+                <div class="wizard-choice">
+                  <el-checkbox v-model="draft[LAMBDA_CHOICE.value]">{{ LAMBDA_CHOICE.label }}</el-checkbox>
+                  <small>{{ LAMBDA_CHOICE.hint }}</small>
                 </div>
               </div>
             </div>
