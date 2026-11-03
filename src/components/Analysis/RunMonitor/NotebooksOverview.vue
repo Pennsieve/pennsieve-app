@@ -246,8 +246,10 @@ const onNotebookCreated = async (newRun) => {
   const instances = store.getters["analysisModule/workflowInstances"] || [];
 
   const fresh = instances.filter((r) => r.uuid && !before.has(r.uuid));
-  const directId = newRun?.uuid || newRun?.id || newRun?.runId;
+  const directId = newRun?.executionRunId || newRun?.uuid || newRun?.id || newRun?.runId;
+  // createRun already added the run under executionRunId, so it isn't "fresh"
   const run =
+    (directId && instances.find((r) => r.uuid === directId)) ||
     fresh.find((r) => r.name === newRun?.name) ||
     fresh[0] ||
     (directId && instances.find((r) => r.uuid === directId)) ||
@@ -314,7 +316,7 @@ const parseEventData = (data) => {
 };
 const onRunStatusUpdate = (raw) => {
   const data = parseEventData(raw);
-  store.commit("analysisModule/UPDATE_RUN_STATUS", {
+  store.dispatch("analysisModule/applyRunStatusEvent", {
     runId: data.runId,
     status: data.status,
   });
