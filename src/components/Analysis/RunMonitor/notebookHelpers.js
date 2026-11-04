@@ -1,4 +1,5 @@
 import { gpuTaskResources } from "../ComputeNodes/computeNodeHelpers";
+import { RUNNING_STATUSES, runsEmptyState } from "./runHelpers";
 
 // Shared helpers for the Notebooks tab + launcher. A notebook is a workflow
 // whose step's app declares, in its app.yml, a live Jupyter session;
@@ -424,3 +425,13 @@ export function notebookProcessorConfigs(dag = [], { variantId = "", resources =
   }
   return configs;
 }
+
+// A notebook session that's running or on its way: as any run
+// (RUNNING_STATUSES).
+export const NOTEBOOK_RUNNING_STATUSES = RUNNING_STATUSES;
+
+// Which empty state the Notebooks tab's Live shows (runsEmptyState):
+// "empty" with no notebooks at all, "idle" with a history but none running,
+// null while loading or running.
+export const notebooksEmptyState = ({ loading = false, runs = [], hasMore = false } = {}) =>
+  runsEmptyState({ loading, runs, hasMore });

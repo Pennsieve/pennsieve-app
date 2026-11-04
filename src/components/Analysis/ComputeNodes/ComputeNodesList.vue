@@ -10,6 +10,8 @@ import BfEmptyPageState from '@/components/shared/bf-empty-page-state/BfEmptyPag
 import CreateComputeNodeDialog from './CreateComputeNodeDialog.vue'
 import ConnectAwsAccountDialog from '@/components/user/integrations/ConnectAwsAccountDialog.vue'
 import ComputeNodeCard from './ComputeNodeCard.vue'
+import { groupMyNodes } from './computeNodeHelpers'
+import AnalysisViewBar from '../AnalysisViewBar.vue'
 import { useComputeResourcesStore } from '@/stores/computeResourcesStore'
 
 const props = defineProps({
@@ -41,6 +43,10 @@ const computeNodes = computed(() => {
   })
 })
 const isLoading = computed(() => computeResourcesStore.isScopeLoading(scope.value))
+// My Workspace: the caller's own nodes (groupMyNodes), for Getting started;
+// and whether Pennsieve's public node is in the list, for the intro.
+const myGroups = computed(() => groupMyNodes(computeNodes.value, profile.value))
+const hasPublicNode = computed(() => computeNodes.value.some((n) => n.platform))
 
 // While a node is being created, updated or destroyed, refetch the list so
 // its card shows when that finishes (no realtime events for compute nodes).
@@ -92,7 +98,11 @@ const isOwner = computed(() => activeOrganization.value?.isOwner || false)
 // Show empty state when no nodes exist
 const showEmptyState = computed(() => !isLoading.value && computeNodes.value.length === 0)
 // Computes if any Compute Resources are available
-const hasNoResources = computed(() => { return computeNodes.value.length === 0 })
+// Getting started: no node of one's own yet (in My Workspace, a shared node
+// such as the public one doesn't count), or none at all in a workspace.
+const hasNoResources = computed(() =>
+  isMyWorkspace.value ? myGroups.value.own.length === 0 : computeNodes.value.length === 0
+)
 
 
 // Format account ID for display
@@ -346,10 +356,18 @@ async function confirmDeleteNode() {
 
 <template>
   <div class="compute-nodes-page">
+  <!-- + New Compute Node on the title row's right, as every Analysis tab's
+       primary action (AnalysisViewBar) -->
+  <AnalysisViewBar>
+    <bf-button :disabled="!canCreate" @click="openCreateDialog">+ New Compute Node</bf-button>
+  </AnalysisViewBar>
   <div class="compute-nodes-container">
     <div class="nodes-toolbar">
       <p class="nodes-intro">
-        <template v-if="isMyWorkspace">
+        <template v-if="isMyWorkspace && hasPublicNode">
+          Your personal compute nodes, on AWS accounts you registered, and the Pennsieve Public Compute Node, available to everyone.
+        </template>
+        <template v-else-if="isMyWorkspace">
           Your personal compute nodes, on AWS accounts you registered. They're private to you.
         </template>
         <template v-else>
@@ -358,7 +376,6 @@ async function confirmDeleteNode() {
         <router-link v-if="isMyWorkspace" :to="{ name: 'user-compute-resource' }" class="doc-link">Your compute resources</router-link>
         <a v-else href="https://docs.pennsieve.io/docs/compute-nodes" target="_blank" rel="noopener" class="doc-link">Documentation</a>
       </p>
-      <bf-button :disabled="!canCreate" @click="openCreateDialog">+ New Compute Node</bf-button>
     </div>
 
       <div class="nodes-content">

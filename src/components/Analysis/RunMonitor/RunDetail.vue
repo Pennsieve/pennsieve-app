@@ -104,6 +104,7 @@ import { appLambdaEligibility, lambdaUnavailableHint, lambdaOverrideWarning, wit
 import { stepLambdaFeedback } from "./lambdaFeedback";
 import { gpuReasonNote } from "./notebookHelpers";
 import { nodeGpu, gpuOffer, gpuName, gpuTaskResources } from "../ComputeNodes/computeNodeHelpers";
+import NodeTierBadge from "../ComputeNodes/NodeTierBadge.vue";
 import { useComputeResourcesStore } from "@/stores/computeResourcesStore";
 
 // Shown in a workspace (/:orgId/analysis/runs/...) and in My Workspace
@@ -3454,7 +3455,10 @@ onUnmounted(() => {
                       :value="c.node.uuid"
                       :disabled="c.reasons.length > 0"
                     >
-                      <span class="setup-option-name" :title="c.node.name">{{ c.node.name }}</span>
+                      <span class="setup-option-head">
+                        <span class="setup-option-name" :title="c.node.name">{{ c.node.name }}</span>
+                        <NodeTierBadge :node="c.node" plain />
+                      </span>
                       <span v-if="c.reasons.length" class="setup-option-why" :title="gpuReasonNote(c.reasons) || undefined">{{ c.reasons.join(" · ") }}</span>
                       <span v-else-if="c.offer" class="setup-option-why">{{ c.offer }}</span>
                     </el-option>
@@ -4369,6 +4373,13 @@ onUnmounted(() => {
   line-height: 1.3;
   white-space: normal;
 
+  /* The node's name, then its tier. */
+  .setup-option-head {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+  }
   .setup-option-name {
     overflow: hidden;
     text-overflow: ellipsis;

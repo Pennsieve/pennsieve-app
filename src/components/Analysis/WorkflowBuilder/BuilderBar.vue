@@ -22,6 +22,8 @@ const props = defineProps({
   // The builder's landing (choose how to start): there is no workflow yet,
   // so no name, description, readiness or Save to show.
   landing: { type: Boolean, default: false },
+  // Where Save goes, if not here (the Workflows tab's title row).
+  saveTarget: { type: String, default: "" },
 });
 // select(item): show what an item is about (its node); start-over; cancel
 const emit = defineEmits(["update:name", "update:description", "save", "start-over", "select", "cancel"]);
@@ -89,13 +91,15 @@ defineExpose({ focusName: () => nameRef.value?.focus() });
       <p v-else class="bb-empty">Nothing to fix. Save when you're ready.</p>
     </el-popover>
 
-    <el-tooltip :content="saveTitle" :disabled="!saveTitle" placement="bottom">
-      <span>
-        <bf-button :disabled="!readiness.ready || saving" :processing="saving" @click="emit('save')">
-          {{ saveLabel }}
-        </bf-button>
-      </span>
-    </el-tooltip>
+    <Teleport defer :to="saveTarget || 'body'" :disabled="!saveTarget">
+      <el-tooltip :content="saveTitle" :disabled="!saveTitle" placement="bottom">
+        <span>
+          <bf-button :disabled="!readiness.ready || saving" :processing="saving" @click="emit('save')">
+            {{ saveLabel }}
+          </bf-button>
+        </span>
+      </el-tooltip>
+    </Teleport>
 
     <button v-if="editing" type="button" class="bb-cancel" @click="emit('cancel')">Cancel</button>
     <el-dropdown v-else trigger="click" @command="(c) => c === 'start-over' && emit('start-over')">

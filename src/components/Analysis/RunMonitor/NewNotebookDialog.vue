@@ -55,6 +55,7 @@ import {
   notebookProcessorConfigs,
 } from "./notebookHelpers";
 import { nodeGpu, gpuOffer, gpuName, gpuTaskResources } from "../ComputeNodes/computeNodeHelpers";
+import NodeTierBadge from "../ComputeNodes/NodeTierBadge.vue";
 import { useComputeResourcesStore } from "@/stores/computeResourcesStore";
 import { fetchVariantGate, provisionerGateReason } from "./variantGate";
 import { fetchNodesSessions, capacityLabel, capacityReason } from "./notebookCapacity";
@@ -1160,7 +1161,10 @@ async function execute() {
               :aria-disabled="nodeReasons(cn).length > 0"
               @click="nodeReasons(cn).length || (form.computeNodeId = cn.uuid)"
             >
-              <div class="wizard-card-name">{{ cn.name }}</div>
+              <div class="wizard-card-head">
+                <span class="wizard-card-name">{{ cn.name }}</span>
+                <NodeTierBadge :node="cn" />
+              </div>
               <div v-if="cn.description" class="wizard-card-desc">
                 {{ cn.description }}
               </div>
@@ -2061,6 +2065,13 @@ async function execute() {
   font-size: 11px;
   font-weight: 400;
   color: theme.$gray_5;
+}
+/* A node's name, then its tier. */
+.wizard-card-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
 }
 .wizard-card-name {
   font-weight: 600;

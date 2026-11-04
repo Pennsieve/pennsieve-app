@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { formatCost, graphStatusColor, lambdaMemory, nodeBorderColor, nodeMetricRows, processorConfigEntry, statusMarkOf } from "./runHelpers";
+import { formatCost, graphStatusColor, isRunningStatus, lambdaMemory, nodeBorderColor, nodeMetricRows, processorConfigEntry, RUNNING_STATUSES, runsEmptyState, statusMarkOf } from "./runHelpers";
 
 describe("formatCost", () => {
   it("says a tiny cost is under a hundredth of a cent, not $0.0000", () => {
@@ -126,5 +126,32 @@ describe("lambdaMemory", () => {
     expect(lambdaMemory("10240")).toBe("10240");
     expect(lambdaMemory("512")).toBe("512");
     expect(lambdaMemory("")).toBe("");
+  });
+});
+
+describe("runsEmptyState", () => {
+  const done = { status: "SUCCEEDED" };
+  it("shows nothing while the first page loads", () => {
+    expect(runsEmptyState({ loading: true, runs: [] })).toBe(null);
+  });
+  it("is empty with no runs, no more pages and no history", () => {
+    expect(runsEmptyState({ runs: [] })).toBe("empty");
+  });
+  it("is idle with a history but none running", () => {
+    expect(runsEmptyState({ runs: [done] })).toBe("idle");
+    expect(runsEmptyState({ runs: [], hasMore: true })).toBe("idle");
+    expect(runsEmptyState({ runs: [], hasHistory: true })).toBe("idle");
+  });
+  it("shows nothing while a run is queued, running or ending", () => {
+    for (const status of RUNNING_STATUSES) expect(runsEmptyState({ runs: [done, { status }] })).toBe(null);
+  });
+  it("leaves a filtered list to its own no-results", () => {
+    expect(runsEmptyState({ runs: [], filtered: true })).toBe(null);
+    expect(runsEmptyState({ runs: [done], filtered: true })).toBe(null);
+  });
+  it("names the running statuses", () => {
+    expect(RUNNING_STATUSES).toEqual(["NOT_STARTED", "STARTED", "FINALIZING"]);
+    expect(isRunningStatus("STARTED")).toBe(true);
+    expect(isRunningStatus("SUCCEEDED")).toBe(false);
   });
 });

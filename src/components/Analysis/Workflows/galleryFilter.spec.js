@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { applyFilters, domainOptions, fieldOptions, inheritedTags, libraryWorkflows, workflowDomains, workflowFields, matchesSearch, outputOptions, sortWorkflows, workflowsView } from "./galleryFilter";
+import { activeFilters, applyFilters, domainOptions, FACET_DEFAULTS, fieldOptions, inheritedTags, libraryWorkflows, workflowDomains, workflowFields, matchesSearch, outputOptions, sortWorkflows, workflowsView } from "./galleryFilter";
 
 const spikes = {
   name: "EEG spikes",
@@ -156,6 +156,12 @@ describe("domains", () => {
     expect(applyFilters([spikes, zipper, tumours], { domain: "imaging", applications })).toEqual([]);
     expect(applyFilters([spikes, zipper, tumours], { domain: "ephys", input: "none", applications })).toEqual([]);
     expect(applyFilters([spikes, zipper, tumours], { domain: "any", applications })).toEqual([spikes, zipper, tumours]);
+    expect(applyFilters([spikes, zipper, tumours], { domain: [], applications })).toEqual([spikes, zipper, tumours]);
+  });
+
+  it("keeps a workflow in any of the chosen domains (OR), and in a chosen field too (AND)", () => {
+    expect(applyFilters([spikes, zipper, tumours], { domain: ["viz", "ephys"], applications })).toEqual([spikes, tumours]);
+    expect(applyFilters([spikes, zipper, tumours], { domain: ["viz", "ephys"], field: ["neuroscience"], applications })).toEqual([spikes]);
   });
 });
 
@@ -205,3 +211,44 @@ describe("workflowsView", () => {
   });
 });
 
+
+describe("activeFilters", () => {
+  const domains = [{ domain: { key: "genomics", label: "Genomics" }, count: 8 }];
+  const fields = [{ field: { key: "neuroscience", label: "Neuroscience" }, count: 6 }];
+  const outputs = [{ value: "download", label: "Download" }];
+
+  it("is empty with every facet at its default", () => {
+    expect(activeFilters(FACET_DEFAULTS, { domains, fields, outputs })).toEqual([]);
+    expect(activeFilters({}, { domains, fields, outputs })).toEqual([]);
+  });
+
+  it("names each facet set, in the panel's order", () => {
+    const state = { domain: "genomics", field: "neuroscience", input: "dataset", output: "download", status: "archived" };
+    expect(activeFilters(state, { domains, fields, outputs })).toEqual([
+      { key: "status", label: "Archived only" },
+      { key: "domain", value: "genomics", label: "Genomics" },
+      { key: "field", value: "neuroscience", label: "Neuroscience" },
+      { key: "input", label: "Takes a dataset" },
+      { key: "output", label: "Output: Download" },
+    ]);
+  });
+
+  it("names a value no longer offered by its key", () => {
+    expect(activeFilters({ ...FACET_DEFAULTS, domain: ["imaging"], output: "s3" }, { domains, fields, outputs })).toEqual([
+      { key: "domain", value: "imaging", label: "imaging" },
+      { key: "output", label: "Output: s3" },
+    ]);
+  });
+
+  it("gives each chosen domain and field its own chip", () => {
+    const more = [...domains, { domain: { key: "imaging", label: "Imaging" }, count: 2 }];
+    expect(activeFilters({ ...FACET_DEFAULTS, domain: ["genomics", "imaging"] }, { domains: more })).toEqual([
+      { key: "domain", value: "genomics", label: "Genomics" },
+      { key: "domain", value: "imaging", label: "Imaging" },
+    ]);
+  });
+
+  it("counts the status only away from Active (Show archived lists all)", () => {
+    expect(activeFilters({ ...FACET_DEFAULTS, status: "all" })).toEqual([{ key: "status", label: "Including archived" }]);
+  });
+});

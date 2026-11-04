@@ -16,7 +16,7 @@ import RunHistory from "./RunHistory.vue";
 import RunWizardDialog from "./RunWizardDialog.vue";
 
 // In the Workflows tab: no runs yet points to the Library, to start one.
-const emit = defineEmits(["open-library"]);
+const emit = defineEmits(["open-library", "update:excludeNotebooks"]);
 const props = defineProps({
   // Inside the Workflows tab (WorkflowsOverview), which has the toolbar and
   // its Run Workflow button: no header of its own.
@@ -24,17 +24,28 @@ const props = defineProps({
   // Leave out standalone notebook sessions (they're on the Notebooks tab); a
   // workflow with a notebook step is a workflow run and stays.
   excludeNotebooks: { type: Boolean, default: false },
+  // Offer "Include notebooks" with the run filters (the Workflows tab's Live;
+  // v-model:exclude-notebooks).
+  notebooksToggle: { type: Boolean, default: false },
 });
 import {
   statusDotClass,
   statusLabel,
   isTerminalStatus,
+  isRunningStatus,
+  runsEmptyState,
   formatTime,
   computeNodeName as computeNodeNameFn,
   getUserName as getUserNameFn,
   runStatusOptions,
   runDisplayName,
 } from "./runHelpers";
+import EmptyState from "../EmptyState.vue";
+import RunningNote from "../RunningNote.vue";
+// The pipeline illustration in Pennsieve's colours; at the slim note's size,
+// its graph and gear alone (the faint lines read as noise there).
+import pipelineIllo from "@/assets/images/illustrations/illo-data-model-pennsieve.svg";
+import pipelineMark from "@/assets/images/illustrations/illo-data-model-pennsieve-mark.svg";
 
 const store = useStore();
 const router = useRouter();
@@ -133,9 +144,7 @@ const shownRuns = computed(() =>
   props.excludeNotebooks ? workflowInstances.value.filter((r) => !isNotebookRun(r)) : workflowInstances.value
 );
 
-const activeRuns = computed(() =>
-  shownRuns.value.filter((r) => r.status === "NOT_STARTED" || r.status === "STARTED" || r.status === "FINALIZING")
-);
+const activeRuns = computed(() => shownRuns.value.filter((r) => isRunningStatus(r.status)));
 
 
 const statsOf = (total, succeeded, failed, canceled) => ({
@@ -159,17 +168,25 @@ const dashboardStats = computed(() => {
   return statsOf(total, less("succeeded"), less("failed"), less("canceled"));
 });
 
-// Nothing has run at all (not just nothing in a range or filter): one
-// welcome in place of an empty overview and list. Notebook sessions may
-// have run while they're hidden.
-const filtersDefault = computed(
-  () => statusFilter.value === "all" && workflowFilter.value === "all" && dashboardRange.value === "allTime"
+// Live's empty states (runsEmptyState): "empty" when no workflow run has
+// ever run here (notebook sessions don't count while they're hidden), in
+// place of the overview and the list; "idle" with a history but nothing
+// running, a slim note over it. Neither while the first page or the
+// counters load, nor with a filter set (the list's own "no results").
+// History: the counters' all-time total; in another range, assumed.
+const listFiltered = computed(
+  () => statusFilter.value !== "all" || workflowFilter.value !== "all" || computeNodeFilter.value !== "all"
 );
-const nothingRun = computed(
-  () => !isLoading.value && filtersDefault.value && !shownRuns.value.length && !dashboardStats.value
+const emptyState = computed(() =>
+  runsEmptyState({
+    loading: isLoading.value || (countersLoading.value && !dashboardStats.value),
+    runs: shownRuns.value,
+    hasMore: hasMoreRuns.value,
+    hasHistory: dashboardRange.value !== "allTime" || !!dashboardStats.value,
+    filtered: listFiltered.value,
+  })
 );
 const onlyNotebooks = computed(() => props.excludeNotebooks && workflowInstances.value.length > 0);
-const toBuilder = () => router.replace({ query: { ...route.query, view: "builder" } });
 const libraryRoute = computed(() => ({ name: isMyWorkspace.value ? "my-workflows" : "workflows", query: { view: "library" } }));
 
 /*
@@ -374,6 +391,11 @@ onBeforeUnmount(() => {
     <div class="builder-content">
       <!-- Main content area: Dashboard -->
       <div class="runs-main">
+        <!-- A history, but nothing running: a slim note over it -->
+        <RunningNote v-if="emptyState === 'idle'" :image="pipelineMark" text="No workflows running right now">
+          <button type="button" class="running-note-link" @click="openWizardDialog">+ Run Workflow</button>
+        </RunningNote>
+
         <!-- Active Runs Strip -->
         <div v-if="activeRuns.length > 0" class="dashboard-section">
           <h3 class="dashboard-section-title">
@@ -419,24 +441,20 @@ onBeforeUnmount(() => {
           </div>
         </div>
 
-        <!-- Nothing has run yet: a welcome, with where to start -->
-        <div v-if="nothingRun && !activeRuns.length" class="runs-welcome">
-          <IconControllerPlay :width="40" :height="40" color="currentColor" class="runs-welcome-icon" />
-          <h3>No workflow runs yet</h3>
-          <p v-if="onlyNotebooks">
-            Only notebook sessions so far. Tick <strong>Include notebooks</strong> to see them here.
-          </p>
-          <p v-else>
-            When you run a workflow, it shows here: live while it runs, then with its status, logs and cost.
-          </p>
-          <div class="runs-welcome-actions">
-            <bf-button @click="openWizardDialog">Run a workflow</bf-button>
-            <template v-if="embedded">
-              <bf-button class="secondary" @click="toBuilder">Build a workflow</bf-button>
-              <router-link :to="libraryRoute" class="runs-welcome-link">Browse workflows</router-link>
-            </template>
-          </div>
-        </div>
+        <!-- No workflow run yet: where to start -->
+        <EmptyState
+          v-if="emptyState === 'empty'"
+          :image="pipelineIllo"
+          title="Run your first workflow"
+          text="Start from a workflow in the Library, or build your own in the Builder."
+        >
+          <template v-if="onlyNotebooks" #note>
+            <p class="runs-empty-note">Only notebook sessions so far: tick <strong>Include notebooks</strong> to see them here.</p>
+          </template>
+          <bf-button @click="openWizardDialog">+ Run Workflow</bf-button>
+          <button v-if="embedded" type="button" class="empty-state-link" @click="emit('open-library')">Browse the Library</button>
+          <router-link v-else :to="libraryRoute" class="empty-state-link">Browse the Library</router-link>
+        </EmptyState>
 
         <template v-else>
         <!-- Aggregate Stats -->
@@ -515,6 +533,15 @@ onBeforeUnmount(() => {
               <el-option label="All compute nodes" value="all" />
               <el-option v-for="cn in computeNodes" :key="cn.uuid" :label="cn.name" :value="cn.uuid" />
             </el-select>
+            <el-checkbox
+              v-if="notebooksToggle"
+              :model-value="!excludeNotebooks"
+              size="small"
+              class="run-filter-check"
+              @change="(on) => emit('update:excludeNotebooks', !on)"
+            >
+              Include notebooks
+            </el-checkbox>
           </template>
           <template #actions="{ run }">
             <button class="rerun-btn" title="Rerun with this configuration" @click="rerunFromRun(run)">
@@ -693,46 +720,11 @@ onBeforeUnmount(() => {
   50% { opacity: 0.8; box-shadow: 0 0 0 6px rgba(6, 182, 212, 0); }
 }
 
-.runs-welcome {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-  padding: 72px 20px;
-  border: 1px dashed theme.$gray_3;
-  text-align: center;
-
-  h3 {
-    margin: 4px 0 0;
-    font-size: 16px;
-    font-weight: 600;
-    color: theme.$gray_6;
-  }
-  p {
-    max-width: 420px;
-    margin: 0;
-    font-size: 14px;
-    line-height: 1.5;
-    color: theme.$gray_5;
-  }
-}
-.runs-welcome-icon {
-  color: theme.$purple_1;
-}
-.runs-welcome-actions {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  margin-top: 12px;
-}
-.runs-welcome-link {
-  font-size: 14px;
-  color: theme.$link-color;
-  text-decoration: none;
-
-  &:hover {
-    color: theme.$link-color-hover;
-  }
+/* With only notebook sessions hidden: where they are. */
+.runs-empty-note {
+  margin: 0;
+  font-size: 13px;
+  color: theme.$gray_5;
 }
 .link-button {
   padding: 0;
@@ -912,6 +904,11 @@ onBeforeUnmount(() => {
 
 .run-filter-select {
   width: 160px;
+}
+/* As tall as the small selects beside it. */
+.run-filter-check {
+  height: 24px;
+  margin-right: 0;
 }
 
 .run-dialog-footer {

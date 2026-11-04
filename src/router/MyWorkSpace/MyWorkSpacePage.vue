@@ -8,6 +8,7 @@
           :page-route="sectionRoute"
           workspace-label="My Workspace"
           :workspace-route="{ name: 'my-workspace' }"
+          :actions="$route.matched.some((r) => r.name === 'my-analysis')"
         />
       </template>
     </bf-rafter>

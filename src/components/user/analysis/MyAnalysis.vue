@@ -38,7 +38,10 @@ const tabs = [
 <template>
   <div class="my-analysis">
     <div class="content-tabs">
-      <router-tabs :tabs="tabs" />
+      <router-tabs class="content-tabs-list" :tabs="tabs" />
+      <!-- The current tab's views (AnalysisViewBar); its actions are on the
+           title row -->
+      <div id="analysis-tab-views" class="tab-views" />
     </div>
     <router-view />
   </div>
@@ -48,8 +51,47 @@ const tabs = [
 @use '@/styles/theme';
 
 .content-tabs {
+  display: flex;
+  align-items: flex-end;
+  gap: 32px;
+  box-sizing: border-box;
+  height: 44px;
   background: white;
   border-bottom: 1px solid theme.$gray_2;
   padding: 0 32px;
+}
+/* The tabs at the row's bottom (their underline on its rule). */
+.content-tabs-list {
+  flex-shrink: 0;
+  max-width: 100%;
+}
+/* The current tab's views (AnalysisViewBar), on the right. */
+.tab-views {
+  display: flex;
+  flex: 1;
+  align-self: center;
+  justify-content: flex-end;
+  min-width: 0;
+}
+/* A phone: the views on a line below the tabs. */
+@media (max-width: 767px) {
+  .content-tabs {
+    flex-wrap: wrap;
+    row-gap: 0;
+    height: auto;
+    padding: 0 16px;
+  }
+  /* A long row of tabs scrolls rather than the page. */
+  .content-tabs-list {
+    overflow-x: auto;
+  }
+  .tab-views {
+    flex-basis: 100%;
+    justify-content: flex-start;
+    padding: 4px 0 8px;
+  }
+  .tab-views:empty {
+    display: none;
+  }
 }
 </style>

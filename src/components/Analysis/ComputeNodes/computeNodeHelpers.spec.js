@@ -8,6 +8,9 @@ import {
   relativeTime,
   formatAccountId,
   deploymentMode,
+  groupMyNodes,
+  DEPLOYMENT_MODES,
+  contrastRatio,
   limitSummary,
   nodeGpu,
   gpuName,
@@ -176,5 +179,42 @@ describe("a node's GPU", () => {
     expect(gpuName(g)).toBe("large tier");
     expect(gpuOffer(g)).toBe("GPU: large tier · up to 2 instances");
     expect(gpuTaskResources(g)).toBe("");
+  });
+});
+
+describe("node tiers (NodeTierBadge)", () => {
+  it("gives each tier its colour, icon and one-line tooltip", () => {
+    expect(deploymentMode({ deploymentMode: "basic" })).toMatchObject({ key: "basic", icon: "shield", tooltip: "Default AWS network; for public or low-risk data." });
+    expect(deploymentMode({ deploymentMode: "secure" })).toMatchObject({ key: "secure", color: "#2563eb", tooltip: "Private network with controlled internet access." });
+    expect(deploymentMode({ deploymentMode: "Compliant" })).toMatchObject({ key: "compliant", color: "#7c3aed", icon: "shield-check", tooltip: "Private network, no internet; for regulated data." });
+  });
+  it("reads a node without one, or an unknown one, as Basic", () => {
+    expect(deploymentMode({}).key).toBe("basic");
+    expect(deploymentMode({ deploymentMode: "other" }).key).toBe("basic");
+  });
+  it("has text that passes WCAG AA on its tint", () => {
+    for (const m of DEPLOYMENT_MODES) expect(contrastRatio(m.color, m.background)).toBeGreaterThanOrEqual(4.5);
+  });
+  it("measures contrast as WCAG does", () => {
+    expect(contrastRatio("#000000", "#ffffff")).toBeCloseTo(21, 5);
+    expect(contrastRatio("#ffffff", "#ffffff")).toBeCloseTo(1, 5);
+  });
+});
+
+describe("groupMyNodes", () => {
+  const me = { id: "N:user:1", intId: 7 };
+  const mine = { uuid: "a", ownerId: "N:user:1" };
+  const mineByInt = { uuid: "b", ownerId: 7 };
+  const publicNode = { uuid: "p", ownerId: "N:user:9", platform: true };
+  const othersNode = { uuid: "o", ownerId: "N:user:2" };
+  it("puts the caller's own nodes first, the rest as shared", () => {
+    expect(groupMyNodes([mine, publicNode, mineByInt, othersNode], me)).toEqual({ own: [mine, mineByInt], shared: [publicNode, othersNode] });
+  });
+  it("always counts Pennsieve's public node as shared, even its owner's", () => {
+    expect(groupMyNodes([{ ...publicNode, ownerId: "N:user:1" }], me).shared).toHaveLength(1);
+  });
+  it("shares everything without a profile, and handles no nodes", () => {
+    expect(groupMyNodes([mine], null)).toEqual({ own: [], shared: [mine] });
+    expect(groupMyNodes([], me)).toEqual({ own: [], shared: [] });
   });
 });
