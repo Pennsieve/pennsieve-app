@@ -76,6 +76,9 @@ describe("compute node page", () => {
   it("sums up a budget row's limits in one line", () => {
     expect(limitSummary({ dailyCostUsd: 5, monthlyCostUsd: null, maxConcurrentRuns: 3 })).toBe("$5.00 a day · 3 runs at once");
     expect(limitSummary({ maxConcurrentRuns: 1 })).toBe("1 run at once");
+    expect(limitSummary({ maxConcurrentRuns: 3, maxInteractiveSessions: 2 })).toBe("3 runs at once · 2 notebooks open");
+    expect(limitSummary({ maxInteractiveSessions: 1 })).toBe("1 notebook open");
+    expect(limitSummary({ maxInteractiveSessions: 0 })).toBe("0 notebooks open");
     expect(limitSummary({ dailyCostUsd: 0 })).toBe("$0.00 a day");
     expect(limitSummary({})).toBe("");
     expect(limitSummary(null)).toBe("");
