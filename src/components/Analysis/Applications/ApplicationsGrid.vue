@@ -13,10 +13,27 @@ import { useRouter, useRoute } from "vue-router";
 
 import IconAnalysis from "../../icons/IconAnalysis.vue";
 import AppBanner from "./AppBanner.vue";
-import { appDomain, appFields, domainColors, domainCounts, fieldCounts } from "./appDomains";
+import { domainCounts, fieldCounts } from "./appDomains";
+import {
+  APP_FILTER_DEFAULTS,
+  VISIBILITY_OPTIONS,
+  appActiveFilters,
+  appsInStatus,
+  filterApps,
+  readmeSummary,
+  visibilityLabel,
+} from "./appFilters";
+import FacetLayout from "../Facets/FacetLayout.vue";
+import FacetSection from "../Facets/FacetSection.vue";
+import FacetOptions from "../Facets/FacetOptions.vue";
+import FacetRadios from "../Facets/FacetRadios.vue";
+import FacetCheck from "../Facets/FacetCheck.vue";
+import CardTags from "../Facets/CardTags.vue";
+import { domainFacetOptions, fieldFacetOptions, toggleKey } from "../Facets/facets";
 import { paletteVariants, versionManifest } from "../WorkflowBuilder/appManifestInfo";
 import RuntimeMark from "../WorkflowGraph/RuntimeMark.vue";
 import IconPDF from "../../icons/IconPDF.vue";
+import { MoreFilled } from "@element-plus/icons-vue";
 import SampleOutputViewer from "../Workflows/SampleOutputViewer.vue";
 import { PDF_URL_FRESH_MS } from "../Workflows/runExamples";
 import { versionsToWatch, withLiveStatus } from "./liveStatus";
@@ -25,21 +42,17 @@ import {
   APP_SORTS,
   appTitle,
   githubRepo,
-  matchesAppSearch,
   appDescription,
   versionLabel,
-  runsOn,
+  appNeedsGpu,
   sortApps,
   versionState,
   workflowUses,
 } from "./appCards";
 
 defineProps({
-  // Inside the Apps tab, whose toolbar links the manifest builder.
+  // Inside the Apps tab, whose bar has the actions.
   embedded: { type: Boolean, default: false },
-  // The Apps tab's bar has the search (v-model:search); then there's no
-  // search row here, and Sort moves to the filter row.
-  searchInBar: { type: Boolean, default: false },
 });
 
 
@@ -53,17 +66,6 @@ const statusFilter = ref("active");
 const pageSize = 10;
 const currentPage = ref(1);
 
-const visibilityOptions = [
-  { label: "All", value: "all" },
-  { label: "Public", value: "public" },
-  { label: "Private", value: "private" },
-];
-
-const statusOptions = [
-  { label: "All", value: "all" },
-  { label: "Active", value: "active" },
-  { label: "Archived", value: "archived" },
-];
 
 /*
   Store computed
@@ -105,21 +107,8 @@ const chipTitle = (v) =>
 /*
   Derived helpers
 */
-const parseGitHubRepo = (sourceUrl) => {
-  if (!sourceUrl) return null;
-  const match = sourceUrl.match(/github\.com\/([^/]+)\/([^/\s.]+)/);
-  if (!match) return null;
-  return { owner: match[1], repo: match[2].replace(/\.git$/, "") };
-};
-
-const parseGitHubDisplay = (sourceUrl) => {
-  const info = parseGitHubRepo(sourceUrl);
-  return info ? `${info.owner}/${info.repo}` : null;
-};
-
 // The app.yml's tags, a few: the rest are found by search.
 const appTags = (app) => (versionManifest(app)?.tags || []).slice(0, 4);
-const repoName = (app) => parseGitHubDisplay(app.sourceUrl) || "Unknown repo";
 
 const latestVersion = (app) => {
   const versions = app.versions || [];
@@ -138,22 +127,16 @@ const latestVersion = (app) => {
   release). Nothing is fetched from GitHub per card: that was one request
   per app, rate-limited (60/hour), and failing for private repositories.
 */
-const readmeSummary = (app) => app?.summary || "";
-
-const visibilityLabel = (app) => {
-  const visibility = app?.visibility;
-  if (visibility !== "public" && visibility !== "private") return null;
-  return visibility === "private" ? "Private" : "Public";
-};
+// (readmeSummary, appFilters.js)
 
 /*
   Filtered & sorted applications (newest first, matching workflows)
 */
 // Where an app runs (from its runtime config), and the choices the list has.
-// A domain's key, or null for every app: the colour legend above the cards.
-const domainFilter = ref(null);
-// A research field's key, or null: combines with the domain (both must hold).
-const fieldFilter = ref(null);
+// Domains' keys (any of them), none for every app.
+const domainFilter = ref([]);
+// Research fields' keys (any of them; with the domains, both must hold).
+const fieldFilter = ref([]);
 
 // The sort is the viewer's, kept in this browser.
 const SORT_KEY = "pennsieve.gallery.appSort";
@@ -187,58 +170,59 @@ const githubUrl = (app) => {
 
 const filtersSet = computed(
   () =>
-    !!searchQuery.value.trim() || visibilityFilter.value !== "all" || !!domainFilter.value || !!fieldFilter.value
+    !!searchQuery.value.trim() || visibilityFilter.value !== "all" || domainFilter.value.length > 0 || fieldFilter.value.length > 0
 );
 function clearFilters() {
   searchQuery.value = "";
   visibilityFilter.value = "all";
-  domainFilter.value = null;
-  fieldFilter.value = null;
+  domainFilter.value = [];
+  fieldFilter.value = [];
 }
 
-// The domains among the apps in this status (active, archived…), as chips
-// in their colours: what the banners' colours mean, and a filter.
-const statusApps = computed(() =>
-  statusFilter.value === "all"
-    ? applications.value
-    : applications.value.filter((app) => (statusFilter.value === "archived") === (app.status === "archived"))
-);
+// The domains among the apps in this status (active, archived…), with
+// their colours' dots: what the banners' colours mean, and a filter; then
+// the research fields among them. One at a time each; both must hold.
+const statusApps = computed(() => appsInStatus(applications.value, statusFilter.value));
 const domainChips = computed(() => domainCounts(statusApps.value));
-const chipStyle = (domain) => {
-  const c = domainColors(domain);
-  return { "--chip-bg": c.bg, "--chip-ink": c.ink, "--chip-line": c.line, "--chip-dot": c.accent };
-};
-const toggleDomain = (key) => (domainFilter.value = domainFilter.value === key ? null : key);
-// The research fields among them: plain chips, since a colour means a domain.
 const fieldChips = computed(() => fieldCounts(statusApps.value));
-const toggleField = (key) => (fieldFilter.value = fieldFilter.value === key ? null : key);
-
-const filteredApplications = computed(() => {
-  let list = applications.value;
-
-  // Filter by lifecycle status. "Active" (the default) hides archived apps.
-  if (statusFilter.value === "active") {
-    list = list.filter((app) => app.status !== "archived");
-  } else if (statusFilter.value === "archived") {
-    list = list.filter((app) => app.status === "archived");
-  }
-
-  list = list.filter((app) => matchesAppSearch(app, searchQuery.value, readmeSummary(app)));
-
-  if (visibilityFilter.value !== "all") {
-    list = list.filter(
-      (app) => (visibilityLabel(app) || "").toLowerCase() === visibilityFilter.value
-    );
-  }
-  if (domainFilter.value) {
-    list = list.filter((app) => appDomain(app)?.key === domainFilter.value);
-  }
-  if (fieldFilter.value) {
-    list = list.filter((app) => appFields(app).some((f) => f.key === fieldFilter.value));
-  }
-
-  return sortApps(list, sortBy.value, workflows.value);
+const domainFacets = computed(() => domainFacetOptions(domainChips.value));
+const fieldFacets = computed(() => fieldFacetOptions(fieldChips.value));
+const toggleDomain = (key) => (domainFilter.value = toggleKey(domainFilter.value, key));
+const toggleField = (key) => (fieldFilter.value = toggleKey(fieldFilter.value, key));
+// Show archived: all (Active and Archived) when ticked, Active when not.
+const showArchived = computed({
+  get: () => statusFilter.value !== APP_FILTER_DEFAULTS.status,
+  set: (on) => (statusFilter.value = on ? "all" : APP_FILTER_DEFAULTS.status),
 });
+
+// The filters set, as removable chips over the cards; Clear all resets them
+// (the search stays: it's in the toolbar).
+const facetRefs = { visibility: visibilityFilter, status: statusFilter, domain: domainFilter, field: fieldFilter };
+const activeChips = computed(() =>
+  appActiveFilters(
+    { visibility: visibilityFilter.value, status: statusFilter.value, domain: domainFilter.value, field: fieldFilter.value },
+    { domains: domainChips.value, fields: fieldChips.value }
+  )
+);
+// Clear a facet, or (a chip of a multi-select one) one of its keys.
+const clearFacet = (key, value) =>
+  (facetRefs[key].value = value === undefined ? APP_FILTER_DEFAULTS[key] : facetRefs[key].value.filter((k) => k !== value));
+const removeChip = (chip) => clearFacet(chip.key, chip.value);
+const clearFacets = () => Object.keys(facetRefs).forEach((key) => clearFacet(key));
+
+const filteredApplications = computed(() =>
+  sortApps(
+    filterApps(applications.value, {
+      status: statusFilter.value,
+      query: searchQuery.value,
+      visibility: visibilityFilter.value,
+      domain: domainFilter.value,
+      field: fieldFilter.value,
+    }),
+    sortBy.value,
+    workflows.value
+  )
+);
 
 const paginatedApplications = computed(() => {
   const start = (currentPage.value - 1) * pageSize;
@@ -331,6 +315,12 @@ const goToDetail = (app) => {
   router.push(scopedRoute("application-detail", { uuid: app.uuid }));
 };
 
+// The card's menu: its repository, or its sample output.
+const onAppMenu = (command, app) => {
+  if (command === "github") window.open(githubUrl(app), "_blank", "noopener");
+  else if (command === "sample") openAppSample(app);
+};
+
 const goToManifestBuilder = () => {
   router.push(scopedRoute("application-manifest-builder"));
 };
@@ -384,79 +374,43 @@ const goToManifestBuilder = () => {
       </div>
     </div>
 
-    <!-- Applications Section -->
-    <div class="applications-section">
-      <div v-if="!searchInBar" class="applications-section-header">
+    <!-- The filters on the left (a rail when folded, a drawer on a phone),
+         as the Workflows Library's; the search and Sort in one row; the
+         chips and cards -->
+    <FacetLayout
+      class="applications-section"
+      storage-key="pennsieve.apps.filtersPanel"
+      :chips="activeChips"
+      @remove="removeChip"
+      @clear-all="clearFacets"
+    >
+      <template #filters>
+        <FacetSection title="Visibility" :clearable="visibilityFilter !== APP_FILTER_DEFAULTS.visibility" @clear="clearFacet('visibility')">
+          <FacetRadios v-model="visibilityFilter" :options="VISIBILITY_OPTIONS" label="Visibility" />
+          <FacetCheck v-model="showArchived" label="Show archived" />
+        </FacetSection>
+        <FacetSection v-if="domainFacets.length" title="Domain" :clearable="domainFilter.length > 0" @clear="clearFacet('domain')">
+          <FacetOptions :options="domainFacets" :selected="domainFilter" @toggle="toggleDomain" />
+        </FacetSection>
+        <FacetSection v-if="fieldFacets.length" title="Field" :clearable="fieldFilter.length > 0" @clear="clearFacet('field')">
+          <FacetOptions :options="fieldFacets" :selected="fieldFilter" @toggle="toggleField" />
+        </FacetSection>
+      </template>
+
+      <template #toolbar>
         <el-input
           v-model="searchQuery"
           placeholder="Search by name, description or repository…"
           clearable
-          class="applications-search-input"
+          class="toolbar-search"
         />
-        <label class="sort-control">
+        <label class="sort-control toolbar-sort">
           Sort
           <el-select v-model="sortBy" size="small" class="sort-select">
             <el-option v-for="o in APP_SORTS" :key="o.value" :label="o.label" :value="o.value" />
           </el-select>
         </label>
-      </div>
-
-      <!-- One row: visibility chips | where it runs | status at the end. -->
-      <div class="filter-row">
-        <div class="scope-buttons">
-          <button
-            v-for="option in visibilityOptions"
-            :key="option.value"
-            class="filter-btn"
-            :class="{ active: visibilityFilter === option.value }"
-            @click="visibilityFilter = option.value"
-          >
-            {{ option.label }}
-          </button>
-        </div>
-        <label v-if="searchInBar" class="sort-control filter-sort">
-          Sort
-          <el-select v-model="sortBy" size="small" class="sort-select">
-            <el-option v-for="o in APP_SORTS" :key="o.value" :label="o.label" :value="o.value" />
-          </el-select>
-        </label>
-        <el-select v-model="statusFilter" size="small" class="status-select" :class="{ 'after-sort': searchInBar }" aria-label="Status">
-          <el-option v-for="option in statusOptions" :key="option.value" :label="option.label" :value="option.value" />
-        </el-select>
-      </div>
-
-      <div v-if="domainChips.length" class="domain-row" role="group" aria-label="What apps are for">
-        <button
-          v-for="{ domain, count } in domainChips"
-          :key="domain.key"
-          type="button"
-          class="domain-chip"
-          :class="{ active: domainFilter === domain.key }"
-          :style="chipStyle(domain)"
-          :aria-pressed="domainFilter === domain.key"
-          :title="domain.subject ? `About ${domain.label.toLowerCase()}` : `For ${domain.label.toLowerCase()}`"
-          @click="toggleDomain(domain.key)"
-        >
-          <span class="domain-dot" />
-          {{ domain.label }}
-          <span class="domain-count">{{ count }}</span>
-        </button>
-      </div>
-      <div v-if="fieldChips.length" class="domain-row field-row" role="group" aria-label="Research field">
-        <span class="field-label">Field</span>
-        <button
-          v-for="{ field, count } in fieldChips"
-          :key="field.key"
-          type="button"
-          class="field-chip"
-          :class="{ active: fieldFilter === field.key }"
-          :aria-pressed="fieldFilter === field.key"
-          @click="toggleField(field.key)"
-        >
-          {{ field.label }}
-          <span class="domain-count">{{ count }}</span>
-        </button>
-      </div>
+      </template>
 
       <div v-if="filteredApplications.length > 0" class="applications-grid">
         <!-- A card: the app's banner on the left (what goes in and comes
@@ -486,7 +440,7 @@ const goToManifestBuilder = () => {
               {{ appDescription(app) || readmeSummary(app) || "No description." }}
             </p>
             <!-- Its variants (a CPU and a GPU build), then its tags -->
-            <div v-if="appTags(app).length || paletteVariants(app).length" class="app-tags">
+            <div v-if="appTags(app).length || paletteVariants(app).length || appNeedsGpu(app)" class="app-tags">
               <span
                 v-for="v in paletteVariants(app)"
                 :key="`v:${v.id}`"
@@ -494,35 +448,42 @@ const goToManifestBuilder = () => {
                 :class="chipState(v)"
                 :title="chipTitle(v)"
               ><RuntimeMark v-if="v.gpu" runtime="gpu" compact />{{ v.name }}</span>
-              <span v-for="t in appTags(app)" :key="t" class="app-tag">{{ t }}</span>
-            </div>
-            <div class="app-meta">
-              <span v-if="runsOn(app)" class="app-runs">{{ runsOn(app) }} · </span>{{ repoName(app) }}
+              <CardTags :tags="appTags(app)" />
+              <!-- Runs on a GPU: muted, as a field tag (a GPU variant's chip
+                   already says so) -->
+              <el-tooltip v-if="appNeedsGpu(app) && !paletteVariants(app).some((v) => v.gpu)" content="Needs a GPU compute node" placement="top">
+                <span class="app-gpu">GPU</span>
+              </el-tooltip>
             </div>
             <div class="app-foot">
               <span class="app-usage">
                 <span class="app-dot" :class="versionState(app)" :title="statusLabel(latestVersion(app)?.status)" />
-                {{ usageText(app) }}
+                <span class="app-usage-text">{{ usageText(app) }}</span>
               </span>
+              <!-- Open, then the rest (GitHub, the sample PDF) in a menu, so
+                   the usage keeps its room on a narrow card -->
               <span class="app-actions" @click.stop>
-                <a
-                  v-if="githubUrl(app)"
-                  :href="githubUrl(app)"
-                  target="_blank"
-                  rel="noopener"
-                  class="app-action"
-                >GitHub</a>
                 <button type="button" class="app-action app-action--open" @click="goToDetail(app)">Open</button>
-                <el-tooltip v-if="appSamples[app.sourceUrl]" content="Sample output: a PDF summary of a run of this app" placement="top">
-                  <button
-                    type="button"
-                    class="app-action app-action--icon"
-                    aria-label="Sample output: a PDF summary of a run of this app"
-                    @click="openAppSample(app)"
-                  >
-                    <IconPDF :width="16" :height="16" color="currentColor" />
+                <el-dropdown
+                  v-if="githubUrl(app) || appSamples[app.sourceUrl]"
+                  trigger="click"
+                  placement="bottom-end"
+                  @command="(c) => onAppMenu(c, app)"
+                >
+                  <button type="button" class="app-action app-action--icon" aria-label="More: GitHub, sample output" title="More">
+                    <el-icon><MoreFilled /></el-icon>
                   </button>
-                </el-tooltip>
+                  <template #dropdown>
+                    <el-dropdown-menu>
+                      <el-dropdown-item v-if="githubUrl(app)" command="github">View on GitHub</el-dropdown-item>
+                      <el-dropdown-item v-if="appSamples[app.sourceUrl]" command="sample">
+                        <span class="app-menu-item" title="A PDF summary of a run of this app">
+                          <IconPDF :width="14" :height="14" color="currentColor" /> Sample output (PDF)
+                        </span>
+                      </el-dropdown-item>
+                    </el-dropdown-menu>
+                  </template>
+                </el-dropdown>
               </span>
             </div>
           </div>
@@ -548,7 +509,7 @@ const goToManifestBuilder = () => {
         :total="filteredApplications.length"
         @current-change="currentPage = $event"
       />
-    </div>
+    </FacetLayout>
     <SampleOutputViewer
       v-model="sampleViewer.open"
       :source="sampleViewer.source"
@@ -562,13 +523,14 @@ const goToManifestBuilder = () => {
 @use "../../../styles/theme";
 @use "../../../styles/element/input";
 
-/* Lined up with the Apps tab's toolbar and the Analysis tabs (32px). */
+/* No padding of its own: the filter panel (or its rail) sits against the
+   page's edges; FacetLayout pads the list (20px/32px, as the Analysis tabs). */
 .applications-container {
-  padding: 20px 32px;
+  min-height: 100%;
 }
 
 .info-section {
-  margin-bottom: 32px;
+  margin: 20px 32px 12px;
 }
 
 .info-card {
@@ -618,39 +580,14 @@ const goToManifestBuilder = () => {
   }
 }
 
-.applications-section {
-  margin-bottom: 48px;
-}
-
-.applications-section-header {
-  display: flex;
-  /* The sort lines up with the bottom of the (taller) search box. */
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 16px;
-
-  h3 {
-    font-size: 20px;
-    font-weight: 500;
-    color: theme.$gray_6;
-    margin: 0;
-  }
-}
-
-.applications-section-actions {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.applications-search-input {
-  /* The row's width up to the sort, so it lines up with the cards below. */
+/* The search fills the toolbar's row up to Sort, then the tab's actions. */
+.toolbar-search {
   flex: 1;
+  min-width: 0;
 }
-
 .sort-control {
   display: flex;
+  flex-shrink: 0;
   align-items: center;
   gap: 8px;
   font-size: 12px;
@@ -659,143 +596,33 @@ const goToManifestBuilder = () => {
 .sort-select {
   width: 170px;
 }
-
-/* One row, all 24px tall, as in the workflow Library. */
-/* The domains, in their banners' colours: a legend, and a filter. */
-.domain-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin: -4px 0 16px;
-}
-.domain-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 3px 10px;
-  border: 1px solid var(--chip-line);
-  border-radius: 3px;
-  background: theme.$white;
-  font: inherit;
-  font-size: 12px;
-  color: var(--chip-ink);
-  cursor: pointer;
-
-  &:hover {
-    background: var(--chip-bg);
+@media (max-width: 767px) {
+  .info-section {
+    margin: 16px 16px 0;
   }
-  &.active {
-    border-color: var(--chip-ink);
-    background: var(--chip-bg);
-    font-weight: 600;
+  /* The select alone says what it sorts by. */
+  .toolbar-sort {
+    font-size: 0;
   }
-}
-.domain-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--chip-dot);
-}
-/* The research fields under them: outlined and grey, a filter only. */
-.field-row {
-  align-items: center;
-  margin-top: -8px;
-}
-.field-label {
-  margin-right: 4px;
-  font-size: 12px;
-  color: theme.$gray_5;
-}
-.field-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 3px 10px;
-  border: 1px solid theme.$gray_2;
-  border-radius: 3px;
-  background: theme.$white;
-  font: inherit;
-  font-size: 12px;
-  color: theme.$gray_6;
-  cursor: pointer;
-
-  &:hover {
-    border-color: theme.$gray_4;
+  .sort-select {
+    width: 130px;
   }
-  &.active {
-    border-color: theme.$gray_6;
-    font-weight: 600;
-  }
-}
-.domain-count {
-  color: theme.$gray_4;
-  font-weight: 400;
-}
-.filter-row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
-  margin-bottom: 16px;
-}
-.scope-buttons {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-.filter-btn {
-  height: 24px;
-  padding: 0 12px;
-  border: 1px solid theme.$gray_2;
-  border-radius: 4px;
-  background: white;
-  color: theme.$gray_5;
-  font-size: 12px;
-  font-weight: 500;
-  line-height: 22px;
-  cursor: pointer;
-  transition: all 0.2s;
-
-  &:hover {
-    border-color: theme.$purple_1;
-    color: theme.$purple_1;
-  }
-  &.active {
-    background: theme.$purple_1;
-    border-color: theme.$purple_1;
-    color: white;
-  }
-}
-.io-select {
-  width: 170px;
-}
-.status-select {
-  width: 110px;
-  margin-left: auto;
-
-  &.after-sort {
-    margin-left: 0;
-  }
-}
-/* Sort and status together at the row's end (Apps tab). */
-.filter-sort {
-  margin-left: auto;
 }
 
-/* Wide cards, two to a row where they fit, as the workflows'. */
+/* Cards two or more to a row where 340px each fit (16px apart), each as
+   tall as its square banner (172px; 140px in a narrow card), as the
+   workflows': the rows line up, and the text fits the card. */
 $card-height: 172px;
 
-/* Cards of one height, with a square banner: the rows line up whether or
-   not a card has tags or a second line of description. */
 .applications-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(340px, 100%), 1fr));
   gap: 16px;
 }
 .app-card {
   display: flex;
-  height: $card-height;
   min-width: 0;
+  container: app-card / inline-size;
   border: 1px solid theme.$gray_2;
   background: theme.$white;
   overflow: hidden;
@@ -811,6 +638,7 @@ $card-height: 172px;
   &:hover .app-actions,
   &:focus-within .app-actions {
     opacity: 1;
+    pointer-events: auto;
   }
   &.is-archived {
     opacity: 0.7;
@@ -819,13 +647,53 @@ $card-height: 172px;
 /* The app's banner, where the workflows show their graph. */
 .app-thumb {
   display: flex;
-  flex: 0 0 $card-height;
+  flex: 0 0 auto;
+  align-self: flex-start;
+  width: $card-height;
+  aspect-ratio: 1 / 1;
   border-right: 1px solid theme.$gray_2;
 }
+/* A narrow card: a smaller square, tighter text, two lines of
+   description. */
+@container app-card (max-width: 440px) {
+  .app-thumb {
+    width: 140px;
+  }
+  .app-body {
+    gap: 4px;
+    padding: 10px 12px;
+  }
+  .app-body .app-description {
+    -webkit-line-clamp: 2;
+  }
+}
+/* Its variants (boxed), then its tags as the panel lists them (CardTags). */
+/* One line: the tags give way (dropping whole ones) to the GPU marker. */
 .app-tags {
   display: flex;
-  gap: 4px;
+  flex-shrink: 0;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 0 4px;
+  height: 18px;
   overflow: hidden;
+}
+/* The tags take the rest of the row, so the ones that don't fit drop
+   whole (CardTags) rather than being cut. */
+.app-tags .card-tags {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+/* Runs on a GPU: muted, as a field tag, after the tags. */
+.app-gpu {
+  flex-shrink: 0;
+  margin-left: 12px;
+  font-size: 12px;
+  line-height: 18px;
+  color: theme.$gray_5;
+}
+.app-variant + .card-tags {
+  margin-left: 8px;
 }
 .app-tag {
   flex-shrink: 0;
@@ -850,6 +718,8 @@ $card-height: 172px;
   color: theme.$red_2;
   text-decoration: line-through;
 }
+/* The text fits the banner's height: it doesn't size the card (contain),
+   and what doesn't fit is cut, never the card stretched. */
 .app-body {
   display: flex;
   flex-direction: column;
@@ -857,6 +727,8 @@ $card-height: 172px;
   flex: 1;
   min-width: 0;
   padding: 14px 16px 12px;
+  contain: size;
+  overflow: hidden;
 }
 .app-title {
   display: flex;
@@ -890,41 +762,39 @@ $card-height: 172px;
   font-weight: 600;
   text-transform: uppercase;
 }
+/* Three lines where the card has room (two in a narrow one). */
 .app-description {
   display: -webkit-box;
+  flex-shrink: 0;
   margin: 0;
   overflow: hidden;
-  -webkit-line-clamp: 2;
+  -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
   font-size: 13px;
   line-height: 1.4;
   color: theme.$gray_5;
 }
-/* Where it runs, then its repository, on one line. */
-.app-meta {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 12px;
-  color: theme.$gray_4;
-}
-.app-runs {
-  color: theme.$gray_6;
-}
+/* One line at the card's foot: the usage gives way (…) to the buttons,
+   which always show. */
 .app-foot {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 8px;
   margin-top: auto;
-  padding-top: 6px;
 }
 .app-usage {
   display: flex;
+  flex: 1 1 auto;
   align-items: center;
   gap: 6px;
+  min-width: 0;
   font-size: 12px;
   color: theme.$gray_4;
+}
+.app-usage-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 /* The latest version's state. */
 .app-dot {
@@ -938,11 +808,26 @@ $card-height: 172px;
   &.pending { background: #f59e0b; }
   &.failed { background: theme.$status_red; }
 }
+/* Over the usage's end, on hover only: the usage keeps the whole line
+   until then (on a touch screen, in the line). */
+.app-foot {
+  position: relative;
+}
 .app-actions {
+  position: absolute;
+  right: 0;
   display: flex;
   gap: 6px;
+  padding-left: 12px;
+  background: linear-gradient(to right, rgba(255, 255, 255, 0), theme.$white 12px);
+  pointer-events: none;
   opacity: 0;
   transition: opacity 0.15s ease;
+}
+.app-menu-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 .app-action--icon {
   display: inline-flex;
@@ -978,7 +863,13 @@ $card-height: 172px;
 }
 @media (hover: none) {
   .app-actions {
+    position: static;
+    flex-shrink: 0;
+    margin-left: auto;
+    padding-left: 0;
+    background: none;
     opacity: 1;
+    pointer-events: auto;
   }
 }
 .clear-filters {

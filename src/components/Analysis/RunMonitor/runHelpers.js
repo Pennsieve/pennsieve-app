@@ -81,6 +81,24 @@ export const statusLabel = (status) => {
   }
 };
 
+// A run that's running or on its way, as Live's "Active" cards count it:
+// queued (NOT_STARTED), running (STARTED), or ending (FINALIZING).
+export const RUNNING_STATUSES = ["NOT_STARTED", "STARTED", "FINALIZING"];
+export const isRunningStatus = (status) => RUNNING_STATUSES.includes(status);
+
+// Which empty state a run list shows (Notebooks and Workflows Live):
+// - "empty": nothing at all (none loaded, no more pages, no history
+//   counted elsewhere: hasHistory);
+// - "idle": a history, but none running;
+// - null: still loading the first page (no flash), filtered (the list's own
+//   "no results" applies), or some are running.
+export function runsEmptyState({ loading = false, runs = [], hasMore = false, hasHistory = false, filtered = false } = {}) {
+  if (loading && !runs.length) return null;
+  if (filtered) return null;
+  if (runs.some((r) => isRunningStatus(r.status))) return null;
+  return runs.length || hasMore || hasHistory ? "idle" : "empty";
+}
+
 export const isTerminalStatus = (status) => {
   return ["SUCCEEDED", "FAILED", "CANCELLED"].includes(status);
 };

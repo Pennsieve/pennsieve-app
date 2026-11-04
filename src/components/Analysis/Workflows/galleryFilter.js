@@ -6,6 +6,7 @@ import { versionManifest } from "../WorkflowBuilder/appManifestInfo";
 import { isNotebookWorkflow } from "../RunMonitor/notebookHelpers";
 import { interfaceDag } from "../RunMonitor/workflowInterface";
 import { fieldsOf, domainOfTag, appDomain } from "../Applications/appDomains";
+import { matchesAny, selectedKeys } from "../Facets/facets";
 
 // Whether a workflow matches a search: its name, description, tags, the
 // apps it runs, or what goes in and comes out ("spike" finds the one running
@@ -91,18 +92,55 @@ export function fieldOptions(list, applications = []) {
     .sort((a, b) => b.count - a.count || a.field.label.localeCompare(b.field.label));
 }
 
-// officialOnly keeps Pennsieve's; domain is a domain's key, field a research
-// field's.
+// officialOnly keeps Pennsieve's; domain and field are lists of keys (any
+// of them: OR within each, AND between them; empty, or "any", for all).
 export function applyFilters(list, { query, input = "any", output = "any", domain = "any", field = "any", officialOnly = false, ...context } = {}) {
   return list.filter(
     (wf) =>
       (!officialOnly || wf.official) &&
       (input === "any" || inputKind(wf) === input) &&
       (output === "any" || outputTypes(wf).includes(output)) &&
-      (domain === "any" || workflowDomains(wf, context.applications).some((d) => d.key === domain)) &&
-      (field === "any" || workflowFields(wf, context.applications).some((f) => f.key === field)) &&
+      matchesAny(workflowDomains(wf, context.applications).map((d) => d.key), domain) &&
+      matchesAny(workflowFields(wf, context.applications).map((f) => f.key), field) &&
       matchesSearch(wf, query, context)
   );
+}
+
+// The Library's facets: what each takes, and its value when nothing is chosen.
+export const INPUT_OPTIONS = [
+  { value: "dataset", label: "Takes a dataset" },
+  { value: "none", label: "No input" },
+];
+// The panel's "Show archived" lists all (Active and Archived); archived
+// alone isn't offered there, but a chip names it should it be set.
+const STATUS_CHIPS = { all: "Including archived", archived: "Archived only" };
+export const FACET_DEFAULTS = Object.freeze({ domain: [], field: [], input: "any", output: "any", status: "active" });
+
+// The facets set away from their defaults, as removable chips: { key, value,
+// label }, one per chosen domain and field (value: its key), in the panel's
+// order (status, domain, field, input, output). The labels come from the
+// options shown (domainOptions, fieldOptions, outputOptions); a value no
+// longer offered (another scope's) shows by its key.
+export function activeFilters(state = {}, { domains = [], fields = [], outputs = [] } = {}) {
+  const set = (key) => state[key] !== undefined && state[key] !== FACET_DEFAULTS[key];
+  const chips = [];
+  if (set("status")) {
+    chips.push({ key: "status", label: STATUS_CHIPS[state.status] || `Status: ${state.status}` });
+  }
+  for (const key of selectedKeys(state.domain)) {
+    chips.push({ key: "domain", value: key, label: domains.find((o) => o.domain.key === key)?.domain.label || key });
+  }
+  for (const key of selectedKeys(state.field)) {
+    chips.push({ key: "field", value: key, label: fields.find((o) => o.field.key === key)?.field.label || key });
+  }
+  if (set("input")) {
+    chips.push({ key: "input", label: INPUT_OPTIONS.find((o) => o.value === state.input)?.label || state.input });
+  }
+  if (set("output")) {
+    const o = outputs.find((x) => x.value === state.output);
+    chips.push({ key: "output", label: `Output: ${o?.label || state.output}` });
+  }
+  return chips;
 }
 
 const lastRun = (wf) =>

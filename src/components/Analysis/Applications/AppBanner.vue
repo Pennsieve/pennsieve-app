@@ -61,6 +61,9 @@ const label = computed(() => {
 
 .ab {
   position: relative;
+  /* The banner is square (the card's), so its width also gives its height:
+     the tile sizes from it (cqw). */
+  container-type: inline-size;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -113,31 +116,37 @@ const label = computed(() => {
 .ab-edge--out {
   margin-bottom: 5px;
 }
+/* The app's tile, always square: alone, half the banner; between its
+   input and output rows, 40% of it, or the height left after the rows and
+   edges (56px) and the padding, if less (cqw is the banner's width less
+   its 16px side padding; its height, the square's, less 34px top and
+   bottom). Its initials and icon scale with it. */
 .ab-tile {
+  --tile: min(50cqw, calc(100cqw - 30px));
   position: relative;
   display: flex;
+  flex: 0 0 auto;
   align-items: center;
   justify-content: center;
-  width: 88px;
-  height: 88px;
+  width: var(--tile);
+  height: var(--tile);
+  aspect-ratio: 1 / 1;
   background: var(--ab-tile);
-  font-size: 30px;
+  font-size: calc(var(--tile) * 0.34);
   font-weight: 600;
   letter-spacing: 0.02em;
   color: var(--ab-ink);
 }
 .ab-tile--small {
-  width: 56px;
-  height: 56px;
-  font-size: 19px;
+  --tile: min(40cqw, calc(100cqw - 74px));
 }
 .ab-icon {
   position: absolute;
-  top: -7px;
-  right: -7px;
-  width: 22px;
-  height: 22px;
-  padding: 3px;
+  top: calc(var(--tile) * -0.08);
+  right: calc(var(--tile) * -0.08);
+  width: max(14px, calc(var(--tile) * 0.25));
+  height: max(14px, calc(var(--tile) * 0.25));
+  padding: max(2px, calc(var(--tile) * 0.035));
   box-sizing: border-box;
   border: 1px solid var(--ab-line);
   border-radius: 50%;

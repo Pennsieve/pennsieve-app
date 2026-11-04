@@ -1,7 +1,7 @@
 // What the Apps tab's cards show, and how they're searched, filtered
 // and sorted: pure, from the application records.
 import { normalizeUrl } from "../RunMonitor/runHelpers";
-import { versionManifest } from "../WorkflowBuilder/appManifestInfo";
+import { variantsOf, versionManifest } from "../WorkflowBuilder/appManifestInfo";
 import { appLambdaEligibility } from "./lambdaEligibility";
 
 export function githubRepo(sourceUrl) {
@@ -69,6 +69,14 @@ export function runsOn(app) {
   const mem = Number(rc.memory);
   if (mem > 0) parts.push(mem >= 1024 ? `${+(mem / 1024).toFixed(1)} GB` : `${mem} MB`);
   return parts.join(" · ");
+}
+
+// Whether the app runs on a GPU: its compute types (its app.yml's, else its
+// record's) or one of its variants say so.
+export function appNeedsGpu(app) {
+  const declared = versionManifest(app)?.runtime?.computeTypes;
+  const types = declared?.length ? declared : app?.runtimeConfig?.computeTypes || [];
+  return types.includes("gpu") || variantsOf(app).some((v) => v.gpu);
 }
 
 // How many of the given workflows run the app.

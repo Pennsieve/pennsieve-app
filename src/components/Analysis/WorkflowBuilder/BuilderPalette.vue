@@ -66,13 +66,13 @@ const tileOf = (app) => {
   <aside class="pal" aria-label="Steps to add">
     <div class="pal-top">
       <el-input v-model="query" size="small" clearable placeholder="Search apps, tags, file types…" class="pal-search" />
-      <button type="button" class="pal-fold" title="Fold the list" aria-label="Fold the list" @click="emit('fold')">
+      <button type="button" class="panel-fold" title="Fold the list" aria-label="Fold the list" @click="emit('fold')">
         <el-icon><ArrowLeft /></el-icon>
       </button>
     </div>
 
     <div class="pal-section">
-      <div class="pal-heading">Data</div>
+      <div class="panel-heading">Data</div>
       <button
         type="button"
         class="pal-item pal-item--data"
@@ -106,7 +106,7 @@ const tileOf = (app) => {
     <p v-if="loading" class="pal-empty">Loading apps…</p>
     <template v-else>
       <div v-for="g in groups" :key="g.key" class="pal-section">
-        <div class="pal-heading">
+        <div class="panel-heading">
           {{ g.key === "fits" && stepLabel ? `Fits after ${stepLabel}` : g.label }}
         </div>
         <p v-if="g.note" class="pal-note">{{ g.note }}</p>
@@ -162,6 +162,7 @@ const tileOf = (app) => {
 
 <style scoped lang="scss">
 @use "../../../styles/theme";
+@use "sidePanel";
 
 .pal {
   display: flex;
@@ -183,38 +184,11 @@ const tileOf = (app) => {
 .pal-search {
   flex: 1;
 }
-.pal-fold {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  width: 24px;
-  height: 24px;
-  padding: 0;
-  border: none;
-  border-radius: 3px;
-  background: none;
-  color: theme.$gray_5;
-  cursor: pointer;
-
-  &:hover {
-    background: theme.$gray_0;
-    color: theme.$purple_3;
-  }
-}
 .pal-section {
   display: flex;
   flex-direction: column;
   gap: 2px;
   margin-bottom: 8px;
-}
-.pal-heading {
-  padding: 4px 4px 2px;
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: theme.$gray_4;
 }
 .pal-item {
   display: flex;

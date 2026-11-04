@@ -20,6 +20,7 @@ import ComputeNodeSecrets from './ComputeNodeSecrets.vue'
 import ComputeNodeLLMBudget from './ComputeNodeLLMBudget.vue'
 import ComputeNodePipelineBudget from './ComputeNodePipelineBudget.vue'
 import AnalysisViewBar from '../AnalysisViewBar.vue'
+import NodeTierBadge from './NodeTierBadge.vue'
 import BfButton from '@/components/shared/bf-button/BfButton.vue'
 import { NODE_TABS, nodeTab, nodeStatus, canToggleStatus, notebookCeiling } from './computeNodeHelpers'
 import { capNodeVersion } from '@/utils/provisionerVersionCap'
@@ -171,6 +172,7 @@ const STATUS_TEXT = { Enabled: 'Running', Paused: 'Paused', Pending: 'Setting up
         <span class="cn-pill" :class="STATUS_PILL[status]">{{ STATUS_TEXT[status] }}{{ status === 'Updating' && computeNode?.pendingProvisionerImageTag ? ` to ${computeNode.pendingProvisionerImageTag}` : '' }}</span>
         <!-- The platform node, Pennsieve's, usable by everyone (account-service marks it). -->
         <span v-if="computeNode?.platform" class="cn-pill">Pennsieve</span>
+        <NodeTierBadge v-if="computeNode" :node="computeNode" />
       </Teleport>
       <AnalysisViewBar v-model="tab" :views="NODE_TABS">
         <!-- Pausing in Pennsieve's warning style (red outline), resuming in

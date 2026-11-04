@@ -31,7 +31,10 @@ import {
   runDisplayName,
   getUserName as getUserNameFn,
 } from "./runHelpers";
-import { isNotebookWorkflow, notebookGpu, runOnGpu, runNodeId, gpuMarkTitle } from "./notebookHelpers";
+import { isNotebookWorkflow, notebookGpu, runOnGpu, runNodeId, gpuMarkTitle, notebooksEmptyState, NOTEBOOK_RUNNING_STATUSES } from "./notebookHelpers";
+import drAzumi from "@/assets/images/illustrations/illo-dr_azumi_1.svg";
+import EmptyState from "../EmptyState.vue";
+import RunningNote from "../RunningNote.vue";
 import { nodeGpu } from "../ComputeNodes/computeNodeHelpers";
 import { useComputeResourcesStore } from "@/stores/computeResourcesStore";
 import RuntimeMark from "../WorkflowGraph/RuntimeMark.vue";
@@ -198,9 +201,7 @@ const activeNotebookRuns = computed(() =>
   notebookRuns.value
     .filter(
       (r) =>
-        r.status === "NOT_STARTED" ||
-        r.status === "STARTED" ||
-        r.status === "FINALIZING"
+        NOTEBOOK_RUNNING_STATUSES.includes(r.status)
     )
     .sort((a, b) => new Date(b.startedAt) - new Date(a.startedAt))
 );
@@ -218,6 +219,13 @@ const historyRuns = computed(() =>
 const nodeName = (id) =>
   (store.getters["analysisModule/computeNodes"] || []).find((n) => n.uuid === id)?.name || "";
 const hasMoreRuns = computed(() => !!store.getters["analysisModule/workflowInstancesCursor"]);
+// Live's empty states (notebooksEmptyState): "empty" (none at all) or
+// "idle" (a history, none running); null while loading or running.
+const emptyState = computed(() =>
+  notebooksEmptyState({ loading: isLoading.value, runs: notebookRuns.value, hasMore: hasMoreRuns.value })
+);
+// Why + New Notebook is off (no notebook workflow published here).
+const NO_KERNELS = "No notebook kernels are published yet.";
 const loadingMore = ref(false);
 async function loadMoreRuns() {
   loadingMore.value = true;
@@ -365,9 +373,11 @@ onBeforeUnmount(() => {
     <!-- Live: the notebooks running and the ones before; Environments: what
          they run with. The view is in the URL (?view=environments). -->
     <AnalysisViewBar v-model="view" :views="VIEWS">
-        <bf-button v-if="view === 'live'" :disabled="notebookWorkflows.length === 0" @click="openNewNotebook()">
-          + New Notebook
-        </bf-button>
+        <el-tooltip v-if="view === 'live'" :content="NO_KERNELS" :disabled="notebookWorkflows.length > 0" placement="bottom">
+          <span>
+            <bf-button :disabled="notebookWorkflows.length === 0" @click="openNewNotebook()">+ New Notebook</bf-button>
+          </span>
+        </el-tooltip>
         <bf-button v-else @click="openCreateEnvironment()">+ New Environment</bf-button>
     </AnalysisViewBar>
     <div class="notebooks-container">
@@ -381,7 +391,27 @@ onBeforeUnmount(() => {
         </p>
       </div>
 
+      <!-- No notebooks at all: what they're for, and a way to start one -->
+      <EmptyState
+        v-else-if="emptyState === 'empty'"
+        :image="drAzumi"
+        title="Explore data in a notebook"
+        text="Open a notebook on a dataset view, and add your own packages through environments."
+      >
+        <el-tooltip :content="NO_KERNELS" :disabled="notebookWorkflows.length > 0" placement="bottom">
+          <span>
+            <bf-button :disabled="notebookWorkflows.length === 0" @click="openNewNotebook()">+ New Notebook</bf-button>
+          </span>
+        </el-tooltip>
+      </EmptyState>
+
       <template v-else>
+        <!-- A history, but nothing running: a slim note over it -->
+        <RunningNote v-if="emptyState === 'idle'" :image="drAzumi" text="No notebooks running right now">
+          <button type="button" class="running-note-link" :disabled="notebookWorkflows.length === 0" @click="openNewNotebook()">
+            + New Notebook
+          </button>
+        </RunningNote>
         <div v-if="activeNotebookRuns.length > 0" class="dashboard-section">
           <h3 class="dashboard-section-title">
             <span class="active-pulse" />
@@ -522,6 +552,7 @@ onBeforeUnmount(() => {
 
 <style scoped lang="scss">
 @use "../../../styles/theme";
+
 
 /* Lined up with the Analysis tabs above (32px). */
 .notebooks-container {
