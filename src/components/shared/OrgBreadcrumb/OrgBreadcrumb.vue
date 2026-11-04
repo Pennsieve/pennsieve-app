@@ -17,6 +17,9 @@
       <!-- A page can put something next to its title here (a compute node's
            status), with <Teleport defer to="#page-title-extra">. -->
       <span id="page-title-extra" class="page-title-extra" />
+      <!-- A page's primary actions, on the row's right (Analysis: the tab's
+           AnalysisViewBar teleports them here). -->
+      <span v-if="actions" id="page-title-actions" class="page-title-actions" />
     </div>
   </div>
 </template>
@@ -54,6 +57,12 @@ export default {
     workspaceRoute: {
       type: Object,
       default: null
+    },
+    // Has a place for the page's actions on the title row's right
+    // (#page-title-actions), as tall as them, so the row doesn't move.
+    actions: {
+      type: Boolean,
+      default: false
     }
   },
 
@@ -144,6 +153,28 @@ export default {
   display: inline-flex;
   align-items: center;
   gap: 8px;
+}
+.page-title-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  min-height: 32px;
+  margin-left: auto;
+}
+/* A phone: the actions under the heading. */
+@media (max-width: 767px) {
+  .page-title-row {
+    flex-wrap: wrap;
+  }
+  .page-title-actions {
+    flex-basis: 100%;
+    justify-content: flex-start;
+    margin-left: 0;
+  }
+  .page-title-actions:empty {
+    display: none;
+  }
 }
 .page-title {
   margin: 0;

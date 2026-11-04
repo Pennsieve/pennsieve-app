@@ -90,22 +90,15 @@ watch(() => route.query.run, openRunFromQuery);
 
 <template>
   <div class="wf-page">
-    <AnalysisViewBar
-      v-model="view"
-      :views="VIEWS"
-      :class="{ 'wf-toolbar--builder': view === 'builder' }"
-    >
+    <AnalysisViewBar v-model="view" :views="VIEWS">
       <!-- Live's one action is running a workflow; the Library's cards each
            have their own Run, and building one is the Builder tab's (a
            "+ New Workflow" here was taken for running one). -->
-      <div v-if="view === 'live'" class="wf-actions">
-        <el-checkbox v-model="includeNotebooks" size="small">Include notebooks</el-checkbox>
-        <bf-button @click="runsRef?.openWizardDialog()">+ Run Workflow</bf-button>
-      </div>
-      <!-- The builder's bar (name, readiness, Save) goes here, so the canvas
-           starts right below one bar. -->
-      <div v-else-if="view === 'builder'" id="wf-toolbar-builder" class="wf-builder-bar" />
+      <bf-button v-if="view === 'live'" @click="runsRef?.openWizardDialog()">+ Run Workflow</bf-button>
     </AnalysisViewBar>
+    <!-- The builder's bar (name, readiness, Save): its own row over the
+         canvas; the views are on the tab row. -->
+    <div v-if="view === 'builder'" id="wf-toolbar-builder" class="wf-builder-bar" />
     <!-- Nothing until a first visit knows whether to open on Live -->
     <div v-if="view" class="wf-body">
       <div v-if="view === 'library'" class="wf-library">
@@ -117,6 +110,8 @@ watch(() => route.query.run, openRunFromQuery);
         ref="runsRef"
         embedded
         :exclude-notebooks="!includeNotebooks"
+        notebooks-toggle
+        @update:exclude-notebooks="(v) => (includeNotebooks = !v)"
         @open-library="view = 'library'"
       />
       <div v-else class="wf-builder">
@@ -136,20 +131,16 @@ watch(() => route.query.run, openRunFromQuery);
   flex-direction: column;
   overflow: hidden;
 }
-/* No rule under the bar on Live, as on the Notebooks tab; the builder keeps
-   one, where the canvas starts right below it. */
-.wf-toolbar--builder {
-  border-bottom: 1px solid theme.$gray_2;
-}
+/* The builder's bar, over the canvas. */
 .wf-builder-bar {
   display: flex;
-  flex: 1;
-  min-width: 0;
-}
-.wf-actions {
-  display: flex;
+  flex-shrink: 0;
   align-items: center;
-  gap: 20px;
+  box-sizing: border-box;
+  height: 56px;
+  padding: 0 32px;
+  border-bottom: 1px solid theme.$gray_2;
+  background: theme.$white;
 }
 .wf-body {
   flex: 1;

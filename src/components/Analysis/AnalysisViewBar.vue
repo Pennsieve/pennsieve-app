@@ -1,8 +1,13 @@
 <script setup>
-// The bar under the Analysis tabs on Workflows, Notebooks and Apps: the view
-// switch on the left (Library/Live/Builder, Live/Environments; Apps has its
-// search there instead, in the `lead` slot), the view's action on the right. One component, so the switch and the first
-// heading below it sit in the same place on every tab.
+// A tab's views and primary actions (Workflows: Live/Library/Builder and
+// + Run Workflow; Notebooks: Live/Environments and + New…; Apps: its
+// actions; a compute node: its tabs and Pause). Each overview owns its bar;
+// the layout shows it in two places, so the tab's content starts right
+// below the tabs:
+// - the views on the right of the Analysis tab row (Analysis.vue,
+//   MyAnalysis.vue: #analysis-tab-views), navigation with the tabs;
+// - the actions on the right of the page's title row (OrgBreadcrumb:
+//   #page-title-actions), in one place on every tab and view.
 import AnalysisViewSwitch from "./AnalysisViewSwitch.vue";
 
 defineProps({
@@ -13,55 +18,35 @@ const emit = defineEmits(["update:modelValue"]);
 </script>
 
 <template>
-  <div class="view-bar">
-    <!-- A tab without views can put something there instead (Apps' search). -->
-    <div v-if="$slots.lead" class="view-lead">
-      <slot name="lead" />
-    </div>
+  <!-- Deferred: both targets are the layout's, rendered in the same pass. -->
+  <Teleport v-if="views.length" defer to="#analysis-tab-views">
     <AnalysisViewSwitch
-      v-else-if="views.length"
       :views="views"
       :model-value="modelValue"
       @update:model-value="(v) => emit('update:modelValue', v)"
     />
+  </Teleport>
+  <Teleport v-if="$slots.default" defer to="#page-title-actions">
     <div class="view-actions">
       <slot />
     </div>
-  </div>
+  </Teleport>
 </template>
 
 <style scoped lang="scss">
-@use "../../styles/theme";
-
-/* One compact row, lined up with the Analysis tabs (32px): the views on the
-   left, the tab's actions (40px buttons) on the right, 8px above and below.
-   A fixed height, so a view whose action is a link or a checkbox doesn't
-   move the switch. */
-.view-bar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  flex-shrink: 0;
-  box-sizing: border-box;
-  height: 56px;
-  padding: 0 32px;
-  background: theme.$white;
-}
-.view-lead {
-  display: flex;
-  align-items: center;
-  min-width: 0;
-}
-/* The switch's own look is in AnalysisViewSwitch.vue. */
-/* The rest of the bar, the action at its right; a view can fill it (the
-   builder's name and Save). */
+/* The tab's actions, on the title row's right; 32px buttons, so the row
+   keeps its height on every tab. */
 .view-actions {
   display: flex;
-  flex: 1;
+  flex-wrap: wrap;
   align-items: center;
-  justify-content: flex-end;
-  gap: 12px;
+  gap: 8px;
   min-width: 0;
+
+  :deep(.bf-button) {
+    min-height: 32px;
+    height: 32px;
+    padding: 0 14px;
+  }
 }
 </style>

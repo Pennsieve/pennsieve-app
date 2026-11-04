@@ -16,7 +16,7 @@ import RunHistory from "./RunHistory.vue";
 import RunWizardDialog from "./RunWizardDialog.vue";
 
 // In the Workflows tab: no runs yet points to the Library, to start one.
-const emit = defineEmits(["open-library"]);
+const emit = defineEmits(["open-library", "update:excludeNotebooks"]);
 const props = defineProps({
   // Inside the Workflows tab (WorkflowsOverview), which has the toolbar and
   // its Run Workflow button: no header of its own.
@@ -24,6 +24,9 @@ const props = defineProps({
   // Leave out standalone notebook sessions (they're on the Notebooks tab); a
   // workflow with a notebook step is a workflow run and stays.
   excludeNotebooks: { type: Boolean, default: false },
+  // Offer "Include notebooks" with the run filters (the Workflows tab's Live;
+  // v-model:exclude-notebooks).
+  notebooksToggle: { type: Boolean, default: false },
 });
 import {
   statusDotClass,
@@ -515,6 +518,15 @@ onBeforeUnmount(() => {
               <el-option label="All compute nodes" value="all" />
               <el-option v-for="cn in computeNodes" :key="cn.uuid" :label="cn.name" :value="cn.uuid" />
             </el-select>
+            <el-checkbox
+              v-if="notebooksToggle"
+              :model-value="!excludeNotebooks"
+              size="small"
+              class="run-filter-check"
+              @change="(on) => emit('update:excludeNotebooks', !on)"
+            >
+              Include notebooks
+            </el-checkbox>
           </template>
           <template #actions="{ run }">
             <button class="rerun-btn" title="Rerun with this configuration" @click="rerunFromRun(run)">
@@ -912,6 +924,11 @@ onBeforeUnmount(() => {
 
 .run-filter-select {
   width: 160px;
+}
+/* As tall as the small selects beside it. */
+.run-filter-check {
+  height: 24px;
+  margin-right: 0;
 }
 
 .run-dialog-footer {
