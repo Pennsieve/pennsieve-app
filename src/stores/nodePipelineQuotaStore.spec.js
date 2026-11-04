@@ -22,6 +22,7 @@ const row = (over = {}) => ({
   monthlyCostUsd: null,
   perRunCostUsd: null,
   maxConcurrentRuns: null,
+  maxInteractiveSessions: null,
   ...over,
 })
 
@@ -69,6 +70,17 @@ describe('nodePipelineQuotaStore', () => {
     it('keeps perRunCostUsd on the per-user scopes', () => {
       expect(normalizePayload(SCOPE_DEFAULT, { perRunCostUsd: 0.25 }).perRunCostUsd).toBe(0.25)
       expect(normalizePayload('u1', { perRunCostUsd: 0.25 }).perRunCostUsd).toBe(0.25)
+    })
+
+    // Notebooks open is a limit on every tier: node-wide, default, per user.
+    // PUT replaces the row, so leaving it out would clear a stored limit.
+    it('sends maxInteractiveSessions on every scope, keeping 0 and null apart', () => {
+      for (const scope of [SCOPE_NODE, SCOPE_DEFAULT, 'u1']) {
+        expect(axesForScope(scope).map((a) => a.key)).toContain('maxInteractiveSessions')
+        expect(normalizePayload(scope, {})).toHaveProperty('maxInteractiveSessions', null)
+        expect(normalizePayload(scope, { maxInteractiveSessions: 0 }).maxInteractiveSessions).toBe(0)
+        expect(normalizePayload(scope, { maxInteractiveSessions: 3 }).maxInteractiveSessions).toBe(3)
+      }
     })
 
     it('always sends notes as a string', () => {

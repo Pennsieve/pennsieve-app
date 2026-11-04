@@ -22,7 +22,7 @@
         <span class="budget-limits" :class="{ unset: !nodeLimits }">{{ nodeLimits || 'No limit' }}</span>
         <span v-if="isOwner" class="budget-actions">
           <button type="button" class="cn-action" @click="openEditNode">{{ nodeRow ? 'Edit' : 'Set' }}</button>
-          <button v-if="nodeRow" type="button" class="cn-icon-button" title="Remove" @click="confirmClear('node', 'the node-wide budget')">&times;</button>
+          <button v-if="nodeRow" type="button" class="cn-icon-button" title="Remove" @click="confirmClear('node', 'the node-wide limits')">&times;</button>
         </span>
       </li>
       <!-- The per-user row holds the per-run cap too, so a personal node
@@ -50,7 +50,7 @@
       </template>
     </ul>
 
-    <p v-if="loadError" class="error-line">Couldn't load the pipeline budget: {{ loadError.message }}</p>
+    <p v-if="loadError" class="error-line">Couldn't load the limits: {{ loadError.message }}</p>
 
     <PipelineQuotaEditModal
       v-model:visible="modalOpen"
@@ -153,7 +153,7 @@ async function confirmClear(scope, label) {
   try {
     await ElMessageBox.confirm(
       `Remove ${label}? Every axis it sets falls back to the next tier, and to unlimited if no tier sets it.`,
-      'Remove budget',
+      'Remove limits',
       { type: 'warning', confirmButtonText: 'Remove', cancelButtonText: 'Cancel' },
     )
   } catch {
@@ -161,7 +161,7 @@ async function confirmClear(scope, label) {
   }
   try {
     await store.deleteRow(props.nodeId, scope)
-    ElMessage.success('Budget removed')
+    ElMessage.success('Limits removed')
     budgetStore.fetch(props.nodeId)
   } catch (e) {
     ElMessage.error(`Failed to remove: ${e?.message || e}`)
@@ -169,7 +169,7 @@ async function confirmClear(scope, label) {
 }
 
 function onSaved() {
-  ElMessage.success('Pipeline budget saved')
+  ElMessage.success('Limits saved')
   // The meter reads resolved limits from workflow-service, so a policy change
   // here only shows up after a refetch.
   budgetStore.fetch(props.nodeId)
