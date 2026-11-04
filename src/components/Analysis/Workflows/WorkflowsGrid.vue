@@ -28,12 +28,13 @@ import { exampleLabel, exampleVersion, PDF_URL_FRESH_MS } from "./runExamples";
 import SampleOutputViewer from "./SampleOutputViewer.vue";
 import LibraryFilters from "./LibraryFilters.vue";
 
-const props = defineProps({
+defineProps({
   // Inside the Workflows tab's Library, whose bar has the New Workflow button.
   embedded: { type: Boolean, default: false },
-  // List notebook workflows too (the Workflows tab's "Include notebooks").
-  includeNotebooks: { type: Boolean, default: false },
 });
+// List notebook workflows too: "Include notebooks", in the filter panel when
+// embedded (the Workflows tab keeps it in the URL, for Live too).
+const includeNotebooks = defineModel("includeNotebooks", { type: Boolean, default: false });
 
 const store = useStore();
 const router = useRouter();
@@ -157,7 +158,7 @@ function clearFilters() {
 
 const filteredWorkflows = computed(() =>
   sortWorkflows(
-    applyFilters(libraryWorkflows(workflows.value, props.includeNotebooks), {
+    applyFilters(libraryWorkflows(workflows.value, includeNotebooks.value), {
       query: searchQuery.value,
       input: inputFilter.value,
       output: outputFilter.value,
@@ -409,6 +410,8 @@ onMounted(async () => {
           v-model:input="inputFilter"
           v-model:output="outputFilter"
           v-model:status="statusFilter"
+          v-model:include-notebooks="includeNotebooks"
+          :notebooks-option="embedded"
           :scope-options="scopeOptions"
           :domains="domainChips"
           :fields="fieldChips"
@@ -432,6 +435,8 @@ onMounted(async () => {
           v-model:input="inputFilter"
           v-model:output="outputFilter"
           v-model:status="statusFilter"
+          v-model:include-notebooks="includeNotebooks"
+          :notebooks-option="embedded"
           :scope-options="scopeOptions"
           :domains="domainChips"
           :fields="fieldChips"
@@ -667,13 +672,23 @@ onMounted(async () => {
   display: flex;
   align-items: stretch;
   gap: 24px;
+  min-width: 0;
 }
 .library-panel {
   flex: 0 0 232px;
+  width: 232px;
+  min-width: 0;
   box-sizing: border-box;
   align-self: flex-start;
   padding: 0 16px 12px 0;
   border-right: 1px solid theme.$gray_2;
+}
+/* The rail starts level with the search, its arrow on the search's middle
+   (the panel's header row is as tall as the search). */
+.library-rail {
+  align-self: stretch;
+  margin: 0;
+  padding-top: 13px;
 }
 .rail-count,
 .filters-count {
@@ -687,9 +702,12 @@ onMounted(async () => {
   line-height: 16px;
   text-align: center;
 }
+/* Shrinks with the panel open (min-width: 0); the cards size to it, not
+   to the viewport (container). */
 .library-main {
-  flex: 1;
+  flex: 1 1 0;
   min-width: 0;
+  container-type: inline-size;
 }
 
 /* The search, up to Sort. */
@@ -827,13 +845,15 @@ $card-height: 172px;
    graph, as the apps' (ApplicationsGrid): the rows line up. */
 .workflows-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(400px, 100%), 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(520px, 100%), 1fr));
   gap: 16px;
 }
 
 .wf-card {
   display: flex;
-  height: $card-height;
+  /* At least this tall; a narrow card's footer may wrap to a second line
+     (cards in a row stay one height). */
+  min-height: $card-height;
   min-width: 0;
   border: 1px solid theme.$gray_2;
   background: theme.$white;
@@ -945,13 +965,16 @@ $card-height: 172px;
 }
 .wf-foot {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
+  row-gap: 6px;
   gap: 8px;
   margin-top: auto;
   padding-top: 6px;
 }
-/* One line each: the usage gives way (…) to the buttons, which never wrap. */
+/* The usage, then the buttons; narrow, the buttons go to a line of their
+   own (right) and the usage wraps rather than being cut. */
 .wf-usage {
   display: flex;
   align-items: center;
@@ -961,13 +984,12 @@ $card-height: 172px;
   color: theme.$gray_4;
 }
 .wf-usage-text {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
 }
 .wf-actions {
   display: flex;
   flex-shrink: 0;
+  margin-left: auto;
   gap: 6px;
   opacity: 0;
   transition: opacity 0.15s ease;

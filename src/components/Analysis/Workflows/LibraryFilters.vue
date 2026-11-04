@@ -1,7 +1,8 @@
 <script setup>
-// The Library's facets: scope, domain, field, input, output and status, one
-// section each. Shown in the Library's side panel and, on a phone, in a
+// The Library's facets: scope (and whether to list notebooks), status,
+// domain, field, input and output, one section each. Shown in the Library's side panel and, on a phone, in a
 // drawer; the Library keeps the values (v-model:<facet>).
+import { useId } from "vue";
 import { domainColors } from "../Applications/appDomains";
 import { FACET_DEFAULTS, INPUT_OPTIONS, STATUS_OPTIONS } from "./galleryFilter";
 
@@ -12,13 +13,18 @@ defineProps({
   outputs: { type: Array, default: () => [] }, // outputOptions
   // Anything chosen (activeFilters), for Clear all.
   anySet: { type: Boolean, default: false },
+  // Offer "Include notebooks" (the Workflows tab's Library).
+  notebooksOption: { type: Boolean, default: false },
 });
+// Ids for the headings, unique to this copy (the panel's or the drawer's).
+const uid = useId();
 const scope = defineModel("scope", { type: String, required: true });
 const domain = defineModel("domain", { type: String, default: "any" });
 const field = defineModel("field", { type: String, default: "any" });
 const input = defineModel("input", { type: String, default: "any" });
 const output = defineModel("output", { type: String, default: "any" });
 const status = defineModel("status", { type: String, default: "active" });
+const includeNotebooks = defineModel("includeNotebooks", { type: Boolean, default: false });
 const emit = defineEmits(["clear-all"]);
 
 // Domain and field are one at a time, as their chips were: ticking one
@@ -37,16 +43,31 @@ const dotStyle = (d) => ({ background: domainColors(d).accent });
       <slot name="action" />
     </div>
 
-    <section class="facet" aria-labelledby="facet-scope">
-      <div id="facet-scope" class="panel-heading facet-heading">Scope</div>
-      <el-radio-group v-model="scope" class="facet-radios" aria-labelledby="facet-scope">
-        <el-radio v-for="o in scopeOptions" :key="o.value" :value="o.value">{{ o.label }}</el-radio>
+    <section class="facet" :aria-labelledby="`${uid}-scope`">
+      <div :id="`${uid}-scope`" class="panel-heading facet-heading">Scope</div>
+      <el-radio-group v-model="scope" class="facet-radios" :aria-labelledby="`${uid}-scope`">
+        <el-radio v-for="o in scopeOptions" :key="o.value" :value="o.value" size="small">{{ o.label }}</el-radio>
+      </el-radio-group>
+      <el-checkbox v-if="notebooksOption" v-model="includeNotebooks" size="small" class="facet-check facet-notebooks">
+        <span class="facet-label">Include notebooks</span>
+      </el-checkbox>
+    </section>
+
+    <section class="facet" :aria-labelledby="`${uid}-status`">
+      <div class="facet-head">
+        <div :id="`${uid}-status`" class="panel-heading facet-heading">Status</div>
+        <button v-if="status !== FACET_DEFAULTS.status" type="button" class="facet-clear" @click="status = FACET_DEFAULTS.status">
+          Clear
+        </button>
+      </div>
+      <el-radio-group v-model="status" class="facet-radios" :aria-labelledby="`${uid}-status`">
+        <el-radio v-for="o in STATUS_OPTIONS" :key="o.value" :value="o.value" size="small">{{ o.label }}</el-radio>
       </el-radio-group>
     </section>
 
-    <section v-if="domains.length" class="facet" aria-labelledby="facet-domain">
+    <section v-if="domains.length" class="facet" :aria-labelledby="`${uid}-domain`">
       <div class="facet-head">
-        <div id="facet-domain" class="panel-heading facet-heading">Domain</div>
+        <div :id="`${uid}-domain`" class="panel-heading facet-heading">Domain</div>
         <button v-if="domain !== FACET_DEFAULTS.domain" type="button" class="facet-clear" @click="domain = FACET_DEFAULTS.domain">
           Clear
         </button>
@@ -55,6 +76,7 @@ const dotStyle = (d) => ({ background: domainColors(d).accent });
         v-for="{ domain: d, count } in domains"
         :key="d.key"
         class="facet-check"
+        size="small"
         :model-value="domain === d.key"
         :title="d.subject ? `About ${d.label.toLowerCase()}` : `For ${d.label.toLowerCase()}`"
         @change="toggleDomain(d.key)"
@@ -65,9 +87,9 @@ const dotStyle = (d) => ({ background: domainColors(d).accent });
       </el-checkbox>
     </section>
 
-    <section v-if="fields.length" class="facet" aria-labelledby="facet-field">
+    <section v-if="fields.length" class="facet" :aria-labelledby="`${uid}-field`">
       <div class="facet-head">
-        <div id="facet-field" class="panel-heading facet-heading">Field</div>
+        <div :id="`${uid}-field`" class="panel-heading facet-heading">Field</div>
         <button v-if="field !== FACET_DEFAULTS.field" type="button" class="facet-clear" @click="field = FACET_DEFAULTS.field">
           Clear
         </button>
@@ -76,6 +98,7 @@ const dotStyle = (d) => ({ background: domainColors(d).accent });
         v-for="{ field: f, count } in fields"
         :key="f.key"
         class="facet-check"
+        size="small"
         :model-value="field === f.key"
         @change="toggleField(f.key)"
       >
@@ -84,43 +107,32 @@ const dotStyle = (d) => ({ background: domainColors(d).accent });
       </el-checkbox>
     </section>
 
-    <section class="facet" aria-labelledby="facet-input">
+    <section class="facet" :aria-labelledby="`${uid}-input`">
       <div class="facet-head">
-        <div id="facet-input" class="panel-heading facet-heading">Input</div>
+        <div :id="`${uid}-input`" class="panel-heading facet-heading">Input</div>
         <button v-if="input !== FACET_DEFAULTS.input" type="button" class="facet-clear" @click="input = FACET_DEFAULTS.input">
           Clear
         </button>
       </div>
-      <el-select v-model="input" size="small" class="facet-select" aria-labelledby="facet-input">
+      <el-select v-model="input" size="small" class="facet-select" :aria-labelledby="`${uid}-input`">
         <el-option label="Any input" value="any" />
         <el-option v-for="o in INPUT_OPTIONS" :key="o.value" :label="o.label" :value="o.value" />
       </el-select>
     </section>
 
-    <section class="facet" aria-labelledby="facet-output">
+    <section class="facet" :aria-labelledby="`${uid}-output`">
       <div class="facet-head">
-        <div id="facet-output" class="panel-heading facet-heading">Output</div>
+        <div :id="`${uid}-output`" class="panel-heading facet-heading">Output</div>
         <button v-if="output !== FACET_DEFAULTS.output" type="button" class="facet-clear" @click="output = FACET_DEFAULTS.output">
           Clear
         </button>
       </div>
-      <el-select v-model="output" size="small" class="facet-select" aria-labelledby="facet-output">
+      <el-select v-model="output" size="small" class="facet-select" :aria-labelledby="`${uid}-output`">
         <el-option label="Any output" value="any" />
         <el-option v-for="o in outputs" :key="o.value" :label="o.label" :value="o.value" />
       </el-select>
     </section>
 
-    <section class="facet" aria-labelledby="facet-status">
-      <div class="facet-head">
-        <div id="facet-status" class="panel-heading facet-heading">Status</div>
-        <button v-if="status !== FACET_DEFAULTS.status" type="button" class="facet-clear" @click="status = FACET_DEFAULTS.status">
-          Clear
-        </button>
-      </div>
-      <el-select v-model="status" size="small" class="facet-select" aria-labelledby="facet-status">
-        <el-option v-for="o in STATUS_OPTIONS" :key="o.value" :label="o.label" :value="o.value" />
-      </el-select>
-    </section>
   </div>
 </template>
 
@@ -131,14 +143,16 @@ const dotStyle = (d) => ({ background: domainColors(d).accent });
 .facets {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 12px;
+  font-size: 13px;
 }
 /* As the builder's inspector header: a small title, the fold on the right. */
 .facets-top {
   display: flex;
   align-items: center;
   gap: 8px;
-  min-height: 24px;
+  /* As tall as the search beside it, so the panel and the list start level. */
+  min-height: 40px;
 }
 .facets-title {
   margin-right: auto;
@@ -174,20 +188,25 @@ const dotStyle = (d) => ({ background: domainColors(d).accent });
     color: theme.$link-color-hover;
   }
 }
+/* As the builder's palette rows: 13px text, 28px rows, small boxes. */
 .facet-radios {
   display: flex;
   flex-direction: column;
   align-items: stretch;
 
   .el-radio {
-    height: 26px;
+    height: 28px;
     margin-right: 0;
+  }
+  :deep(.el-radio__label) {
+    font-size: 13px;
+    color: theme.$gray_6;
   }
 }
 /* A checkbox per option: the label fills the row, its count on the right. */
 .facet-check {
   display: flex;
-  height: 26px;
+  height: 28px;
   margin-right: 0;
 
   :deep(.el-checkbox__label) {
@@ -196,7 +215,12 @@ const dotStyle = (d) => ({ background: domainColors(d).accent });
     align-items: center;
     gap: 6px;
     min-width: 0;
+    font-size: 13px;
+    color: theme.$gray_6;
   }
+}
+.facet-notebooks {
+  margin-top: 2px;
 }
 .facet-dot {
   width: 8px;

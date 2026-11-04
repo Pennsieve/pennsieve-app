@@ -219,11 +219,11 @@ describe("activeFilters", () => {
   it("names each facet set, in the panel's order", () => {
     const state = { domain: "genomics", field: "neuroscience", input: "dataset", output: "download", status: "archived" };
     expect(activeFilters(state, { domains, fields, outputs })).toEqual([
+      { key: "status", label: "Status: Archived" },
       { key: "domain", label: "Genomics" },
       { key: "field", label: "Neuroscience" },
       { key: "input", label: "Takes a dataset" },
       { key: "output", label: "Output: Download" },
-      { key: "status", label: "Status: Archived" },
     ]);
   });
 

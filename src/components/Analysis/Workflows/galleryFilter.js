@@ -118,12 +118,15 @@ export const STATUS_OPTIONS = [
 export const FACET_DEFAULTS = { domain: "any", field: "any", input: "any", output: "any", status: "active" };
 
 // The facets set away from their defaults, as removable chips: { key, label }
-// in the panel's order (domain, field, input, output, status). The labels
+// in the panel's order (status, domain, field, input, output). The labels
 // come from the options shown (domainOptions, fieldOptions, outputOptions);
 // a value no longer offered (another scope's) shows by its key.
 export function activeFilters(state = {}, { domains = [], fields = [], outputs = [] } = {}) {
   const set = (key) => state[key] !== undefined && state[key] !== FACET_DEFAULTS[key];
   const chips = [];
+  if (set("status")) {
+    chips.push({ key: "status", label: `Status: ${STATUS_OPTIONS.find((o) => o.value === state.status)?.label || state.status}` });
+  }
   if (set("domain")) {
     const d = domains.find((o) => o.domain.key === state.domain);
     chips.push({ key: "domain", label: d?.domain.label || state.domain });
@@ -138,9 +141,6 @@ export function activeFilters(state = {}, { domains = [], fields = [], outputs =
   if (set("output")) {
     const o = outputs.find((x) => x.value === state.output);
     chips.push({ key: "output", label: `Output: ${o?.label || state.output}` });
-  }
-  if (set("status")) {
-    chips.push({ key: "status", label: `Status: ${STATUS_OPTIONS.find((o) => o.value === state.status)?.label || state.status}` });
   }
   return chips;
 }
