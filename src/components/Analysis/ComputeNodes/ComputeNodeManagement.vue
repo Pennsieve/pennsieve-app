@@ -21,7 +21,7 @@ import ComputeNodeLLMBudget from './ComputeNodeLLMBudget.vue'
 import ComputeNodePipelineBudget from './ComputeNodePipelineBudget.vue'
 import AnalysisViewBar from '../AnalysisViewBar.vue'
 import BfButton from '@/components/shared/bf-button/BfButton.vue'
-import { NODE_TABS, nodeTab, nodeStatus, canToggleStatus } from './computeNodeHelpers'
+import { NODE_TABS, nodeTab, nodeStatus, canToggleStatus, notebookCeiling } from './computeNodeHelpers'
 import { capNodeVersion } from '@/utils/provisionerVersionCap'
 
 const route = useRoute()
@@ -231,7 +231,7 @@ const STATUS_TEXT = { Enabled: 'Running', Paused: 'Paused', Pending: 'Setting up
                pipelines run in the node's own cloud account. -->
           <section id="pipeline-budget" class="cn-section">
             <h3 class="cn-section-title">Limits &amp; budget</h3>
-            <ComputeNodePipelineBudget :node-id="nodeUuid" :is-owner="canManage" :per-user="!isPersonalNode" />
+            <ComputeNodePipelineBudget :node-id="nodeUuid" :is-owner="canManage" :per-user="!isPersonalNode" :notebook-ceiling="notebookCeiling(computeNode)" />
           </section>
           <!-- AI spend limits: the node-wide cap the governor enforces on every
                call, chat and apps alike, then per-user caps on chat. No budget

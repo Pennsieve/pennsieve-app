@@ -19,7 +19,10 @@
     <ul class="cn-list">
       <li class="budget-row" :title="nodeRow?.notes || undefined">
         <span class="budget-who">Whole node</span>
-        <span class="budget-limits" :class="{ unset: !nodeLimits }">{{ nodeLimits || 'No limit' }}</span>
+        <span class="budget-limits">
+          <span :class="{ unset: !nodeLimits }">{{ nodeLimits || 'No limit' }}</span>
+          <span class="budget-notebooks" :class="{ unset: notebooksUnset(nodeRow) }">{{ tierNotebookLine(nodeRow, notebookCeiling) }}</span>
+        </span>
         <span v-if="isOwner" class="budget-actions">
           <button type="button" class="cn-action" @click="openEditNode">{{ nodeRow ? 'Edit' : 'Set' }}</button>
           <button v-if="nodeRow" type="button" class="cn-icon-button" title="Remove" @click="confirmClear('node', 'the node-wide limits')">&times;</button>
@@ -29,7 +32,10 @@
            (one user) keeps it, as "Your runs". -->
       <li class="budget-row" :title="defaultRow?.notes || undefined">
         <span class="budget-who">{{ perUser ? 'Each user' : 'Your runs' }}</span>
-        <span class="budget-limits" :class="{ unset: !defaultLimits }">{{ defaultLimits || 'No limit' }}</span>
+        <span class="budget-limits">
+          <span :class="{ unset: !defaultLimits }">{{ defaultLimits || 'No limit' }}</span>
+          <span class="budget-notebooks" :class="{ unset: notebooksUnset(defaultRow) }">{{ tierNotebookLine(defaultRow, notebookCeiling) }}</span>
+        </span>
         <span v-if="isOwner" class="budget-actions">
           <button type="button" class="cn-action" @click="openEditDefault">{{ defaultRow ? 'Edit' : 'Set' }}</button>
           <button v-if="defaultRow" type="button" class="cn-icon-button" title="Remove" @click="confirmClear('default', 'the per-user default')">&times;</button>
@@ -38,7 +44,10 @@
       <template v-if="perUser">
         <li v-for="row in userRows" :key="row.userId" class="budget-row" :title="row.notes || undefined">
           <span class="budget-who">{{ getUserName(row.userId) }}</span>
-          <span class="budget-limits" :class="{ unset: !limitSummary(row) }">{{ limitSummary(row) || 'No limit' }}</span>
+          <span class="budget-limits">
+            <span :class="{ unset: !otherLimits(row) }">{{ otherLimits(row) || 'No limit' }}</span>
+            <span class="budget-notebooks" :class="{ unset: notebooksUnset(row) }">{{ tierNotebookLine(row, notebookCeiling) }}</span>
+          </span>
           <span v-if="isOwner" class="budget-actions">
             <button type="button" class="cn-action" @click="openEditUser(row)">Edit</button>
             <button type="button" class="cn-icon-button" title="Remove" @click="confirmClear(row.userId, `the limit for ${getUserName(row.userId)}`)">&times;</button>
@@ -59,6 +68,7 @@
       :row="modalRow"
       :subject-label="modalSubjectLabel"
       :available-users="availableUsersForPicker"
+      :notebook-ceiling="notebookCeiling"
       @saved="onSaved"
     />
   </div>
@@ -72,7 +82,7 @@ import PipelineBudgetMeter from './PipelineBudgetMeter.vue'
 import PipelineQuotaEditModal from './PipelineQuotaEditModal.vue'
 import { useNodePipelineQuotaStore } from '@/stores/nodePipelineQuotaStore'
 import { usePipelineBudgetStore } from '@/stores/pipelineBudgetStore'
-import { limitSummary } from './computeNodeHelpers'
+import { limitSummary, tierNotebookLine, NON_NOTEBOOK_LIMIT_KEYS } from './computeNodeHelpers'
 
 const props = defineProps({
   nodeId: { type: String, required: true },
@@ -80,6 +90,9 @@ const props = defineProps({
   // A node with others on it (not a personal node): the per-user default and
   // overrides only make sense there.
   perUser: { type: Boolean, default: true },
+  // The node's own maxInteractiveSessions: the most notebooks it allows open
+  // at once, whatever the tiers say. 0 means notebooks are off.
+  notebookCeiling: { type: Number, default: 0 },
 })
 
 const vuexStore = useStore()
@@ -96,8 +109,12 @@ const isLoading = computed(() => store.isLoading(props.nodeId))
 const isConfigured = computed(() => store.isConfigured(props.nodeId))
 const loadError = computed(() => store.getError(props.nodeId))
 
-const nodeLimits = computed(() => limitSummary(nodeRow.value))
-const defaultLimits = computed(() => limitSummary(defaultRow.value))
+// Notebooks get their own line, read against the node's ceiling: an unset
+// tier is capped by the node, not unlimited.
+const otherLimits = (row) => limitSummary(row, NON_NOTEBOOK_LIMIT_KEYS)
+const notebooksUnset = (row) => props.notebookCeiling <= 0 || row?.maxInteractiveSessions == null
+const nodeLimits = computed(() => otherLimits(nodeRow.value))
+const defaultLimits = computed(() => otherLimits(defaultRow.value))
 
 // Meter wiring — the same props ChatQuotaHeader-style presentational components
 // expect. Reads workflow-service rather than account-service: account-service
@@ -211,15 +228,25 @@ watch(() => props.nodeId, load)
     color: theme.$gray_6;
   }
   .budget-limits {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    min-width: 0;
     margin-left: auto;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
     color: theme.$gray_6;
 
-    &.unset {
+    > span {
+      max-width: 100%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .unset {
       color: theme.$gray_4;
     }
+  }
+  .budget-notebooks {
+    font-size: 12px;
   }
   .budget-actions {
     display: flex;
