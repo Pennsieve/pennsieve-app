@@ -229,11 +229,12 @@ export const mutations = {
       workflow.isActive = isActive;
     }
   },
-  UPDATE_WORKFLOW_DETAILS(state, { uuid, name, description }) {
+  UPDATE_WORKFLOW_DETAILS(state, { uuid, name, description, tags }) {
     const workflow = state.workflows.find((w) => w.uuid === uuid);
     if (workflow) {
       if (name !== undefined) workflow.name = name;
       if (description !== undefined) workflow.description = description;
+      if (tags !== undefined) workflow.tags = tags;
     }
   },
   UPDATE_WORKFLOW_VISIBILITY(state, { uuid, visibility, official }) {
@@ -751,7 +752,7 @@ export const actions = {
 
       const result = await response.json();
 
-      if (payload.name !== undefined || payload.description !== undefined) {
+      if (payload.name !== undefined || payload.description !== undefined || payload.tags !== undefined) {
         commit("UPDATE_WORKFLOW_DETAILS", { uuid, ...payload });
       }
       if (payload.isActive !== undefined) {

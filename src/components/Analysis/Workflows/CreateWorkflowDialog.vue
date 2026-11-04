@@ -47,6 +47,14 @@
           </div>
         </el-form-item>
 
+        <el-form-item prop="tags">
+          <template #label>
+            <span>Tags</span>
+            <span class="label-helper"> optional </span>
+          </template>
+          <domain-tags-input v-model="workflow.tags" placeholder="What the workflow is for: pick a tag, or type your own" />
+        </el-form-item>
+
         <bf-button @click="addApp" type="button">Add an App</bf-button>
 
         <div
@@ -132,11 +140,13 @@ import { mapState, mapActions } from "vuex";
 import BfButton from "../../shared/bf-button/BfButton.vue";
 import BfDialogHeader from "../../shared/bf-dialog-header/BfDialogHeader.vue";
 import DialogBody from "../../shared/dialog-body/DialogBody.vue";
+import DomainTagsInput from "../Applications/DomainTagsInput.vue";
 import EventBus from "../../../utils/event-bus";
 
 const defaultWorkflowValues = () => ({
   name: "",
   description: "",
+  tags: [],
   apps: [],
 });
 
@@ -151,6 +161,7 @@ export default {
     BfDialogHeader,
     DialogBody,
     BfButton,
+    DomainTagsInput,
   },
 
   props: {
@@ -341,6 +352,7 @@ export default {
           const formattedWorkflow = {
             name: this.workflow.name,
             description: this.workflow.description,
+            tags: this.workflow.tags,
             processors: processors,
           };
 
