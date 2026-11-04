@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { applyFilters, fieldOptions, libraryWorkflows, workflowFields, matchesSearch, outputOptions, sortWorkflows, workflowsView } from "./galleryFilter";
+import { applyFilters, domainOptions, fieldOptions, inheritedTags, libraryWorkflows, workflowDomains, workflowFields, matchesSearch, outputOptions, sortWorkflows, workflowsView } from "./galleryFilter";
 
 const spikes = {
   name: "EEG spikes",
@@ -35,6 +35,13 @@ describe("matchesSearch", () => {
     expect(matchesSearch(zipper, "download", { targetTypes })).toBe(true);
     expect(matchesSearch(zipper, "zip download", { targetTypes })).toBe(true);
     expect(matchesSearch(zipper, "zip pennsieve", { targetTypes })).toBe(false);
+  });
+
+  it("matches the workflow's own tags", () => {
+    const tagged = { ...zipper, tags: ["quality-control", "Cytometry"] };
+    expect(matchesSearch(tagged, "cytometry")).toBe(true);
+    expect(matchesSearch(tagged, "quality zip")).toBe(true);
+    expect(matchesSearch(zipper, "cytometry")).toBe(false);
   });
 });
 
@@ -83,6 +90,17 @@ describe("research fields", () => {
     expect(workflowFields(zipper, applications)).toEqual([]);
   });
 
+  it("are the workflow's own tags' when it has tags", () => {
+    // Tagged: its tags alone, so a tag can narrow what its apps would say.
+    const tagged = { ...cyto, tags: ["oncology", "quality-control"] };
+    expect(workflowFields(tagged, applications).map((f) => f.key)).toEqual(["oncology"]);
+    expect(workflowFields({ ...zipper, tags: ["Neuroscience"] }, applications).map((f) => f.key)).toEqual(["neuroscience"]);
+    // Tags that name no field: none, not the apps'.
+    expect(workflowFields({ ...cyto, tags: ["quality-control"] }, applications)).toEqual([]);
+    expect(applyFilters([spikes, zipper, tagged], { field: "oncology", applications })).toEqual([tagged]);
+    expect(applyFilters([spikes, zipper, tagged], { field: "immunology", applications })).toEqual([]);
+  });
+
   it("offers the fields the list has, most common first", () => {
     const more = { name: "Spikes again", dag: [step("https://github.com/org/spike-detect")] };
     expect(fieldOptions([...all, more], applications).map((o) => [o.field.key, o.count])).toEqual([
@@ -97,6 +115,47 @@ describe("research fields", () => {
     expect(applyFilters(all, { field: "neuroscience", input: "dataset", applications })).toEqual([spikes]);
     expect(applyFilters(all, { field: "neuroscience", input: "none", applications })).toEqual([]);
     expect(applyFilters(all, { field: "any", applications })).toEqual(all);
+  });
+});
+
+describe("domains", () => {
+  const app = (url, tags) => ({ sourceUrl: url, versions: [{ version: "v1", createdAt: "2026-01-01", manifest: { tags } }] });
+  const applications = [
+    app("https://github.com/org/spike-detect", ["electrophysiology", "epilepsy"]),
+    app("https://github.com/org/tumour-map", ["imaging", "visualization"]),
+  ];
+  const step = (url) => ({ id: url, type: "processor", sourceUrl: url });
+  const tumours = { name: "Tumours", tags: ["Visualization"], dag: [step("https://github.com/org/tumour-map")] };
+
+  it("are the workflow's own tags' domains, else its apps'", () => {
+    // Tagged: its tags alone (the app is Imaging; the workflow says Visualization).
+    expect(workflowDomains(tumours, applications).map((d) => d.key)).toEqual(["viz"]);
+    // Untagged: its apps'.
+    expect(workflowDomains(spikes, applications).map((d) => d.key)).toEqual(["ephys"]);
+    expect(workflowDomains({ ...tumours, tags: [] }, applications).map((d) => d.key)).toEqual(["imaging"]);
+    expect(workflowDomains(zipper, applications)).toEqual([]);
+  });
+
+  it("offers the domains the list has, subjects first", () => {
+    expect(domainOptions([spikes, zipper, tumours], applications).map((o) => [o.domain.key, o.count])).toEqual([
+      ["ephys", 1],
+      ["viz", 1],
+    ]);
+  });
+
+  it("shows an untagged workflow its apps' domains and fields as tags", () => {
+    expect(inheritedTags({ ...tumours, tags: [] }, applications)).toEqual(["imaging"]);
+    expect(inheritedTags(spikes, applications)).toEqual(["electrophysiology", "neuroscience"]);
+    expect(inheritedTags(zipper, applications)).toEqual([]);
+    // A tagged workflow shows its own.
+    expect(inheritedTags(tumours, applications)).toEqual([]);
+  });
+
+  it("filters by domain, with the other filters", () => {
+    expect(applyFilters([spikes, zipper, tumours], { domain: "viz", applications })).toEqual([tumours]);
+    expect(applyFilters([spikes, zipper, tumours], { domain: "imaging", applications })).toEqual([]);
+    expect(applyFilters([spikes, zipper, tumours], { domain: "ephys", input: "none", applications })).toEqual([]);
+    expect(applyFilters([spikes, zipper, tumours], { domain: "any", applications })).toEqual([spikes, zipper, tumours]);
   });
 });
 

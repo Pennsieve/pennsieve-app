@@ -36,10 +36,18 @@
           :min="0"
           :precision="axis.unit === 'usd' ? 2 : 0"
           :step="axis.step"
-          placeholder="No limit"
+          :placeholder="placeholderFor(axis)"
+          :disabled="axis.key === NOTEBOOK_KEY && notebooksOff"
           style="width: 100%"
           :controls="false"
         />
+        <!-- Notebooks open only narrows the node's own ceiling (its
+             maxInteractiveSessions). Above it the limit has no effect, but
+             saving goes through: the ceiling can be raised later. -->
+        <template v-if="axis.key === NOTEBOOK_KEY">
+          <p v-if="notebooksOff" class="field-hint">{{ NOTEBOOKS_OFF_HINT }}</p>
+          <p v-else-if="notebookWarning" class="zero-warning">{{ notebookWarning }}</p>
+        </template>
       </div>
 
       <!--
@@ -82,6 +90,13 @@ import {
   SCOPE_DEFAULT,
   SCOPE_NODE,
 } from '@/stores/nodePipelineQuotaStore'
+import {
+  notebookLimitText,
+  notebookLimitWarning,
+  NOTEBOOKS_OFF_HINT,
+} from './computeNodeHelpers'
+
+const NOTEBOOK_KEY = 'maxInteractiveSessions'
 
 const props = defineProps({
   visible: { type: Boolean, default: false },
@@ -91,6 +106,8 @@ const props = defineProps({
   row: { type: Object, default: null },
   subjectLabel: { type: String, default: '' },
   availableUsers: { type: Array, default: () => [] },
+  // The node's own maxInteractiveSessions; 0 means notebooks are off.
+  notebookCeiling: { type: Number, default: 0 },
 })
 
 const emit = defineEmits(['update:visible', 'saved'])
@@ -128,6 +145,13 @@ const blurb = computed(() => {
   }
   return 'Applies to this user only, and takes precedence over the default. Leave a field blank to fall back to the default.'
 })
+
+const notebooksOff = computed(() => !(props.notebookCeiling > 0))
+const notebookWarning = computed(() => notebookLimitWarning(form.value[NOTEBOOK_KEY], props.notebookCeiling))
+// Blank notebooks open is capped by the node, so say so; elsewhere blank is
+// no limit at all.
+const placeholderFor = (axis) =>
+  axis.key === NOTEBOOK_KEY ? notebookLimitText(null, props.notebookCeiling) : 'No limit'
 
 const hasZero = computed(() => axes.value.some((a) => form.value[a.key] === 0))
 
@@ -213,6 +237,13 @@ async function onSave() {
   margin: 0;
   font-size: 12px;
   color: theme.$orange_1;
+  line-height: 1.5;
+}
+
+.field-hint {
+  margin: 0;
+  font-size: 12px;
+  color: theme.$gray_5;
   line-height: 1.5;
 }
 

@@ -5,15 +5,15 @@ import { normalizeUrl } from "../RunMonitor/runHelpers";
 import { versionManifest } from "../WorkflowBuilder/appManifestInfo";
 import { isNotebookWorkflow } from "../RunMonitor/notebookHelpers";
 import { interfaceDag } from "../RunMonitor/workflowInterface";
-import { fieldsOf } from "../Applications/appDomains";
+import { fieldsOf, domainOfTag, appDomain } from "../Applications/appDomains";
 
-// Whether a workflow matches a search: its name, description, the apps it
-// runs, or what goes in and comes out ("spike" finds the one running
+// Whether a workflow matches a search: its name, description, tags, the
+// apps it runs, or what goes in and comes out ("spike" finds the one running
 // spike-detect; "download" the ones that produce a download).
 export function matchesSearch(wf, query, { applications = [], targetTypes = [] } = {}) {
   const q = (query || "").trim().toLowerCase();
   if (!q) return true;
-  const haystack = [wf.name, wf.description, ...appNames(wf, applications), ioSummary(wf, targetTypes)]
+  const haystack = [wf.name, wf.description, ...(wf.tags || []), ...appNames(wf, applications), ioSummary(wf, targetTypes)]
     .filter(Boolean)
     .join("\n")
     .toLowerCase();
@@ -45,10 +45,40 @@ function stepApps(wf, applications) {
     .map((n) => byUrl.get(normalizeUrl(n.sourceUrl)) || null);
 }
 
-// The research fields a workflow serves: those of its steps' apps, from
-// their app.yml tags, in step order.
+// A workflow with tags is what its tags say; one without is what its steps'
+// apps are (their app.yml tags, in step order), so a workflow nobody has
+// tagged yet still has a place in the filters.
+const tagged = (wf) => (wf?.tags || []).length > 0;
+
+// The research fields a workflow serves.
 export function workflowFields(wf, applications = []) {
+  if (tagged(wf)) return fieldsOf(wf);
   return [...new Set(stepApps(wf, applications).flatMap((app) => fieldsOf(versionManifest(app))))];
+}
+
+// The domains a workflow is for (what it handles: imaging, visualization…,
+// appDomains.js); an app's is the first its tags name.
+export function workflowDomains(wf, applications = []) {
+  if (tagged(wf)) return [...new Set((wf.tags || []).map(domainOfTag).filter(Boolean))];
+  return [...new Set(stepApps(wf, applications).map((app) => appDomain(app)).filter(Boolean))];
+}
+
+// The domain chips for a list: each domain some workflow is for, with how
+// many workflows; subjects first, then the most common.
+export function domainOptions(list, applications = []) {
+  const counts = new Map();
+  for (const wf of list || []) for (const d of workflowDomains(wf, applications)) counts.set(d, (counts.get(d) || 0) + 1);
+  return [...counts]
+    .map(([domain, count]) => ({ domain, count }))
+    .sort((a, b) => Number(!!b.domain.subject) - Number(!!a.domain.subject) || b.count - a.count || a.domain.label.localeCompare(b.domain.label));
+}
+
+// What an untagged workflow's card shows in place of tags: the tags its apps'
+// domains and fields go by ("imaging", "neuroscience"), so a card says why a
+// chip filter matched it. Empty for a tagged workflow (its own tags show).
+export function inheritedTags(wf, applications = []) {
+  if (tagged(wf)) return [];
+  return [...new Set([...workflowDomains(wf, applications).map((d) => d.tag), ...workflowFields(wf, applications).map((f) => f.tag)])];
 }
 
 // The field chips for a list: each field some workflow serves, with how
@@ -61,13 +91,15 @@ export function fieldOptions(list, applications = []) {
     .sort((a, b) => b.count - a.count || a.field.label.localeCompare(b.field.label));
 }
 
-// officialOnly keeps Pennsieve's; field is a research field's key.
-export function applyFilters(list, { query, input = "any", output = "any", field = "any", officialOnly = false, ...context } = {}) {
+// officialOnly keeps Pennsieve's; domain is a domain's key, field a research
+// field's.
+export function applyFilters(list, { query, input = "any", output = "any", domain = "any", field = "any", officialOnly = false, ...context } = {}) {
   return list.filter(
     (wf) =>
       (!officialOnly || wf.official) &&
       (input === "any" || inputKind(wf) === input) &&
       (output === "any" || outputTypes(wf).includes(output)) &&
+      (domain === "any" || workflowDomains(wf, context.applications).some((d) => d.key === domain)) &&
       (field === "any" || workflowFields(wf, context.applications).some((f) => f.key === field)) &&
       matchesSearch(wf, query, context)
   );

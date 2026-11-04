@@ -18,7 +18,7 @@ export default defineConfig({
   css: {
     preprocessorOptions: {
       scss: {
-        additionalData: `@use "./src/styles/index.scss" as *;`,
+        additionalData: `@use "@/styles/index.scss" as *;`,
         silenceDeprecations: ['global-builtin', 'legacy-js-api', 'new-global', 'color-functions'],
       },
     },
@@ -53,15 +53,17 @@ export default defineConfig({
   // Need to build for esnext to support PDF Viewer which has a await statement that needs next es
   optimizeDeps: {
     exclude: ['@duckdb/duckdb-wasm'],
-    esbuildOptions: {
-      target: "esnext",
+    rolldownOptions: {
+      transform: {
+        target: "esnext",
+      },
     },
   },
   test: {
     // enable jest-like global test APIs
     globals: true,
     // max duration of a test: Vitest's default. 200ms timed out synchronous
-    // tests on a busy machine (Jenkins).
+    // tests on a busy machine (Jenkins) once Vitest 5 came in.
     testTimeout: 5000,
     setupFiles: ['./src/test/setup.ts'],
     server: {
