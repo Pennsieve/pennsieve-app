@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   appLambdaEligibility,
   lambdaEligibility,
+  lambdaOverrideWarning,
   lambdaStatusLabel,
   lambdaUnavailableHint,
   withLambdaChoice,
@@ -18,23 +19,26 @@ describe("lambdaEligibility", () => {
       available: true,
       reasons: [],
       known: true,
+      overridable: false,
     });
     expect(lambdaEligibility({ version: "v1", lambda: rec(false, ["image is 12 GB"]), manifest: man({ computeTypes: ["standard", "lambda"] }) })).toEqual({
       available: false,
       reasons: ["image is 12 GB"],
       known: true,
+      overridable: false,
     });
   });
 
   it("falls back to the app.yml's computeTypes without a record", () => {
-    expect(lambdaEligibility({ manifest: man({ computeTypes: ["standard", "lambda"] }) })).toEqual({ available: true, reasons: [], known: false });
+    expect(lambdaEligibility({ manifest: man({ computeTypes: ["standard", "lambda"] }) })).toEqual({ available: true, reasons: [], known: false, overridable: false });
     expect(lambdaEligibility({ manifest: man({ computeTypes: ["standard"] }) })).toEqual({
       available: false,
       reasons: [LAMBDA_UNCHECKED_REASON],
       known: false,
+      overridable: false,
     });
     expect(lambdaEligibility({})).toMatchObject({ available: false, known: false });
-    expect(lambdaEligibility(null)).toEqual({ available: false, reasons: [], known: false });
+    expect(lambdaEligibility(null)).toEqual({ available: false, reasons: [], known: false, overridable: false });
   });
 
   it("honours the author's opt-out", () => {
@@ -42,11 +46,13 @@ describe("lambdaEligibility", () => {
       available: false,
       reasons: [LAMBDA_OPT_OUT_REASON],
       known: false,
+      overridable: false,
     });
     expect(lambdaEligibility({ lambda: rec(true), manifest: man({ optimize: false }) })).toEqual({
       available: false,
       reasons: [LAMBDA_OPT_OUT_REASON],
       known: true,
+      overridable: false,
     });
   });
 
@@ -69,6 +75,27 @@ describe("lambdaEligibility", () => {
     expect(lambdaEligibility(version, "a")).toMatchObject({ available: false, reasons: ["too big"], known: true });
     const noOwn = { defaultVariant: "a", variants: [{ id: "a", lambda: rec(true) }], manifest: man({}) };
     expect(lambdaEligibility(noOwn).available).toBe(true);
+  });
+
+  it("says when a run may override a version that doesn't fit", () => {
+    const over = { ...rec(false, ["memory 16384 MB is over 10240"]), overridable: true };
+    expect(lambdaEligibility({ lambda: over, manifest: man({}) })).toEqual({
+      available: false,
+      reasons: ["memory 16384 MB is over 10240"],
+      known: true,
+      overridable: true,
+    });
+    // Not without the record's say-so, nor when it fits anyway.
+    expect(lambdaEligibility({ lambda: rec(false, ["image is 12 GB"]), manifest: man({}) }).overridable).toBe(false);
+    expect(lambdaEligibility({ lambda: { ...rec(true), overridable: true }, manifest: man({}) }).overridable).toBe(false);
+    expect(lambdaEligibility({ lambda: { ...over, overridable: "yes" }, manifest: man({}) }).overridable).toBe(false);
+    // The author's opt-out can't be overridden.
+    expect(lambdaEligibility({ lambda: over, manifest: man({ optimize: false }) }).overridable).toBe(false);
+    // Nor a version without a record.
+    expect(lambdaEligibility({ manifest: man({ computeTypes: ["standard"] }) }).overridable).toBe(false);
+    // A variant's record decides for it.
+    const version = { lambda: rec(true), variants: [{ id: "big", lambda: over }], manifest: man({}) };
+    expect(lambdaEligibility(version, "big")).toMatchObject({ available: false, overridable: true });
   });
 
   it("reads a variant's own manifest for the fallback", () => {
@@ -97,6 +124,14 @@ describe("labels", () => {
     expect(lambdaUnavailableHint({ available: true, reasons: [] })).toBe("");
     expect(lambdaUnavailableHint({ available: false, reasons: ["a", "b"] })).toBe("Lambda isn't available for this version: a; b.");
     expect(lambdaUnavailableHint({ available: false, reasons: [] })).toContain("doesn't fit Lambda");
+  });
+  it("warns what an override risks", () => {
+    expect(lambdaOverrideWarning({ available: false, overridable: true, reasons: ["memory 16 GB", "timeout 30 min"] })).toBe(
+      "This app declares memory 16 GB; timeout 30 min. A Lambda step gets at most 10 GB and runs at most 14 minutes; a step past either fails."
+    );
+    expect(lambdaOverrideWarning({ available: false, overridable: false, reasons: ["x"] })).toBe("");
+    expect(lambdaOverrideWarning({ available: true, overridable: false, reasons: [] })).toBe("");
+    expect(lambdaOverrideWarning(null)).toBe("");
   });
   it("labels the app page's status", () => {
     expect(lambdaStatusLabel({ available: true, reasons: [], known: true })).toBe("available");
