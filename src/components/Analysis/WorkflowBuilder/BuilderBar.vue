@@ -19,6 +19,9 @@ const props = defineProps({
   editing: { type: Boolean, default: false },
   // Building has started: before, the bar doesn't list what's missing.
   started: { type: Boolean, default: true },
+  // The builder's landing (choose how to start): there is no workflow yet,
+  // so no name, description, readiness or Save to show.
+  landing: { type: Boolean, default: false },
 });
 // select(item): show what an item is about (its node); start-over; cancel
 const emit = defineEmits(["update:name", "update:description", "save", "start-over", "select", "cancel"]);
@@ -46,7 +49,8 @@ defineExpose({ focusName: () => nameRef.value?.focus() });
 </script>
 
 <template>
-  <div class="bb">
+  <div v-if="landing" class="bb" />
+  <div v-else class="bb">
     <div class="bb-titles">
       <input
         ref="nameRef"
