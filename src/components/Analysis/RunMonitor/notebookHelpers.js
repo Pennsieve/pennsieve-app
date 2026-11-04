@@ -37,6 +37,13 @@ export function interactiveCapable(cn) {
   );
 }
 
+// A compliant node's notebooks have no internet access, so pip/conda installs
+// fail there; packages come only from the run's environments. "" elsewhere.
+export function offlineNote(cn) {
+  if ((cn?.deploymentMode || "").toLowerCase() !== "compliant") return "";
+  return "No internet access: packages can't be installed from the notebook. Add them through an environment.";
+}
+
 // A notebook's language for people.
 export function kernelLabel(kernel) {
   if (kernel === "python") return "Python";
