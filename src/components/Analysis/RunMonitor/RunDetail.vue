@@ -101,6 +101,7 @@ import { stepNames } from "../WorkflowBuilder/stepNames";
 import { modelLine, modelLineText, variantName } from "../WorkflowBuilder/appVariants";
 import { fetchVariantGate, runsNonDefaultVariant } from "./variantGate";
 import { appLambdaEligibility, lambdaUnavailableHint, lambdaOverrideWarning, withLambdaChoice } from "../Applications/lambdaEligibility";
+import { stepLambdaFeedback } from "./lambdaFeedback";
 import { gpuReasonNote } from "./notebookHelpers";
 import { nodeGpu, gpuOffer, gpuName, gpuTaskResources } from "../ComputeNodes/computeNodeHelpers";
 import { useComputeResourcesStore } from "@/stores/computeResourcesStore";
@@ -838,7 +839,14 @@ const runToNodesAndEdges = (run) => {
     } else {
       const cfg = runProcessorConfigs.find((c) => c.nodeId === d.id);
       extra.executionTarget = cfg?.executionTarget || null;
+      extra.lambdaOverride = cfg?.lambdaOverride === true;
       Object.assign(extra, stepManifest(dag, d.id));
+      // What its app.yml declares (or the run's runtime config), for the
+      // Lambda notice (lambdaFeedback.js).
+      const declared = portsOfStep(dag, availableApplications.value)(d.id)?.runtime || {};
+      extra.declaredMemory = declared.memory ?? d.runtimeConfig?.memory ?? null;
+      extra.declaredTimeout = declared.timeoutSeconds ?? d.runtimeConfig?.timeoutSeconds ?? null;
+      extra.variant = d.variant || null;
       extra.cpu = cfg?.cpu || null;
       extra.memory = cfg?.memory || null;
       const nodeParams = runProcessorParams[d.id] || {};
@@ -2192,6 +2200,23 @@ const selectedNodeMetrics = computed(() => {
       (nm) => nm.nodeId === selectedNode.value.id
     ) || null
   );
+});
+
+// What a finished step's use says about Lambda: limits to declare after an
+// override, or a step on standard that would fit (lambdaFeedback.js).
+const selectedStepLambdaFeedback = computed(() => {
+  const data = selectedNode.value?.data;
+  if (mode.value !== "browse" || data?.processorType !== "processor") return null;
+  const app = findMatchedApp(data.sourceUrl);
+  return stepLambdaFeedback({
+    status: data.status,
+    executionTarget: data.executionTarget || selectedNodeMetrics.value?.computeType || null,
+    lambdaOverride: data.lambdaOverride,
+    eligibility: app ? appLambdaEligibility(app, data.version, data.variant) : null,
+    metrics: selectedNodeMetrics.value,
+    declaredMemory: data.declaredMemory,
+    declaredTimeout: data.declaredTimeout,
+  });
 });
 
 /*
@@ -3641,6 +3666,12 @@ onUnmounted(() => {
                 </div>
               </div>
 
+              <p v-if="selectedStepLambdaFeedback" class="files-mismatch lambda-feedback">
+                <template v-for="(seg, i) in selectedStepLambdaFeedback.segments" :key="i"
+                  ><code v-if="typeof seg === 'object'">{{ seg.code }}</code><template v-else>{{ seg }}</template></template
+                >
+              </p>
+
               <div class="metrics-summary">
                 <div
                   class="metrics-summary-item"
@@ -4971,6 +5002,13 @@ onUnmounted(() => {
 // A step that worked, with something to know (its warning).
 .node-warning .info-value {
   color: #92400e;
+}
+
+.lambda-feedback code {
+  font-size: 11px;
+  background: rgba(146, 64, 14, 0.08);
+  padding: 0 3px;
+  border-radius: 3px;
 }
 
 .files-mismatch {
