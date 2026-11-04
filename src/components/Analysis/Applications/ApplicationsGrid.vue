@@ -16,7 +16,6 @@ import AppBanner from "./AppBanner.vue";
 import { domainCounts, fieldCounts } from "./appDomains";
 import {
   APP_FILTER_DEFAULTS,
-  APP_STATUS_OPTIONS,
   VISIBILITY_OPTIONS,
   appActiveFilters,
   appsInStatus,
@@ -28,8 +27,9 @@ import FacetLayout from "../Facets/FacetLayout.vue";
 import FacetSection from "../Facets/FacetSection.vue";
 import FacetOptions from "../Facets/FacetOptions.vue";
 import FacetRadios from "../Facets/FacetRadios.vue";
+import FacetCheck from "../Facets/FacetCheck.vue";
 import CardTags from "../Facets/CardTags.vue";
-import { domainFacetOptions, fieldFacetOptions } from "../Facets/facets";
+import { domainFacetOptions, fieldFacetOptions, toggleKey } from "../Facets/facets";
 import { paletteVariants, versionManifest } from "../WorkflowBuilder/appManifestInfo";
 import RuntimeMark from "../WorkflowGraph/RuntimeMark.vue";
 import IconPDF from "../../icons/IconPDF.vue";
@@ -145,10 +145,10 @@ const latestVersion = (app) => {
   Filtered & sorted applications (newest first, matching workflows)
 */
 // Where an app runs (from its runtime config), and the choices the list has.
-// A domain's key, or null for every app: the colour legend above the cards.
-const domainFilter = ref(null);
-// A research field's key, or null: combines with the domain (both must hold).
-const fieldFilter = ref(null);
+// Domains' keys (any of them), none for every app.
+const domainFilter = ref([]);
+// Research fields' keys (any of them; with the domains, both must hold).
+const fieldFilter = ref([]);
 
 // The sort is the viewer's, kept in this browser.
 const SORT_KEY = "pennsieve.gallery.appSort";
@@ -182,13 +182,13 @@ const githubUrl = (app) => {
 
 const filtersSet = computed(
   () =>
-    !!searchQuery.value.trim() || visibilityFilter.value !== "all" || !!domainFilter.value || !!fieldFilter.value
+    !!searchQuery.value.trim() || visibilityFilter.value !== "all" || domainFilter.value.length > 0 || fieldFilter.value.length > 0
 );
 function clearFilters() {
   searchQuery.value = "";
   visibilityFilter.value = "all";
-  domainFilter.value = null;
-  fieldFilter.value = null;
+  domainFilter.value = [];
+  fieldFilter.value = [];
 }
 
 // The domains among the apps in this status (active, archived…), with
@@ -199,8 +199,13 @@ const domainChips = computed(() => domainCounts(statusApps.value));
 const fieldChips = computed(() => fieldCounts(statusApps.value));
 const domainFacets = computed(() => domainFacetOptions(domainChips.value));
 const fieldFacets = computed(() => fieldFacetOptions(fieldChips.value));
-const toggleDomain = (key) => (domainFilter.value = domainFilter.value === key ? null : key);
-const toggleField = (key) => (fieldFilter.value = fieldFilter.value === key ? null : key);
+const toggleDomain = (key) => (domainFilter.value = toggleKey(domainFilter.value, key));
+const toggleField = (key) => (fieldFilter.value = toggleKey(fieldFilter.value, key));
+// Show archived: all (Active and Archived) when ticked, Active when not.
+const showArchived = computed({
+  get: () => statusFilter.value !== APP_FILTER_DEFAULTS.status,
+  set: (on) => (statusFilter.value = on ? "all" : APP_FILTER_DEFAULTS.status),
+});
 
 // The filters set, as removable chips over the cards; Clear all resets them
 // (the search stays: it's in the toolbar).
@@ -211,8 +216,11 @@ const activeChips = computed(() =>
     { domains: domainChips.value, fields: fieldChips.value }
   )
 );
-const clearFacet = (key) => (facetRefs[key].value = APP_FILTER_DEFAULTS[key]);
-const clearFacets = () => Object.keys(facetRefs).forEach(clearFacet);
+// Clear a facet, or (a chip of a multi-select one) one of its keys.
+const clearFacet = (key, value) =>
+  (facetRefs[key].value = value === undefined ? APP_FILTER_DEFAULTS[key] : facetRefs[key].value.filter((k) => k !== value));
+const removeChip = (chip) => clearFacet(chip.key, chip.value);
+const clearFacets = () => Object.keys(facetRefs).forEach((key) => clearFacet(key));
 
 const filteredApplications = computed(() =>
   sortApps(
@@ -379,23 +387,19 @@ const goToManifestBuilder = () => {
       class="applications-section"
       storage-key="pennsieve.apps.filtersPanel"
       :chips="activeChips"
-      @remove="clearFacet"
+      @remove="removeChip"
       @clear-all="clearFacets"
     >
       <template #filters>
         <FacetSection title="Visibility" :clearable="visibilityFilter !== APP_FILTER_DEFAULTS.visibility" @clear="clearFacet('visibility')">
           <FacetRadios v-model="visibilityFilter" :options="VISIBILITY_OPTIONS" label="Visibility" />
+          <FacetCheck v-model="showArchived" label="Show archived" />
         </FacetSection>
-        <FacetSection v-if="domainFacets.length" title="Domain" :clearable="!!domainFilter" @clear="clearFacet('domain')">
+        <FacetSection v-if="domainFacets.length" title="Domain" :clearable="domainFilter.length > 0" @clear="clearFacet('domain')">
           <FacetOptions :options="domainFacets" :selected="domainFilter" @toggle="toggleDomain" />
         </FacetSection>
-        <FacetSection v-if="fieldFacets.length" title="Field" :clearable="!!fieldFilter" @clear="clearFacet('field')">
+        <FacetSection v-if="fieldFacets.length" title="Field" :clearable="fieldFilter.length > 0" @clear="clearFacet('field')">
           <FacetOptions :options="fieldFacets" :selected="fieldFilter" @toggle="toggleField" />
-        </FacetSection>
-        <FacetSection title="Status" :clearable="statusFilter !== APP_FILTER_DEFAULTS.status" @clear="clearFacet('status')">
-          <el-select v-model="statusFilter" size="small" aria-label="Status">
-            <el-option v-for="o in APP_STATUS_OPTIONS" :key="o.value" :label="o.label" :value="o.value" />
-          </el-select>
         </FacetSection>
       </template>
 
@@ -458,7 +462,7 @@ const goToManifestBuilder = () => {
             <div class="app-foot">
               <span class="app-usage">
                 <span class="app-dot" :class="versionState(app)" :title="statusLabel(latestVersion(app)?.status)" />
-                {{ usageText(app) }}
+                <span class="app-usage-text">{{ usageText(app) }}</span>
               </span>
               <span class="app-actions" @click.stop>
                 <a
@@ -604,12 +608,11 @@ const goToManifestBuilder = () => {
   }
 }
 
-/* Cards two or more to a row where 340px each fit (16px apart), sized to
-   the list beside the filter panel, as the workflows'. */
+/* Cards two or more to a row where 340px each fit (16px apart), each as
+   tall as its square banner (172px; 140px in a narrow card), as the
+   workflows': the rows line up, and the text fits the card. */
 $card-height: 172px;
 
-/* Cards of one height, with a square banner: the rows line up whether or
-   not a card has tags or a second line of description. */
 .applications-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(min(340px, 100%), 1fr));
@@ -617,9 +620,6 @@ $card-height: 172px;
 }
 .app-card {
   display: flex;
-  /* At least this tall; a narrow card's footer may wrap to a second line
-     (cards in a row stay one height). */
-  min-height: $card-height;
   min-width: 0;
   container: app-card / inline-size;
   border: 1px solid theme.$gray_2;
@@ -645,22 +645,40 @@ $card-height: 172px;
 /* The app's banner, where the workflows show their graph. */
 .app-thumb {
   display: flex;
-  flex: 0 0 $card-height;
+  flex: 0 0 auto;
+  align-self: flex-start;
+  width: $card-height;
+  aspect-ratio: 1 / 1;
   border-right: 1px solid theme.$gray_2;
 }
-/* A narrow card (two to a row beside the panel, or a phone): a narrower
-   banner, so the text keeps room. */
+/* A narrow card: a smaller square, tighter text, no runtime/repo line. */
 @container app-card (max-width: 440px) {
   .app-thumb {
-    flex-basis: 128px;
+    width: 140px;
+  }
+  .app-body {
+    gap: 4px;
+    padding: 10px 12px;
+  }
+  .app-meta {
+    display: none;
   }
 }
 /* Its variants (boxed), then its tags as the panel lists them (CardTags). */
 .app-tags {
   display: flex;
+  flex-shrink: 0;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 4px;
+  gap: 0 4px;
+  height: 18px;
   overflow: hidden;
+}
+/* The tags take the rest of the row, so the ones that don't fit drop
+   whole (CardTags) rather than being cut. */
+.app-tags .card-tags {
+  flex: 1 1 0;
+  min-width: 0;
 }
 .app-variant + .card-tags {
   margin-left: 8px;
@@ -688,6 +706,8 @@ $card-height: 172px;
   color: theme.$red_2;
   text-decoration: line-through;
 }
+/* The text fits the banner's height: it doesn't size the card (contain),
+   and what doesn't fit is cut, never the card stretched. */
 .app-body {
   display: flex;
   flex-direction: column;
@@ -695,6 +715,8 @@ $card-height: 172px;
   flex: 1;
   min-width: 0;
   padding: 14px 16px 12px;
+  contain: size;
+  overflow: hidden;
 }
 .app-title {
   display: flex;
@@ -730,6 +752,7 @@ $card-height: 172px;
 }
 .app-description {
   display: -webkit-box;
+  flex-shrink: 0;
   margin: 0;
   overflow: hidden;
   -webkit-line-clamp: 2;
@@ -749,22 +772,27 @@ $card-height: 172px;
 .app-runs {
   color: theme.$gray_6;
 }
+/* One line at the card's foot: the usage gives way (…) to the buttons,
+   which always show. */
 .app-foot {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
-  justify-content: space-between;
-  row-gap: 6px;
   gap: 8px;
   margin-top: auto;
-  padding-top: 6px;
 }
 .app-usage {
   display: flex;
+  flex: 1 1 auto;
   align-items: center;
   gap: 6px;
+  min-width: 0;
   font-size: 12px;
   color: theme.$gray_4;
+}
+.app-usage-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 /* The latest version's state. */
 .app-dot {

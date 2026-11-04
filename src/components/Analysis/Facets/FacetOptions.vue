@@ -1,12 +1,11 @@
 <script setup>
 // A section's options as checkboxes, each with its count (and a domain's
-// coloured dot). One at a time, as the galleries' filters are: ticking one
-// unticks the other, ticking it again clears it (the page does, on toggle).
+// coloured dot). Any number at a time (the page keeps the list, on toggle).
 defineProps({
   // [{ key, label, count, color?, title? }]
   options: { type: Array, default: () => [] },
-  // The chosen option's key (anything else: none).
-  selected: { type: String, default: null },
+  // The chosen options' keys.
+  selected: { type: Array, default: () => [] },
 });
 const emit = defineEmits(["toggle"]);
 </script>
@@ -17,7 +16,7 @@ const emit = defineEmits(["toggle"]);
     :key="o.key"
     class="facet-row"
     size="small"
-    :model-value="selected === o.key"
+    :model-value="selected.includes(o.key)"
     :title="o.title"
     @change="emit('toggle', o.key)"
   >

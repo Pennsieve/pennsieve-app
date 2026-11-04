@@ -14,7 +14,8 @@ import { ArrowLeft, ArrowRight, Close } from "@element-plus/icons-vue";
 const props = defineProps({
   // Where the fold state is kept (localStorage), e.g. "pennsieve.apps.filtersPanel".
   storageKey: { type: String, required: true },
-  // The filters set: [{ key, label }], each removable; none, no chip row.
+  // The filters set: [{ key, value?, label }], each removable (remove: the
+// chip); none, no chip row.
   chips: { type: Array, default: () => [] },
 });
 const emit = defineEmits(["remove", "clear-all"]);
@@ -55,7 +56,7 @@ const drawerOpen = ref(false);
     <aside v-else class="facet-panel" aria-label="Filters">
       <div class="facets-top">
         <span class="facets-title">Filters</span>
-        <button v-if="chips.length" type="button" class="facet-link" @click="emit('clear-all')">Clear all</button>
+        <button v-if="chips.length" type="button" class="facet-link" @click="emit('clear-all')">Clear filters</button>
         <button type="button" class="panel-fold" title="Fold the filters" aria-label="Fold the filters" @click="togglePanel">
           <el-icon><ArrowLeft /></el-icon>
         </button>
@@ -66,7 +67,7 @@ const drawerOpen = ref(false);
     <el-drawer v-model="drawerOpen" direction="ltr" size="280px" :with-header="false">
       <div class="facets-top">
         <span class="facets-title">Filters</span>
-        <button v-if="chips.length" type="button" class="facet-link" @click="emit('clear-all')">Clear all</button>
+        <button v-if="chips.length" type="button" class="facet-link" @click="emit('clear-all')">Clear filters</button>
         <button type="button" class="panel-fold" title="Close the filters" aria-label="Close the filters" @click="drawerOpen = false">
           <el-icon><Close /></el-icon>
         </button>
@@ -84,13 +85,13 @@ const drawerOpen = ref(false);
       </div>
 
       <div v-if="chips.length" class="active-filters" role="group" aria-label="Active filters">
-        <span v-for="chip in chips" :key="chip.key" class="active-chip">
+        <span v-for="chip in chips" :key="`${chip.key}:${chip.value ?? ''}`" class="active-chip">
           {{ chip.label }}
-          <button type="button" class="active-chip-remove" :aria-label="`Remove filter ${chip.label}`" @click="emit('remove', chip.key)">
+          <button type="button" class="active-chip-remove" :aria-label="`Remove filter ${chip.label}`" @click="emit('remove', chip)">
             <el-icon><Close /></el-icon>
           </button>
         </span>
-        <button type="button" class="facet-link facet-link--13" @click="emit('clear-all')">Clear all</button>
+        <button type="button" class="facet-link facet-link--13" @click="emit('clear-all')">Clear filters</button>
       </div>
 
       <slot />

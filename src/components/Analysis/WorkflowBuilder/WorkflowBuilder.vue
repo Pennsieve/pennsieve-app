@@ -118,6 +118,12 @@ const props = defineProps({
     type: String,
     default: "",
   },
+  // Where Save goes, with toolbarTarget (the Workflows tab's title row:
+  // the tab's primary action); else it stays in the bar.
+  saveTarget: {
+    type: String,
+    default: "",
+  },
 });
 
 const router = useRouter();
@@ -2818,6 +2824,7 @@ const openNodeSettings = (id) => {
           :started="started"
           :landing="landing"
           :saving="saving"
+          :save-target="toolbarTarget ? saveTarget : ''"
           @save="saveWorkflow"
           @start-over="startOver"
           @select="onReadinessSelect"

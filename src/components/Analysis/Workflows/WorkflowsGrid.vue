@@ -30,7 +30,7 @@ import FacetOptions from "../Facets/FacetOptions.vue";
 import FacetRadios from "../Facets/FacetRadios.vue";
 import FacetCheck from "../Facets/FacetCheck.vue";
 import CardTags from "../Facets/CardTags.vue";
-import { domainFacetOptions, fieldFacetOptions } from "../Facets/facets";
+import { domainFacetOptions, fieldFacetOptions, toggleKey } from "../Facets/facets";
 
 defineProps({
   // Inside the Workflows tab's Library, whose bar has the New Workflow button.
@@ -54,8 +54,8 @@ const statusFilter = ref("active");
 const scopeFilter = ref("workspace"); // "workspace" | "public" | "pennsieve" (public, official only)
 const inputFilter = ref("any"); // "any" | "dataset" | "none"
 const outputFilter = ref("any"); // "any" | a target type
-const domainFilter = ref("any"); // "any" | a domain's key
-const fieldFilter = ref("any"); // "any" | a research field's key
+const domainFilter = ref([]); // domains' keys (any of them); none: all
+const fieldFilter = ref([]); // research fields' keys (any of them); none: all
 
 // The sort is the viewer's, kept in this browser.
 const SORT_KEY = "pennsieve.gallery.workflowSort";
@@ -113,15 +113,18 @@ const activeChips = computed(() =>
     { domains: domainChips.value, fields: fieldChips.value, outputs: outputChoices.value }
   )
 );
-const clearFacet = (key) => (facetRefs[key].value = FACET_DEFAULTS[key]);
-const clearFacets = () => Object.keys(facetRefs).forEach(clearFacet);
+// Clear a facet, or (a chip of a multi-select one) one of its keys.
+const clearFacet = (key, value) =>
+  (facetRefs[key].value = value === undefined ? FACET_DEFAULTS[key] : facetRefs[key].value.filter((k) => k !== value));
+const removeChip = (chip) => clearFacet(chip.key, chip.value);
+const clearFacets = () => Object.keys(facetRefs).forEach((key) => clearFacet(key));
 
 // The panel's Domain and Field, one at a time (ticking a chosen one clears
 // it); Show archived lists all, unticked Active.
 const domainFacets = computed(() => domainFacetOptions(domainChips.value));
 const fieldFacets = computed(() => fieldFacetOptions(fieldChips.value));
-const toggleDomain = (key) => (domainFilter.value = domainFilter.value === key ? "any" : key);
-const toggleField = (key) => (fieldFilter.value = fieldFilter.value === key ? "any" : key);
+const toggleDomain = (key) => (domainFilter.value = toggleKey(domainFilter.value, key));
+const toggleField = (key) => (fieldFilter.value = toggleKey(fieldFilter.value, key));
 const showArchived = computed({
   get: () => statusFilter.value !== FACET_DEFAULTS.status,
   set: (on) => (statusFilter.value = on ? "all" : FACET_DEFAULTS.status),
@@ -132,15 +135,15 @@ const filtersSet = computed(
     !!searchQuery.value.trim() ||
     inputFilter.value !== "any" ||
     outputFilter.value !== "any" ||
-    domainFilter.value !== "any" ||
-    fieldFilter.value !== "any"
+    domainFilter.value.length > 0 ||
+    fieldFilter.value.length > 0
 );
 function clearFilters() {
   searchQuery.value = "";
   inputFilter.value = "any";
   outputFilter.value = "any";
-  domainFilter.value = "any";
-  fieldFilter.value = "any";
+  domainFilter.value = [];
+  fieldFilter.value = [];
 }
 
 const filteredWorkflows = computed(() =>
@@ -380,7 +383,7 @@ onMounted(async () => {
       class="workflows-section"
       storage-key="pennsieve.library.filtersPanel"
       :chips="activeChips"
-      @remove="clearFacet"
+      @remove="removeChip"
       @clear-all="clearFacets"
     >
       <template #filters>
@@ -389,10 +392,10 @@ onMounted(async () => {
           <FacetCheck v-if="embedded" v-model="includeNotebooks" label="Include notebooks" />
           <FacetCheck v-model="showArchived" label="Show archived" />
         </FacetSection>
-        <FacetSection v-if="domainFacets.length" title="Domain" :clearable="domainFilter !== FACET_DEFAULTS.domain" @clear="clearFacet('domain')">
+        <FacetSection v-if="domainFacets.length" title="Domain" :clearable="domainFilter.length > 0" @clear="clearFacet('domain')">
           <FacetOptions :options="domainFacets" :selected="domainFilter" @toggle="toggleDomain" />
         </FacetSection>
-        <FacetSection v-if="fieldFacets.length" title="Field" :clearable="fieldFilter !== FACET_DEFAULTS.field" @clear="clearFacet('field')">
+        <FacetSection v-if="fieldFacets.length" title="Field" :clearable="fieldFilter.length > 0" @clear="clearFacet('field')">
           <FacetOptions :options="fieldFacets" :selected="fieldFilter" @toggle="toggleField" />
         </FacetSection>
         <FacetSection title="Input" :clearable="inputFilter !== FACET_DEFAULTS.input" @clear="clearFacet('input')">
@@ -650,8 +653,9 @@ onMounted(async () => {
 
 $card-height: 172px;
 
-/* Cards two or more to a row where 340px each fit (16px apart), of one height with a square
-   graph, as the apps' (ApplicationsGrid): the rows line up. */
+/* Cards two or more to a row where 340px each fit (16px apart), each as
+   tall as its square graph (172px; 140px in a narrow card), as the apps'
+   (ApplicationsGrid): the rows line up, and the text fits the card. */
 .workflows-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(min(340px, 100%), 1fr));
@@ -660,9 +664,6 @@ $card-height: 172px;
 
 .wf-card {
   display: flex;
-  /* At least this tall; a narrow card's footer may wrap to a second line
-     (cards in a row stay one height). */
-  min-height: $card-height;
   min-width: 0;
   container: wf-card / inline-size;
   border: 1px solid theme.$gray_2;
@@ -687,7 +688,10 @@ $card-height: 172px;
 }
 /* The graph, on the builder's dotted canvas. */
 .wf-thumb {
-  flex: 0 0 $card-height;
+  flex: 0 0 auto;
+  align-self: flex-start;
+  width: $card-height;
+  aspect-ratio: 1 / 1;
   box-sizing: border-box;
   padding: 8px;
   border-right: 1px solid theme.$gray_2;
@@ -695,6 +699,8 @@ $card-height: 172px;
   background-image: radial-gradient(theme.$gray_3 1px, transparent 1px);
   background-size: 12px 12px;
 }
+/* The text fits the graph's height: it doesn't size the card (contain),
+   and what doesn't fit is cut (overflow), never the card stretched. */
 .wf-body {
   display: flex;
   flex-direction: column;
@@ -702,6 +708,21 @@ $card-height: 172px;
   flex: 1;
   min-width: 0;
   padding: 14px 16px 12px;
+  contain: size;
+  overflow: hidden;
+}
+/* A narrow card: a smaller square, tighter text, no input/output line. */
+@container wf-card (max-width: 440px) {
+  .wf-thumb {
+    width: 140px;
+  }
+  .wf-body {
+    gap: 4px;
+    padding: 10px 12px;
+  }
+  .wf-io {
+    display: none;
+  }
 }
 .wf-title {
   display: flex;
@@ -747,20 +768,17 @@ $card-height: 172px;
   font-size: 12px;
   color: theme.$gray_6;
 }
+/* One line at the card's foot: the usage gives way (…) to the buttons,
+   which always show. */
 .wf-foot {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
-  justify-content: space-between;
-  row-gap: 6px;
   gap: 8px;
   margin-top: auto;
-  padding-top: 6px;
 }
-/* The usage, then the buttons; narrow, the buttons go to a line of their
-   own (right) and the usage wraps rather than being cut. */
 .wf-usage {
   display: flex;
+  flex: 1 1 auto;
   align-items: center;
   gap: 6px;
   min-width: 0;
@@ -768,7 +786,9 @@ $card-height: 172px;
   color: theme.$gray_4;
 }
 .wf-usage-text {
-  overflow-wrap: anywhere;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .wf-actions {
   display: flex;
@@ -810,13 +830,6 @@ $card-height: 172px;
     color: theme.$white;
   }
 }
-/* A narrow card (two to a row beside the panel, or a phone): a smaller
-   graph, so the text keeps room. */
-@container wf-card (max-width: 440px) {
-  .wf-thumb {
-    flex-basis: 112px;
-  }
-}
 @media (hover: none) {
   .wf-actions {
     opacity: 1;
@@ -829,7 +842,7 @@ $card-height: 172px;
   flex-shrink: 0;
   font-size: 13px;
   color: theme.$gray_5;
-  margin: 2px 0 4px 0;
+  margin: 0;
   line-height: 1.4;
   word-break: break-word;
 }

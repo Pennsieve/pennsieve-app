@@ -29,22 +29,32 @@ const emit = defineEmits(["update:modelValue"]);
 <style scoped lang="scss">
 @use "../../styles/theme";
 
+/* A sub-selector beside the underlined tabs, not a second tab bar: 32px
+   tall (the app's small controls), a thin light container, the chosen view
+   a white pill. Explicit heights, so global button styles can't stretch it. */
 .view-switch {
   display: inline-flex;
   flex-shrink: 0;
+  align-items: center;
+  box-sizing: border-box;
+  height: 32px;
   padding: 2px;
   border: 1px solid theme.$gray_2;
   border-radius: 6px;
   background: theme.$gray_1;
 }
 .view-option {
-  padding: 5px 14px;
+  box-sizing: border-box;
+  height: 26px;
+  margin: 0;
+  padding: 0 12px;
   border: none;
   border-radius: 4px;
   background: none;
   font: inherit;
   font-size: 13px;
   font-weight: 500;
+  line-height: 26px;
   color: theme.$gray_5;
   cursor: pointer;
 
@@ -54,7 +64,7 @@ const emit = defineEmits(["update:modelValue"]);
   &.active {
     background: theme.$white;
     color: theme.$purple_3;
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
   }
 }
 </style>

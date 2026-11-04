@@ -163,7 +163,7 @@ export default {
   align-items: center;
   justify-content: flex-end;
   gap: 8px;
-  min-height: 32px;
+  min-height: 36px;
   margin-left: auto;
   margin-right: 24px;
 }

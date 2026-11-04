@@ -17,7 +17,7 @@ const shown = computed(() => props.tags.slice(0, props.max).map((t) => ({ tag: t
 <template>
   <div class="card-tags" :class="{ 'card-tags--inherited': inherited }">
     <span v-for="t in shown" :key="t.tag" class="card-tag" :class="{ 'card-tag--domain': t.domain }">
-      <span v-if="t.color" class="card-tag-dot" :style="{ background: t.color }" />{{ t.text }}
+      <span v-if="t.color" class="card-tag-dot" :style="{ background: t.color }" /><span class="card-tag-text">{{ t.text }}</span>
     </span>
     <span v-if="tags.length > max" class="card-tag">+{{ tags.length - max }}</span>
   </div>
@@ -27,10 +27,15 @@ const shown = computed(() => props.tags.slice(0, props.max).map((t) => ({ tag: t
 @use "../../../styles/theme";
 
 /* One line, a few; the rest are found by search. */
+/* Whole tags only: one that doesn't fit wraps to a second line, hidden
+   (never cut mid-word); a first tag longer than the row ends in "…". */
 .card-tags {
   display: flex;
+  flex-shrink: 0;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 12px;
+  gap: 0 12px;
+  height: 18px;
   overflow: hidden;
   font-size: 12px;
   line-height: 18px;
@@ -38,10 +43,15 @@ const shown = computed(() => props.tags.slice(0, props.max).map((t) => ({ tag: t
 }
 .card-tag {
   display: inline-flex;
-  flex-shrink: 0;
   align-items: center;
   gap: 5px;
+  max-width: 100%;
+  min-width: 0;
   white-space: nowrap;
+}
+.card-tag-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 /* A domain's name as the panel's, darker than a field's. */
 .card-tag--domain {

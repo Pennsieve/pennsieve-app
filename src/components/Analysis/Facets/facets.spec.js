@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { domainFacetOptions, fieldFacetOptions, tagDisplay } from "./facets";
+import { domainFacetOptions, fieldFacetOptions, matchesAny, selectedKeys, tagDisplay, toggleKey } from "./facets";
 import { domainOfTag, fieldOfTag, domainColors } from "../Applications/appDomains";
 
 describe("facet options", () => {
@@ -25,5 +25,24 @@ describe("tagDisplay", () => {
   });
   it("shows any other tag as written", () => {
     expect(tagDisplay("my-lab-pipeline")).toEqual({ text: "my-lab-pipeline", color: null, domain: false });
+  });
+});
+
+describe("multi-select sections", () => {
+  it("reads a choice as a list", () => {
+    expect(selectedKeys("any")).toEqual([]);
+    expect(selectedKeys(null)).toEqual([]);
+    expect(selectedKeys("imaging")).toEqual(["imaging"]);
+    expect(selectedKeys(["imaging", "genomics"])).toEqual(["imaging", "genomics"]);
+  });
+  it("ticks and unticks a key", () => {
+    expect(toggleKey([], "a")).toEqual(["a"]);
+    expect(toggleKey(["a", "b"], "a")).toEqual(["b"]);
+  });
+  it("matches any chosen key, or all with none chosen", () => {
+    expect(matchesAny(["a", "b"], [])).toBe(true);
+    expect(matchesAny(["a"], ["b", "a"])).toBe(true);
+    expect(matchesAny(["a"], ["b"])).toBe(false);
+    expect(matchesAny([], ["b"])).toBe(false);
   });
 });

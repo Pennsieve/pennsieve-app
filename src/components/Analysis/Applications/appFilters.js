@@ -3,19 +3,18 @@
 // rules are easy to test; moved out of ApplicationsGrid unchanged.
 import { appDomain, appFields } from "./appDomains";
 import { matchesAppSearch } from "./appCards";
+import { matchesAny, selectedKeys } from "../Facets/facets";
 
 export const VISIBILITY_OPTIONS = [
   { label: "All", value: "all" },
   { label: "Public", value: "public" },
   { label: "Private", value: "private" },
 ];
-export const APP_STATUS_OPTIONS = [
-  { label: "Active", value: "active" },
-  { label: "Archived", value: "archived" },
-  { label: "All", value: "all" },
-];
+// The panel's "Show archived" lists all (Active and Archived), as on the
+// Workflows Library; archived alone isn't offered, but a chip names it.
+const STATUS_CHIPS = { all: "Including archived", archived: "Archived only" };
 // Nothing chosen: every visibility, active apps, any domain or field.
-export const APP_FILTER_DEFAULTS = { visibility: "all", status: "active", domain: null, field: null };
+export const APP_FILTER_DEFAULTS = Object.freeze({ visibility: "all", status: "active", domain: [], field: [] });
 
 // "Public" or "Private" (null for anything else).
 export function visibilityLabel(app) {
@@ -37,31 +36,34 @@ export function appsInStatus(apps = [], status = "active") {
 }
 
 // The apps a choice keeps: in its status, matching the search, of its
-// visibility, for its domain (a key) and serving its field (a key); a
-// domain and a field must both hold.
-export function filterApps(apps = [], { status = "active", query = "", visibility = "all", domain = null, field = null } = {}) {
+// visibility, for any of its domains and serving any of its fields (lists
+// of keys: OR within each, AND between them; empty for all).
+export function filterApps(apps = [], { status = "active", query = "", visibility = "all", domain = [], field = [] } = {}) {
   let list = appsInStatus(apps, status);
   list = list.filter((app) => matchesAppSearch(app, query, readmeSummary(app)));
   if (visibility !== "all") list = list.filter((app) => (visibilityLabel(app) || "").toLowerCase() === visibility);
-  if (domain) list = list.filter((app) => appDomain(app)?.key === domain);
-  if (field) list = list.filter((app) => appFields(app).some((f) => f.key === field));
+  list = list.filter((app) => matchesAny([appDomain(app)?.key].filter(Boolean), domain));
+  list = list.filter((app) => matchesAny(appFields(app).map((f) => f.key), field));
   return list;
 }
 
 // The filters set away from their defaults, as removable chips ({ key,
-// label }) in the panel's order: visibility, domain, field, status. Labels
-// come from the options shown (domainCounts, fieldCounts); one no longer
-// offered shows by its key.
+// value, label }; one per chosen domain and field, value its key) in the
+// panel's order: visibility, status, domain, field. Labels come from the
+// options shown (domainCounts, fieldCounts); one no longer offered shows by
+// its key.
 export function appActiveFilters(state = {}, { domains = [], fields = [] } = {}) {
   const set = (key) => state[key] !== undefined && state[key] !== APP_FILTER_DEFAULTS[key];
   const chips = [];
   if (set("visibility")) {
     chips.push({ key: "visibility", label: VISIBILITY_OPTIONS.find((o) => o.value === state.visibility)?.label || state.visibility });
   }
-  if (set("domain")) chips.push({ key: "domain", label: domains.find((o) => o.domain.key === state.domain)?.domain.label || state.domain });
-  if (set("field")) chips.push({ key: "field", label: fields.find((o) => o.field.key === state.field)?.field.label || state.field });
-  if (set("status")) {
-    chips.push({ key: "status", label: `Status: ${APP_STATUS_OPTIONS.find((o) => o.value === state.status)?.label || state.status}` });
+  if (set("status")) chips.push({ key: "status", label: STATUS_CHIPS[state.status] || `Status: ${state.status}` });
+  for (const key of selectedKeys(state.domain)) {
+    chips.push({ key: "domain", value: key, label: domains.find((o) => o.domain.key === key)?.domain.label || key });
+  }
+  for (const key of selectedKeys(state.field)) {
+    chips.push({ key: "field", value: key, label: fields.find((o) => o.field.key === key)?.field.label || key });
   }
   return chips;
 }

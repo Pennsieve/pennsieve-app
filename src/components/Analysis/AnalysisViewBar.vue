@@ -34,8 +34,10 @@ const emit = defineEmits(["update:modelValue"]);
 </template>
 
 <style scoped lang="scss">
-/* The tab's actions, on the title row's right; 32px buttons, so the row
-   keeps its height on every tab. */
+/* The tab's actions, on the title row's right: standard 36px controls
+   (as the app's filters and selects), normal padding, the filled primary
+   style kept. Explicit sizes, so the header's or global button rules can't
+   stretch them. */
 .view-actions {
   display: flex;
   flex-wrap: wrap;
@@ -44,9 +46,14 @@ const emit = defineEmits(["update:modelValue"]);
   min-width: 0;
 
   :deep(.bf-button) {
-    min-height: 32px;
-    height: 32px;
-    padding: 0 14px;
+    box-sizing: border-box;
+    height: 36px;
+    min-height: 36px;
+    min-width: 0;
+    padding: 0 16px;
+    font-size: 14px;
+    line-height: 1;
+    white-space: nowrap;
   }
 }
 </style>

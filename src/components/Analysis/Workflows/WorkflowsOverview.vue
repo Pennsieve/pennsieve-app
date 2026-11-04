@@ -91,10 +91,11 @@ watch(() => route.query.run, openRunFromQuery);
 <template>
   <div class="wf-page">
     <AnalysisViewBar v-model="view" :views="VIEWS">
-      <!-- Live's one action is running a workflow; the Library's cards each
-           have their own Run, and building one is the Builder tab's (a
-           "+ New Workflow" here was taken for running one). -->
+      <!-- Each view's primary action, in one place: running a workflow,
+           making one (the Builder, on its start screen), saving it. -->
       <bf-button v-if="view === 'live'" @click="runsRef?.openWizardDialog()">+ Run Workflow</bf-button>
+      <bf-button v-else-if="view === 'library'" @click="view = 'builder'">+ New Workflow</bf-button>
+      <span v-else-if="view === 'builder'" id="wf-builder-save" class="wf-builder-save" />
     </AnalysisViewBar>
     <!-- The builder's bar (name, readiness, Save): its own row over the
          canvas; the views are on the tab row. -->
@@ -115,7 +116,7 @@ watch(() => route.query.run, openRunFromQuery);
         @open-library="view = 'library'"
       />
       <div v-else class="wf-builder">
-        <WorkflowBuilder toolbar-target="#wf-toolbar-builder" />
+        <WorkflowBuilder toolbar-target="#wf-toolbar-builder" save-target="#wf-builder-save" />
       </div>
     </div>
     <RunWizardDialog ref="runDialog" />
@@ -141,6 +142,9 @@ watch(() => route.query.run, openRunFromQuery);
   padding: 0 32px;
   border-bottom: 1px solid theme.$gray_2;
   background: theme.$white;
+}
+.wf-builder-save {
+  display: inline-flex;
 }
 .wf-body {
   flex: 1;

@@ -156,6 +156,12 @@ describe("domains", () => {
     expect(applyFilters([spikes, zipper, tumours], { domain: "imaging", applications })).toEqual([]);
     expect(applyFilters([spikes, zipper, tumours], { domain: "ephys", input: "none", applications })).toEqual([]);
     expect(applyFilters([spikes, zipper, tumours], { domain: "any", applications })).toEqual([spikes, zipper, tumours]);
+    expect(applyFilters([spikes, zipper, tumours], { domain: [], applications })).toEqual([spikes, zipper, tumours]);
+  });
+
+  it("keeps a workflow in any of the chosen domains (OR), and in a chosen field too (AND)", () => {
+    expect(applyFilters([spikes, zipper, tumours], { domain: ["viz", "ephys"], applications })).toEqual([spikes, tumours]);
+    expect(applyFilters([spikes, zipper, tumours], { domain: ["viz", "ephys"], field: ["neuroscience"], applications })).toEqual([spikes]);
   });
 });
 
@@ -220,17 +226,25 @@ describe("activeFilters", () => {
     const state = { domain: "genomics", field: "neuroscience", input: "dataset", output: "download", status: "archived" };
     expect(activeFilters(state, { domains, fields, outputs })).toEqual([
       { key: "status", label: "Archived only" },
-      { key: "domain", label: "Genomics" },
-      { key: "field", label: "Neuroscience" },
+      { key: "domain", value: "genomics", label: "Genomics" },
+      { key: "field", value: "neuroscience", label: "Neuroscience" },
       { key: "input", label: "Takes a dataset" },
       { key: "output", label: "Output: Download" },
     ]);
   });
 
   it("names a value no longer offered by its key", () => {
-    expect(activeFilters({ ...FACET_DEFAULTS, domain: "imaging", output: "s3" }, { domains, fields, outputs })).toEqual([
-      { key: "domain", label: "imaging" },
+    expect(activeFilters({ ...FACET_DEFAULTS, domain: ["imaging"], output: "s3" }, { domains, fields, outputs })).toEqual([
+      { key: "domain", value: "imaging", label: "imaging" },
       { key: "output", label: "Output: s3" },
+    ]);
+  });
+
+  it("gives each chosen domain and field its own chip", () => {
+    const more = [...domains, { domain: { key: "imaging", label: "Imaging" }, count: 2 }];
+    expect(activeFilters({ ...FACET_DEFAULTS, domain: ["genomics", "imaging"] }, { domains: more })).toEqual([
+      { key: "domain", value: "genomics", label: "Genomics" },
+      { key: "domain", value: "imaging", label: "Imaging" },
     ]);
   });
 

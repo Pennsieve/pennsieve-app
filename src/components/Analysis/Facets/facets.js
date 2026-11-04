@@ -24,3 +24,17 @@ export function tagDisplay(tag) {
   const f = fieldOfTag(tag);
   return { text: f ? f.label : tag, color: null, domain: false };
 }
+
+// A multi-select section's chosen keys, as a list: none for "any", null or
+// nothing; a single key (the old one-at-a-time value) as one.
+export const selectedKeys = (value) => (value == null || value === "any" ? [] : [].concat(value));
+
+// The chosen keys with one ticked or unticked.
+export const toggleKey = (keys = [], key) => (keys.includes(key) ? keys.filter((k) => k !== key) : [...keys, key]);
+
+// Whether an item with these keys passes a section's choice: any of them
+// (OR within a section; sections combine with AND). Nothing chosen: all.
+export const matchesAny = (itemKeys = [], chosen) => {
+  const want = selectedKeys(chosen);
+  return !want.length || itemKeys.some((k) => want.includes(k));
+};

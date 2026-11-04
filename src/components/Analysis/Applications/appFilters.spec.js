@@ -36,8 +36,14 @@ describe("filterApps", () => {
   it("filters by domain and field, both holding", () => {
     const ephys = domainOfTag("electrophysiology").key;
     const neuro = fieldOfTag("neuroscience").key;
-    expect(keys(filterApps(apps, { status: "all", field: neuro }))).toEqual(["spike-detect", "old-viewer"]);
-    expect(keys(filterApps(apps, { status: "all", field: neuro, domain: ephys }))).toEqual(["spike-detect"]);
+    expect(keys(filterApps(apps, { status: "all", field: [neuro] }))).toEqual(["spike-detect", "old-viewer"]);
+    expect(keys(filterApps(apps, { status: "all", field: [neuro], domain: [ephys] }))).toEqual(["spike-detect"]);
+  });
+  it("keeps an app in any of the chosen domains (OR)", () => {
+    const ephys = domainOfTag("electrophysiology").key;
+    const genomics = domainOfTag("genomics").key;
+    expect(keys(filterApps(apps, { domain: [ephys, genomics] }))).toEqual(["spike-detect", "gene-counts"]);
+    expect(keys(filterApps(apps, { domain: [] }))).toEqual(["spike-detect", "gene-counts"]);
   });
   it("searches the README summary too", () => {
     expect(keys(filterApps(apps, { status: "all", query: "traces" }))).toEqual(["old-viewer"]);
@@ -59,12 +65,12 @@ describe("appActiveFilters", () => {
     expect(appActiveFilters(APP_FILTER_DEFAULTS, { domains, fields })).toEqual([]);
   });
   it("names each filter set, in the panel's order", () => {
-    const state = { visibility: "private", domain: domainOfTag("genomics").key, field: fieldOfTag("immunology").key, status: "archived" };
+    const state = { visibility: "private", domain: [domainOfTag("genomics").key], field: [fieldOfTag("immunology").key], status: "all" };
     expect(appActiveFilters(state, { domains, fields })).toEqual([
       { key: "visibility", label: "Private" },
-      { key: "domain", label: domainOfTag("genomics").label },
-      { key: "field", label: fieldOfTag("immunology").label },
-      { key: "status", label: "Status: Archived" },
+      { key: "status", label: "Including archived" },
+      { key: "domain", value: domainOfTag("genomics").key, label: domainOfTag("genomics").label },
+      { key: "field", value: fieldOfTag("immunology").key, label: fieldOfTag("immunology").label },
     ]);
   });
 });
