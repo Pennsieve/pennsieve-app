@@ -13,6 +13,12 @@ import {
   gpuName,
   gpuOffer,
   gpuTaskResources,
+  notebookCeiling,
+  notebookLimitText,
+  notebookLimitWarning,
+  tierNotebookLine,
+  NON_NOTEBOOK_LIMIT_KEYS,
+  NOTEBOOKS_OFF,
 } from "./computeNodeHelpers";
 
 describe("compute node page", () => {
@@ -82,6 +88,52 @@ describe("compute node page", () => {
     expect(limitSummary({ dailyCostUsd: 0 })).toBe("$0.00 a day");
     expect(limitSummary({})).toBe("");
     expect(limitSummary(null)).toBe("");
+    expect(limitSummary({ maxConcurrentRuns: 3, maxInteractiveSessions: 2 }, NON_NOTEBOOK_LIMIT_KEYS)).toBe("3 runs at once");
+  });
+});
+
+// A tier's notebooks-open limit only narrows the node's own ceiling
+// (maxInteractiveSessions on the node record).
+describe("notebook limits against the node's ceiling", () => {
+  it("reads the ceiling off the node, 0 when sessions are off", () => {
+    expect(notebookCeiling({ maxInteractiveSessions: 2 })).toBe(2);
+    expect(notebookCeiling({ maxInteractiveSessions: 0 })).toBe(0);
+    expect(notebookCeiling({})).toBe(0);
+    expect(notebookCeiling(null)).toBe(0);
+  });
+
+  it("says what an unset tier comes to", () => {
+    expect(notebookLimitText(null, 2)).toBe("No limit (node allows up to 2)");
+    expect(notebookLimitText(undefined, 2)).toBe("No limit (node allows up to 2)");
+    expect(notebookLimitWarning(null, 2)).toBe("");
+    expect(tierNotebookLine(null, 2)).toBe("Notebooks open: No limit (node allows up to 2)");
+    expect(tierNotebookLine({ maxInteractiveSessions: null }, 2)).toBe("Notebooks open: No limit (node allows up to 2)");
+  });
+
+  it("shows a limit at or below the ceiling as is, without a warning", () => {
+    expect(notebookLimitText(1, 2)).toBe("1 notebook open");
+    expect(notebookLimitText(2, 2)).toBe("2 notebooks open");
+    expect(notebookLimitText(0, 2)).toBe("0 notebooks open");
+    expect(notebookLimitWarning(2, 2)).toBe("");
+    expect(notebookLimitWarning(0, 2)).toBe("");
+    expect(tierNotebookLine({ maxInteractiveSessions: 1 }, 2)).toBe("1 notebook open");
+  });
+
+  it("flags a limit above the ceiling, which has no effect", () => {
+    expect(notebookLimitText(5, 2)).toBe("5 notebooks open (node allows up to 2)");
+    expect(notebookLimitWarning(5, 2)).toBe("This node allows at most 2 open notebooks; a higher limit has no effect.");
+    expect(notebookLimitWarning(3, 1)).toBe("This node allows at most 1 open notebook; a higher limit has no effect.");
+    expect(tierNotebookLine({ maxInteractiveSessions: 5 }, 2)).toBe("5 notebooks open (node allows up to 2)");
+  });
+
+  it("says notebooks are off when the node has no sessions", () => {
+    expect(NOTEBOOKS_OFF).toBe("Notebooks are off on this node");
+    for (const ceiling of [0, null, undefined]) {
+      expect(notebookLimitText(null, ceiling)).toBe(NOTEBOOKS_OFF);
+      expect(notebookLimitText(3, ceiling)).toBe(NOTEBOOKS_OFF);
+      expect(notebookLimitWarning(3, ceiling)).toBe("");
+      expect(tierNotebookLine({ maxInteractiveSessions: 3 }, ceiling)).toBe(NOTEBOOKS_OFF);
+    }
   });
 });
 

@@ -210,3 +210,44 @@ export function limitSummary(row, keys = Object.keys(LIMIT_PHRASES)) {
     .map((k) => LIMIT_PHRASES[k](row[k]))
     .join(" · ");
 }
+
+// Notebooks open, against the node's ceiling. A tier's maxInteractiveSessions
+// (node-wide, per-user default, a user's override) only narrows the node's
+// own maxInteractiveSessions, set with its infrastructure config: the
+// effective limit is the stricter of the two, so an unset tier is not
+// unlimited. A ceiling of 0 (or none) means notebooks are off on the node.
+export const NOTEBOOKS_OFF = "Notebooks are off on this node";
+export const NOTEBOOKS_OFF_HINT = "Turn notebooks on in the node's configuration (Overview, What it can do) to limit them here.";
+export const notebookCeiling = (node) => Math.max(0, Number(node?.maxInteractiveSessions) || 0);
+const isSet = (v) => v !== null && v !== undefined && v !== "";
+
+// The axes limitSummary sums up besides notebooks, which get their own line.
+export const NON_NOTEBOOK_LIMIT_KEYS = Object.keys(LIMIT_PHRASES).filter((k) => k !== "maxInteractiveSessions");
+
+// What a tier's notebook limit comes to: "No limit (node allows up to 2)",
+// "1 notebook open", "5 notebooks open (node allows up to 2)", or that
+// notebooks are off.
+export function notebookLimitText(value, ceiling) {
+  const n = Number(ceiling) || 0;
+  if (n <= 0) return NOTEBOOKS_OFF;
+  if (!isSet(value)) return `No limit (node allows up to ${n})`;
+  const own = LIMIT_PHRASES.maxInteractiveSessions(value);
+  return Number(value) > n ? `${own} (node allows up to ${n})` : own;
+}
+
+// The warning under the field when a tier asks for more than the node allows;
+// "" when it doesn't. Saving still goes through: the ceiling can be raised.
+export function notebookLimitWarning(value, ceiling) {
+  const n = Number(ceiling) || 0;
+  if (n <= 0 || !isSet(value) || Number(value) <= n) return "";
+  return `This node allows at most ${n} open notebook${n === 1 ? "" : "s"}; a higher limit has no effect.`;
+}
+
+// A tier row's notebook line in Limits & budget: the limit text, with the
+// axis named when the text alone wouldn't say ("Notebooks open: No limit
+// (node allows up to 2)").
+export function tierNotebookLine(row, ceiling) {
+  const value = row?.maxInteractiveSessions;
+  const text = notebookLimitText(value, ceiling);
+  return (Number(ceiling) || 0) > 0 && !isSet(value) ? `Notebooks open: ${text}` : text;
+}
