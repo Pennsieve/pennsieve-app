@@ -285,3 +285,15 @@ export function tierNotebookLine(row, ceiling) {
   const text = notebookLimitText(value, ceiling);
   return (Number(ceiling) || 0) > 0 && !isSet(value) ? `Notebooks open: ${text}` : text;
 }
+
+// My Workspace's nodes in two groups: "own", the caller's personal nodes
+// (they own it: ownerId is their id or intId), and "shared", the ones others
+// make available to them, such as Pennsieve's public node (platform, the
+// flag the card's Pennsieve mark reads), which is always shared.
+export function groupMyNodes(nodes = [], profile = null) {
+  const mine = (n) => !!profile && n.ownerId != null && (n.ownerId === profile.id || n.ownerId === profile.intId);
+  const own = [];
+  const shared = [];
+  for (const n of nodes) (!n.platform && mine(n) ? own : shared).push(n);
+  return { own, shared };
+}

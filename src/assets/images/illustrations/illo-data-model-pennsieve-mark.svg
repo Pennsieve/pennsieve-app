@@ -11,7 +11,17 @@
 	.st5{fill:#011F5B;}
 </style>
 <title>data-model</title>
-<!-- The graph and gear of illo-data-model-pennsieve.svg alone, for small sizes (no faint lines or dots) -->
+<!-- The graph and gear of illo-data-model-pennsieve.svg on a round disc (as
+     Dr. Azumi's frame), with a few of its lines and dots, for small sizes -->
+<circle cx="382" cy="360" r="195" fill="#e6e9ef"/>
+<g fill="none" stroke="#b3bcce" stroke-width="4" stroke-linecap="round" opacity="0.6">
+  <line x1="262" y1="232" x2="468" y2="520"/>
+  <line x1="232" y1="420" x2="332" y2="282"/>
+</g>
+<circle cx="500" cy="252" r="9" fill="#b3bcce"/>
+<circle cx="302" cy="498" r="7" fill="#b3bcce"/>
+<g transform="translate(382 360) scale(0.74) translate(-370 -360)">
+
 <path class="st3" d="M557,376.3c-2.7-10.1-8.3-19.1-16.1-26l-10.5,9.9l-13.4-7.1l2.5-14.2c-10.1-2.7-20.7-2.4-30.5,1l3.3,14l-12.9,8
 	l-11.1-9.2c-7.3,7.4-12.4,16.7-14.4,26.9l13.8,4.1l0.5,15.1l-13.6,5c2.7,10.1,8.3,19.1,16.1,26l10.5-9.9l13.4,7.2l-2.5,14.2
 	c10.1,2.7,20.7,2.4,30.5-0.9l-3.3-14.1l12.9-8l11.1,9.2c7.4-7.4,12.4-16.7,14.4-26.9l-13.8-4.1l-0.5-15.1L557,376.3z M513.8,403
@@ -30,4 +40,5 @@
 	c0,11.7-9.5,21.2-21.2,21.2C215,261.2,205.5,251.7,205.5,240z M271.1,501.2c-21.5,0-38.9-17.5-38.9-38.9s17.5-38.9,38.9-38.9
 	s38.9,17.5,38.9,38.9S292.6,501.2,271.1,501.2z M448.9,385.6c-36.2,0-65.6-29.4-65.6-65.6c0-36.2,29.4-65.6,65.6-65.6
 	s65.6,29.4,65.6,65.6C514.5,356.2,485.1,385.6,448.9,385.6z"/>
+</g>
 </svg>
