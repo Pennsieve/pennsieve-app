@@ -8,6 +8,7 @@
 */
 import { stepVariant, variantsOf, versionManifest } from "./appManifestInfo";
 import { diffLines, manifestDiff } from "./manifestDiff";
+import { appLambdaEligibility } from "../Applications/lambdaEligibility";
 
 const COMPUTE_TYPES = ["standard", "lambda", "gpu"];
 
@@ -102,7 +103,8 @@ const resource = (current, before, after) => {
 /*
   What switching a step to another variant of its version changes:
   - variant: what the step keeps ("" for the default, which isn't written);
-  - computeType: kept when the new variant runs there, else its first type;
+  - computeType: kept when the new variant runs there (Lambda: when the
+    variant fits it, lambdaEligibility.js), else its first type;
   - cpu, memory: the new variant's where the step had the old one's, else
     raised to the new variant's (as workflow-service floors them);
   - kept: parameters the step set itself whose value isn't the new
@@ -117,9 +119,12 @@ export function switchVariant(data, app, next) {
   const from = versionManifest(app, tag, data?.variant);
   const target = effectiveVariant(app, tag, next);
   const to = versionManifest(app, tag, target?.id);
-  const types = (to?.runtime?.computeTypes || []).filter((t) => COMPUTE_TYPES.includes(t));
+  const lambda = appLambdaEligibility(app, tag, target?.id).available;
+  const declared = (to?.runtime?.computeTypes || []).filter((t) => COMPUTE_TYPES.includes(t));
+  // Lambda is the variant's when it fits, whether or not its app.yml lists it.
+  const types = [...declared.filter((t) => t !== "lambda"), ...(lambda ? ["lambda"] : [])];
   let computeType = data?.computeType || "standard";
-  if (types.length && !types.includes(computeType)) computeType = types[0];
+  if (computeType === "lambda" ? !lambda : declared.length && !types.includes(computeType)) computeType = types[0] || "standard";
   const kept = Object.entries(data?.defaultParams || {})
     .filter(([, v]) => v !== undefined && v !== null && v !== "")
     .map(([name, value]) => {

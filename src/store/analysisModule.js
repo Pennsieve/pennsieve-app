@@ -16,6 +16,19 @@ const extractErrorMessage = async (response) => {
 // (organization_id) and verify it; without one they work in your personal
 // scope. Pass the workspace being viewed, never a preferred organization
 // (deprecated).
+// runTenant is who a run is for, as workflow-service takes it: the
+// workspace being viewed (ORG#<uuid>), or the user in My Workspace
+// (USER#<uuid>). Without it a run is put in the compute node's workspace,
+// which fails on a node of another workspace (the Pennsieve public node):
+// "user has no access to dataset ... the run declared no tenant".
+export const runTenant = (rootState) => {
+  const uuid = (nodeId) => String(nodeId || "").split(":").pop();
+  const orgId = rootState.activeOrganization?.organization?.id;
+  if (orgId) return `ORG#${uuid(orgId)}`;
+  const userId = rootState.profile?.id;
+  return userId ? `USER#${uuid(userId)}` : undefined;
+};
+
 const withWorkspace = (url, rootState) => {
   const orgId = rootState.activeOrganization?.organization?.id;
   if (!orgId) return url;
@@ -370,10 +383,12 @@ export const actions = {
           const rc = app.runtimeConfig || {};
           return {
             ...app,
+            // Lambda isn't assumed: whether a version may run there is its
+            // own (lambdaEligibility.js, from the version's lambda record).
             runtimeConfig: {
               cpu: rc.cpu || null,
               memory: rc.memory || null,
-              computeTypes: (rc.computeTypes && rc.computeTypes.length ? rc.computeTypes : ["standard", "lambda"])
+              computeTypes: (rc.computeTypes && rc.computeTypes.length ? rc.computeTypes : ["standard"])
                 .map((t) => (t === "ecs" ? "standard" : t)),
             },
           };
@@ -1185,6 +1200,8 @@ export const actions = {
     }
   },
   createRun: async ({ state, commit, rootState }, payload) => {
+    const tenant = payload?.tenant || runTenant(rootState);
+    if (tenant) payload = { ...payload, tenant };
     const tokens = await useGetAllTokens();
     const url = `${rootState.config.api2Url}/compute/workflows/runs`;
     const resp = await fetch(url, {

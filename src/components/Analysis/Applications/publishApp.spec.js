@@ -11,7 +11,7 @@ describe("slugify", () => {
 
 describe("appYmlFor", () => {
   it("writes the app's manifest from the draft, with the compute types chosen", () => {
-    const yml = appYmlFor({ ...newDraft(), name: "Spike Sorter", description: "Sorts spikes.", tags: "ephys, sorting", lambda: true, cpu: "2048", memory: "4096", inputs: "recordings", outputs: "spikes, report" });
+    const yml = appYmlFor({ ...newDraft(), name: "Spike Sorter", description: "Sorts spikes.", tags: "ephys, sorting", gpu: true, cpu: "2048", memory: "4096", inputs: "recordings", outputs: "spikes, report" });
     expect(yml).toMatch(/^# yaml-language-server/);
     expect(yml).toMatch(/name: Spike Sorter/);
     expect(yml).toMatch(/description: Sorts spikes\./);
@@ -19,10 +19,21 @@ describe("appYmlFor", () => {
     expect(yml).toMatch(/- ephys\n\s+- sorting/);
     expect(yml).toMatch(/cpu: 2048/);
     expect(yml).toMatch(/memory: 4096/);
-    expect(yml).toMatch(/computeTypes:\n\s+- standard\n\s+- lambda/);
-    expect(yml).not.toMatch(/- gpu/);
+    expect(yml).toMatch(/computeTypes:\n\s+- standard\n\s+- gpu/);
+    // Lambda isn't a compute type the author lists; it runs there when it fits.
+    expect(yml).not.toMatch(/- lambda/);
+    expect(yml).not.toMatch(/optimize/);
     expect(yml).toMatch(/inputs:\n\s+- name: recordings/);
     expect(yml).toMatch(/outputs:\n\s+- name: spikes\n[\s\S]*- name: report/);
+  });
+});
+
+describe("appYmlFor's Lambda opt-out", () => {
+  it("writes optimize: false only when the author unticks it", () => {
+    expect(appYmlFor({ ...newDraft(), name: "A" })).not.toMatch(/optimize|lambda/);
+    const yml = appYmlFor({ ...newDraft(), name: "A", optimize: false });
+    expect(yml).toMatch(/optimize: false/);
+    expect(yml).not.toMatch(/- lambda/);
   });
 });
 

@@ -50,6 +50,33 @@ describe("compute resources store", () => {
     ]);
   });
 
+  it("marks a node Updating with its new config once a config update is accepted", async () => {
+    const node = { uuid: "n1", status: "Enabled", maxInteractiveSessions: 0 };
+    fetch.mockResolvedValueOnce(respond({ nodes: [node] }));
+    const store = useComputeResourcesStore();
+    await store.fetchUserOwnedComputeNodes();
+
+    fetch.mockResolvedValueOnce(respond({ message: "Config updated, re-provisioning initiated" }));
+    await store.updateComputeNodeConfig("n1", { maxInteractiveSessions: 2 });
+
+    expect(fetch.mock.calls[1][0]).toBe(`${nodesUrl}/n1/update-config`);
+    expect(store.getScopedComputeNodes("user-owned")).toEqual([
+      { uuid: "n1", status: "Updating", maxInteractiveSessions: 2 },
+    ]);
+  });
+
+  it("leaves the node as it was when a config update is refused", async () => {
+    const node = { uuid: "n1", status: "Enabled", maxInteractiveSessions: 0 };
+    fetch.mockResolvedValueOnce(respond({ nodes: [node] }));
+    const store = useComputeResourcesStore();
+    await store.fetchUserOwnedComputeNodes();
+
+    fetch.mockResolvedValueOnce({ ok: false, status: 400, statusText: "Bad Request", text: async () => "no" });
+    await expect(store.updateComputeNodeConfig("n1", { maxInteractiveSessions: 2 })).rejects.toThrow();
+
+    expect(store.getScopedComputeNodes("user-owned")).toEqual([node]);
+  });
+
   it("asks for GPU tiers without organization_id when there is no organization", async () => {
     fetch.mockResolvedValueOnce(respond([{ key: "small" }]));
     const store = useComputeResourcesStore();

@@ -51,6 +51,16 @@ describe("a version's variants on the app's page", () => {
     expect(gpu.runsOn).toContain("14 GB");
     expect(variantDetails(app(null), "v0.3.0")).toEqual([]);
   });
+
+  it("names Lambda among a variant's runtimes only when it fits Lambda", () => {
+    const vs = variants("deployed");
+    vs[0].lambda = { eligible: true, reasons: [] };
+    vs[1].manifest.runtime.computeTypes = ["gpu", "lambda"];
+    vs[1].lambda = { eligible: false, reasons: ["needs a GPU"] };
+    const [cpu, gpu] = variantDetails(app(vs), "v0.3.0");
+    expect(cpu.runsOn).toBe("Standard, Lambda · 4 vCPU · 8 GB");
+    expect(gpu.runsOn).toMatch(/^GPU ·/);
+  });
 });
 
 describe("a release's progress", () => {

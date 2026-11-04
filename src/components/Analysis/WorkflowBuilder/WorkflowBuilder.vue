@@ -101,6 +101,7 @@ import {
 } from "./inputPorts";
 import { requiredUnset } from "./builderReadiness";
 import { fitsAfter } from "./appManifestInfo";
+import { appLambdaEligibility, lambdaUnavailableHint, withLambdaChoice } from "../Applications/lambdaEligibility";
 
 const { onNodeClick, onPaneClick, onConnect, onConnectStart, onConnectEnd, onEdgeUpdate, screenToFlowCoordinate, fitView } =
   useVueFlow();
@@ -397,6 +398,7 @@ const applyVersion = (node, tag) => {
   node.data.tag = tag;
   if (!stepVariant(node.data.application, tag, node.data.variant)) delete node.data.variant;
   if (fallback) ElMessage({ type: "info", showClose: true, message: `${fallback}.` });
+  keepComputeTypeFit(node.data);
   const m = versionManifest(node.data.application, tag, node.data.variant);
   if (m) {
     node.data.paramSchema = toParamSchema(m.parameters || []);
@@ -619,9 +621,19 @@ const getComputeTypesForTarget = (targetType) => {
   return noGpu(types && types.length ? types : DEFAULT_COMPUTE_TYPES);
 };
 
+// An app step's choices: the app's, with GPU, and Lambda always listed (it
+// is disabled, with why, unless the step's version and variant fit Lambda).
 const getComputeTypesForApplication = (application) => {
   const types = application?.runtimeConfig?.computeTypes;
-  return types && types.length ? withGpu(types) : DEFAULT_COMPUTE_TYPES;
+  return withLambdaChoice(types && types.length ? withGpu(types) : DEFAULT_COMPUTE_TYPES);
+};
+const stepLambda = (data) =>
+  appLambdaEligibility(data?.application, data?.tag || latestVersion(data?.application)?.version, data?.variant);
+const isStepComputeTypeDisabled = (ct, data) => ct === "lambda" && !stepLambda(data).available;
+const stepComputeTypeHint = (ct, data) => (ct === "lambda" ? lambdaUnavailableHint(stepLambda(data)) : "");
+// A step left on Lambda that its version (or variant) doesn't fit: standard.
+const keepComputeTypeFit = (data) => {
+  if (data?.computeType === "lambda" && !stepLambda(data).available) data.computeType = "standard";
 };
 
 /*
@@ -659,6 +671,8 @@ const applyManifestDefaults = async (nodeId, application) => {
   const declared = runtime.computeTypes?.length ? runtime.computeTypes : schema.runtime?.computeTypes || [];
   const supported = declared.find((t) => DEFAULT_COMPUTE_TYPES.includes(t));
   if (supported) node.data.computeType = supported;
+  // Lambda only where the version fits it (lambdaEligibility.js).
+  keepComputeTypeFit(node.data);
 
   // cpu / memory — only when the manifest declares them and the node has none.
   const cpu = runtime.cpu || schema.resources?.cpu;
@@ -3775,7 +3789,7 @@ const openNodeSettings = (id) => {
                     <span class="info-label">
                       Compute Type
                       <el-tooltip
-                        content="Application must be set up for Lambda, if selected"
+                        content="Lambda is offered when this version fits it (15 min, 10 GB) and its author allows it"
                         placement="top"
                       >
                         <IconInfoSmall :width="20" :height="20" class="compute-type-info-icon" />
@@ -3786,7 +3800,6 @@ const openNodeSettings = (id) => {
                       size="small"
                       class="info-inline-select"
                     >
-                      <!-- TODO: use API-driven computeTypes once applications return them reliably -->
                       <el-option
                         v-for="ct in getComputeTypesForApplication(
                           selectedNode.data.application,
@@ -3794,7 +3807,16 @@ const openNodeSettings = (id) => {
                         :key="ct"
                         :label="formatComputeTypeLabel(ct)"
                         :value="ct"
-                      />
+                        :disabled="isStepComputeTypeDisabled(ct, selectedNode.data)"
+                      >
+                        <el-tooltip
+                          :disabled="!isStepComputeTypeDisabled(ct, selectedNode.data)"
+                          :content="stepComputeTypeHint(ct, selectedNode.data)"
+                          placement="right"
+                        >
+                          <span>{{ formatComputeTypeLabel(ct) }}</span>
+                        </el-tooltip>
+                      </el-option>
                     </el-select>
                   </div>
                   <!-- Standard: CPU then dependent Memory -->

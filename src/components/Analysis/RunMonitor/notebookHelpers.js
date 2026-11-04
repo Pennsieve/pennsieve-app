@@ -37,6 +37,13 @@ export function interactiveCapable(cn) {
   );
 }
 
+// A compliant node's notebooks have no internet access, so pip/conda installs
+// fail there; packages come only from the run's environments. "" elsewhere.
+export function offlineNote(cn) {
+  if ((cn?.deploymentMode || "").toLowerCase() !== "compliant") return "";
+  return "No internet access: packages can't be installed from the notebook. Add them through an environment.";
+}
+
 // A notebook's language for people.
 export function kernelLabel(kernel) {
   if (kernel === "python") return "Python";
@@ -364,3 +371,56 @@ export const runNodeId = (run) =>
 // run's.
 export const gpuShortLabel = (gpu) => (gpu?.model ? `GPU (${gpu.model.replace(/^NVIDIA\s+/i, "")})` : "GPU");
 export const gpuMarkTitle = (gpu) => (gpu?.model ? `Runs on a GPU (${gpu.model})` : "Runs on a GPU");
+
+// The disk of a CPU session (its Fargate task's ephemeral storage), in GiB:
+// it holds the environment and the files added from the inputs. A GPU
+// session uses its instance's disk, so it has no choice.
+export const DEFAULT_NOTEBOOK_DISK_GIB = 64;
+// Fargate storage above 20 GB, per GB-hour (us-east-1).
+const DISK_GB_HOUR_USD = 0.000111;
+export const NOTEBOOK_DISK_OPTIONS = [64, 128, 200].map((gib) => ({
+  value: gib,
+  label: gib === DEFAULT_NOTEBOOK_DISK_GIB ? `${gib} GB (default)` : `${gib} GB`,
+}));
+export const notebookDiskLabel = (gib) => `${gib} GB disk`;
+
+// What a disk costs over the default's, an hour: 128 GB (+64 GB, 0.7¢)
+// "under 1¢", 200 GB (+136 GB, 1.5¢) "about 1.5¢"; "" for the default.
+export function notebookDiskExtraCost(gib) {
+  const cents = (gib - DEFAULT_NOTEBOOK_DISK_GIB) * DISK_GB_HOUR_USD * 100;
+  if (cents <= 0) return "";
+  return cents < 1 ? "under 1¢" : `about ${Math.round(cents * 2) / 2}¢`;
+}
+
+// The disk step's hint, its costs from the options.
+export function notebookDiskHint() {
+  const extras = NOTEBOOK_DISK_OPTIONS.filter((o) => notebookDiskExtraCost(o.value)).map(
+    (o) => `${notebookDiskExtraCost(o.value)} an hour more for ${o.value} GB`
+  );
+  return (
+    "The disk holds the notebook's environment and any files you add from your inputs. " +
+    `More disk costs a little more while the notebook is open: ${extras.join(", ")}.`
+  );
+}
+
+// The run's processorConfigs: each processor step's resources. A GPU kernel,
+// or a variant that declares its resources, gets the variant's (no CPU and
+// memory chosen; resources null). A kernel that offers its variants per run
+// gets the pick (variantId) on its session step. The disk (diskGiB) is the
+// session step's alone, and only on a CPU session (resources given).
+export function notebookProcessorConfigs(dag = [], { variantId = "", resources = null } = {}) {
+  const sessionId = sessionStepId(dag);
+  const configs = [];
+  for (const node of dag || []) {
+    if (node.type === "data-source" || node.type === "data-target") continue;
+    const pc = { nodeId: node.id };
+    if (variantId && node.id === sessionId) pc.variant = variantId;
+    if (resources) {
+      pc.cpu = resources.cpu;
+      pc.memory = resources.memory;
+      if (resources.diskGiB && node.id === sessionId) pc.diskGiB = Number(resources.diskGiB);
+    }
+    if (Object.keys(pc).length > 1) configs.push(pc);
+  }
+  return configs;
+}

@@ -78,6 +78,17 @@ export const COMPUTE_TYPES = Object.freeze({
 
 export const DEFAULT_COMPUTE_TYPES = Object.freeze([COMPUTE_TYPES.STANDARD]);
 
+// The compute types an author picks in the editor. Lambda isn't one: every
+// built image can run there, and app-deploy-service decides per version
+// whether it fits; the author only opts out (runtime.optimize: false, the
+// schema's optimize). A computeTypes list that names lambda is kept as
+// written.
+export const AUTHOR_COMPUTE_TYPES = Object.freeze([COMPUTE_TYPES.STANDARD, COMPUTE_TYPES.GPU]);
+
+// Whether an app.yml runtime lets Pennsieve run it on an optimized runtime
+// it fits, such as Lambda: yes unless it says optimize: false.
+const parseOptimize = (runtime) => runtime?.optimize !== false;
+
 /**
  * Data types a port (input/output) can carry. Used to validate that an
  * upstream application's outputs are compatible with a downstream
@@ -295,7 +306,7 @@ const parseSession = (runtime) => {
 
 export const createApplicationSchema = (overrides = {}) => ({
   resources: { cpu: null, memory: null },
-  runtime: { computeTypes: [...DEFAULT_COMPUTE_TYPES], interactive: false, sessionType: "", kernel: "" },
+  runtime: { computeTypes: [...DEFAULT_COMPUTE_TYPES], optimize: true, interactive: false, sessionType: "", kernel: "" },
   parameters: [],
   inputs: [],
   outputs: [],
@@ -414,7 +425,7 @@ export const parseApplication = (app) => {
 
   return createApplicationSchema({
     resources: { cpu: rc.cpu ?? null, memory: rc.memory ?? null },
-    runtime: { computeTypes: parseComputeTypes(rc), ...parseSession(rc) },
+    runtime: { computeTypes: parseComputeTypes(rc), optimize: parseOptimize(rc), ...parseSession(rc) },
     parameters: parseParameters(app),
     inputs: asArray(app?.inputs).map(parsePort),
     outputs: asArray(app?.outputs).map(parsePort),
@@ -760,6 +771,9 @@ export const buildManifest = (schema, meta = {}) => {
   runtime.computeTypes = s.runtime?.computeTypes?.length
     ? [...s.runtime.computeTypes]
     : [...DEFAULT_COMPUTE_TYPES];
+  // An author's opt-out from optimized runtimes (Lambda); left out otherwise
+  // (Pennsieve may run it on one it fits).
+  if (s.runtime?.optimize === false) runtime.optimize = false;
   if (meta.timeoutSeconds != null && meta.timeoutSeconds !== "") {
     runtime.timeoutSeconds = Number(meta.timeoutSeconds);
   }
@@ -939,7 +953,7 @@ export const parseManifest = (source) => {
           cpu: runtime.cpu ?? null,
           memory: runtime.memory ?? null,
         },
-        runtime: { computeTypes: parseComputeTypes(runtime), ...parseSession(runtime) },
+        runtime: { computeTypes: parseComputeTypes(runtime), optimize: parseOptimize(runtime), ...parseSession(runtime) },
         parameters: asArray(manifest.parameters).map(parseParameter),
         inputs: asArray(manifest.inputs).map(parsePort),
         outputs: asArray(manifest.outputs).map(parsePort),

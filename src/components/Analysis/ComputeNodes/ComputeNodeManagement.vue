@@ -230,7 +230,7 @@ const STATUS_TEXT = { Enabled: 'Running', Paused: 'Paused', Pending: 'Setting up
                (workflow-service), on every node. No limits means unlimited:
                pipelines run in the node's own cloud account. -->
           <section id="pipeline-budget" class="cn-section">
-            <h3 class="cn-section-title">Pipeline budget</h3>
+            <h3 class="cn-section-title">Limits &amp; budget</h3>
             <ComputeNodePipelineBudget :node-id="nodeUuid" :is-owner="canManage" :per-user="!isPersonalNode" />
           </section>
           <!-- AI spend limits: the node-wide cap the governor enforces on every

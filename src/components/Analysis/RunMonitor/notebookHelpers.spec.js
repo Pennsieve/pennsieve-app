@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   launchableKernels,
+  offlineNote,
   kernelOutput,
   notebookKernel,
   isNotebookWorkflow,
@@ -33,6 +34,12 @@ import {
   runNodeId,
   gpuShortLabel,
   gpuMarkTitle,
+  DEFAULT_NOTEBOOK_DISK_GIB,
+  NOTEBOOK_DISK_OPTIONS,
+  notebookDiskLabel,
+  notebookDiskExtraCost,
+  notebookDiskHint,
+  notebookProcessorConfigs,
 } from "./notebookHelpers";
 
 // workflow-service's computed field: a notebook only when a step's app.yml
@@ -363,5 +370,68 @@ describe("a GPU session's mark", () => {
     expect(runNodeId({ computeNodeUuid: "a" })).toBe("a");
     expect(runNodeId({ workflowInstanceConfiguration: { computeNodeId: "b" } })).toBe("b");
     expect(runNodeId(null)).toBe("");
+  });
+});
+
+describe("offlineNote", () => {
+  it("warns on compliant nodes only", () => {
+    expect(offlineNote({ deploymentMode: "compliant" })).toMatch(/environment/);
+    expect(offlineNote({ deploymentMode: "COMPLIANT" })).not.toBe("");
+    expect(offlineNote({ deploymentMode: "secure" })).toBe("");
+    expect(offlineNote({})).toBe("");
+    expect(offlineNote(null)).toBe("");
+  });
+});
+
+describe("notebook disk", () => {
+  it("offers 64 (the default), 128 and 200 GB", () => {
+    expect(DEFAULT_NOTEBOOK_DISK_GIB).toBe(64);
+    expect(NOTEBOOK_DISK_OPTIONS.map((o) => o.value)).toEqual([64, 128, 200]);
+    expect(NOTEBOOK_DISK_OPTIONS[0].label).toBe("64 GB (default)");
+    expect(notebookDiskLabel(128)).toBe("128 GB disk");
+  });
+
+  it("prices the extra disk at Fargate's storage rate", () => {
+    expect(notebookDiskExtraCost(64)).toBe("");
+    expect(notebookDiskExtraCost(128)).toBe("under 1¢"); // +64 GB ≈ 0.7¢/h
+    expect(notebookDiskExtraCost(200)).toBe("about 1.5¢"); // +136 GB ≈ 1.5¢/h
+    expect(notebookDiskHint()).toContain("under 1¢ an hour more for 128 GB, about 1.5¢ an hour more for 200 GB");
+  });
+});
+
+describe("notebookProcessorConfigs", () => {
+  const dag = [
+    { id: "src", type: "data-source" },
+    { id: "prep", type: "processor" },
+    { id: "nb", type: "processor", runtimeConfig: { interactive: true } },
+    { id: "out", type: "data-target" },
+  ];
+
+  it("gives every step the CPU and memory, and the session step the disk", () => {
+    expect(notebookProcessorConfigs(dag, { resources: { cpu: "2048", memory: "4096", diskGiB: 128 } })).toEqual([
+      { nodeId: "prep", cpu: "2048", memory: "4096" },
+      { nodeId: "nb", cpu: "2048", memory: "4096", diskGiB: 128 },
+    ]);
+  });
+
+  it("sends the default disk too, as a number", () => {
+    const [pc] = notebookProcessorConfigs([{ id: "nb", type: "processor" }], {
+      resources: { cpu: "1024", memory: "2048", diskGiB: "64" },
+    });
+    expect(pc.diskGiB).toBe(64);
+  });
+
+  it("sends no resources or disk when the variant sets them (a GPU session)", () => {
+    expect(notebookProcessorConfigs(dag, { variantId: "gpu" })).toEqual([{ nodeId: "nb", variant: "gpu" }]);
+    expect(notebookProcessorConfigs(dag)).toEqual([]);
+  });
+
+  it("puts a per-run variant on the session step with the resources", () => {
+    expect(
+      notebookProcessorConfigs([{ id: "nb", type: "processor" }], {
+        variantId: "cpu",
+        resources: { cpu: "1024", memory: "2048", diskGiB: 200 },
+      })
+    ).toEqual([{ nodeId: "nb", variant: "cpu", cpu: "1024", memory: "2048", diskGiB: 200 }]);
   });
 });

@@ -48,7 +48,7 @@
         cheaper than an owner accidentally switching a node off.
       -->
       <p v-if="hasZero" class="zero-warning">
-        A cap of <strong>0</strong> blocks every run on that axis. Clear the field
+        A cap of <strong>0</strong> blocks every run (or notebook) on that axis. Clear the field
         instead to leave the axis unlimited.
       </p>
 
@@ -112,16 +112,16 @@ const axes = computed(() => axesForScope(props.mode === 'edit-node' ? SCOPE_NODE
 const title = computed(
   () =>
     ({
-      'edit-node': 'Edit node-wide pipeline budget',
-      'edit-default': 'Edit default per-user pipeline budget',
+      'edit-node': 'Edit node-wide limits',
+      'edit-default': 'Edit default per-user limits',
       'add-user': 'Add user override',
       'edit-user': 'Edit user override',
-    }[props.mode] || 'Edit pipeline budget'),
+    }[props.mode] || 'Edit limits'),
 )
 
 const blurb = computed(() => {
   if (props.mode === 'edit-node') {
-    return 'Caps spend across all users of this node combined. Leave a field blank to leave that axis unlimited.'
+    return 'Caps spend, runs and open notebooks across all users of this node combined. Leave a field blank to leave that axis unlimited.'
   }
   if (props.mode === 'edit-default') {
     return 'Applies to each user individually, unless they have an override below. Leave a field blank to leave that axis unlimited.'

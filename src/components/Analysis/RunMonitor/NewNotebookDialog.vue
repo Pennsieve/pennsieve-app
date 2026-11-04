@@ -25,6 +25,7 @@ import {
   notebookKernel,
   kernelLabel,
   interactiveCapable,
+  offlineNote,
   launchableKernels,
   kernelOutput,
   nonSavingAlternative,
@@ -39,7 +40,6 @@ import {
   variantSetsResources,
   variantResources,
   variantNodeUnfit,
-  sessionStepId,
   hardwareOptions,
   pickedOption,
   optionsForNode,
@@ -48,10 +48,16 @@ import {
   hardwareLabel as hardwareOptionLabel,
   gpuSessionHelp,
   gpuReviewResources,
+  DEFAULT_NOTEBOOK_DISK_GIB,
+  NOTEBOOK_DISK_OPTIONS,
+  notebookDiskLabel,
+  notebookDiskHint,
+  notebookProcessorConfigs,
 } from "./notebookHelpers";
 import { nodeGpu, gpuOffer, gpuName, gpuTaskResources } from "../ComputeNodes/computeNodeHelpers";
 import { useComputeResourcesStore } from "@/stores/computeResourcesStore";
 import { fetchVariantGate, provisionerGateReason } from "./variantGate";
+import { fetchNodesSessions, capacityLabel, capacityReason } from "./notebookCapacity";
 import RuntimeMark from "../WorkflowGraph/RuntimeMark.vue";
 import { STANDARD_CPU_OPTIONS, getStandardMemoryOptions, getTargetTypeLabel } from "./runHelpers";
 import { sourceLabel } from "../WorkflowGraph/sourceInputs";
@@ -136,6 +142,10 @@ const DEFAULT_CPU = "1024"; // 1 vCPU
 const AUTO_MEMORY = "auto";
 const resourceCpu = ref(DEFAULT_CPU);
 const resourceMemory = ref(AUTO_MEMORY);
+// The session's disk in GiB (a CPU session's; a GPU one uses its instance's).
+const resourceDisk = ref(DEFAULT_NOTEBOOK_DISK_GIB);
+const diskOptions = NOTEBOOK_DISK_OPTIONS;
+const diskHint = notebookDiskHint();
 const cpuOptions = STANDARD_CPU_OPTIONS;
 const memoryOptions = computed(() => getStandardMemoryOptions(resourceCpu.value));
 // Balanced default memory for a CPU when memory is left automatic: 2 GB per vCPU
@@ -230,7 +240,22 @@ const nodeMustRun = computed(() => {
   if (allHardware.value.length) return allHardware.value;
   return runVariant.value ? [runVariant.value] : [];
 });
-const nodeReasons = (cn) => nodeHardwareUnfit(cn, nodeMustRun.value, gateReason);
+// Each listed node's room for notebooks ({ [uuid]: capacity | null }), read
+// when the dialog opens; a node that couldn't be read shows none.
+const nodeCapacity = ref({});
+const nodeCapacityLabel = (cn) => capacityLabel(nodeCapacity.value[cn?.uuid]);
+const nodeReasons = (cn) => {
+  const reasons = nodeHardwareUnfit(cn, nodeMustRun.value, gateReason);
+  const full = capacityReason(nodeCapacity.value[cn?.uuid]);
+  return full ? [...reasons, full] : reasons;
+};
+// Reads the capacity of the nodes given (all listed, by default). Failures
+// leave a node without one and never block the dialog.
+async function loadCapacity(nodes = interactiveComputeNodes.value) {
+  if (!nodes.length) return;
+  const read = await fetchNodesSessions(config.value.api2Url, nodes, useGetToken).catch(() => ({}));
+  nodeCapacity.value = { ...nodeCapacity.value, ...read };
+}
 // A GPU session decided before the node (chosen first, or the kernel's only).
 const gpuFirst = computed(() => isGpu.value && (hardwarePinned.value || !allHardware.value.length));
 // The hardware the chosen node can run.
@@ -290,6 +315,15 @@ const cardOffersGpu = (card) =>
 // Notebooks page filters nodes consistently everywhere.
 const interactiveComputeNodes = computed(() =>
   computeNodes.value.filter(interactiveCapable)
+);
+// Nodes listed after the dialog opened (the list still loading): read theirs.
+watch(
+  () => interactiveComputeNodes.value.map((cn) => cn.uuid).join(","),
+  () => {
+    if (!visible.value) return;
+    const unread = interactiveComputeNodes.value.filter((cn) => !(cn.uuid in nodeCapacity.value));
+    if (unread.length) loadCapacity(unread);
+  }
 );
 const filteredComputeNodes = computed(() => {
   const q = computeNodeSearch.value.toLowerCase().trim();
@@ -832,6 +866,8 @@ watch(visible, (open) => {
   if (open) {
     reset();
     if (!variantGate.value) fetchVariantGate(config.value.api2Url, useGetToken).then((g) => (variantGate.value = g));
+    nodeCapacity.value = {};
+    loadCapacity();
     if (!gpuTiers.value.length) {
       computeResourcesStore
         .fetchGpuTiers(store.getters.activeOrganization?.organization?.id)
@@ -890,7 +926,7 @@ const soFar = computed(() => {
   if (step.value > S.NODE && selectedComputeNode.value) rows.push({ label: "Compute node", value: selectedComputeNode.value.name });
   if ((step.value > S.HARDWARE || gpuFirst.value) && hardwareLabel.value) rows.push({ label: "Hardware", value: hardwareLabel.value });
   if (step.value > S.RESOURCES && !variantResourcesSet.value) {
-    rows.push({ label: "Resources", value: `${cpuLabel(resourceCpu.value)} · ${isAutoMemory.value ? memoryLabel(autoMemoryForCpu(resourceCpu.value)) : memoryLabel(resourceMemory.value)}` });
+    rows.push({ label: "Resources", value: `${cpuLabel(resourceCpu.value)} · ${isAutoMemory.value ? memoryLabel(autoMemoryForCpu(resourceCpu.value)) : memoryLabel(resourceMemory.value)} · ${notebookDiskLabel(resourceDisk.value)}` });
   }
   if (step.value > S.INPUT) {
     const input = iface.value
@@ -959,18 +995,13 @@ async function execute() {
     // A GPU kernel, or a variant that declares its resources: the
     // variant's (no CPU and memory chosen). A kernel that offers its
     // variants per run gets the pick on its session step.
-    const processorConfigs = [];
-    const sessionId = selectedVariant.value ? sessionStepId(dag) : "";
-    for (const node of dag) {
-      if (node.type === "data-source" || node.type === "data-target") continue;
-      const pc = { nodeId: node.id };
-      if (node.id === sessionId) pc.variant = selectedVariant.value.id;
-      if (!variantResourcesSet.value) {
-        pc.cpu = resourceCpu.value;
-        pc.memory = resolvedMemory.value;
-      }
-      if (Object.keys(pc).length > 1) processorConfigs.push(pc);
-    }
+    // A CPU session's disk goes on its session step.
+    const processorConfigs = notebookProcessorConfigs(dag, {
+      variantId: selectedVariant.value?.id || "",
+      resources: variantResourcesSet.value
+        ? null
+        : { cpu: resourceCpu.value, memory: resolvedMemory.value, diskGiB: resourceDisk.value },
+    });
 
     // Outside a workspace, the public dataset is the first data source's view.
     // It's a source's only input: the session downloads its files into it.
@@ -1012,6 +1043,8 @@ async function execute() {
     emit("created", newRun);
   } catch (err) {
     console.error("Failed to start notebook:", err);
+    // The node may have filled up since it was read (a 409): read it again.
+    if (selectedComputeNode.value) loadCapacity([selectedComputeNode.value]);
     EventBus.$emit("toast", {
       detail: { type: "error", msg: err?.message || "Failed to start notebook." },
     });
@@ -1108,6 +1141,8 @@ async function execute() {
             {{ selectedComputeNode.description }}
           </div>
           <div class="wizard-card-offer">{{ gpuOffer(selectedGpu) }}</div>
+          <div v-if="nodeCapacityLabel(selectedComputeNode)" class="wizard-card-capacity">{{ nodeCapacityLabel(selectedComputeNode) }}</div>
+          <p v-if="offlineNote(selectedComputeNode)" class="resource-hint">{{ offlineNote(selectedComputeNode) }}</p>
         </div>
         <template v-else>
           <el-input
@@ -1130,7 +1165,9 @@ async function execute() {
                 {{ cn.description }}
               </div>
               <!-- What it offers: its GPU (the node's tier), or CPU only -->
-              <div class="wizard-card-offer">{{ gpuOffer(gpuOf(cn)) }}</div>
+              <div class="wizard-card-offer">{{ gpuOffer(gpuOf(cn)) }}<template v-if="offlineNote(cn)"> · No internet access</template></div>
+              <!-- Its notebooks in use, everyone's and the caller's -->
+              <div v-if="nodeCapacityLabel(cn)" class="wizard-card-capacity">{{ nodeCapacityLabel(cn) }}</div>
               <!-- Hardware chosen first (a GPU kernel): why this node can't host it -->
               <div v-if="nodeReasons(cn).length" class="wizard-card-why" :title="gpuReasonNote(nodeReasons(cn)) || undefined">
                 {{ nodeReasons(cn).join(" · ") }}
@@ -1178,7 +1215,7 @@ async function execute() {
       <!-- Compute resources (CPU sessions) -->
       <div v-if="step === S.RESOURCES" class="wizard-step">
         <p class="wizard-step-desc">
-          Choose the CPU and memory for this notebook's compute task.
+          Choose the CPU, memory and disk for this notebook's compute task.
         </p>
         <div class="resource-grid">
           <div class="resource-field">
@@ -1207,11 +1244,23 @@ async function execute() {
               />
             </el-select>
           </div>
+          <div class="resource-field">
+            <label class="resource-label">Disk</label>
+            <el-select v-model="resourceDisk" size="default" style="width: 100%">
+              <el-option
+                v-for="opt in diskOptions"
+                :key="opt.value"
+                :label="opt.label"
+                :value="opt.value"
+              />
+            </el-select>
+          </div>
         </div>
         <p class="resource-hint">
           Memory is set automatically based on the CPU unless you pick a specific
           value. Higher tiers cost more — start small and scale up if needed.
         </p>
+        <p class="resource-hint">{{ diskHint }}</p>
       </div>
 
       <!-- Input (a notebook with an input: what it starts with) -->
@@ -1597,7 +1646,8 @@ async function execute() {
             <span class="wizard-summary-label">Resources</span>
             <span class="wizard-summary-value">
               {{ cpuLabel(resourceCpu) }} ·
-              {{ isAutoMemory ? `${memoryLabel(autoMemoryForCpu(resourceCpu))} (auto)` : memoryLabel(resourceMemory) }}
+              {{ isAutoMemory ? `${memoryLabel(autoMemoryForCpu(resourceCpu))} (auto)` : memoryLabel(resourceMemory) }} ·
+              {{ notebookDiskLabel(resourceDisk) }}
             </span>
           </div>
           <div v-if="iface" class="wizard-summary-row">
@@ -1947,6 +1997,11 @@ async function execute() {
   cursor: not-allowed;
   opacity: 0.6;
 }
+.wizard-card-capacity {
+  margin-top: 2px;
+  font-size: 12px;
+  color: theme.$gray_5;
+}
 .wizard-card-why {
   margin-top: 4px;
   font-size: 12px;
@@ -2102,7 +2157,7 @@ async function execute() {
 /* compute resources */
 .resource-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(3, 1fr);
   gap: 16px;
 }
 .resource-field {

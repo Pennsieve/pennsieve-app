@@ -44,7 +44,7 @@ import * as siteConfig from '@/site-config/site.json'
 export const SCOPE_NODE = 'node'
 export const SCOPE_DEFAULT = 'default'
 
-// The four axes a policy row can set, in the order they're rendered. Kept here
+// The axes a policy row can set, in the order they're rendered. Kept here
 // so the store, the panel and the modal cannot drift apart on field names.
 //
 // `perRunCostUsd` is absent from the node scope on purpose: a per-run ceiling
@@ -56,6 +56,10 @@ export const AXES = [
   { key: 'monthlyCostUsd', label: 'Monthly', unit: 'usd', step: 10 },
   { key: 'perRunCostUsd', label: 'Per run', unit: 'usd', step: 0.5, nodeScope: false },
   { key: 'maxConcurrentRuns', label: 'Concurrent runs', unit: 'count', step: 1 },
+  // Open notebooks: everyone's together on the node scope, one user's on the
+  // default and user scopes. workflow-service enforces it when a notebook
+  // starts; the node's own maxInteractiveSessions stays the ceiling.
+  { key: 'maxInteractiveSessions', label: 'Notebooks open', unit: 'count', step: 1 },
 ]
 
 export const axesForScope = (scope) =>

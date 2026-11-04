@@ -34,6 +34,7 @@ import { usageSidebar } from "./appUsage";
 import { useSendXhr } from "@/mixins/request/request_composable";
 import { environmentsServiceUrl, findReferences } from "@/utils/environmentsService";
 import { appDefault, catalogQuery, choiceLabel, referenceInputs, referenceKindText, referenceLabel } from "../RunMonitor/referenceSources";
+import { appLambdaEligibility, lambdaStatusLabel } from "./lambdaEligibility";
 
 
 const props = defineProps({
@@ -279,6 +280,11 @@ const shownRuntime = computed(() => {
     timeoutSeconds: manifestMeta.value?.timeoutSeconds,
   };
 });
+// Whether the shown version (and variant) may run on Lambda, as
+// app-deploy-service checked it (lambdaEligibility.js).
+const shownLambda = computed(() =>
+  lambdaStatusLabel(appLambdaEligibility(liveDetail.value, sortedVersions.value[0]?.version, appYmlVariant.value || undefined))
+);
 const shownParams = computed(() => variantView.value?.parameters || manifestSchema.value?.parameters || []);
 // "set by variant": a value the chosen (non-default) variant sets itself.
 const setByVariant = (field) => !!variantView.value && !variantView.value.isDefault && !!variantView.value.differs[field];
@@ -1039,6 +1045,10 @@ watch(
                       {{ shownRuntime.computeTypes.join(", ") || "—" }}
                       <span v-if="setByVariant('computeTypes')" class="manifest-variant-mark">set by variant</span>
                     </span>
+                  </div>
+                  <div v-if="shownLambda" class="manifest-field">
+                    <span class="manifest-field-label">Lambda</span>
+                    <span class="manifest-field-value">{{ shownLambda }}</span>
                   </div>
                   <div v-if="shownRuntime.cpu != null" class="manifest-field">
                     <span class="manifest-field-label">CPU</span>

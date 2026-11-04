@@ -8,6 +8,7 @@
 import { variantsOf } from "../WorkflowBuilder/appManifestInfo";
 import { variantSetParams } from "../WorkflowBuilder/appVariants";
 import { computeLabel } from "./appCards";
+import { appLambdaEligibility } from "./lambdaEligibility";
 
 // The variants a version's row lists, with their build status; [] for one
 // without variants.
@@ -16,9 +17,14 @@ export function versionVariants(app, tag) {
   return list.length > 1 ? list : [];
 }
 
-const resources = (rt) => {
+// lambda: whether the variant may run on Lambda (lambdaEligibility.js); a
+// computeTypes list's lambda isn't shown otherwise.
+const resources = (rt, lambda) => {
   const parts = [];
-  const types = (rt?.computeTypes || []).map(computeLabel).filter(Boolean);
+  const listed = (rt?.computeTypes || []).filter((t) => t !== "lambda");
+  const order = ["standard", "lambda", "gpu"];
+  const withLambda = (lambda ? [...listed, "lambda"] : listed).sort((a, b) => (order.indexOf(a) + 1 || 99) - (order.indexOf(b) + 1 || 99));
+  const types = withLambda.map(computeLabel).filter(Boolean);
   if (types.length) parts.push(types.join(", "));
   const cpu = Number(rt?.cpu);
   if (cpu > 0) parts.push(`${+(cpu / 1024).toFixed(2)} vCPU`);
@@ -51,7 +57,7 @@ export function variantDetails(app, tag) {
       gpu: v.gpu,
       status: v.status,
       failureReason: v.failureReason,
-      runsOn: resources(rt),
+      runsOn: resources(rt, appLambdaEligibility(app, tag, v.id).available),
       timeout: duration(rt.timeoutSeconds),
       params: names.map((name) => {
         const p = (v.manifest?.parameters || []).find((x) => x.name === name) || {};
