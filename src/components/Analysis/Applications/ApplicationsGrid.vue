@@ -44,7 +44,7 @@ import {
   githubRepo,
   appDescription,
   versionLabel,
-  runsOn,
+  appNeedsGpu,
   sortApps,
   versionState,
   workflowUses,
@@ -107,21 +107,8 @@ const chipTitle = (v) =>
 /*
   Derived helpers
 */
-const parseGitHubRepo = (sourceUrl) => {
-  if (!sourceUrl) return null;
-  const match = sourceUrl.match(/github\.com\/([^/]+)\/([^/\s.]+)/);
-  if (!match) return null;
-  return { owner: match[1], repo: match[2].replace(/\.git$/, "") };
-};
-
-const parseGitHubDisplay = (sourceUrl) => {
-  const info = parseGitHubRepo(sourceUrl);
-  return info ? `${info.owner}/${info.repo}` : null;
-};
-
 // The app.yml's tags, a few: the rest are found by search.
 const appTags = (app) => (versionManifest(app)?.tags || []).slice(0, 4);
-const repoName = (app) => parseGitHubDisplay(app.sourceUrl) || "Unknown repo";
 
 const latestVersion = (app) => {
   const versions = app.versions || [];
@@ -453,7 +440,7 @@ const goToManifestBuilder = () => {
               {{ appDescription(app) || readmeSummary(app) || "No description." }}
             </p>
             <!-- Its variants (a CPU and a GPU build), then its tags -->
-            <div v-if="appTags(app).length || paletteVariants(app).length" class="app-tags">
+            <div v-if="appTags(app).length || paletteVariants(app).length || appNeedsGpu(app)" class="app-tags">
               <span
                 v-for="v in paletteVariants(app)"
                 :key="`v:${v.id}`"
@@ -462,9 +449,11 @@ const goToManifestBuilder = () => {
                 :title="chipTitle(v)"
               ><RuntimeMark v-if="v.gpu" runtime="gpu" compact />{{ v.name }}</span>
               <CardTags :tags="appTags(app)" />
-            </div>
-            <div class="app-meta">
-              <span v-if="runsOn(app)" class="app-runs">{{ runsOn(app) }} · </span>{{ repoName(app) }}
+              <!-- Runs on a GPU: muted, as a field tag (a GPU variant's chip
+                   already says so) -->
+              <el-tooltip v-if="appNeedsGpu(app) && !paletteVariants(app).some((v) => v.gpu)" content="Needs a GPU compute node" placement="top">
+                <span class="app-gpu">GPU</span>
+              </el-tooltip>
             </div>
             <div class="app-foot">
               <span class="app-usage">
@@ -664,7 +653,8 @@ $card-height: 172px;
   aspect-ratio: 1 / 1;
   border-right: 1px solid theme.$gray_2;
 }
-/* A narrow card: a smaller square, tighter text, no runtime/repo line. */
+/* A narrow card: a smaller square, tighter text, two lines of
+   description. */
 @container app-card (max-width: 440px) {
   .app-thumb {
     width: 140px;
@@ -673,15 +663,16 @@ $card-height: 172px;
     gap: 4px;
     padding: 10px 12px;
   }
-  .app-meta {
-    display: none;
+  .app-body .app-description {
+    -webkit-line-clamp: 2;
   }
 }
 /* Its variants (boxed), then its tags as the panel lists them (CardTags). */
+/* One line: the tags give way (dropping whole ones) to the GPU marker. */
 .app-tags {
   display: flex;
   flex-shrink: 0;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: center;
   gap: 0 4px;
   height: 18px;
@@ -690,8 +681,16 @@ $card-height: 172px;
 /* The tags take the rest of the row, so the ones that don't fit drop
    whole (CardTags) rather than being cut. */
 .app-tags .card-tags {
-  flex: 1 1 0;
+  flex: 0 1 auto;
   min-width: 0;
+}
+/* Runs on a GPU: muted, as a field tag, after the tags. */
+.app-gpu {
+  flex-shrink: 0;
+  margin-left: 12px;
+  font-size: 12px;
+  line-height: 18px;
+  color: theme.$gray_5;
 }
 .app-variant + .card-tags {
   margin-left: 8px;
@@ -763,27 +762,17 @@ $card-height: 172px;
   font-weight: 600;
   text-transform: uppercase;
 }
+/* Three lines where the card has room (two in a narrow one). */
 .app-description {
   display: -webkit-box;
   flex-shrink: 0;
   margin: 0;
   overflow: hidden;
-  -webkit-line-clamp: 2;
+  -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
   font-size: 13px;
   line-height: 1.4;
   color: theme.$gray_5;
-}
-/* Where it runs, then its repository, on one line. */
-.app-meta {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 12px;
-  color: theme.$gray_4;
-}
-.app-runs {
-  color: theme.$gray_6;
 }
 /* One line at the card's foot: the usage gives way (…) to the buttons,
    which always show. */

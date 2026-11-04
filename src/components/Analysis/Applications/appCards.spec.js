@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { appTitle, appInitials, appColor, appDescription, versionLabel, runsOn, workflowUses, versionState, matchesAppSearch, sortApps } from "./appCards";
+import { appTitle, appInitials, appColor, appDescription, versionLabel, runsOn, workflowUses, versionState, matchesAppSearch, sortApps, appNeedsGpu } from "./appCards";
 
 const spike = {
   name: "spike-detect",
@@ -84,5 +84,17 @@ describe("recommended order", () => {
       "deploying",
       "failed",
     ]);
+  });
+});
+
+describe("appNeedsGpu", () => {
+  const withRuntime = (runtime, extra = {}) => ({ versions: [{ version: "1.0.0", createdAt: "2026-01-01", manifest: { name: "x", runtime }, ...extra }] });
+  it("is true when its compute types include gpu", () => {
+    expect(appNeedsGpu(withRuntime({ computeTypes: ["gpu"] }))).toBe(true);
+    expect(appNeedsGpu({ runtimeConfig: { computeTypes: ["standard", "gpu"] }, versions: [] })).toBe(true);
+  });
+  it("is false for a CPU-only app", () => {
+    expect(appNeedsGpu(withRuntime({ computeTypes: ["standard"] }))).toBe(false);
+    expect(appNeedsGpu({ versions: [] })).toBe(false);
   });
 });
