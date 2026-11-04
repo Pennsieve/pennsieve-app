@@ -52,6 +52,7 @@ import {
 import { nodeGpu, gpuOffer, gpuName, gpuTaskResources } from "../ComputeNodes/computeNodeHelpers";
 import { useComputeResourcesStore } from "@/stores/computeResourcesStore";
 import { fetchVariantGate, provisionerGateReason } from "./variantGate";
+import { fetchNodesSessions, capacityLabel, capacityReason } from "./notebookCapacity";
 import RuntimeMark from "../WorkflowGraph/RuntimeMark.vue";
 import { STANDARD_CPU_OPTIONS, getStandardMemoryOptions, getTargetTypeLabel } from "./runHelpers";
 import { sourceLabel } from "../WorkflowGraph/sourceInputs";
@@ -230,7 +231,22 @@ const nodeMustRun = computed(() => {
   if (allHardware.value.length) return allHardware.value;
   return runVariant.value ? [runVariant.value] : [];
 });
-const nodeReasons = (cn) => nodeHardwareUnfit(cn, nodeMustRun.value, gateReason);
+// Each listed node's room for notebooks ({ [uuid]: capacity | null }), read
+// when the dialog opens; a node that couldn't be read shows none.
+const nodeCapacity = ref({});
+const nodeCapacityLabel = (cn) => capacityLabel(nodeCapacity.value[cn?.uuid]);
+const nodeReasons = (cn) => {
+  const reasons = nodeHardwareUnfit(cn, nodeMustRun.value, gateReason);
+  const full = capacityReason(nodeCapacity.value[cn?.uuid]);
+  return full ? [...reasons, full] : reasons;
+};
+// Reads the capacity of the nodes given (all listed, by default). Failures
+// leave a node without one and never block the dialog.
+async function loadCapacity(nodes = interactiveComputeNodes.value) {
+  if (!nodes.length) return;
+  const read = await fetchNodesSessions(config.value.api2Url, nodes, useGetToken).catch(() => ({}));
+  nodeCapacity.value = { ...nodeCapacity.value, ...read };
+}
 // A GPU session decided before the node (chosen first, or the kernel's only).
 const gpuFirst = computed(() => isGpu.value && (hardwarePinned.value || !allHardware.value.length));
 // The hardware the chosen node can run.
@@ -290,6 +306,15 @@ const cardOffersGpu = (card) =>
 // Notebooks page filters nodes consistently everywhere.
 const interactiveComputeNodes = computed(() =>
   computeNodes.value.filter(interactiveCapable)
+);
+// Nodes listed after the dialog opened (the list still loading): read theirs.
+watch(
+  () => interactiveComputeNodes.value.map((cn) => cn.uuid).join(","),
+  () => {
+    if (!visible.value) return;
+    const unread = interactiveComputeNodes.value.filter((cn) => !(cn.uuid in nodeCapacity.value));
+    if (unread.length) loadCapacity(unread);
+  }
 );
 const filteredComputeNodes = computed(() => {
   const q = computeNodeSearch.value.toLowerCase().trim();
@@ -832,6 +857,8 @@ watch(visible, (open) => {
   if (open) {
     reset();
     if (!variantGate.value) fetchVariantGate(config.value.api2Url, useGetToken).then((g) => (variantGate.value = g));
+    nodeCapacity.value = {};
+    loadCapacity();
     if (!gpuTiers.value.length) {
       computeResourcesStore
         .fetchGpuTiers(store.getters.activeOrganization?.organization?.id)
@@ -1012,6 +1039,8 @@ async function execute() {
     emit("created", newRun);
   } catch (err) {
     console.error("Failed to start notebook:", err);
+    // The node may have filled up since it was read (a 409): read it again.
+    if (selectedComputeNode.value) loadCapacity([selectedComputeNode.value]);
     EventBus.$emit("toast", {
       detail: { type: "error", msg: err?.message || "Failed to start notebook." },
     });
@@ -1108,6 +1137,7 @@ async function execute() {
             {{ selectedComputeNode.description }}
           </div>
           <div class="wizard-card-offer">{{ gpuOffer(selectedGpu) }}</div>
+          <div v-if="nodeCapacityLabel(selectedComputeNode)" class="wizard-card-capacity">{{ nodeCapacityLabel(selectedComputeNode) }}</div>
         </div>
         <template v-else>
           <el-input
@@ -1131,6 +1161,8 @@ async function execute() {
               </div>
               <!-- What it offers: its GPU (the node's tier), or CPU only -->
               <div class="wizard-card-offer">{{ gpuOffer(gpuOf(cn)) }}</div>
+              <!-- Its notebooks in use, everyone's and the caller's -->
+              <div v-if="nodeCapacityLabel(cn)" class="wizard-card-capacity">{{ nodeCapacityLabel(cn) }}</div>
               <!-- Hardware chosen first (a GPU kernel): why this node can't host it -->
               <div v-if="nodeReasons(cn).length" class="wizard-card-why" :title="gpuReasonNote(nodeReasons(cn)) || undefined">
                 {{ nodeReasons(cn).join(" · ") }}
@@ -1946,6 +1978,11 @@ async function execute() {
 .wizard-card.is-unfit {
   cursor: not-allowed;
   opacity: 0.6;
+}
+.wizard-card-capacity {
+  margin-top: 2px;
+  font-size: 12px;
+  color: theme.$gray_5;
 }
 .wizard-card-why {
   margin-top: 4px;
