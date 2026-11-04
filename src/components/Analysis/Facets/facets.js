@@ -18,11 +18,28 @@ export const fieldFacetOptions = (list = []) => list.map(({ field, count }) => (
 
 // A card's tag as the panel lists it: a domain's by its name, after a dot in
 // its colour; a field's by its name; any other as written.
+// Its key says what it names (two spellings of one domain share one).
 export function tagDisplay(tag) {
   const d = domainOfTag(tag);
-  if (d) return { text: d.label, color: domainColors(d).accent, domain: true };
+  if (d) return { key: `domain:${d.key}`, text: d.label, color: domainColors(d).accent, domain: true };
   const f = fieldOfTag(tag);
-  return { text: f ? f.label : tag, color: null, domain: false };
+  if (f) return { key: `field:${f.key}`, text: f.label, color: null, domain: false };
+  return { key: `tag:${String(tag).trim().toLowerCase()}`, text: tag, color: null, domain: false };
+}
+
+// A card's tags as shown, each once: tags naming the same domain or field
+// ("cytometry", "Cytometry", "flow-cytometry"), or the same word in another
+// case, show as one, the first.
+export function displayTags(tags = []) {
+  const seen = new Set();
+  const out = [];
+  for (const tag of tags) {
+    const t = { tag, ...tagDisplay(tag) };
+    if (seen.has(t.key)) continue;
+    seen.add(t.key);
+    out.push(t);
+  }
+  return out;
 }
 
 // A multi-select section's chosen keys, as a list: none for "any", null or

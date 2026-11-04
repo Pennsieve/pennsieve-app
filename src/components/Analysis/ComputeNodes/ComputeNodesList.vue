@@ -43,9 +43,10 @@ const computeNodes = computed(() => {
   })
 })
 const isLoading = computed(() => computeResourcesStore.isScopeLoading(scope.value))
-// My Workspace: the caller's own nodes, then those shared with them (the
-// public node among them), each its own section (groupMyNodes).
+// My Workspace: the caller's own nodes (groupMyNodes), for Getting started;
+// and whether Pennsieve's public node is in the list, for the intro.
 const myGroups = computed(() => groupMyNodes(computeNodes.value, profile.value))
+const hasPublicNode = computed(() => computeNodes.value.some((n) => n.platform))
 
 // While a node is being created, updated or destroyed, refetch the list so
 // its card shows when that finishes (no realtime events for compute nodes).
@@ -361,11 +362,19 @@ async function confirmDeleteNode() {
     <bf-button :disabled="!canCreate" @click="openCreateDialog">+ New Compute Node</bf-button>
   </AnalysisViewBar>
   <div class="compute-nodes-container">
-    <!-- A workspace's intro; My Workspace says it per section below -->
-    <div v-if="!isMyWorkspace" class="nodes-toolbar">
+    <div class="nodes-toolbar">
       <p class="nodes-intro">
-        Compute nodes run this workspace's workflows and notebooks, on cloud accounts members registered.
-        <a href="https://docs.pennsieve.io/docs/compute-nodes" target="_blank" rel="noopener" class="doc-link">Documentation</a>
+        <template v-if="isMyWorkspace && hasPublicNode">
+          Your personal compute nodes, on AWS accounts you registered, and the Pennsieve Public Compute Node, available to everyone.
+        </template>
+        <template v-else-if="isMyWorkspace">
+          Your personal compute nodes, on AWS accounts you registered. They're private to you.
+        </template>
+        <template v-else>
+          Compute nodes run this workspace's workflows and notebooks, on cloud accounts members registered.
+        </template>
+        <router-link v-if="isMyWorkspace" :to="{ name: 'user-compute-resource' }" class="doc-link">Your compute resources</router-link>
+        <a v-else href="https://docs.pennsieve.io/docs/compute-nodes" target="_blank" rel="noopener" class="doc-link">Documentation</a>
       </p>
     </div>
 
@@ -385,12 +394,7 @@ async function confirmDeleteNode() {
         </div>
 
         <!-- Nodes List -->
-        <!-- A workspace's nodes, or (either context) none or loading -->
-        <div
-          v-if="!isMyWorkspace || showEmptyState || (isLoading && computeNodes.length === 0)"
-          class="nodes-section"
-          v-loading="isLoading && computeNodes.length === 0"
-        >
+        <div class="nodes-section" v-loading="isLoading && computeNodes.length === 0">
           <h3 class="nodes-title">Compute nodes</h3>
           
           <div v-if="showEmptyState" class="empty-state">
@@ -435,44 +439,6 @@ async function confirmDeleteNode() {
             />
           </div>
         </div>
-
-        <!-- My Workspace: one's own nodes, then those shared with one; a
-             group without nodes doesn't show -->
-        <template v-else>
-          <div v-if="myGroups.own.length" class="nodes-section">
-            <h3 class="nodes-title">Your compute nodes</h3>
-            <p class="nodes-intro nodes-section-line">
-              Private to you, on AWS accounts you registered.
-              <router-link :to="{ name: 'user-compute-resource' }" class="doc-link">Your compute resources</router-link>
-            </p>
-            <div class="nodes-grid">
-              <ComputeNodeCard
-                v-for="node in myGroups.own"
-                :key="node.uuid"
-                :node="node"
-                :has-admin-rights="hasAdminRights"
-                :is-updating="isNodeUpdating(node.uuid)"
-                @update-status="updateStatus"
-              />
-            </div>
-          </div>
-          <div v-if="myGroups.shared.length" class="nodes-section">
-            <h3 class="nodes-title">Shared with you</h3>
-            <p class="nodes-intro nodes-section-line">
-              Nodes others make available to every user, such as the Pennsieve Public Compute Node.
-            </p>
-            <div class="nodes-grid">
-              <ComputeNodeCard
-                v-for="node in myGroups.shared"
-                :key="node.uuid"
-                :node="node"
-                :has-admin-rights="hasAdminRights"
-                :is-updating="isNodeUpdating(node.uuid)"
-                @update-status="updateStatus"
-              />
-            </div>
-          </div>
-        </template>
       </div>
     </div>
     
@@ -577,11 +543,6 @@ h2 {
     margin-left: 6px;
     color: theme.$purple_3;
   }
-}
-
-/* A section's line under its heading (My Workspace's groups). */
-.nodes-section-line {
-  margin: -6px 0 12px;
 }
 
 .nodes-content {

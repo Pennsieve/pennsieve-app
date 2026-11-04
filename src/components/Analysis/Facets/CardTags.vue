@@ -2,7 +2,7 @@
 // A card's tags as the filter panel lists them (facets.js tagDisplay): a
 // domain's coloured dot and name, a field's (or any other) name in grey.
 import { computed } from "vue";
-import { tagDisplay } from "./facets";
+import { displayTags } from "./facets";
 
 const props = defineProps({
   tags: { type: Array, default: () => [] },
@@ -11,15 +11,17 @@ const props = defineProps({
   // Not the item's own (a workflow's apps'): in italics.
   inherited: { type: Boolean, default: false },
 });
-const shown = computed(() => props.tags.slice(0, props.max).map((t) => ({ tag: t, ...tagDisplay(t) })));
+// Each once (the same domain or field under two spellings shows once).
+const unique = computed(() => displayTags(props.tags));
+const shown = computed(() => unique.value.slice(0, props.max));
 </script>
 
 <template>
   <div class="card-tags" :class="{ 'card-tags--inherited': inherited }">
-    <span v-for="t in shown" :key="t.tag" class="card-tag" :class="{ 'card-tag--domain': t.domain }">
+    <span v-for="t in shown" :key="t.key" class="card-tag" :class="{ 'card-tag--domain': t.domain }">
       <span v-if="t.color" class="card-tag-dot" :style="{ background: t.color }" /><span class="card-tag-text">{{ t.text }}</span>
     </span>
-    <span v-if="tags.length > max" class="card-tag">+{{ tags.length - max }}</span>
+    <span v-if="unique.length > max" class="card-tag">+{{ unique.length - max }}</span>
   </div>
 </template>
 

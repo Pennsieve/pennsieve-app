@@ -33,6 +33,7 @@ import { domainFacetOptions, fieldFacetOptions, toggleKey } from "../Facets/face
 import { paletteVariants, versionManifest } from "../WorkflowBuilder/appManifestInfo";
 import RuntimeMark from "../WorkflowGraph/RuntimeMark.vue";
 import IconPDF from "../../icons/IconPDF.vue";
+import { MoreFilled } from "@element-plus/icons-vue";
 import SampleOutputViewer from "../Workflows/SampleOutputViewer.vue";
 import { PDF_URL_FRESH_MS } from "../Workflows/runExamples";
 import { versionsToWatch, withLiveStatus } from "./liveStatus";
@@ -327,6 +328,12 @@ const goToDetail = (app) => {
   router.push(scopedRoute("application-detail", { uuid: app.uuid }));
 };
 
+// The card's menu: its repository, or its sample output.
+const onAppMenu = (command, app) => {
+  if (command === "github") window.open(githubUrl(app), "_blank", "noopener");
+  else if (command === "sample") openAppSample(app);
+};
+
 const goToManifestBuilder = () => {
   router.push(scopedRoute("application-manifest-builder"));
 };
@@ -464,25 +471,30 @@ const goToManifestBuilder = () => {
                 <span class="app-dot" :class="versionState(app)" :title="statusLabel(latestVersion(app)?.status)" />
                 <span class="app-usage-text">{{ usageText(app) }}</span>
               </span>
+              <!-- Open, then the rest (GitHub, the sample PDF) in a menu, so
+                   the usage keeps its room on a narrow card -->
               <span class="app-actions" @click.stop>
-                <a
-                  v-if="githubUrl(app)"
-                  :href="githubUrl(app)"
-                  target="_blank"
-                  rel="noopener"
-                  class="app-action"
-                >GitHub</a>
                 <button type="button" class="app-action app-action--open" @click="goToDetail(app)">Open</button>
-                <el-tooltip v-if="appSamples[app.sourceUrl]" content="Sample output: a PDF summary of a run of this app" placement="top">
-                  <button
-                    type="button"
-                    class="app-action app-action--icon"
-                    aria-label="Sample output: a PDF summary of a run of this app"
-                    @click="openAppSample(app)"
-                  >
-                    <IconPDF :width="16" :height="16" color="currentColor" />
+                <el-dropdown
+                  v-if="githubUrl(app) || appSamples[app.sourceUrl]"
+                  trigger="click"
+                  placement="bottom-end"
+                  @command="(c) => onAppMenu(c, app)"
+                >
+                  <button type="button" class="app-action app-action--icon" aria-label="More: GitHub, sample output" title="More">
+                    <el-icon><MoreFilled /></el-icon>
                   </button>
-                </el-tooltip>
+                  <template #dropdown>
+                    <el-dropdown-menu>
+                      <el-dropdown-item v-if="githubUrl(app)" command="github">View on GitHub</el-dropdown-item>
+                      <el-dropdown-item v-if="appSamples[app.sourceUrl]" command="sample">
+                        <span class="app-menu-item" title="A PDF summary of a run of this app">
+                          <IconPDF :width="14" :height="14" color="currentColor" /> Sample output (PDF)
+                        </span>
+                      </el-dropdown-item>
+                    </el-dropdown-menu>
+                  </template>
+                </el-dropdown>
               </span>
             </div>
           </div>
@@ -637,6 +649,7 @@ $card-height: 172px;
   &:hover .app-actions,
   &:focus-within .app-actions {
     opacity: 1;
+    pointer-events: auto;
   }
   &.is-archived {
     opacity: 0.7;
@@ -806,13 +819,26 @@ $card-height: 172px;
   &.pending { background: #f59e0b; }
   &.failed { background: theme.$status_red; }
 }
+/* Over the usage's end, on hover only: the usage keeps the whole line
+   until then (on a touch screen, in the line). */
+.app-foot {
+  position: relative;
+}
 .app-actions {
+  position: absolute;
+  right: 0;
   display: flex;
-  flex-shrink: 0;
-  margin-left: auto;
   gap: 6px;
+  padding-left: 12px;
+  background: linear-gradient(to right, rgba(255, 255, 255, 0), theme.$white 12px);
+  pointer-events: none;
   opacity: 0;
   transition: opacity 0.15s ease;
+}
+.app-menu-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 .app-action--icon {
   display: inline-flex;
@@ -848,7 +874,13 @@ $card-height: 172px;
 }
 @media (hover: none) {
   .app-actions {
+    position: static;
+    flex-shrink: 0;
+    margin-left: auto;
+    padding-left: 0;
+    background: none;
     opacity: 1;
+    pointer-events: auto;
   }
 }
 .clear-filters {
