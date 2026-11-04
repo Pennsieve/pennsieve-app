@@ -21,9 +21,10 @@ import toQueryParams from "@/utils/toQueryParams";
 import TargetDatasetField from "./TargetDatasetField.vue";
 import { targetWritesToDataset, targetParamFields, buildDataTargets, targetDatasetId, datasetName } from "./dataTargets";
 import { validateRunName, runDisplayName, RUN_NAME_MAX_LENGTH, targetTypeName,
-  nodeMetricRows,
+  nodeMetricRows, processorConfigEntry, lambdaMemory,
 } from "./runHelpers";
 import { sourceLabel, sourceHints, hintLine, portsOfStep, missingFilesMessage } from "../WorkflowGraph/sourceInputs";
+import { appLambdaEligibility, lambdaUnavailableHint, lambdaOverrideWarning, withLambdaChoice } from "../Applications/lambdaEligibility";
 
 const { onNodeClick, onPaneClick, fitView, updateNodeData } = useVueFlow();
 
@@ -162,11 +163,59 @@ const getComputeTypesForTarget = (targetType) => {
   return types && types.length ? withGpu(types) : [];
 };
 
+// An app step's choices: the app's, with GPU, and Lambda always listed (it
+// is disabled, with why, unless the pinned version fits Lambda).
 const getComputeTypesForProcessor = (sourceUrl) => {
   if (!sourceUrl) return DEFAULT_COMPUTE_TYPES;
-  const app = availableApplications.value.find((a) => a.source?.url === sourceUrl);
+  const app = findMatchedApp(sourceUrl);
   const types = app?.runtimeConfig?.computeTypes;
-  return types && types.length ? withGpu(types) : DEFAULT_COMPUTE_TYPES;
+  return withLambdaChoice(types && types.length ? withGpu(types) : DEFAULT_COMPUTE_TYPES);
+};
+
+// Whether a step's pinned version (and variant) may run on Lambda
+// (lambdaEligibility.js): app-deploy-service's check, else its app.yml.
+const stepLambda = (nodeId, sourceUrl, version) => {
+  const d = (configDefinition.value?.dag || []).find((n) => n.id === nodeId);
+  const app = findMatchedApp(sourceUrl || d?.sourceUrl);
+  return appLambdaEligibility(app, version ?? nodeConfigs[nodeId]?.version ?? d?.tag, d?.variant);
+};
+// A version that doesn't fit Lambda only for its declared resources may still
+// be put on Lambda for this run (an override); the others can't.
+const isProcessorComputeTypeDisabled = (ct, nodeId) => {
+  if (ct !== "lambda") return false;
+  const e = stepLambda(nodeId);
+  return !e.available && !e.overridable;
+};
+const processorComputeTypeHint = (ct, nodeId) => (ct === "lambda" ? lambdaUnavailableHint(stepLambda(nodeId)) : "");
+// A step left on Lambda when its version doesn't fit it runs standard,
+// unless the user picked Lambda as an override the version allows.
+const processorTargetFor = (ct, nodeId, sourceUrl, version, picked = false) => {
+  if (ct !== "lambda") return ct;
+  const e = stepLambda(nodeId, sourceUrl, version);
+  return e.available || (picked && e.overridable) ? ct : "standard";
+};
+const onStepVersionChange = (nodeId) => {
+  const cfg = nodeConfigs[nodeId];
+  if (!cfg) return;
+  cfg.executionTarget = processorTargetFor(cfg.executionTarget, nodeId, undefined, undefined, cfg.lambdaPicked);
+  if (cfg.executionTarget === "lambda") cfg.memory = lambdaMemory(cfg.memory);
+};
+// "Lambda (override)" when Lambda is only there as an override.
+const processorComputeTypeLabel = (ct, nodeId) => {
+  if (ct !== "lambda") return formatComputeTypeLabel(ct);
+  const e = stepLambda(nodeId);
+  return !e.available && e.overridable ? "Lambda (override)" : formatComputeTypeLabel(ct);
+};
+// The override's warning for a step on Lambda; "" when none.
+const stepLambdaWarning = (nodeId) =>
+  nodeConfigs[nodeId]?.executionTarget === "lambda" ? lambdaOverrideWarning(stepLambda(nodeId)) : "";
+// A Lambda chosen here is the user's pick (kept as an override on a version
+// change); the resource settings start over for the new target.
+const onProcessorTargetChange = (nodeId) => {
+  const cfg = nodeConfigs[nodeId];
+  cfg.cpu = "";
+  cfg.memory = "";
+  cfg.lambdaPicked = cfg.executionTarget === "lambda";
 };
 
 /* Version helpers — match WorkflowBuilder */
@@ -1035,11 +1084,17 @@ const initiateWorkflow = async () => {
           .map(([key, value]) => ({ key, value: String(value) }));
 
         const matchedApp = findMatchedApp(d.sourceUrl);
+        const version = srcCfg?.version || d.tag || latestVersion(matchedApp)?.version || "";
+        // A rerun of a run that overrode Lambda keeps that pick.
+        const lambdaPicked = srcCfg?.lambdaOverride === true;
+        const executionTarget = processorTargetFor(srcCfg?.executionTarget || d.computeType || "standard", d.id, d.sourceUrl, version, lambdaPicked);
+        const memory = srcCfg?.memory || (d.runtimeConfig?.memory ? String(d.runtimeConfig.memory) : "");
         nodeConfigs[d.id] = {
-          executionTarget: srcCfg?.executionTarget || d.computeType || "standard",
-          version: srcCfg?.version || d.tag || latestVersion(matchedApp)?.version || "",
+          executionTarget,
+          lambdaPicked,
+          version,
           cpu: srcCfg?.cpu || (d.runtimeConfig?.cpu ? String(d.runtimeConfig.cpu) : ""),
-          memory: srcCfg?.memory || (d.runtimeConfig?.memory ? String(d.runtimeConfig.memory) : ""),
+          memory: executionTarget === "lambda" ? lambdaMemory(memory) : memory,
           schemaParams,
           extraParams,
         };
@@ -1169,12 +1224,8 @@ const executeWorkflow = async () => {
         }
       } else if (dagNode.type !== "data-source") {
         // Processor node: version + executionTarget + optional cpu/memory
-        const entry = { nodeId };
-        if (cfg.executionTarget) entry.executionTarget = cfg.executionTarget;
-        if (cfg.version) entry.version = cfg.version;
-        if (cfg.cpu) entry.cpu = cfg.cpu;
-        if (cfg.memory) entry.memory = cfg.memory;
-        processorConfigs.push(entry);
+        // lambdaOverride when Lambda was picked as an override (runHelpers.js).
+        processorConfigs.push(processorConfigEntry(nodeId, cfg, stepLambda(nodeId)));
       }
     });
 
@@ -1979,15 +2030,32 @@ onUnmounted(() => {
                     v-model="nodeConfigs[selectedNode.id].executionTarget"
                     size="small"
                     style="width: 100%"
-                    @change="() => { nodeConfigs[selectedNode.id].cpu = ''; nodeConfigs[selectedNode.id].memory = '' }"
+                    @change="() => onProcessorTargetChange(selectedNode.id)"
                   >
                     <el-option
                       v-for="ct in getComputeTypesForProcessor(selectedNode.data?.sourceUrl)"
                       :key="ct"
-                      :label="formatComputeTypeLabel(ct)"
+                      :label="processorComputeTypeLabel(ct, selectedNode.id)"
                       :value="ct"
-                    />
+                      :disabled="isProcessorComputeTypeDisabled(ct, selectedNode.id)"
+                    >
+                      <el-tooltip
+                        :disabled="!isProcessorComputeTypeDisabled(ct, selectedNode.id)"
+                        :content="processorComputeTypeHint(ct, selectedNode.id)"
+                        placement="right"
+                      >
+                        <span>{{ processorComputeTypeLabel(ct, selectedNode.id) }}</span>
+                      </el-tooltip>
+                    </el-option>
                   </el-select>
+                  <el-alert
+                    v-if="stepLambdaWarning(selectedNode.id)"
+                    :title="stepLambdaWarning(selectedNode.id)"
+                    type="warning"
+                    :closable="false"
+                    show-icon
+                    style="margin-top: 6px"
+                  />
                 </div>
                 <div class="config-field">
                   <label>Version</label>
@@ -1996,6 +2064,7 @@ onUnmounted(() => {
                     size="small"
                     style="width: 100%"
                     placeholder="latest"
+                    @change="() => onStepVersionChange(selectedNode.id)"
                     :disabled="sortedVersions(findMatchedApp(selectedNode.data?.sourceUrl)).length <= 1"
                   >
                     <el-option
@@ -2062,6 +2131,7 @@ onUnmounted(() => {
                       type="number"
                       :min="128"
                       :max="10240"
+                      @change="(v) => { nodeConfigs[selectedNode.id].memory = lambdaMemory(v) }"
                     />
                   </div>
                 </template>

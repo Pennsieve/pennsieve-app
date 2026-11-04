@@ -97,11 +97,8 @@
           >
             Standard
           </el-checkbox>
-          <el-checkbox
-            v-model="lambdaEnabled"
-          >
-            Lambda
-          </el-checkbox>
+          <!-- Lambda isn't chosen here: Pennsieve checks each version for
+               whether it fits Lambda (an app.yml can opt out). -->
         </el-form-item>
 
         <el-form-item prop="computeNode">
@@ -267,7 +264,6 @@ export default {
 
   data() {
     return {
-      lambdaEnabled: false,
       application: defaultApplicationFormValues(),
       cpuItems:[
         {
@@ -394,7 +390,6 @@ export default {
     closeDialog() {
       this.$emit("close", false);
       this.application = defaultApplicationFormValues();
-      this.lambdaEnabled = false;
       this.$refs.form.clearValidate();
     },
 
@@ -426,7 +421,6 @@ export default {
       this.$refs.form.validate(async (valid) => {
         if (valid) {
           const computeTypes = ["standard"];
-          if (this.lambdaEnabled) computeTypes.push("lambda");
 
           const formattedNewApplication = {
             name: this.application.name,

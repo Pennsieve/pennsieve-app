@@ -110,6 +110,17 @@ describe("switching variants", () => {
     expect(switchVariant(step, both, "gpu").computeType).toBe("standard");
   });
 
+  it("keeps Lambda only on a variant that fits it, listed or not", () => {
+    const fit = JSON.parse(JSON.stringify(dynasd));
+    fit.versions[1].variants[0].lambda = { eligible: true, reasons: [] };
+    fit.versions[1].variants[1].lambda = { eligible: false, reasons: ["needs a GPU"] };
+    const onLambda = { ...step, variant: "gpu", computeType: "lambda" };
+    expect(switchVariant(onLambda, fit, "cpu").computeType).toBe("lambda");
+    expect(switchVariant({ ...step, computeType: "lambda" }, fit, "gpu").computeType).toBe("gpu");
+    // Unchecked: only where its app.yml lists lambda.
+    expect(switchVariant(onLambda, dynasd, "cpu").computeType).toBe("standard");
+  });
+
   it("keeps values the step set, and says when they differ from the variant's default", () => {
     const s = switchVariant({ ...step, defaultParams: { MODEL: "lindda", DEVICE: "auto" } }, dynasd, "gpu");
     expect(s.kept).toEqual([{ name: "MODEL", label: "Detector", value: "lindda", variantDefault: "oncet" }]);
