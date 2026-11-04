@@ -101,6 +101,9 @@ async function saveConfig() {
 }
 
 // Recent activity: the workspace's (or the user's) runs, this node's.
+// The notebook line points owners at the per-user limits, on Settings.
+const limitsRoute = computed(() => ({ query: { ...route.query, tab: 'settings' }, hash: '#pipeline-budget' }))
+
 const runsLoading = ref(true)
 const recentRuns = computed(() =>
   recentNodeRuns(store.getters['analysisModule/workflowInstances'] || [], props.node.uuid)
@@ -162,7 +165,10 @@ onMounted(async () => {
             {{ c.label }}
             <span class="cn-pill" :class="{ 'is-on': c.on }">{{ c.on ? 'On' : 'Off' }}</span>
           </span>
-          <span class="cn-muted">{{ c.detail }}</span>
+          <span class="cn-muted">
+            {{ c.detail }}<template v-if="c.key === 'notebooks' && c.on && canManage"> ·
+              <router-link :to="limitsRoute" class="limits-link">per-user limits in Limits &amp; budget</router-link></template>
+          </span>
         </div>
       </div>
 
@@ -275,6 +281,14 @@ onMounted(async () => {
   font-size: 14px;
   font-weight: 600;
   color: theme.$gray_6;
+}
+.limits-link {
+  color: theme.$purple_3;
+  text-decoration: none;
+
+  &:hover {
+    text-decoration: underline;
+  }
 }
 .tier-select {
   width: 280px;
