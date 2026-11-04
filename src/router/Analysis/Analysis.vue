@@ -2,7 +2,7 @@
   <bf-page>
     <bf-rafter slot="heading" class="primary" :org-id="orgId">
       <template #breadcrumb>
-        <org-breadcrumb page-name="Analysis" :crumbs="breadcrumbCrumbs" :page-route="{ name: 'workflows' }" actions />
+        <org-breadcrumb page-name="Analysis" :crumbs="breadcrumbCrumbs" :page-route="{ name: 'workflows' }" />
       </template>
     </bf-rafter>
     <div class="content-tabs">

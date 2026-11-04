@@ -72,7 +72,6 @@ const includeNotebooks = computed({
   set: (on) => router.replace({ query: { ...route.query, notebooks: on ? "1" : undefined } }),
 });
 
-const runsRef = ref(null);
 
 // A link with ?run=<workflow> opens the run dialog on it, over whichever
 // view is showing; the query goes, so a reload doesn't open it again.
@@ -90,15 +89,15 @@ watch(() => route.query.run, openRunFromQuery);
 
 <template>
   <div class="wf-page">
-    <AnalysisViewBar v-model="view" :views="VIEWS">
-      <!-- Live's one action is running a workflow; the Library's cards each
-           have their own Run, and building one is the Builder tab's (a
-           "+ New Workflow" here was taken for running one). -->
-      <bf-button v-if="view === 'live'" @click="runsRef?.openWizardDialog()">+ Run Workflow</bf-button>
+    <!-- The views on the tab row; + Run Workflow under it on the right, on
+         every view (where the Compute Nodes tab has + New Compute Node), and
+         on the Builder its bar (name, readiness, Save) on that row's left. -->
+    <AnalysisViewBar v-model="view" :views="VIEWS" :ruled="view === 'builder'">
+      <template v-if="view === 'builder'" #lead>
+        <div id="wf-toolbar-builder" class="wf-builder-bar" />
+      </template>
+      <bf-button @click="runDialog?.open()">+ Run Workflow</bf-button>
     </AnalysisViewBar>
-    <!-- The builder's bar (name, readiness, Save): its own row over the
-         canvas; the views are on the tab row. -->
-    <div v-if="view === 'builder'" id="wf-toolbar-builder" class="wf-builder-bar" />
     <!-- Nothing until a first visit knows whether to open on Live -->
     <div v-if="view" class="wf-body">
       <div v-if="view === 'library'" class="wf-library">
@@ -107,7 +106,6 @@ watch(() => route.query.run, openRunFromQuery);
       </div>
       <RunsOverview
         v-else-if="view === 'live'"
-        ref="runsRef"
         embedded
         :exclude-notebooks="!includeNotebooks"
         notebooks-toggle
@@ -131,16 +129,11 @@ watch(() => route.query.run, openRunFromQuery);
   flex-direction: column;
   overflow: hidden;
 }
-/* The builder's bar, over the canvas. */
+/* The builder's bar, on the toolbar row's left. */
 .wf-builder-bar {
   display: flex;
-  flex-shrink: 0;
-  align-items: center;
-  box-sizing: border-box;
-  height: 56px;
-  padding: 0 32px;
-  border-bottom: 1px solid theme.$gray_2;
-  background: theme.$white;
+  flex: 1;
+  min-width: 0;
 }
 .wf-body {
   flex: 1;
