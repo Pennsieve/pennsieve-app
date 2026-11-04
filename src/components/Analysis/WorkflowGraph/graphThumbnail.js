@@ -37,14 +37,39 @@ export function thumbnailLayout(dag) {
   }
   dagre.layout(g);
   const graph = g.graph();
+  const placed = new Map(
+    nodes.map((n) => {
+      const p = g.node(n.id);
+      const { width: w, height: h } = sizeOf(n);
+      return [n.id, { id: n.id, kind: nodeKind(n), x: p.x - w / 2, y: p.y - h / 2, w, h }];
+    })
+  );
   return {
     width: graph.width || box.width,
     height: graph.height || box.height,
-    nodes: nodes.map((n) => {
-      const p = g.node(n.id);
-      const { width: w, height: h } = sizeOf(n);
-      return { id: n.id, kind: nodeKind(n), x: p.x - w / 2, y: p.y - h / 2, w, h };
+    nodes: [...placed.values()],
+    // A line from the bottom of the step it comes from to the top of the one
+    // it goes to, as on the canvas. Not dagre's routes: an edge that skips a
+    // rank is routed through placeholder points, which at a thumbnail's tight
+    // spacing swing out to the side and through other boxes.
+    edges: g.edges().map((e) => {
+      const a = placed.get(e.v);
+      const b = placed.get(e.w);
+      return {
+        id: `${e.v}->${e.w}`,
+        points: [
+          { x: a.x + a.w / 2, y: a.y + a.h },
+          { x: b.x + b.w / 2, y: b.y },
+        ],
+      };
     }),
-    edges: g.edges().map((e) => ({ id: `${e.v}->${e.w}`, points: g.edge(e).points || [] })),
   };
+}
+
+// An SVG path for an edge's two points: a vertical S-curve, as the canvas
+// draws a connection between a step's bottom and the next one's top.
+export function edgePath([from, to]) {
+  if (!from || !to) return "";
+  const bend = Math.max(Math.abs(to.y - from.y) / 2, 12);
+  return `M${from.x},${from.y} C${from.x},${from.y + bend} ${to.x},${to.y - bend} ${to.x},${to.y}`;
 }
