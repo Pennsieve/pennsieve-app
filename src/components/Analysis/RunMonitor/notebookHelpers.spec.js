@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   launchableKernels,
+  offlineNote,
   kernelOutput,
   notebookKernel,
   isNotebookWorkflow,
@@ -363,5 +364,15 @@ describe("a GPU session's mark", () => {
     expect(runNodeId({ computeNodeUuid: "a" })).toBe("a");
     expect(runNodeId({ workflowInstanceConfiguration: { computeNodeId: "b" } })).toBe("b");
     expect(runNodeId(null)).toBe("");
+  });
+});
+
+describe("offlineNote", () => {
+  it("warns on compliant nodes only", () => {
+    expect(offlineNote({ deploymentMode: "compliant" })).toMatch(/environment/);
+    expect(offlineNote({ deploymentMode: "COMPLIANT" })).not.toBe("");
+    expect(offlineNote({ deploymentMode: "secure" })).toBe("");
+    expect(offlineNote({})).toBe("");
+    expect(offlineNote(null)).toBe("");
   });
 });

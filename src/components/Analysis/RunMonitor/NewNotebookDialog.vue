@@ -25,6 +25,7 @@ import {
   notebookKernel,
   kernelLabel,
   interactiveCapable,
+  offlineNote,
   launchableKernels,
   kernelOutput,
   nonSavingAlternative,
@@ -1138,6 +1139,7 @@ async function execute() {
           </div>
           <div class="wizard-card-offer">{{ gpuOffer(selectedGpu) }}</div>
           <div v-if="nodeCapacityLabel(selectedComputeNode)" class="wizard-card-capacity">{{ nodeCapacityLabel(selectedComputeNode) }}</div>
+          <p v-if="offlineNote(selectedComputeNode)" class="resource-hint">{{ offlineNote(selectedComputeNode) }}</p>
         </div>
         <template v-else>
           <el-input
@@ -1160,7 +1162,7 @@ async function execute() {
                 {{ cn.description }}
               </div>
               <!-- What it offers: its GPU (the node's tier), or CPU only -->
-              <div class="wizard-card-offer">{{ gpuOffer(gpuOf(cn)) }}</div>
+              <div class="wizard-card-offer">{{ gpuOffer(gpuOf(cn)) }}<template v-if="offlineNote(cn)"> · No internet access</template></div>
               <!-- Its notebooks in use, everyone's and the caller's -->
               <div v-if="nodeCapacityLabel(cn)" class="wizard-card-capacity">{{ nodeCapacityLabel(cn) }}</div>
               <!-- Hardware chosen first (a GPU kernel): why this node can't host it -->
