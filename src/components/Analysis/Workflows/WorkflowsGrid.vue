@@ -614,12 +614,14 @@ onMounted(async () => {
 @use "../../../styles/element/input";
 
 /* Lined up with the toolbar above and the Analysis tabs (32px). */
+/* No padding on the left: the filter panel (or its rail) sits against the
+   page's edge, as the builder's do; the list keeps 32px on the right. */
 .workflows-container {
-  padding: 20px 32px;
+  padding: 20px 32px 20px 0;
 }
 
 .info-section {
-  margin-bottom: 32px;
+  margin: 0 0 32px 32px;
 }
 
 .info-card {
@@ -679,16 +681,18 @@ onMounted(async () => {
   width: 232px;
   min-width: 0;
   box-sizing: border-box;
-  align-self: flex-start;
-  padding: 0 16px 12px 0;
+  /* Against the page's left and top edges, its rule running the list's
+     height; its header still level with the search. */
+  margin: -20px 0 -20px;
+  padding: 20px 16px 12px;
   border-right: 1px solid theme.$gray_2;
 }
 /* The rail starts level with the search, its arrow on the search's middle
    (the panel's header row is as tall as the search). */
 .library-rail {
   align-self: stretch;
-  margin: 0;
-  padding-top: 13px;
+  margin: -20px 0 -20px;
+  padding-top: 33px;
 }
 .rail-count,
 .filters-count {
@@ -757,6 +761,9 @@ onMounted(async () => {
 @media (max-width: 767px) {
   .workflows-container {
     padding: 16px;
+  }
+  .info-section {
+    margin-left: 0;
   }
   .library-layout {
     display: block;
@@ -841,11 +848,11 @@ onMounted(async () => {
 
 $card-height: 172px;
 
-/* Wide cards, two to a row where they fit, of one height with a square
+/* Cards two or more to a row where 340px each fit (16px apart), of one height with a square
    graph, as the apps' (ApplicationsGrid): the rows line up. */
 .workflows-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(520px, 100%), 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(340px, 100%), 1fr));
   gap: 16px;
 }
 
@@ -855,6 +862,7 @@ $card-height: 172px;
      (cards in a row stay one height). */
   min-height: $card-height;
   min-width: 0;
+  container: wf-card / inline-size;
   border: 1px solid theme.$gray_2;
   background: theme.$white;
   overflow: hidden;
@@ -1026,8 +1034,9 @@ $card-height: 172px;
     color: theme.$white;
   }
 }
-/* A phone: a smaller graph, so the text keeps room. */
-@media (max-width: 479px) {
+/* A narrow card (two to a row beside the panel, or a phone): a smaller
+   graph, so the text keeps room. */
+@container wf-card (max-width: 440px) {
   .wf-thumb {
     flex-basis: 112px;
   }
