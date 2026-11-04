@@ -33,6 +33,19 @@ describe("postInputsFetch", () => {
       postInputsFetch("https://k", "tok", [{ source: "n", path: "a" }], { fetchFn: respond(502, "n: dataset not open\n") })
     ).rejects.toThrow("n: dataset not open");
   });
+
+  it("rejects with the sidecar's message when the files don't fit on the disk", async () => {
+    const msg = "The files need 90 GB but the notebook's disk has 40 GB free.";
+    await expect(
+      postInputsFetch("https://k", "tok", [{ source: "n", path: "a" }], { fetchFn: respond(507, msg) })
+    ).rejects.toThrow(msg);
+  });
+
+  it("falls back to a status message when the sidecar says nothing", async () => {
+    await expect(
+      postInputsFetch("https://k", "tok", [{ source: "n", path: "a" }], { fetchFn: respond(507, "") })
+    ).rejects.toThrow("(507)");
+  });
 });
 
 describe("getInputsFetch", () => {
