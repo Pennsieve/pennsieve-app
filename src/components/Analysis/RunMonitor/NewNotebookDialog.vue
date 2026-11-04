@@ -40,7 +40,6 @@ import {
   variantSetsResources,
   variantResources,
   variantNodeUnfit,
-  sessionStepId,
   hardwareOptions,
   pickedOption,
   optionsForNode,
@@ -49,6 +48,11 @@ import {
   hardwareLabel as hardwareOptionLabel,
   gpuSessionHelp,
   gpuReviewResources,
+  DEFAULT_NOTEBOOK_DISK_GIB,
+  NOTEBOOK_DISK_OPTIONS,
+  notebookDiskLabel,
+  notebookDiskHint,
+  notebookProcessorConfigs,
 } from "./notebookHelpers";
 import { nodeGpu, gpuOffer, gpuName, gpuTaskResources } from "../ComputeNodes/computeNodeHelpers";
 import { useComputeResourcesStore } from "@/stores/computeResourcesStore";
@@ -138,6 +142,10 @@ const DEFAULT_CPU = "1024"; // 1 vCPU
 const AUTO_MEMORY = "auto";
 const resourceCpu = ref(DEFAULT_CPU);
 const resourceMemory = ref(AUTO_MEMORY);
+// The session's disk in GiB (a CPU session's; a GPU one uses its instance's).
+const resourceDisk = ref(DEFAULT_NOTEBOOK_DISK_GIB);
+const diskOptions = NOTEBOOK_DISK_OPTIONS;
+const diskHint = notebookDiskHint();
 const cpuOptions = STANDARD_CPU_OPTIONS;
 const memoryOptions = computed(() => getStandardMemoryOptions(resourceCpu.value));
 // Balanced default memory for a CPU when memory is left automatic: 2 GB per vCPU
@@ -918,7 +926,7 @@ const soFar = computed(() => {
   if (step.value > S.NODE && selectedComputeNode.value) rows.push({ label: "Compute node", value: selectedComputeNode.value.name });
   if ((step.value > S.HARDWARE || gpuFirst.value) && hardwareLabel.value) rows.push({ label: "Hardware", value: hardwareLabel.value });
   if (step.value > S.RESOURCES && !variantResourcesSet.value) {
-    rows.push({ label: "Resources", value: `${cpuLabel(resourceCpu.value)} · ${isAutoMemory.value ? memoryLabel(autoMemoryForCpu(resourceCpu.value)) : memoryLabel(resourceMemory.value)}` });
+    rows.push({ label: "Resources", value: `${cpuLabel(resourceCpu.value)} · ${isAutoMemory.value ? memoryLabel(autoMemoryForCpu(resourceCpu.value)) : memoryLabel(resourceMemory.value)} · ${notebookDiskLabel(resourceDisk.value)}` });
   }
   if (step.value > S.INPUT) {
     const input = iface.value
@@ -987,18 +995,13 @@ async function execute() {
     // A GPU kernel, or a variant that declares its resources: the
     // variant's (no CPU and memory chosen). A kernel that offers its
     // variants per run gets the pick on its session step.
-    const processorConfigs = [];
-    const sessionId = selectedVariant.value ? sessionStepId(dag) : "";
-    for (const node of dag) {
-      if (node.type === "data-source" || node.type === "data-target") continue;
-      const pc = { nodeId: node.id };
-      if (node.id === sessionId) pc.variant = selectedVariant.value.id;
-      if (!variantResourcesSet.value) {
-        pc.cpu = resourceCpu.value;
-        pc.memory = resolvedMemory.value;
-      }
-      if (Object.keys(pc).length > 1) processorConfigs.push(pc);
-    }
+    // A CPU session's disk goes on its session step.
+    const processorConfigs = notebookProcessorConfigs(dag, {
+      variantId: selectedVariant.value?.id || "",
+      resources: variantResourcesSet.value
+        ? null
+        : { cpu: resourceCpu.value, memory: resolvedMemory.value, diskGiB: resourceDisk.value },
+    });
 
     // Outside a workspace, the public dataset is the first data source's view.
     // It's a source's only input: the session downloads its files into it.
@@ -1212,7 +1215,7 @@ async function execute() {
       <!-- Compute resources (CPU sessions) -->
       <div v-if="step === S.RESOURCES" class="wizard-step">
         <p class="wizard-step-desc">
-          Choose the CPU and memory for this notebook's compute task.
+          Choose the CPU, memory and disk for this notebook's compute task.
         </p>
         <div class="resource-grid">
           <div class="resource-field">
@@ -1241,11 +1244,23 @@ async function execute() {
               />
             </el-select>
           </div>
+          <div class="resource-field">
+            <label class="resource-label">Disk</label>
+            <el-select v-model="resourceDisk" size="default" style="width: 100%">
+              <el-option
+                v-for="opt in diskOptions"
+                :key="opt.value"
+                :label="opt.label"
+                :value="opt.value"
+              />
+            </el-select>
+          </div>
         </div>
         <p class="resource-hint">
           Memory is set automatically based on the CPU unless you pick a specific
           value. Higher tiers cost more — start small and scale up if needed.
         </p>
+        <p class="resource-hint">{{ diskHint }}</p>
       </div>
 
       <!-- Input (a notebook with an input: what it starts with) -->
@@ -1631,7 +1646,8 @@ async function execute() {
             <span class="wizard-summary-label">Resources</span>
             <span class="wizard-summary-value">
               {{ cpuLabel(resourceCpu) }} ·
-              {{ isAutoMemory ? `${memoryLabel(autoMemoryForCpu(resourceCpu))} (auto)` : memoryLabel(resourceMemory) }}
+              {{ isAutoMemory ? `${memoryLabel(autoMemoryForCpu(resourceCpu))} (auto)` : memoryLabel(resourceMemory) }} ·
+              {{ notebookDiskLabel(resourceDisk) }}
             </span>
           </div>
           <div v-if="iface" class="wizard-summary-row">
@@ -2141,7 +2157,7 @@ async function execute() {
 /* compute resources */
 .resource-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(3, 1fr);
   gap: 16px;
 }
 .resource-field {
