@@ -69,21 +69,41 @@ export function formatAccountId(accountId) {
   return accountId;
 }
 
+// A node's tier (deploymentMode): its label, what it's for, and how its
+// badge (NodeTierBadge) shows it: a shield in its colour on a light tint of
+// it (text contrast WCAG AA, tested), with a one-line tooltip.
+// Basic slate with an outline shield; Secure blue; Compliant violet with a
+// checked shield.
 const MODES = {
   basic: {
+    key: "basic",
     label: "Basic",
+    color: "#475569",
+    background: "#f1f5f9",
+    icon: "shield",
+    tooltip: "Default AWS network; for public or low-risk data.",
     summary: "For development and testing: apps reach the internet directly.",
     details:
       "A cost-effective setup for development, testing and proofs of concept. Apps have direct internet access and use standard encryption.",
   },
   secure: {
+    key: "secure",
     label: "Secure",
+    color: "#2563eb",
+    background: "#eff6ff",
+    icon: "shield-filled",
+    tooltip: "Private network with controlled internet access.",
     summary: "For production: an isolated network with controlled internet access.",
     details:
       "Apps run in an isolated network with controlled internet access. All data is encrypted with dedicated keys, and network activity is logged for auditing.",
   },
   compliant: {
+    key: "compliant",
     label: "Compliant",
+    color: "#7c3aed",
+    background: "#f5f3ff",
+    icon: "shield-check",
+    tooltip: "Private network, no internet; for regulated data.",
     summary: "For regulated data: no internet access, private network only.",
     details:
       "Designed for regulated environments such as healthcare and government. Apps have no internet access; all traffic stays within the cloud provider's private network. Includes dedicated encryption keys and full network audit logging, suitable for HIPAA and NIST 800-171.",
@@ -92,6 +112,20 @@ const MODES = {
 
 export const deploymentMode = (node) =>
   MODES[(node?.deploymentMode || "basic").toLowerCase()] || MODES.basic;
+
+// Every tier, in order (Basic, Secure, Compliant).
+export const DEPLOYMENT_MODES = Object.values(MODES);
+
+// WCAG contrast ratio of two #rrggbb colours (1 to 21); AA text needs 4.5.
+export function contrastRatio(a, b) {
+  const lum = (hex) => {
+    const [r, g, bl] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255);
+    const lin = (c) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
+    return 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(bl);
+  };
+  const [hi, lo] = [lum(a), lum(b)].sort((x, y) => y - x);
+  return (hi + 0.05) / (lo + 0.05);
+}
 
 /*
   A node's GPU, as the wizard, the run page and the session header describe

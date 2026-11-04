@@ -8,6 +8,7 @@
   <div
     class="cn-card-tile"
     :class="{ 'is-off': ['Paused', 'Failed', 'Destroying'].includes(statusLabel) }"
+    :style="{ '--tier': tier.color }"
     role="link"
     tabindex="0"
     @click="openNode"
@@ -28,10 +29,7 @@
     <p class="tile-description">{{ node.description || 'No description.' }}</p>
 
     <div class="tile-meta">
-      <el-tooltip :content="deploymentModeTooltip" placement="top" :show-after="300" :popper-style="{ maxWidth: '320px' }">
-        <span>{{ modeLabel }}</span>
-      </el-tooltip>
-      <span class="sep">·</span>
+      <NodeTierBadge :node="node" />
       <span>{{ getAccountTypeLabel(node.account?.accountType) }}</span>
       <template v-if="ownerName">
         <span class="sep">·</span>
@@ -103,7 +101,8 @@ import { computed, onMounted } from 'vue'
 import { useStore } from 'vuex'
 import { useRoute, useRouter } from 'vue-router'
 import IconPennsieveMark from '../../icons/IconPennsieveMark.vue'
-import { nodeCapabilities } from './computeNodeHelpers'
+import { deploymentMode, nodeCapabilities } from './computeNodeHelpers'
+import NodeTierBadge from './NodeTierBadge.vue'
 import { ElMessage } from 'element-plus'
 import { useComputeResourcesStore } from '@/stores/computeResourcesStore'
 import { usePipelineBudgetStore } from '@/stores/pipelineBudgetStore'
@@ -154,10 +153,8 @@ const detailRoute = computed(() => ({
 const openNode = () => router.push(detailRoute.value)
 
 const statusLabel = computed(() => getStatusForNode(props.node))
-const modeLabel = computed(() => {
-  const mode = props.node.deploymentMode || 'basic'
-  return mode.charAt(0).toUpperCase() + mode.slice(1)
-})
+// Its tier, for the card's accent stripe (the badge shows the name).
+const tier = computed(() => deploymentMode(props.node))
 // What the node runs, as the Library's app chips: notebooks, GPUs, AI
 // models when on, and an update when one is waiting for someone else.
 const chips = computed(() => {
@@ -194,19 +191,6 @@ const ownerName = computed(() => {
   return null
 })
 
-const deploymentModeTooltip = computed(() => {
-  const mode = (props.node.deploymentMode || 'basic').toLowerCase()
-  switch (mode) {
-    case 'basic':
-      return 'Basic — Lowest cost option for development and testing. Processors run with direct internet access. Uses standard AWS encryption.'
-    case 'secure':
-      return 'Secure — Production-ready with network isolation. Processors run in private subnets with full internet access via NAT. Includes KMS encryption and network audit logs.'
-    case 'compliant':
-      return 'Compliant — For regulated environments (HIPAA, NIST). No internet access — all traffic stays within the AWS network. Includes KMS encryption and network audit logs.'
-    default:
-      return ''
-  }
-})
 
 function getAccountTypeLabel(type) {
   switch (type) {
@@ -264,6 +248,7 @@ async function updateNode() {
 /* As the Library's cards: white, square, a quiet border that turns purple
    on hover, the actions only then. */
 .cn-card-tile {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -287,6 +272,18 @@ async function updateNode() {
   }
   &.is-off {
     opacity: 0.75;
+  }
+  /* Its tier's colour, a 4px stripe down the left: over the padding, so
+     nothing moves, and apart from the border the hover colours. */
+  &::before {
+    content: '';
+    position: absolute;
+    top: -1px;
+    bottom: -1px;
+    left: -1px;
+    width: 4px;
+    background: var(--tier);
+    pointer-events: none;
   }
 }
 

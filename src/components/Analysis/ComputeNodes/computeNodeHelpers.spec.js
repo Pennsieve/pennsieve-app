@@ -8,6 +8,8 @@ import {
   relativeTime,
   formatAccountId,
   deploymentMode,
+  DEPLOYMENT_MODES,
+  contrastRatio,
   limitSummary,
   nodeGpu,
   gpuName,
@@ -176,5 +178,24 @@ describe("a node's GPU", () => {
     expect(gpuName(g)).toBe("large tier");
     expect(gpuOffer(g)).toBe("GPU: large tier · up to 2 instances");
     expect(gpuTaskResources(g)).toBe("");
+  });
+});
+
+describe("node tiers (NodeTierBadge)", () => {
+  it("gives each tier its colour, icon and one-line tooltip", () => {
+    expect(deploymentMode({ deploymentMode: "basic" })).toMatchObject({ key: "basic", icon: "shield", tooltip: "Default AWS network; for public or low-risk data." });
+    expect(deploymentMode({ deploymentMode: "secure" })).toMatchObject({ key: "secure", color: "#2563eb", tooltip: "Private network with controlled internet access." });
+    expect(deploymentMode({ deploymentMode: "Compliant" })).toMatchObject({ key: "compliant", color: "#7c3aed", icon: "shield-check", tooltip: "Private network, no internet; for regulated data." });
+  });
+  it("reads a node without one, or an unknown one, as Basic", () => {
+    expect(deploymentMode({}).key).toBe("basic");
+    expect(deploymentMode({ deploymentMode: "other" }).key).toBe("basic");
+  });
+  it("has text that passes WCAG AA on its tint", () => {
+    for (const m of DEPLOYMENT_MODES) expect(contrastRatio(m.color, m.background)).toBeGreaterThanOrEqual(4.5);
+  });
+  it("measures contrast as WCAG does", () => {
+    expect(contrastRatio("#000000", "#ffffff")).toBeCloseTo(21, 5);
+    expect(contrastRatio("#ffffff", "#ffffff")).toBeCloseTo(1, 5);
   });
 });
