@@ -5,7 +5,7 @@
     the owner's own cloud account and capping is opt-in. Showing a row of
     "unlimited" bars there would be noise on the majority of nodes.
   -->
-  <div v-if="show" class="pipeline-budget" :class="[`level-${level}`, { expanded }]">
+  <div v-if="show" class="pipeline-budget" :class="[`level-${level}`, { expanded, 'is-inline': inline }]">
     <button
       type="button"
       class="collapsed-row"
@@ -137,6 +137,9 @@ const props = defineProps({
   // is the blocker — a dedicated node does not help a user who is merely at
   // their own concurrency limit.
   manageHref: { type: String, default: '' },
+  // On a card: no box, the summary then a thin bar on one line ("$9.86 left
+  // · Node daily ▬▬▬"); it still opens the details.
+  inline: { type: Boolean, default: false },
 })
 
 const expanded = ref(false)
@@ -247,6 +250,35 @@ defineExpose({ expanded })
   border: 1px solid theme.$gray_2;
   background: theme.$white;
   font-size: 12px;
+}
+/* Inline (a card): no box; the summary first, then a thin bar. */
+.pipeline-budget.is-inline {
+  border: 0;
+  background: none;
+
+  .collapsed-row {
+    padding: 2px 0;
+  }
+  .caption {
+    flex: 0 1 auto;
+    order: -1;
+    color: theme.$gray_5;
+
+    strong {
+      font-weight: 600;
+      color: theme.$gray_6;
+    }
+  }
+  .meter {
+    flex: 1 1 auto;
+    max-width: 160px;
+    min-width: 48px;
+    height: 3px;
+  }
+  .expanded {
+    padding-left: 0;
+    padding-right: 0;
+  }
 }
 
 .collapsed-row {

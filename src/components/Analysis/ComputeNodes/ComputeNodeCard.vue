@@ -1,9 +1,11 @@
 <template>
   <!--
-    A compute node, as the Library draws a workflow: a white square card, the
-    name and its badges on the first line, two lines of description, chips
-    for what the node runs, and the actions on hover. The whole card opens
-    the node's page.
+    A compute node, as the Library draws a workflow: a white card with its
+    name (and its status, only when it isn't Enabled), two lines of
+    description, its tier badge with what it runs in quiet grey, its budget
+    inline when it has one, and one muted line of where it runs, whose it is
+    and its provisioner, the actions on hover. The whole card opens the
+    node's page.
   -->
   <div
     class="cn-card-tile"
@@ -21,26 +23,25 @@
           <IconPennsieveMark :width="14" :height="14" color="currentColor" />
         </span>
       </el-tooltip>
-      <span class="tile-badge" :class="`status-${statusLabel.toLowerCase()}`">
+      <span v-if="statusLabel !== 'Enabled'" class="tile-badge" :class="`status-${statusLabel.toLowerCase()}`">
         {{ statusLabel }}{{ statusLabel === 'Updating' && node.pendingProvisionerImageTag ? ` to ${node.pendingProvisionerImageTag}` : '' }}
       </span>
     </div>
 
     <p class="tile-description">{{ node.description || 'No description.' }}</p>
 
-    <div class="tile-meta">
+    <!-- Its tier, then what it runs: neutral, so the badge is the colour -->
+    <div class="tile-caps">
       <NodeTierBadge :node="node" />
-      <span>{{ getAccountTypeLabel(node.account?.accountType) }}</span>
-      <template v-if="ownerName">
-        <span class="sep">·</span>
-        <span>Owned by {{ ownerName }}</span>
+      <template v-for="(chip, i) in chips" :key="chip.key">
+        <span v-if="i > 0" class="sep">·</span>
+        <el-tooltip :content="chip.detail" placement="top" :show-after="300">
+          <span class="tile-cap" :class="{ 'tile-cap--warn': chip.kind === 'update' }">
+            <el-icon v-if="CAP_ICONS[chip.kind]" class="tile-cap-icon"><component :is="CAP_ICONS[chip.kind]" /></el-icon>
+            {{ chip.label }}
+          </span>
+        </el-tooltip>
       </template>
-    </div>
-
-    <div v-if="chips.length" class="tile-chips">
-      <el-tooltip v-for="chip in chips" :key="chip.key" :content="chip.detail" placement="top" :show-after="300">
-        <span class="tile-chip" :class="chip.kind">{{ chip.label }}</span>
-      </el-tooltip>
     </div>
 
     <!-- What the caller has left to spend on this node, once known. Only
@@ -48,6 +49,7 @@
     <PipelineBudgetMeter
       v-if="meterBudget"
       class="tile-budget"
+      inline
       :budget="meterBudget"
       :spend-axes="meterSpendAxes"
       :concurrency-axes="meterConcurrencyAxes"
@@ -59,7 +61,8 @@
     />
 
     <div class="tile-foot">
-      <span class="tile-version">{{ node.provisionerImageTag ? `Provisioner ${node.provisionerImageTag}` : '' }}</span>
+      <!-- Where it runs, whose it is, its provisioner: one muted line -->
+      <span class="tile-version" :title="footLine">{{ footLine }}</span>
       <span class="tile-actions" @click.stop>
         <el-tooltip
           v-if="hasProvisionerUpdate && canUpdateNode"
@@ -103,6 +106,7 @@ import { useRoute, useRouter } from 'vue-router'
 import IconPennsieveMark from '../../icons/IconPennsieveMark.vue'
 import { deploymentMode, nodeCapabilities } from './computeNodeHelpers'
 import NodeTierBadge from './NodeTierBadge.vue'
+import { Cpu, MagicStick, Notebook } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { useComputeResourcesStore } from '@/stores/computeResourcesStore'
 import { usePipelineBudgetStore } from '@/stores/pipelineBudgetStore'
@@ -153,6 +157,18 @@ const detailRoute = computed(() => ({
 const openNode = () => router.push(detailRoute.value)
 
 const statusLabel = computed(() => getStatusForNode(props.node))
+// What it runs, each with a small icon (Element Plus's).
+const CAP_ICONS = { notebooks: Notebook, gpu: Cpu, ai: MagicStick }
+// The foot line: "AWS · Owned by … · Provisioner v1.36.3".
+const footLine = computed(() =>
+  [
+    shortAccountType(props.node.account?.accountType),
+    ownerName.value && `Owned by ${ownerName.value}`,
+    props.node.provisionerImageTag && `Provisioner ${props.node.provisionerImageTag}`,
+  ]
+    .filter(Boolean)
+    .join(' · ')
+)
 // Its tier, for the card's accent stripe (the badge shows the name).
 const tier = computed(() => deploymentMode(props.node))
 // What the node runs, as the Library's app chips: notebooks, GPUs, AI
@@ -192,12 +208,12 @@ const ownerName = computed(() => {
 })
 
 
-function getAccountTypeLabel(type) {
+function shortAccountType(type) {
   switch (type) {
-    case 'AWS': return 'Amazon Web Services'
-    case 'GCP': return 'Google Cloud Platform'
-    case 'AZURE': return 'Microsoft Azure'
-    default: return type || 'Unknown'
+    case 'AWS': return 'AWS'
+    case 'GCP': return 'Google Cloud'
+    case 'AZURE': return 'Azure'
+    default: return type || ''
   }
 }
 
@@ -273,16 +289,17 @@ async function updateNode() {
   &.is-off {
     opacity: 0.75;
   }
-  /* Its tier's colour, a 4px stripe down the left: over the padding, so
-     nothing moves, and apart from the border the hover colours. */
+  /* A light tint of its tier's colour, a 2px stripe down the left (the
+     badge is the tier's marker): over the padding, so nothing moves. */
   &::before {
     content: '';
     position: absolute;
     top: -1px;
     bottom: -1px;
     left: -1px;
-    width: 4px;
+    width: 2px;
     background: var(--tier);
+    opacity: 0.45;
     pointer-events: none;
   }
 }
@@ -329,11 +346,11 @@ async function updateNode() {
   text-transform: uppercase;
   letter-spacing: 0.3px;
 
-  &.status-enabled {
-    background: theme.$green_tint;
-    color: theme.$green_2;
-  }
+  /* Only states that need a look show (Enabled doesn't). */
   &.status-paused,
+  &.status-disabled,
+  &.status-updating,
+  &.status-pending,
   &.status-destroying {
     background: theme.$orange_tint;
     color: theme.$orange_2;
@@ -357,7 +374,8 @@ async function updateNode() {
   word-break: break-word;
 }
 
-.tile-meta {
+/* The tier badge, then what the node runs in quiet grey, with icons. */
+.tile-caps {
   display: flex;
   align-items: center;
   gap: 6px;
@@ -365,47 +383,27 @@ async function updateNode() {
   overflow: hidden;
   white-space: nowrap;
   font-size: 12px;
-  color: theme.$gray_6;
+  color: theme.$gray_5;
 
   .sep {
     color: theme.$gray_3;
   }
 }
-
-/* What the node runs, as the Library's app chips. */
-.tile-chips {
-  display: flex;
-  flex-wrap: wrap;
+.tile-caps > .tier-badge {
+  margin-right: 4px;
+}
+.tile-cap {
+  display: inline-flex;
+  align-items: center;
   gap: 4px;
 }
-.tile-chip {
-  padding: 1px 7px;
-  border-radius: 3px;
-  background: theme.$gray_0;
-  color: theme.$gray_5;
-  font-size: 11px;
-  font-weight: 500;
-
-  &.notebooks {
-    background: rgba(theme.$purple_3, 0.08);
-    color: theme.$purple_3;
-  }
-  &.gpu {
-    background: rgba(theme.$orange_1, 0.12);
-    color: theme.$orange_2;
-  }
-  &.ai {
-    background: theme.$green_tint;
-    color: theme.$green_2;
-  }
-  &.update {
-    background: theme.$orange_tint;
-    color: theme.$orange_2;
-  }
+.tile-cap-icon {
+  font-size: 12px;
+  color: theme.$gray_4;
 }
-
-.tile-budget {
-  max-width: 440px;
+/* An update waiting for someone else: the one cap that asks for a look. */
+.tile-cap--warn {
+  color: theme.$orange_2;
 }
 
 .tile-foot {
@@ -413,6 +411,7 @@ async function updateNode() {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
+  min-width: 0;
   margin-top: auto;
   padding-top: 6px;
 }
