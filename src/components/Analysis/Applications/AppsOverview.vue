@@ -1,7 +1,7 @@
 <script setup>
 // The Apps tab: the applications workflow steps run. No views; the bar has
-// the search on the left (where other tabs have their view switch) and the
-// actions on the right: a new app from Pennsieve's template, a guided wizard
+// the actions on the right (the search and Sort are the grid's, over its
+// cards, as on the Workflows Library): a new app from Pennsieve's template, a guided wizard
 // (PublishAppDialog: describe it, the repository from the template, the
 // GitHub App, the app.yml, the release); or a repository the user already
 // has (AddRepositoryDialog: access, destinations, sharing, a release).
@@ -14,7 +14,6 @@ import PublishAppDialog from "./PublishAppDialog.vue";
 import AddRepositoryDialog from "./AddRepositoryDialog.vue";
 
 const store = useStore();
-const search = ref("");
 const publishOpen = ref(false);
 const addOpen = ref(false);
 // The wizard picks from the repositories Pennsieve sees; have them ready.
@@ -36,17 +35,6 @@ onBeforeUnmount(() => timers.forEach(clearTimeout));
 <template>
   <div class="apps-page">
     <AnalysisViewBar>
-      <template #lead>
-        <label class="apps-search-control">
-          Search
-          <el-input
-            v-model="search"
-            placeholder="Name, description or repository…"
-            clearable
-            class="apps-search"
-          />
-        </label>
-      </template>
       <div class="apps-actions">
         <bf-button class="secondary" @click="openAdd">Add Repository</bf-button>
         <bf-button @click="publishOpen = true">Create New App</bf-button>
@@ -54,10 +42,10 @@ onBeforeUnmount(() => timers.forEach(clearTimeout));
     </AnalysisViewBar>
     <PublishAppDialog v-model="publishOpen" />
     <AddRepositoryDialog v-model="addOpen" @done="onDone" />
-    <!-- As the Workflows tab's Library: the grid's own 20px/32px padding,
-         scrolling under a fixed bar. -->
+    <!-- As the Workflows tab's Library: filters on the left, the search and
+         Sort in one row over the cards. -->
     <div class="apps-body">
-      <ApplicationsGrid v-model:search="search" embedded search-in-bar />
+      <ApplicationsGrid embedded />
     </div>
   </div>
 </template>
@@ -71,17 +59,6 @@ onBeforeUnmount(() => timers.forEach(clearTimeout));
   display: flex;
   flex-direction: column;
   overflow: hidden;
-}
-.apps-search-control {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 13px;
-  font-weight: 600;
-  color: theme.$gray_5;
-}
-.apps-search {
-  width: 360px;
 }
 .apps-actions {
   display: flex;

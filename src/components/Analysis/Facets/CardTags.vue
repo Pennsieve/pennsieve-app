@@ -1,0 +1,59 @@
+<script setup>
+// A card's tags as the filter panel lists them (facets.js tagDisplay): a
+// domain's coloured dot and name, a field's (or any other) name in grey.
+import { computed } from "vue";
+import { tagDisplay } from "./facets";
+
+const props = defineProps({
+  tags: { type: Array, default: () => [] },
+  // Shown at most; then +n.
+  max: { type: Number, default: 4 },
+  // Not the item's own (a workflow's apps'): in italics.
+  inherited: { type: Boolean, default: false },
+});
+const shown = computed(() => props.tags.slice(0, props.max).map((t) => ({ tag: t, ...tagDisplay(t) })));
+</script>
+
+<template>
+  <div class="card-tags" :class="{ 'card-tags--inherited': inherited }">
+    <span v-for="t in shown" :key="t.tag" class="card-tag" :class="{ 'card-tag--domain': t.domain }">
+      <span v-if="t.color" class="card-tag-dot" :style="{ background: t.color }" />{{ t.text }}
+    </span>
+    <span v-if="tags.length > max" class="card-tag">+{{ tags.length - max }}</span>
+  </div>
+</template>
+
+<style scoped lang="scss">
+@use "../../../styles/theme";
+
+/* One line, a few; the rest are found by search. */
+.card-tags {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  overflow: hidden;
+  font-size: 12px;
+  line-height: 18px;
+  color: theme.$gray_5;
+}
+.card-tag {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+}
+/* A domain's name as the panel's, darker than a field's. */
+.card-tag--domain {
+  color: theme.$gray_6;
+}
+.card-tag-dot {
+  width: 7px;
+  height: 7px;
+  flex-shrink: 0;
+  border-radius: 50%;
+}
+.card-tags--inherited {
+  font-style: italic;
+}
+</style>

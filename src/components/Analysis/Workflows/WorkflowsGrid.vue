@@ -9,7 +9,6 @@ const exampleCache = createExampleCache(exampleUnavailable);
 
 <script setup>
 import { computed, ref, watch, onMounted } from "vue";
-import { ArrowLeft, ArrowRight, Close } from "@element-plus/icons-vue";
 import { interfaceDag } from "../RunMonitor/workflowInterface";
 import { useStore } from "vuex";
 import { useRouter, useRoute } from "vue-router";
@@ -21,12 +20,17 @@ import IconPDF from "../../icons/IconPDF.vue";
 import WorkflowThumbnail from "../WorkflowGraph/WorkflowThumbnail.vue";
 import RunWizardDialog from "../RunMonitor/RunWizardDialog.vue";
 import { ioSummary, usageLine, cardText } from "./workflowSummary";
-import { domainColors, domainOfTag, fieldOfTag } from "../Applications/appDomains";
-import { activeFilters, applyFilters, domainOptions, FACET_DEFAULTS, fieldOptions, inheritedTags, libraryWorkflows, outputOptions, sortWorkflows, SORTS } from "./galleryFilter";
+import { activeFilters, applyFilters, domainOptions, FACET_DEFAULTS, INPUT_OPTIONS, fieldOptions, inheritedTags, libraryWorkflows, outputOptions, sortWorkflows, SORTS } from "./galleryFilter";
 import { isNotebookWorkflow } from "../RunMonitor/notebookHelpers";
 import { exampleLabel, exampleVersion, PDF_URL_FRESH_MS } from "./runExamples";
 import SampleOutputViewer from "./SampleOutputViewer.vue";
-import LibraryFilters from "./LibraryFilters.vue";
+import FacetLayout from "../Facets/FacetLayout.vue";
+import FacetSection from "../Facets/FacetSection.vue";
+import FacetOptions from "../Facets/FacetOptions.vue";
+import FacetRadios from "../Facets/FacetRadios.vue";
+import FacetCheck from "../Facets/FacetCheck.vue";
+import CardTags from "../Facets/CardTags.vue";
+import { domainFacetOptions, fieldFacetOptions } from "../Facets/facets";
 
 defineProps({
   // Inside the Workflows tab's Library, whose bar has the New Workflow button.
@@ -112,34 +116,17 @@ const activeChips = computed(() =>
 const clearFacet = (key) => (facetRefs[key].value = FACET_DEFAULTS[key]);
 const clearFacets = () => Object.keys(facetRefs).forEach(clearFacet);
 
-// The filter panel folds to a rail, as the builder's do; the choice is kept
-// in this browser. On a phone it's a drawer, opened by Filters.
-const PANEL_KEY = "pennsieve.library.filtersPanel";
-const storedPanel = () => {
-  try {
-    return localStorage.getItem(PANEL_KEY) !== "folded";
-  } catch {
-    return true;
-  }
-};
-const panelOpen = ref(storedPanel());
-const togglePanel = () => {
-  panelOpen.value = !panelOpen.value;
-  try {
-    localStorage.setItem(PANEL_KEY, panelOpen.value ? "open" : "folded");
-  } catch {
-    // not kept
-  }
-};
-const drawerOpen = ref(false);
-// A card's tag as the panel lists it: a domain's by its name after a dot in
-// its colour, a field's or any other by its name in grey.
-const cardTag = (tag) => {
-  const d = domainOfTag(tag);
-  if (d) return { text: d.label, dot: { background: domainColors(d).accent } };
-  const f = fieldOfTag(tag);
-  return { text: f ? f.label : tag, dot: null };
-};
+// The panel's Domain and Field, one at a time (ticking a chosen one clears
+// it); Show archived lists all, unticked Active.
+const domainFacets = computed(() => domainFacetOptions(domainChips.value));
+const fieldFacets = computed(() => fieldFacetOptions(fieldChips.value));
+const toggleDomain = (key) => (domainFilter.value = domainFilter.value === key ? "any" : key);
+const toggleField = (key) => (fieldFilter.value = fieldFilter.value === key ? "any" : key);
+const showArchived = computed({
+  get: () => statusFilter.value !== FACET_DEFAULTS.status,
+  set: (on) => (statusFilter.value = on ? "all" : FACET_DEFAULTS.status),
+});
+
 const filtersSet = computed(
   () =>
     !!searchQuery.value.trim() ||
@@ -387,223 +374,165 @@ onMounted(async () => {
       </div>
     </div>
 
-    <!-- Workflows Section: the filters on the left (a rail when folded, a
-         drawer on a phone), the search, chips and cards on the right -->
-    <div class="workflows-section library-layout">
-      <button
-        v-if="!panelOpen"
-        type="button"
-        class="panel-rail library-rail"
-        title="Show the filters"
-        aria-label="Show the filters"
-        @click="togglePanel"
-      >
-        <el-icon><ArrowRight /></el-icon>
-        <span class="panel-rail-label">Filters</span>
-        <span v-if="activeChips.length" class="rail-count">{{ activeChips.length }}</span>
-      </button>
-      <aside v-else class="library-panel" aria-label="Filters">
-        <LibraryFilters
-          v-model:scope="scopeFilter"
-          v-model:domain="domainFilter"
-          v-model:field="fieldFilter"
-          v-model:input="inputFilter"
-          v-model:output="outputFilter"
-          v-model:status="statusFilter"
-          v-model:include-notebooks="includeNotebooks"
-          :notebooks-option="embedded"
-          :scope-options="scopeOptions"
-          :domains="domainChips"
-          :fields="fieldChips"
-          :outputs="outputChoices"
-          :any-set="activeChips.length > 0"
-          @clear-all="clearFacets"
-        >
-          <template #action>
-            <button type="button" class="panel-fold" title="Fold the filters" aria-label="Fold the filters" @click="togglePanel">
-              <el-icon><ArrowLeft /></el-icon>
-            </button>
-          </template>
-        </LibraryFilters>
-      </aside>
+    <!-- The filters on the left (a rail when folded, a drawer on a phone),
+         the search and Sort in one row, the chips and cards -->
+    <FacetLayout
+      class="workflows-section"
+      storage-key="pennsieve.library.filtersPanel"
+      :chips="activeChips"
+      @remove="clearFacet"
+      @clear-all="clearFacets"
+    >
+      <template #filters>
+        <FacetSection title="Scope">
+          <FacetRadios v-model="scopeFilter" :options="scopeOptions" label="Scope" />
+          <FacetCheck v-if="embedded" v-model="includeNotebooks" label="Include notebooks" />
+          <FacetCheck v-model="showArchived" label="Show archived" />
+        </FacetSection>
+        <FacetSection v-if="domainFacets.length" title="Domain" :clearable="domainFilter !== FACET_DEFAULTS.domain" @clear="clearFacet('domain')">
+          <FacetOptions :options="domainFacets" :selected="domainFilter" @toggle="toggleDomain" />
+        </FacetSection>
+        <FacetSection v-if="fieldFacets.length" title="Field" :clearable="fieldFilter !== FACET_DEFAULTS.field" @clear="clearFacet('field')">
+          <FacetOptions :options="fieldFacets" :selected="fieldFilter" @toggle="toggleField" />
+        </FacetSection>
+        <FacetSection title="Input" :clearable="inputFilter !== FACET_DEFAULTS.input" @clear="clearFacet('input')">
+          <el-select v-model="inputFilter" size="small" aria-label="Input">
+            <el-option label="Any input" value="any" />
+            <el-option v-for="o in INPUT_OPTIONS" :key="o.value" :label="o.label" :value="o.value" />
+          </el-select>
+        </FacetSection>
+        <FacetSection title="Output" :clearable="outputFilter !== FACET_DEFAULTS.output" @clear="clearFacet('output')">
+          <el-select v-model="outputFilter" size="small" aria-label="Output">
+            <el-option label="Any output" value="any" />
+            <el-option v-for="o in outputChoices" :key="o.value" :label="o.label" :value="o.value" />
+          </el-select>
+        </FacetSection>
+      </template>
 
-      <el-drawer v-model="drawerOpen" direction="ltr" size="280px" :with-header="false" class="library-drawer">
-        <LibraryFilters
-          v-model:scope="scopeFilter"
-          v-model:domain="domainFilter"
-          v-model:field="fieldFilter"
-          v-model:input="inputFilter"
-          v-model:output="outputFilter"
-          v-model:status="statusFilter"
-          v-model:include-notebooks="includeNotebooks"
-          :notebooks-option="embedded"
-          :scope-options="scopeOptions"
-          :domains="domainChips"
-          :fields="fieldChips"
-          :outputs="outputChoices"
-          :any-set="activeChips.length > 0"
-          @clear-all="clearFacets"
-        >
-          <template #action>
-            <button type="button" class="panel-fold" title="Close the filters" aria-label="Close the filters" @click="drawerOpen = false">
-              <el-icon><Close /></el-icon>
-            </button>
-          </template>
-        </LibraryFilters>
-      </el-drawer>
+      <template #toolbar>
+        <el-input
+          v-model="searchQuery"
+          placeholder="Search by name, tag, app, input or output…"
+          clearable
+          class="toolbar-search"
+        />
+        <label class="sort-control toolbar-sort">
+          Sort
+          <el-select v-model="sortBy" size="small" class="sort-select">
+            <el-option v-for="o in SORTS" :key="o.value" :label="o.label" :value="o.value" />
+          </el-select>
+        </label>
+      </template>
 
-      <div class="library-main">
-        <!-- The search fills the row up to Sort; on a phone, Filters first -->
-        <div class="list-toolbar">
-          <!-- The Workflows tab's Library/Live/Builder switch, on this row -->
-          <div v-if="$slots['view-switch']" class="toolbar-switch">
-            <slot name="view-switch" />
+      <p v-if="scopeFilter === 'pennsieve'" class="scope-hint">
+        Workflows Pennsieve has reviewed and validated. They can be run from any workspace.
+      </p>
+      <p v-else-if="isPublicScope" class="scope-hint">
+        Public workflows published across all workspaces. They can be run from
+        any workspace; only the creator can edit or unpublish them.
+      </p>
+
+      <div v-if="filteredWorkflows.length > 0" class="workflows-grid">
+        <!-- A card: the graph on the left; what it is, does and runs on the
+             right; Open and Run. -->
+        <div
+          v-for="wf in paginatedWorkflows"
+          :key="wf.uuid"
+          class="wf-card"
+          :class="{ 'is-inactive': !wf.isActive }"
+          role="link"
+          tabindex="0"
+          @click="goToDetail(wf)"
+          @keydown.enter="goToDetail(wf)"
+        >
+          <div class="wf-thumb">
+            <WorkflowThumbnail :dag="interfaceDag(wf)" :aspect="1" />
           </div>
-          <button type="button" class="filters-button" @click="drawerOpen = true">
-            Filters<span v-if="activeChips.length" class="filters-count">{{ activeChips.length }}</span>
-          </button>
-          <el-input
-            v-model="searchQuery"
-            placeholder="Search by name, tag, app, input or output…"
-            clearable
-            class="workflows-search-input toolbar-search"
-          />
-          <label class="sort-control toolbar-sort">
-            Sort
-            <el-select v-model="sortBy" size="small" class="sort-select">
-              <el-option v-for="o in SORTS" :key="o.value" :label="o.label" :value="o.value" />
-            </el-select>
-          </label>
-        </div>
-
-        <div v-if="activeChips.length" class="active-filters" role="group" aria-label="Active filters">
-          <span v-for="chip in activeChips" :key="chip.key" class="active-chip">
-            {{ chip.label }}
-            <button type="button" class="active-chip-remove" :aria-label="`Remove filter ${chip.label}`" @click="clearFacet(chip.key)">
-              <el-icon><Close /></el-icon>
-            </button>
-          </span>
-          <button type="button" class="clear-filters" @click="clearFacets">Clear all</button>
-        </div>
-
-        <p v-if="scopeFilter === 'pennsieve'" class="scope-hint">
-          Workflows Pennsieve has reviewed and validated. They can be run from any workspace.
-        </p>
-        <p v-else-if="isPublicScope" class="scope-hint">
-          Public workflows published across all workspaces. They can be run from
-          any workspace; only the creator can edit or unpublish them.
-        </p>
-
-        <div v-if="filteredWorkflows.length > 0" class="workflows-grid">
-          <!-- A card: the graph on the left; what it is, does and runs on the
-               right; Open and Run. -->
-          <div
-            v-for="wf in paginatedWorkflows"
-            :key="wf.uuid"
-            class="wf-card"
-            :class="{ 'is-inactive': !wf.isActive }"
-            role="link"
-            tabindex="0"
-            @click="goToDetail(wf)"
-            @keydown.enter="goToDetail(wf)"
-          >
-            <div class="wf-thumb">
-              <WorkflowThumbnail :dag="interfaceDag(wf)" :aspect="1" />
+          <div class="wf-body">
+            <div class="wf-title">
+              <span class="wf-name">{{ wf.name }}</span>
+              <el-tooltip
+                v-if="wf.official"
+                content="Reviewed and validated by Pennsieve."
+                placement="top"
+              >
+                <span class="official-mark" @click.stop>
+                  <IconPennsieveMark :width="14" :height="14" color="currentColor" />
+                </span>
+              </el-tooltip>
+              <span v-if="!wf.isActive" class="wf-badge">Inactive</span>
+              <span v-else-if="wf.visibility === 'public' && !wf.official" class="wf-badge">Public</span>
             </div>
-            <div class="wf-body">
-              <div class="wf-title">
-                <span class="wf-name">{{ wf.name }}</span>
+            <p class="wf-description">{{ cardText(wf) || "No description." }}</p>
+            <div class="wf-io">{{ ioSummary(wf, targetTypes) }}</div>
+            <!-- Its tags, a few, as the filter panel lists them (a domain
+                 with its coloured dot, a field in grey); the steps are found
+                 by search and seen on the card's graph. Without tags of its
+                 own, what its apps are for, in italics: why a filter finds
+                 it, and that it can be given its own. -->
+            <CardTags v-if="wf.tags?.length" :tags="wf.tags" />
+            <CardTags
+              v-else-if="inheritedTags(wf, applications).length"
+              :tags="inheritedTags(wf, applications)"
+              inherited
+              title="From its apps. Edit the workflow to give it tags of its own."
+            />
+            <div class="wf-foot">
+              <span class="wf-usage">
+                <span class="last-run-dot" :class="lastRunInfo(wf).statusKey" />
+                <span class="wf-usage-text">{{ usageLine(wf, formatRelativeTime) }}</span>
+              </span>
+              <span class="wf-actions" @click.stop>
+                <button type="button" class="wf-action" @click="goToDetail(wf)">Open</button>
                 <el-tooltip
-                  v-if="wf.official"
-                  content="Reviewed and validated by Pennsieve."
+                  v-if="examples[wf.uuid]"
+                  :content="`${cardExampleLabel(examples[wf.uuid])}: a PDF summary of a run`"
                   placement="top"
                 >
-                  <span class="official-mark" @click.stop>
-                    <IconPennsieveMark :width="14" :height="14" color="currentColor" />
-                  </span>
-                </el-tooltip>
-                <span v-if="!wf.isActive" class="wf-badge">Inactive</span>
-                <span v-else-if="wf.visibility === 'public' && !wf.official" class="wf-badge">Public</span>
-              </div>
-              <p class="wf-description">{{ cardText(wf) || "No description." }}</p>
-              <div class="wf-io">{{ ioSummary(wf, targetTypes) }}</div>
-              <!-- Its tags, a few, as the filter panel lists them (a domain
-                   with its coloured dot, a field in grey); the steps are found
-                   by search and seen on the card's graph. Without tags of its
-                   own, what its apps are for, in italics: why a filter finds
-                   it, and that it can be given its own. -->
-              <div v-if="wf.tags?.length" class="wf-tags">
-                <span v-for="t in wf.tags.slice(0, 4)" :key="t" class="wf-tag" :class="{ 'wf-tag--domain': cardTag(t).dot }">
-                  <span v-if="cardTag(t).dot" class="wf-tag-dot" :style="cardTag(t).dot" />{{ cardTag(t).text }}
-                </span>
-                <span v-if="wf.tags.length > 4" class="wf-tag">+{{ wf.tags.length - 4 }}</span>
-              </div>
-              <div
-                v-else-if="inheritedTags(wf, applications).length"
-                class="wf-tags wf-tags--inherited"
-                title="From its apps. Edit the workflow to give it tags of its own."
-              >
-                <span v-for="t in inheritedTags(wf, applications).slice(0, 4)" :key="t" class="wf-tag" :class="{ 'wf-tag--domain': cardTag(t).dot }">
-                  <span v-if="cardTag(t).dot" class="wf-tag-dot" :style="cardTag(t).dot" />{{ cardTag(t).text }}
-                </span>
-              </div>
-              <div class="wf-foot">
-                <span class="wf-usage">
-                  <span class="last-run-dot" :class="lastRunInfo(wf).statusKey" />
-                  <span class="wf-usage-text">{{ usageLine(wf, formatRelativeTime) }}</span>
-                </span>
-                <span class="wf-actions" @click.stop>
-                  <button type="button" class="wf-action" @click="goToDetail(wf)">Open</button>
-                  <el-tooltip
-                    v-if="examples[wf.uuid]"
-                    :content="`${cardExampleLabel(examples[wf.uuid])}: a PDF summary of a run`"
-                    placement="top"
+                  <button
+                    type="button"
+                    class="wf-action wf-action--icon"
+                    :aria-label="`${exampleLabel(examples[wf.uuid])}: a PDF summary of a run (opens in a new tab)`"
+                    @click="openExample(wf)"
                   >
-                    <button
-                      type="button"
-                      class="wf-action wf-action--icon"
-                      :aria-label="`${exampleLabel(examples[wf.uuid])}: a PDF summary of a run (opens in a new tab)`"
-                      @click="openExample(wf)"
-                    >
-                      <IconPDF :width="16" :height="16" color="currentColor" />
-                    </button>
-                  </el-tooltip>
-                  <button v-if="wf.isActive" type="button" class="wf-action wf-action--run" @click="runWorkflow(wf)">
-                    ▶ Run
+                    <IconPDF :width="16" :height="16" color="currentColor" />
                   </button>
-                </span>
-              </div>
+                </el-tooltip>
+                <button v-if="wf.isActive" type="button" class="wf-action wf-action--run" @click="runWorkflow(wf)">
+                  ▶ Run
+                </button>
+              </span>
             </div>
           </div>
         </div>
-
-        <div v-else class="empty-state">
-          <IconAnalysis :width="48" :height="48" color="#9ca3af" />
-          <span v-if="isLoadingAll">Loading workflows...</span>
-          <template v-else-if="workflows.length === 0">
-            <span>No workflows yet</span>
-            <button type="button" class="clear-filters" @click="router.replace({ query: { ...route.query, view: 'builder' } })">Build one in the Builder</button>
-          </template>
-          <span v-else-if="searchQuery">
-            No workflows match
-            <strong>"{{ searchQuery }}"</strong>
-          </span>
-          <span v-else>No workflows match your filters</span>
-          <button v-if="filtersSet" type="button" class="clear-filters" @click="clearFilters">Clear search and filters</button>
-        </div>
-
-        <el-pagination
-          v-if="filteredWorkflows.length > 0"
-          class="workflows-pagination"
-          :page-size="pageSize"
-          :pager-count="5"
-          :current-page="currentPage"
-          layout="prev, pager, next"
-          :total="filteredWorkflows.length"
-          @current-change="onPageChange"
-        />
       </div>
-    </div>
+
+      <div v-else class="empty-state">
+        <IconAnalysis :width="48" :height="48" color="#9ca3af" />
+        <span v-if="isLoadingAll">Loading workflows...</span>
+        <template v-else-if="workflows.length === 0">
+          <span>No workflows yet</span>
+          <button type="button" class="clear-filters" @click="router.replace({ query: { ...route.query, view: 'builder' } })">Build one in the Builder</button>
+        </template>
+        <span v-else-if="searchQuery">
+          No workflows match
+          <strong>"{{ searchQuery }}"</strong>
+        </span>
+        <span v-else>No workflows match your filters</span>
+        <button v-if="filtersSet" type="button" class="clear-filters" @click="clearFilters">Clear search and filters</button>
+      </div>
+
+      <el-pagination
+        v-if="filteredWorkflows.length > 0"
+        class="workflows-pagination"
+        :page-size="pageSize"
+        :pager-count="5"
+        :current-page="currentPage"
+        layout="prev, pager, next"
+        :total="filteredWorkflows.length"
+        @current-change="onPageChange"
+      />
+    </FacetLayout>
     <RunWizardDialog ref="runDialog" />
     <SampleOutputViewer
       v-model="viewer.open"
@@ -617,18 +546,16 @@ onMounted(async () => {
 
 <style lang="scss" scoped>
 @use "../../../styles/theme";
-@use "../WorkflowBuilder/sidePanel";
 @use "../../../styles/element/input";
 
-/* Lined up with the toolbar above and the Analysis tabs (32px). */
-/* No padding on the left: the filter panel (or its rail) sits against the
-   page's edge, as the builder's do; the list keeps 32px on the right. */
+/* No padding of its own: the filter panel (or its rail) sits against the
+   page's edges; FacetLayout pads the list (20px/32px, as the Analysis tabs). */
 .workflows-container {
-  padding: 20px 32px 20px 0;
+  min-height: 100%;
 }
 
 .info-section {
-  margin: 0 0 32px 32px;
+  margin: 20px 32px 12px;
 }
 
 .info-card {
@@ -655,9 +582,6 @@ onMounted(async () => {
   }
 }
 
-.workflows-section {
-  margin-bottom: 48px;
-}
 
 .workflows-section-header {
   display: flex;
@@ -675,87 +599,10 @@ onMounted(async () => {
   }
 }
 
-/* Filters on the left, as the builder's side panels: 232px open, a 30px
-   rail folded (_sidePanel.scss); the list takes the rest. */
-.library-layout {
-  display: flex;
-  align-items: stretch;
-  gap: 24px;
-  min-width: 0;
-}
-.library-panel {
-  flex: 0 0 232px;
-  width: 232px;
-  min-width: 0;
-  box-sizing: border-box;
-  /* Against the page's left and top edges, its rule running the list's
-     height; its header still level with the search. */
-  margin: -20px 0 -20px;
-  padding: 20px 16px 12px;
-  border-right: 1px solid theme.$gray_2;
-}
-/* The rail starts level with the search, its arrow on the search's middle
-   (the panel's header row is as tall as the search). */
-.library-rail {
-  align-self: stretch;
-  margin: -20px 0 -20px;
-  padding-top: 33px;
-}
-.rail-count,
-.filters-count {
-  min-width: 16px;
-  padding: 0 4px;
-  border-radius: 8px;
-  background: theme.$purple_3;
-  color: theme.$white;
-  font-size: 10px;
-  font-weight: 600;
-  line-height: 16px;
-  text-align: center;
-}
-/* Shrinks with the panel open (min-width: 0); the cards size to it, not
-   to the viewport (container). */
-.library-main {
-  flex: 1 1 0;
-  min-width: 0;
-  container-type: inline-size;
-}
-
-/* The search, up to Sort. */
-.list-toolbar {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  margin-bottom: 16px;
-}
+/* The search fills the toolbar's row up to Sort. */
 .toolbar-search {
   flex: 1;
   min-width: 0;
-}
-.toolbar-switch {
-  display: flex;
-  flex-shrink: 0;
-}
-/* Filters opens the drawer, on a phone only. */
-.filters-button {
-  display: none;
-  align-items: center;
-  gap: 6px;
-  flex-shrink: 0;
-  height: 32px;
-  padding: 0 12px;
-  border: 1px solid theme.$gray_3;
-  border-radius: 4px;
-  background: theme.$white;
-  font: inherit;
-  font-size: 13px;
-  color: theme.$gray_6;
-  cursor: pointer;
-
-  &:hover {
-    border-color: theme.$purple_1;
-    color: theme.$purple_3;
-  }
 }
 .sort-control {
   display: flex;
@@ -768,31 +615,9 @@ onMounted(async () => {
 .sort-select {
   width: 160px;
 }
-/* A phone: the panel is a drawer; the list fills the width. */
 @media (max-width: 767px) {
-  .workflows-container {
-    padding: 16px;
-  }
   .info-section {
-    margin-left: 0;
-  }
-  .library-layout {
-    display: block;
-  }
-  .library-panel,
-  .library-rail {
-    display: none;
-  }
-  .filters-button {
-    display: inline-flex;
-  }
-  .list-toolbar {
-    flex-wrap: wrap;
-    gap: 8px;
-  }
-  /* The switch on its own line, then Filters, the search and Sort. */
-  .toolbar-switch {
-    flex-basis: 100%;
+    margin: 16px 16px 0;
   }
   /* The select alone says what it sorts by. */
   .toolbar-sort {
@@ -813,45 +638,6 @@ onMounted(async () => {
 
   &:hover {
     color: theme.$link-color-hover;
-  }
-}
-
-/* The facets set, each removable; nothing when none is. */
-.active-filters {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px;
-  margin: -4px 0 16px;
-}
-.active-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  max-width: 100%;
-  padding: 2px 4px 2px 10px;
-  border: 1px solid theme.$gray_3;
-  border-radius: 3px;
-  background: theme.$gray_1;
-  font-size: 12px;
-  color: theme.$gray_6;
-}
-.active-chip-remove {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 18px;
-  height: 18px;
-  padding: 0;
-  border: none;
-  border-radius: 3px;
-  background: none;
-  color: theme.$gray_5;
-  cursor: pointer;
-
-  &:hover {
-    background: theme.$gray_2;
-    color: theme.$purple_3;
   }
 }
 
@@ -960,39 +746,6 @@ $card-height: 172px;
   white-space: nowrap;
   font-size: 12px;
   color: theme.$gray_6;
-}
-/* The workflow's tags, a few, on one line, as the filter panel lists them:
-   a domain's dot in its colour, then its name; the rest are found by
-   search. */
-.wf-tags {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  overflow: hidden;
-  font-size: 12px;
-  line-height: 18px;
-  color: theme.$gray_5;
-}
-.wf-tag {
-  display: inline-flex;
-  flex-shrink: 0;
-  align-items: center;
-  gap: 5px;
-  white-space: nowrap;
-}
-.wf-tag-dot {
-  width: 7px;
-  height: 7px;
-  flex-shrink: 0;
-  border-radius: 50%;
-}
-/* A domain's name as the panel's, darker than a field's. */
-.wf-tag--domain {
-  color: theme.$gray_6;
-}
-/* Inherited from the apps: in italics. */
-.wf-tags--inherited {
-  font-style: italic;
 }
 .wf-foot {
   display: flex;
