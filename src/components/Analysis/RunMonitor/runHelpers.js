@@ -270,6 +270,8 @@ export const nodeMetricRows = (nm) => {
   } else if (memGiven) {
     push("Memory", `${Math.round(memGiven).toLocaleString()} MiB`);
   }
+  // The node's EBS volume; omitted when the step had none
+  if (nm.volumeGiB > 0) push("Volume (EBS)", `${Math.round(nm.volumeGiB).toLocaleString()} GiB`);
   if (nm.imageUri) push("Image", shortImage(nm.imageUri), { title: nm.imageUri });
   // The cost last: it is the receipt's total line.
   if (nm.estimatedCost != null) push("Estimated cost", formatCost(nm.estimatedCost), { cost: true });

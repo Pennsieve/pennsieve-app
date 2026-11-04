@@ -57,6 +57,13 @@ describe("nodeMetricRows", () => {
     expect(rows.find((r) => r.label === "Image").title).toContain("941165240011");
     expect(rows.some((r) => r.note)).toBe(false);
     expect(Object.keys(byLabel)).not.toContain("Memory");
+    expect(Object.keys(byLabel)).not.toContain("Volume (EBS)");
+  });
+
+  it("shows a step's EBS volume when it had one", () => {
+    const rows = nodeMetricRows({ computeType: "standard", cpuUnits: 1024, memoryMiB: 2048, volumeGiB: 100, estimatedCost: 0.01 });
+    const byLabel = Object.fromEntries(rows.filter((r) => r.label).map((r) => [r.label, r.value]));
+    expect(byLabel["Volume (EBS)"]).toBe("100 GiB");
   });
 
   it("says when a short step has no usage sample, and gives a Lambda step its report", () => {

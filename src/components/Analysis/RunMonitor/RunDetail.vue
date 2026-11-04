@@ -4091,6 +4091,10 @@ onUnmounted(() => {
               <span>Memory GB Hours</span>
               <span>{{ runMetrics.costEstimate.ecs.memoryGBHours?.toFixed(4) }}</span>
             </div>
+            <div v-if="runMetrics.costEstimate.ecs.volumeGBHours" class="receipt-row">
+              <span>Volume storage (EBS) GB Hours</span>
+              <span>{{ runMetrics.costEstimate.ecs.volumeGBHours.toFixed(4) }}</span>
+            </div>
             <div class="receipt-row receipt-row-cost">
               <span>Subtotal</span>
               <span>{{ formatCost(runMetrics.costEstimate.ecs.estimatedCost) }}</span>

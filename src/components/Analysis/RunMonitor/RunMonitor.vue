@@ -667,10 +667,11 @@ const parseEventData = (data) => {
 const onRunStatusUpdate = async (raw) => {
   const data = parseEventData(raw);
 
-  // Update the run in the instances list
-  store.commit("analysisModule/UPDATE_RUN_STATUS", {
+  // Update the run in the instances list (refetches it for an unknown run)
+  store.dispatch("analysisModule/applyRunStatusEvent", {
     runId: data.runId,
     status: data.status,
+    fetchParams: getRunFilterParams(),
   });
 
   // If this is the currently selected run, update the detailed view
@@ -1279,7 +1280,7 @@ const executeWorkflow = async () => {
     runNameError.value = "";
 
     // Set a temporary placeholder so the canvas doesn't show the dashboard
-    const runId = newRun?.uuid || newRun?.id || newRun?.runId;
+    const runId = newRun?.executionRunId || newRun?.uuid || newRun?.id || newRun?.runId;
     selectedRun.value = newRun || { uuid: runId, status: "STARTED" };
     nodes.value = [];
     edges.value = [];
@@ -2965,6 +2966,10 @@ onUnmounted(() => {
             <div class="receipt-row">
               <span>Memory GB Hours</span>
               <span>{{ runMetrics.costEstimate.ecs.memoryGBHours?.toFixed(4) }}</span>
+            </div>
+            <div v-if="runMetrics.costEstimate.ecs.volumeGBHours" class="receipt-row">
+              <span>Volume storage (EBS) GB Hours</span>
+              <span>{{ runMetrics.costEstimate.ecs.volumeGBHours.toFixed(4) }}</span>
             </div>
             <div class="receipt-row receipt-row-cost">
               <span>Subtotal</span>
