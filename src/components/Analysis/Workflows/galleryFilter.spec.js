@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { applyFilters, domainOptions, fieldOptions, inheritedTags, libraryWorkflows, workflowDomains, workflowFields, matchesSearch, outputOptions, sortWorkflows, workflowsView } from "./galleryFilter";
+import { activeFilters, applyFilters, domainOptions, FACET_DEFAULTS, fieldOptions, inheritedTags, libraryWorkflows, workflowDomains, workflowFields, matchesSearch, outputOptions, sortWorkflows, workflowsView } from "./galleryFilter";
 
 const spikes = {
   name: "EEG spikes",
@@ -205,3 +205,36 @@ describe("workflowsView", () => {
   });
 });
 
+
+describe("activeFilters", () => {
+  const domains = [{ domain: { key: "genomics", label: "Genomics" }, count: 8 }];
+  const fields = [{ field: { key: "neuroscience", label: "Neuroscience" }, count: 6 }];
+  const outputs = [{ value: "download", label: "Download" }];
+
+  it("is empty with every facet at its default", () => {
+    expect(activeFilters(FACET_DEFAULTS, { domains, fields, outputs })).toEqual([]);
+    expect(activeFilters({}, { domains, fields, outputs })).toEqual([]);
+  });
+
+  it("names each facet set, in the panel's order", () => {
+    const state = { domain: "genomics", field: "neuroscience", input: "dataset", output: "download", status: "archived" };
+    expect(activeFilters(state, { domains, fields, outputs })).toEqual([
+      { key: "domain", label: "Genomics" },
+      { key: "field", label: "Neuroscience" },
+      { key: "input", label: "Takes a dataset" },
+      { key: "output", label: "Output: Download" },
+      { key: "status", label: "Status: Archived" },
+    ]);
+  });
+
+  it("names a value no longer offered by its key", () => {
+    expect(activeFilters({ ...FACET_DEFAULTS, domain: "imaging", output: "s3" }, { domains, fields, outputs })).toEqual([
+      { key: "domain", label: "imaging" },
+      { key: "output", label: "Output: s3" },
+    ]);
+  });
+
+  it("counts the status only away from Active", () => {
+    expect(activeFilters({ ...FACET_DEFAULTS, status: "all" })).toEqual([{ key: "status", label: "Status: All" }]);
+  });
+});

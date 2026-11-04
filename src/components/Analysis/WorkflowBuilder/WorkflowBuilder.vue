@@ -3382,7 +3382,7 @@ const openNodeSettings = (id) => {
       <div v-else-if="!landing" ref="sidebarRef" class="applications-sidebar">
         <div class="insp-top">
           <span>Details</span>
-          <button type="button" class="insp-fold" title="Fold the details" aria-label="Fold the details" @click="togglePanel('inspector')">
+          <button type="button" class="panel-fold" title="Fold the details" aria-label="Fold the details" @click="togglePanel('inspector')">
             <el-icon><ArrowRight /></el-icon>
           </button>
         </div>
@@ -4392,6 +4392,7 @@ const openNodeSettings = (id) => {
 
 <style lang="scss" scoped>
 @use "../../../styles/theme";
+@use "sidePanel";
 
 .workflow-builder {
   flex: 1;
@@ -4567,36 +4568,7 @@ const openNodeSettings = (id) => {
   overflow: hidden;
 }
 
-/* Folding the side panels: a rail to open one, a button to fold it. */
-.panel-rail {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 10px;
-  width: 30px;
-  flex-shrink: 0;
-  padding: 12px 0;
-  border: none;
-  border-right: 1px solid theme.$gray_2;
-  background: theme.$white;
-  color: theme.$gray_5;
-  cursor: pointer;
-
-  &:hover {
-    background: theme.$gray_1;
-    color: theme.$purple_3;
-  }
-}
-.panel-rail--right {
-  border-right: none;
-  border-left: 1px solid theme.$gray_2;
-}
-.panel-rail-label {
-  writing-mode: vertical-rl;
-  transform: rotate(180deg);
-  font-size: 12px;
-  font-weight: 500;
-}
+/* Folding the side panels: the rail and fold button are in _sidePanel.scss. */
 .insp-top {
   display: flex;
   align-items: center;
@@ -4607,24 +4579,6 @@ const openNodeSettings = (id) => {
   letter-spacing: 0.04em;
   text-transform: uppercase;
   color: theme.$gray_4;
-}
-.insp-fold {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 24px;
-  height: 24px;
-  padding: 0;
-  border: none;
-  border-radius: 3px;
-  background: none;
-  color: theme.$gray_5;
-  cursor: pointer;
-
-  &:hover {
-    background: theme.$gray_0;
-    color: theme.$purple_3;
-  }
 }
 .icon-btn {
   display: flex;

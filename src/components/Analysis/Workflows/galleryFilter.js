@@ -105,6 +105,46 @@ export function applyFilters(list, { query, input = "any", output = "any", domai
   );
 }
 
+// The Library's facets: what each takes, and its value when nothing is chosen.
+export const INPUT_OPTIONS = [
+  { value: "dataset", label: "Takes a dataset" },
+  { value: "none", label: "No input" },
+];
+export const STATUS_OPTIONS = [
+  { value: "active", label: "Active" },
+  { value: "archived", label: "Archived" },
+  { value: "all", label: "All" },
+];
+export const FACET_DEFAULTS = { domain: "any", field: "any", input: "any", output: "any", status: "active" };
+
+// The facets set away from their defaults, as removable chips: { key, label }
+// in the panel's order (domain, field, input, output, status). The labels
+// come from the options shown (domainOptions, fieldOptions, outputOptions);
+// a value no longer offered (another scope's) shows by its key.
+export function activeFilters(state = {}, { domains = [], fields = [], outputs = [] } = {}) {
+  const set = (key) => state[key] !== undefined && state[key] !== FACET_DEFAULTS[key];
+  const chips = [];
+  if (set("domain")) {
+    const d = domains.find((o) => o.domain.key === state.domain);
+    chips.push({ key: "domain", label: d?.domain.label || state.domain });
+  }
+  if (set("field")) {
+    const f = fields.find((o) => o.field.key === state.field);
+    chips.push({ key: "field", label: f?.field.label || state.field });
+  }
+  if (set("input")) {
+    chips.push({ key: "input", label: INPUT_OPTIONS.find((o) => o.value === state.input)?.label || state.input });
+  }
+  if (set("output")) {
+    const o = outputs.find((x) => x.value === state.output);
+    chips.push({ key: "output", label: `Output: ${o?.label || state.output}` });
+  }
+  if (set("status")) {
+    chips.push({ key: "status", label: `Status: ${STATUS_OPTIONS.find((o) => o.value === state.status)?.label || state.status}` });
+  }
+  return chips;
+}
+
 const lastRun = (wf) =>
   Date.parse(wf?.lastRunAt || wf?.metrics?.lastRunAt || wf?.metrics?.lastRunCompletedAt || "") || 0;
 const created = (wf) => Date.parse(wf?.createdAt || "") || 0;
