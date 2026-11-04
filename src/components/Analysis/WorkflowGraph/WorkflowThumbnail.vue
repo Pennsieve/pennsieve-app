@@ -2,7 +2,7 @@
 // A workflow's graph in miniature (graphThumbnail.js): coloured boxes and
 // the lines between them, scaled to fit and centred.
 import { computed } from "vue";
-import { thumbnailLayout, KIND_COLOR, KIND_FILL } from "./graphThumbnail";
+import { thumbnailLayout, edgePath, KIND_COLOR, KIND_FILL } from "./graphThumbnail";
 
 const props = defineProps({
   dag: { type: Array, default: () => [] },
@@ -24,13 +24,12 @@ const viewBox = computed(() => {
   else h = w / props.aspect;
   return `${(l.width - w) / 2} ${(l.height - h) / 2} ${w} ${h}`;
 });
-const path = (points) => points.map((p, i) => `${i ? "L" : "M"}${p.x},${p.y}`).join(" ");
 </script>
 
 <template>
   <svg class="wt" :viewBox="viewBox" preserveAspectRatio="xMidYMid meet" role="img" aria-label="The workflow's steps">
     <template v-if="layout">
-      <path v-for="e in layout.edges" :key="e.id" :d="path(e.points)" class="wt__edge" />
+      <path v-for="e in layout.edges" :key="e.id" :d="edgePath(e.points)" class="wt__edge" />
       <g v-for="n in layout.nodes" :key="n.id">
         <!-- A step: a card with its strip; an input or output: a pill -->
         <template v-if="n.kind === 'processor'">
