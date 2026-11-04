@@ -31,7 +31,8 @@ import {
   runDisplayName,
   getUserName as getUserNameFn,
 } from "./runHelpers";
-import { isNotebookWorkflow, notebookGpu, runOnGpu, runNodeId, gpuMarkTitle } from "./notebookHelpers";
+import { isNotebookWorkflow, notebookGpu, runOnGpu, runNodeId, gpuMarkTitle, notebooksEmptyState, NOTEBOOK_RUNNING_STATUSES } from "./notebookHelpers";
+import drAzumi from "@/assets/images/illustrations/illo-dr_azumi_1.svg";
 import { nodeGpu } from "../ComputeNodes/computeNodeHelpers";
 import { useComputeResourcesStore } from "@/stores/computeResourcesStore";
 import RuntimeMark from "../WorkflowGraph/RuntimeMark.vue";
@@ -198,9 +199,7 @@ const activeNotebookRuns = computed(() =>
   notebookRuns.value
     .filter(
       (r) =>
-        r.status === "NOT_STARTED" ||
-        r.status === "STARTED" ||
-        r.status === "FINALIZING"
+        NOTEBOOK_RUNNING_STATUSES.includes(r.status)
     )
     .sort((a, b) => new Date(b.startedAt) - new Date(a.startedAt))
 );
@@ -218,6 +217,13 @@ const historyRuns = computed(() =>
 const nodeName = (id) =>
   (store.getters["analysisModule/computeNodes"] || []).find((n) => n.uuid === id)?.name || "";
 const hasMoreRuns = computed(() => !!store.getters["analysisModule/workflowInstancesCursor"]);
+// Live's empty states (notebooksEmptyState): "empty" (none at all) or
+// "idle" (a history, none running); null while loading or running.
+const emptyState = computed(() =>
+  notebooksEmptyState({ loading: isLoading.value, runs: notebookRuns.value, hasMore: hasMoreRuns.value })
+);
+// Why + New Notebook is off (no notebook workflow published here).
+const NO_KERNELS = "No notebook kernels are published yet.";
 const loadingMore = ref(false);
 async function loadMoreRuns() {
   loadingMore.value = true;
@@ -365,9 +371,11 @@ onBeforeUnmount(() => {
     <!-- Live: the notebooks running and the ones before; Environments: what
          they run with. The view is in the URL (?view=environments). -->
     <AnalysisViewBar v-model="view" :views="VIEWS">
-        <bf-button v-if="view === 'live'" :disabled="notebookWorkflows.length === 0" @click="openNewNotebook()">
-          + New Notebook
-        </bf-button>
+        <el-tooltip v-if="view === 'live'" :content="NO_KERNELS" :disabled="notebookWorkflows.length > 0" placement="bottom">
+          <span>
+            <bf-button :disabled="notebookWorkflows.length === 0" @click="openNewNotebook()">+ New Notebook</bf-button>
+          </span>
+        </el-tooltip>
         <bf-button v-else @click="openCreateEnvironment()">+ New Environment</bf-button>
     </AnalysisViewBar>
     <div class="notebooks-container">
@@ -381,7 +389,27 @@ onBeforeUnmount(() => {
         </p>
       </div>
 
+      <!-- No notebooks at all: what they're for, and a way to start one -->
+      <div v-else-if="emptyState === 'empty'" class="nb-empty">
+        <img class="nb-empty__illo" :src="drAzumi" alt="" />
+        <h3 class="nb-empty__title">Explore data in a notebook</h3>
+        <p class="nb-empty__text">Open a notebook on a dataset view, and add your own packages through environments.</p>
+        <el-tooltip :content="NO_KERNELS" :disabled="notebookWorkflows.length > 0" placement="bottom">
+          <span>
+            <bf-button :disabled="notebookWorkflows.length === 0" @click="openNewNotebook()">+ New Notebook</bf-button>
+          </span>
+        </el-tooltip>
+      </div>
+
       <template v-else>
+        <!-- A history, but nothing running: a slim note over it -->
+        <div v-if="emptyState === 'idle'" class="nb-idle">
+          <img class="nb-idle__illo" :src="drAzumi" alt="" />
+          <span class="nb-idle__text">No notebooks running right now</span>
+          <button type="button" class="nb-idle__link" :disabled="notebookWorkflows.length === 0" @click="openNewNotebook()">
+            + New Notebook
+          </button>
+        </div>
         <div v-if="activeNotebookRuns.length > 0" class="dashboard-section">
           <h3 class="dashboard-section-title">
             <span class="active-pulse" />
@@ -522,6 +550,81 @@ onBeforeUnmount(() => {
 
 <style scoped lang="scss">
 @use "../../../styles/theme";
+
+/* No notebooks at all: Dr. Azumi, what notebooks are for, + New Notebook. */
+.nb-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  max-width: 440px;
+  margin: 32px auto;
+  text-align: center;
+}
+.nb-empty__illo {
+  width: 180px;
+  max-width: 60%;
+  height: auto;
+  margin-bottom: 8px;
+}
+.nb-empty__title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: theme.$gray_6;
+}
+.nb-empty__text {
+  margin: 0 0 12px;
+  font-size: 14px;
+  line-height: 1.5;
+  color: theme.$gray_5;
+}
+/* A history, none running: one slim row (64px) over it. */
+.nb-idle {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  box-sizing: border-box;
+  min-height: 64px;
+  margin-bottom: 16px;
+  padding: 8px 16px 8px 8px;
+  border: 1px solid theme.$gray_2;
+  border-radius: 4px;
+  background: theme.$gray_1;
+}
+.nb-idle__illo {
+  width: 48px;
+  height: 48px;
+  object-fit: contain;
+}
+.nb-idle__text {
+  font-size: 14px;
+  color: theme.$gray_6;
+}
+.nb-idle__link {
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  font-size: 14px;
+  color: theme.$link-color;
+  cursor: pointer;
+
+  &:hover:not(:disabled) {
+    color: theme.$link-color-hover;
+  }
+  &:disabled {
+    color: theme.$gray_4;
+    cursor: default;
+  }
+}
+@media (max-width: 767px) {
+  .nb-idle {
+    justify-content: center;
+    text-align: center;
+  }
+}
 
 /* Lined up with the Analysis tabs above (32px). */
 .notebooks-container {

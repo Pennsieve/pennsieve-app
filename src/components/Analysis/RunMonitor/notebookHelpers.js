@@ -424,3 +424,17 @@ export function notebookProcessorConfigs(dag = [], { variantId = "", resources =
   }
   return configs;
 }
+
+// A notebook session that's running or on its way (as Live's "Active"
+// cards): queued (NOT_STARTED), running (STARTED), or ending (FINALIZING).
+export const NOTEBOOK_RUNNING_STATUSES = ["NOT_STARTED", "STARTED", "FINALIZING"];
+
+// Which empty state Live shows (the Notebooks tab):
+// - "empty": no notebooks at all (none loaded, and no more pages to load);
+// - "idle": notebooks in the history, but none running;
+// - null: still loading (no flash), or some are running.
+export function notebooksEmptyState({ loading = false, runs = [], hasMore = false } = {}) {
+  if (loading && !runs.length) return null;
+  if (!runs.length) return hasMore ? "idle" : "empty";
+  return runs.some((r) => NOTEBOOK_RUNNING_STATUSES.includes(r.status)) ? null : "idle";
+}

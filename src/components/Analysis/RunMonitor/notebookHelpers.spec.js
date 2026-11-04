@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
+  notebooksEmptyState,
   launchableKernels,
   offlineNote,
   kernelOutput,
@@ -433,5 +434,28 @@ describe("notebookProcessorConfigs", () => {
         resources: { cpu: "1024", memory: "2048", diskGiB: 200 },
       })
     ).toEqual([{ nodeId: "nb", variant: "cpu", cpu: "1024", memory: "2048", diskGiB: 200 }]);
+  });
+});
+
+describe("notebooksEmptyState", () => {
+  it("shows nothing while loading the first runs", () => {
+    expect(notebooksEmptyState({ loading: true, runs: [] })).toBe(null);
+  });
+  it("is empty with no notebooks at all", () => {
+    expect(notebooksEmptyState({ runs: [] })).toBe("empty");
+  });
+  it("is idle with no notebooks loaded yet but more pages to load", () => {
+    expect(notebooksEmptyState({ runs: [], hasMore: true })).toBe("idle");
+  });
+  it("is idle with a history but none running", () => {
+    expect(notebooksEmptyState({ runs: [{ status: "SUCCEEDED" }, { status: "FAILED" }] })).toBe("idle");
+  });
+  it("shows nothing while one is starting, running or ending", () => {
+    for (const status of ["NOT_STARTED", "STARTED", "FINALIZING"]) {
+      expect(notebooksEmptyState({ runs: [{ status: "SUCCEEDED" }, { status }] })).toBe(null);
+    }
+  });
+  it("keeps showing a state while refreshing a list it has", () => {
+    expect(notebooksEmptyState({ loading: true, runs: [{ status: "SUCCEEDED" }] })).toBe("idle");
   });
 });
