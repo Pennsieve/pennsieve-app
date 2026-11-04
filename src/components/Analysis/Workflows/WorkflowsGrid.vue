@@ -21,7 +21,7 @@ import IconPDF from "../../icons/IconPDF.vue";
 import WorkflowThumbnail from "../WorkflowGraph/WorkflowThumbnail.vue";
 import RunWizardDialog from "../RunMonitor/RunWizardDialog.vue";
 import { ioSummary, usageLine, cardText } from "./workflowSummary";
-import { domainColors, domainOfTag } from "../Applications/appDomains";
+import { domainColors, domainOfTag, fieldOfTag } from "../Applications/appDomains";
 import { activeFilters, applyFilters, domainOptions, FACET_DEFAULTS, fieldOptions, inheritedTags, libraryWorkflows, outputOptions, sortWorkflows, SORTS } from "./galleryFilter";
 import { isNotebookWorkflow } from "../RunMonitor/notebookHelpers";
 import { exampleLabel, exampleVersion, PDF_URL_FRESH_MS } from "./runExamples";
@@ -132,13 +132,13 @@ const togglePanel = () => {
   }
 };
 const drawerOpen = ref(false);
-// A card's tag in its domain's colours (an inherited one outlined, not
-// filled); neutral without a domain.
-const tagStyle = (tag, inherited = false) => {
+// A card's tag as the panel lists it: a domain's by its name after a dot in
+// its colour, a field's or any other by its name in grey.
+const cardTag = (tag) => {
   const d = domainOfTag(tag);
-  if (!d) return {};
-  const c = domainColors(d);
-  return inherited ? { borderColor: c.line, color: c.ink } : { background: c.bg, borderColor: c.line, color: c.ink };
+  if (d) return { text: d.label, dot: { background: domainColors(d).accent } };
+  const f = fieldOfTag(tag);
+  return { text: f ? f.label : tag, dot: null };
 };
 const filtersSet = computed(
   () =>
@@ -455,6 +455,10 @@ onMounted(async () => {
       <div class="library-main">
         <!-- The search fills the row up to Sort; on a phone, Filters first -->
         <div class="list-toolbar">
+          <!-- The Workflows tab's Library/Live/Builder switch, on this row -->
+          <div v-if="$slots['view-switch']" class="toolbar-switch">
+            <slot name="view-switch" />
+          </div>
           <button type="button" class="filters-button" @click="drawerOpen = true">
             Filters<span v-if="activeChips.length" class="filters-count">{{ activeChips.length }}</span>
           </button>
@@ -523,22 +527,25 @@ onMounted(async () => {
               </div>
               <p class="wf-description">{{ cardText(wf) || "No description." }}</p>
               <div class="wf-io">{{ ioSummary(wf, targetTypes) }}</div>
-              <!-- Its tags, a few, in their domains' colours; the steps are
-                   found by search and seen on the card's graph. Without tags
-                   of its own, what its apps are for, dashed: why a chip
-                   filter finds it, and that it can be given its own. -->
+              <!-- Its tags, a few, as the filter panel lists them (a domain
+                   with its coloured dot, a field in grey); the steps are found
+                   by search and seen on the card's graph. Without tags of its
+                   own, what its apps are for, in italics: why a filter finds
+                   it, and that it can be given its own. -->
               <div v-if="wf.tags?.length" class="wf-tags">
-                <span v-for="t in wf.tags.slice(0, 4)" :key="t" class="wf-tag" :style="tagStyle(t)">{{ t }}</span>
+                <span v-for="t in wf.tags.slice(0, 4)" :key="t" class="wf-tag" :class="{ 'wf-tag--domain': cardTag(t).dot }">
+                  <span v-if="cardTag(t).dot" class="wf-tag-dot" :style="cardTag(t).dot" />{{ cardTag(t).text }}
+                </span>
                 <span v-if="wf.tags.length > 4" class="wf-tag">+{{ wf.tags.length - 4 }}</span>
               </div>
-              <div v-else-if="inheritedTags(wf, applications).length" class="wf-tags">
-                <span
-                  v-for="t in inheritedTags(wf, applications).slice(0, 4)"
-                  :key="t"
-                  class="wf-tag wf-tag--inherited"
-                  :style="tagStyle(t, true)"
-                  title="From its apps. Edit the workflow to give it tags of its own."
-                >{{ t }}</span>
+              <div
+                v-else-if="inheritedTags(wf, applications).length"
+                class="wf-tags wf-tags--inherited"
+                title="From its apps. Edit the workflow to give it tags of its own."
+              >
+                <span v-for="t in inheritedTags(wf, applications).slice(0, 4)" :key="t" class="wf-tag" :class="{ 'wf-tag--domain': cardTag(t).dot }">
+                  <span v-if="cardTag(t).dot" class="wf-tag-dot" :style="cardTag(t).dot" />{{ cardTag(t).text }}
+                </span>
               </div>
               <div class="wf-foot">
                 <span class="wf-usage">
@@ -725,6 +732,10 @@ onMounted(async () => {
   flex: 1;
   min-width: 0;
 }
+.toolbar-switch {
+  display: flex;
+  flex-shrink: 0;
+}
 /* Filters opens the drawer, on a phone only. */
 .filters-button {
   display: none;
@@ -776,7 +787,12 @@ onMounted(async () => {
     display: inline-flex;
   }
   .list-toolbar {
+    flex-wrap: wrap;
     gap: 8px;
+  }
+  /* The switch on its own line, then Filters, the search and Sort. */
+  .toolbar-switch {
+    flex-basis: 100%;
   }
   /* The select alone says what it sorts by. */
   .toolbar-sort {
@@ -945,31 +961,38 @@ $card-height: 172px;
   font-size: 12px;
   color: theme.$gray_6;
 }
-/* One line: the first apps, then +n. */
-/* The workflow's tags, a few, in their domains' colours (grey without one);
-   the rest are found by search. */
+/* The workflow's tags, a few, on one line, as the filter panel lists them:
+   a domain's dot in its colour, then its name; the rest are found by
+   search. */
 .wf-tags {
   display: flex;
-  gap: 4px;
+  align-items: center;
+  gap: 12px;
   overflow: hidden;
-}
-.wf-tag {
-  flex-shrink: 0;
-  /* A pixel more below than above: the font's ascent outweighs its descent,
-     so lowercase text sits low in an evenly padded box. */
-  padding: 1px 8px 3px;
-  border: 1px solid transparent;
-  border-radius: 3px;
-  background: theme.$gray_0;
-  font-size: 11px;
-  line-height: 1.4;
+  font-size: 12px;
+  line-height: 18px;
   color: theme.$gray_5;
 }
-/* Inherited from the apps: outlined, not filled, in the same colours. */
-.wf-tag--inherited {
-  border-style: dashed;
-  border-color: theme.$gray_3;
-  background: transparent;
+.wf-tag {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+}
+.wf-tag-dot {
+  width: 7px;
+  height: 7px;
+  flex-shrink: 0;
+  border-radius: 50%;
+}
+/* A domain's name as the panel's, darker than a field's. */
+.wf-tag--domain {
+  color: theme.$gray_6;
+}
+/* Inherited from the apps: in italics. */
+.wf-tags--inherited {
+  font-style: italic;
 }
 .wf-foot {
   display: flex;

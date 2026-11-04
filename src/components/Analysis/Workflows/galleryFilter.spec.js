@@ -219,7 +219,7 @@ describe("activeFilters", () => {
   it("names each facet set, in the panel's order", () => {
     const state = { domain: "genomics", field: "neuroscience", input: "dataset", output: "download", status: "archived" };
     expect(activeFilters(state, { domains, fields, outputs })).toEqual([
-      { key: "status", label: "Status: Archived" },
+      { key: "status", label: "Archived only" },
       { key: "domain", label: "Genomics" },
       { key: "field", label: "Neuroscience" },
       { key: "input", label: "Takes a dataset" },
@@ -234,7 +234,7 @@ describe("activeFilters", () => {
     ]);
   });
 
-  it("counts the status only away from Active", () => {
-    expect(activeFilters({ ...FACET_DEFAULTS, status: "all" })).toEqual([{ key: "status", label: "Status: All" }]);
+  it("counts the status only away from Active (Show archived lists all)", () => {
+    expect(activeFilters({ ...FACET_DEFAULTS, status: "all" })).toEqual([{ key: "status", label: "Including archived" }]);
   });
 });

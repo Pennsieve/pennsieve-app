@@ -1,10 +1,10 @@
 <script setup>
-// The Library's facets: scope (and whether to list notebooks), status,
-// domain, field, input and output, one section each. Shown in the Library's side panel and, on a phone, in a
+// The Library's facets: scope (and whether to list notebooks and archived
+// workflows), domain, field, input and output, one section each. Shown in the Library's side panel and, on a phone, in a
 // drawer; the Library keeps the values (v-model:<facet>).
-import { useId } from "vue";
 import { domainColors } from "../Applications/appDomains";
-import { FACET_DEFAULTS, INPUT_OPTIONS, STATUS_OPTIONS } from "./galleryFilter";
+import { computed, useId } from "vue";
+import { FACET_DEFAULTS, INPUT_OPTIONS } from "./galleryFilter";
 
 defineProps({
   scopeOptions: { type: Array, required: true },
@@ -25,6 +25,11 @@ const input = defineModel("input", { type: String, default: "any" });
 const output = defineModel("output", { type: String, default: "any" });
 const status = defineModel("status", { type: String, default: "active" });
 const includeNotebooks = defineModel("includeNotebooks", { type: Boolean, default: false });
+// Show archived: all (Active and Archived) when ticked, Active when not.
+const showArchived = computed({
+  get: () => status.value !== FACET_DEFAULTS.status,
+  set: (on) => (status.value = on ? "all" : FACET_DEFAULTS.status),
+});
 const emit = defineEmits(["clear-all"]);
 
 // Domain and field are one at a time, as their chips were: ticking one
@@ -48,22 +53,14 @@ const dotStyle = (d) => ({ background: domainColors(d).accent });
       <el-radio-group v-model="scope" class="facet-radios" :aria-labelledby="`${uid}-scope`">
         <el-radio v-for="o in scopeOptions" :key="o.value" :value="o.value" size="small">{{ o.label }}</el-radio>
       </el-radio-group>
-      <el-checkbox v-if="notebooksOption" v-model="includeNotebooks" size="small" class="facet-check facet-notebooks">
+      <el-checkbox v-if="notebooksOption" v-model="includeNotebooks" size="small" class="facet-check">
         <span class="facet-label">Include notebooks</span>
+      </el-checkbox>
+      <el-checkbox v-model="showArchived" size="small" class="facet-check">
+        <span class="facet-label">Show archived</span>
       </el-checkbox>
     </section>
 
-    <section class="facet" :aria-labelledby="`${uid}-status`">
-      <div class="facet-head">
-        <div :id="`${uid}-status`" class="panel-heading facet-heading">Status</div>
-        <button v-if="status !== FACET_DEFAULTS.status" type="button" class="facet-clear" @click="status = FACET_DEFAULTS.status">
-          Clear
-        </button>
-      </div>
-      <el-radio-group v-model="status" class="facet-radios" :aria-labelledby="`${uid}-status`">
-        <el-radio v-for="o in STATUS_OPTIONS" :key="o.value" :value="o.value" size="small">{{ o.label }}</el-radio>
-      </el-radio-group>
-    </section>
 
     <section v-if="domains.length" class="facet" :aria-labelledby="`${uid}-domain`">
       <div class="facet-head">
@@ -200,6 +197,7 @@ const dotStyle = (d) => ({ background: domainColors(d).accent });
   }
   :deep(.el-radio__label) {
     font-size: 13px;
+    font-weight: 400;
     color: theme.$gray_6;
   }
 }
@@ -216,10 +214,12 @@ const dotStyle = (d) => ({ background: domainColors(d).accent });
     gap: 6px;
     min-width: 0;
     font-size: 13px;
+    font-weight: 400;
     color: theme.$gray_6;
   }
 }
-.facet-notebooks {
+/* The toggles under Scope's radios. */
+.facet-radios + .facet-check {
   margin-top: 2px;
 }
 .facet-dot {

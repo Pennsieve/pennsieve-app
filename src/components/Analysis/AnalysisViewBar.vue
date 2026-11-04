@@ -3,6 +3,8 @@
 // switch on the left (Library/Live/Builder, Live/Environments; Apps has its
 // search there instead, in the `lead` slot), the view's action on the right. One component, so the switch and the first
 // heading below it sit in the same place on every tab.
+import AnalysisViewSwitch from "./AnalysisViewSwitch.vue";
+
 defineProps({
   views: { type: Array, default: () => [] }, // [{ key, label }]
   modelValue: { type: String, default: "" },
@@ -16,19 +18,12 @@ const emit = defineEmits(["update:modelValue"]);
     <div v-if="$slots.lead" class="view-lead">
       <slot name="lead" />
     </div>
-    <div v-else-if="views.length" class="view-switch" role="tablist">
-      <button
-        v-for="v in views"
-        :key="v.key"
-        role="tab"
-        class="view-option"
-        :class="{ active: modelValue === v.key }"
-        :aria-selected="modelValue === v.key"
-        @click="emit('update:modelValue', v.key)"
-      >
-        {{ v.label }}
-      </button>
-    </div>
+    <AnalysisViewSwitch
+      v-else-if="views.length"
+      :views="views"
+      :model-value="modelValue"
+      @update:model-value="(v) => emit('update:modelValue', v)"
+    />
     <div class="view-actions">
       <slot />
     </div>
@@ -56,34 +51,7 @@ const emit = defineEmits(["update:modelValue"]);
   align-items: center;
   min-width: 0;
 }
-.view-switch {
-  display: inline-flex;
-  flex-shrink: 0;
-  padding: 2px;
-  border: 1px solid theme.$gray_2;
-  border-radius: 6px;
-  background: theme.$gray_1;
-}
-.view-option {
-  padding: 5px 14px;
-  border: none;
-  border-radius: 4px;
-  background: none;
-  font: inherit;
-  font-size: 13px;
-  font-weight: 500;
-  color: theme.$gray_5;
-  cursor: pointer;
-
-  &:hover {
-    color: theme.$purple_3;
-  }
-  &.active {
-    background: theme.$white;
-    color: theme.$purple_3;
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
-  }
-}
+/* The switch's own look is in AnalysisViewSwitch.vue. */
 /* The rest of the bar, the action at its right; a view can fill it (the
    builder's name and Save). */
 .view-actions {

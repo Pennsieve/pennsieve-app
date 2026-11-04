@@ -110,11 +110,9 @@ export const INPUT_OPTIONS = [
   { value: "dataset", label: "Takes a dataset" },
   { value: "none", label: "No input" },
 ];
-export const STATUS_OPTIONS = [
-  { value: "active", label: "Active" },
-  { value: "archived", label: "Archived" },
-  { value: "all", label: "All" },
-];
+// The panel's "Show archived" lists all (Active and Archived); archived
+// alone isn't offered there, but a chip names it should it be set.
+const STATUS_CHIPS = { all: "Including archived", archived: "Archived only" };
 export const FACET_DEFAULTS = { domain: "any", field: "any", input: "any", output: "any", status: "active" };
 
 // The facets set away from their defaults, as removable chips: { key, label }
@@ -125,7 +123,7 @@ export function activeFilters(state = {}, { domains = [], fields = [], outputs =
   const set = (key) => state[key] !== undefined && state[key] !== FACET_DEFAULTS[key];
   const chips = [];
   if (set("status")) {
-    chips.push({ key: "status", label: `Status: ${STATUS_OPTIONS.find((o) => o.value === state.status)?.label || state.status}` });
+    chips.push({ key: "status", label: STATUS_CHIPS[state.status] || `Status: ${state.status}` });
   }
   if (set("domain")) {
     const d = domains.find((o) => o.domain.key === state.domain);

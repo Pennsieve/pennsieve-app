@@ -16,6 +16,7 @@ import WorkflowBuilder from "../WorkflowBuilder/WorkflowBuilder.vue";
 import WorkflowsGrid from "./WorkflowsGrid.vue";
 import { workflowsView, WORKFLOW_VIEWS } from "./galleryFilter";
 import AnalysisViewBar from "../AnalysisViewBar.vue";
+import AnalysisViewSwitch from "../AnalysisViewSwitch.vue";
 import RunWizardDialog from "../RunMonitor/RunWizardDialog.vue";
 
 const route = useRoute();
@@ -90,7 +91,14 @@ watch(() => route.query.run, openRunFromQuery);
 
 <template>
   <div class="wf-page">
-    <AnalysisViewBar v-model="view" :views="VIEWS" :class="{ 'wf-toolbar--builder': view === 'builder' }">
+    <!-- The Library puts the switch in its own toolbar, next to its search
+         (one row); Live and the Builder keep this bar. -->
+    <AnalysisViewBar
+      v-if="view !== 'library'"
+      v-model="view"
+      :views="VIEWS"
+      :class="{ 'wf-toolbar--builder': view === 'builder' }"
+    >
       <!-- Live's one action is running a workflow; the Library's cards each
            have their own Run, and building one is the Builder tab's (a
            "+ New Workflow" here was taken for running one). -->
@@ -106,7 +114,11 @@ watch(() => route.query.run, openRunFromQuery);
     <div v-if="view" class="wf-body">
       <div v-if="view === 'library'" class="wf-library">
         <!-- Include notebooks is in its filter panel -->
-        <WorkflowsGrid v-model:include-notebooks="includeNotebooks" embedded />
+        <WorkflowsGrid v-model:include-notebooks="includeNotebooks" embedded>
+          <template #view-switch>
+            <AnalysisViewSwitch v-model="view" :views="VIEWS" />
+          </template>
+        </WorkflowsGrid>
       </div>
       <RunsOverview
         v-else-if="view === 'live'"
