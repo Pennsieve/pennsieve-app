@@ -10,6 +10,7 @@ import BfEmptyPageState from '@/components/shared/bf-empty-page-state/BfEmptyPag
 import CreateComputeNodeDialog from './CreateComputeNodeDialog.vue'
 import ConnectAwsAccountDialog from '@/components/user/integrations/ConnectAwsAccountDialog.vue'
 import ComputeNodeCard from './ComputeNodeCard.vue'
+import AnalysisViewBar from '../AnalysisViewBar.vue'
 import { useComputeResourcesStore } from '@/stores/computeResourcesStore'
 
 const props = defineProps({
@@ -346,6 +347,11 @@ async function confirmDeleteNode() {
 
 <template>
   <div class="compute-nodes-page">
+  <!-- + New Compute Node on the title row's right, as every Analysis tab's
+       primary action (AnalysisViewBar) -->
+  <AnalysisViewBar>
+    <bf-button :disabled="!canCreate" @click="openCreateDialog">+ New Compute Node</bf-button>
+  </AnalysisViewBar>
   <div class="compute-nodes-container">
     <div class="nodes-toolbar">
       <p class="nodes-intro">
@@ -358,7 +364,6 @@ async function confirmDeleteNode() {
         <router-link v-if="isMyWorkspace" :to="{ name: 'user-compute-resource' }" class="doc-link">Your compute resources</router-link>
         <a v-else href="https://docs.pennsieve.io/docs/compute-nodes" target="_blank" rel="noopener" class="doc-link">Documentation</a>
       </p>
-      <bf-button :disabled="!canCreate" @click="openCreateDialog">+ New Compute Node</bf-button>
     </div>
 
       <div class="nodes-content">
