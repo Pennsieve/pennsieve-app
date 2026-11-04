@@ -42,7 +42,10 @@ import {
 } from "./runHelpers";
 import EmptyState from "../EmptyState.vue";
 import RunningNote from "../RunningNote.vue";
-import pipelineIllo from "@/assets/images/illustrations/illo-data-model.svg";
+// The pipeline illustration in Pennsieve's colours; at the slim note's size,
+// its graph and gear alone (the faint lines read as noise there).
+import pipelineIllo from "@/assets/images/illustrations/illo-data-model-pennsieve.svg";
+import pipelineMark from "@/assets/images/illustrations/illo-data-model-pennsieve-mark.svg";
 
 const store = useStore();
 const router = useRouter();
@@ -389,7 +392,7 @@ onBeforeUnmount(() => {
       <!-- Main content area: Dashboard -->
       <div class="runs-main">
         <!-- A history, but nothing running: a slim note over it -->
-        <RunningNote v-if="emptyState === 'idle'" :image="pipelineIllo" text="No workflows running right now">
+        <RunningNote v-if="emptyState === 'idle'" :image="pipelineMark" text="No workflows running right now">
           <button type="button" class="running-note-link" @click="openWizardDialog">+ Run Workflow</button>
         </RunningNote>
 
