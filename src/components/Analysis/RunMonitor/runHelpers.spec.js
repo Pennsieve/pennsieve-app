@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { formatCost, graphStatusColor, nodeBorderColor, nodeMetricRows, statusMarkOf } from "./runHelpers";
+import { formatCost, graphStatusColor, lambdaMemory, nodeBorderColor, nodeMetricRows, processorConfigEntry, statusMarkOf } from "./runHelpers";
 
 describe("formatCost", () => {
   it("says a tiny cost is under a hundredth of a cent, not $0.0000", () => {
@@ -71,5 +71,53 @@ describe("nodeMetricRows", () => {
     expect(l["Memory used"]).toBe("42 of 512 MiB (8%)");
     expect(l["Billed"]).toBe("213 ms");
     expect(lambda.some((r) => r.note)).toBe(false);
+  });
+});
+
+describe("processorConfigEntry", () => {
+  const fits = { available: true, reasons: [], known: true, overridable: false };
+  const over = { available: false, reasons: ["memory 16384 MB"], known: true, overridable: true };
+  const hard = { available: false, reasons: ["image is 12 GB"], known: true, overridable: false };
+
+  it("builds an app step's entry from its settings", () => {
+    expect(processorConfigEntry("a", { executionTarget: "standard", version: "v1", cpu: "1024", memory: "4096" }, fits)).toEqual({
+      nodeId: "a",
+      executionTarget: "standard",
+      version: "v1",
+      cpu: "1024",
+      memory: "4096",
+    });
+    expect(processorConfigEntry("a", {})).toEqual({ nodeId: "a" });
+    expect(processorConfigEntry("a", { executionTarget: "standard", interactive: true }, fits)).toEqual({
+      nodeId: "a",
+      executionTarget: "standard",
+      interactive: true,
+      sessionType: "jupyter",
+    });
+  });
+
+  it("marks a Lambda picked as an override, and nothing else", () => {
+    expect(processorConfigEntry("a", { executionTarget: "lambda" }, over)).toEqual({ nodeId: "a", executionTarget: "lambda", lambdaOverride: true });
+    expect(processorConfigEntry("a", { executionTarget: "lambda" }, fits)).not.toHaveProperty("lambdaOverride");
+    expect(processorConfigEntry("a", { executionTarget: "lambda" }, hard)).not.toHaveProperty("lambdaOverride");
+    expect(processorConfigEntry("a", { executionTarget: "standard" }, over)).not.toHaveProperty("lambdaOverride");
+    expect(processorConfigEntry("a", { executionTarget: "gpu" }, over)).not.toHaveProperty("lambdaOverride");
+    expect(processorConfigEntry("a", { executionTarget: "lambda" })).not.toHaveProperty("lambdaOverride");
+  });
+
+  it("caps a Lambda step's memory at 10240, and only a Lambda step's", () => {
+    expect(processorConfigEntry("a", { executionTarget: "lambda", memory: "16384" }, over).memory).toBe("10240");
+    expect(processorConfigEntry("a", { executionTarget: "lambda", memory: "3008" }, fits).memory).toBe("3008");
+    expect(processorConfigEntry("a", { executionTarget: "standard", memory: "16384" }, over).memory).toBe("16384");
+  });
+});
+
+describe("lambdaMemory", () => {
+  it("caps memory at Lambda's most", () => {
+    expect(lambdaMemory("20000")).toBe("10240");
+    expect(lambdaMemory(20000)).toBe("10240");
+    expect(lambdaMemory("10240")).toBe("10240");
+    expect(lambdaMemory("512")).toBe("512");
+    expect(lambdaMemory("")).toBe("");
   });
 });

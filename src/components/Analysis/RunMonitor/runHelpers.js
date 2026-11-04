@@ -1,4 +1,5 @@
 import { sourceLabel } from "../WorkflowGraph/sourceInputs";
+import { LAMBDA_MAX_MEMORY } from "../Applications/lambdaEligibility";
 /**
  * Shared pure utility functions for RunsOverview and RunDetail.
  */
@@ -301,6 +302,37 @@ export const getMemoryOptionsForCpu = (cpu) => FARGATE_MEMORY_MAP[cpu] || [];
 export const LAMBDA_MEMORY_OPTIONS = [
   "128", "256", "512", "1024", "1769", "2048", "3072", "4096", "5120", "6144", "7168", "8192", "10240",
 ];
+
+// A step's memory setting as Lambda takes it: capped at Lambda's most.
+export const lambdaMemory = (memory) => {
+  const mb = parseInt(memory, 10);
+  return mb > LAMBDA_MAX_MEMORY ? String(LAMBDA_MAX_MEMORY) : memory;
+};
+
+/*
+  An app step's processorConfigs entry for a run's submission, from its
+  configure-page settings (cfg: executionTarget, version, cpu, memory,
+  interactive, sessionType) and its version's Lambda eligibility
+  (lambdaEligibility.js). A Lambda step's memory is capped at Lambda's most;
+  lambdaOverride is set only when Lambda was chosen though the version
+  doesn't fit it but may be overridden.
+*/
+export function processorConfigEntry(nodeId, cfg = {}, lambda = null) {
+  const entry = { nodeId };
+  const onLambda = cfg.executionTarget === "lambda";
+  if (cfg.executionTarget) entry.executionTarget = cfg.executionTarget;
+  if (onLambda && lambda && !lambda.available && lambda.overridable) entry.lambdaOverride = true;
+  if (cfg.version) entry.version = cfg.version;
+  if (cfg.cpu) entry.cpu = cfg.cpu;
+  if (cfg.memory) entry.memory = onLambda ? lambdaMemory(cfg.memory) : cfg.memory;
+  // Interactive (Jupyter) override: workflow-service applies it to the run
+  // DAG node's runtimeConfig (interactive waitForTaskToken step).
+  if (cfg.interactive) {
+    entry.interactive = true;
+    entry.sessionType = cfg.sessionType || "jupyter";
+  }
+  return entry;
+}
 
 // Find a reasonable Fargate CPU for a given memory value.
 // Targets a ~2:1 memory-to-CPU ratio for a balanced configuration.
