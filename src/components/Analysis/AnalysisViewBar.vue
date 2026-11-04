@@ -33,8 +33,10 @@ const emit = defineEmits(["update:modelValue"]);
 <style scoped lang="scss">
 @use "../../styles/theme";
 
-/* Lined up with the Analysis tabs (32px). A fixed height, so a view whose
-   action is a link or a checkbox doesn't move the switch. */
+/* One compact row, lined up with the Analysis tabs (32px): the views on the
+   left, the tab's actions (40px buttons) on the right, 8px above and below.
+   A fixed height, so a view whose action is a link or a checkbox doesn't
+   move the switch. */
 .view-bar {
   display: flex;
   align-items: center;
@@ -42,7 +44,7 @@ const emit = defineEmits(["update:modelValue"]);
   gap: 16px;
   flex-shrink: 0;
   box-sizing: border-box;
-  height: 68px;
+  height: 56px;
   padding: 0 32px;
   background: theme.$white;
 }
