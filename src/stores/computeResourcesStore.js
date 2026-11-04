@@ -1487,7 +1487,19 @@ export const useComputeResourcesStore = defineStore('computeResources', () => {
         body: JSON.stringify(config)
       })
       if (response.ok) {
-        return await response.json()
+        const result = await response.json()
+        // The provisioner re-applies the node with the new config: it is
+        // Updating, with the new config, until the update is done; the node
+        // list refetches while a node is updating.
+        for (const [scope, scopedNodes] of scopedComputeNodes.value.entries()) {
+          const index = scopedNodes.findIndex(node => node.uuid === nodeId)
+          if (index !== -1) {
+            const updatedNodes = [...scopedNodes]
+            updatedNodes[index] = { ...updatedNodes[index], ...config, status: 'Updating' }
+            scopedComputeNodes.value.set(scope, updatedNodes)
+          }
+        }
+        return result
       } else {
         const errorText = await response.text()
         console.error('Failed to update compute node config:', response.status, errorText)
