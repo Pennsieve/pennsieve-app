@@ -225,10 +225,7 @@ const confirmDelete = async () => {
     store
       .dispatch('analysisModule/fetchApplications', { force: true })
       .catch(() => {})
-    router.push({
-      name: 'my-code',
-      query: { tab: 'published', app: appUuid.value },
-    })
+    router.push({ name: 'my-code' })
   } catch (error) {
     console.error(error)
     EventBus.$emit('toast', {
