@@ -7,6 +7,9 @@ import {
   pendingFiles,
   rowStatus,
   summarize,
+  addedSourceName,
+  inputSubtitle,
+  inputsDiskUse,
 } from "./inputsHelpers";
 
 const entries = [
@@ -90,5 +93,36 @@ describe("middleTruncate", () => {
     expect(short.startsWith("H2192cG1a")).toBe(true);
     expect(short.endsWith("layer.tif")).toBe(true);
     expect(middleTruncate("short.csv", 24)).toBe("short.csv");
+  });
+});
+
+describe("addedSourceName", () => {
+  it("is the dataset and its folder, as a source name allows", () => {
+    expect(addedSourceName("openneuro", "ds000001/")).toBe("openneuro-ds000001");
+    expect(addedSourceName("openneuro", "ds000001/sub-01/")).toBe("openneuro-sub-01");
+    expect(addedSourceName("openneuro")).toBe("openneuro");
+    expect(addedSourceName("allen-nd-open-data", "exaSPIM_609281 (raw)/")).toBe("allen-nd-open-data-exaSPIM_609281-raw");
+    expect(addedSourceName("_x", "")).toBe("x");
+    expect(addedSourceName("openneuro", "ds000001/", 3)).toBe("openneuro-ds000001-3");
+  });
+});
+
+describe("inputSubtitle", () => {
+  it("says where an input came from, and its folder", () => {
+    expect(inputSubtitle({ openDataset: "openneuro", folder: "openneuro-ds008968" })).toBe("OpenNeuro · openneuro-ds008968");
+    expect(inputSubtitle({ openDataset: "1000-genomes", folder: "1000-genomes-HG00096" })).toBe("AWS Open Data · 1000-genomes-HG00096");
+    expect(inputSubtitle({ sourceVersion: 1, folder: "dataset-42-v1" })).toBe("Pennsieve Discover v1 · dataset-42-v1");
+    expect(inputSubtitle({})).toBe("Pennsieve Discover");
+  });
+});
+
+describe("inputsDiskUse", () => {
+  it("measures the inputs against the session's disk", () => {
+    const use = inputsDiskUse(18.3e9, 64);
+    expect(use.text).toBe("18.3 GB of inputs on the session's 64 GB disk");
+    expect(use.share).toBeCloseTo(18.3e9 / (64 * 2 ** 30));
+    expect(use.full).toBe(false);
+    expect(inputsDiskUse(60e9, 64).full).toBe(true);
+    expect(inputsDiskUse(2e9, null)).toEqual({ text: "2.0 GB of inputs in the session", share: null, full: false });
   });
 });

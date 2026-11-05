@@ -5,9 +5,13 @@ export default { name: "FileNode" };
 </script>
 
 <script setup>
-import { CRATE_FILE } from "@/composables/useJupyterSession";
-defineProps({
+import { computed } from "vue";
+import { VIEW_CRATE_DIR } from "@/composables/useJupyterSession";
+import { visibleEntries } from "./fileBrowserHelpers";
+const props = defineProps({
   node: { type: Object, required: true },
+  // Show dot-files and dot-folders (.pennsieve, .datalad); hidden otherwise.
+  showHidden: { type: Boolean, default: false },
   depth: { type: Number, default: 0 },
   iconOf: { type: Function, required: true },
   fmtSize: { type: Function, required: true },
@@ -15,6 +19,7 @@ defineProps({
 });
 
 const emit = defineEmits(["toggle", "copy", "insert", "open"]);
+const children = computed(() => visibleEntries(props.node.children, props.showHidden));
 
 const isNotebook = (node) =>
   node.type === "notebook" || /\.ipynb$/i.test(node.name || "");
@@ -32,11 +37,11 @@ const isNotebook = (node) =>
         <template v-if="node.type === 'directory'">{{ node.open ? "▾" : "▸" }}</template>
       </span>
       <img class="fn__icon" :src="iconOf(node)" alt="" />
-      <!-- The crate is shown by what it is; its file name is in the row's title. -->
+      <!-- The view's crate folder is shown by what it is; its name is in the row's title. -->
       <span
         class="fn__name"
-        :title="node.name === CRATE_FILE ? 'The input\'s RO-Crate manifest (ro-crate-metadata.json): every file of the dataset, with sizes, checksums and its source. Add files from Inputs.' : undefined"
-        >{{ node.name === CRATE_FILE ? "input manifest" : node.name }}</span
+        :title="node.name === VIEW_CRATE_DIR ? 'This input\'s dataset view (.pennsieve/view.json, an RO-Crate): where its files come from, their sizes and checksums. Add files from Inputs.' : undefined"
+        >{{ node.name === VIEW_CRATE_DIR ? "input manifest" : node.name }}</span
       >
       <span
         v-if="depth === 0 && node.type === 'directory' && node.name === 'output'"
@@ -72,12 +77,13 @@ const isNotebook = (node) =>
       loading…
     </span>
 
-    <ul v-if="node.open && node.children && node.children.length" class="fn__children">
+    <ul v-if="node.open && node.children && children.length" class="fn__children">
       <FileNode
-        v-for="child in node.children"
+        v-for="child in children"
         :key="child.path"
         :node="child"
         :depth="depth + 1"
+        :show-hidden="showHidden"
         :icon-of="iconOf"
         :fmt-size="fmtSize"
         :fmt-time="fmtTime"
@@ -88,7 +94,7 @@ const isNotebook = (node) =>
       />
     </ul>
     <span
-      v-else-if="node.open && node.children && !node.children.length"
+      v-else-if="node.open && node.children && !children.length"
       class="fn__empty"
       :style="{ paddingLeft: (depth + 1) * 14 + 22 + 'px' }"
     >

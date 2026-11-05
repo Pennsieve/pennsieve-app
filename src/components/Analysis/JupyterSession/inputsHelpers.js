@@ -87,3 +87,40 @@ export function middleTruncate(name, max = 30) {
   const tail = Math.ceil((max - 1) / 2);
   return `${name.slice(0, max - 1 - tail)}…${name.slice(-tail)}`;
 }
+
+// The input folder an added view goes in: the dataset's name and the last
+// folder of its prefix, as a session source's name allows (letters, digits,
+// '.', '_', '-', starting with a letter or digit). n > 1 for the next free one.
+export function addedSourceName(dataset, prefix = "", n = 1) {
+  const last = prefix.split("/").filter(Boolean).pop() || "";
+  const clean = (s) => s.replace(/[^A-Za-z0-9._-]+/g, "-").replace(/^[^A-Za-z0-9]+/, "").replace(/-+$/, "");
+  const base = [clean(dataset), clean(last)].filter(Boolean).join("-").slice(0, 80) || "added";
+  return n > 1 ? `${base}-${n}` : base;
+}
+
+// An input's second line: where it came from, and its folder of input/ as
+// the session's files show it ("OpenNeuro · openneuro-ds008968"). folder is
+// "" when the session can't say (an older sidecar).
+export function inputSubtitle({ openDataset = "", sourceVersion = null, folder = "" } = {}) {
+  const platform =
+    openDataset === "openneuro"
+      ? "OpenNeuro"
+      : openDataset
+      ? "AWS Open Data"
+      : sourceVersion
+      ? `Pennsieve Discover v${sourceVersion}`
+      : "Pennsieve Discover";
+  return folder ? `${platform} · ${folder}` : platform;
+}
+
+// How much of the session's disk the downloaded inputs take: { text, share,
+// full } with share 0 to 1 and full past 80%. diskGiB is the disk the user
+// chose; a session without one (GPU: its instance's disk) shows only the
+// bytes.
+const GB = 1e9;
+export function inputsDiskUse(bytes, diskGiB) {
+  const used = `${(bytes / GB).toFixed(1)} GB`;
+  if (!diskGiB) return { text: `${used} of inputs in the session`, share: null, full: false };
+  const share = Math.min(1, bytes / (diskGiB * 2 ** 30));
+  return { text: `${used} of inputs on the session's ${diskGiB} GB disk`, share, full: share > 0.8 };
+}

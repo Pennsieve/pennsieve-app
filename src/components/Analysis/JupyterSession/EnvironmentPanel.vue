@@ -6,6 +6,7 @@
 // stays, its variables are cleared. Hidden for R kernels, on sites without
 // environments-service, and on sessions from before environments.
 import { computed, onBeforeUnmount, ref, watch } from "vue";
+import { useRememberedFold } from "./sectionFold";
 import { ElMessage, ElMessageBox } from "element-plus";
 import { ArrowRight } from "@element-plus/icons-vue";
 import IconWarningCircle from "@/components/icons/IconWarningCircle.vue";
@@ -27,7 +28,8 @@ const props = defineProps({
 
 const available = ref(false); // the site has environments-service
 const outdated = ref(false); // the session's node predates environments
-const collapsed = ref(false);
+// Folded or not, remembered in this browser.
+const collapsed = useRememberedFold("environment");
 const loading = ref(false);
 const error = ref(null);
 
@@ -254,27 +256,32 @@ onBeforeUnmount(() => clearTimeout(pollTimer));
 </template>
 
 <style scoped lang="scss">
+@use "sass:color";
 @use "../../../styles/theme";
 
 .env {
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
-  border-bottom: 1px solid theme.$gray_2;
+  border-bottom: 1px solid color.mix(theme.$gray_2, theme.$gray_3); /* between sections: a touch stronger than the lines inside */
   border-right: 1px solid theme.$gray_2;
   background: theme.$gray_1;
   font-size: 13px;
 }
-/* Section header as the app's side-panel accordions: title, chevron right. */
+/* Section header as the workflow builder's panel headings (_sidePanel.scss
+   .panel-heading): a small uppercase label on the panel's own background,
+   no line under it (sections are set apart by a stronger line between
+   them); its actions and chevron on the right. */
 .env__head {
   display: flex;
   align-items: center;
   gap: 8px;
+  box-sizing: border-box;
   width: 100%;
-  padding: 10px 10px;
+  padding: 9px 12px;
   border: none;
-  border-bottom: 1px solid theme.$gray_2;
-  background: theme.$gray_0;
+  border-bottom: none;
+  background: none;
   cursor: pointer;
   font: inherit;
   text-align: left;
@@ -283,9 +290,11 @@ onBeforeUnmount(() => clearTimeout(pollTimer));
   border-bottom: none;
 }
 .env__title {
+  font-size: 11px;
   font-weight: 600;
-  font-size: 13px;
-  color: theme.$gray_6;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: theme.$gray_4;
 }
 .env__peek {
   flex: 1;

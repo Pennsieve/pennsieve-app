@@ -5,11 +5,13 @@
 // the session only through the run's data targets (e.g. a download target's
 // zip), not from here. Refreshes on demand (and the parent calls refresh()
 // after cell runs).
-import { ref, watch } from "vue";
+import { computed, ref, watch } from "vue";
 import FileNode from "./FileNode.vue";
 import { ArrowRight } from "@element-plus/icons-vue";
 import { fileIconForPath } from "@/utils/fileIconForPath";
 import { sessionPathCode } from "./pathCode";
+import { visibleEntries, readShowHidden, writeShowHidden } from "./fileBrowserHelpers";
+import { useRememberedFold } from "./sectionFold";
 
 const props = defineProps({
   listDir: { type: Function, required: true },
@@ -23,9 +25,15 @@ const emit = defineEmits(["insert-path", "open-notebook"]);
 
 // Tree node: { name, path, type, size, last_modified, children, open, loading }
 const roots = ref([]);
-const collapsed = ref(false);
+// Folded or not, remembered in this browser.
+const collapsed = useRememberedFold("files");
 const loading = ref(false);
 const error = ref(null);
+// Dot-files and dot-folders (each input's .pennsieve/, a dataset's
+// .datalad/) are hidden unless the user shows them; remembered here.
+const showHidden = ref(readShowHidden());
+watch(showHidden, (v) => writeShowHidden(v));
+const shownRoots = computed(() => visibleEntries(roots.value, showHidden.value));
 
 function decorate(entry) {
   return {
@@ -87,12 +95,9 @@ async function autoExpandInput() {
   );
   if (!input) return;
   await toggle(input);
-  if (
-    input.children &&
-    input.children.length === 1 &&
-    input.children[0].type === "directory"
-  ) {
-    await toggle(input.children[0]);
+  const shown = visibleEntries(input.children, showHidden.value);
+  if (shown.length === 1 && shown[0].type === "directory") {
+    await toggle(shown[0]);
   }
 }
 
@@ -161,7 +166,32 @@ function copyPath(node) {
     <div class="fb__head" @click="collapsed = !collapsed">
       <span class="fb__title" title="What's on the session's disk: input/, output/ and your notebook">Session files</span>
       <span class="fb__head-actions">
-        <button class="fb__refresh" title="Refresh" :disabled="loading" @click.stop="refresh">⟳</button>
+        <!-- Dot-files and folders, such as each input's .pennsieve/ (its dataset view) -->
+        <button
+          v-if="!collapsed"
+          class="fb__hidden-toggle"
+          :class="{ 'is-on': showHidden }"
+          :title="showHidden ? 'Hide hidden files' : 'Show hidden files (.pennsieve, .datalad)'"
+          :aria-label="showHidden ? 'Hide hidden files' : 'Show hidden files'"
+          :aria-pressed="showHidden"
+          @click.stop="showHidden = !showHidden"
+        >
+          <svg v-if="showHidden" width="14" height="14" viewBox="0 0 16 16" aria-hidden="true">
+            <path d="M1.5 8S4 3.5 8 3.5 14.5 8 14.5 8 12 12.5 8 12.5 1.5 8 1.5 8z" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" />
+            <circle cx="8" cy="8" r="2" fill="none" stroke="currentColor" stroke-width="1.3" />
+          </svg>
+          <svg v-else width="14" height="14" viewBox="0 0 16 16" aria-hidden="true">
+            <path d="M1.5 8S4 3.5 8 3.5 14.5 8 14.5 8 12 12.5 8 12.5 1.5 8 1.5 8z" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" />
+            <circle cx="8" cy="8" r="2" fill="none" stroke="currentColor" stroke-width="1.3" />
+            <path d="M2.5 13.5 13.5 2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" />
+          </svg>
+        </button>
+        <button v-if="!collapsed" class="fb__refresh" title="Refresh" aria-label="Refresh" :disabled="loading" @click.stop="refresh">
+          <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true">
+            <path d="M13 8a5 5 0 1 1-1.46-3.54" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" />
+            <path d="M13 2.5v3h-3" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+        </button>
         <button class="fb__fold" :aria-expanded="!collapsed" aria-label="Fold session files" @click.stop="collapsed = !collapsed">
           <el-icon class="fb__chevron" :class="{ 'is-open': !collapsed }"><ArrowRight /></el-icon>
         </button>
@@ -174,12 +204,13 @@ function copyPath(node) {
     <p v-else-if="error" class="fb__msg fb__msg--error">{{ error }}</p>
     <p v-else-if="!roots.length" class="fb__msg">No files.</p>
 
-    <ul v-else class="fb__tree">
+    <ul v-if="ready && !error && shownRoots.length" class="fb__tree">
       <FileNode
-        v-for="node in roots"
+        v-for="node in shownRoots"
         :key="node.path"
         :node="node"
         :depth="0"
+        :show-hidden="showHidden"
         :icon-of="icon"
         :fmt-size="fmtSize"
         :fmt-time="fmtTime"
@@ -205,19 +236,24 @@ function copyPath(node) {
   font-size: 13px;
   min-width: 0;
 }
+/* Section header as the workflow builder's panel headings (_sidePanel.scss
+   .panel-heading): a small uppercase label on the panel's own background,
+   no line under it (sections are set apart by a stronger line between
+   them); its actions and chevron on the right. */
 .fb__head {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 10px 10px;
+  padding: 9px 12px;
   cursor: pointer;
-  border-bottom: 1px solid theme.$gray_2;
-  background: theme.$gray_0;
+  border-bottom: none;
 }
 .fb__title {
+  font-size: 11px;
   font-weight: 600;
-  font-size: 13px;
-  color: theme.$gray_6;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: theme.$gray_4;
 }
 .fb__head-actions {
   display: flex;
@@ -239,16 +275,36 @@ function copyPath(node) {
 .fb__chevron.is-open {
   transform: rotate(90deg);
 }
+.fb__hidden-toggle {
+  display: flex;
+  align-items: center;
+  border: none;
+  background: none;
+  padding: 2px 4px;
+  border-radius: 3px;
+  color: theme.$gray_4;
+  cursor: pointer;
+
+  &:hover {
+    background: theme.$purple_tint;
+    color: theme.$gray_6;
+  }
+  &.is-on {
+    color: theme.$gray_6;
+  }
+}
+/* The header's icon actions: the same size, the same grey as the eye. */
 .fb__refresh {
+  display: flex;
+  align-items: center;
   border: none;
   background: none;
   cursor: pointer;
-  font-size: 14px;
-  color: theme.$gray_5;
-  border-radius: 4px;
-  padding: 2px 6px;
+  color: theme.$gray_4;
+  border-radius: 3px;
+  padding: 2px 4px;
 }
-.fb__refresh:hover { background: theme.$purple_tint; }
+.fb__refresh:hover { background: theme.$purple_tint; color: theme.$gray_6; }
 .fb__tree {
   list-style: none;
   margin: 0;

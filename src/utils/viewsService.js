@@ -121,3 +121,85 @@ export async function createRunView({ name, picks }, options = {}) {
     body: { name, sources: runViewSources(picks), lifecycle: 'run' },
   })
 }
+
+// The AWS Open Data Registry datasets a view can take, from views-service's
+// catalog (GET /open-data, a schema.org DataCatalog), as
+// { name, title, summary, keywords, publisher, regions, anonymous, url }.
+// name is the registry name (registry.opendata.aws/<name>).
+export async function listOpenData(options = {}) {
+  const catalog = await viewsRequest('/open-data', options)
+  return (catalog.dataset || []).map((d) => ({
+    name: d.identifier,
+    title: d.name || d.identifier,
+    summary: d.description || '',
+    keywords: d.keywords || [],
+    publisher: d.publisher || '',
+    regions: d['pennsieve:regions'] || [],
+    anonymous: !!d['pennsieve:anonymous'],
+    url: d.url,
+  }))
+}
+
+// The catalog, read once per page load (about 800 KB): listOpenData's.
+let openDataCache = null
+export function openDataCatalog(options = {}) {
+  if (!openDataCache) {
+    openDataCache = listOpenData(options).catch((err) => {
+      openDataCache = null
+      throw err
+    })
+  }
+  return openDataCache
+}
+
+// The catalog's datasets anyone can read that match a query: every word in
+// the name, title, publisher or keywords. Matches on the name or title
+// come first.
+export function searchOpenData(datasets, query = '') {
+  const words = query.toLowerCase().split(/\s+/).filter(Boolean)
+  const open = (datasets || []).filter((d) => d.anonymous)
+  if (!words.length) return open
+  const text = (d) => [d.name, d.title, d.publisher, ...d.keywords].join(' ').toLowerCase()
+  const head = (d) => `${d.name} ${d.title}`.toLowerCase()
+  return open
+    .filter((d) => words.every((w) => text(d).includes(w)))
+    .sort((a, b) => Number(words.every((w) => head(b).includes(w))) - Number(words.every((w) => head(a).includes(w))))
+}
+
+// One level of an Open Data dataset's bucket under prefix ('' for its top,
+// else ending in /): { prefix, folders: [name], files: [{ name, size }],
+// truncated } (at most 1,000 folders and files). startsWith narrows it to
+// names starting with that, which finds a folder past the first 1,000.
+export async function listOpenDataFolder({ dataset, prefix = '', startsWith = '' }, options = {}) {
+  const q = new URLSearchParams()
+  if (prefix) q.set('prefix', prefix)
+  if (startsWith) q.set('startsWith', startsWith)
+  const qs = q.toString()
+  return viewsRequest(`/open-data/${encodeURIComponent(dataset)}/folders${qs ? `?${qs}` : ''}`, options)
+}
+
+// A prefix as a view takes it: no leading slash or surrounding space.
+export const openDataPrefix = (prefix = '') => prefix.trim().replace(/^\/+/, '')
+
+// The name of a view of an Open Data dataset's files under prefix: two
+// views of the same dataset with the same name are of the same files.
+export const openDataViewName = (title, prefix = '') => {
+  const p = openDataPrefix(prefix)
+  return p ? `${title} (${p})` : title
+}
+
+// A view made for one run of an Open Data dataset's files under prefix (all
+// of them when empty). views-service lists them from the dataset's public
+// bucket when the view is made; they sit under open-data-<name>/.
+export async function createOpenDataView({ dataset, title, prefix = '' }, options = {}) {
+  const p = openDataPrefix(prefix)
+  return viewsRequest('/me', {
+    ...options,
+    method: 'POST',
+    body: {
+      name: openDataViewName(title, p),
+      sources: [{ kind: 'openData', dataset, ...(p && { prefix: p }) }],
+      lifecycle: 'run',
+    },
+  })
+}

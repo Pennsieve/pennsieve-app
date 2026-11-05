@@ -106,6 +106,9 @@ const {
   listDir,
   fetchInputs,
   inputsStatus,
+  inputSources,
+  addInputSource,
+  removeInputSource,
   environmentState,
   switchEnvironment,
   clearEnvironment,
@@ -800,6 +803,9 @@ const kernelPill = computed(() => {
           :run-id="runId"
           :fetch-inputs="fetchInputs"
           :inputs-status="inputsStatus"
+          :input-sources="inputSources"
+          :add-input-source="addInputSource"
+          :remove-input-source="removeInputSource"
           :ready="status === 'ready'"
           :width="sidebarWidth"
           @downloaded="fileBrowserRef?.refresh?.()"
