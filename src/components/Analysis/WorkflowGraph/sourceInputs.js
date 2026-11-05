@@ -7,6 +7,7 @@
 // Pure: on DAG steps ({ id, inputs }) and app.yml ports.
 
 import { shortMediaType, versionManifest } from "../WorkflowBuilder/appManifestInfo";
+import { mediaTypeAccepts, normalizeMediaType } from "../Applications/applicationSchema";
 
 // The inputs a source feeds: { step, input } per link from it.
 export function inputsFedBy(sourceId, steps) {
@@ -37,6 +38,7 @@ export function sourceHints(sourceId, steps, portsOf) {
         step,
         input,
         types: [...new Set([...(port.mediaTypes || []).map(shortMediaType), ...(port.formats || []).map((f) => EDAM_TYPES[f]).filter(Boolean)])],
+        mediaTypes: (port.mediaTypes || []).map(normalizeMediaType).filter(Boolean),
         layout: layout.length ? String(layout[layout.length - 1]).split("@")[0].toUpperCase() : "",
         description: port.description || "",
       };
@@ -98,6 +100,8 @@ const EXTENSION_TYPES = {
   xlsx: "SHEET",
   nii: "NIFTI",
   "nii.gz": "NIFTI",
+  "ome.tif": "OME-TIFF",
+  "ome.tiff": "OME-TIFF",
   tif: "TIFF",
   jpg: "JPEG",
   yml: "YAML",
@@ -127,14 +131,38 @@ export function fileShortTypes(name) {
   return [...types].filter(Boolean);
 }
 
+// A file's media types from the platform's formats (GET /packages/formats,
+// the store's packageFormats: { value, extensions }), by its longest
+// matching extension, as an upload types it: "a.nwb" is
+// "application/x-hdf5; profile=nwb", "a.ome.tif" "image/tiff; profile=ome-tiff".
+export function fileMediaTypes(name, formats) {
+  const lower = String(name || "").toLowerCase();
+  let best = 0;
+  let types = [];
+  for (const f of formats || []) {
+    for (const e of f?.extensions || []) {
+      const ext = String(e).toLowerCase();
+      if (!ext || !lower.endsWith(ext) || ext.length < best) continue;
+      if (ext.length > best) (best = ext.length), (types = []);
+      types.push(normalizeMediaType(f.value));
+    }
+  }
+  return [...new Set(types.filter(Boolean))];
+}
+
 // The chosen files a source's inputs don't take, by what they take (its
 // hints): { names, expected: "JSON" }, or null when they all fit, when an
 // input takes any file or a folder layout, or when its app declares no types
-// (nothing to compare).
-export function fileTypeMismatches(fileNames, hints) {
+// (nothing to compare). With the platform's formats, a file also fits by
+// media type: an NWB file fits an HDF5 input, an .h5 file not an NWB one.
+export function fileTypeMismatches(fileNames, hints, formats = []) {
   const accepted = acceptedFileTypes(hints);
   if (!accepted) return null;
-  const names = (fileNames || []).filter((n) => !fileShortTypes(n).some((t) => accepted.has(t)));
+  const media = (hints || []).flatMap((h) => h.mediaTypes || []);
+  const fits = (n) =>
+    fileShortTypes(n).some((t) => accepted.has(t)) ||
+    fileMediaTypes(n, formats).some((t) => media.some((a) => mediaTypeAccepts(a, t)));
+  const names = (fileNames || []).filter((n) => !fits(n));
   return names.length ? { names, expected: [...accepted].join(" or ") } : null;
 }
 

@@ -2,7 +2,7 @@
 // manifest app-deploy-service stores per version, on each entry of the app
 // list's versions). Apps without an app.yml have none, and are shown and
 // used as before, marked "No manifest".
-import { validateAppConnection } from "../Applications/applicationSchema";
+import { parseMediaType, validateAppConnection } from "../Applications/applicationSchema";
 // The session type of an interactive (human-in-the-loop) app: "jupyter" (a
 // notebook) or another kind; null for a batch app. Only as its app.yml
 // declares it (runtime.interactive, runtime.sessionType): the one place an
@@ -114,9 +114,11 @@ export const manifestsServed = (apps) => (apps || []).some((a) => (a.versions ||
 
 // "application/edf" -> "EDF", "image/png" -> "PNG", "*/*" -> "Any";
 // "application/octet-stream" -> "File"; a vendor type by its last part ("application/vnd.apache.parquet" ->
-// "PARQUET").
+// "PARQUET"); a profiled type by its profile, its format's id ("application/x-hdf5; profile=nwb" -> "NWB").
 export function shortMediaType(t) {
   if (!t || t === "*/*") return "Any";
+  const { profile } = parseMediaType(t);
+  if (profile) return profile.toUpperCase();
   // Bytes of any kind: a file, not a format.
   if (t === "application/octet-stream") return "File";
   let sub = String(t).split("/").pop().replace(/^x-/, "").split("+")[0];
