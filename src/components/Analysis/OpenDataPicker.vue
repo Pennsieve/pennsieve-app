@@ -8,6 +8,11 @@ import { computed, onMounted, ref } from "vue";
 import { openDataCatalog, searchOpenData } from "@/utils/viewsService";
 import OpenDataFolders from "./OpenDataFolders.vue";
 
+// A note on a dataset ("" for none): the new notebook dialog's, when none
+// of the user's nodes can reach it.
+const props = defineProps({ cardNote: { type: Function, default: null } });
+const note = (d) => props.cardNote?.(d) || "";
+
 // The chosen dataset (a listOpenData entry) and folder ("" for all of it,
 // else ending in /).
 const dataset = defineModel("dataset", { default: null });
@@ -66,6 +71,7 @@ onMounted(() => {
             <a :href="dataset.url" target="_blank" rel="noopener">registry.opendata.aws/{{ dataset.name }}</a>
             <span v-if="dataset.regions.length">{{ dataset.regions.join(", ") }}</span>
           </div>
+          <div v-if="note(dataset)" class="od-note">{{ note(dataset) }}</div>
           <div v-if="dataset.keywords.length" class="od-tags">
             <span v-for="k in dataset.keywords.slice(0, TAGS_SHOWN)" :key="k" class="od-tag">{{ k }}</span>
           </div>
@@ -104,6 +110,7 @@ onMounted(() => {
               <span v-if="d.publisher">{{ d.publisher }}</span>
               <span v-if="d.regions.length">{{ d.regions.join(", ") }}</span>
             </span>
+            <span v-if="note(d)" class="od-note">{{ note(d) }}</span>
             <span v-if="d.summary" class="od-summary">{{ d.summary }}</span>
             <span v-if="d.keywords.length" class="od-tags">
               <span v-for="k in d.keywords.slice(0, TAGS_SHOWN)" :key="k" class="od-tag">{{ k }}</span>
@@ -176,6 +183,10 @@ onMounted(() => {
   flex-direction: column;
   gap: 3px;
   min-width: 0;
+}
+.od-note {
+  font-size: 12px;
+  color: theme.$orange_2;
 }
 .od-summary {
   font-size: 12px;

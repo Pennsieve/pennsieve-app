@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { acceptsInput, dataRegions, nodeDataReason, nodeDataNote, dataSize, suggestedDisk, isImagingData } from "./dataHints";
+import { acceptsInput, dataRegions, dataUnreachable, nodeDataReason, nodeDataNote, dataSize, suggestedDisk, isImagingData } from "./dataHints";
 import { NOTEBOOK_DISK_OPTIONS } from "./notebookHelpers";
 
 const GiB = 2 ** 30;
@@ -43,6 +43,38 @@ describe("data hints", () => {
     );
     expect(openData({ anonymous: false, regions: ["us-east-1"] })).toMatch(/Can't reach data in us-east-1/);
     expect(openData(null)).toMatch(/Can't reach this data/);
+  });
+
+  // The data step says when no node can take the data (Next waits), and the
+  // node step then offers other data: both from dataUnreachable.
+  it("knows when none of the user's nodes can reach the data", () => {
+    const publicNode = { deploymentMode: "compliant", region: "us-east-1" };
+    const westCompliant = { deploymentMode: "compliant", region: "us-west-2" };
+    const basic = { deploymentMode: "basic", region: "us-west-2" };
+    const dandi = { anonymous: true, regions: ["us-east-2"] };
+
+    // Only compliant nodes, in another region than the data.
+    expect(dataUnreachable([westCompliant], "openNeuro")).toBe("Not reachable from your compute nodes (us-east-1)");
+    expect(dataUnreachable([westCompliant], "sparc")).toMatch(/us-east-1/);
+    expect(dataUnreachable([publicNode], "openData", { openDataDataset: dandi })).toBe(
+      "Not reachable from your compute nodes (us-east-2)"
+    );
+    expect(dataUnreachable([publicNode, westCompliant], "openData", { openDataDataset: dandi })).toMatch(/us-east-2/);
+    // One node that reaches it is enough.
+    expect(dataUnreachable([publicNode, westCompliant], "epilepsyScience")).toBe("");
+    expect(dataUnreachable([publicNode], "openData", { openDataDataset: { anonymous: true, regions: ["us-east-1"] } })).toBe("");
+    // A basic node (internet) reaches everything.
+    expect(dataUnreachable([westCompliant, basic], "openNeuro")).toBe("");
+    expect(dataUnreachable([publicNode, basic], "openData", { openDataDataset: dandi })).toBe("");
+    // Pennsieve's own data, any node.
+    expect(dataUnreachable([westCompliant], "public")).toBe("");
+    expect(dataUnreachable([westCompliant], "dataset")).toBe("");
+    // Not judged: no nodes listed yet, or an Open Data pick without its dataset.
+    expect(dataUnreachable([], "openNeuro")).toBe("");
+    expect(dataUnreachable([publicNode], "openData")).toBe("");
+  });
+
+  it("notes cross-region transfer", () => {
     expect(nodeDataNote({ region: "us-east-1" }, ["us-west-2"])).toMatch(/us-west-2.*us-east-1/);
     expect(nodeDataNote({ region: "us-west-2" }, ["us-west-2"])).toBe("");
     expect(nodeDataNote({}, ["us-west-2"])).toBe("");

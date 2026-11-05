@@ -11,7 +11,7 @@
 // via v-model and emits `created` with the new run.
 import { isPathPrefixParam, targetParamLabel, defaultsToRunName, targetWritesToDataset, canWriteDataset, searchDatasets } from "./dataTargets";
 import { hasInterface, withInterfaceNodes, destinationChoices, NO_DESTINATION } from "./workflowInterface";
-import { acceptsInput, dataRegions, nodeDataReason, nodeDataNote, dataSize, suggestedDisk, isImagingData } from "./dataHints";
+import { acceptsInput, dataRegions, dataUnreachable, nodeDataReason, nodeDataNote, dataSize, suggestedDisk, isImagingData } from "./dataHints";
 import { computed, reactive, ref, watch } from "vue";
 import { useStore } from "vuex";
 import BfButton from "../../shared/bf-button/BfButton.vue";
@@ -428,6 +428,9 @@ function loadPlatformCounts() {
       .catch(() => {});
   }
 }
+// A platform none of the user's nodes can reach (its data in a region only
+// compliant nodes elsewhere would read): said on its card.
+const platformUnreachable = (c) => dataUnreachable(interactiveComputeNodes.value, c);
 const platformLine = (c) => {
   const p = INPUT_CHOICES[c].platform;
   return platformCount(platformCounts.value[p], DATA_PLATFORMS[p].noun);
@@ -593,11 +596,11 @@ const canNext = computed(() => {
         : inputChoice.value === "public"
         ? !!publicDataset.value
         : inputChoice.value === "openData"
-        ? !!openDataDataset.value
+        ? !!openDataDataset.value && !inputUnreachable.value
         : inputChoice.value === "openNeuro"
-        ? !!openNeuroDataset.value
+        ? !!openNeuroDataset.value && !inputUnreachable.value
         : isPortal.value
-        ? !!portalDataset.value
+        ? !!portalDataset.value && !inputUnreachable.value
         : inputChoice.value === "none";
     case S.FILES:
       return dataSourcesComplete.value;
@@ -699,6 +702,11 @@ const dataContext = computed(() => ({
   selectedDataset: selectedDataset.value?.content,
 }));
 const nodeNote = (cn) => nodeDataNote(cn, dataRegions(inputChoice.value, dataContext.value));
+// The data chosen, when none of the user's nodes can reach it: it stays
+// chosen (a node may be added), but Next waits, and the node step offers
+// other data.
+const inputUnreachable = computed(() => dataUnreachable(interactiveComputeNodes.value, inputChoice.value, dataContext.value));
+const openDataUnreachable = (d) => dataUnreachable(interactiveComputeNodes.value, "openData", { openDataDataset: d });
 const dataBytes = computed(() => dataSize(inputChoice.value, dataContext.value));
 const diskSuggestion = computed(() => suggestedDisk(dataBytes.value, diskOptions));
 const imagingData = computed(() => isImagingData(inputChoice.value, dataContext.value));
@@ -1248,6 +1256,10 @@ async function execute() {
         <p class="wizard-step-desc">
           Select a compute node with notebook sessions enabled<template v-if="gpuFirst">, GPUs, and secure or compliant mode</template>.
         </p>
+        <p v-if="inputUnreachable" class="io-unreachable-note">
+          None of your compute nodes can reach this data.
+          <button type="button" class="io-other-data" @click="step = S.INPUT">Choose other data</button>
+        </p>
         <div v-if="selectedComputeNode" class="wizard-selection">
           <div class="wizard-selection-header">
             <span class="wizard-selection-name">{{ selectedComputeNode.name }}</span>
@@ -1427,6 +1439,7 @@ async function execute() {
               <span class="io-choice__name">{{ INPUT_CHOICES[c].label }}</span>
               <span class="io-choice__desc">{{ INPUT_CHOICES[c].desc }}</span>
               <span v-if="platformLine(c)" class="io-platform__count">{{ platformLine(c) }}</span>
+              <span v-if="platformUnreachable(c)" class="io-unreachable">{{ platformUnreachable(c) }}</span>
             </span>
           </button>
         </div>
@@ -1489,7 +1502,7 @@ async function execute() {
           and the folder of it to start with. The notebook starts with its
           file list; you pick which files to download from the notebook.
         </p>
-        <OpenDataPicker v-model:dataset="openDataDataset" v-model:prefix="openDataPrefix" />
+        <OpenDataPicker v-model:dataset="openDataDataset" v-model:prefix="openDataPrefix" :card-note="openDataUnreachable" />
       </div>
       <!-- Dataset -->
       <div v-else-if="step === S.INPUT && showPublicInput" class="wizard-step">
@@ -1565,7 +1578,10 @@ async function execute() {
           </div>
         </template>
       </div>
-
+      <!-- No node of the user's can reach it: Next waits, and why -->
+      <p v-if="inputUnreachable" class="io-unreachable-note">
+        {{ inputUnreachable }}. Add a compute node that can reach it, or choose other data.
+      </p>
       </div>
       </div>
 
@@ -1986,6 +2002,32 @@ async function execute() {
   margin-top: 2px;
   font-size: 12px;
   color: theme.$gray_4;
+}
+.io-unreachable {
+  margin-top: 2px;
+  font-size: 12px;
+  color: theme.$orange_2;
+}
+.io-unreachable-note {
+  flex-shrink: 0;
+  margin: 8px 0 0;
+  padding: 6px 10px;
+  border-left: 2px solid theme.$orange_1;
+  background: theme.$orange_tint;
+  font-size: 12px;
+  color: theme.$gray_5;
+}
+.io-other-data {
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  color: theme.$purple_2;
+  cursor: pointer;
+
+  &:hover {
+    text-decoration: underline;
+  }
 }
 .io-platform__note {
   margin: 8px 0 0;

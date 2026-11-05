@@ -45,6 +45,16 @@ export function nodeDataReason(cn, choice, { openDataDataset } = {}) {
   return `Can't reach ${where} (no internet access: only public data in ${cn.region || "its region"})`;
 }
 
+// Why none of the user's notebook nodes can take the chosen data ("" when
+// one can, or before any are listed): said at the data step, so the node
+// step never dead-ends. An Open Data pick waits for its dataset.
+export function dataUnreachable(nodes = [], choice, { openDataDataset } = {}) {
+  if (!nodes.length || (choice === "openData" && !openDataDataset)) return "";
+  if (nodes.some((cn) => !nodeDataReason(cn, choice, { openDataDataset }))) return "";
+  const regions = dataRegions(choice, { openDataDataset });
+  return `Not reachable from your compute nodes${regions.length ? ` (${regions.join(", ")})` : ""}`;
+}
+
 // A note on a compute node for the chosen data ("" for none): reading data
 // from another region costs cross-region transfer.
 export function nodeDataNote(cn, regions = []) {
