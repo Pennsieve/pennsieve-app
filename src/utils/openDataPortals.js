@@ -29,7 +29,8 @@ export const OPEN_DATA_PORTALS = {
 export const PORTAL_DISCOVER_URL = 'https://api.pennsieve.io/discover'
 
 const bucketUrl = (portal, path) => `https://${OPEN_DATA_PORTALS[portal].bucket}.s3.amazonaws.com/${path}`
-export const portalBannerUrl = (portal, id) => bucketUrl(portal, `${id}/banner.jpg`)
+// A dataset's banner, as a .jpg or a .png: the ones to try, in order.
+export const portalBannerUrls = (portal, id) => ['jpg', 'png'].map((ext) => bucketUrl(portal, `${id}/banner.${ext}`))
 
 // The portal's dataset ids, newest first: its bucket's numbered folders.
 export async function portalDatasetIds(portal, { listFolder = listOpenDataFolder } = {}) {
@@ -79,7 +80,7 @@ export const toPortalDataset = (portal, m = {}) => ({
   keywords: m.keywords || [],
   published: m.datePublished || '',
   doi: String(m['@id'] || '').replace(/^https?:\/\/doi\.org\//, ''),
-  banner: portalBannerUrl(portal, m.pennsieveDatasetId),
+  banners: portalBannerUrls(portal, m.pennsieveDatasetId),
 })
 
 // The first two contributors, then "et al.".

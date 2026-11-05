@@ -47,7 +47,10 @@ describe("a manifest", () => {
       authors: "Luke Bowden, Maria Daglas, et al.",
       organization: "SPARC",
       doi: "10.26275/9hgk-oozi",
-      banner: "https://sparc-prod-aod-discover-publish50-use1.s3.amazonaws.com/704/banner.jpg",
+      banners: [
+        "https://sparc-prod-aod-discover-publish50-use1.s3.amazonaws.com/704/banner.jpg",
+        "https://sparc-prod-aod-discover-publish50-use1.s3.amazonaws.com/704/banner.png",
+      ],
     });
   });
 
