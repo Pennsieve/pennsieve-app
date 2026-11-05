@@ -102,8 +102,11 @@ function clear() {
   if (!matches.value.length) search();
 }
 
-// A banner that isn't there leaves the placeholder.
-const noBanner = ref({});
+// A dataset's banner is a .jpg or a .png: the next is tried when one isn't
+// there, and the placeholder shows when neither is.
+const bannerTry = ref({}); // id -> which of its banners
+const bannerOf = (d) => d.banners[bannerTry.value[d.id] || 0] || "";
+const nextBanner = (d) => (bannerTry.value = { ...bannerTry.value, [d.id]: (bannerTry.value[d.id] || 0) + 1 });
 </script>
 
 <template>
@@ -112,7 +115,7 @@ const noBanner = ref({});
     <div v-if="dataset" class="pp-selected">
       <div class="pp-head">
         <div class="pp-banner">
-          <img v-if="!noBanner[dataset.id]" :src="dataset.banner" alt="" @error="noBanner = { ...noBanner, [dataset.id]: true }" />
+          <img v-if="bannerOf(dataset)" :src="bannerOf(dataset)" alt="" @error="nextBanner(dataset)" />
           <IconCompass v-else :width="20" :height="20" color="#b3bcce" />
         </div>
         <div class="pp-head__text">
@@ -147,7 +150,7 @@ const noBanner = ref({});
       <div class="pp-cards">
         <button v-for="d in results" :key="d.id" type="button" class="pp-card" @click="choose(d)">
           <span class="pp-banner">
-            <img v-if="!noBanner[d.id]" :src="d.banner" alt="" loading="lazy" @error="noBanner = { ...noBanner, [d.id]: true }" />
+            <img v-if="bannerOf(d)" :src="bannerOf(d)" alt="" loading="lazy" @error="nextBanner(d)" />
             <IconCompass v-else :width="20" :height="20" color="#b3bcce" />
           </span>
           <span class="pp-card__text">
