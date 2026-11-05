@@ -132,19 +132,25 @@ export const stepsFor = (draft, { installed = false, released = false } = {}) =>
 };
 
 const DRAFT_KEY = "pennsieve.publishApp.draft";
+// A draft is for coming back from GitHub, not for days later: an older one
+// is dropped and the dialog starts fresh.
+export const DRAFT_MAX_AGE_MS = 60 * 60 * 1000;
 
-export const loadDraft = (storage = globalThis.localStorage) => {
+export const loadDraft = (storage = globalThis.localStorage, now = Date.now()) => {
   try {
     const raw = storage?.getItem(DRAFT_KEY);
-    return raw ? { ...newDraft(), ...JSON.parse(raw) } : newDraft();
+    if (!raw) return newDraft();
+    const { savedAt, ...draft } = JSON.parse(raw);
+    if (!(savedAt > now - DRAFT_MAX_AGE_MS)) return newDraft();
+    return { ...newDraft(), ...draft };
   } catch {
     return newDraft();
   }
 };
 
-export const saveDraft = (draft, storage = globalThis.localStorage) => {
+export const saveDraft = (draft, storage = globalThis.localStorage, now = Date.now()) => {
   try {
-    storage?.setItem(DRAFT_KEY, JSON.stringify(draft));
+    storage?.setItem(DRAFT_KEY, JSON.stringify({ ...draft, savedAt: now }));
   } catch {
     // Nothing kept in this browser; the dialog still works.
   }

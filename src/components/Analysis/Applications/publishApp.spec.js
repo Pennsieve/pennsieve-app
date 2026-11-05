@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { appYmlFor, installUrl, loadDraft, newDraft, saveDraft, slugify, stepsFor, templateUrl } from "./publishApp";
+import { DRAFT_MAX_AGE_MS, appYmlFor, installUrl, loadDraft, newDraft, saveDraft, slugify, stepsFor, templateUrl } from "./publishApp";
 
 describe("slugify", () => {
   it("makes a repository name from an app's name", () => {
@@ -100,6 +100,17 @@ describe("draft storage", () => {
     saveDraft({ ...newDraft(), name: "x", owner: "lab" }, storage);
     expect(loadDraft(storage).owner).toBe("lab");
     store.set("pennsieve.publishApp.draft", "{not json");
+    expect(loadDraft(storage).name).toBe("");
+  });
+
+  it("drops a draft over an hour old", () => {
+    const store = new Map();
+    const storage = { getItem: (k) => store.get(k) ?? null, setItem: (k, v) => store.set(k, v), removeItem: (k) => store.delete(k) };
+    saveDraft({ ...newDraft(), name: "x" }, storage, 1_000_000);
+    expect(loadDraft(storage, 1_000_000 + DRAFT_MAX_AGE_MS - 1).name).toBe("x");
+    expect(loadDraft(storage, 1_000_000 + DRAFT_MAX_AGE_MS).name).toBe("");
+    // One kept before drafts had a time is as good as old.
+    store.set("pennsieve.publishApp.draft", JSON.stringify({ ...newDraft(), name: "x" }));
     expect(loadDraft(storage).name).toBe("");
   });
 });
