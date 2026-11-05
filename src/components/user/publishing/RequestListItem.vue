@@ -202,21 +202,20 @@ const isWithdrawn = computed(() => {
   return props.datasetRequest.proposalStatus === "WITHDRAWN";
 });
 
-const isEditable = computed(() => {
-  return isDraft.value || isWithdrawn.value;
-});
-
 const truncatedDescription = computed(() => {
   const desc = props.datasetRequest.description || "";
   return desc.length > 150 ? desc.substring(0, 150) + "..." : desc;
 });
 
 const surveyComplete = computed(() => {
-  const questions = repository.value?.questions;
-  const surveyResponses = props.datasetRequest.survey;
-  if (questions == null || surveyResponses == null) {
+  // Without the repository we can't know its questions, so hold off on Submit
+  // getRepositoryByNodeId returns {} when not found, so check for a real match
+  if (!repository.value?.organizationNodeId) {
     return false;
   }
+  // A repository with no question list has nothing to answer
+  const questions = repository.value.questions ?? [];
+  const surveyResponses = props.datasetRequest.survey ?? [];
 
   return questions.every((question) => {
     const answer = surveyResponses.find(

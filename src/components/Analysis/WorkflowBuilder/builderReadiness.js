@@ -82,13 +82,15 @@ export function builderReadiness({ name = "", nodes = [], edges = [], edgeIssues
   return { ready: blocking.length === 0, blocking, warnings: items.filter((i) => i.level === "warn"), items };
 }
 
-// An app step's parameters with no default and no value set: required, by
-// app.yml's convention that a parameter without a default is.
+// An app step's required parameters with no default and no value set. An
+// explicit `required` wins (app.yml defaults it to false); with no flag at
+// all, a parameter without a default is treated as required.
 export function requiredUnset(node) {
   const schema = node?.data?.paramSchema || [];
   const set = node?.data?.defaultParams || {};
+  const isRequired = (p) => (p.required != null ? Boolean(p.required) : true);
   return schema
-    .filter((p) => p.defaultValue == null || p.defaultValue === "")
+    .filter((p) => isRequired(p) && (p.defaultValue == null || p.defaultValue === ""))
     .map((p) => p.name)
     .filter((name) => name && (set[name] == null || set[name] === ""));
 }

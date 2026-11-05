@@ -2,8 +2,8 @@
 // One parameter of a step, with the control its app.yml declares: choices
 // (validValues) as a dropdown, a number (with min/max) as a number field, a
 // boolean as a switch, else text. The description is its help; the default
-// shows until it's overridden, with Reset to default. One with no default is
-// required: set here, or when the workflow runs. Values are strings, as the
+// shows until it's overridden, with Reset to default. A required one must be
+// set here, or when the workflow runs. Values are strings, as the
 // workflow stores them; an empty override means "use the default".
 import { computed } from "vue";
 
@@ -25,8 +25,12 @@ const type = computed(() => {
 });
 const hasDefault = computed(() => props.param.defaultValue != null && props.param.defaultValue !== "");
 const overridden = computed(() => props.modelValue != null && props.modelValue !== "");
-// app.yml's convention: a parameter with no default is required.
-const required = computed(() => !hasDefault.value);
+// An app parameter carries an explicit `required` (app.yml defaults it to
+// false). Data-target params carry none, so they keep the older rule: no
+// default means it must be set.
+const required = computed(() =>
+  props.param.required != null ? Boolean(props.param.required) : !hasDefault.value,
+);
 const shownValue = computed(() => (overridden.value ? String(props.modelValue) : hasDefault.value ? String(props.param.defaultValue) : ""));
 
 function set(value) {

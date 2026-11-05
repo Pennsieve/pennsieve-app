@@ -76,20 +76,20 @@ describe('applicationSchema', () => {
       expect(numeric.validValues).toEqual(['0.1'])
     })
 
-    it('treats a parameter with no default as required', () => {
-      const [needed] = parseParameters({ paramSchema: [{ name: 'channel', type: 'string' }] })
-      expect(needed.required).toBe(true)
+    it('treats a parameter as optional unless it says required: true', () => {
+      // No default and no flag: still optional — `required` defaults to false.
+      const [implicit] = parseParameters({ paramSchema: [{ name: 'channel', type: 'string' }] })
+      expect(implicit.required).toBe(false)
 
-      const [defaulted] = parseParameters({
-        paramSchema: [{ name: 'mode', type: 'string', defaultValue: 'fast' }],
-      })
-      expect(defaulted.required).toBe(false)
-
-      // An explicit flag still wins over the inference.
-      const [explicit] = parseParameters({
+      const [explicitOff] = parseParameters({
         paramSchema: [{ name: 'channel', type: 'string', required: false }],
       })
-      expect(explicit.required).toBe(false)
+      expect(explicitOff.required).toBe(false)
+
+      const [explicitOn] = parseParameters({
+        paramSchema: [{ name: 'channel', type: 'string', required: true }],
+      })
+      expect(explicitOn.required).toBe(true)
     })
 
     it('reads only `validValues` / `defaultValue`, not the earlier `allowedValues` / `default` / `enum`', () => {
@@ -525,8 +525,8 @@ describe('applicationSchema', () => {
             validValues: ['fast', 'accurate'],
           }),
           createParameter({ name: 'verbose', type: PARAM_TYPES.BOOLEAN, defaultValue: false }),
-          // No default: required is implied, so it is not written out.
-          createParameter({ name: 'channel', type: PARAM_TYPES.STRING, required: true }),
+          // Optional, no default: nothing about `required` is written out.
+          createParameter({ name: 'channel', type: PARAM_TYPES.STRING }),
         ],
       })
       const m = buildManifest(schema, { name: 'X' })
@@ -548,20 +548,19 @@ describe('applicationSchema', () => {
       expect(m.parameters[2]).toMatchObject({ name: 'verbose', defaultValue: 'false' })
       expect(m.parameters[3]).toMatchObject({ name: 'channel', type: 'string' })
 
-      // `required` is implied by the presence (or not) of a default, so it is
-      // only written when the parameter contradicts that.
+      // `required` defaults to false, so optional parameters omit it.
       m.parameters.forEach((p) => expect(p).not.toHaveProperty('required'))
       m.parameters.forEach((p) => expect(p).not.toHaveProperty('default'))
       m.parameters.forEach((p) => expect(p).not.toHaveProperty('allowedValues'))
     })
 
-    it('writes `required` only when it contradicts the default', () => {
+    it('writes `required` only when true', () => {
       const m = buildManifest(
         createApplicationSchema({
           parameters: [
-            // Optional despite having no default.
+            // Optional, no default.
             createParameter({ name: 'a', type: PARAM_TYPES.STRING, required: false }),
-            // Required despite having one.
+            // Required, even with a default.
             createParameter({
               name: 'b',
               type: PARAM_TYPES.STRING,
@@ -572,7 +571,7 @@ describe('applicationSchema', () => {
         }),
         { name: 'X' },
       )
-      expect(m.parameters[0].required).toBe(false)
+      expect(m.parameters[0]).not.toHaveProperty('required')
       expect(m.parameters[1].required).toBe(true)
     })
 
@@ -833,8 +832,8 @@ describe('applicationSchema', () => {
 
   /*
     The parameter form the platform actually publishes: `defaultValue` and
-    `validValues` as strings, types limited to string/number/boolean, and no
-    `required` key — a parameter without a default is required by definition.
+    `validValues` as strings, types limited to string/number/boolean, and
+    `required` written only when true (it defaults to false).
     Reading it and writing it back must both land on exactly this shape.
   */
   describe('canonical parameter form', () => {
@@ -863,7 +862,11 @@ describe('applicationSchema', () => {
       '    defaultValue: "false"',
       '  - name: channel',
       '    type: string',
-      '    description: Channel to analyze (no default, treated as required).',
+      '    required: true',
+      '    description: Channel to analyze.',
+      '  - name: accession',
+      '    type: string',
+      '    description: Optional accession; no default and no required flag.',
     ].join('\n')
 
     it('reads it', () => {
@@ -907,6 +910,13 @@ describe('applicationSchema', () => {
           defaultValue: null,
           validValues: [],
         },
+        {
+          name: 'accession',
+          type: PARAM_TYPES.STRING,
+          required: false,
+          defaultValue: null,
+          validValues: [],
+        },
       ])
     })
 
@@ -936,7 +946,13 @@ describe('applicationSchema', () => {
         {
           name: 'channel',
           type: 'string',
-          description: 'Channel to analyze (no default, treated as required).',
+          description: 'Channel to analyze.',
+          required: true,
+        },
+        {
+          name: 'accession',
+          type: 'string',
+          description: 'Optional accession; no default and no required flag.',
         },
       ])
     })
@@ -951,8 +967,9 @@ describe('applicationSchema', () => {
       expect(byName.threshold.validValues).toEqual(['0.1', '0.5', '0.9'])
       expect(byName.mode.validValues).toEqual(['fast', 'accurate'])
       expect(byName.verbose.validValues).toEqual([])
-      // No default reaches the builder as "required at run".
+      // Only an explicit `required: true` reaches the builder as required.
       expect(byName.channel).toMatchObject({ required: true, defaultValue: undefined })
+      expect(byName.accession).toMatchObject({ required: false, defaultValue: undefined })
     })
   })
 })
