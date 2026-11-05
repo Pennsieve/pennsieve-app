@@ -2059,6 +2059,7 @@ const openNodeSettings = (id) => {
                       {{ param.name }}
                       <el-tooltip
                         v-if="
+                          param.required &&
                           param.defaultValue == null &&
                           !selectedNode.data.defaultParams?.[param.name]
                         "
