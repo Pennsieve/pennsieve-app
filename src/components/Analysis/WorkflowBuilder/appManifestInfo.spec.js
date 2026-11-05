@@ -44,6 +44,8 @@ describe("media types", () => {
     expect(shortMediaType("*/*")).toBe("Any");
     expect(shortMediaType("application/vnd.apache.parquet")).toBe("PARQUET");
     expect(shortMediaType("application/x-rds")).toBe("RDS");
+    expect(shortMediaType("application/x-hdf5; profile=nwb")).toBe("NWB");
+    expect(shortMediaType("image/tiff; profile=ome-tiff")).toBe("OME-TIFF");
     expect(shortMediaType("application/octet-stream")).toBe("File");
     expect(shortMediaType("application/vnd.pennsieve.open-ephys")).toBe("OPEN-EPHYS");
     expect(shortMediaType("application/vnd.pennsieve.ome-zarr")).toBe("OME-ZARR");
