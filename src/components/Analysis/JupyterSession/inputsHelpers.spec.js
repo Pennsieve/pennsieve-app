@@ -110,6 +110,8 @@ describe("addedSourceName", () => {
 describe("inputSubtitle", () => {
   it("says where an input came from, and its folder", () => {
     expect(inputSubtitle({ openDataset: "openneuro", folder: "openneuro-ds008968" })).toBe("OpenNeuro · openneuro-ds008968");
+    expect(inputSubtitle({ openDataset: "sparc", folder: "sparc-704" })).toBe("SPARC · sparc-704");
+    expect(inputSubtitle({ openDataset: "epilepsy-science" })).toBe("Epilepsy.Science");
     expect(inputSubtitle({ openDataset: "1000-genomes", folder: "1000-genomes-HG00096" })).toBe("AWS Open Data · 1000-genomes-HG00096");
     expect(inputSubtitle({ sourceVersion: 1, folder: "dataset-42-v1" })).toBe("Pennsieve Discover v1 · dataset-42-v1");
     expect(inputSubtitle({})).toBe("Pennsieve Discover");
