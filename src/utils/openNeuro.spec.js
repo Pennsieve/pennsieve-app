@@ -39,6 +39,16 @@ describe("OpenNeuro", () => {
     await expect(searchOpenNeuro({}, { fetchFn })).rejects.toThrow("You do not have access");
   });
 
+  it("skips a deleted dataset and keeps the rest", async () => {
+    const fetchFn = respond(200, {
+      errors: [{ message: "Dataset ds008958 has been deleted. Reason: subject privacy.", path: ["advancedSearch", "edges", 1, "node"] }],
+      data: { advancedSearch: { edges: [{ node }, { node: null }], pageInfo: { count: 1932, hasNextPage: true, endCursor: "c1" } } },
+    });
+    const res = await searchOpenNeuro({}, { fetchFn });
+    expect(res.datasets.map((d) => d.id)).toEqual(["ds004100"]);
+    expect(res.next).toBe("c1");
+  });
+
   it("names a dataset by its id when it has no title", () => {
     expect(toOpenNeuroDataset({ id: "ds1" }).name).toBe("ds1");
     expect(openNeuroUrl("ds000001")).toBe("https://openneuro.org/datasets/ds000001");

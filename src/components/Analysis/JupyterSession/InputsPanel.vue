@@ -17,6 +17,8 @@ import OpenDataPicker from "../OpenDataPicker.vue";
 import DiscoverPicker from "../DiscoverPicker.vue";
 import OpenNeuroPicker from "../OpenNeuroPicker.vue";
 import { OPENNEURO_REGISTRY } from "@/utils/openNeuro";
+import PortalPicker from "../PortalPicker.vue";
+import { OPEN_DATA_PORTALS } from "@/utils/openDataPortals";
 import PlatformMark from "../PlatformMark.vue";
 import { DATA_PLATFORMS } from "../dataPlatforms";
 import { fileIconForPath } from "@/utils/fileIconForPath";
@@ -336,8 +338,9 @@ async function download() {
 
 /* ------------------------------------------------- adding and removing --- */
 // Another view while the session runs, from a data platform: a Pennsieve
-// Discover dataset version, or an AWS Open Data dataset or a folder of one,
-// made into a view and staged as input/<name>/.
+// Discover dataset version, or an OpenNeuro, SPARC, Epilepsy.Science or AWS
+// Open Data dataset or a folder of one, made into a view and staged as
+// input/<name>/.
 const addOpen = ref(false);
 const addPlatform = ref("discover");
 const addDataset = ref(null);
@@ -346,6 +349,16 @@ const addDiscover = ref(null);
 const addDiscoverVersion = ref(null);
 const addOpenNeuro = ref(null);
 const addOpenNeuroPrefix = ref("");
+// A SPARC or Epilepsy.Science dataset: a folder of the portal's Open Data
+// entry. Choosing the other portal starts over.
+const addPortal = ref(null);
+const addPortalPrefix = ref("");
+const addIsPortal = computed(() => addPlatform.value in OPEN_DATA_PORTALS);
+const addRegistry = computed(() => OPEN_DATA_PORTALS[addPlatform.value]?.registry || "");
+watch(addPlatform, () => {
+  addPortal.value = null;
+  addPortalPrefix.value = "";
+});
 const adding = ref(false);
 const addError = ref(null);
 
@@ -356,12 +369,20 @@ function openAdd() {
   addDiscoverVersion.value = null;
   addOpenNeuro.value = null;
   addOpenNeuroPrefix.value = "";
+  addPortal.value = null;
+  addPortalPrefix.value = "";
   addError.value = null;
   addOpen.value = true;
 }
 
 const addReady = computed(() =>
-  addPlatform.value === "discover" ? !!addDiscover.value : addPlatform.value === "openNeuro" ? !!addOpenNeuro.value : !!addDataset.value
+  addPlatform.value === "discover"
+    ? !!addDiscover.value
+    : addPlatform.value === "openNeuro"
+    ? !!addOpenNeuro.value
+    : addIsPortal.value
+    ? !!addPortal.value
+    : !!addDataset.value
 );
 
 // A source already in the session with the same files: the same Discover
@@ -378,6 +399,12 @@ const addDuplicate = computed(() => {
     const name = openDataViewName(d.name, addOpenNeuroPrefix.value);
     return sources.value.find((s) => s.openDataset === OPENNEURO_REGISTRY && s.viewName === name) || null;
   }
+  if (addIsPortal.value) {
+    const d = addPortal.value;
+    if (!d) return null;
+    const name = openDataViewName(d.name, addPortalPrefix.value);
+    return sources.value.find((s) => s.openDataset === addRegistry.value && s.viewName === name) || null;
+  }
   const d = addDataset.value;
   if (!d) return null;
   const name = openDataViewName(d.title, addPrefix.value);
@@ -388,6 +415,8 @@ const addDuplicateLabel = computed(() =>
     ? `Version ${addDiscoverVersion.value} of ${addDiscover.value?.name}`
     : addPlatform.value === "openNeuro"
     ? `This folder of ${addOpenNeuro.value?.name}`
+    : addIsPortal.value
+    ? `This folder of ${addPortal.value?.name}`
     : `This folder of ${addDataset.value?.title}`
 );
 
@@ -405,6 +434,11 @@ async function addData() {
       const d = addOpenNeuro.value;
       view = await createOpenDataView({ dataset: OPENNEURO_REGISTRY, title: d.name, prefix: addOpenNeuroPrefix.value });
       folder = (n) => addedSourceName(OPENNEURO_REGISTRY, addOpenNeuroPrefix.value, n);
+    } else if (addIsPortal.value) {
+      const d = addPortal.value;
+      const registry = addRegistry.value;
+      view = await createOpenDataView({ dataset: registry, title: d.name, prefix: addPortalPrefix.value });
+      folder = (n) => addedSourceName(registry, addPortalPrefix.value, n);
     } else {
       const d = addDataset.value;
       view = await createOpenDataView({ dataset: d.name, title: d.title, prefix: addPrefix.value });
@@ -684,6 +718,13 @@ function fmtSize(bytes) {
           v-else-if="addPlatform === 'openNeuro'"
           v-model:dataset="addOpenNeuro"
           v-model:prefix="addOpenNeuroPrefix"
+        />
+        <PortalPicker
+          v-else-if="addIsPortal"
+          :key="addPlatform"
+          :portal="addPlatform"
+          v-model:dataset="addPortal"
+          v-model:prefix="addPortalPrefix"
         />
         <OpenDataPicker v-else v-model:dataset="addDataset" v-model:prefix="addPrefix" />
       </template>

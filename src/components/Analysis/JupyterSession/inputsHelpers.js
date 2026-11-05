@@ -99,12 +99,15 @@ export function addedSourceName(dataset, prefix = "", n = 1) {
 }
 
 // An input's second line: where it came from, and its folder of input/ as
-// the session's files show it ("OpenNeuro · openneuro-ds008968"). folder is
+// the session's files show it ("OpenNeuro · openneuro-ds008968",
+// "SPARC · sparc-704"). folder is
 // "" when the session can't say (an older sidecar).
+// The Open Data entries a data platform of its own reads from.
+const OPEN_DATA_PLATFORMS = { openneuro: "OpenNeuro", sparc: "SPARC", "epilepsy-science": "Epilepsy.Science" };
 export function inputSubtitle({ openDataset = "", sourceVersion = null, folder = "" } = {}) {
   const platform =
-    openDataset === "openneuro"
-      ? "OpenNeuro"
+    OPEN_DATA_PLATFORMS[openDataset]
+      ? OPEN_DATA_PLATFORMS[openDataset]
       : openDataset
       ? "AWS Open Data"
       : sourceVersion

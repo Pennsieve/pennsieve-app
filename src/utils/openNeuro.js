@@ -27,7 +27,9 @@ async function gql(query, variables, fetchFn) {
     body: JSON.stringify({ query, variables }),
   })
   const body = await resp.json().catch(() => ({}))
-  if (!resp.ok || body.errors?.length) {
+  // An error alongside data is about one result (a dataset since deleted,
+  // say: its node is null); the rest are still good.
+  if (!resp.ok || (body.errors?.length && !body.data)) {
     throw new Error(body.errors?.[0]?.message || `OpenNeuro responded ${resp.status}`)
   }
   return body.data
@@ -60,9 +62,9 @@ export async function searchOpenNeuro({ query = '', modality = '', first = 25, a
   const data = await gql(SEARCH, { q, first, after }, fetchFn)
   const s = data.advancedSearch
   return {
-    datasets: (s.edges || []).map((e) => toOpenNeuroDataset(e.node)),
-    count: s.pageInfo?.count ?? null,
-    next: s.pageInfo?.hasNextPage ? s.pageInfo.endCursor : null,
+    datasets: (s?.edges || []).filter((e) => e?.node).map((e) => toOpenNeuroDataset(e.node)),
+    count: s?.pageInfo?.count ?? null,
+    next: s?.pageInfo?.hasNextPage ? s.pageInfo.endCursor : null,
   }
 }
 

@@ -4,10 +4,10 @@
 import { hasInterface } from "./workflowInterface";
 
 // The data platforms whose files come from public S3 buckets.
-const PUBLIC_BUCKET_INPUTS = new Set(["openNeuro", "openData"]);
+const PUBLIC_BUCKET_INPUTS = new Set(["openNeuro", "sparc", "epilepsyScience", "openData"]);
 
 // Whether a kernel's workflow can start with the input chosen (dataset,
-// public, openNeuro, openData or none). A workflow that declares its input
+// public, openNeuro, sparc, epilepsyScience, openData or none). A workflow that declares its input
 // takes any of them, and none when it's optional; one that doesn't reads a
 // workspace dataset's files, or in My Workspace a public dataset or nothing.
 export function acceptsInput(wf, choice, { personal = false } = {}) {
@@ -21,10 +21,12 @@ export function acceptsInput(wf, choice, { personal = false } = {}) {
   return false;
 }
 
-// Where the chosen data lives, when it's known: OpenNeuro's copy is in
-// us-east-1, an Open Data dataset says (its regions).
+// Where the chosen data lives, when it's known: OpenNeuro's, SPARC's and
+// Epilepsy.Science's copies are in us-east-1, an Open Data dataset says
+// (its regions).
+const US_EAST_1_INPUTS = new Set(["openNeuro", "sparc", "epilepsyScience"]);
 export function dataRegions(choice, { openDataDataset } = {}) {
-  if (choice === "openNeuro") return ["us-east-1"];
+  if (US_EAST_1_INPUTS.has(choice)) return ["us-east-1"];
   if (choice === "openData") return openDataDataset?.regions || [];
   return [];
 }
@@ -67,11 +69,12 @@ export function suggestedDisk(bytes, options = []) {
 }
 
 // Whether the data is imaging, where a GPU may help (deep learning,
-// registration, segmentation): from OpenNeuro's modalities or an Open Data
-// dataset's tags.
+// registration, segmentation): from OpenNeuro's modalities, or an Open Data
+// dataset's or a SPARC or Epilepsy.Science dataset's keywords.
 const IMAGING = /^(mri|pet|ct|microscopy|imaging|medical imaging|computer vision|cryo-em|histopathology|whole slide imaging)$/i;
-export function isImagingData(choice, { openNeuroDataset, openDataDataset } = {}) {
+export function isImagingData(choice, { openNeuroDataset, openDataDataset, portalDataset } = {}) {
   if (choice === "openNeuro") return (openNeuroDataset?.modalities || []).some((m) => IMAGING.test(m));
+  if (choice === "sparc" || choice === "epilepsyScience") return (portalDataset?.keywords || []).some((k) => IMAGING.test(k));
   if (choice === "openData") return (openDataDataset?.keywords || []).some((k) => IMAGING.test(k));
   return false;
 }
