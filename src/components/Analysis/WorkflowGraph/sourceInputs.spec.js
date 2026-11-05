@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { inputsFedBy, sourceLabel, sourceHints, hintLine, portsOfStep, missingFilesMessage, fileShortType, fileShortTypes, fileTypeMismatches, acceptedFileTypes, linkHints } from "./sourceInputs";
+import { inputsFedBy, sourceLabel, sourceHints, hintLine, portsOfStep, missingFilesMessage, fileShortType, fileShortTypes, fileTypeMismatches, acceptedFileTypes, linkHints, fileMediaTypes } from "./sourceInputs";
 
 // Four sources into test-ports-processor: two linked to its inputs, two to
 // "all inputs".
@@ -140,5 +140,34 @@ describe("an input's media types and EDAM formats", () => {
   it("takes FASTQs and sample sheets", () => {
     expect(fileTypeMismatches(["test_rnaseq_1.fastq.gz", "a_R2.fq.gz", "b.fastq", "samples.csv", "samples.xlsx"], hints)).toBeNull();
     expect(fileTypeMismatches(["notes.pdf"], hints)).toEqual({ names: ["notes.pdf"], expected: "GZIP or CSV or SHEET or FASTQ" });
+  });
+});
+
+describe("formats sharing a media type (profiles)", () => {
+  const formats = [
+    { value: "application/x-hdf5", extensions: [".hdf5", ".h5"] },
+    { value: "application/x-hdf5; profile=nwb", extensions: [".nwb"] },
+    { value: "image/tiff", extensions: [".tiff", ".tif"] },
+    { value: "image/tiff; profile=ome-tiff", extensions: [".ome.tiff", ".ome.tif"] },
+  ];
+  const hintsFor = (mediaTypes) =>
+    sourceHints("src", [{ id: "s", inputs: [{ from: "src", input: "x" }] }], () => ({ inputs: [{ name: "x", mediaTypes }] }));
+
+  it("types a file by its longest extension", () => {
+    expect(fileMediaTypes("a.nwb", formats)).toEqual(["application/x-hdf5; profile=nwb"]);
+    expect(fileMediaTypes("cells.OME.TIF", formats)).toEqual(["image/tiff; profile=ome-tiff"]);
+    expect(fileMediaTypes("plain.tif", formats)).toEqual(["image/tiff"]);
+    expect(fileMediaTypes("notes.pdf", formats)).toEqual([]);
+  });
+
+  it("an HDF5 input takes NWB files; an NWB input not plain HDF5", () => {
+    expect(fileTypeMismatches(["a.h5", "b.nwb"], hintsFor(["application/x-hdf5"]), formats)).toBeNull();
+    expect(fileTypeMismatches(["a.h5", "b.nwb"], hintsFor(["application/x-hdf5; profile=nwb"]), formats)).toEqual({ names: ["a.h5"], expected: "NWB" });
+  });
+
+  it("an OME-TIFF input names and takes OME-TIFFs", () => {
+    const hints = hintsFor(["image/tiff; profile=ome-tiff"]);
+    expect(hints[0].types).toEqual(["OME-TIFF"]);
+    expect(fileTypeMismatches(["x.ome.tiff", "y.tif"], hints)).toEqual({ names: ["y.tif"], expected: "OME-TIFF" });
   });
 });

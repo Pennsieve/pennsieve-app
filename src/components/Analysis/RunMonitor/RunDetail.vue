@@ -1782,7 +1782,7 @@ const configHints = (nodeId) => {
 const sourceMismatch = (nodeId, hints = configHints(nodeId)) => {
   const names = chosenFileNames(nodeId);
   if (!names.length) return null;
-  const m = fileTypeMismatches(names, hints);
+  const m = fileTypeMismatches(names, hints, store.state.analysisModule.packageFormats);
   return m && { ...m, total: names.length };
 };
 
@@ -2341,7 +2341,7 @@ const pickerTypes = computed(() => [...(acceptedFileTypes(pickerHints.value) || 
 const pickerDescription = computed(() => [...new Set(pickerHints.value.map((h) => h.description).filter(Boolean))].join(" "));
 const pickerWhyNot = (row) => {
   if (pickerAllowOtherTypes.value || !pickerTypes.value || row?.content?.packageType === "Collection") return "";
-  if (!fileTypeMismatches([row?.content?.name || ""], pickerHints.value)) return "";
+  if (!fileTypeMismatches([row?.content?.name || ""], pickerHints.value, store.state.analysisModule.packageFormats)) return "";
   return `${sourcePicker.value.name || "This input"} takes ${pickerTypes.value} files`;
 };
 
@@ -2492,6 +2492,9 @@ onMounted(async () => {
     store.dispatch("analysisModule/fetchComputeNodes", { force: isMyWorkspace.value }),
     store.dispatch("analysisModule/fetchTargetTypes"),
     store.dispatch("analysisModule/fetchApplications"),
+    // The platform's formats type the files the picker checks (an .nwb file
+    // fits an HDF5 input); without them it goes by extension alone.
+    store.dispatch("analysisModule/fetchPackageFormats"),
   ]);
 
   // Check for pending configure mode
