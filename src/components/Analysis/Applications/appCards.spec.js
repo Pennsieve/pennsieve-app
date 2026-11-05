@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { appTitle, appInitials, appColor, appDescription, versionLabel, runsOn, workflowUses, versionState, matchesAppSearch, sortApps, appNeedsGpu } from "./appCards";
+import { appTitle, appInitials, appColor, appDescription, versionLabel, runsOn, workflowUses, versionState, matchesAppSearch, sortApps, appNeedsGpu, appPageTitle, applicationPageTitle } from "./appCards";
 
 const spike = {
   name: "spike-detect",
@@ -96,5 +96,25 @@ describe("appNeedsGpu", () => {
   it("is false for a CPU-only app", () => {
     expect(appNeedsGpu(withRuntime({ computeTypes: ["standard"] }))).toBe(false);
     expect(appNeedsGpu({ versions: [] })).toBe(false);
+  });
+});
+
+describe("app page title", () => {
+  const stPrep = { uuid: "a1", name: "st-prep", sourceUrl: "https://github.com/pennsieve-apps/st-prep" };
+
+  it("is the repository, else the name", () => {
+    expect(appPageTitle(stPrep)).toBe("pennsieve-apps/st-prep");
+    expect(appPageTitle({ name: "Local tool" })).toBe("Local tool");
+  });
+
+  it("uses the app the page loaded, then the Apps list, else nothing", () => {
+    const getters = (current, list = []) => ({
+      "analysisModule/currentApplication": current,
+      "analysisModule/applications": list,
+    });
+    expect(applicationPageTitle("a1", getters(stPrep))).toBe("pennsieve-apps/st-prep");
+    expect(applicationPageTitle("a1", getters({ uuid: "other", name: "x" }, [stPrep]))).toBe("pennsieve-apps/st-prep");
+    expect(applicationPageTitle("a1", getters(null))).toBe("");
+    expect(applicationPageTitle("", getters(stPrep))).toBe("");
   });
 });
