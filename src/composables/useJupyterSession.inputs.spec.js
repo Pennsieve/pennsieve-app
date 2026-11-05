@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { postInputsFetch, getInputsFetch } from "./useJupyterSession";
+import { postInputsFetch, getInputsFetch, sessionSourcesRequest } from "./useJupyterSession";
 
 const respond = (status, body) =>
   vi.fn().mockResolvedValue({
@@ -53,5 +53,38 @@ describe("getInputsFetch", () => {
     const fetchFn = respond(200, { files: [{ source: "n", path: "a", state: "done" }] });
     expect(await getInputsFetch("https://k", "tok", { fetchFn })).toHaveLength(1);
     expect(fetchFn.mock.calls[0][1].headers.Authorization).toBe("Bearer tok");
+  });
+});
+
+describe("sessionSourcesRequest", () => {
+  const sources = [{ name: "", viewId: "v1", version: 1, root: true }, { name: "openneuro-ds000001", viewId: "v2", version: 1, added: true }];
+
+  it("lists, adds and removes the session's views", async () => {
+    let fetchFn = respond(200, { sources });
+    expect(await sessionSourcesRequest("https://k", "tok", "GET", {}, { fetchFn })).toEqual(sources);
+    expect(fetchFn.mock.calls[0][0]).toBe("https://k/pennsieve/inputs/sources");
+
+    fetchFn = respond(201, { sources });
+    await sessionSourcesRequest("https://k", "tok", "POST", { body: { name: "openneuro-ds000001", viewId: "v2", version: 1 } }, { fetchFn });
+    let [url, init] = fetchFn.mock.calls[0];
+    expect(init.method).toBe("POST");
+    expect(init.headers.Authorization).toBe("Bearer tok");
+    expect(JSON.parse(init.body)).toEqual({ name: "openneuro-ds000001", viewId: "v2", version: 1 });
+
+    fetchFn = respond(200, { sources: [] });
+    await sessionSourcesRequest("https://k", "tok", "DELETE", { name: "openneuro-ds000001" }, { fetchFn });
+    [url, init] = fetchFn.mock.calls[0];
+    expect(url).toBe("https://k/pennsieve/inputs/sources?name=openneuro-ds000001");
+    expect(init.method).toBe("DELETE");
+  });
+
+  it("is null from a sidecar that can't change its inputs", async () => {
+    expect(await sessionSourcesRequest("https://k", "tok", "GET", {}, { fetchFn: respond(404, "not found") })).toBeNull();
+  });
+
+  it("rejects with the sidecar's message and status", async () => {
+    const err = await sessionSourcesRequest("https://k", "tok", "POST", { body: {} }, { fetchFn: respond(409, "input/x already exists") }).catch((e) => e);
+    expect(err.message).toBe("input/x already exists");
+    expect(err.status).toBe(409);
   });
 });

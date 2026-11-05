@@ -11,12 +11,12 @@
 // via v-model and emits `created` with the new run.
 import { isPathPrefixParam, targetParamLabel, defaultsToRunName, targetWritesToDataset, canWriteDataset, searchDatasets } from "./dataTargets";
 import { hasInterface, withInterfaceNodes, destinationChoices, NO_DESTINATION } from "./workflowInterface";
+import { acceptsInput, dataRegions, nodeDataReason, nodeDataNote, dataSize, suggestedDisk, isImagingData } from "./dataHints";
 import { computed, reactive, ref, watch } from "vue";
 import { useStore } from "vuex";
 import BfButton from "../../shared/bf-button/BfButton.vue";
 import AnalysisFilesTable from "../../FilesTable/AnalysisFilesTable.vue";
 import BreadcrumbNavigation from "../../datasets/files/BreadcrumbNavigation/BreadcrumbNavigation.vue";
-import IconCompass from "@/components/icons/IconCompass.vue";
 import { useGetToken } from "@/composables/useGetToken";
 import { useSendXhr } from "@/mixins/request/request_composable";
 import toQueryParams from "@/utils/toQueryParams";
@@ -63,8 +63,14 @@ import RuntimeMark from "../WorkflowGraph/RuntimeMark.vue";
 import { STANDARD_CPU_OPTIONS, getStandardMemoryOptions, getTargetTypeLabel } from "./runHelpers";
 import { sourceLabel } from "../WorkflowGraph/sourceInputs";
 import * as siteConfig from "@/site-config/site.json";
-import { viewsServiceUrl, viewForDataset, viewDataSource } from "@/utils/viewsService";
-import { searchPublicDatasets as findPublicDatasets } from "@/utils/publicDatasets";
+import { viewsServiceUrl, viewForDataset, viewDataSource, createOpenDataView, openDataCatalog } from "@/utils/viewsService";
+import OpenDataPicker from "../OpenDataPicker.vue";
+import OpenNeuroPicker from "../OpenNeuroPicker.vue";
+import { countOpenNeuro, OPENNEURO_REGISTRY } from "@/utils/openNeuro";
+import DiscoverPicker from "../DiscoverPicker.vue";
+import PlatformMark from "../PlatformMark.vue";
+import { DATA_PLATFORMS, platformCount } from "../dataPlatforms";
+import { countPublicDatasets } from "@/utils/publicDatasets";
 
 const props = defineProps({
   modelValue: { type: Boolean, default: false },
@@ -85,7 +91,12 @@ const emit = defineEmits(["update:modelValue", "created"]);
 
 // The kernels that can start here: in My Workspace, not those whose results
 // go to a dataset (there's none to write to).
-const kernelChoices = computed(() => launchableKernels(props.notebookWorkflows, { personal: props.personal }));
+// The data comes first: only kernels that can take it are offered.
+const kernelChoices = computed(() =>
+  launchableKernels(props.notebookWorkflows, { personal: props.personal }).filter((wf) =>
+    acceptsInput(wf, inputChoice.value, { personal: props.personal })
+  )
+);
 // One card per kernel: its CPU and GPU workflows (app variants) together,
 // with a Hardware toggle when it has both.
 const cards = computed(() => kernelCards(kernelChoices.value));
@@ -120,14 +131,16 @@ let datasetSearchTimer = null;
 const executing = ref(false);
 
 // The steps, in order (indices into stepTitles).
-const S = { KERNEL: 0, NODE: 1, HARDWARE: 2, RESOURCES: 3, INPUT: 4, FILES: 5, OUTPUT: 6, REVIEW: 7 };
+// The data first: it decides which kernels can take it, and guides the
+// compute node, hardware and disk (dataHints).
+const S = { INPUT: 0, KERNEL: 1, FILES: 2, NODE: 3, HARDWARE: 4, RESOURCES: 5, OUTPUT: 6, REVIEW: 7 };
 const stepTitles = computed(() => [
+  "Choose Data",
   "Select Kernel",
+  "Select Input Files",
   "Select Compute Node",
   "Hardware",
   "Compute Resources",
-  iface.value ? "Input" : "Select Dataset",
-  "Select Input Files",
   iface.value ? "Results" : "Output Destination",
   "Review & Start",
 ]);
@@ -248,7 +261,8 @@ const nodeCapacityLabel = (cn) => capacityLabel(nodeCapacity.value[cn?.uuid]);
 const nodeReasons = (cn) => {
   const reasons = nodeHardwareUnfit(cn, nodeMustRun.value, gateReason);
   const full = capacityReason(nodeCapacity.value[cn?.uuid]);
-  return full ? [...reasons, full] : reasons;
+  const data = nodeDataReason(cn, inputChoice.value);
+  return [...reasons, ...(full ? [full] : []), ...(data ? [data] : [])];
 };
 // Reads the capacity of the nodes given (all listed, by default). Failures
 // leave a node without one and never block the dialog.
@@ -378,14 +392,42 @@ const ifaceInput = computed(() => selectedWorkflow.value?.inputs?.[0] || null);
 const ifaceOutput = computed(() => selectedWorkflow.value?.outputs?.[0] || null);
 const INPUT_CHOICES = {
   dataset: { label: "Files from a dataset", desc: "Choose a dataset in this workspace, then the files to start with" },
-  public: { label: "A public dataset", desc: "A published dataset; you pick its files from the notebook" },
+  public: { label: DATA_PLATFORMS.discover.name, desc: DATA_PLATFORMS.discover.desc, platform: "discover" },
+  openNeuro: { label: DATA_PLATFORMS.openNeuro.name, desc: DATA_PLATFORMS.openNeuro.desc, platform: "openNeuro" },
+  openData: { label: DATA_PLATFORMS.openData.name, desc: DATA_PLATFORMS.openData.desc, platform: "openData" },
   none: { label: "No input", desc: "Start with an empty input/ folder" },
 };
+// The data platforms' sizes, shown on their cards.
+const platformCounts = ref({ discover: null, openNeuro: null, openData: null });
+function loadPlatformCounts() {
+  if (!publicInputs) return;
+  if (platformCounts.value.discover == null) {
+    countPublicDatasets()
+      .then((n) => (platformCounts.value.discover = n))
+      .catch(() => {});
+  }
+  if (platformCounts.value.openNeuro == null) {
+    countOpenNeuro()
+      .then((n) => (platformCounts.value.openNeuro = n))
+      .catch(() => {});
+  }
+  if (platformCounts.value.openData == null) {
+    openDataCatalog()
+      .then((list) => (platformCounts.value.openData = list.filter((d) => d.anonymous).length))
+      .catch(() => {});
+  }
+}
+const platformLine = (c) => {
+  const p = INPUT_CHOICES[c].platform;
+  return platformCount(platformCounts.value[p], DATA_PLATFORMS[p].noun);
+};
+// Chosen before the kernel: every kind of data the dialog can start with
+// here; the kernels are then those that take it.
 const inputChoices = computed(() => {
   const c = [];
-  if (!props.personal && ifaceInput.value) c.push("dataset");
-  if (publicInputs && ifaceInput.value) c.push("public");
-  if (!ifaceInput.value || ifaceInput.value.optional) c.push("none");
+  if (!props.personal) c.push("dataset");
+  if (publicInputs) c.push("public", "openNeuro", "openData");
+  c.push("none");
   return c;
 });
 const inputChoice = ref("");
@@ -403,14 +445,12 @@ const outputDesc = (t) =>
     : targetWritesToDataset(t)
     ? "output/ copied into a dataset folder when the session ends"
     : "";
-// Choices start from what the workflow suggests: a dataset's files in a
-// workspace (else a public dataset), and the output's default.
+// The output starts from what the workflow suggests. (The input is chosen
+// first, before the kernel: reset.)
 watch(
   () => [form.value.workflowId, iface.value],
   () => {
     if (!iface.value) return;
-    const inputs = inputChoices.value;
-    inputChoice.value = inputs.includes(props.personal ? "public" : "dataset") ? (props.personal ? "public" : "dataset") : inputs[0] || "";
     const outs = outputChoices.value;
     const preferred = ifaceOutput.value?.default?.targetType;
     outputChoice.value = outs.includes(preferred) ? preferred : outs.find((t) => t !== NO_DESTINATION) || outs[0] || "";
@@ -422,13 +462,15 @@ watch(outputChoice, (t) => {
   if (!iface.value || !node || !t) return;
   dataTargetConfigs[node.id] = t === NO_DESTINATION ? { params: [] } : targetConfigFor(node, t);
 });
-// A public dataset as a workspace notebook's input: its search starts once
-// it's chosen.
-watch(inputChoice, (c) => {
-  if (c === "public" && publicInputs && !publicResults.value.length && !publicLoading.value) searchPublicDatasets();
+// A kernel chosen for other data that can't take this one is unchosen.
+watch(inputChoice, () => {
+  if (form.value.workflowId && !kernelChoices.value.some((wf) => wf.uuid === form.value.workflowId)) {
+    form.value.workflowId = "";
+    form.value.variant = "";
+  }
 });
-const showPublicInput = computed(() => (iface.value ? inputChoice.value === "public" && publicInputs : props.personal && publicInputs));
-const showDatasetInput = computed(() => (iface.value ? inputChoice.value === "dataset" : !props.personal));
+const showPublicInput = computed(() => inputChoice.value === "public" && publicInputs);
+const showDatasetInput = computed(() => inputChoice.value === "dataset");
 const outputWritesDataset = computed(() => iface.value && !!outputChoice.value && outputChoice.value !== NO_DESTINATION && targetWritesToDataset(outputChoice.value));
 
 /* ------------------------------------------------ view-only datasets ------- */
@@ -535,16 +577,17 @@ const canNext = computed(() => {
     case S.RESOURCES:
       return true; // resources always have a valid default (1 vCPU)
     case S.INPUT:
-      if (iface.value) {
-        return inputChoice.value === "dataset"
-          ? !!form.value.datasetId
-          : inputChoice.value === "public"
-          ? !!publicDataset.value
-          : inputChoice.value === "none";
-      }
-      return props.personal || !!form.value.datasetId;
+      return inputChoice.value === "dataset"
+        ? !!form.value.datasetId
+        : inputChoice.value === "public"
+        ? !!publicDataset.value
+        : inputChoice.value === "openData"
+        ? !!openDataDataset.value
+        : inputChoice.value === "openNeuro"
+        ? !!openNeuroDataset.value
+        : inputChoice.value === "none";
     case S.FILES:
-      return (props.personal && !iface.value) || dataSourcesComplete.value;
+      return dataSourcesComplete.value;
     case S.OUTPUT:
       if (iface.value && outputChoice.value === NO_DESTINATION) return true;
       return dataTargetsComplete.value && (!chooseResultsDataset.value || !!resultsDatasetId.value);
@@ -587,53 +630,52 @@ const onDatasetSearch = (query) => {
 // view (utils/viewsService). Discover is read anonymously, as on the public
 // dataset pages.
 const publicInputs = !!viewsServiceUrl();
-const publicQuery = ref("");
-const publicResults = ref([]);
-const publicLoading = ref(false);
-const publicDataset = ref(null); // { id, name, version, doi, fileCount, size }
-const publicVersions = ref([]);
+const publicDataset = ref(null); // a published dataset, chosen with DiscoverPicker
 const publicVersion = ref(null);
-let publicSearchTimer = null;
 
-async function searchPublicDatasets(query = "") {
-  publicLoading.value = true;
-  try {
-    publicResults.value = await findPublicDatasets(query);
-  } catch (err) {
-    console.error("Failed to search public datasets:", err);
-    publicResults.value = [];
-  } finally {
-    publicLoading.value = false;
-  }
-}
+/* --------------------------------------------------- AWS Open Data input --- */
+// A dataset of the Registry of Open Data on AWS and a folder of it, chosen
+// with OpenDataPicker: the notebook starts with a view of its files there,
+// listed from its public bucket when the run starts, and the user downloads
+// what they need from the Inputs panel.
+const openDataDataset = ref(null); // a listOpenData entry
+const openDataPrefix = ref("");
 
-const onPublicSearch = () => {
-  clearTimeout(publicSearchTimer);
-  publicSearchTimer = setTimeout(() => searchPublicDatasets(publicQuery.value), 300);
-};
+// An OpenNeuro dataset, chosen with OpenNeuroPicker: a view of its folder
+// in the Open Data catalog's openneuro entry.
+const openNeuroDataset = ref(null); // a searchOpenNeuro result
+const openNeuroPrefix = ref("");
+const openNeuroLabel = computed(() => {
+  const d = openNeuroDataset.value;
+  if (!d) return "";
+  return `${d.name} (${openNeuroPrefix.value || d.id})`;
+});
 
-async function selectPublicDataset(d) {
-  publicDataset.value = d;
-  publicVersion.value = d.version;
-  publicVersions.value = [d.version];
-  try {
-    const url = `${siteConfig.discoverUrl}/datasets/${d.id}/versions`;
-    const response = await useSendXhr(url, { method: "GET" });
-    const versions = (Array.isArray(response) ? response : [])
-      .map((v) => v.version)
-      .filter((v) => Number.isInteger(v))
-      .sort((a, b) => b - a);
-    if (versions.length) publicVersions.value = versions;
-  } catch (err) {
-    console.error("Failed to load the dataset's versions:", err);
-  }
-}
+const openDataLabel = computed(() => {
+  const d = openDataDataset.value;
+  if (!d) return "";
+  const p = openDataPrefix.value.trim();
+  return p ? `${d.title} (${p})` : d.title;
+});
 
-function clearPublicDataset() {
-  publicDataset.value = null;
-  publicVersion.value = null;
-  publicVersions.value = [];
-}
+// Hints from the data chosen: where it lives (a node elsewhere costs
+// transfer), its size (the disk suggested), and whether it's imaging (a
+// GPU may help).
+const dataContext = computed(() => ({
+  publicDataset: publicDataset.value,
+  openNeuroDataset: openNeuroDataset.value,
+  openDataDataset: openDataDataset.value,
+  selectedDataset: selectedDataset.value?.content,
+}));
+const nodeNote = (cn) => nodeDataNote(cn, dataRegions(inputChoice.value, dataContext.value));
+const dataBytes = computed(() => dataSize(inputChoice.value, dataContext.value));
+const diskSuggestion = computed(() => suggestedDisk(dataBytes.value, diskOptions));
+const imagingData = computed(() => isImagingData(inputChoice.value, dataContext.value));
+// The disk follows the suggestion until the user picks one.
+const diskTouched = ref(false);
+watch(diskSuggestion, (gib) => {
+  if (gib && !diskTouched.value) resourceDisk.value = gib;
+});
 
 const formatSize = (bytes) => {
   if (!bytes) return "0 B";
@@ -827,15 +869,21 @@ function reset() {
   nameTouched.value = false;
   computeNodeSearch.value = "";
   datasetSearchQuery.value = "";
-  publicQuery.value = "";
-  clearPublicDataset();
+  publicDataset.value = null;
+  publicVersion.value = null;
+  openDataDataset.value = null;
+  openDataPrefix.value = "";
+  openNeuroDataset.value = null;
+  openNeuroPrefix.value = "";
+  // The data comes first: a workspace's own dataset, else a public one.
+  inputChoice.value = props.personal ? (publicInputs ? "public" : "none") : "dataset";
+  diskTouched.value = false;
   resourceCpu.value = DEFAULT_CPU;
   resourceMemory.value = AUTO_MEMORY;
   step.value = 0;
   configDefinition.value = null;
   resultsDatasetId.value = "";
   resultsQuery.value = "";
-  inputChoice.value = "";
   outputChoice.value = "";
   Object.keys(dataSourceFiles).forEach((k) => delete dataSourceFiles[k]);
   Object.keys(dataTargetConfigs).forEach((k) => delete dataTargetConfigs[k]);
@@ -876,7 +924,7 @@ watch(visible, (open) => {
         .catch(() => {});
     }
     if (!props.personal) fetchDatasetOptions();
-    else if (publicInputs) searchPublicDatasets();
+    loadPlatformCounts();
   }
 });
 
@@ -886,12 +934,12 @@ watch(visible, (open) => {
 // that declares its own with those: no CPU and memory to choose. A kernel
 // without a hardware choice has no Hardware step.
 const skipsStep = (i) =>
-  (i === S.FILES && (iface.value ? inputChoice.value !== "dataset" : props.personal)) ||
+  (i === S.FILES && inputChoice.value !== "dataset") ||
   (i === S.HARDWARE && !allHardware.value.length) ||
   (i === S.RESOURCES && variantResourcesSet.value);
 
 const next = async () => {
-  if (step.value === S.INPUT) await loadDefinition(); // leaving Dataset → load inputs
+  if (step.value === S.KERNEL) await loadDefinition(); // leaving Kernel → its inputs and outputs
   let n = step.value + 1;
   while (skipsStep(n)) n++;
   if (n < stepTitles.value.length) step.value = n;
@@ -905,14 +953,14 @@ const back = () => {
 /* ------------------------------------------------------- info column ------ */
 // Input and Results show their own choices on the left (io-split); every
 // other step, what it's for and what's chosen so far.
-const stepHasChoices = computed(() => iface.value && (step.value === S.INPUT || step.value === S.OUTPUT));
+const stepHasChoices = computed(() => step.value === S.INPUT || (iface.value && step.value === S.OUTPUT));
 const STEP_ABOUT = [
+  "The data the notebook works with.",
   "A notebook is a live Jupyter session on a compute node. Choose its language.",
+  "The files copied into the notebook's input/ folder before it starts.",
   "The compute node the session runs on. Only nodes with notebook sessions are offered; each says whether it has a GPU.",
   "CPU, or the node's GPU when it has one. A GPU notebook gets the whole GPU instance.",
   "The CPU and memory the session gets. Memory follows the CPU unless you set it.",
-  "The dataset the notebook works with.",
-  "The files copied into the notebook's input/ folder before it starts.",
   "Where the notebook's results go when the session ends.",
   "Check the session, name it, and start it.",
 ];
@@ -923,26 +971,27 @@ const stepAbout = computed(() =>
 );
 const soFar = computed(() => {
   const rows = [];
-  if (step.value > 0 && selectedWorkflow.value) rows.push({ label: "Kernel", value: kernelLabel(notebookKernel(selectedWorkflow.value)) });
-  if (step.value > S.NODE && selectedComputeNode.value) rows.push({ label: "Compute node", value: selectedComputeNode.value.name });
-  if ((step.value > S.HARDWARE || gpuFirst.value) && hardwareLabel.value) rows.push({ label: "Hardware", value: hardwareLabel.value });
-  if (step.value > S.RESOURCES && !variantResourcesSet.value) {
-    rows.push({ label: "Resources", value: `${cpuLabel(resourceCpu.value)} · ${isAutoMemory.value ? memoryLabel(autoMemoryForCpu(resourceCpu.value)) : memoryLabel(resourceMemory.value)} · ${notebookDiskLabel(resourceDisk.value)}` });
-  }
   if (step.value > S.INPUT) {
-    const input = iface.value
-      ? inputChoice.value === "public"
+    const input =
+      inputChoice.value === "public"
         ? publicDataset.value?.name || "A public dataset"
+        : inputChoice.value === "openData"
+        ? openDataLabel.value || "AWS Open Data"
+        : inputChoice.value === "openNeuro"
+        ? openNeuroLabel.value || "OpenNeuro"
         : inputChoice.value === "dataset"
         ? selectedDataset.value?.content?.name || "A dataset"
-        : "No input"
-      : props.personal
-      ? publicDataset.value?.name || "None"
-      : selectedDataset.value?.content?.name;
-    if (input) rows.push({ label: "Input", value: input });
+        : "No input";
+    rows.push({ label: "Data", value: input });
   }
-  if (step.value > S.FILES && iface.value && inputChoice.value === "dataset") {
+  if (step.value > S.KERNEL && selectedWorkflow.value) rows.push({ label: "Kernel", value: kernelLabel(notebookKernel(selectedWorkflow.value)) });
+  if (step.value > S.FILES && inputChoice.value === "dataset") {
     rows.push({ label: "Files", value: String(dataSourceNodes.value.reduce((n, d) => n + fileCountForNode(d.id), 0)) });
+  }
+  if (step.value > S.NODE && selectedComputeNode.value) rows.push({ label: "Compute node", value: selectedComputeNode.value.name });
+  if ((step.value > S.HARDWARE || gpuFirst.value) && step.value > S.KERNEL && hardwareLabel.value) rows.push({ label: "Hardware", value: hardwareLabel.value });
+  if (step.value > S.RESOURCES && !variantResourcesSet.value) {
+    rows.push({ label: "Resources", value: `${cpuLabel(resourceCpu.value)} · ${isAutoMemory.value ? memoryLabel(autoMemoryForCpu(resourceCpu.value)) : memoryLabel(resourceMemory.value)} · ${notebookDiskLabel(resourceDisk.value)}` });
   }
   if (step.value > S.OUTPUT && iface.value) rows.push({ label: "Results", value: outputLabel(outputChoice.value) });
   return rows;
@@ -964,7 +1013,7 @@ async function execute() {
     const dag = configDefinition.value?.dag || [];
 
     const dataSources = {};
-    if (!iface.value || inputChoice.value === "dataset") {
+    if (inputChoice.value === "dataset") {
       for (const [nodeId, files] of Object.entries(dataSourceFiles)) {
         const ids = files.map((f) => f.content?.id).filter(Boolean);
         if (ids.length) dataSources[nodeId] = { packageIds: ids };
@@ -1007,12 +1056,32 @@ async function execute() {
     // Outside a workspace, the public dataset is the first data source's view.
     // It's a source's only input: the session downloads its files into it.
     const personalSources = {};
-    const usesPublic = iface.value ? inputChoice.value === "public" : props.personal;
+    const usesPublic = inputChoice.value === "public";
     if (usesPublic && publicDataset.value && dataSourceNodes.value.length) {
       const view = await viewForDataset({
         datasetId: publicDataset.value.id,
         version: publicVersion.value,
         name: publicDataset.value.name,
+      });
+      personalSources[dataSourceNodes.value[0].id] = viewDataSource(view);
+    }
+    // An AWS Open Data dataset: a view made for this run, listed now.
+    const usesOpenData = inputChoice.value === "openData";
+    if (usesOpenData && openDataDataset.value && dataSourceNodes.value.length) {
+      const view = await createOpenDataView({
+        dataset: openDataDataset.value.name,
+        title: openDataDataset.value.title,
+        prefix: openDataPrefix.value,
+      });
+      personalSources[dataSourceNodes.value[0].id] = viewDataSource(view);
+    }
+    // An OpenNeuro dataset: a view of its folder in the openneuro entry.
+    const usesOpenNeuro = inputChoice.value === "openNeuro";
+    if (usesOpenNeuro && openNeuroDataset.value && dataSourceNodes.value.length) {
+      const view = await createOpenDataView({
+        dataset: OPENNEURO_REGISTRY,
+        title: openNeuroDataset.value.name,
+        prefix: openNeuroPrefix.value,
       });
       personalSources[dataSourceNodes.value[0].id] = viewDataSource(view);
     }
@@ -1025,7 +1094,7 @@ async function execute() {
         ...(processorConfigs.length > 0 && { processorConfigs }),
       },
       ...(runDatasetId.value && { datasetId: runDatasetId.value }),
-      dataSources: usesPublic ? personalSources : dataSources,
+      dataSources: usesPublic || usesOpenData || usesOpenNeuro ? personalSources : dataSources,
       ...(name && { name }),
       ...(Object.keys(dataTargets).length > 0 && { dataTargets }),
     };
@@ -1059,7 +1128,7 @@ async function execute() {
   <el-dialog
     v-model="visible"
     :title="stepTitles[step]"
-    width="min(840px, 96vw)"
+    width="min(960px, 96vw)"
     :close-on-click-modal="false"
   >
     <div class="wizard-body">
@@ -1095,7 +1164,7 @@ async function execute() {
       <div v-if="step === S.KERNEL" class="wizard-step">
         <p class="wizard-step-desc">Choose the kernel for this notebook.</p>
         <p v-if="!kernelChoices.length" class="wizard-step-desc">
-          None of the notebook kernels can start outside a workspace yet: their results are saved to a dataset.
+          No notebook kernel can start with this data here. Go back to choose other data, or none.
         </p>
         <div class="kernel-grid">
           <div
@@ -1144,6 +1213,7 @@ async function execute() {
           <div class="wizard-card-offer">{{ gpuOffer(selectedGpu) }}</div>
           <div v-if="nodeCapacityLabel(selectedComputeNode)" class="wizard-card-capacity">{{ nodeCapacityLabel(selectedComputeNode) }}</div>
           <p v-if="offlineNote(selectedComputeNode)" class="resource-hint">{{ offlineNote(selectedComputeNode) }}</p>
+          <p v-if="nodeNote(selectedComputeNode)" class="data-hint">{{ nodeNote(selectedComputeNode) }}</p>
         </div>
         <template v-else>
           <el-input
@@ -1172,6 +1242,8 @@ async function execute() {
               <div class="wizard-card-offer">{{ gpuOffer(gpuOf(cn)) }}<template v-if="offlineNote(cn)"> · No internet access</template></div>
               <!-- Its notebooks in use, everyone's and the caller's -->
               <div v-if="nodeCapacityLabel(cn)" class="wizard-card-capacity">{{ nodeCapacityLabel(cn) }}</div>
+              <!-- The data chosen: in another region, it costs transfer -->
+              <div v-if="nodeNote(cn)" class="data-hint data-hint--card">{{ nodeNote(cn) }}</div>
               <!-- Hardware chosen first (a GPU kernel): why this node can't host it -->
               <div v-if="nodeReasons(cn).length" class="wizard-card-why" :title="gpuReasonNote(nodeReasons(cn)) || undefined">
                 {{ nodeReasons(cn).join(" · ") }}
@@ -1188,6 +1260,9 @@ async function execute() {
       <!-- Hardware: what the chosen node can run, as cards to compare -->
       <div v-if="step === S.HARDWARE" class="wizard-step">
         <p class="wizard-step-desc">Where should this notebook run?</p>
+        <p v-if="imagingData" class="data-hint">
+          This is imaging data: a GPU can speed up deep learning, registration and segmentation.
+        </p>
         <div class="hardware-grid" role="radiogroup" aria-label="Hardware">
           <button
             v-for="o in nodeHardware"
@@ -1250,7 +1325,7 @@ async function execute() {
           </div>
           <div class="resource-field">
             <label class="resource-label">Disk</label>
-            <el-select v-model="resourceDisk" size="default" style="width: 100%">
+            <el-select v-model="resourceDisk" size="default" style="width: 100%" @change="diskTouched = true">
               <el-option
                 v-for="opt in diskOptions"
                 :key="opt.value"
@@ -1264,134 +1339,105 @@ async function execute() {
           Memory is set automatically based on the CPU unless you pick a specific
           value. Higher tiers cost more — start small and scale up if needed.
         </p>
+        <p v-if="diskSuggestion" class="data-hint">
+          The data is {{ formatSize(dataBytes) }} in all: {{ diskSuggestion }} GB fits it with room for the
+          environment<template v-if="dataBytes > 180 * 2 ** 30">, but not all of it: download the folders you need</template>.
+        </p>
         <p class="resource-hint">{{ diskHint }}</p>
       </div>
 
       <!-- Input (a notebook with an input: what it starts with) -->
-      <div v-if="step === S.INPUT" :class="{ 'io-split': iface }">
-      <div v-if="iface" class="io-side">
-      <div class="io-choices-label">Start with</div>
-      <div class="io-choices">
-        <button
-          v-for="c in inputChoices"
-          :key="c"
-          type="button"
-          class="io-choice"
-          :class="{ 'is-picked': inputChoice === c }"
-          @click="inputChoice = c"
-        >
-          <span class="io-choice__name">{{ INPUT_CHOICES[c].label }}</span>
-          <span class="io-choice__desc">{{ INPUT_CHOICES[c].desc }}</span>
-        </button>
-      </div>
+      <div v-if="step === S.INPUT" class="io-split">
+      <div class="io-side">
+      <template v-if="inputChoices.includes('dataset')">
+        <div class="io-choices-label">Your workspace</div>
+        <div class="io-choices">
+          <button
+            type="button"
+            class="io-choice"
+            :class="{ 'is-picked': inputChoice === 'dataset' }"
+            @click="inputChoice = 'dataset'"
+          >
+            <span class="io-choice__name">{{ INPUT_CHOICES.dataset.label }}</span>
+            <span class="io-choice__desc">{{ INPUT_CHOICES.dataset.desc }}</span>
+          </button>
+        </div>
+      </template>
+      <template v-if="inputChoices.some((c) => INPUT_CHOICES[c].platform)">
+        <div class="io-choices-label io-choices-label--group">Data platforms</div>
+        <div class="io-choices">
+          <button
+            v-for="c in inputChoices.filter((c) => INPUT_CHOICES[c].platform)"
+            :key="c"
+            type="button"
+            class="io-choice io-platform"
+            :class="{ 'is-picked': inputChoice === c }"
+            @click="inputChoice = c"
+          >
+            <PlatformMark :platform="INPUT_CHOICES[c].platform" />
+            <span class="io-platform__text">
+              <span class="io-choice__name">{{ INPUT_CHOICES[c].label }}</span>
+              <span class="io-choice__desc">{{ INPUT_CHOICES[c].desc }}</span>
+              <span v-if="platformLine(c)" class="io-platform__count">{{ platformLine(c) }}</span>
+            </span>
+          </button>
+        </div>
+        <p class="io-platform__note">You pick which files to download from the notebook.</p>
+      </template>
+      <button
+        v-if="inputChoices.includes('none')"
+        type="button"
+        class="io-none"
+        :class="{ 'is-picked': inputChoice === 'none' }"
+        @click="inputChoice = 'none'"
+      >
+        Start without input data →
+      </button>
       </div>
       <div class="io-main">
-      <div v-if="step === S.INPUT && iface && inputChoice === 'none'" class="wizard-step">
+      <div v-if="step === S.INPUT && inputChoice === 'none'" class="wizard-step">
         <p class="wizard-step-desc">The notebook starts with an empty <code>input/</code> folder.</p>
+      </div>
+      <div v-else-if="step === S.INPUT && inputChoice === 'openNeuro'" class="wizard-step">
+        <h4 class="io-section-title io-platform-title">
+          <PlatformMark platform="openNeuro" :size="24" />
+          Choose an OpenNeuro dataset
+        </h4>
+        <p class="wizard-step-desc">
+          A dataset from <a href="https://openneuro.org" target="_blank" rel="noopener">OpenNeuro</a>,
+          read from its copy in the Registry of Open Data on AWS at its latest
+          version. The notebook starts with its file list; you pick which files
+          to download from the notebook.
+        </p>
+        <OpenNeuroPicker v-model:dataset="openNeuroDataset" v-model:prefix="openNeuroPrefix" />
+      </div>
+      <div v-else-if="step === S.INPUT && inputChoice === 'openData'" class="wizard-step">
+        <h4 class="io-section-title io-platform-title">
+          <PlatformMark platform="openData" :size="24" />
+          Choose an AWS Open Data dataset
+        </h4>
+        <p class="wizard-step-desc">
+          A dataset from the
+          <a href="https://registry.opendata.aws/" target="_blank" rel="noopener">Registry of Open Data on AWS</a>,
+          and the folder of it to start with. The notebook starts with its
+          file list; you pick which files to download from the notebook.
+        </p>
+        <OpenDataPicker v-model:dataset="openDataDataset" v-model:prefix="openDataPrefix" />
       </div>
       <!-- Dataset -->
       <div v-else-if="step === S.INPUT && showPublicInput" class="wizard-step">
-        <h4 v-if="iface" class="io-section-title">Choose a public dataset</h4>
+        <h4 class="io-section-title io-platform-title">
+          <PlatformMark platform="discover" :size="24" />
+          Choose a Pennsieve Discover dataset
+        </h4>
         <p class="wizard-step-desc">
-          Optionally choose a public dataset to work with. You pick which of
-          its files to download from the notebook. Skip this step to start
-          without input data.
+          A published dataset and its version. The notebook starts with its
+          file list; you pick which files to download from the notebook.
         </p>
-        <div v-if="publicDataset" class="wizard-selection public-selection">
-          <div class="public-row">
-            <div class="public-banner">
-              <img v-if="publicDataset.banner" :src="publicDataset.banner" alt="" />
-              <div v-else class="public-banner-placeholder">
-                <IconCompass :width="20" :height="20" color="#b3bcce" />
-              </div>
-            </div>
-            <div class="public-info">
-              <div class="wizard-selection-header">
-                <span class="wizard-selection-name">{{ publicDataset.name }}</span>
-                <button class="wizard-selection-clear" @click="clearPublicDataset">
-                  &times;
-                </button>
-              </div>
-              <div v-if="publicDataset.authors" class="public-authors">
-                {{ publicDataset.authors }}
-              </div>
-              <div v-if="publicDataset.organizationName" class="public-org">
-                {{ publicDataset.organizationName }}
-              </div>
-              <div class="public-meta">
-                <span>{{ publicDataset.fileCount }} files</span>
-                <span>{{ formatSize(publicDataset.size) }}</span>
-                <span v-if="publicDataset.doi">DOI {{ publicDataset.doi }}</span>
-              </div>
-            </div>
-          </div>
-          <div class="public-version">
-            <label class="resource-label">Version</label>
-            <el-select v-model="publicVersion" size="small" style="width: 140px">
-              <el-option
-                v-for="v in publicVersions"
-                :key="v"
-                :label="`Version ${v}`"
-                :value="v"
-              />
-            </el-select>
-          </div>
-        </div>
-        <template v-else>
-          <el-input
-            v-model="publicQuery"
-            placeholder="Search public datasets..."
-            clearable
-            class="wizard-search"
-            @input="onPublicSearch"
-          />
-          <div class="wizard-cards">
-            <div v-if="publicLoading" class="wizard-cards-loading">Searching...</div>
-            <div
-              v-for="ds in publicResults"
-              :key="ds.id"
-              class="wizard-card public-row"
-              @click="selectPublicDataset(ds)"
-            >
-              <div class="public-banner">
-                <img v-if="ds.banner" :src="ds.banner" alt="" loading="lazy" />
-                <div v-else class="public-banner-placeholder">
-                  <IconCompass :width="20" :height="20" color="#b3bcce" />
-                </div>
-              </div>
-              <div class="public-info">
-                <div class="wizard-card-name public-name">{{ ds.name }}</div>
-                <div v-if="ds.authors" class="public-authors">{{ ds.authors }}</div>
-                <div v-if="ds.organizationName" class="public-org">
-                  {{ ds.organizationName }}
-                </div>
-                <div class="public-meta">
-                  <span>Version {{ ds.version }}</span>
-                  <span>{{ ds.fileCount }} files</span>
-                  <span>{{ formatSize(ds.size) }}</span>
-                </div>
-              </div>
-            </div>
-            <div
-              v-if="!publicLoading && publicResults.length === 0"
-              class="wizard-cards-loading"
-            >
-              No public datasets found
-            </div>
-          </div>
-        </template>
-      </div>
-      <div v-else-if="step === S.INPUT && personal && !iface" class="wizard-step wizard-step--disabled">
-        <p class="wizard-step-desc">
-          Selecting a dataset isn't available outside a workspace yet. Public
-          datasets, and datasets from your workspaces, will be selectable here.
-          For now the notebook starts without input data.
-        </p>
-        <el-input placeholder="Search datasets..." disabled class="wizard-search" />
+        <DiscoverPicker v-model:dataset="publicDataset" v-model:version="publicVersion" />
       </div>
       <div v-else-if="step === S.INPUT && showDatasetInput" class="wizard-step">
-        <h4 v-if="iface" class="io-section-title">Choose a dataset</h4>
-        <p v-else class="wizard-step-desc">Select the dataset to work with.</p>
+        <h4 class="io-section-title">Choose a dataset</h4>
         <div v-if="selectedDataset" class="wizard-selection">
           <div class="wizard-selection-header">
             <span class="wizard-selection-name">{{ selectedDataset.content?.name }}</span>
@@ -1654,11 +1700,15 @@ async function execute() {
               {{ notebookDiskLabel(resourceDisk) }}
             </span>
           </div>
-          <div v-if="iface" class="wizard-summary-row">
-            <span class="wizard-summary-label">Input</span>
+          <div class="wizard-summary-row">
+            <span class="wizard-summary-label">Data</span>
             <span class="wizard-summary-value">{{
               inputChoice === "public"
                 ? `${publicDataset?.name} (version ${publicVersion})`
+                : inputChoice === "openData"
+                ? `${openDataLabel} (AWS Open Data)`
+                : inputChoice === "openNeuro"
+                ? `${openNeuroLabel} (OpenNeuro)`
                 : inputChoice === "dataset"
                 ? `${dataSourceNodes.reduce((n, d) => n + fileCountForNode(d.id), 0)} files from ${selectedDataset?.content?.name}`
                 : "None"
@@ -1672,32 +1722,25 @@ async function execute() {
                 : outputLabel(outputChoice)
             }}</span>
           </div>
-          <div v-if="personal && !iface" class="wizard-summary-row">
-            <span class="wizard-summary-label">Public dataset</span>
-            <span class="wizard-summary-value">{{
-              publicDataset ? `${publicDataset.name} (version ${publicVersion})` : "None"
-            }}</span>
-          </div>
-          <div v-if="!personal && !iface" class="wizard-summary-row">
-            <span class="wizard-summary-label">Dataset</span>
-            <span class="wizard-summary-value">{{ selectedDataset?.content?.name }}</span>
-          </div>
           <div v-if="viewOnly && !iface" class="wizard-summary-row">
             <span class="wizard-summary-label">Results saved to</span>
             <span class="wizard-summary-value">{{ resultsDataset?.content?.name }}</span>
-          </div>
-          <div v-if="!personal && !iface" class="wizard-summary-row">
-            <span class="wizard-summary-label">Input files</span>
-            <span class="wizard-summary-value">
-              {{ dataSourceNodes.reduce((n, d) => n + fileCountForNode(d.id), 0) }}
-              selected
-            </span>
           </div>
         </div>
         <p v-if="isGpu" class="resource-hint">{{ selectedGpu?.model ? `Runs on the node's ${selectedGpu.model}. ` : "" }}{{ GPU_NOTE }}</p>
         <p v-if="showPublicInput && publicDataset && !dataSourceNodes.length" class="public-warning">
           This notebook has no input to attach {{ publicDataset.name }} to, so
           it would start without it.
+        </p>
+        <p v-else-if="inputChoice === 'openNeuro' && openNeuroDataset" class="resource-hint">
+          The notebook starts with the file list of {{ openNeuroLabel }} in
+          <code>input/</code>, read from OpenNeuro's copy on AWS. Choose which
+          files to download from its <strong>Inputs</strong> panel.
+        </p>
+        <p v-else-if="inputChoice === 'openData' && openDataDataset" class="resource-hint">
+          The notebook starts with the file list of {{ openDataLabel }} in
+          <code>input/</code>, read from its public bucket. Choose which files
+          to download from its <strong>Inputs</strong> panel.
         </p>
         <p v-else-if="showPublicInput && publicDataset" class="resource-hint">
           The notebook starts with the dataset's file list in
@@ -1754,7 +1797,7 @@ async function execute() {
    right, apart by a rule */
 .io-split {
   display: grid;
-  grid-template-columns: 240px minmax(0, 1fr);
+  grid-template-columns: 340px minmax(0, 1fr);
   gap: 20px;
   min-height: 320px;
 }
@@ -1774,6 +1817,64 @@ async function execute() {
   flex-direction: column;
   gap: 6px;
 }
+/* A hint from the data chosen (dataHints) */
+.data-hint {
+  margin: 6px 0;
+  padding: 6px 10px;
+  border-left: 2px solid theme.$teal_2;
+  background: theme.$teal_tint;
+  font-size: 12px;
+  color: theme.$gray_5;
+}
+.data-hint--card {
+  margin: 6px 0 0;
+}
+.io-choices-label--group {
+  margin-top: 16px;
+}
+.io-choice.io-platform {
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+}
+.io-platform__text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.io-platform__count {
+  margin-top: 2px;
+  font-size: 12px;
+  color: theme.$gray_4;
+}
+.io-platform__note {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: theme.$gray_4;
+}
+.io-platform-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.io-none {
+  display: block;
+  margin-top: 16px;
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  font-size: 13px;
+  color: theme.$purple_2;
+  cursor: pointer;
+
+  &:hover,
+  &.is-picked {
+    color: theme.$purple_3;
+    text-decoration: underline;
+  }
+}
 .io-section-title {
   margin: 0 0 10px;
   font-size: 14px;
@@ -1785,7 +1886,7 @@ async function execute() {
   flex-direction: column;
   gap: 2px;
   min-width: 0;
-  padding: 8px 10px;
+  padding: 12px 14px;
   border: 1px solid theme.$gray_2;
   border-radius: 4px;
   background: theme.$white;
@@ -1794,12 +1895,12 @@ async function execute() {
   cursor: pointer;
 
   &:hover {
-    border-color: theme.$purple_1;
+    background: theme.$gray_1;
   }
+  /* Calm: a thin accent on the left and a faint tint. */
   &.is-picked {
-    border-color: theme.$purple_1;
-    background: #f5f3ff;
-    box-shadow: inset 3px 0 0 theme.$purple_1;
+    background: theme.$gray_1;
+    box-shadow: inset 2px 0 0 theme.$purple_3;
   }
 }
 .io-choice__name {

@@ -129,6 +129,36 @@ export async function getInputsFetch(kernelBaseUrl, token, { fetchFn = globalThi
   return inputsResponse(resp);
 }
 
+// The session's view inputs, changed while it runs: another view added as
+// input/<name>/, or one removed (its downloaded files stay). The browser only
+// names the view; the sidecar fetches its crate with the run's own credential.
+//   GET    {session}/pennsieve/inputs/sources -> 200
+//   POST   {session}/pennsieve/inputs/sources {name, viewId, version} -> 201
+//   DELETE {session}/pennsieve/inputs/sources?name=<source> -> 200
+// All answer { sources: [{ name, viewId, version, root, added }] }; root is
+// the view staged in input/ itself, named by the run's data source. null
+// from a sidecar that can't change its inputs (older, or none).
+const SOURCES_PATH = "/pennsieve/inputs/sources";
+
+export async function sessionSourcesRequest(kernelBaseUrl, token, method = "GET", { body, name } = {}, { fetchFn = globalThis.fetch } = {}) {
+  const query = name ? `?name=${encodeURIComponent(name)}` : "";
+  const resp = await fetchFn(`${kernelBaseUrl}${SOURCES_PATH}${query}`, {
+    method,
+    credentials: "include",
+    headers: { Authorization: `Bearer ${token}`, ...(body && { "Content-Type": "application/json" }) },
+    ...(body && { body: JSON.stringify(body) }),
+  });
+  if (method === "GET" && resp.status === 404) return null;
+  if (!resp.ok) {
+    const text = await resp.text().catch(() => "");
+    const err = new Error(text.trim() || `The session couldn't change its inputs (${resp.status}).`);
+    err.status = resp.status;
+    throw err;
+  }
+  const out = await resp.json();
+  return out.sources || [];
+}
+
 // The session's environment, switched while it runs. The sidecar fetches the
 // version from environments-service with the run's own credential, unpacks
 // it and restarts the kernel; the browser only names it:
@@ -173,8 +203,10 @@ export async function sessionEnvironmentRequest(kernelBaseUrl, token, method = "
 // (notebookPath inside the composable), not this module-level default.
 const DEFAULT_NOTEBOOK_PATH = "output/notebook.ipynb";
 
-// A dataset view's RO-Crate metadata, staged at the root of its input folder.
-export const CRATE_FILE = "ro-crate-metadata.json";
+// The folder of each input folder where the session keeps its dataset view's
+// RO-Crate (.pennsieve/view.json). A dataset's own ro-crate-metadata.json
+// is a file like any other.
+export const VIEW_CRATE_DIR = ".pennsieve";
 
 let cellSeq = 0;
 const newId = () => `cell-${Date.now().toString(36)}-${cellSeq++}`;
@@ -651,8 +683,8 @@ export function useJupyterSession() {
         if ((a.type === "directory") !== (b.type === "directory")) {
           return a.type === "directory" ? -1 : 1;
         }
-        if ((a.name === CRATE_FILE) !== (b.name === CRATE_FILE)) {
-          return a.name === CRATE_FILE ? 1 : -1;
+        if ((a.name === VIEW_CRATE_DIR) !== (b.name === VIEW_CRATE_DIR)) {
+          return a.name === VIEW_CRATE_DIR ? 1 : -1;
         }
         return a.name.localeCompare(b.name);
       });
@@ -935,6 +967,22 @@ export function useJupyterSession() {
     return getInputsFetch(kernelBaseUrl, sessionToken);
   }
 
+  // The session's view inputs (see sessionSourcesRequest).
+  function inputSources() {
+    if (!kernelBaseUrl) throw new Error("The session isn't connected.");
+    return sessionSourcesRequest(kernelBaseUrl, sessionToken);
+  }
+
+  function addInputSource(name, viewId, version) {
+    if (!kernelBaseUrl) throw new Error("The session isn't connected.");
+    return sessionSourcesRequest(kernelBaseUrl, sessionToken, "POST", { body: { name, viewId, version } });
+  }
+
+  function removeInputSource(name) {
+    if (!kernelBaseUrl) throw new Error("The session isn't connected.");
+    return sessionSourcesRequest(kernelBaseUrl, sessionToken, "DELETE", { name });
+  }
+
   // The session's environment (see sessionEnvironmentRequest).
   function environmentState() {
     if (!kernelBaseUrl) throw new Error("The session isn't connected.");
@@ -1008,6 +1056,9 @@ export function useJupyterSession() {
     listDir,
     fetchInputs,
     inputsStatus,
+    inputSources,
+    addInputSource,
+    removeInputSource,
     // environment
     environmentState,
     switchEnvironment,

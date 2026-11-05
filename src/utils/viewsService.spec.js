@@ -6,6 +6,12 @@ import {
   viewDataSource,
   listEntries,
   ViewsServiceError,
+  listOpenData,
+  searchOpenData,
+  createOpenDataView,
+  listOpenDataFolder,
+  openDataViewName,
+  openDataCatalog,
 } from "./viewsService";
 import dev from "../site-config/dev.json";
 import prod from "../site-config/prod.json";
@@ -116,5 +122,78 @@ describe("run views", () => {
         { datasetId: 9, version: 1, paths: ["files/sub"] },
       ],
     });
+  });
+});
+
+describe("open data", () => {
+  const catalog = {
+    "@type": "DataCatalog",
+    dataset: [
+      { identifier: "openneuro", name: "OpenNeuro", publisher: "OpenNeuro", keywords: ["neuroimaging", "bids"], "pennsieve:regions": ["us-east-1"], "pennsieve:anonymous": true, url: "https://registry.opendata.aws/openneuro/" },
+      { identifier: "hcp-openaccess", name: "Human Connectome Project", keywords: ["neuroimaging"], "pennsieve:anonymous": false },
+      { identifier: "dandiarchive", name: "DANDI: Distributed Archives for Neurophysiology Data Integration", keywords: ["neurophysiology", "openneuro-like"], "pennsieve:anonymous": true },
+    ],
+  };
+
+  it("lists the catalog", async () => {
+    const fetchFn = respond([200, catalog]);
+    const list = await listOpenData({ config, getToken, fetchFn });
+    expect(fetchFn.mock.calls[0][0]).toBe("https://api2.pennsieve.net/views/open-data");
+    expect(list[0]).toEqual({
+      name: "openneuro", title: "OpenNeuro", summary: "", keywords: ["neuroimaging", "bids"], publisher: "OpenNeuro",
+      regions: ["us-east-1"], anonymous: true, url: "https://registry.opendata.aws/openneuro/",
+    });
+  });
+
+  it("searches only what anyone can read, name and title matches first", async () => {
+    const list = await listOpenData({ config, getToken, fetchFn: respond([200, catalog]) });
+    expect(searchOpenData(list, "").map((d) => d.name)).toEqual(["openneuro", "dandiarchive"]);
+    expect(searchOpenData(list, "neuroimaging").map((d) => d.name)).toEqual(["openneuro"]);
+    expect(searchOpenData(list, "openneuro").map((d) => d.name)).toEqual(["openneuro", "dandiarchive"]);
+    expect(searchOpenData(list, "connectome")).toEqual([]);
+  });
+
+  it("makes a run view of a prefix", async () => {
+    const view = { id: "v9", version: 1 };
+    const fetchFn = respond([201, view]);
+    expect(await createOpenDataView({ dataset: "openneuro", title: "OpenNeuro", prefix: " /ds000001/ " }, { config, getToken, fetchFn })).toEqual(view);
+    const [url, init] = fetchFn.mock.calls[0];
+    expect(url).toBe("https://api2.pennsieve.net/views/me");
+    expect(JSON.parse(init.body)).toEqual({
+      name: "OpenNeuro (ds000001/)",
+      sources: [{ kind: "openData", dataset: "openneuro", prefix: "ds000001/" }],
+      lifecycle: "run",
+    });
+    const whole = respond([201, view]);
+    await createOpenDataView({ dataset: "openneuro", title: "OpenNeuro" }, { config, getToken, fetchFn: whole });
+    expect(JSON.parse(whole.mock.calls[0][1].body).sources).toEqual([{ kind: "openData", dataset: "openneuro" }]);
+  });
+});
+
+describe("listOpenDataFolder", () => {
+  it("lists one level, narrowed by name", async () => {
+    const level = { prefix: "", folders: ["ds000001"], files: [], truncated: true };
+    const fetchFn = respond([200, level], [200, level]);
+    expect(await listOpenDataFolder({ dataset: "openneuro" }, { config, getToken, fetchFn })).toEqual(level);
+    expect(fetchFn.mock.calls[0][0]).toBe("https://api2.pennsieve.net/views/open-data/openneuro/folders");
+    await listOpenDataFolder({ dataset: "openneuro", prefix: "ds000001/", startsWith: "sub" }, { config, getToken, fetchFn });
+    expect(fetchFn.mock.calls[1][0]).toBe("https://api2.pennsieve.net/views/open-data/openneuro/folders?prefix=ds000001%2F&startsWith=sub");
+  });
+});
+
+describe("openDataViewName", () => {
+  it("names a view by its dataset and folder", () => {
+    expect(openDataViewName("OpenNeuro", " /ds000001/ ")).toBe("OpenNeuro (ds000001/)");
+    expect(openDataViewName("OpenNeuro", "")).toBe("OpenNeuro");
+  });
+});
+
+describe("openDataCatalog", () => {
+  it("reads the catalog once", async () => {
+    const fetchFn = respond([200, { dataset: [{ identifier: "openneuro", "pennsieve:anonymous": true }] }]);
+    const first = await openDataCatalog({ config, getToken, fetchFn });
+    const again = await openDataCatalog({ config, getToken, fetchFn });
+    expect(first).toBe(again);
+    expect(fetchFn).toHaveBeenCalledTimes(1);
   });
 });
