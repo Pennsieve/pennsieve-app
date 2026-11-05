@@ -39,12 +39,15 @@ const props = defineProps({
 // A GPU session (the session app's gpu variant): marked in the header, and
 // the environment panel warns about environments that bring their own
 // torch, tensorflow or jax. Read from the run; a CPU session until it is.
-// The header names the run's node's GPU (its GPU tier) where known.
+// The header names the run's node's GPU (its GPU tier) where known. The
+// run's node also limits the data the Inputs panel can add (a compliant
+// node reads public data only in its region).
 const onGpu = ref(false);
 const sessionGpu = ref(null);
+const sessionNode = ref(null);
 const vuexStore = useStore();
 const computeResourcesStore = useComputeResourcesStore();
-async function loadSessionGpu(run) {
+async function loadSessionNode(run) {
   const nodeId = runNodeId(run);
   if (!nodeId) return null;
   try {
@@ -53,8 +56,16 @@ async function loadSessionGpu(run) {
       await vuexStore.dispatch("analysisModule/fetchComputeNodes");
       nodes = vuexStore.getters["analysisModule/computeNodes"] || [];
     }
+    return nodes.find((n) => n.uuid === nodeId) || null;
+  } catch {
+    return null;
+  }
+}
+async function loadSessionGpu(node) {
+  if (!node) return null;
+  try {
     const tiers = await computeResourcesStore.fetchGpuTiers(vuexStore.getters.activeOrganization?.organization?.id);
-    return nodeGpu(nodes.find((n) => n.uuid === nodeId), tiers || []);
+    return nodeGpu(node, tiers || []);
   } catch {
     return null;
   }
@@ -64,12 +75,16 @@ watch(
   async (id) => {
     onGpu.value = false;
     sessionGpu.value = null;
+    sessionNode.value = null;
     if (!id) return;
     const run = await fetchRun(siteConfig.api2Url, id);
     if (id !== props.runId) return;
     onGpu.value = runOnGpu(run);
+    const node = await loadSessionNode(run);
+    if (id !== props.runId) return;
+    sessionNode.value = node;
     if (!onGpu.value) return;
-    const gpu = await loadSessionGpu(run);
+    const gpu = await loadSessionGpu(node);
     if (id === props.runId) sessionGpu.value = gpu;
   },
   { immediate: true }
@@ -807,6 +822,7 @@ const kernelPill = computed(() => {
           :add-input-source="addInputSource"
           :remove-input-source="removeInputSource"
           :ready="status === 'ready'"
+          :node="sessionNode"
           :width="sidebarWidth"
           @downloaded="fileBrowserRef?.refresh?.()"
         />

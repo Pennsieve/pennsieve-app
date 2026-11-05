@@ -55,6 +55,14 @@ export function dataUnreachable(nodes = [], choice, { openDataDataset } = {}) {
   return `Not reachable from your compute nodes${regions.length ? ` (${regions.join(", ")})` : ""}`;
 }
 
+// Why a running session's node can't take data added to it ("" when it
+// can, while its node isn't known, or before an Open Data dataset is
+// chosen): the Inputs panel's rule, the dialog's for one node.
+export function sessionDataReason(cn, choice, { openDataDataset } = {}) {
+  if (!cn || (choice === "openData" && !openDataDataset)) return "";
+  return nodeDataReason(cn, choice, { openDataDataset });
+}
+
 // A note on a compute node for the chosen data ("" for none): reading data
 // from another region costs cross-region transfer.
 export function nodeDataNote(cn, regions = []) {

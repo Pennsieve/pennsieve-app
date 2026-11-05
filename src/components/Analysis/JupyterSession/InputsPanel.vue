@@ -21,6 +21,7 @@ import PortalPicker from "../PortalPicker.vue";
 import { OPEN_DATA_PORTALS } from "@/utils/openDataPortals";
 import PlatformMark from "../PlatformMark.vue";
 import { DATA_PLATFORMS } from "../dataPlatforms";
+import { sessionDataReason } from "../RunMonitor/dataHints";
 import { fileIconForPath } from "@/utils/fileIconForPath";
 import { ArrowRight } from "@element-plus/icons-vue";
 import IconDoneCheckCircle from "@/components/icons/IconDoneCheckCircle.vue";
@@ -49,6 +50,9 @@ const props = defineProps({
   addInputSource: { type: Function, default: null },
   removeInputSource: { type: Function, default: null },
   ready: { type: Boolean, default: false },
+  // The session's compute node, when known: a compliant one reads public
+  // data only in its region, so other data can't be added.
+  node: { type: Object, default: null },
   // The sidebar's width in px: long names are shortened to fit it.
   width: { type: Number, default: 300 },
 });
@@ -361,6 +365,13 @@ watch(addPlatform, () => {
 });
 const adding = ref(false);
 const addError = ref(null);
+// Why the session's node can't take a platform's data, or the Open Data
+// dataset chosen ("" when it can): greyed out, and not added.
+const platformReason = (key) => sessionDataReason(props.node, key);
+const openDataReason = (d) => sessionDataReason(props.node, "openData", { openDataDataset: d });
+const addReason = computed(() =>
+  addPlatform.value === "openData" ? openDataReason(addDataset.value) : platformReason(addPlatform.value)
+);
 
 function openAdd() {
   addDataset.value = null;
@@ -372,6 +383,7 @@ function openAdd() {
   addPortal.value = null;
   addPortalPrefix.value = "";
   addError.value = null;
+  if (platformReason(addPlatform.value)) addPlatform.value = "discover";
   addOpen.value = true;
 }
 
@@ -421,7 +433,7 @@ const addDuplicateLabel = computed(() =>
 );
 
 async function addData() {
-  if (!addReady.value || adding.value || addDuplicate.value) return;
+  if (!addReady.value || adding.value || addDuplicate.value || addReason.value) return;
   adding.value = true;
   addError.value = null;
   try {
@@ -696,14 +708,17 @@ function fmtSize(bytes) {
           type="button"
           role="tab"
           class="inp__platform"
-          :class="{ 'is-picked': addPlatform === key }"
+          :class="{ 'is-picked': addPlatform === key, 'is-unreachable': platformReason(key) }"
           :aria-selected="addPlatform === key"
+          :disabled="!!platformReason(key)"
+          :title="platformReason(key) || undefined"
           @click="addPlatform = key"
         >
           <PlatformMark :platform="key" :size="32" />
           <span class="inp__platform-text">
             <span class="inp__platform-name">{{ p.name }}</span>
             <span class="inp__platform-desc">{{ p.desc }}</span>
+            <span v-if="platformReason(key)" class="inp__platform-why">{{ platformReason(key) }}</span>
           </span>
         </button>
       </div>
@@ -726,15 +741,16 @@ function fmtSize(bytes) {
           v-model:dataset="addPortal"
           v-model:prefix="addPortalPrefix"
         />
-        <OpenDataPicker v-else v-model:dataset="addDataset" v-model:prefix="addPrefix" />
+        <OpenDataPicker v-else v-model:dataset="addDataset" v-model:prefix="addPrefix" :card-note="openDataReason" />
       </template>
       <p v-if="addDuplicate" class="inp__msg inp__msg--error">
         {{ addDuplicateLabel }} is already in the session, as input/{{ addDuplicate.nodeId }}/.
       </p>
+      <p v-if="addReason" class="inp__msg inp__msg--error">{{ addReason }}: this session's node can't read it.</p>
       <p v-if="addError" class="inp__msg inp__msg--error">{{ addError }}</p>
       <template #footer>
         <el-button @click="addOpen = false">Cancel</el-button>
-        <el-button type="primary" :disabled="!addReady || !!addDuplicate" :loading="adding" @click="addData">Add to session</el-button>
+        <el-button type="primary" :disabled="!addReady || !!addDuplicate || !!addReason" :loading="adding" @click="addData">Add to session</el-button>
       </template>
     </el-dialog>
   </div>
@@ -942,6 +958,20 @@ function fmtSize(bytes) {
     background: theme.$gray_1;
     box-shadow: inset 2px 0 0 theme.$purple_3;
   }
+  /* The session's node can't read its data. */
+  &.is-unreachable {
+    opacity: 0.55;
+    cursor: not-allowed;
+
+    &:hover {
+      background: theme.$white;
+    }
+  }
+}
+.inp__platform-why {
+  margin-top: 2px;
+  font-size: 12px;
+  color: theme.$gray_5;
 }
 .inp__platform-text {
   display: flex;

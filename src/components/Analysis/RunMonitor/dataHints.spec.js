@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { acceptsInput, dataRegions, dataUnreachable, nodeDataReason, nodeDataNote, dataSize, suggestedDisk, isImagingData } from "./dataHints";
+import { acceptsInput, dataRegions, dataUnreachable, sessionDataReason, nodeDataReason, nodeDataNote, dataSize, suggestedDisk, isImagingData } from "./dataHints";
 import { NOTEBOOK_DISK_OPTIONS } from "./notebookHelpers";
 
 const GiB = 2 ** 30;
@@ -72,6 +72,24 @@ describe("data hints", () => {
     // Not judged: no nodes listed yet, or an Open Data pick without its dataset.
     expect(dataUnreachable([], "openNeuro")).toBe("");
     expect(dataUnreachable([publicNode], "openData")).toBe("");
+  });
+
+  // The running session's Inputs panel: data added to it must be reachable
+  // from the session's node.
+  it("knows what a running session's node can add", () => {
+    const publicNode = { deploymentMode: "compliant", region: "us-east-1" };
+    const dandi = { anonymous: true, regions: ["us-east-2"] };
+    expect(sessionDataReason(publicNode, "openData", { openDataDataset: dandi })).toBe(
+      "Can't reach data in us-east-2 (no internet access: only public data in us-east-1)"
+    );
+    expect(sessionDataReason(publicNode, "openData", { openDataDataset: { anonymous: true, regions: ["us-east-1"] } })).toBe("");
+    expect(sessionDataReason(publicNode, "sparc")).toBe("");
+    expect(sessionDataReason({ deploymentMode: "compliant", region: "us-west-2" }, "openNeuro")).toMatch(/us-east-1.*us-west-2/);
+    expect(sessionDataReason(publicNode, "discover")).toBe("");
+    expect(sessionDataReason({ deploymentMode: "basic", region: "us-west-2" }, "openData", { openDataDataset: dandi })).toBe("");
+    // Not judged yet: the node not known, or no Open Data dataset chosen.
+    expect(sessionDataReason(null, "openNeuro")).toBe("");
+    expect(sessionDataReason(publicNode, "openData")).toBe("");
   });
 
   it("notes cross-region transfer", () => {
