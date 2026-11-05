@@ -4,7 +4,8 @@
 // cards, as on the Workflows Library): a new app from Pennsieve's template, a guided wizard
 // (PublishAppDialog: describe it, the repository from the template, the
 // GitHub App, the app.yml, the release); or a repository the user already
-// has (AddRepositoryDialog: access, destinations, sharing, a release).
+// has (AddRepositoryDialog: access, destinations, sharing, a release). The
+// repositories already tracked are managed on the user's Code page.
 import { onBeforeUnmount, ref } from "vue";
 import { useStore } from "vuex";
 import BfButton from "../../shared/bf-button/BfButton.vue";
@@ -36,6 +37,7 @@ onBeforeUnmount(() => timers.forEach(clearTimeout));
   <div class="apps-page">
     <AnalysisViewBar>
       <div class="apps-actions">
+        <router-link class="apps-repos-link" :to="{ name: 'my-code' }">Manage repositories</router-link>
         <bf-button class="secondary" @click="openAdd">Add Repository</bf-button>
         <bf-button @click="publishOpen = true">Create New App</bf-button>
       </div>
@@ -64,6 +66,17 @@ onBeforeUnmount(() => timers.forEach(clearTimeout));
   display: flex;
   align-items: center;
   gap: 8px;
+}
+// The repositories already tracked are on the user's Code page.
+.apps-repos-link {
+  margin-right: 8px;
+  font-size: 14px;
+  color: theme.$purple_2;
+  text-decoration: none;
+
+  &:hover {
+    text-decoration: underline;
+  }
 }
 .apps-body {
   flex: 1;
