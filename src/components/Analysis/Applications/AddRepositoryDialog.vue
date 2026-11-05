@@ -13,7 +13,8 @@
 //      app exists already (it's shared from its page).
 //   4. A release: build the latest one GitHub has, make a new one, or later.
 //
-// The draft is kept in this browser, so a trip to GitHub resumes here.
+// The draft is kept in this browser, so a reload while setting things up on
+// GitHub resumes here; closing the dialog drops it, as does an hour.
 import { computed, onBeforeUnmount, ref, watch } from "vue";
 import { useStore } from "vuex";
 import { ElMessage } from "element-plus";
@@ -421,9 +422,11 @@ const finishLater = () => {
 
 watch(
   () => props.modelValue,
-  (open) => {
+  (open, wasOpen) => {
     if (!open) {
       stopPolling();
+      // Closed (Cancel, the ×, Esc, or done): the next open starts fresh.
+      if (wasOpen) startOver();
       return;
     }
     if (props.initialRepo?.owner && props.initialRepo?.repo) useRepo(props.initialRepo);
@@ -470,11 +473,6 @@ const startOver = () => {
 };
 const close = () => {
   visible.value = false;
-  if (released.value || draft.value.releaseChoice === "later") {
-    clearDraft();
-    draft.value = newDraft();
-    access.value = null;
-  }
 };
 </script>
 
