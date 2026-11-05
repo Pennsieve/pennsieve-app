@@ -1176,6 +1176,7 @@ async function execute() {
     :title="stepTitles[step]"
     width="min(960px, 96vw)"
     top="5vh"
+    class="nb-dialog"
     :close-on-click-modal="false"
   >
     <div class="wizard-body">
@@ -1192,7 +1193,7 @@ async function execute() {
       <!-- Two columns on every step: what it's for and what's chosen so far on
            the left (on Input and Results, the step's own choices are), the
            step on the right. On a narrow screen, the step alone. -->
-      <div class="nb-layout" :class="{ 'has-info': !stepHasChoices }">
+      <div class="nb-layout" :class="{ 'has-info': !stepHasChoices, 'is-split': step === S.INPUT }">
       <aside v-if="!stepHasChoices" class="nb-info">
         <p class="nb-info__about">{{ stepAbout }}</p>
         <template v-if="soFar.length">
@@ -1869,26 +1870,82 @@ async function execute() {
 }
 /* Two columns: the choices on the left, what the chosen one needs on the
    right, apart by a rule */
-/* Within the window: each column scrolls on its own (the dialog's title,
-   progress and buttons take about 200px of 90vh). */
+/* The dialog is at most 90vh (nb-dialog, below): a step scrolls between its
+   progress and its buttons, and Choose Data's columns fill that space and
+   scroll each on its own, ending together above the buttons. */
+.wizard-body {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+}
+.nb-layout {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}
+.nb-layout.is-split {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+
+  > .nb-content {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    min-height: 0;
+  }
+}
 .io-split {
   display: grid;
+  flex: 1 1 auto;
   grid-template-columns: 340px minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
   gap: 20px;
   min-height: 320px;
 }
 .io-side,
 .io-main {
-  max-height: calc(90vh - 200px);
+  min-height: 0;
+  padding-bottom: 2px; /* the last card's border */
 }
 .io-side {
   padding-right: 20px;
   overflow-y: auto;
   border-right: 1px solid theme.$gray_2;
 }
+/* The step's dataset list takes the rest of the column, down to the
+   buttons (the pickers' own lists are a fixed height elsewhere). */
 .io-main {
+  display: flex;
+  flex-direction: column;
   min-width: 0;
   overflow-y: auto;
+
+  > .wizard-step {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    min-height: 0;
+  }
+  > .wizard-step > .wizard-cards,
+  .discover-picker > :deep(.wizard-cards),
+  :deep(.on-cards),
+  :deep(.od-cards),
+  :deep(.pp-cards) {
+    flex: 1 1 auto;
+    min-height: 160px;
+    max-height: none;
+  }
+  .discover-picker,
+  .on-picker,
+  .open-data-picker,
+  .pp-picker {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    min-height: 0;
+  }
 
   > .wizard-step {
     padding-top: 0;
@@ -1999,6 +2056,7 @@ async function execute() {
 .wizard-body {
   min-height: 300px;
 }
+
 .nb-layout.has-info {
   display: grid;
   grid-template-columns: 240px minmax(0, 1fr);
@@ -2052,9 +2110,11 @@ async function execute() {
   .nb-info {
     display: none;
   }
+  .nb-layout.is-split {
+    overflow-y: auto;
+  }
   .io-side,
   .io-main {
-    max-height: none;
     overflow-y: visible;
   }
   .io-side {
@@ -2536,5 +2596,23 @@ async function execute() {
 .wizard-footer-right {
   display: flex;
   gap: 8px;
+}
+</style>
+
+<style lang="scss">
+/* The dialog (teleported, so not scoped): at most 90vh, its body taking
+   what the title and buttons leave, for the steps to scroll in. */
+.el-dialog.nb-dialog {
+  display: flex;
+  flex-direction: column;
+  max-height: 90vh;
+  margin-bottom: 0;
+
+  > .el-dialog__body {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    min-height: 0;
+  }
 }
 </style>
