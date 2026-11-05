@@ -263,7 +263,7 @@ const nodeCapacityLabel = (cn) => capacityLabel(nodeCapacity.value[cn?.uuid]);
 const nodeReasons = (cn) => {
   const reasons = nodeHardwareUnfit(cn, nodeMustRun.value, gateReason);
   const full = capacityReason(nodeCapacity.value[cn?.uuid]);
-  const data = nodeDataReason(cn, inputChoice.value);
+  const data = nodeDataReason(cn, inputChoice.value, dataContext.value);
   return [...reasons, ...(full ? [full] : []), ...(data ? [data] : [])];
 };
 // Reads the capacity of the nodes given (all listed, by default). Failures

@@ -24,10 +24,25 @@ describe("data hints", () => {
     expect(dataRegions("epilepsyScience")).toEqual(["us-east-1"]);
     expect(dataRegions("openData", { openDataDataset: { regions: ["us-west-2"] } })).toEqual(["us-west-2"]);
     expect(dataRegions("public")).toEqual([]);
-    expect(nodeDataReason({ deploymentMode: "Compliant" }, "openData")).toMatch(/public data/);
-    expect(nodeDataReason({ deploymentMode: "compliant" }, "public")).toBe("");
-    expect(nodeDataReason({ deploymentMode: "secure" }, "openNeuro")).toBe("");
-    expect(nodeDataReason({ deploymentMode: "compliant" }, "sparc")).toMatch(/public data/);
+    const east = { deploymentMode: "Compliant", region: "us-east-1" };
+    const west = { deploymentMode: "compliant", region: "us-west-2" };
+    expect(nodeDataReason(east, "public")).toBe("");
+    expect(nodeDataReason(west, "public")).toBe("");
+    expect(nodeDataReason({ deploymentMode: "secure", region: "us-west-2" }, "openNeuro")).toBe("");
+    // A compliant node reaches the anonymous Open Data buckets in its region.
+    expect(nodeDataReason(east, "openNeuro")).toBe("");
+    expect(nodeDataReason(east, "sparc")).toBe("");
+    expect(nodeDataReason(east, "epilepsyScience")).toBe("");
+    expect(nodeDataReason(west, "sparc")).toBe(
+      "Can't reach data in us-east-1 (no internet access: only public data in us-west-2)"
+    );
+    const openData = (d) => nodeDataReason(east, "openData", { openDataDataset: d });
+    expect(openData({ anonymous: true, regions: ["us-east-1"] })).toBe("");
+    expect(openData({ anonymous: true, regions: ["us-east-2", "eu-west-1"] })).toBe(
+      "Can't reach data in us-east-2, eu-west-1 (no internet access: only public data in us-east-1)"
+    );
+    expect(openData({ anonymous: false, regions: ["us-east-1"] })).toMatch(/Can't reach data in us-east-1/);
+    expect(openData(null)).toMatch(/Can't reach this data/);
     expect(nodeDataNote({ region: "us-east-1" }, ["us-west-2"])).toMatch(/us-west-2.*us-east-1/);
     expect(nodeDataNote({ region: "us-west-2" }, ["us-west-2"])).toBe("");
     expect(nodeDataNote({}, ["us-west-2"])).toBe("");

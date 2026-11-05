@@ -31,12 +31,18 @@ export function dataRegions(choice, { openDataDataset } = {}) {
   return [];
 }
 
-// Why a compute node can't take the chosen data ("" when it can): a
-// compliant node has no internet access, so it can't read a public bucket.
-export function nodeDataReason(cn, choice) {
+// Why a compute node can't take the chosen data ("" when it can). A
+// compliant node has no internet access: its S3 gateway reaches only the
+// anonymous Open Data buckets in its own region (and Pennsieve's public
+// data), so another platform's data must be there.
+export function nodeDataReason(cn, choice, { openDataDataset } = {}) {
   const compliant = (cn?.deploymentMode || "").toLowerCase() === "compliant";
-  if (compliant && PUBLIC_BUCKET_INPUTS.has(choice)) return "Can't reach public data (no internet access)";
-  return "";
+  if (!compliant || !PUBLIC_BUCKET_INPUTS.has(choice)) return "";
+  const regions = dataRegions(choice, { openDataDataset });
+  const anonymous = choice !== "openData" || !!openDataDataset?.anonymous;
+  if (anonymous && cn.region && regions.includes(cn.region)) return "";
+  const where = regions.length ? `data in ${regions.join(", ")}` : "this data";
+  return `Can't reach ${where} (no internet access: only public data in ${cn.region || "its region"})`;
 }
 
 // A note on a compute node for the chosen data ("" for none): reading data
