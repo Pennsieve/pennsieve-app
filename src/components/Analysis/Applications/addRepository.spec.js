@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
+  DRAFT_MAX_AGE_MS,
   STEPS,
   accessPayload,
   destinationsOf,
@@ -140,5 +141,17 @@ describe("the draft", () => {
     saveDraft(draft, storage);
     expect(loadDraft(storage)).toEqual(draft);
     expect(loadDraft({ getItem: () => "{not json" })).toEqual(newDraft());
+  });
+
+  it("is dropped after an hour", () => {
+    const stored = new Map();
+    const storage = { getItem: (k) => stored.get(k) ?? null, setItem: (k, v) => stored.set(k, v), removeItem: (k) => stored.delete(k) };
+    const draft = { ...newDraft(), owner: "lab", repo: "alpha" };
+    saveDraft(draft, storage, 1_000_000);
+    expect(loadDraft(storage, 1_000_000 + DRAFT_MAX_AGE_MS - 1)).toEqual(draft);
+    expect(loadDraft(storage, 1_000_000 + DRAFT_MAX_AGE_MS)).toEqual(newDraft());
+    // One kept before drafts had a time is as good as old.
+    stored.set("pennsieve.addRepository.draft", JSON.stringify(draft));
+    expect(loadDraft(storage)).toEqual(newDraft());
   });
 });

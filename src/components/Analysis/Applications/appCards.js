@@ -14,6 +14,25 @@ export function appTitle(app) {
   return app?.name || githubRepo(app?.sourceUrl)?.repo || "Unnamed app";
 }
 
+// An app's page title: its repository (owner/repo), which is how its page
+// and the App Store name it; its name if it has no GitHub source.
+export function appPageTitle(app) {
+  const r = githubRepo(app?.sourceUrl);
+  return r ? `${r.owner}/${r.repo}` : appTitle(app);
+}
+
+// The page header's title for the app at /apps/<uuid>: the one its page
+// loaded (currentApplication), else the Apps list's, else '' (the header's
+// fallback) while neither is in.
+export function applicationPageTitle(uuid, getters) {
+  if (!uuid) return "";
+  const current = getters["analysisModule/currentApplication"];
+  const app = current?.uuid === uuid
+    ? current
+    : (getters["analysisModule/applications"] || []).find((a) => a.uuid === uuid);
+  return app ? appPageTitle(app) : "";
+}
+
 // The card's tile: the app's initials on a colour of its own, derived from
 // its name, so it's stable and needs nothing from outside the platform.
 export function appInitials(app) {

@@ -16,7 +16,8 @@
 //   6. Publish: the first release. The app is in the gallery when its
 //      image is built.
 //
-// The draft is kept in this browser, so closing and coming back resumes.
+// The draft is kept in this browser, so a reload while setting things up on
+// GitHub resumes here; closing the dialog drops it, as does an hour.
 import { computed, onBeforeUnmount, ref, watch } from "vue";
 import { useStore } from "vuex";
 import { ElMessage } from "element-plus";
@@ -201,7 +202,7 @@ const isLast = computed(() => step.value === STEPS.length - 1);
 
 watch(
   () => props.modelValue,
-  (open) => {
+  (open, wasOpen) => {
     if (open) {
       ownerPrefilled();
       installed.value = false;
@@ -213,6 +214,8 @@ watch(
       startPolling();
     } else {
       stopPolling();
+      // Closed (Cancel, the ×, Esc, or done): the next open starts fresh.
+      if (wasOpen) startOver();
     }
   },
   { immediate: true }

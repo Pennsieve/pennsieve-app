@@ -1,107 +1,51 @@
 <template>
+  <!-- A repository, as the Apps tab's cards: its name and whether it's
+       public on top, the description, its latest release, then where its
+       releases go; the actions over the foot's end on hover. -->
   <div class="repo-card">
-    <div class="repo-header">
-      <div class="repo-info">
-        <h3>{{ repo.full_name || repo.name }}</h3>
-        <div class="repo-subtitle">GitHub Repository</div>
-        <div v-if="repo.description" class="repo-description">
-          {{ repo.description }}
-        </div>
-        <div class="repo-tags">
-          <span
-            v-if="matchedAppRaw && typeof matchedAppRaw.isPrivate === 'boolean'"
-            class="tag"
-            :class="matchedAppRaw.isPrivate ? 'private' : 'public'"
-          >
-            {{ matchedAppRaw.isPrivate ? 'Private' : 'Public' }}
-          </span>
-          <span v-if="repo.language" class="tag language">
-            {{ repo.language }}
-          </span>
-        </div>
-      </div>
-
-      <div class="header-right">
-        <div class="tracking-box">
-          <div class="tracking-statuses">
-            <div
-              class="status-icon-row"
-              :class="repo.publishing_to_discover ? 'enabled' : 'disabled'"
-            >
-              <span class="status-icon-label">Discover</span>
-              <span class="status-icon-state">
-                {{ repo.publishing_to_discover ? 'On' : 'Off' }}
-              </span>
-            </div>
-            <div
-              class="status-icon-row"
-              :class="repo.publishing_to_appstore ? 'enabled' : 'disabled'"
-            >
-              <span class="status-icon-label">App Store</span>
-              <span class="status-icon-state">
-                {{ repo.publishing_to_appstore ? 'On' : 'Off' }}
-              </span>
-            </div>
-          </div>
-        </div>
+    <div class="repo-title">
+      <span class="repo-name" :title="fullName">{{ fullName }}</span>
+      <span class="repo-badge">{{ repo.private ? 'Private' : 'Public' }}</span>
+    </div>
+    <p class="repo-description">{{ repo.description || 'No description.' }}</p>
+    <div class="repo-meta">{{ release }}</div>
+    <div class="repo-foot">
+      <span class="repo-status" :title="status.title || ''">
+        <span class="repo-dot" :class="status.state" />
+        <span class="repo-status-text">{{ status.text }}</span>
+      </span>
+      <span class="repo-actions">
         <button
-          class="settings-button"
+          v-if="!repo.publishing_to_appstore && !repo.publishing_to_discover"
           type="button"
-          title="Edit tracking settings"
-          @click="handleManageSettings"
+          class="repo-action repo-action--primary"
+          title="Choose where its releases go, who can use the app, and release it"
+          @click="$emit('setup', repo)"
         >
-          <IconSettings :width="20" :height="20" color="currentColor" />
+          Set up
         </button>
-      </div>
-    </div>
-
-    <div class="repo-stats">
-      <span v-if="repo.stargazers_count !== undefined" class="stat-item">
-        ⭐ {{ repo.stargazers_count }}
-      </span>
-      <span v-if="repo.forks_count !== undefined" class="stat-item">
-        🍴 {{ repo.forks_count }}
-      </span>
-      <span v-if="repo.updated_at" class="stat-item">
-        Updated {{ formatDate(repo.updated_at) }}
-      </span>
-    </div>
-
-    <div class="repo-card-actions">
-      <a
-        v-if="canShowExternalLinks"
-        :href="repo.html_url || repo.url"
-        target="_blank"
-        rel="noopener noreferrer"
-        class="card-action-link"
-      >
-        <IconGitHub :width="14" :height="14" color="currentColor" />
-        <span>View on GitHub</span>
-      </a>
-      <button
-        v-if="releaseRepo"
-        type="button"
-        class="card-action-link card-action-button"
-        :disabled="releaseLoading"
-        :title="releaseTitle"
-        @click="openRelease"
-      >
-        {{ releaseLoading ? 'Checking…' : 'Release a version' }}
-      </button>
-      <button
-        v-if="!repo.publishing_to_appstore && !repo.publishing_to_discover"
-        type="button"
-        class="card-action-link card-action-button card-action-setup"
-        title="Choose where its releases go, who can use the app, and release it"
-        @click="$emit('setup', repo)"
-      >
-        Set up publishing
-      </button>
-      <span
-        v-if="repo.publishing_to_appstore && !matchedAppRaw && !hasReleases"
-        class="card-action-hint"
-      >
-        Release a version to add it to the App Store
+        <button
+          v-else-if="releaseRepo"
+          type="button"
+          class="repo-action repo-action--primary"
+          :disabled="releaseLoading"
+          :title="releaseTitle"
+          @click="openRelease"
+        >
+          {{ releaseLoading ? 'Checking…' : 'Release' }}
+        </button>
+        <el-dropdown trigger="click" placement="bottom-end" @command="onMenu">
+          <button type="button" class="repo-action repo-action--icon" aria-label="More: settings, GitHub, the app" title="More">
+            <el-icon><MoreFilled /></el-icon>
+          </button>
+          <template #dropdown>
+            <el-dropdown-menu>
+              <el-dropdown-item v-if="matchedApp" command="app">Open the app</el-dropdown-item>
+              <el-dropdown-item command="settings">Where releases go…</el-dropdown-item>
+              <el-dropdown-item v-if="canShowExternalLinks" command="github">View on GitHub</el-dropdown-item>
+            </el-dropdown-menu>
+          </template>
+        </el-dropdown>
       </span>
     </div>
     <ReleaseDialog
@@ -118,19 +62,18 @@
 </template>
 
 <script>
-import IconGitHub from "@/components/icons/IconGitHub.vue";
-import IconSettings from "@/components/icons/IconSettings.vue";
 import { ElMessage } from "element-plus";
+import { MoreFilled } from "@element-plus/icons-vue";
 import ReleaseDialog from "@/components/Analysis/Applications/ReleaseDialog.vue";
 import { fetchReleaseStatus } from "@/components/Analysis/Applications/release";
 import { useGetToken } from "@/composables/useGetToken";
+import { latestRelease, releaseLabel, repoApp, repoFullName, repoStatus } from "./codeRepos";
 
 export default {
   name: 'CodeRepoListItem',
 
   components: {
-    IconGitHub,
-    IconSettings,
+    MoreFilled,
     ReleaseDialog,
   },
 
@@ -168,18 +111,14 @@ export default {
       return profile.id || profile.intId || null
     },
 
+    fullName() {
+      return repoFullName(this.repo)
+    },
+
     // Resolved by sourceUrl match — does NOT apply privacy gating, so the
     // template can decide which links to surface.
     matchedAppRaw() {
-      const candidates = [this.repo.html_url, this.repo.url].filter(Boolean)
-      if (candidates.length === 0) return null
-      const normalize = (url) =>
-        (url || '')
-          .replace(/\.git$/, '')
-          .replace(/\/+$/, '')
-          .toLowerCase()
-      const targets = new Set(candidates.map(normalize))
-      return this.applications.find((a) => targets.has(normalize(a.sourceUrl))) || null
+      return repoApp(this.repo, this.applications)
     },
 
     // True when there's a matched app, it's private, and the viewer is
@@ -204,26 +143,27 @@ export default {
       return !this.isPrivateUnowned
     },
 
-    // True when the repo already has at least one GitHub release. A repo that
-    // has been released doesn't need another release to reach the App Store,
-    // so the "create a release" hint should not be shown in that case.
-    hasReleases() {
-      return (this.repo?.content?.releases?.length || 0) > 0
+    // Where its releases go, for the foot.
+    status() {
+      return repoStatus(this.repo, { hasApp: Boolean(this.matchedAppRaw) })
     },
+    release() {
+      return releaseLabel(this.repo)
+    },
+
     api2Url() {
       return this.$store.state.config?.api2Url || ''
     },
     // { owner, repo } from the repository's full name or its URL.
     releaseRepo() {
-      const full = this.repo.full_name ||
-        (this.repo.html_url || this.repo.url || '').replace(/^https?:\/\/github\.com\//, '').replace(/\.git$/, '')
-      const [owner, name] = (full || '').split('/')
+      const [owner, name] = this.fullName.split('/')
       return owner && name ? { owner, repo: name } : null
     },
     // Versions already released, so the dialog suggests the next one.
     knownTags() {
-      return (this.repo?.content?.releases || [])
-        .map((r) => r.label || r.tag_name || r.name)
+      const releases = this.repo?.content?.releases || this.repo?.releases || [latestRelease(this.repo)]
+      return releases
+        .map((r) => r?.label || r?.tag_name || r?.name)
         .filter(Boolean)
     },
     releaseTitle() {
@@ -269,252 +209,176 @@ export default {
         }, delay))
       }
     },
-    handleManageSettings() {
-      this.$emit('manage-settings', this.repo)
-    },
-
-    formatDate(dateString) {
-      if (!dateString) return ''
-      const date = new Date(dateString)
-      const now = new Date()
-      const diffTime = Math.abs(now - date)
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
-
-      if (diffDays === 1) {
-        return '1 day ago'
-      } else if (diffDays < 30) {
-        return `${diffDays} days ago`
-      } else if (diffDays < 365) {
-        const months = Math.ceil(diffDays / 30)
-        return `${months} month${months > 1 ? 's' : ''} ago`
-      } else {
-        const years = Math.ceil(diffDays / 365)
-        return `${years} year${years > 1 ? 's' : ''} ago`
+    // The card's menu: its app, its settings, or GitHub.
+    onMenu(command) {
+      if (command === 'app') {
+        this.$router.push({ name: 'my-application-detail', params: { uuid: this.matchedApp.uuid } })
+      } else if (command === 'settings') {
+        this.$emit('manage-settings', this.repo)
+      } else if (command === 'github') {
+        window.open(this.repo.html_url || this.repo.url, '_blank', 'noopener')
       }
-    }
+    },
   }
 }
 </script>
 
 <style scoped lang="scss">
-@use '../../../styles/_theme.scss';
+@use '../../../styles/_theme.scss' as theme;
 
+/* As an app card's text side (ApplicationsGrid): the same border, hover,
+   type and foot; no banner. */
 .repo-card {
-  background: white;
-  border: 1px solid theme.$gray_2;
-  padding: 20px;
-  transition: border-color 0.2s ease;
-
-  &:hover {
-    border-color: theme.$gray_3;
-  }
-}
-
-.repo-header {
   display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 16px;
-}
-
-.repo-info {
-  flex: 1;
-  min-width: 0;
-
-  h3 {
-    font-size: 16px;
-    font-weight: 500;
-    color: theme.$gray_6;
-    margin: 0 0 8px 0;
-  }
-
-  .repo-name-link {
-    color: theme.$gray_6;
-    text-decoration: none;
-    transition: color 0.2s ease;
-
-    &:hover {
-      color: theme.$purple_2;
-      text-decoration: underline;
-    }
-  }
-}
-
-.repo-subtitle {
-  font-size: 13px;
-  color: theme.$gray_5;
-  margin-bottom: 6px;
-  font-weight: 400;
-}
-
-.repo-description {
-  font-size: 13px;
-  color: theme.$gray_5;
-  margin: 4px 0 8px 0;
-  line-height: 1.4;
-  word-break: break-word;
-}
-
-.repo-tags {
-  display: flex;
+  flex-direction: column;
   gap: 6px;
-  margin-top: 8px;
-  flex-wrap: wrap;
+  min-width: 0;
+  min-height: 140px;
+  box-sizing: border-box;
+  padding: 14px 16px 12px;
+  border: 1px solid theme.$gray_2;
+  background: theme.$white;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 
-  .tag {
-    display: inline-block;
-    padding: 2px 8px;
-    border-radius: 3px;
-    font-size: 11px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-
-    &.private {
-      background: rgba(#EF4444, 0.1);
-      color: #DC2626;
-    }
-
-    &.public {
-      background: rgba(#10B981, 0.1);
-      color: #059669;
-    }
-
-    &.language {
-      background: theme.$gray_1;
-      color: theme.$gray_5;
-    }
+  &:hover,
+  &:focus-within {
+    border-color: theme.$purple_1;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  }
+  &:hover .repo-actions,
+  &:focus-within .repo-actions {
+    opacity: 1;
+    pointer-events: auto;
   }
 }
-
-.header-right {
+.repo-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.repo-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 15px;
+  font-weight: 600;
+  color: theme.$gray_6;
+}
+/* In the top-right corner: the badges line up down the grid. */
+.repo-badge {
+  flex-shrink: 0;
+  margin-left: auto;
+  padding: 0 6px;
+  border-radius: 3px;
+  background: theme.$gray_0;
+  color: theme.$gray_5;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+.repo-description {
+  display: -webkit-box;
+  margin: 0;
+  overflow: hidden;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  font-size: 13px;
+  line-height: 1.4;
+  color: theme.$gray_5;
+}
+.repo-meta {
+  font-size: 12px;
+  color: theme.$gray_4;
+}
+/* One line at the foot: the status gives way (…) to the buttons. */
+.repo-foot {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 8px;
-  flex-shrink: 0;
+  margin-top: auto;
 }
-
-.settings-button {
+.repo-status {
   display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  width: 28px;
-  height: 28px;
-  border: none;
-  border-radius: 4px;
-  background: transparent;
-  color: theme.$gray_4;
-  cursor: pointer;
-  transition: all 0.15s ease;
-
-  &:hover {
-    color: theme.$purple_2;
-    background: rgba(theme.$purple_2, 0.08);
-  }
-}
-
-.tracking-box {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.tracking-box-title {
-  font-size: 11px;
-  font-weight: 600;
-  color: theme.$gray_5;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-  white-space: nowrap;
-}
-
-.tracking-statuses {
-  display: flex;
-  gap: 6px;
-}
-
-.status-icon-row {
-  display: flex;
+  flex: 1 1 auto;
   align-items: center;
   gap: 6px;
-  padding: 4px 10px;
-  border-radius: 4px;
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-  white-space: nowrap;
-
-  &.enabled {
-    background: rgba(theme.$status_green, 0.12);
-    color: theme.$status_green;
-  }
-
-  &.disabled {
-    background: theme.$gray_1;
-    color: theme.$gray_4;
-  }
-}
-
-.card-action-hint {
-  margin-left: auto;
-  font-size: 13px;
-  font-weight: 500;
-  color: theme.$gray_4;
-  font-style: italic;
-}
-
-.repo-stats {
-  display: flex;
-  gap: 16px;
-  margin-top: 12px;
+  min-width: 0;
   font-size: 12px;
   color: theme.$gray_4;
-  flex-wrap: wrap;
-
-  .stat-item {
-    white-space: nowrap;
-  }
 }
+.repo-status-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.repo-dot {
+  width: 8px;
+  height: 8px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: theme.$gray_3;
 
-.repo-card-actions {
+  &.ok { background: theme.$status_green; }
+  &.pending { background: #f59e0b; }
+}
+/* Over the status's end, on hover only (in the line on a touch screen). */
+.repo-actions {
+  position: absolute;
+  right: 0;
   display: flex;
-  gap: 18px;
-  margin-top: 14px;
-  padding-top: 14px;
-  border-top: 1px solid theme.$gray_2;
-  flex-wrap: wrap;
-}
-
-.card-action-button:disabled {
-  opacity: 0.6;
-  cursor: default;
-}
-.card-action-link {
-  display: inline-flex;
-  align-items: center;
   gap: 6px;
-  background: none;
-  border: none;
-  padding: 0;
+  padding-left: 12px;
+  background: linear-gradient(to right, rgba(255, 255, 255, 0), theme.$white 12px);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+.repo-action {
+  padding: 3px 10px;
+  border: 1px solid theme.$gray_3;
+  border-radius: 4px;
+  background: theme.$white;
   font: inherit;
-  font-size: 13px;
-  font-weight: 500;
-  color: theme.$purple_3;
-  text-decoration: none;
+  font-size: 12px;
+  color: theme.$gray_6;
   cursor: pointer;
 
   &:hover {
-    text-decoration: underline;
+    border-color: theme.$purple_1;
+    color: theme.$purple_3;
   }
-
-  .arrow {
-    transition: transform 0.15s ease;
+  &:disabled {
+    opacity: 0.6;
+    cursor: default;
   }
+}
+.repo-action--icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3px 6px;
+}
+.repo-action--primary {
+  border-color: theme.$purple_3;
+  background: theme.$purple_3;
+  color: theme.$white;
 
-  &:hover .arrow {
-    transform: translateX(2px);
+  &:hover {
+    background: theme.$purple_2;
+    color: theme.$white;
+  }
+}
+@media (hover: none) {
+  .repo-actions {
+    position: static;
+    flex-shrink: 0;
+    margin-left: auto;
+    padding-left: 0;
+    background: none;
+    opacity: 1;
+    pointer-events: auto;
   }
 }
 </style>

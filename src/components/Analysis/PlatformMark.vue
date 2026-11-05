@@ -1,13 +1,18 @@
 <script setup>
-// A data platform's mark: the Pennsieve mark for Pennsieve Discover, and a
-// neutral cloud and data store for the Registry of Open Data on AWS (not
-// AWS's logo).
+// A data platform's mark: the Pennsieve mark for Pennsieve Discover, a
+// brain for OpenNeuro, SPARC's and Epilepsy.Science's own logos (portals
+// Pennsieve runs), and a neutral cloud and data store for the Registry of
+// Open Data on AWS (not AWS's logo).
 import IconPennsieveMark from "@/components/icons/IconPennsieveMark.vue";
 import IconOpenData from "@/components/icons/IconOpenData.vue";
 import IconBrain from "@/components/icons/IconBrain.vue";
+import sparcLogo from "@/assets/images/logos/sparc-logo.svg";
+import epilepsyScienceLogo from "@/assets/images/logos/epilepsy-science-logo.svg";
+
+const LOGOS = { sparc: sparcLogo, epilepsyScience: epilepsyScienceLogo };
 
 defineProps({
-  platform: { type: String, required: true }, // discover | openNeuro | openData
+  platform: { type: String, required: true }, // discover | openNeuro | sparc | epilepsyScience | openData
   size: { type: Number, default: 36 },
 });
 </script>
@@ -27,6 +32,7 @@ defineProps({
       color="currentColor"
     />
     <IconBrain v-else-if="platform === 'openNeuro'" :width="Math.round(size * 0.6)" :height="Math.round(size * 0.6)" />
+    <img v-else-if="LOGOS[platform]" class="pm__logo" :src="LOGOS[platform]" alt="" />
     <IconOpenData v-else :width="Math.round(size * 0.6)" :height="Math.round(size * 0.6)" />
   </span>
 </template>
@@ -48,6 +54,27 @@ defineProps({
 .pm--openNeuro {
   background: theme.$status_purple;
   color: theme.$white;
+}
+/* The SPARC wordmark on white, inset; Epilepsy.Science's mark is square
+   with its own background, so it fills the tile. */
+.pm--sparc {
+  box-sizing: border-box;
+  border: 1px solid theme.$gray_2;
+  background: theme.$white;
+
+  .pm__logo {
+    width: 80%;
+    height: 80%;
+  }
+}
+.pm--epilepsyScience {
+  overflow: hidden;
+}
+.pm__logo {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
 }
 .pm--openData {
   background: theme.$teal_2;

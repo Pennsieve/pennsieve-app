@@ -22,6 +22,7 @@ import BfStage from "../../components/layout/BfStage/BfStage.vue";
 import BfRafter from "../../components/shared/bf-rafter/BfRafter.vue";
 import RouterTabs from "../../components/shared/routerTabs/routerTabs.vue";
 import OrgBreadcrumb from "../../components/shared/OrgBreadcrumb/OrgBreadcrumb.vue";
+import { applicationPageTitle } from "../../components/Analysis/Applications/appCards";
 import { useComputeResourcesStore } from "@/stores/computeResourcesStore";
 import { useGetToken } from "@/composables/useGetToken";
 import EventBus from "@/utils/event-bus";
@@ -42,11 +43,7 @@ export default {
       return this.$store.getters["analysisModule/selectedWorkflow"] || {};
     },
     applicationName() {
-      const uuid = this.$route.params.uuid;
-      if (!uuid) return '';
-      const apps = this.$store.getters["analysisModule/applications"] || [];
-      const app = apps.find(a => a.uuid === uuid);
-      return app?.name || '';
+      return applicationPageTitle(this.$route.params.uuid, this.$store.getters);
     },
     computeNodeName() {
       const nodeId = this.$route.params.nodeId;

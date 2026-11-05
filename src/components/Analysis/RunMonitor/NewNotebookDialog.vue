@@ -67,6 +67,8 @@ import { viewsServiceUrl, viewForDataset, viewDataSource, createOpenDataView, op
 import OpenDataPicker from "../OpenDataPicker.vue";
 import OpenNeuroPicker from "../OpenNeuroPicker.vue";
 import { countOpenNeuro, OPENNEURO_REGISTRY } from "@/utils/openNeuro";
+import PortalPicker from "../PortalPicker.vue";
+import { OPEN_DATA_PORTALS, portalDatasetIds } from "@/utils/openDataPortals";
 import DiscoverPicker from "../DiscoverPicker.vue";
 import PlatformMark from "../PlatformMark.vue";
 import { DATA_PLATFORMS, platformCount } from "../dataPlatforms";
@@ -393,12 +395,14 @@ const ifaceOutput = computed(() => selectedWorkflow.value?.outputs?.[0] || null)
 const INPUT_CHOICES = {
   dataset: { label: "Files from a dataset", desc: "Choose a dataset in this workspace, then the files to start with" },
   public: { label: DATA_PLATFORMS.discover.name, desc: DATA_PLATFORMS.discover.desc, platform: "discover" },
-  openNeuro: { label: DATA_PLATFORMS.openNeuro.name, desc: DATA_PLATFORMS.openNeuro.desc, platform: "openNeuro" },
   openData: { label: DATA_PLATFORMS.openData.name, desc: DATA_PLATFORMS.openData.desc, platform: "openData" },
+  sparc: { label: DATA_PLATFORMS.sparc.name, desc: DATA_PLATFORMS.sparc.desc, platform: "sparc" },
+  epilepsyScience: { label: DATA_PLATFORMS.epilepsyScience.name, desc: DATA_PLATFORMS.epilepsyScience.desc, platform: "epilepsyScience" },
+  openNeuro: { label: DATA_PLATFORMS.openNeuro.name, desc: DATA_PLATFORMS.openNeuro.desc, platform: "openNeuro" },
   none: { label: "No input", desc: "Start with an empty input/ folder" },
 };
 // The data platforms' sizes, shown on their cards.
-const platformCounts = ref({ discover: null, openNeuro: null, openData: null });
+const platformCounts = ref({ discover: null, openNeuro: null, sparc: null, epilepsyScience: null, openData: null });
 function loadPlatformCounts() {
   if (!publicInputs) return;
   if (platformCounts.value.discover == null) {
@@ -410,6 +414,13 @@ function loadPlatformCounts() {
     countOpenNeuro()
       .then((n) => (platformCounts.value.openNeuro = n))
       .catch(() => {});
+  }
+  for (const portal of Object.keys(OPEN_DATA_PORTALS)) {
+    if (platformCounts.value[portal] == null) {
+      portalDatasetIds(portal)
+        .then((ids) => (platformCounts.value[portal] = ids.length))
+        .catch(() => {});
+    }
   }
   if (platformCounts.value.openData == null) {
     openDataCatalog()
@@ -426,7 +437,7 @@ const platformLine = (c) => {
 const inputChoices = computed(() => {
   const c = [];
   if (!props.personal) c.push("dataset");
-  if (publicInputs) c.push("public", "openNeuro", "openData");
+  if (publicInputs) c.push("public", "openData", "sparc", "epilepsyScience", "openNeuro");
   c.push("none");
   return c;
 });
@@ -585,6 +596,8 @@ const canNext = computed(() => {
         ? !!openDataDataset.value
         : inputChoice.value === "openNeuro"
         ? !!openNeuroDataset.value
+        : isPortal.value
+        ? !!portalDataset.value
         : inputChoice.value === "none";
     case S.FILES:
       return dataSourcesComplete.value;
@@ -651,6 +664,23 @@ const openNeuroLabel = computed(() => {
   return `${d.name} (${openNeuroPrefix.value || d.id})`;
 });
 
+// A SPARC or Epilepsy.Science dataset, chosen with PortalPicker: a view of
+// its folder in the portal's Open Data entry. Choosing the other portal
+// starts over.
+const portalDataset = ref(null); // a toPortalDataset
+const portalPrefix = ref("");
+const isPortal = computed(() => inputChoice.value in OPEN_DATA_PORTALS);
+watch(inputChoice, () => {
+  portalDataset.value = null;
+  portalPrefix.value = "";
+});
+const portalLabel = computed(() => {
+  const d = portalDataset.value;
+  if (!d) return "";
+  const p = portalPrefix.value.replace(/\/$/, "");
+  return p && p !== String(d.id) ? `${d.name} (${p})` : d.name;
+});
+
 const openDataLabel = computed(() => {
   const d = openDataDataset.value;
   if (!d) return "";
@@ -665,6 +695,7 @@ const dataContext = computed(() => ({
   publicDataset: publicDataset.value,
   openNeuroDataset: openNeuroDataset.value,
   openDataDataset: openDataDataset.value,
+  portalDataset: portalDataset.value,
   selectedDataset: selectedDataset.value?.content,
 }));
 const nodeNote = (cn) => nodeDataNote(cn, dataRegions(inputChoice.value, dataContext.value));
@@ -875,6 +906,8 @@ function reset() {
   openDataPrefix.value = "";
   openNeuroDataset.value = null;
   openNeuroPrefix.value = "";
+  portalDataset.value = null;
+  portalPrefix.value = "";
   // The data comes first: a workspace's own dataset, else a public one.
   inputChoice.value = props.personal ? (publicInputs ? "public" : "none") : "dataset";
   diskTouched.value = false;
@@ -979,6 +1012,8 @@ const soFar = computed(() => {
         ? openDataLabel.value || "AWS Open Data"
         : inputChoice.value === "openNeuro"
         ? openNeuroLabel.value || "OpenNeuro"
+        : isPortal.value
+        ? portalLabel.value || DATA_PLATFORMS[inputChoice.value].name
         : inputChoice.value === "dataset"
         ? selectedDataset.value?.content?.name || "A dataset"
         : "No input";
@@ -1085,6 +1120,17 @@ async function execute() {
       });
       personalSources[dataSourceNodes.value[0].id] = viewDataSource(view);
     }
+    // A SPARC or Epilepsy.Science dataset: a view of its folder in the
+    // portal's Open Data entry.
+    const usesPortal = isPortal.value;
+    if (usesPortal && portalDataset.value && dataSourceNodes.value.length) {
+      const view = await createOpenDataView({
+        dataset: OPEN_DATA_PORTALS[inputChoice.value].registry,
+        title: portalDataset.value.name,
+        prefix: portalPrefix.value,
+      });
+      personalSources[dataSourceNodes.value[0].id] = viewDataSource(view);
+    }
 
     const name = runName.value.trim();
     const payload = {
@@ -1094,7 +1140,7 @@ async function execute() {
         ...(processorConfigs.length > 0 && { processorConfigs }),
       },
       ...(runDatasetId.value && { datasetId: runDatasetId.value }),
-      dataSources: usesPublic || usesOpenData || usesOpenNeuro ? personalSources : dataSources,
+      dataSources: usesPublic || usesOpenData || usesOpenNeuro || usesPortal ? personalSources : dataSources,
       ...(name && { name }),
       ...(Object.keys(dataTargets).length > 0 && { dataTargets }),
     };
@@ -1129,6 +1175,8 @@ async function execute() {
     v-model="visible"
     :title="stepTitles[step]"
     width="min(960px, 96vw)"
+    top="5vh"
+    class="nb-dialog"
     :close-on-click-modal="false"
   >
     <div class="wizard-body">
@@ -1145,7 +1193,7 @@ async function execute() {
       <!-- Two columns on every step: what it's for and what's chosen so far on
            the left (on Input and Results, the step's own choices are), the
            step on the right. On a narrow screen, the step alone. -->
-      <div class="nb-layout" :class="{ 'has-info': !stepHasChoices }">
+      <div class="nb-layout" :class="{ 'has-info': !stepHasChoices, 'is-split': step === S.INPUT }">
       <aside v-if="!stepHasChoices" class="nb-info">
         <p class="nb-info__about">{{ stepAbout }}</p>
         <template v-if="soFar.length">
@@ -1410,6 +1458,25 @@ async function execute() {
           to download from the notebook.
         </p>
         <OpenNeuroPicker v-model:dataset="openNeuroDataset" v-model:prefix="openNeuroPrefix" />
+      </div>
+      <div v-else-if="step === S.INPUT && isPortal" class="wizard-step">
+        <h4 class="io-section-title io-platform-title">
+          <PlatformMark :platform="inputChoice" :size="24" />
+          Choose a {{ DATA_PLATFORMS[inputChoice].name }} dataset
+        </h4>
+        <p class="wizard-step-desc">
+          A dataset published on
+          <a :href="OPEN_DATA_PORTALS[inputChoice].url" target="_blank" rel="noopener">{{ DATA_PLATFORMS[inputChoice].name }}</a>,
+          read from its copy in the Registry of Open Data on AWS at its latest
+          version. The notebook starts with its file list; you pick which files
+          to download from the notebook.
+        </p>
+        <PortalPicker
+          :key="inputChoice"
+          :portal="inputChoice"
+          v-model:dataset="portalDataset"
+          v-model:prefix="portalPrefix"
+        />
       </div>
       <div v-else-if="step === S.INPUT && inputChoice === 'openData'" class="wizard-step">
         <h4 class="io-section-title io-platform-title">
@@ -1709,6 +1776,8 @@ async function execute() {
                 ? `${openDataLabel} (AWS Open Data)`
                 : inputChoice === "openNeuro"
                 ? `${openNeuroLabel} (OpenNeuro)`
+                : isPortal
+                ? `${portalLabel} (${DATA_PLATFORMS[inputChoice].name})`
                 : inputChoice === "dataset"
                 ? `${dataSourceNodes.reduce((n, d) => n + fileCountForNode(d.id), 0)} files from ${selectedDataset?.content?.name}`
                 : "None"
@@ -1736,6 +1805,12 @@ async function execute() {
           The notebook starts with the file list of {{ openNeuroLabel }} in
           <code>input/</code>, read from OpenNeuro's copy on AWS. Choose which
           files to download from its <strong>Inputs</strong> panel.
+        </p>
+        <p v-else-if="isPortal && portalDataset" class="resource-hint">
+          The notebook starts with the file list of {{ portalLabel }} in
+          <code>input/</code>, read from {{ DATA_PLATFORMS[inputChoice].name }}'s
+          copy on AWS. Choose which files to download from its
+          <strong>Inputs</strong> panel.
         </p>
         <p v-else-if="inputChoice === 'openData' && openDataDataset" class="resource-hint">
           The notebook starts with the file list of {{ openDataLabel }} in
@@ -1795,18 +1870,82 @@ async function execute() {
 }
 /* Two columns: the choices on the left, what the chosen one needs on the
    right, apart by a rule */
+/* The dialog is at most 90vh (nb-dialog, below): a step scrolls between its
+   progress and its buttons, and Choose Data's columns fill that space and
+   scroll each on its own, ending together above the buttons. */
+.wizard-body {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+}
+.nb-layout {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}
+.nb-layout.is-split {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+
+  > .nb-content {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    min-height: 0;
+  }
+}
 .io-split {
   display: grid;
+  flex: 1 1 auto;
   grid-template-columns: 340px minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
   gap: 20px;
   min-height: 320px;
 }
+.io-side,
+.io-main {
+  min-height: 0;
+  padding-bottom: 2px; /* the last card's border */
+}
 .io-side {
   padding-right: 20px;
+  overflow-y: auto;
   border-right: 1px solid theme.$gray_2;
 }
+/* The step's dataset list takes the rest of the column, down to the
+   buttons (the pickers' own lists are a fixed height elsewhere). */
 .io-main {
+  display: flex;
+  flex-direction: column;
   min-width: 0;
+  overflow-y: auto;
+
+  > .wizard-step {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    min-height: 0;
+  }
+  > .wizard-step > .wizard-cards,
+  .discover-picker > :deep(.wizard-cards),
+  :deep(.on-cards),
+  :deep(.od-cards),
+  :deep(.pp-cards) {
+    flex: 1 1 auto;
+    min-height: 160px;
+    max-height: none;
+  }
+  .discover-picker,
+  .on-picker,
+  .open-data-picker,
+  .pp-picker {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    min-height: 0;
+  }
 
   > .wizard-step {
     padding-top: 0;
@@ -1917,6 +2056,7 @@ async function execute() {
 .wizard-body {
   min-height: 300px;
 }
+
 .nb-layout.has-info {
   display: grid;
   grid-template-columns: 240px minmax(0, 1fr);
@@ -1969,6 +2109,13 @@ async function execute() {
   }
   .nb-info {
     display: none;
+  }
+  .nb-layout.is-split {
+    overflow-y: auto;
+  }
+  .io-side,
+  .io-main {
+    overflow-y: visible;
   }
   .io-side {
     margin-bottom: 16px;
@@ -2449,5 +2596,23 @@ async function execute() {
 .wizard-footer-right {
   display: flex;
   gap: 8px;
+}
+</style>
+
+<style lang="scss">
+/* The dialog (teleported, so not scoped): at most 90vh, its body taking
+   what the title and buttons leave, for the steps to scroll in. */
+.el-dialog.nb-dialog {
+  display: flex;
+  flex-direction: column;
+  max-height: 90vh;
+  margin-bottom: 0;
+
+  > .el-dialog__body {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    min-height: 0;
+  }
 }
 </style>

@@ -727,17 +727,13 @@ watch(
 
 <template>
   <div class="applications-page">
-    <!-- Header -->
-    <div class="builder-header">
-      <span class="header-title">
-        <router-link :to="appsRoute" class="header-back-link">Apps</router-link>
-        <template v-if="detail">
-          <span class="header-breadcrumb-sep">/</span>
-          <span class="header-detail-name">{{ repoName }}</span>
-        </template>
-      </span>
-      <!-- The page's main action: publish a release (the app store follows) -->
-      <div v-if="detail && (canRelease || isAppOwner || tryVersion || appSample)" class="header-actions">
+    <!-- The page's actions, on the right of its title row like every
+         Analysis page's (the title is the app's repository: Analysis.vue,
+         MyWorkSpacePage.vue). Publishing a release is the main one. -->
+    <Teleport v-if="detail && (canRelease || isAppOwner || tryVersion || appSample)" defer to="#page-title-actions">
+      <div class="header-actions">
+        <!-- "3 new commits since v1.3.6": a release is due. -->
+        <span v-if="canRelease && nudge" class="release-nudge">{{ nudge }}</span>
         <el-tooltip v-if="appSample" content="Sample output: a PDF summary of a run of this app" placement="bottom">
           <button type="button" class="header-sample-btn" aria-label="View the app's sample output" @click="openAppSample">
             <IconPDF :width="20" :height="20" color="currentColor" />
@@ -753,9 +749,8 @@ watch(
           </span>
         </el-tooltip>
         <bf-button v-if="isAppOwner" class="compact flex secondary" @click="shareOpen = true">Share</bf-button>
-        <template v-if="canRelease">
-        <span v-if="nudge" class="release-nudge">{{ nudge }}</span>
         <el-tooltip
+          v-if="canRelease"
           :disabled="!nothingToRelease"
           :content="`Nothing new since ${releaseStatus?.latestTag}: the ${releaseStatus?.target} branch is at that release.`"
           placement="bottom"
@@ -764,9 +759,8 @@ watch(
             <bf-button class="compact flex" :disabled="nothingToRelease" @click="releaseOpen = true">Release a version</bf-button>
           </span>
         </el-tooltip>
-        </template>
       </div>
-    </div>
+    </Teleport>
 
     <!-- Loading -->
     <div v-if="detailLoading" class="app-loading">
@@ -1553,47 +1547,15 @@ watch(
   overflow: hidden;
 }
 
-.builder-header {
+// Teleported into the page's title row (OrgBreadcrumb), still this
+// component's scoped styles.
+.header-actions {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 8px 24px;
-  background-color: theme.$white;
-  border-bottom: 1px solid theme.$gray_3;
-  min-height: 48px;
+}
 
-  .header-title {
-    font-weight: 400;
-    font-size: 13px;
-    color: theme.$gray_4;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-
-  .header-back-link {
-    color: theme.$purple_3;
-    cursor: pointer;
-    font-weight: 500;
-    text-decoration: none;
-
-    &:hover {
-      text-decoration: underline;
-    }
-  }
-
-  .header-breadcrumb-sep {
-    color: theme.$gray_4;
-    font-weight: 400;
-  }
-
-  .header-detail-name {
-    font-weight: 600;
-    font-size: 14px;
-    color: theme.$black;
-  }
-
-  .header-sample-btn {
+.header-sample-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1609,18 +1571,11 @@ watch(
     border-color: theme.$purple_1;
   }
 }
-.header-actions {
-    margin-left: auto;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-  }
 
-  // "3 new commits since v1.3.6": a release is due.
-  .release-nudge {
-    font-size: 12px;
-    color: theme.$orange_2;
-  }
+.release-nudge {
+  font-size: 12px;
+  color: theme.$orange_2;
+  white-space: nowrap;
 }
 
 .app-loading {

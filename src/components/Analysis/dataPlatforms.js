@@ -1,12 +1,30 @@
 // The data platforms a notebook can take a dataset from, as the new notebook
-// dialog and the session's Inputs panel present them. A dataset from either
-// becomes a view: the notebook starts with its file list, and the user picks
-// which files to download.
+// dialog and the session's Inputs panel present them, in this order. A
+// dataset from any of them becomes a view: the notebook starts with its file
+// list, and the user picks which files to download.
 export const DATA_PLATFORMS = {
   discover: {
     name: "Pennsieve Discover",
     desc: "Published, citable research datasets",
     noun: "published datasets",
+  },
+  openData: {
+    name: "AWS Open Data",
+    desc: "The Registry of Open Data on AWS",
+    noun: "datasets",
+  },
+  // Data portals on Pennsieve Discover whose datasets are also in the
+  // Registry of Open Data on AWS: a notebook reads them from there
+  // (utils/openDataPortals). SPARC's include RE-JOIN's and PRECISION's.
+  sparc: {
+    name: "SPARC",
+    desc: "The peripheral nervous system, with RE-JOIN and PRECISION",
+    noun: "datasets",
+  },
+  epilepsyScience: {
+    name: "Epilepsy.Science",
+    desc: "Clinical and pre-clinical epilepsy research",
+    noun: "datasets",
   },
   // OpenNeuro's datasets are in the Registry of Open Data on AWS; this
   // platform finds them with OpenNeuro's own search (utils/openNeuro).
@@ -14,11 +32,6 @@ export const DATA_PLATFORMS = {
     name: "OpenNeuro",
     desc: "Open neuroimaging datasets, from its copy on AWS",
     noun: "public datasets",
-  },
-  openData: {
-    name: "AWS Open Data",
-    desc: "The Registry of Open Data on AWS",
-    noun: "datasets",
   },
 };
 

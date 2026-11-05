@@ -8,7 +8,7 @@
           :page-route="sectionRoute"
           workspace-label="My Workspace"
           :workspace-route="{ name: 'my-workspace' }"
-          :actions="$route.matched.some((r) => r.name === 'my-analysis')"
+          :actions="$route.matched.some((r) => r.name === 'my-analysis' || r.name === 'my-code')"
         />
       </template>
     </bf-rafter>
@@ -23,6 +23,7 @@
 import BfRafter from "@/components/shared/bf-rafter/BfRafter.vue";
 import RouterTabs from "@/components/shared/routerTabs/routerTabs.vue";
 import OrgBreadcrumb from "@/components/shared/OrgBreadcrumb/OrgBreadcrumb.vue";
+import { applicationPageTitle } from "@/components/Analysis/Applications/appCards";
 import { useComputeResourcesStore } from "@/stores/computeResourcesStore";
 
 export default {
@@ -166,7 +167,7 @@ export default {
           return [{ name: 'Apps' }];
         }
         const appPages = {
-          'my-application-detail': 'Application',
+          'my-application-detail': applicationPageTitle(this.$route.params.uuid, this.$store.getters) || 'Application',
           'my-application-manifest-guide': 'Manifest Guide',
           'my-application-manifest-builder': 'Create Manifest',
         };

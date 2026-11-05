@@ -44,6 +44,8 @@ const initialState = () => ({
   computeNodesLoaded: false,
   applications: [],
   applicationsLoaded: false,
+  // The app whose page is open (fetchApplication): the page header's title.
+  currentApplication: null,
   deletingApplications: [],
   processors: [],
   preprocessors: [],
@@ -182,6 +184,9 @@ export const mutations = {
   },
   SET_WORKFLOW_LOGS(state, logs) {
     state.workflowLogs = logs;
+  },
+  SET_CURRENT_APPLICATION(state, app) {
+    state.currentApplication = app;
   },
   SET_SELECTED_WORKFLOW(state, workflow) {
     state.selectedWorkflow = workflow;
@@ -415,7 +420,7 @@ export const actions = {
       return Promise.reject(err);
     }
   },
-  fetchApplication: async ({ rootState }, uuid) => {
+  fetchApplication: async ({ rootState, commit }, uuid) => {
     if (!uuid) throw new Error("Missing application uuid");
     const url = withWorkspace(`${rootState.config.api2Url}/applications/store/${uuid}`, rootState);
     const userToken = await useGetToken();
@@ -428,7 +433,9 @@ export const actions = {
     if (!resp.ok) {
       throw new Error(`Failed to fetch application: ${resp.status}`);
     }
-    return await resp.json();
+    const app = await resp.json();
+    commit("SET_CURRENT_APPLICATION", app);
+    return app;
   },
   fetchApplicationPermissions: async ({ rootState }, uuid) => {
     if (!uuid) throw new Error("Missing application uuid");
@@ -1440,6 +1447,7 @@ export const getters = {
   activityDialogVisible: (state) => state.activityDialogVisible,
   selectedProcessor: (state) => state.selectedProcessor,
   applications: (state) => state.applications,
+  currentApplication: (state) => state.currentApplication,
   computeNodes: (state) => state.computeNodes,
   targetTypes: (state) => state.targetTypes,
   packageFormats: (state) => state.packageFormats,

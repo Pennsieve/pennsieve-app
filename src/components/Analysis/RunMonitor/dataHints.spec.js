@@ -20,11 +20,14 @@ describe("data hints", () => {
 
   it("knows where public data lives, and which nodes can reach it", () => {
     expect(dataRegions("openNeuro")).toEqual(["us-east-1"]);
+    expect(dataRegions("sparc")).toEqual(["us-east-1"]);
+    expect(dataRegions("epilepsyScience")).toEqual(["us-east-1"]);
     expect(dataRegions("openData", { openDataDataset: { regions: ["us-west-2"] } })).toEqual(["us-west-2"]);
     expect(dataRegions("public")).toEqual([]);
     expect(nodeDataReason({ deploymentMode: "Compliant" }, "openData")).toMatch(/public data/);
     expect(nodeDataReason({ deploymentMode: "compliant" }, "public")).toBe("");
     expect(nodeDataReason({ deploymentMode: "secure" }, "openNeuro")).toBe("");
+    expect(nodeDataReason({ deploymentMode: "compliant" }, "sparc")).toMatch(/public data/);
     expect(nodeDataNote({ region: "us-east-1" }, ["us-west-2"])).toMatch(/us-west-2.*us-east-1/);
     expect(nodeDataNote({ region: "us-west-2" }, ["us-west-2"])).toBe("");
     expect(nodeDataNote({}, ["us-west-2"])).toBe("");
@@ -44,6 +47,8 @@ describe("data hints", () => {
     expect(isImagingData("openNeuro", { openNeuroDataset: { modalities: ["mri"] } })).toBe(true);
     expect(isImagingData("openNeuro", { openNeuroDataset: { modalities: ["eeg"] } })).toBe(false);
     expect(isImagingData("openData", { openDataDataset: { keywords: ["biology", "Imaging"] } })).toBe(true);
+    expect(isImagingData("sparc", { portalDataset: { keywords: ["mouse", "microscopy"] } })).toBe(true);
+    expect(isImagingData("epilepsyScience", { portalDataset: { keywords: ["ieeg"] } })).toBe(false);
     expect(isImagingData("public", {})).toBe(false);
   });
 });
