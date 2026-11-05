@@ -30,17 +30,12 @@ const orgId = computed(() => props.orgId)
 const isMyWorkspace = computed(() => !orgId.value)
 const scope = computed(() => isMyWorkspace.value ? 'user-owned' : `workspace:${orgId.value}`)
 
-// Use Pinia store for compute nodes data - use scoped system
-const statusOrder = { 'enabled': 0, 'active': 0, 'running': 0, 'ready': 0, 'paused': 1, 'stopped': 1, 'disabled': 1, 'destroying': 2, 'pending': 3 }
-
+// Use Pinia store for compute nodes data - use scoped system.
+// By name only: a node keeps its place while it's updated, paused or
+// destroyed, so the cards don't move under the pointer.
 const computeNodes = computed(() => {
   const nodes = computeResourcesStore.getScopedComputeNodes(scope.value) || []
-  return [...nodes].sort((a, b) => {
-    const statusA = statusOrder[(a.status || 'pending').toLowerCase()] ?? 4
-    const statusB = statusOrder[(b.status || 'pending').toLowerCase()] ?? 4
-    if (statusA !== statusB) return statusA - statusB
-    return (a.name || '').toLowerCase().localeCompare((b.name || '').toLowerCase())
-  })
+  return [...nodes].sort((a, b) => (a.name || '').toLowerCase().localeCompare((b.name || '').toLowerCase()))
 })
 const isLoading = computed(() => computeResourcesStore.isScopeLoading(scope.value))
 // My Workspace: the caller's own nodes (groupMyNodes), for Getting started;

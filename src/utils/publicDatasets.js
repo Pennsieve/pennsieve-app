@@ -39,6 +39,12 @@ export async function searchPublicDatasets(query = '', { sendXhr = useSendXhr, c
   return (response?.datasets || []).map(toPublicDataset).filter((d) => !d.embargo)
 }
 
+// How many openly published research datasets Discover has.
+export async function countPublicDatasets({ sendXhr = useSendXhr, config = siteConfig } = {}) {
+  const response = await sendXhr(`${config.discoverUrl}/datasets?limit=1&offset=0&datasetType=research&embargo=false`, { method: 'GET' })
+  return response?.totalCount ?? null
+}
+
 // A folder of a published version, a page at a time: { files, totalCount },
 // each file { name, path, type ("Directory" for a folder), size, fileType }.
 export async function browsePublicFiles({ id, version, path = '', limit = 500, offset = 0 }, { sendXhr = useSendXhr, config = siteConfig } = {}) {
