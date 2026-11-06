@@ -36,8 +36,9 @@ import bossdb from "./bossdb";
 import dandi from "./dandi";
 import physionet from "./physionet";
 import allen from "./allen";
+import cellxgene from "./cellxgene";
 
-const LIST = [discover, openData, sparc, epilepsyScience, openNeuro, bossdb, dandi, physionet, allen];
+const LIST = [discover, openData, sparc, epilepsyScience, openNeuro, bossdb, dandi, physionet, allen, cellxgene];
 
 export const PLATFORMS = Object.fromEntries(LIST.map((p) => [p.key, p]));
 export const PLATFORM_KEYS = LIST.map((p) => p.key);
