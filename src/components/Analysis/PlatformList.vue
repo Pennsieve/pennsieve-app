@@ -85,10 +85,11 @@ const line = (key) => platformCount(counts[key], DATA_PLATFORMS[key].noun);
   &:hover {
     background: theme.$gray_1;
   }
-  /* Calm: a thin accent on the left and a faint tint. */
+  /* Chosen: its whole outline in purple and a faint tint (an accent on
+     one side would curl round the corners). */
   &.is-picked {
+    border-color: theme.$purple_3;
     background: theme.$gray_1;
-    box-shadow: inset 2px 0 0 theme.$purple_3;
   }
 }
 .pl__text {
