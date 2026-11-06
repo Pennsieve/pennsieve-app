@@ -9,6 +9,7 @@ import {
   listOpenData,
   searchOpenData,
   createOpenDataView,
+  createDandiView,
   listOpenDataFolder,
   openDataViewName,
   openDataCatalog,
@@ -167,6 +168,20 @@ describe("open data", () => {
     const whole = respond([201, view]);
     await createOpenDataView({ dataset: "openneuro", title: "OpenNeuro" }, { config, getToken, fetchFn: whole });
     expect(JSON.parse(whole.mock.calls[0][1].body).sources).toEqual([{ kind: "openData", dataset: "openneuro" }]);
+  });
+
+  it("makes a run view of a dandiset version, all of it or a folder", async () => {
+    const view = { id: "v-2", version: 1 };
+    const fetchFn = respond([201, view]);
+    await createDandiView({ dandiset: "000003", version: "0.250624.0409", title: "Mossy Cells", prefix: "sub-20/" }, { config, getToken, fetchFn });
+    expect(JSON.parse(fetchFn.mock.calls[0][1].body)).toEqual({
+      name: "Mossy Cells (sub-20/)",
+      sources: [{ kind: "dandi", dandiset: "000003", dandisetVersion: "0.250624.0409", prefix: "sub-20/" }],
+      lifecycle: "run",
+    });
+    const whole = respond([201, view]);
+    await createDandiView({ dandiset: "000003", version: "draft", title: "Mossy Cells" }, { config, getToken, fetchFn: whole });
+    expect(JSON.parse(whole.mock.calls[0][1].body).sources).toEqual([{ kind: "dandi", dandiset: "000003", dandisetVersion: "draft" }]);
   });
 });
 

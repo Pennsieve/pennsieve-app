@@ -33,6 +33,14 @@ export const DATA_PLATFORMS = {
     desc: "Open neuroimaging datasets, from its copy on AWS",
     noun: "public datasets",
   },
+  // The DANDI Archive's dandisets are in the Registry of Open Data on AWS,
+  // as files stored by content: a notebook takes a dandiset version as
+  // views-service's own kind of source (utils/dandi).
+  dandi: {
+    name: "DANDI",
+    desc: "Neurophysiology data, mostly NWB, from the DANDI Archive",
+    noun: "dandisets",
+  },
 };
 
 // "1,213 datasets", or "" before the count is known.

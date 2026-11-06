@@ -63,10 +63,12 @@ import RuntimeMark from "../WorkflowGraph/RuntimeMark.vue";
 import { STANDARD_CPU_OPTIONS, getStandardMemoryOptions, getTargetTypeLabel } from "./runHelpers";
 import { sourceLabel } from "../WorkflowGraph/sourceInputs";
 import * as siteConfig from "@/site-config/site.json";
-import { viewsServiceUrl, viewForDataset, viewDataSource, createOpenDataView, openDataCatalog } from "@/utils/viewsService";
+import { viewsServiceUrl, viewForDataset, viewDataSource, createOpenDataView, createDandiView, openDataCatalog } from "@/utils/viewsService";
 import OpenDataPicker from "../OpenDataPicker.vue";
 import OpenNeuroPicker from "../OpenNeuroPicker.vue";
 import { countOpenNeuro, OPENNEURO_REGISTRY } from "@/utils/openNeuro";
+import DandiPicker from "../DandiPicker.vue";
+import { countDandi, dandiViewTitle } from "@/utils/dandi";
 import PortalPicker from "../PortalPicker.vue";
 import { OPEN_DATA_PORTALS, portalDatasetIds } from "@/utils/openDataPortals";
 import DiscoverPicker from "../DiscoverPicker.vue";
@@ -399,10 +401,11 @@ const INPUT_CHOICES = {
   sparc: { label: DATA_PLATFORMS.sparc.name, desc: DATA_PLATFORMS.sparc.desc, platform: "sparc" },
   epilepsyScience: { label: DATA_PLATFORMS.epilepsyScience.name, desc: DATA_PLATFORMS.epilepsyScience.desc, platform: "epilepsyScience" },
   openNeuro: { label: DATA_PLATFORMS.openNeuro.name, desc: DATA_PLATFORMS.openNeuro.desc, platform: "openNeuro" },
+  dandi: { label: DATA_PLATFORMS.dandi.name, desc: DATA_PLATFORMS.dandi.desc, platform: "dandi" },
   none: { label: "No input", desc: "Start with an empty input/ folder" },
 };
 // The data platforms' sizes, shown on their cards.
-const platformCounts = ref({ discover: null, openNeuro: null, sparc: null, epilepsyScience: null, openData: null });
+const platformCounts = ref({ discover: null, openNeuro: null, sparc: null, epilepsyScience: null, openData: null, dandi: null });
 function loadPlatformCounts() {
   if (!publicInputs) return;
   if (platformCounts.value.discover == null) {
@@ -413,6 +416,11 @@ function loadPlatformCounts() {
   if (platformCounts.value.openNeuro == null) {
     countOpenNeuro()
       .then((n) => (platformCounts.value.openNeuro = n))
+      .catch(() => {});
+  }
+  if (platformCounts.value.dandi == null) {
+    countDandi()
+      .then((n) => (platformCounts.value.dandi = n))
       .catch(() => {});
   }
   for (const portal of Object.keys(OPEN_DATA_PORTALS)) {
@@ -437,7 +445,7 @@ const platformLine = (c) => {
 const inputChoices = computed(() => {
   const c = [];
   if (!props.personal) c.push("dataset");
-  if (publicInputs) c.push("public", "openData", "sparc", "epilepsyScience", "openNeuro");
+  if (publicInputs) c.push("public", "openData", "sparc", "epilepsyScience", "openNeuro", "dandi");
   c.push("none");
   return c;
 });
@@ -596,6 +604,8 @@ const canNext = computed(() => {
         ? !!openDataDataset.value
         : inputChoice.value === "openNeuro"
         ? !!openNeuroDataset.value
+        : inputChoice.value === "dandi"
+        ? !!dandiDataset.value
         : isPortal.value
         ? !!portalDataset.value
         : inputChoice.value === "none";
@@ -664,6 +674,16 @@ const openNeuroLabel = computed(() => {
   return `${d.name} (${openNeuroPrefix.value || d.id})`;
 });
 
+// A dandiset version, chosen with DandiPicker: a view of its files (each
+// read from its blob in the archive's bucket), all or a folder's.
+const dandiDataset = ref(null); // a searchDandi result, at the version chosen
+const dandiPrefix = ref("");
+const dandiLabel = computed(() => {
+  const d = dandiDataset.value;
+  if (!d) return "";
+  return `${d.name} (DANDI:${d.id}${dandiPrefix.value ? `/${dandiPrefix.value}` : ""}, ${d.version})`;
+});
+
 // A SPARC or Epilepsy.Science dataset, chosen with PortalPicker: a view of
 // its folder in the portal's Open Data entry. Choosing the other portal
 // starts over.
@@ -694,6 +714,7 @@ const openDataLabel = computed(() => {
 const dataContext = computed(() => ({
   publicDataset: publicDataset.value,
   openNeuroDataset: openNeuroDataset.value,
+  dandiDataset: dandiDataset.value,
   openDataDataset: openDataDataset.value,
   portalDataset: portalDataset.value,
   selectedDataset: selectedDataset.value?.content,
@@ -906,6 +927,8 @@ function reset() {
   openDataPrefix.value = "";
   openNeuroDataset.value = null;
   openNeuroPrefix.value = "";
+  dandiDataset.value = null;
+  dandiPrefix.value = "";
   portalDataset.value = null;
   portalPrefix.value = "";
   // The data comes first: a workspace's own dataset, else a public one.
@@ -1012,6 +1035,8 @@ const soFar = computed(() => {
         ? openDataLabel.value || "AWS Open Data"
         : inputChoice.value === "openNeuro"
         ? openNeuroLabel.value || "OpenNeuro"
+        : inputChoice.value === "dandi"
+        ? dandiLabel.value || "DANDI"
         : isPortal.value
         ? portalLabel.value || DATA_PLATFORMS[inputChoice.value].name
         : inputChoice.value === "dataset"
@@ -1120,6 +1145,17 @@ async function execute() {
       });
       personalSources[dataSourceNodes.value[0].id] = viewDataSource(view);
     }
+    // A dandiset version: a view of its files, each read from its blob.
+    const usesDandi = inputChoice.value === "dandi";
+    if (usesDandi && dandiDataset.value && dataSourceNodes.value.length) {
+      const view = await createDandiView({
+        dandiset: dandiDataset.value.id,
+        version: dandiDataset.value.version,
+        title: dandiViewTitle(dandiDataset.value),
+        prefix: dandiPrefix.value,
+      });
+      personalSources[dataSourceNodes.value[0].id] = viewDataSource(view);
+    }
     // A SPARC or Epilepsy.Science dataset: a view of its folder in the
     // portal's Open Data entry.
     const usesPortal = isPortal.value;
@@ -1140,7 +1176,7 @@ async function execute() {
         ...(processorConfigs.length > 0 && { processorConfigs }),
       },
       ...(runDatasetId.value && { datasetId: runDatasetId.value }),
-      dataSources: usesPublic || usesOpenData || usesOpenNeuro || usesPortal ? personalSources : dataSources,
+      dataSources: usesPublic || usesOpenData || usesOpenNeuro || usesDandi || usesPortal ? personalSources : dataSources,
       ...(name && { name }),
       ...(Object.keys(dataTargets).length > 0 && { dataTargets }),
     };
@@ -1459,6 +1495,19 @@ async function execute() {
         </p>
         <OpenNeuroPicker v-model:dataset="openNeuroDataset" v-model:prefix="openNeuroPrefix" />
       </div>
+      <div v-else-if="step === S.INPUT && inputChoice === 'dandi'" class="wizard-step">
+        <h4 class="io-section-title io-platform-title">
+          <PlatformMark platform="dandi" :size="24" />
+          Choose a dandiset
+        </h4>
+        <p class="wizard-step-desc">
+          A dandiset from the <a href="https://dandiarchive.org" target="_blank" rel="noopener">DANDI Archive</a>
+          at a published version (or its draft), read from its copy in the
+          Registry of Open Data on AWS. The notebook starts with its file
+          list; you pick which files to download from the notebook.
+        </p>
+        <DandiPicker v-model:dataset="dandiDataset" v-model:prefix="dandiPrefix" />
+      </div>
       <div v-else-if="step === S.INPUT && isPortal" class="wizard-step">
         <h4 class="io-section-title io-platform-title">
           <PlatformMark :platform="inputChoice" :size="24" />
@@ -1776,6 +1825,8 @@ async function execute() {
                 ? `${openDataLabel} (AWS Open Data)`
                 : inputChoice === "openNeuro"
                 ? `${openNeuroLabel} (OpenNeuro)`
+                : inputChoice === "dandi"
+                ? dandiLabel
                 : isPortal
                 ? `${portalLabel} (${DATA_PLATFORMS[inputChoice].name})`
                 : inputChoice === "dataset"
@@ -1805,6 +1856,12 @@ async function execute() {
           The notebook starts with the file list of {{ openNeuroLabel }} in
           <code>input/</code>, read from OpenNeuro's copy on AWS. Choose which
           files to download from its <strong>Inputs</strong> panel.
+        </p>
+        <p v-else-if="inputChoice === 'dandi' && dandiDataset" class="resource-hint">
+          The notebook starts with the file list of {{ dandiLabel }} in
+          <code>input/</code>, read from the DANDI Archive's bucket on AWS.
+          Zarr folders aren't included yet. Choose which files to download
+          from its <strong>Inputs</strong> panel.
         </p>
         <p v-else-if="isPortal && portalDataset" class="resource-hint">
           The notebook starts with the file list of {{ portalLabel }} in
@@ -1931,6 +1988,7 @@ async function execute() {
   > .wizard-step > .wizard-cards,
   .discover-picker > :deep(.wizard-cards),
   :deep(.on-cards),
+  :deep(.dd-cards),
   :deep(.od-cards),
   :deep(.pp-cards) {
     flex: 1 1 auto;

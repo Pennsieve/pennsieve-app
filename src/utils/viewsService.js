@@ -188,6 +188,23 @@ export const openDataViewName = (title, prefix = '') => {
   return p ? `${title} (${p})` : title
 }
 
+// A view made for one run of a dandiset version's files under prefix (a
+// folder of the dandiset; all of it when empty). views-service reads the
+// version's file list from the archive's bucket when the view is made; each
+// file points at its blob. Zarr assets aren't taken.
+export async function createDandiView({ dandiset, version, title, prefix = '' }, options = {}) {
+  const p = openDataPrefix(prefix)
+  return viewsRequest('/me', {
+    ...options,
+    method: 'POST',
+    body: {
+      name: openDataViewName(title, p),
+      sources: [{ kind: 'dandi', dandiset, dandisetVersion: version, ...(p && { prefix: p }) }],
+      lifecycle: 'run',
+    },
+  })
+}
+
 // A view made for one run of an Open Data dataset's files under prefix (all
 // of them when empty). views-service lists them from the dataset's public
 // bucket when the view is made; they sit under open-data-<name>/.
