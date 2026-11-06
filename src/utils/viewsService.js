@@ -211,6 +211,23 @@ export async function createDandiView({ dandiset, version, title, prefix = '' },
   })
 }
 
+// A view made for one run of several folders of an Open Data dataset (at
+// most 20), named name: each folder a source, its files at their paths in
+// the dataset under open-data-<name>/ (views-service refuses overlapping
+// folders). One folder is createOpenDataView's.
+export async function createOpenDataViewOf({ dataset, name, prefixes = [] }, options = {}) {
+  const ps = prefixes.map(openDataPrefix)
+  return viewsRequest('/me', {
+    ...options,
+    method: 'POST',
+    body: {
+      name,
+      sources: ps.map((p) => ({ kind: 'openData', dataset, ...(p && { prefix: p }) })),
+      lifecycle: 'run',
+    },
+  })
+}
+
 // A view made for one run of an Open Data dataset's files under prefix (all
 // of them when empty). views-service lists them from the dataset's public
 // bucket when the view is made; they sit under open-data-<name>/.

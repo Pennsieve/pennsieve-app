@@ -12,7 +12,7 @@ import { computed, onBeforeUnmount, ref, watch } from "vue";
 import { ElMessageBox } from "element-plus";
 import * as siteConfig from "@/site-config/site.json";
 import { useGetToken } from "@/composables/useGetToken";
-import { getView, listEntries, createOpenDataView, createDandiView, openDataViewName, viewForDataset } from "@/utils/viewsService";
+import { getView, listEntries, createOpenDataView, createOpenDataViewOf, createDandiView, openDataViewName, viewForDataset } from "@/utils/viewsService";
 import OpenDataPicker from "../OpenDataPicker.vue";
 import DiscoverPicker from "../DiscoverPicker.vue";
 import OpenNeuroPicker from "../OpenNeuroPicker.vue";
@@ -21,7 +21,7 @@ import PortalPicker from "../PortalPicker.vue";
 import DandiPicker from "../DandiPicker.vue";
 import { DANDI_REGISTRY, dandiViewTitle } from "@/utils/dandi";
 import BossdbPicker from "../BossdbPicker.vue";
-import { BOSSDB_REGISTRY } from "@/utils/bossdb";
+import { BOSSDB_REGISTRY, bossdbViewName } from "@/utils/bossdb";
 import { OPEN_DATA_PORTALS } from "@/utils/openDataPortals";
 import PlatformMark from "../PlatformMark.vue";
 import { DATA_PLATFORMS } from "../dataPlatforms";
@@ -368,8 +368,7 @@ const addOpenNeuro = ref(null);
 const addOpenNeuroPrefix = ref("");
 const addDandi = ref(null);
 const addDandiPrefix = ref("");
-const addBossdb = ref(null);
-const addBossdbPrefix = ref("");
+const addBossdbPicks = ref([]);
 // A SPARC or Epilepsy.Science dataset: a folder of the portal's Open Data
 // entry. Choosing the other portal starts over.
 const addPortal = ref(null);
@@ -392,8 +391,7 @@ function openAdd() {
   addOpenNeuroPrefix.value = "";
   addDandi.value = null;
   addDandiPrefix.value = "";
-  addBossdb.value = null;
-  addBossdbPrefix.value = "";
+  addBossdbPicks.value = [];
   addPortal.value = null;
   addPortalPrefix.value = "";
   addError.value = null;
@@ -406,7 +404,7 @@ const addReady = computed(() =>
     : addPlatform.value === "openNeuro"
     ? !!addOpenNeuro.value
     : addPlatform.value === "bossdb"
-    ? !!addBossdb.value
+    ? addBossdbPicks.value.length > 0
     : addPlatform.value === "dandi"
     ? !!addDandi.value
     : addIsPortal.value
@@ -429,9 +427,8 @@ const addDuplicate = computed(() => {
     return sources.value.find((s) => s.openDataset === OPENNEURO_REGISTRY && s.viewName === name) || null;
   }
   if (addPlatform.value === "bossdb") {
-    const d = addBossdb.value;
-    if (!d) return null;
-    const name = openDataViewName(d.name, addBossdbPrefix.value);
+    if (!addBossdbPicks.value.length) return null;
+    const name = bossdbViewName(addBossdbPicks.value);
     return sources.value.find((s) => s.openDataset === BOSSDB_REGISTRY && s.viewName === name) || null;
   }
   if (addPlatform.value === "dandi") {
@@ -457,7 +454,7 @@ const addDuplicateLabel = computed(() =>
     : addPlatform.value === "openNeuro"
     ? `This folder of ${addOpenNeuro.value?.name}`
     : addPlatform.value === "bossdb"
-    ? `${addBossdb.value?.name}`
+    ? bossdbViewName(addBossdbPicks.value)
     : addPlatform.value === "dandi"
     ? `This folder of ${addDandi.value?.name} (${addDandi.value?.version})`
     : addIsPortal.value
@@ -480,10 +477,12 @@ async function addData() {
       view = await createOpenDataView({ dataset: OPENNEURO_REGISTRY, title: d.name, prefix: addOpenNeuroPrefix.value });
       folder = (n) => addedSourceName(OPENNEURO_REGISTRY, addOpenNeuroPrefix.value, n);
     } else if (addPlatform.value === "bossdb") {
-      const d = addBossdb.value;
-      view = await createOpenDataView({ dataset: BOSSDB_REGISTRY, title: d.name, prefix: addBossdbPrefix.value });
-      // Named after the volume: bossdb-witvliet2020-Dataset_1-em.
-      folder = (n) => addedSourceName(BOSSDB_REGISTRY, `${d.collection}-${d.experiment}-${d.channel}/`, n);
+      const picks = addBossdbPicks.value;
+      view = await createOpenDataViewOf({ dataset: BOSSDB_REGISTRY, name: bossdbViewName(picks), prefixes: picks.map((p) => p.prefix) });
+      // Named after what's chosen: bossdb-witvliet2020-Dataset_1-em for
+      // one, its collection for several of one.
+      const one = picks.length === 1 ? picks[0].prefix : picks[0].prefix.split("/")[0];
+      folder = (n) => addedSourceName(BOSSDB_REGISTRY, `${one.replace(/\/$/, "").replaceAll("/", "-")}/`, n);
     } else if (addPlatform.value === "dandi") {
       const d = addDandi.value;
       const p = addDandiPrefix.value;
@@ -796,11 +795,7 @@ function fmtSize(bytes) {
           v-model:dataset="addOpenNeuro"
           v-model:prefix="addOpenNeuroPrefix"
         />
-        <BossdbPicker
-          v-else-if="addPlatform === 'bossdb'"
-          v-model:dataset="addBossdb"
-          v-model:prefix="addBossdbPrefix"
-        />
+        <BossdbPicker v-else-if="addPlatform === 'bossdb'" v-model:picks="addBossdbPicks" />
         <DandiPicker
           v-else-if="addPlatform === 'dandi'"
           v-model:dataset="addDandi"

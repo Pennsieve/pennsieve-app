@@ -78,6 +78,26 @@ export async function bossdbChannels(collection, experiment, { fetchFn = globalT
     .sort((a, b) => a.name.localeCompare(b.name, 'en', { numeric: true }))
 }
 
+// The most a notebook takes from BossDB at once: views-service's sources
+// per view.
+export const BOSSDB_MAX_PICKS = 20
+
+// What's chosen: a collection, an experiment or a channel, by its folder
+// ({ prefix, label, level, description, type }). Adding one drops those
+// inside it; one inside a pick is already in.
+export const pickCovers = (pick, prefix) => prefix.startsWith(pick.prefix)
+export function addPick(picks, pick) {
+  if (picks.some((p) => pickCovers(p, pick.prefix))) return picks
+  return [...picks.filter((p) => !pickCovers(pick, p.prefix)), pick]
+}
+
+// A view's name for picks: the one's label, else what they're from.
+export function bossdbViewName(picks) {
+  if (picks.length === 1) return `BossDB: ${picks[0].label}`
+  const collections = [...new Set(picks.map((p) => p.prefix.split('/')[0]))]
+  return `BossDB: ${collections.length === 1 ? collections[0] : `${collections.length} collections`} (${picks.length} selections)`
+}
+
 // How many collections a notebook can take from.
 export async function countBossdb(options = {}) {
   return (await bossdbCollections(options)).length

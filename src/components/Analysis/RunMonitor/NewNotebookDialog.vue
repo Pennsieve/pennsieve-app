@@ -64,14 +64,14 @@ import RuntimeMark from "../WorkflowGraph/RuntimeMark.vue";
 import { STANDARD_CPU_OPTIONS, getStandardMemoryOptions, getTargetTypeLabel } from "./runHelpers";
 import { sourceLabel } from "../WorkflowGraph/sourceInputs";
 import * as siteConfig from "@/site-config/site.json";
-import { viewsServiceUrl, viewForDataset, viewDataSource, createOpenDataView, createDandiView, openDataCatalog } from "@/utils/viewsService";
+import { viewsServiceUrl, viewForDataset, viewDataSource, createOpenDataView, createOpenDataViewOf, createDandiView, openDataCatalog } from "@/utils/viewsService";
 import OpenDataPicker from "../OpenDataPicker.vue";
 import OpenNeuroPicker from "../OpenNeuroPicker.vue";
 import { countOpenNeuro, OPENNEURO_REGISTRY } from "@/utils/openNeuro";
 import DandiPicker from "../DandiPicker.vue";
 import { countDandi, dandiViewTitle } from "@/utils/dandi";
 import BossdbPicker from "../BossdbPicker.vue";
-import { countBossdb, BOSSDB_REGISTRY } from "@/utils/bossdb";
+import { countBossdb, bossdbViewName, BOSSDB_REGISTRY } from "@/utils/bossdb";
 import PortalPicker from "../PortalPicker.vue";
 import { OPEN_DATA_PORTALS, portalDatasetIds } from "@/utils/openDataPortals";
 import DiscoverPicker from "../DiscoverPicker.vue";
@@ -615,7 +615,7 @@ const canNext = computed(() => {
         : inputChoice.value === "openNeuro"
         ? !!openNeuroDataset.value
         : inputChoice.value === "bossdb"
-        ? !!bossdbDataset.value
+        ? bossdbPicks.value.length > 0
         : inputChoice.value === "dandi"
         ? !!dandiDataset.value
         : isPortal.value
@@ -686,11 +686,10 @@ const openNeuroLabel = computed(() => {
   return `${d.name} (${openNeuroPrefix.value || d.id})`;
 });
 
-// A BossDB volume (a channel), chosen with BossdbPicker: a view of its
-// folder of the bossdb entry, which views-service takes whole (a precomputed
-// volume, read in place).
-const bossdbDataset = ref(null); // { collection, experiment, channel, name, ... }
-const bossdbPrefix = ref("");
+// BossDB collections, experiments or volumes, chosen with BossdbPicker: a
+// view of their folders of the bossdb entry, whose volumes views-service
+// takes whole (precomputed, read in place).
+const bossdbPicks = ref([]); // [{ prefix, label, ... }]
 
 // A dandiset version, chosen with DandiPicker: a view of its files (each
 // read from its blob in the archive's bucket), all or a folder's.
@@ -947,8 +946,7 @@ function reset() {
   openNeuroPrefix.value = "";
   dandiDataset.value = null;
   dandiPrefix.value = "";
-  bossdbDataset.value = null;
-  bossdbPrefix.value = "";
+  bossdbPicks.value = [];
   portalDataset.value = null;
   portalPrefix.value = "";
   // The data comes first: a workspace's own dataset, else a public one.
@@ -1061,7 +1059,7 @@ const soFar = computed(() => {
         : inputChoice.value === "openNeuro"
         ? openNeuroLabel.value || "OpenNeuro"
         : inputChoice.value === "bossdb"
-        ? bossdbDataset.value?.name || "BossDB"
+        ? (bossdbPicks.value.length ? bossdbViewName(bossdbPicks.value) : "BossDB")
         : inputChoice.value === "dandi"
         ? dandiLabel.value || "DANDI"
         : isPortal.value
@@ -1184,13 +1182,13 @@ async function execute() {
       });
       personalSources[dataSourceNodes.value[0].id] = viewDataSource(view);
     }
-    // A BossDB volume: a view of its channel's folder, a precomputed volume.
+    // BossDB: a view of the folders chosen, their volumes precomputed stacks.
     const usesBossdb = inputChoice.value === "bossdb";
-    if (usesBossdb && bossdbDataset.value && dataSourceNodes.value.length) {
-      const view = await createOpenDataView({
+    if (usesBossdb && bossdbPicks.value.length && dataSourceNodes.value.length) {
+      const view = await createOpenDataViewOf({
         dataset: BOSSDB_REGISTRY,
-        title: bossdbDataset.value.name,
-        prefix: bossdbPrefix.value,
+        name: bossdbViewName(bossdbPicks.value),
+        prefixes: bossdbPicks.value.map((p) => p.prefix),
       });
       personalSources[dataSourceNodes.value[0].id] = viewDataSource(view);
     }
@@ -1543,14 +1541,15 @@ async function execute() {
       <div v-else-if="step === S.INPUT && inputChoice === 'bossdb'" class="wizard-step">
         <h4 class="io-section-title io-platform-title">
           <PlatformMark platform="bossdb" :size="24" />
-          Choose a BossDB volume
+          Choose BossDB data
         </h4>
         <p class="wizard-step-desc">
-          A volume from <a href="https://bossdb.org" target="_blank" rel="noopener">BossDB</a>, read
-          from its copy in the Registry of Open Data on AWS. The notebook reads it in place, a
-          region at a time; nothing is downloaded up front.
+          Volumes from <a href="https://bossdb.org" target="_blank" rel="noopener">BossDB</a>, read
+          from its copy in the Registry of Open Data on AWS: whole collections, experiments or
+          channels, as many as you need. The notebook reads each volume in place, a region at a
+          time; nothing is downloaded up front.
         </p>
-        <BossdbPicker v-model:dataset="bossdbDataset" v-model:prefix="bossdbPrefix" />
+        <BossdbPicker v-model:picks="bossdbPicks" />
       </div>
       <div v-else-if="step === S.INPUT && inputChoice === 'dandi'" class="wizard-step">
         <h4 class="io-section-title io-platform-title">

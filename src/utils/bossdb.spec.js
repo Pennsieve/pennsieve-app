@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { bossdbCollections, searchBossdb, bossdbExperiments, bossdbChannels, countBossdb } from "./bossdb";
+import { bossdbCollections, searchBossdb, bossdbExperiments, bossdbChannels, countBossdb, addPick, bossdbViewName } from "./bossdb";
 
 // BossDB's API, as it answers the public token (abridged), by path: it
 // can't read every public experiment.
@@ -59,5 +59,28 @@ describe("BossDB", () => {
     expect(await bossdbChannels("alonso-nanclares2024", "AB2", { fetchFn, listFolder })).toEqual([
       { name: "MEC_L1_S1_REG", type: "", datatype: "", description: "", path: "alonso-nanclares2024/AB2/MEC_L1_S1_REG/" },
     ]);
+  });
+});
+
+describe("BossDB picks", () => {
+  const em1 = { prefix: "witvliet2020/Dataset_1/em/", label: "witvliet2020 · Dataset_1 · em" };
+  const em2 = { prefix: "witvliet2020/Dataset_2/em/", label: "witvliet2020 · Dataset_2 · em" };
+  const whole = { prefix: "witvliet2020/", label: "witvliet2020 (whole collection)" };
+  const other = { prefix: "Kasthuri/", label: "Kasthuri (whole collection)" };
+
+  it("adds a pick, dropping those inside it; one inside a pick is already in", () => {
+    let picks = addPick(addPick([], em1), em2);
+    expect(picks).toEqual([em1, em2]);
+    picks = addPick(picks, whole);
+    expect(picks).toEqual([whole]);
+    expect(addPick(picks, em1)).toBe(picks);
+    // A prefix of a name isn't a folder above it.
+    expect(addPick([{ prefix: "witvliet2020/Dataset_1/" }], { prefix: "witvliet2020/Dataset_10/" })).toHaveLength(2);
+  });
+
+  it("names a view after what's chosen", () => {
+    expect(bossdbViewName([em1])).toBe("BossDB: witvliet2020 · Dataset_1 · em");
+    expect(bossdbViewName([em1, em2])).toBe("BossDB: witvliet2020 (2 selections)");
+    expect(bossdbViewName([whole, other])).toBe("BossDB: 2 collections (2 selections)");
   });
 });

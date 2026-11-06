@@ -1,17 +1,24 @@
 <script setup>
-// Choosing a BossDB volume (utils/bossdb): a collection, then one of its
-// experiments, then one of its channels, as the Open Data bucket has them,
-// described where BossDB's API can. The notebook takes that channel's folder of the
-// bossdb entry, which views-service takes whole as a precomputed volume,
-// read in place. Used by the new notebook dialog and the running session's
-// Inputs panel.
+// Choosing what a notebook takes from BossDB (utils/bossdb): whole
+// collections, experiments or channels, several at once, as the Open Data
+// bucket has them, described where BossDB's API can. Each is a folder of
+// the bossdb entry; views-service takes the volumes in them whole, as
+// precomputed stacks read in place. Used by the new notebook dialog and the
+// running session's Inputs panel.
 import { computed, onMounted, ref } from "vue";
-import { bossdbCollections, searchBossdb, bossdbExperiments, bossdbChannels, bossdbUrl } from "@/utils/bossdb";
+import {
+  bossdbCollections,
+  searchBossdb,
+  bossdbExperiments,
+  bossdbChannels,
+  bossdbUrl,
+  addPick,
+  pickCovers,
+  BOSSDB_MAX_PICKS,
+} from "@/utils/bossdb";
 
-// The chosen volume ({ collection, experiment, channel, name, description,
-// type, datatype }) and its folder in the bucket (prefix, ending in /).
-const dataset = defineModel("dataset", { default: null });
-const prefix = defineModel("prefix", { type: String, default: "" });
+// What's chosen: [{ prefix, label, level, description, type }].
+const picks = defineModel("picks", { type: Array, default: () => [] });
 
 const collections = ref([]);
 const query = ref("");
@@ -24,6 +31,7 @@ const error = ref("");
 let seq = 0;
 
 const shown = computed(() => searchBossdb(collections.value, query.value));
+const full = computed(() => picks.value.length >= BOSSDB_MAX_PICKS);
 
 async function run(what, fn) {
   const mine = ++seq;
@@ -45,9 +53,7 @@ function loadCollections() {
     if (current()) collections.value = list;
   });
 }
-onMounted(() => {
-  if (!dataset.value) loadCollections();
-});
+onMounted(loadCollections);
 
 function openCollection(name) {
   collection.value = name;
@@ -68,93 +74,102 @@ function openExperiment(e) {
   });
 }
 
-function choose(ch) {
-  dataset.value = {
-    collection: collection.value,
-    experiment: experiment.value.name,
-    channel: ch.name,
-    name: `${collection.value} · ${experiment.value.name} · ${ch.name}`,
-    description: experiment.value.description,
-    type: ch.type,
-    datatype: ch.datatype,
-  };
-  prefix.value = ch.path;
+function up(to) {
+  if (to === "collections") collection.value = "";
+  experiment.value = null;
 }
 
-// Back up a level: from the volume chosen to its collection's experiments.
-function up(to) {
-  if (dataset.value) {
-    const name = dataset.value.collection;
-    dataset.value = null;
-    prefix.value = "";
-    openCollection(name);
-    return;
-  }
-  if (to === "collections") {
-    collection.value = "";
-    experiment.value = null;
-    if (!collections.value.length) loadCollections();
-  } else if (to === "experiments") {
-    experiment.value = null;
-  }
+// A folder's state: chosen, inside a chosen one, or free.
+const chosen = (prefix) => picks.value.some((p) => p.prefix === prefix);
+const within = (prefix) => picks.value.some((p) => p.prefix !== prefix && pickCovers(p, prefix));
+function toggle(pick) {
+  if (chosen(pick.prefix)) picks.value = picks.value.filter((p) => p.prefix !== pick.prefix);
+  else if (!within(pick.prefix) && !full.value) picks.value = addPick(picks.value, pick);
 }
+const remove = (prefix) => (picks.value = picks.value.filter((p) => p.prefix !== prefix));
+
+const collectionPick = (c) => ({ prefix: `${c}/`, label: `${c} (whole collection)`, level: "collection", description: "", type: "" });
+const experimentPick = (e) => ({
+  prefix: `${collection.value}/${e.name}/`,
+  label: `${collection.value} · ${e.name}`,
+  level: "experiment",
+  description: e.description,
+  type: "",
+});
+const channelPick = (ch) => ({
+  prefix: ch.path,
+  label: `${collection.value} · ${experiment.value.name} · ${ch.name}`,
+  level: "channel",
+  description: experiment.value.description,
+  type: ch.type,
+});
 </script>
 
 <template>
   <div class="bd-picker">
-    <!-- The volume chosen. -->
-    <div v-if="dataset" class="bd-head">
-      <div class="bd-head__text">
-        <div class="bd-head__name">{{ dataset.name }}</div>
-        <div v-if="dataset.description" class="bd-desc">{{ dataset.description }}</div>
-        <div class="bd-meta">
-          <a :href="bossdbUrl(dataset.collection)" target="_blank" rel="noopener">bossdb.org/project/{{ dataset.collection }}</a>
-          <span v-if="dataset.type">{{ dataset.type }}</span>
-          <span v-if="dataset.datatype">{{ dataset.datatype }}</span>
-          <span>{{ prefix }}</span>
-        </div>
-        <p class="bd-note">
-          A Neuroglancer precomputed volume: the notebook reads it in place (CloudVolume),
-          without downloading it.
-        </p>
-      </div>
-      <button type="button" class="bd-head__clear" title="Choose another volume" aria-label="Choose another volume" @click="up()">
-        &times;
-      </button>
+    <!-- What's chosen, to remove. -->
+    <div v-if="picks.length" class="bd-picks">
+      <span v-for="p in picks" :key="p.prefix" class="bd-pick" :title="p.prefix">
+        {{ p.label }}
+        <button type="button" class="bd-pick__remove" :aria-label="`Remove ${p.label}`" @click="remove(p.prefix)">&times;</button>
+      </span>
+      <span v-if="full" class="bd-picks__note">At most {{ BOSSDB_MAX_PICKS }}.</span>
     </div>
 
-    <template v-else>
-      <nav class="bd-crumbs" aria-label="BossDB">
-        <button type="button" class="bd-crumb" :class="{ 'is-current': !collection }" @click="up('collections')">Collections</button>
-        <template v-if="collection">
-          <span class="bd-crumbs__sep">/</span>
-          <button type="button" class="bd-crumb" :class="{ 'is-current': !experiment }" @click="up('experiments')">{{ collection }}</button>
-        </template>
-        <template v-if="experiment">
-          <span class="bd-crumbs__sep">/</span>
-          <span class="bd-crumb is-current">{{ experiment.name }}</span>
-        </template>
-      </nav>
+    <nav class="bd-crumbs" aria-label="BossDB">
+      <button type="button" class="bd-crumb" :class="{ 'is-current': !collection }" @click="up('collections')">Collections</button>
+      <template v-if="collection">
+        <span class="bd-crumbs__sep">/</span>
+        <button type="button" class="bd-crumb" :class="{ 'is-current': !experiment }" @click="up('experiments')">{{ collection }}</button>
+        <a class="bd-crumbs__link" :href="bossdbUrl(collection)" target="_blank" rel="noopener" title="On bossdb.org">↗</a>
+      </template>
+      <template v-if="experiment">
+        <span class="bd-crumbs__sep">/</span>
+        <span class="bd-crumb is-current">{{ experiment.name }}</span>
+      </template>
+    </nav>
 
-      <!-- Collections. -->
-      <template v-if="!collection">
-        <el-input v-model="query" class="bd-search" placeholder="Search BossDB collections..." clearable />
-        <p v-if="!loading && !error && collections.length" class="bd-count">
-          {{ query.trim() ? `${shown.length} of ` : "" }}{{ collections.length }} collections
-        </p>
-        <div class="bd-cards">
-          <button v-for="c in shown" :key="c" type="button" class="bd-card" @click="openCollection(c)">
+    <!-- Collections: tick one to take all of it, or open it. -->
+    <template v-if="!collection">
+      <el-input v-model="query" class="bd-search" placeholder="Search BossDB collections..." clearable />
+      <p v-if="!loading && !error && collections.length" class="bd-count">
+        {{ query.trim() ? `${shown.length} of ` : "" }}{{ collections.length }} collections · tick one to take all of it, or open it to choose
+      </p>
+      <div class="bd-cards">
+        <div v-for="c in shown" :key="c" class="bd-row" :class="{ 'is-chosen': chosen(`${c}/`) }">
+          <input
+            type="checkbox"
+            :checked="chosen(`${c}/`)"
+            :disabled="!chosen(`${c}/`) && full"
+            :aria-label="`Take all of ${c}`"
+            @change="toggle(collectionPick(c))"
+          />
+          <button type="button" class="bd-card" @click="openCollection(c)">
             <span class="bd-card__name">{{ c }}</span>
           </button>
-          <div v-if="loading" class="bd-msg">Loading BossDB…</div>
-          <div v-else-if="error" class="bd-msg">{{ error }}</div>
-          <div v-else-if="!shown.length" class="bd-msg">No BossDB collections found</div>
         </div>
-      </template>
+        <div v-if="loading" class="bd-msg">Loading BossDB…</div>
+        <div v-else-if="error" class="bd-msg">{{ error }}</div>
+        <div v-else-if="!shown.length" class="bd-msg">No BossDB collections found</div>
+      </div>
+    </template>
 
-      <!-- A collection's experiments. -->
-      <div v-else-if="!experiment" class="bd-cards">
-        <button v-for="e in experiments" :key="e.name" type="button" class="bd-card" @click="openExperiment(e)">
+    <!-- A collection's experiments. -->
+    <div v-else-if="!experiment" class="bd-cards">
+      <div
+        v-for="e in experiments"
+        :key="e.name"
+        class="bd-row"
+        :class="{ 'is-chosen': chosen(`${collection}/${e.name}/`), 'is-within': within(`${collection}/${e.name}/`) }"
+      >
+        <input
+          type="checkbox"
+          :checked="chosen(`${collection}/${e.name}/`) || within(`${collection}/${e.name}/`)"
+          :disabled="within(`${collection}/${e.name}/`) || (!chosen(`${collection}/${e.name}/`) && full)"
+          :aria-label="`Take all of ${e.name}`"
+          @change="toggle(experimentPick(e))"
+        />
+        <button type="button" class="bd-card" @click="openExperiment(e)">
           <span class="bd-card__name">{{ e.name }}</span>
           <span v-if="e.description" class="bd-desc">{{ e.description }}</span>
           <span v-if="e.channels || e.levels" class="bd-meta">
@@ -162,15 +177,29 @@ function up(to) {
             <span v-if="e.levels">{{ e.levels }} resolution levels</span>
           </span>
         </button>
-        <div v-if="loading" class="bd-msg">Loading experiments…</div>
-        <div v-else-if="error" class="bd-msg">{{ error }}</div>
-        <div v-else-if="!experiments.length" class="bd-msg">No experiments</div>
       </div>
+      <div v-if="loading" class="bd-msg">Loading experiments…</div>
+      <div v-else-if="error" class="bd-msg">{{ error }}</div>
+      <div v-else-if="!experiments.length" class="bd-msg">No experiments</div>
+    </div>
 
-      <!-- An experiment's channels in the Open Data bucket. -->
-      <div v-else class="bd-cards">
-        <p v-if="experiment.description" class="bd-desc bd-desc--lead">{{ experiment.description }}</p>
-        <button v-for="ch in channels" :key="ch.name" type="button" class="bd-card" @click="choose(ch)">
+    <!-- An experiment's channels: each a volume. -->
+    <div v-else class="bd-cards">
+      <p v-if="experiment.description" class="bd-desc bd-desc--lead">{{ experiment.description }}</p>
+      <div
+        v-for="ch in channels"
+        :key="ch.name"
+        class="bd-row"
+        :class="{ 'is-chosen': chosen(ch.path), 'is-within': within(ch.path) }"
+      >
+        <input
+          type="checkbox"
+          :checked="chosen(ch.path) || within(ch.path)"
+          :disabled="within(ch.path) || (!chosen(ch.path) && full)"
+          :aria-label="`Take ${ch.name}`"
+          @change="toggle(channelPick(ch))"
+        />
+        <button type="button" class="bd-card" :disabled="within(ch.path)" @click="toggle(channelPick(ch))">
           <span class="bd-card__name">{{ ch.name }}</span>
           <span class="bd-meta">
             <span v-if="ch.type">{{ ch.type }}</span>
@@ -178,17 +207,55 @@ function up(to) {
             <span>{{ ch.path }}</span>
           </span>
         </button>
-        <div v-if="loading" class="bd-msg">Loading channels…</div>
-        <div v-else-if="error" class="bd-msg">{{ error }}</div>
-        <div v-else-if="!channels.length" class="bd-msg">This experiment has no volumes in the Open Data bucket</div>
       </div>
-    </template>
+      <div v-if="loading" class="bd-msg">Loading channels…</div>
+      <div v-else-if="error" class="bd-msg">{{ error }}</div>
+      <div v-else-if="!channels.length" class="bd-msg">This experiment has no volumes in the Open Data bucket</div>
+    </div>
   </div>
 </template>
 
 <style scoped lang="scss">
 @use "../../styles/theme";
 
+.bd-picks {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+.bd-pick {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+  padding: 2px 4px 2px 8px;
+  border-radius: 12px;
+  background: theme.$purple_tint;
+  font-size: 12px;
+  color: theme.$gray_6;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.bd-pick__remove {
+  border: none;
+  background: none;
+  padding: 0 2px;
+  font-size: 14px;
+  line-height: 1;
+  color: theme.$gray_4;
+  cursor: pointer;
+
+  &:hover {
+    color: theme.$gray_6;
+  }
+}
+.bd-picks__note {
+  font-size: 12px;
+  color: theme.$gray_4;
+}
 .bd-crumbs {
   display: flex;
   flex-wrap: wrap;
@@ -199,6 +266,10 @@ function up(to) {
 }
 .bd-crumbs__sep {
   color: theme.$gray_3;
+}
+.bd-crumbs__link {
+  color: theme.$gray_4;
+  text-decoration: none;
 }
 .bd-crumb {
   border: none;
@@ -237,21 +308,43 @@ function up(to) {
 .bd-count + .bd-cards {
   margin-top: 0;
 }
-.bd-card {
+.bd-row {
   display: flex;
-  flex-direction: column;
-  gap: 3px;
-  width: 100%;
-  padding: 10px 14px;
-  border: none;
+  align-items: flex-start;
+  gap: 10px;
+  padding-left: 14px;
   border-bottom: 1px solid theme.$gray_2;
   background: theme.$white;
+
+  input[type="checkbox"] {
+    flex-shrink: 0;
+    margin-top: 13px;
+  }
+  &.is-chosen {
+    background: theme.$purple_tint;
+  }
+  &.is-within {
+    background: theme.$gray_1;
+  }
+}
+.bd-card {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  padding: 10px 14px 10px 0;
+  border: none;
+  background: none;
   font: inherit;
   text-align: left;
   cursor: pointer;
 
-  &:hover {
-    background: theme.$gray_1;
+  &:hover:not(:disabled) .bd-card__name {
+    color: theme.$purple_2;
+  }
+  &:disabled {
+    cursor: default;
   }
 }
 .bd-card__name {
@@ -281,49 +374,10 @@ function up(to) {
     margin: 0 6px;
     color: theme.$gray_3;
   }
-  a {
-    color: theme.$purple_2;
-  }
 }
 .bd-msg {
   padding: 8px 14px;
   font-size: 12px;
   color: theme.$gray_4;
-}
-.bd-head {
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
-}
-.bd-head__text {
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  gap: 4px;
-  min-width: 0;
-}
-.bd-head__name {
-  font-size: 15px;
-  font-weight: 600;
-  color: theme.$gray_6;
-}
-.bd-note {
-  margin: 6px 0 0;
-  font-size: 12px;
-  color: theme.$gray_4;
-}
-.bd-head__clear {
-  flex-shrink: 0;
-  border: none;
-  background: none;
-  padding: 0 2px;
-  font-size: 18px;
-  line-height: 1;
-  color: theme.$gray_4;
-  cursor: pointer;
-
-  &:hover {
-    color: theme.$gray_6;
-  }
 }
 </style>
