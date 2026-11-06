@@ -130,7 +130,7 @@ onMounted(() => {
       <p v-if="projects.length" class="pn-count">
         {{ found.toLocaleString("en-US") }} open-access project{{ found === 1 ? "" : "s" }}
       </p>
-      <div class="pn-cards">
+      <div class="pn-cards pp-list">
         <div v-if="loading" class="pn-msg">Loading PhysioNet's projects…</div>
         <div v-else-if="error" class="pn-msg">{{ error }}</div>
         <button v-for="d in results" :key="d.name" type="button" class="pn-card" @click="choose(d)">

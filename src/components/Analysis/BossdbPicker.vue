@@ -135,7 +135,7 @@ const channelPick = (ch) => ({
       <p v-if="!loading && !error && collections.length" class="bd-count">
         {{ query.trim() ? `${shown.length} of ` : "" }}{{ collections.length }} collections · tick one to take all of it, or open it to choose
       </p>
-      <div class="bd-cards">
+      <div class="bd-cards pp-list">
         <div v-for="c in shown" :key="c" class="bd-row" :class="{ 'is-chosen': chosen(`${c}/`) }">
           <input
             type="checkbox"
@@ -155,7 +155,7 @@ const channelPick = (ch) => ({
     </template>
 
     <!-- A collection's experiments. -->
-    <div v-else-if="!experiment" class="bd-cards">
+    <div v-else-if="!experiment" class="bd-cards pp-list">
       <div
         v-for="e in experiments"
         :key="e.name"
@@ -184,7 +184,7 @@ const channelPick = (ch) => ({
     </div>
 
     <!-- An experiment's channels: each a volume. -->
-    <div v-else class="bd-cards">
+    <div v-else class="bd-cards pp-list">
       <p v-if="experiment.description" class="bd-desc bd-desc--lead">{{ experiment.description }}</p>
       <div
         v-for="ch in channels"

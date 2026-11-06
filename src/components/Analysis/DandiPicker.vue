@@ -145,7 +145,7 @@ const versionLabel = (v) => (v === "draft" ? "draft (may still change)" : `versi
       <p v-if="count != null && !loading" class="dd-count">
         {{ count.toLocaleString("en-US") }} dandiset{{ count === 1 ? "" : "s" }}
       </p>
-      <div class="dd-cards">
+      <div class="dd-cards pp-list">
         <button v-for="d in results" :key="d.id" type="button" class="dd-card" @click="choose(d)">
           <span class="dd-card__name">{{ d.name }}</span>
           <span class="dd-meta">

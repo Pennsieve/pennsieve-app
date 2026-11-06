@@ -40,7 +40,7 @@ const models = computed(() => {
         <template v-else>{{ bit }}</template>
       </template>
     </p>
-    <component :is="p.picker" :key="platform" v-bind="{ ...p.pickerProps, ...models }" />
+    <component :is="p.picker" :key="platform" class="pp__picker" v-bind="{ ...p.pickerProps, ...models }" />
   </div>
 </template>
 
@@ -53,27 +53,16 @@ const models = computed(() => {
   flex-direction: column;
   min-height: 0;
 }
-/* A picker fills the column, and its list of results the rest of it: the
-   dialog sets the height, the list scrolls inside. */
-.discover-picker,
-.on-picker,
-.open-data-picker,
-.pp-picker,
-.dd-picker,
-.bd-picker,
-.pn-picker {
+/* A picker fills the column, and its list of results (each picker marks it
+   pp-list) the rest of it: the dialog sets the height, the list scrolls
+   inside. */
+.pp__picker {
   display: flex;
   flex: 1 1 auto;
   flex-direction: column;
   min-height: 0;
 }
-.discover-picker > :deep(.wizard-cards),
-:deep(.on-cards),
-:deep(.od-cards),
-:deep(.pp-cards),
-:deep(.dd-cards),
-:deep(.bd-cards),
-:deep(.pn-cards) {
+.pp__picker :deep(.pp-list) {
   flex: 1 1 auto;
   min-height: 160px;
   max-height: none;

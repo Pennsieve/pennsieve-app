@@ -96,7 +96,7 @@ onMounted(() => {
     <!-- Choosing one: search the catalog. -->
     <template v-else>
       <el-input v-model="openDataQuery" :placeholder="`Search ${source}...`" clearable class="od-search" />
-      <div class="od-cards">
+      <div class="od-cards pp-list">
         <div v-if="openDataLoading" class="od-msg">Loading the catalog…</div>
         <div v-else-if="openDataError" class="od-msg">{{ openDataError }}</div>
         <button

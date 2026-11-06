@@ -44,8 +44,7 @@ describe("a CELLxGENE view", () => {
     expect(create).toHaveBeenCalledWith({
       dataset: "biohub-cellxgene-census",
       name: "CELLxGENE: 2 datasets",
-      prefix: "2025-01-30/h5ads/",
-      paths: ["a1.h5ad", "b2.h5ad"],
+      groups: [{ prefix: "2025-01-30/h5ads/", paths: ["a1.h5ad", "b2.h5ad"] }],
     });
   });
 });

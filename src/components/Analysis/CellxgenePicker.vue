@@ -96,7 +96,7 @@ onMounted(() => {
       {{ catalog.release }} · tick the ones to take
     </p>
 
-    <div class="cx-cards">
+    <div class="cx-cards pp-list">
       <div v-if="loading" class="cx-msg">Loading CELLxGENE's datasets…</div>
       <div v-else-if="error" class="cx-msg">{{ error }}</div>
       <label v-for="d in shown" :key="d.id" class="cx-row" :class="{ 'is-chosen': pickedIds.has(d.id) }">

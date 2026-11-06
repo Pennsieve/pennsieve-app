@@ -228,18 +228,22 @@ export async function createOpenDataViewOf({ dataset, name, prefixes = [] }, opt
   })
 }
 
-// A view made for one run of some files of an Open Data dataset's folder
-// (prefix), named name: views-service reads each by its key (at most 100),
-// and they sit at their paths below the folder. A CELLxGENE Census release's
-// datasets, each one .h5ad in a folder of 1,500.
-export async function createOpenDataFilesView({ dataset, name, prefix = '', paths = [] }, options = {}) {
-  const p = openDataPrefix(prefix)
+// A view made for one run of some files of an Open Data dataset, named
+// name: each group ({ prefix, paths, folder }) one source, whose files
+// views-service reads by their keys (prefix + path, at most 100 a group).
+// They sit at their paths below the prefix, or in folder at their names
+// (an ENCODE experiment's files, spread across dated folders); in a view of
+// several groups, under open-data-<name>/.
+export async function createOpenDataFilesView({ dataset, name, groups = [] }, options = {}) {
   return viewsRequest('/me', {
     ...options,
     method: 'POST',
     body: {
       name,
-      sources: [{ kind: 'openData', dataset, ...(p && { prefix: p }), paths }],
+      sources: groups.map(({ prefix = '', paths = [], folder = '' }) => {
+        const p = openDataPrefix(prefix)
+        return { kind: 'openData', dataset, ...(p && { prefix: p }), paths, ...(folder && { folder }) }
+      }),
       lifecycle: 'run',
     },
   })

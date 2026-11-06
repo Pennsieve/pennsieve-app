@@ -29,7 +29,7 @@ describe("the data platforms", () => {
   });
 
   it("are listed in order", () => {
-    expect(PLATFORM_KEYS).toEqual(["discover", "openData", "sparc", "epilepsyScience", "openNeuro", "bossdb", "dandi", "physionet", "allen", "cellxgene"]);
+    expect(PLATFORM_KEYS).toEqual(["discover", "openData", "sparc", "epilepsyScience", "openNeuro", "bossdb", "dandi", "physionet", "allen", "cellxgene", "encode"]);
   });
 
   it("say where their data lives, and which nodes can reach it", () => {
@@ -91,6 +91,10 @@ describe("the data platforms", () => {
     const lung = { id: "a1", title: "Lung / epithelium", file: "a1.h5ad", size: 5, collectionName: "HLCA" };
     expect(PLATFORMS.cellxgene.folderName({ picks: [lung] }, 1)).toBe("cellxgene-Lung-epithelium");
     expect(PLATFORMS.cellxgene.label({ picks: [lung] })).toBe("CELLxGENE: Lung / epithelium");
+    const exp = { accession: "ENCSR000AKP", assay: "RNA-seq", files: [{ key: "a/ENCFF1.bam", size: 3 }] };
+    expect(PLATFORMS.encode.folderName({ picks: [exp] }, 1)).toBe("encode-ENCSR000AKP");
+    expect(PLATFORMS.encode.folderName({ picks: [exp, exp] }, 1)).toBe("encode-2-experiments");
+    expect(platformData("encode", { picks: [exp] })).toMatchObject({ regions: ["us-west-2"], size: 3, publicBucket: true });
     expect(platformData("cellxgene", { picks: [lung, { ...lung, id: "b2", size: 7 }] })).toMatchObject({ regions: ["us-west-2"], size: 12, publicBucket: true });
   });
 

@@ -73,5 +73,5 @@ export function cellxgeneFolderName(picks) {
 // naming their files.
 export async function createCellxgeneView(picks, { load = cellxgeneDatasets, create = createOpenDataFilesView } = {}) {
   const { openDataset, prefix } = await load()
-  return create({ dataset: openDataset, name: cellxgeneViewName(picks), prefix, paths: picks.map((p) => p.file) })
+  return create({ dataset: openDataset, name: cellxgeneViewName(picks), groups: [{ prefix, paths: picks.map((p) => p.file) }] })
 }

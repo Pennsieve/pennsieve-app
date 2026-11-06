@@ -37,8 +37,9 @@ import dandi from "./dandi";
 import physionet from "./physionet";
 import allen from "./allen";
 import cellxgene from "./cellxgene";
+import encode from "./encode";
 
-const LIST = [discover, openData, sparc, epilepsyScience, openNeuro, bossdb, dandi, physionet, allen, cellxgene];
+const LIST = [discover, openData, sparc, epilepsyScience, openNeuro, bossdb, dandi, physionet, allen, cellxgene, encode];
 
 export const PLATFORMS = Object.fromEntries(LIST.map((p) => [p.key, p]));
 export const PLATFORM_KEYS = LIST.map((p) => p.key);
