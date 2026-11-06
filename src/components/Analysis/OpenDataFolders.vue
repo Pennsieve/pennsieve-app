@@ -66,6 +66,9 @@ const crumbs = computed(() => {
   const parts = prefix.value.slice(props.root.length).split("/").filter(Boolean);
   return parts.map((name, i) => ({ name, prefix: props.root + parts.slice(0, i + 1).join("/") + "/" }));
 });
+// The folder shown, when it's a stack itself (views-service says).
+const STACKS = { "ome-zarr": "an OME-Zarr image", zarr: "a Zarr", "neuroglancer-precomputed": "a precomputed volume" };
+const levelStack = computed(() => STACKS[level.value?.stack] || "");
 const levelFiles = computed(() => (level.value?.files || []).filter((f) => !f.zarr));
 const levelZarrs = computed(() => (level.value?.files || []).filter((f) => f.zarr));
 const levelSize = computed(() => levelFiles.value.reduce((n, f) => n + (f.size || 0), 0));
@@ -107,9 +110,13 @@ const formatSize = (bytes) => {
         @input="onFilter"
       />
     </div>
-    <p class="odf__note">
+    <p v-if="levelStack" class="odf__note">
+      This folder is {{ levelStack }}: the notebook reads it whole, in place, without downloading it.
+    </p>
+    <p v-else class="odf__note">
       The notebook starts with {{ shown ? `everything in ${shown}` : `all of ${rootLabel}` }}.
-      Open a folder to start with less; a notebook lists at most 100,000 files.
+      Open a folder to start with less; a notebook lists at most 100,000 files. Zarr and
+      precomputed volumes in it are read in place.
     </p>
     <div class="odf__level">
       <div v-if="loading" class="odf__msg">Listing…</div>

@@ -147,6 +147,8 @@ describe("stacks", () => {
     expect(stackFormat(only)).toBe("Zarr");
     expect(stackIcon(zarr)).toBe("/file-icons/icon-microscope.svg");
     expect(stackIcon(only)).toBe("/file-icons/icon-data.svg");
+    expect(stackFormat({ format: "neuroglancer-precomputed" })).toBe("Precomputed volume");
+    expect(stackIcon({ format: "neuroglancer-precomputed" })).toBe("/file-icons/icon-microscope.svg");
   });
 
   it("shows a stack in its folder, and a folder that has only stacks", () => {
