@@ -636,7 +636,8 @@ function fmtSize(bytes) {
                 <img class="inp__icon" :src="stackIcon(row.entry)" alt="" />
                 <span class="inp__text">{{ row.label }}</span>
               </span>
-              <span class="inp__meta inp__stack-size">{{ fmtSize(row.size) }}</span>
+              <!-- Its size when known (a Zarr in DANDI), else its format. -->
+              <span class="inp__meta inp__stack-size">{{ row.size ? fmtSize(row.size) : row.format }}</span>
               <button
                 type="button"
                 class="inp__stack-code"

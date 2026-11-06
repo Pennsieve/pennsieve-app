@@ -9,13 +9,25 @@ const ROOTS = { input: "INPUT_DIR", output: "OUTPUT_DIR" };
 
 const quote = (s) => JSON.stringify(s);
 
-// Code that opens a stack (a Zarr) in place, from its s3:// location: zarr
-// with anonymous s3fs in Python; its URL in R, which has no one reader.
+// A stack's public https URL, without its trailing /, from its s3://
+// location and region: what a precomputed volume is read from.
+const httpsOf = (url, region) => {
+  const m = String(url).match(/^s3:\/\/([^/]+)\/(.*?)\/?$/);
+  return m ? `https://s3.${region || "us-east-1"}.amazonaws.com/${m[1]}/${m[2]}` : url;
+};
+
+// Code that opens a stack in place, from its s3:// location: a Zarr with
+// zarr and anonymous s3fs, a Neuroglancer precomputed volume with
+// CloudVolume over https, in Python; its URL in R, which has no one reader.
 export function stackCode(entry, kernelName = "") {
   const url = entry?.location || "";
   const r = kernelName.toLowerCase().startsWith("r ") || kernelName.toLowerCase() === "r";
   const name = String(entry?.cratePath || "").replace(/\/$/, "");
   if (r) return `# ${name}: read it in place (${entry?.region || "AWS"}, no credentials)\n${quote(url)}`;
+  if (entry?.format === "neuroglancer-precomputed") {
+    const https = httpsOf(url, entry.region);
+    return `from cloudvolume import CloudVolume\n# ${name}: a precomputed volume, read in place (mip 0 is full resolution)\nvol = CloudVolume(${quote(`precomputed://${https}`)}, mip=0, progress=False)`;
+  }
   const options = entry?.region
     ? `{"anon": True, "client_kwargs": {"region_name": ${quote(entry.region)}}}`
     : `{"anon": True}`;

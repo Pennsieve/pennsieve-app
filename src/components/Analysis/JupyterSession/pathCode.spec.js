@@ -29,6 +29,13 @@ describe("stackCode", () => {
     );
     expect(stackCode({ ...zarr, region: undefined })).toContain('storage_options={"anon": True})');
   });
+  it("opens a precomputed volume with CloudVolume over https", () => {
+    const em = { cratePath: "Dataset_1/em/", location: "s3://bossdb-open-data/witvliet2020/Dataset_1/em/", region: "us-east-1", format: "neuroglancer-precomputed" };
+    expect(stackCode(em, "Python 3.12.3")).toBe(
+      'from cloudvolume import CloudVolume\n# Dataset_1/em: a precomputed volume, read in place (mip 0 is full resolution)\nvol = CloudVolume("precomputed://https://s3.us-east-1.amazonaws.com/bossdb-open-data/witvliet2020/Dataset_1/em", mip=0, progress=False)'
+    );
+  });
+
   it("gives its URL in R", () => {
     expect(stackCode(zarr, "R 4.4.1")).toBe('# micr/a.ome.zarr: read it in place (us-east-2, no credentials)\n"s3://dandiarchive/zarr/56/"');
   });
