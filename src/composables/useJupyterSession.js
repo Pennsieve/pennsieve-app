@@ -23,6 +23,7 @@ import {
   ContentsManager,
   ServerConnection,
 } from "@jupyterlab/services";
+import { PYTHON_PACKAGES_CODE, R_PACKAGES_CODE, parsePackages } from "@/components/Analysis/JupyterSession/environmentHelpers";
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const toWs = (u) => u.replace(/^http/i, "ws");
@@ -811,6 +812,21 @@ export function useJupyterSession() {
     cell.outputs.push(out);
   }
 
+  // The packages the kernel can import, asked silently (no cell, no history):
+  // [{ name, version }], or null when it printed none. It waits behind a
+  // cell that's running.
+  async function kernelPackages() {
+    if (!kernel) throw new Error("No active kernel.");
+    const r = /^r\b/i.test(kernelName.value || "");
+    let out = "";
+    const future = kernel.requestExecute({ code: r ? R_PACKAGES_CODE : PYTHON_PACKAGES_CODE, silent: true, store_history: false, stop_on_error: false });
+    future.onIOPub = (msg) => {
+      if (msg.header.msg_type === "stream" && msg.content.name === "stdout") out += msg.content.text;
+    };
+    await future.done;
+    return parsePackages(out);
+  }
+
   async function executeCell(id) {
     const cell = cells.value[indexOf(id)];
     if (!cell || cell.cell_type !== "code") return;
@@ -1060,6 +1076,7 @@ export function useJupyterSession() {
     connectPhase,
     kernelStatus,
     kernelName,
+    kernelPackages,
     error,
     cells,
     dirty,

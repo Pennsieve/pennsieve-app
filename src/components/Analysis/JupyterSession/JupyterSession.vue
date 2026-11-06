@@ -93,6 +93,7 @@ const {
   connectPhase,
   kernelStatus,
   kernelName,
+  kernelPackages,
   error,
   cells,
   dirty,
@@ -821,6 +822,7 @@ const kernelPill = computed(() => {
           :ready="status === 'ready'"
           :kernel-name="kernelName"
           :gpu="onGpu"
+          :kernel-packages="kernelPackages"
         />
         <AddDataDialog
           v-if="inputs.canChange"
