@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
+  sessionRestrictions,
   notebooksEmptyState,
   launchableKernels,
   offlineNote,
@@ -457,5 +458,27 @@ describe("notebooksEmptyState", () => {
   });
   it("keeps showing a state while refreshing a list it has", () => {
     expect(notebooksEmptyState({ loading: true, runs: [{ status: "SUCCEEDED" }] })).toBe("idle");
+  });
+});
+
+describe("sessionRestrictions", () => {
+  it("says what a compliant node's session can't do", () => {
+    const r = sessionRestrictions({ deploymentMode: "Compliant", region: "us-east-1" });
+    expect(r.title).toMatch(/compliant node, with no internet access/);
+    expect(r.items).toHaveLength(4);
+    expect(r.items[0]).toMatch(/pip, conda, install.packages/);
+    expect(r.items[2]).toBe(
+      "Data: your workspace's datasets, Pennsieve Discover, and public data on AWS in us-east-1. That includes OpenNeuro, SPARC and Epilepsy.Science; DANDI (us-east-2) can't be read."
+    );
+    expect(sessionRestrictions({ deploymentMode: "compliant", region: "us-west-2" }).items[2]).toBe(
+      "Data: your workspace's datasets, Pennsieve Discover, and public data on AWS in us-west-2."
+    );
+    expect(sessionRestrictions({ deploymentMode: "compliant" }).items[2]).toMatch(/in the node's region\.$/);
+  });
+
+  it("says nothing for other nodes", () => {
+    expect(sessionRestrictions({ deploymentMode: "secure", region: "us-east-1" })).toBe(null);
+    expect(sessionRestrictions({ deploymentMode: "basic" })).toBe(null);
+    expect(sessionRestrictions(null)).toBe(null);
   });
 });

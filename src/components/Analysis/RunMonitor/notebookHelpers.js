@@ -45,6 +45,28 @@ export function offlineNote(cn) {
   return "No internet access: packages can't be installed from the notebook. Add them through an environment.";
 }
 
+// What a session on this node can't do, said when it opens ({ title, items }),
+// or null: a compliant node has no internet access, reads public data only
+// in its own region, and can't add data while a session runs.
+export function sessionRestrictions(cn) {
+  if ((cn?.deploymentMode || "").toLowerCase() !== "compliant") return null;
+  const region = cn.region || "";
+  const data = region
+    ? `Data: your workspace's datasets, Pennsieve Discover, and public data on AWS in ${region}.`
+    : "Data: your workspace's datasets, Pennsieve Discover, and public data on AWS in the node's region.";
+  const examples =
+    region === "us-east-1" ? " That includes OpenNeuro, SPARC and Epilepsy.Science; DANDI (us-east-2) can't be read." : "";
+  return {
+    title: "This notebook runs on a compliant node, with no internet access.",
+    items: [
+      "Packages can't be installed from the notebook (pip, conda, install.packages): use an environment that has them.",
+      "Code can't reach the web: APIs, git clone and downloads from URLs won't connect.",
+      data + examples,
+      "Data can't be added while the session runs: choose it when you start a notebook.",
+    ],
+  };
+}
+
 // A notebook's language for people.
 export function kernelLabel(kernel) {
   if (kernel === "python") return "Python";

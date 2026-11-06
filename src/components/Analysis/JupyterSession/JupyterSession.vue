@@ -14,8 +14,9 @@ import InputsPanel from "./InputsPanel.vue";
 import EnvironmentPanel from "./EnvironmentPanel.vue";
 import { sessionPathCode } from "./pathCode";
 import RuntimeMark from "../WorkflowGraph/RuntimeMark.vue";
+import IconWarningCircle from "@/components/icons/IconWarningCircle.vue";
 import { fetchRun } from "../RunMonitor/runDetails";
-import { runOnGpu, runNodeId, gpuShortLabel, gpuMarkTitle } from "../RunMonitor/notebookHelpers";
+import { runOnGpu, runNodeId, gpuShortLabel, gpuMarkTitle, sessionRestrictions } from "../RunMonitor/notebookHelpers";
 import { nodeGpu } from "../ComputeNodes/computeNodeHelpers";
 import { useComputeResourcesStore } from "@/stores/computeResourcesStore";
 import { useStore } from "vuex";
@@ -89,6 +90,31 @@ watch(
   },
   { immediate: true }
 );
+
+// What a session on its node can't do (a compliant node: no internet), said
+// when it opens until dismissed. Dismissed per session, in this browser.
+const restrictions = computed(() => sessionRestrictions(sessionNode.value));
+const restrictionsKey = computed(() => `nb-restrictions-dismissed:${props.runId}`);
+const restrictionsDismissed = ref(false);
+watch(
+  restrictionsKey,
+  (key) => {
+    try {
+      restrictionsDismissed.value = localStorage.getItem(key) === "1";
+    } catch {
+      restrictionsDismissed.value = false;
+    }
+  },
+  { immediate: true }
+);
+function dismissRestrictions() {
+  restrictionsDismissed.value = true;
+  try {
+    localStorage.setItem(restrictionsKey.value, "1");
+  } catch {
+    /* kept for this page only */
+  }
+}
 
 // The run's page: where ending the session leads, since the run carries on
 // (its next steps, e.g. a download target's zip, show there). In its
@@ -952,6 +978,19 @@ const kernelPill = computed(() => {
           </el-tooltip>
         </div>
 
+        <!-- What a session on this node can't do (a compliant node: no
+             internet), once per session until dismissed. -->
+        <div v-if="restrictions && !restrictionsDismissed" class="nb-restrictions" role="note">
+          <IconWarningCircle class="nb-restrictions__icon" :width="16" :height="16" />
+          <div class="nb-restrictions__text">
+            <strong>{{ restrictions.title }}</strong>
+            <ul>
+              <li v-for="item in restrictions.items" :key="item">{{ item }}</li>
+            </ul>
+          </div>
+          <button type="button" class="nb-restrictions__close" aria-label="Dismiss" title="Dismiss" @click="dismissRestrictions">&times;</button>
+        </div>
+
         <!-- Offer to open an existing notebook staged in input/ -->
         <div v-if="status === 'ready' && showInputBanner" class="nb-open-banner">
           <span class="nb-open-banner__text">
@@ -1341,5 +1380,42 @@ const kernelPill = computed(() => {
   flex-wrap: wrap;
 }
 .nb-open-banner__text { flex: 1; min-width: 180px; }
+.nb-restrictions {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 24px;
+  background: #fef6eb; /* orange_tint */
+  border-bottom: 1px solid #f6dcb6;
+  font-size: 13px;
+  color: #333333; /* gray_6 */
+}
+.nb-restrictions__icon {
+  flex-shrink: 0;
+  margin-top: 1px;
+  color: #e0912a; /* orange_2 */
+}
+.nb-restrictions__text {
+  flex: 1;
+  min-width: 0;
+
+  ul {
+    margin: 4px 0 0;
+    padding-left: 18px;
+  }
+  li + li {
+    margin-top: 2px;
+  }
+}
+.nb-restrictions__close {
+  flex-shrink: 0;
+  border: none;
+  background: none;
+  padding: 0 2px;
+  font-size: 18px;
+  line-height: 1;
+  color: #71747c; /* gray_4 */
+  cursor: pointer;
+}
 .nb-open-banner__select { width: 240px; }
 </style>

@@ -67,6 +67,9 @@ const emit = defineEmits(["downloaded"]);
 const sources = ref([]);
 // Whether views can be added and removed while the session runs.
 const canChange = ref(false);
+// A compliant node's session can't add data (its sidecar can't fetch a view's
+// crate); removing still works.
+const canAdd = computed(() => canChange.value && (props.node?.deploymentMode || "").toLowerCase() !== "compliant");
 // The session's disk, as the user chose it (the run's processorConfigs
 // diskGiB); null for a session without one (GPU: its instance's disk).
 const diskGiB = ref(null);
@@ -541,7 +544,7 @@ function fmtSize(bytes) {
     <div class="inp__head" @click="collapsed = !collapsed">
       <span class="inp__title">Inputs</span>
       <span class="inp__head-actions">
-        <button v-if="canChange && !collapsed" class="inp__add" title="Add a dataset to the session" @click.stop="openAdd">
+        <button v-if="canAdd && !collapsed" class="inp__add" title="Add a dataset to the session" @click.stop="openAdd">
           + Add data
         </button>
         <button class="inp__fold" :aria-expanded="!collapsed" aria-label="Fold inputs" @click.stop="collapsed = !collapsed">
