@@ -13,7 +13,7 @@ export default { name: "FileNode" };
 import { computed, ref } from "vue";
 import { VIEW_CRATE_DIR } from "@/composables/useJupyterSession";
 import { visibleEntries } from "./fileBrowserHelpers";
-import { stackFormat, stackIcon } from "./inputsHelpers";
+import { stackFormat, stackIcon, costLine } from "./inputsHelpers";
 
 const props = defineProps({
   node: { type: Object, required: true },
@@ -58,26 +58,29 @@ const selected = computed(() => remote.value && props.inputs.isSelected(view.val
 // Ticking shows on hover, and on every remote file once any is ticked.
 const ticking = computed(() => props.inputs?.selected.size > 0);
 
-// A download big enough to ask first, or that doesn't fit, waits here.
-const confirm = ref(null); // { bytes, fits, go }
-function start(bytes, go) {
-  const c = props.inputs.check(bytes);
-  if (c.ask) confirm.value = { bytes, fits: c.fits, go };
+// A download big enough to ask first, one that costs the node's account
+// (from another region), or one that doesn't fit, waits here.
+const confirm = ref(null); // { bytes, fits, cost, go }
+function start(bytes, entries, go) {
+  const c = props.inputs.check(bytes, entries);
+  if (c.ask) confirm.value = { bytes, fits: c.fits, cost: c.cost, go };
   else go();
 }
 function download() {
   if (under.value) return;
   const { source, entry } = view.value;
-  start(entry.size || 0, () => props.inputs.requestEntries(source, [entry]));
+  start(entry.size || 0, [entry], () => props.inputs.requestEntries(source, [entry]));
 }
 function downloadAll() {
   const { source } = view.value;
   const entries = left.value;
-  start(leftSize.value, () => props.inputs.requestEntries(source, entries));
+  start(leftSize.value, entries, () => props.inputs.requestEntries(source, entries));
 }
-function go() {
+// noted: don't say what it costs again in this session.
+function go(noted = false) {
   const c = confirm.value;
   confirm.value = null;
+  if (noted) props.inputs.noteCost();
   c?.go();
 }
 
@@ -205,7 +208,11 @@ function onRow() {
       <template v-if="confirm.fits">
         Download {{ fmtSize(confirm.bytes) }}?
         <template v-if="inputs.freeBytes != null">Leaves about {{ fmtSize(inputs.freeBytes - confirm.bytes) }} free.</template>
-        <button class="fn__confirm-go" @click.stop="go">Download</button>
+        <template v-if="confirm.cost">
+          {{ costLine(confirm.cost) }}
+        </template>
+        <button class="fn__confirm-go" @click.stop="go()">Download</button>
+        <button v-if="confirm.cost" class="fn__confirm-no" @click.stop="go(true)">Download, don't remind me</button>
         <button class="fn__confirm-no" @click.stop="confirm = null">Not now</button>
       </template>
       <template v-else>

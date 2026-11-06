@@ -2,6 +2,7 @@
 // guides the later steps: which kernels can take it, which compute nodes
 // can reach it, how much disk it needs, and whether a GPU may help.
 import { hasInterface } from "./workflowInterface";
+import { nodeRegion } from "../ComputeNodes/computeNodeHelpers";
 
 // Whether a kernel's workflow can start with the input chosen (dataset, a
 // data platform's key, public for Discover's, or none). A workflow that
@@ -31,8 +32,9 @@ export function nodeDataReason(cn, data = {}) {
 // A note on a compute node for the chosen data ("" for none): reading data
 // from another region costs cross-region transfer.
 export function nodeDataNote(cn, regions = []) {
-  if (!cn?.region || !regions.length || regions.includes(cn.region)) return "";
-  return `Data in ${regions.join(", ")}, node in ${cn.region}: transfer costs apply`;
+  const region = nodeRegion(cn);
+  if (!region || !regions.length || regions.includes(region)) return "";
+  return `Data in ${regions.join(", ")}, node in ${region}: transfer costs apply`;
 }
 
 // Room a session needs besides its data: its environment and the user's

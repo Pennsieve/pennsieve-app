@@ -25,6 +25,8 @@ describe("data hints", () => {
     expect(nodeDataNote({ region: "us-east-1" }, ["us-west-2"])).toMatch(/us-west-2.*us-east-1/);
     expect(nodeDataNote({ region: "us-west-2" }, ["us-west-2"])).toBe("");
     expect(nodeDataNote({}, ["us-west-2"])).toBe("");
+    // Its region from its queue, as account-service sends it.
+    expect(nodeDataNote({ queueUrl: "https://sqs.us-east-1.amazonaws.com/1/q" }, ["us-west-2"])).toMatch(/node in us-east-1/);
   });
 
   it("suggests a disk for the data", () => {

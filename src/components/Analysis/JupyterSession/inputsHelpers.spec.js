@@ -13,6 +13,11 @@ import {
   addedSourceName,
   inputSubtitle,
   inputsDiskUse,
+  transferCost,
+  costText,
+  readCostNoted,
+  writeCostNoted,
+  costLine,
 } from "./inputsHelpers";
 
 const entries = [
@@ -159,5 +164,44 @@ describe("stacks", () => {
     const micr = folderContents(files, "sub-1/micr/", [zarr, only]);
     expect(micr.map((r) => [r.type, r.name])).toEqual([["file", "a.json"], ["stack", "a.ome.zarr"], ["file", "photo.jpg"]]);
     expect(micr[1]).toMatchObject({ path: "sub-1/micr/a.ome.zarr/", size: 9000, entry: zarr });
+  });
+});
+
+describe("transferCost", () => {
+  const secure = { region: "us-east-1", deploymentMode: "secure" };
+  const files = [
+    { size: 6e9, region: "us-west-2" },
+    { size: 4e9, region: "us-west-2" },
+    { size: 9e9, region: "us-east-1" },
+  ];
+  it("charges another region's data through a secure node's NAT gateway", () => {
+    const cost = transferCost(files, secure);
+    expect(cost).toMatchObject({ bytes: 10e9, regions: ["us-west-2"], nodeRegion: "us-east-1" });
+    expect(cost.usd).toBeCloseTo(0.45);
+  });
+  it("is nothing in the node's region, on a basic node, or where the region isn't known", () => {
+    expect(transferCost(files.slice(2), secure)).toBeNull();
+    expect(transferCost(files, { region: "us-east-1", deploymentMode: "basic" })).toBeNull();
+    expect(transferCost(files, { deploymentMode: "secure" })).toBeNull();
+    expect(transferCost([{ size: 5 }], secure)).toBeNull();
+  });
+  it("says it in a sentence", () => {
+    expect(costText(0.45)).toBe("about $0.45");
+    expect(costText(0.004)).toBe("less than $0.01");
+    expect(costText(1234.4)).toBe("about $1,234");
+    expect(costLine({ bytes: 10e9, usd: 0.45, regions: ["us-west-2"], nodeRegion: "us-east-1" })).toBe(
+      "us-west-2 to this us-east-1 node: about $0.45 for the node's network to carry 10.0 GB."
+    );
+  });
+  it("remembers, for a session, not to say it again", () => {
+    const store = new Map();
+    const storage = { getItem: (k) => store.get(k) ?? null, setItem: (k, v) => store.set(k, v) };
+    expect(readCostNoted("run-1", storage)).toBe(false);
+    writeCostNoted("run-1", storage);
+    expect(readCostNoted("run-1", storage)).toBe(true);
+    expect(readCostNoted("run-2", storage)).toBe(false);
+    const broken = { getItem: () => { throw new Error("blocked"); }, setItem: () => { throw new Error("blocked"); } };
+    expect(readCostNoted("run-1", broken)).toBe(false);
+    expect(() => writeCostNoted("run-1", broken)).not.toThrow();
   });
 });

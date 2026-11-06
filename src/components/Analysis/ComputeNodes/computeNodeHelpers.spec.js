@@ -218,3 +218,15 @@ describe("groupMyNodes", () => {
     expect(groupMyNodes([], me)).toEqual({ own: [], shared: [] });
   });
 });
+
+describe("nodeRegion", () => {
+  it("reads a node's region from its queue's or gateway's URL", async () => {
+    const { nodeRegion } = await import("./computeNodeHelpers");
+    expect(nodeRegion({ queueUrl: "https://sqs.us-west-2.amazonaws.com/123/queue-x" })).toBe("us-west-2");
+    expect(nodeRegion({ computeNodeGatewayUrl: "https://abc.lambda-url.eu-central-1.on.aws/" })).toBe("eu-central-1");
+    expect(nodeRegion({ region: "us-east-2", queueUrl: "https://sqs.us-west-2.amazonaws.com/1/q" })).toBe("us-east-2");
+    expect(nodeRegion({ queueUrl: "https://queue.amazonaws.com/1/q" })).toBe("us-east-1");
+    expect(nodeRegion({})).toBe("");
+    expect(nodeRegion(null)).toBe("");
+  });
+});

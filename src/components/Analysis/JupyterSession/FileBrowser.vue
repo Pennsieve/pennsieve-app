@@ -15,6 +15,7 @@ import { fileIconForPath } from "@/utils/fileIconForPath";
 import { sessionPathCode } from "./pathCode";
 import { visibleEntries, readShowHidden, writeShowHidden, readOnlyLocal, writeOnlyLocal } from "./fileBrowserHelpers";
 import { useRememberedFold } from "./sectionFold";
+import { costLine } from "./inputsHelpers";
 
 const props = defineProps({
   listDir: { type: Function, required: true },
@@ -175,6 +176,21 @@ watch(
   { immediate: true }
 );
 
+// Downloading what's ticked: first, what it costs the node's account, when
+// it costs anything (from another region), unless the user said not to be
+// reminded in this session.
+const costAsk = ref(null);
+function askSelected() {
+  const cost = props.inputs.selectedCost;
+  if (cost) costAsk.value = cost;
+  else props.inputs.downloadSelected();
+}
+function downloadSelected(noted = false) {
+  costAsk.value = null;
+  if (noted) props.inputs.noteCost();
+  props.inputs.downloadSelected();
+}
+
 function fmtSize(n) {
   if (n == null) return "";
   if (n < 0) n = 0;
@@ -289,10 +305,16 @@ function copyPath(node) {
 
     <!-- The inputs: what's ticked, what's under way, the disk. -->
     <div v-if="inputs && ready && (inputs.sources.length || inputs.requestError)" class="fb__foot">
-      <div v-if="inputs.selected.size" class="fb__bar">
+      <div v-if="inputs.selected.size && costAsk" class="fb__bar fb__bar--ask">
+        <span class="fb__bar-text">{{ costLine(costAsk) }}</span>
+        <button class="fb__bar-btn fb__bar-btn--go" @click="downloadSelected()">Download</button>
+        <button class="fb__bar-btn" @click="downloadSelected(true)">Don't remind me</button>
+        <button class="fb__bar-btn" @click="costAsk = null">Not now</button>
+      </div>
+      <div v-else-if="inputs.selected.size" class="fb__bar">
         <span class="fb__bar-text">{{ inputs.selected.size }} selected · {{ fmtSize(inputs.selectedSize) }}</span>
         <button class="fb__bar-btn" @click="inputs.clearSelection()">Clear</button>
-        <button class="fb__bar-btn fb__bar-btn--go" @click="inputs.downloadSelected()">Download</button>
+        <button class="fb__bar-btn fb__bar-btn--go" @click="askSelected()">Download</button>
       </div>
       <div v-if="inputs.active.length" class="fb__bar">
         <span class="fb__bar-text">Downloading {{ inputs.active.length }} · {{ fmtSize(inputs.activeLeft) }} left</span>
@@ -432,6 +454,15 @@ function copyPath(node) {
   gap: 6px;
   font-size: 12px;
   color: theme.$gray_6;
+}
+/* What a download costs: the line wraps, the buttons below it. */
+.fb__bar--ask {
+  flex-wrap: wrap;
+
+  .fb__bar-text {
+    flex-basis: 100%;
+    color: theme.$orange_2;
+  }
 }
 .fb__bar-text {
   flex: 1;

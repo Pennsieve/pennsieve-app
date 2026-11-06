@@ -17,7 +17,7 @@ import { sessionPathCode, stackCode } from "./pathCode";
 import RuntimeMark from "../WorkflowGraph/RuntimeMark.vue";
 import { fetchRun } from "../RunMonitor/runDetails";
 import { runOnGpu, runNodeId, gpuShortLabel, gpuMarkTitle } from "../RunMonitor/notebookHelpers";
-import { nodeGpu } from "../ComputeNodes/computeNodeHelpers";
+import { nodeGpu, nodeRegion } from "../ComputeNodes/computeNodeHelpers";
 import { useComputeResourcesStore } from "@/stores/computeResourcesStore";
 import { useStore } from "vuex";
 import * as siteConfig from "@/site-config/site.json";
@@ -43,9 +43,12 @@ const props = defineProps({
 // The header names the run's node's GPU (its GPU tier) where known.
 const onGpu = ref(false);
 const sessionGpu = ref(null);
+// The run's compute node, where known: its region and tier say what a
+// download from another region costs (useSessionInputs).
+const sessionNode = ref(null);
 const vuexStore = useStore();
 const computeResourcesStore = useComputeResourcesStore();
-async function loadSessionGpu(run) {
+async function loadRunNode(run) {
   const nodeId = runNodeId(run);
   if (!nodeId) return null;
   try {
@@ -54,8 +57,16 @@ async function loadSessionGpu(run) {
       await vuexStore.dispatch("analysisModule/fetchComputeNodes");
       nodes = vuexStore.getters["analysisModule/computeNodes"] || [];
     }
+    return nodes.find((n) => n.uuid === nodeId) || null;
+  } catch {
+    return null;
+  }
+}
+async function loadSessionGpu(node) {
+  if (!node) return null;
+  try {
     const tiers = await computeResourcesStore.fetchGpuTiers(vuexStore.getters.activeOrganization?.organization?.id);
-    return nodeGpu(nodes.find((n) => n.uuid === nodeId), tiers || []);
+    return nodeGpu(node, tiers || []);
   } catch {
     return null;
   }
@@ -65,12 +76,16 @@ watch(
   async (id) => {
     onGpu.value = false;
     sessionGpu.value = null;
+    sessionNode.value = null;
     if (!id) return;
     const run = await fetchRun(siteConfig.api2Url, id);
     if (id !== props.runId) return;
     onGpu.value = runOnGpu(run);
+    const node = await loadRunNode(run);
+    if (id !== props.runId) return;
+    sessionNode.value = node && { region: nodeRegion(node), deploymentMode: node.deploymentMode || "" };
     if (!onGpu.value) return;
-    const gpu = await loadSessionGpu(run);
+    const gpu = await loadSessionGpu(node);
     if (id === props.runId) sessionGpu.value = gpu;
   },
   { immediate: true }
@@ -295,6 +310,7 @@ const fileBrowserRef = ref(null);
 // one opens the platforms' dialog.
 const inputs = useSessionInputs({
   runId: () => props.runId,
+  node: () => sessionNode.value,
   fetchInputs,
   inputsStatus,
   cancelInputs,

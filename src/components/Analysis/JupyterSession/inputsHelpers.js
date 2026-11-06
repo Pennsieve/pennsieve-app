@@ -144,6 +144,50 @@ export function inputSubtitle({ platform: own = "", openDataset = "", sourceVers
   return folder ? `${platform} · ${folder}` : platform;
 }
 
+// What downloading files ({ size, region }) costs the session's node's
+// account, when it costs anything: { bytes, usd, regions, nodeRegion }, or
+// null. A secure node's tasks are in private subnets: S3 in its own region
+// is reached through its gateway endpoint, free, but another region's goes
+// through its NAT gateway, charged per GB processed (AWS's US price; the
+// bucket's owner pays the transfer itself). A basic node reaches it
+// directly, and a compliant node can't at all.
+export const NAT_COST_PER_GB = 0.045;
+export function transferCost(files = [], node = null) {
+  if (!node?.region || (node.deploymentMode || "").toLowerCase() !== "secure") return null;
+  const cross = files.filter((f) => f.region && f.region !== node.region);
+  const bytes = cross.reduce((n, f) => n + (f.size || 0), 0);
+  if (!bytes) return null;
+  return { bytes, usd: (bytes / 1e9) * NAT_COST_PER_GB, regions: [...new Set(cross.map((f) => f.region))].sort(), nodeRegion: node.region };
+}
+
+// A cost in a sentence: "about $0.55", "less than $0.01".
+export const costText = (usd) => (usd < 0.01 ? "less than $0.01" : `about $${usd < 10 ? usd.toFixed(2) : Math.round(usd).toLocaleString("en-US")}`);
+
+// A transferCost in a sentence, for the download's prompt.
+export const costLine = (c) =>
+  `${c.regions.join(" and ")} to this ${c.nodeRegion} node: ${costText(c.usd)} for the node's network to carry ${
+    c.bytes >= 1e9 ? `${(c.bytes / 1e9).toFixed(1)} GB` : `${Math.max(1, Math.round(c.bytes / 1e6))} MB`
+  }.`;
+
+// Whether the user said not to be told of transfer costs again in this
+// session (a run): kept for the browser tab, so a reload doesn't ask again.
+// Storage can be unavailable: then it's asked again.
+const costKey = (runId) => `pennsieve.sessionFiles.costNoted.${runId}`;
+export function readCostNoted(runId, storage = globalThis.sessionStorage) {
+  try {
+    return !!runId && storage?.getItem(costKey(runId)) === "true";
+  } catch {
+    return false;
+  }
+}
+export function writeCostNoted(runId, storage = globalThis.sessionStorage) {
+  try {
+    if (runId) storage?.setItem(costKey(runId), "true");
+  } catch {
+    // not kept
+  }
+}
+
 // How much of the session's disk the downloaded inputs take: { text, share,
 // full } with share 0 to 1 and full past 80%. diskGiB is the disk the user
 // chose; a session without one (GPU: its instance's disk) shows only the

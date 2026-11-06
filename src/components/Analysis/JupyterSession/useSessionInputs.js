@@ -13,7 +13,16 @@ import * as siteConfig from "@/site-config/site.json";
 import { useGetToken } from "@/composables/useGetToken";
 import { CancelUnavailable } from "@/composables/useJupyterSession";
 import { getView, listEntries } from "@/utils/viewsService";
-import { folderContents, splitStacks, inputKey, inputsDiskUse, inputSubtitle } from "./inputsHelpers";
+import {
+  folderContents,
+  splitStacks,
+  inputKey,
+  inputsDiskUse,
+  inputSubtitle,
+  transferCost,
+  readCostNoted,
+  writeCostNoted,
+} from "./inputsHelpers";
 import { platformReading } from "../platforms";
 
 const POLL_MS = 2000;
@@ -46,8 +55,10 @@ export function downloadCheck(bytes, freeBytes) {
 }
 
 // runId is the run's id, or a function that says it (a page that switches
-// runs).
+// runs). node says the session's compute node ({ region, deploymentMode }),
+// when known: a download from another region can cost its account.
 export function useSessionInputs({
+  node = () => null,
   runId,
   fetchInputs,
   inputsStatus,
@@ -227,7 +238,38 @@ export function useSessionInputs({
   // The disk left for more, as far as the inputs say (the environment and
   // the user's own files use it too); null when the disk isn't known.
   const freeBytes = computed(() => (diskGiB.value ? Math.max(0, diskGiB.value * GiB - inputBytes.value - activeLeft.value) : null));
-  const check = (bytes) => downloadCheck(bytes, freeBytes.value);
+  /* --------------------------------------------------------- what it costs --- */
+  const currentRun = () => (typeof runId === "function" ? runId() : runId);
+  // Whether the user said not to be told again in this session.
+  const costNoted = ref(readCostNoted(currentRun()));
+  watch(
+    () => currentRun(),
+    (id) => (costNoted.value = readCostNoted(id))
+  );
+  function noteCost() {
+    costNoted.value = true;
+    writeCostNoted(currentRun());
+  }
+  const entryOf = (source, path) => source.entries.find((e) => e.cratePath === path);
+  // What downloading these ([{ source, path }] or entries of a source) would
+  // cost the node's account: transferCost's, or null when nothing, or when
+  // the user said not to be told again.
+  function costOf(files) {
+    if (costNoted.value) return null;
+    const list = files.map((f) => {
+      const e = f.cratePath ? f : entryOf(f.source, f.path);
+      return { size: e?.size || f.size || 0, region: e?.region || "" };
+    });
+    return transferCost(list, node());
+  }
+
+  // Whether to ask before downloading: when it's big for the disk, or costs
+  // the node's account (files, when given, say which).
+  const check = (bytes, files = []) => {
+    const c = downloadCheck(bytes, freeBytes.value);
+    const cost = files.length ? costOf(files) : null;
+    return { ...c, ask: c.ask || !!cost, cost };
+  };
 
   // Asks the sidecar for files: [{ source, path }].
   async function request(files) {
@@ -272,6 +314,7 @@ export function useSessionInputs({
   }
   const clearSelection = () => (selected.value = new Map());
   const selectedSize = computed(() => [...selected.value.values()].reduce((n, f) => n + f.size, 0));
+  const selectedCost = computed(() => costOf([...selected.value.values()]));
   async function downloadSelected() {
     const files = [...selected.value.values()];
     clearSelection();
@@ -318,6 +361,9 @@ export function useSessionInputs({
     folderProgress,
     remainingIn,
     check,
+    costNoted,
+    noteCost,
+    selectedCost,
     request,
     requestEntries,
     cancel,
