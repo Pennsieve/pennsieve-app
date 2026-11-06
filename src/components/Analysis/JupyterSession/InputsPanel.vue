@@ -12,12 +12,14 @@ import { computed, onBeforeUnmount, ref, watch } from "vue";
 import { ElMessageBox } from "element-plus";
 import * as siteConfig from "@/site-config/site.json";
 import { useGetToken } from "@/composables/useGetToken";
-import { getView, listEntries, createOpenDataView, openDataViewName, viewForDataset } from "@/utils/viewsService";
+import { getView, listEntries, createOpenDataView, createDandiView, openDataViewName, viewForDataset } from "@/utils/viewsService";
 import OpenDataPicker from "../OpenDataPicker.vue";
 import DiscoverPicker from "../DiscoverPicker.vue";
 import OpenNeuroPicker from "../OpenNeuroPicker.vue";
 import { OPENNEURO_REGISTRY } from "@/utils/openNeuro";
 import PortalPicker from "../PortalPicker.vue";
+import DandiPicker from "../DandiPicker.vue";
+import { DANDI_REGISTRY, dandiViewTitle } from "@/utils/dandi";
 import { OPEN_DATA_PORTALS } from "@/utils/openDataPortals";
 import PlatformMark from "../PlatformMark.vue";
 import { DATA_PLATFORMS } from "../dataPlatforms";
@@ -343,8 +345,8 @@ async function download() {
 /* ------------------------------------------------- adding and removing --- */
 // Another view while the session runs, from a data platform: a Pennsieve
 // Discover dataset version, or an OpenNeuro, SPARC, Epilepsy.Science or AWS
-// Open Data dataset or a folder of one, made into a view and staged as
-// input/<name>/.
+// Open Data dataset or a folder of one, or a dandiset version or a folder
+// of it, made into a view and staged as input/<name>/.
 const addOpen = ref(false);
 const addPlatform = ref("discover");
 const addDataset = ref(null);
@@ -353,6 +355,8 @@ const addDiscover = ref(null);
 const addDiscoverVersion = ref(null);
 const addOpenNeuro = ref(null);
 const addOpenNeuroPrefix = ref("");
+const addDandi = ref(null);
+const addDandiPrefix = ref("");
 // A SPARC or Epilepsy.Science dataset: a folder of the portal's Open Data
 // entry. Choosing the other portal starts over.
 const addPortal = ref(null);
@@ -380,6 +384,8 @@ function openAdd() {
   addDiscoverVersion.value = null;
   addOpenNeuro.value = null;
   addOpenNeuroPrefix.value = "";
+  addDandi.value = null;
+  addDandiPrefix.value = "";
   addPortal.value = null;
   addPortalPrefix.value = "";
   addError.value = null;
@@ -392,6 +398,8 @@ const addReady = computed(() =>
     ? !!addDiscover.value
     : addPlatform.value === "openNeuro"
     ? !!addOpenNeuro.value
+    : addPlatform.value === "dandi"
+    ? !!addDandi.value
     : addIsPortal.value
     ? !!addPortal.value
     : !!addDataset.value
@@ -411,6 +419,12 @@ const addDuplicate = computed(() => {
     const name = openDataViewName(d.name, addOpenNeuroPrefix.value);
     return sources.value.find((s) => s.openDataset === OPENNEURO_REGISTRY && s.viewName === name) || null;
   }
+  if (addPlatform.value === "dandi") {
+    const d = addDandi.value;
+    if (!d) return null;
+    const name = openDataViewName(dandiViewTitle(d), addDandiPrefix.value);
+    return sources.value.find((s) => s.openDataset === DANDI_REGISTRY && s.viewName === name) || null;
+  }
   if (addIsPortal.value) {
     const d = addPortal.value;
     if (!d) return null;
@@ -427,6 +441,8 @@ const addDuplicateLabel = computed(() =>
     ? `Version ${addDiscoverVersion.value} of ${addDiscover.value?.name}`
     : addPlatform.value === "openNeuro"
     ? `This folder of ${addOpenNeuro.value?.name}`
+    : addPlatform.value === "dandi"
+    ? `This folder of ${addDandi.value?.name} (${addDandi.value?.version})`
     : addIsPortal.value
     ? `This folder of ${addPortal.value?.name}`
     : `This folder of ${addDataset.value?.title}`
@@ -446,6 +462,11 @@ async function addData() {
       const d = addOpenNeuro.value;
       view = await createOpenDataView({ dataset: OPENNEURO_REGISTRY, title: d.name, prefix: addOpenNeuroPrefix.value });
       folder = (n) => addedSourceName(OPENNEURO_REGISTRY, addOpenNeuroPrefix.value, n);
+    } else if (addPlatform.value === "dandi") {
+      const d = addDandi.value;
+      const p = addDandiPrefix.value;
+      view = await createDandiView({ dandiset: d.id, version: d.version, title: dandiViewTitle(d), prefix: p });
+      folder = (n) => addedSourceName(DANDI_REGISTRY, p || `${d.id}/`, n);
     } else if (addIsPortal.value) {
       const d = addPortal.value;
       const registry = addRegistry.value;
@@ -733,6 +754,11 @@ function fmtSize(bytes) {
           v-else-if="addPlatform === 'openNeuro'"
           v-model:dataset="addOpenNeuro"
           v-model:prefix="addOpenNeuroPrefix"
+        />
+        <DandiPicker
+          v-else-if="addPlatform === 'dandi'"
+          v-model:dataset="addDandi"
+          v-model:prefix="addDandiPrefix"
         />
         <PortalPicker
           v-else-if="addIsPortal"

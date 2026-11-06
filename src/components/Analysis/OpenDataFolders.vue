@@ -4,7 +4,9 @@
 // it takes everything below. root is the folder the user can't go above
 // (an OpenNeuro dataset's ds folder; "" for the whole resource). The filter
 // narrows a level by its names' first letters, which S3 does, so it finds a
-// folder past the first 1,000.
+// folder past the first 1,000. list, when given, lists a level instead (a
+// dandiset version's tree, from DANDI's API), as listOpenDataFolder does;
+// a file it marks zarr is a Zarr folder, which a view doesn't take yet.
 import { computed, onMounted, ref, watch } from "vue";
 import { listOpenDataFolder } from "@/utils/viewsService";
 
@@ -14,6 +16,11 @@ const props = defineProps({
   root: { type: String, default: "" },
   // The breadcrumb's first part, for root.
   rootLabel: { type: String, required: true },
+  // ({ prefix, startsWith }) => a level, instead of the bucket's.
+  list: { type: Function, default: null },
+  // Whether the filter finds names past the first 1,000 (S3 filters by
+  // name; DANDI doesn't).
+  filterFindsMore: { type: Boolean, default: true },
 });
 const prefix = defineModel("prefix", { type: String, default: "" });
 
@@ -29,7 +36,8 @@ async function load() {
   loading.value = true;
   error.value = "";
   try {
-    const l = await listOpenDataFolder({ dataset: props.dataset, prefix: prefix.value, startsWith: filter.value.trim() });
+    const args = { dataset: props.dataset, prefix: prefix.value, startsWith: filter.value.trim() };
+    const l = await (props.list ? props.list(args) : listOpenDataFolder(args));
     if (mine === seq) level.value = l;
   } catch (err) {
     console.error("Failed to list the Open Data folder:", err);
@@ -58,7 +66,9 @@ const crumbs = computed(() => {
   const parts = prefix.value.slice(props.root.length).split("/").filter(Boolean);
   return parts.map((name, i) => ({ name, prefix: props.root + parts.slice(0, i + 1).join("/") + "/" }));
 });
-const levelSize = computed(() => (level.value?.files || []).reduce((n, f) => n + (f.size || 0), 0));
+const levelFiles = computed(() => (level.value?.files || []).filter((f) => !f.zarr));
+const levelZarrs = computed(() => (level.value?.files || []).filter((f) => f.zarr));
+const levelSize = computed(() => levelFiles.value.reduce((n, f) => n + (f.size || 0), 0));
 const shown = computed(() => (prefix.value === props.root ? "" : prefix.value.slice(props.root.length)));
 
 const formatSize = (bytes) => {
@@ -118,14 +128,17 @@ const formatSize = (bytes) => {
             <path d="M4.5 2.5 8 6l-3.5 3.5" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" />
           </svg>
         </button>
-        <div v-if="level.files.length" class="odf__msg">
-          {{ level.files.length }} file{{ level.files.length === 1 ? "" : "s" }} here · {{ formatSize(levelSize) }}
+        <div v-if="levelFiles.length" class="odf__msg">
+          {{ levelFiles.length }} file{{ levelFiles.length === 1 ? "" : "s" }} here · {{ formatSize(levelSize) }}
+        </div>
+        <div v-if="levelZarrs.length" class="odf__msg" :title="levelZarrs.map((f) => f.name).join('\n')">
+          {{ levelZarrs.length }} Zarr folder{{ levelZarrs.length === 1 ? "" : "s" }} here ({{ formatSize(levelZarrs.reduce((n, f) => n + f.size, 0)) }}): not taken into a notebook yet
         </div>
         <div v-if="!level.folders.length && !level.files.length" class="odf__msg">
           Nothing here{{ filter ? ` starting with "${filter}"` : "" }}
         </div>
         <div v-if="level.truncated" class="odf__msg">
-          Showing the first 1,000. Type the first letters of a name to find others.
+          Showing the first 1,000.<template v-if="filterFindsMore"> Type the first letters of a name to find others.</template>
         </div>
       </template>
     </div>

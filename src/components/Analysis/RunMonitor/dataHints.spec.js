@@ -22,6 +22,8 @@ describe("data hints", () => {
     expect(dataRegions("openNeuro")).toEqual(["us-east-1"]);
     expect(dataRegions("sparc")).toEqual(["us-east-1"]);
     expect(dataRegions("epilepsyScience")).toEqual(["us-east-1"]);
+    expect(dataRegions("dandi")).toEqual(["us-east-2"]);
+    expect(nodeDataReason({ deploymentMode: "compliant" }, "dandi")).not.toBe("");
     expect(dataRegions("openData", { openDataDataset: { regions: ["us-west-2"] } })).toEqual(["us-west-2"]);
     expect(dataRegions("public")).toEqual([]);
     const east = { deploymentMode: "Compliant", region: "us-east-1" };
@@ -100,6 +102,7 @@ describe("data hints", () => {
 
   it("suggests a disk for the data", () => {
     expect(dataSize("openNeuro", { openNeuroDataset: { size: 5 * GiB } })).toBe(5 * GiB);
+    expect(dataSize("dandi", { dandiDataset: { size: 7 * GiB } })).toBe(7 * GiB);
     expect(dataSize("openData", {})).toBeNull();
     expect(suggestedDisk(2 * GiB, NOTEBOOK_DISK_OPTIONS)).toBe(64);
     expect(suggestedDisk(80 * GiB, NOTEBOOK_DISK_OPTIONS)).toBe(128);

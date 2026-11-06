@@ -151,12 +151,70 @@ export const structureMatches = (option, query) => {
     .some((s) => String(s).toLowerCase().includes(q));
 };
 
+/*
+ * A media type may carry a profile, naming one format that shares its
+ * container's type: NWB is "application/x-hdf5; profile=nwb", OME-TIFF
+ * "image/tiff; profile=ome-tiff" (the platform's format registry). A port taking
+ * the bare type takes its profiles too; one naming a profile takes only it.
+ * The parameter is a Pennsieve convention (after RFC 6906): these media
+ * types register no profile parameter of their own.
+ */
+
+/** "application/x-hdf5;profile=NWB" -> { base: "application/x-hdf5", profile: "nwb" }. */
+export const parseMediaType = (value) => {
+  const [base, ...params] = String(value ?? "").split(";");
+  const profile = params
+    .map((p) => p.split("="))
+    .find(([k]) => k.trim().toLowerCase() === "profile")?.[1];
+  return { base: base.trim().toLowerCase(), profile: String(profile ?? "").trim().toLowerCase() };
+};
+
+/** A media type as app.yml stores it: lower case, its profile as "; profile=<name>". */
+export const normalizeMediaType = (value) => {
+  const { base, profile } = parseMediaType(value);
+  if (!base) return "";
+  return profile ? `${base}; profile=${profile}` : base;
+};
+
+/** Does a port of type `accepted` take a file of type `type`? `*` + `/` + `*` takes any. */
+export const mediaTypeAccepts = (accepted, type) => {
+  const a = parseMediaType(accepted);
+  const t = parseMediaType(type);
+  if (a.base === "*/*" || t.base === "*/*") return true;
+  return a.base === t.base && (!a.profile || a.profile === t.profile);
+};
+
+/**
+ * Could a file be of both types? The same type, or one is the other's
+ * profile (HDF5 and NWB: an NWB file is both). Different profiles never are.
+ */
+export const mediaTypesOverlap = (a, b) => mediaTypeAccepts(a, b) || mediaTypeAccepts(b, a);
+
+/**
+ * A port's EDAM formats after its media types change from `previous` to
+ * `types`: a type taken out takes its EDAM id along, unless a type it overlaps
+ * stays (HDF5 swapped for AnnData, application/x-hdf5; profile=anndata: an
+ * AnnData file is still HDF5, format_3590). With no types, none.
+ *
+ * @param {string[]} formats  the port's EDAM ids
+ * @param {(type: string) => string|undefined} edamOf  a media type's EDAM id
+ */
+export const keptFormats = (formats, previous, types, edamOf) => {
+  if (!asArray(types).length) return [];
+  const dropped = asArray(previous)
+    .filter((t) => !types.includes(t) && !types.some((u) => mediaTypesOverlap(t, u)))
+    .map(edamOf)
+    .filter(Boolean);
+  return asArray(formats).filter((f) => !dropped.includes(f));
+};
+
 export const portDataTypeOptions = (packageFormats, declared = []) => {
   const options = [...FALLBACK_PORT_DATA_TYPES];
   const seen = new Set(options.map((o) => o.value));
-  // Formats can share a media type (HDF5 and NWB are both
-  // application/x-hdf5): one option per media type, naming every format that
-  // uses it and their extensions, so searching "nwb" finds it.
+  // Formats can share a media type (a registry without profiles): one option
+  // per media type, naming every format that uses it and their extensions, so
+  // searching for any of them finds it. With profiles (NWB is
+  // application/x-hdf5; profile=nwb), each is its own option.
   const byValue = new Map();
   const edamsByValue = new Map();
   for (const t of asArray(packageFormats)) {
@@ -182,7 +240,7 @@ export const portDataTypeOptions = (packageFormats, declared = []) => {
     (edamsByValue.get(t.value) || edamsByValue.set(t.value, []).get(t.value)).push(t.edam ? String(t.edam) : "");
   }
   // A media type's EDAM id: only when every format sharing it has the same one
-  // (HDF5 and NWB share application/x-hdf5; NWB has none, so neither gets it).
+  // (where HDF5 and NWB share application/x-hdf5, NWB has none, so neither gets it).
   for (const [value, edams] of edamsByValue) {
     if (edams.length && edams[0] && edams.every((e) => e === edams[0])) byValue.get(value).edam = edams[0];
   }
@@ -435,11 +493,11 @@ const parsePort = (raw) =>
   createPort({
     name: raw?.name ?? "",
     description: raw?.description ?? "",
-    dataType: raw?.dataType ?? asArray(raw?.mediaTypes).map(String)[0] ?? "any",
+    dataType: raw?.dataType ?? asArray(raw?.mediaTypes).map(normalizeMediaType).filter(Boolean)[0] ?? "any",
     required: Boolean(raw?.required),
     // Carried through so port compatibility can compare media types when a
     // manifest describes ports that way.
-    mediaTypes: asArray(raw?.mediaTypes).map(String),
+    mediaTypes: asArray(raw?.mediaTypes).map(normalizeMediaType).filter(Boolean),
     formats: asArray(raw?.formats).map((f) => normalizeEdamFormat(f)).filter(Boolean),
     conformsTo: conformsToList(raw?.conformsTo),
     container: raw?.container === "directory" || raw?.container === "file" ? raw.container : "",
@@ -626,13 +684,13 @@ const manifestParameter = (p) => {
 // select is `dataType`, kept in step with mediaTypes), its EDAM formats, or
 // neither, which takes any file. A non-MIME dataType from an older manifest
 // is kept as the (deprecated) dataType so it isn't lost.
-const isMediaType = (v) => /^[\w.+-]+\/[\w.+-]+$/.test(String(v || ""));
+const isMediaType = (v) => /^[\w.+-]+\/[\w.+-]+$/.test(parseMediaType(v).base) && normalizeMediaType(v) === String(v);
 const manifestPort = (port) => {
   const out = { name: (port.name || "").trim() };
   if (port.description && port.description.trim())
     out.description = port.description.trim();
-  const media = asArray(port.mediaTypes).map(String).filter(isMediaType);
-  if (!media.length && isMediaType(port.dataType)) media.push(String(port.dataType));
+  const media = asArray(port.mediaTypes).map(normalizeMediaType).filter(isMediaType);
+  if (!media.length && isMediaType(normalizeMediaType(port.dataType))) media.push(normalizeMediaType(port.dataType));
   if (media.length) out.mediaTypes = [...new Set(media)];
   else if (port.dataType && port.dataType !== "any") out.dataType = port.dataType;
   const formats = asArray(port.formats).map(normalizeEdamFormat).filter(Boolean);
@@ -650,9 +708,10 @@ const manifestPort = (port) => {
 /**
  * Inputs at the root of INPUT_DIR that would mix with another root input,
  * each with why. Inputs of different media types can share the root: the app
- * tells them apart by type. They mix when they can't be told apart (a shared
- * media type, or one takes any file), or when one is a layout, which owns the
- * root (a BIDS tree).
+ * tells them apart by type. They mix when they can't be told apart (a file
+ * either would take: a shared media type, one a profile of the other's, as an
+ * NWB file is HDF5, or one takes any file), or when one is a layout, which
+ * owns the root (a BIDS tree).
  *
  * @param {PortSchema[]} inputs
  * @returns {Map<PortSchema, {other: PortSchema, why: string}>}
@@ -667,8 +726,11 @@ export const rootInputCollisions = (inputs) => {
     const bm = asArray(b.mediaTypes);
     const any = [a, b].find((p) => !asArray(p.mediaTypes).length);
     if (any) return `${any.name || "an input"} takes any file`;
-    const shared = am.find((t) => bm.includes(t));
-    return shared ? `both take ${shared}` : "";
+    for (const t of am) {
+      const u = bm.find((b) => mediaTypesOverlap(t, b));
+      if (u) return `both take ${parseMediaType(t).profile ? t : u}`;
+    }
+    return "";
   };
   for (const a of root) {
     for (const b of root) {
@@ -1111,6 +1173,10 @@ export function validateParameters(parameters) {
  * the comparison whenever both ports declare them; `dataType` is the fallback
  * for schemas authored in the app form, which describe ports that way.
  *
+ * Types overlap as mediaTypesOverlap says: an NWB output (application/x-hdf5;
+ * profile=nwb) feeds an HDF5 input, and an HDF5 output may be NWB, so it
+ * feeds an NWB input too; different profiles don't meet.
+ *
  * `*` + `/` + `*` is the only wildcard. `application/octet-stream` is a
  * concrete type here: it is what the reference manifest puts on its generic
  * pipeline ports, so treating it as "matches anything" short-circuited the
@@ -1130,15 +1196,13 @@ export function arePortsCompatible(output, input) {
     if (!structuresCompatible(outStructures, inStructures)) return false;
     const o = asArray(output.mediaTypes);
     const i = asArray(input.mediaTypes);
-    return !o.length || !i.length || o.some((t) => t === "*/*" || i.includes(t)) || i.includes("*/*");
+    return !o.length || !i.length || o.some((t) => i.some((u) => mediaTypesOverlap(t, u)));
   }
 
   const outMedia = asArray(output.mediaTypes);
   const inMedia = asArray(input.mediaTypes);
   if (outMedia.length && inMedia.length) {
-    const wildcard = (t) => t === "*/*";
-    if (outMedia.some(wildcard) || inMedia.some(wildcard)) return true;
-    return outMedia.some((o) => inMedia.includes(o));
+    return outMedia.some((o) => inMedia.some((i) => mediaTypesOverlap(o, i)));
   }
 
   // Only reachable for dataType-shaped ports: validateAppConnection excludes
