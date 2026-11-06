@@ -9,6 +9,7 @@ import {
   listOpenData,
   searchOpenData,
   createOpenDataView,
+  createDandiView,
   listOpenDataFolder,
   openDataViewName,
   openDataCatalog,
@@ -129,9 +130,16 @@ describe("open data", () => {
   const catalog = {
     "@type": "DataCatalog",
     dataset: [
-      { identifier: "openneuro", name: "OpenNeuro", publisher: "OpenNeuro", keywords: ["neuroimaging", "bids"], "pennsieve:regions": ["us-east-1"], "pennsieve:anonymous": true, url: "https://registry.opendata.aws/openneuro/" },
-      { identifier: "hcp-openaccess", name: "Human Connectome Project", keywords: ["neuroimaging"], "pennsieve:anonymous": false },
-      { identifier: "dandiarchive", name: "DANDI: Distributed Archives for Neurophysiology Data Integration", keywords: ["neurophysiology", "openneuro-like"], "pennsieve:anonymous": true },
+      {
+        identifier: "openneuro", name: "OpenNeuro", publisher: "OpenNeuro", keywords: ["neuroimaging", "bids"], isAccessibleForFree: true,
+        distribution: [
+          { contentUrl: "https://s3.us-east-1.amazonaws.com/openneuro.org/", isAccessibleForFree: true },
+          { contentUrl: "https://s3.us-east-1.amazonaws.com/openneuro-derivatives/", isAccessibleForFree: true },
+        ],
+        url: "https://registry.opendata.aws/openneuro/",
+      },
+      { identifier: "hcp-openaccess", name: "Human Connectome Project", keywords: ["neuroimaging"], isAccessibleForFree: false },
+      { identifier: "dandiarchive", name: "DANDI: Distributed Archives for Neurophysiology Data Integration", keywords: ["neurophysiology", "openneuro-like"], isAccessibleForFree: true },
     ],
   };
 
@@ -168,6 +176,20 @@ describe("open data", () => {
     await createOpenDataView({ dataset: "openneuro", title: "OpenNeuro" }, { config, getToken, fetchFn: whole });
     expect(JSON.parse(whole.mock.calls[0][1].body).sources).toEqual([{ kind: "openData", dataset: "openneuro" }]);
   });
+
+  it("makes a run view of a dandiset version, all of it or a folder", async () => {
+    const view = { id: "v-2", version: 1 };
+    const fetchFn = respond([201, view]);
+    await createDandiView({ dandiset: "000003", version: "0.250624.0409", title: "Mossy Cells", prefix: "sub-20/" }, { config, getToken, fetchFn });
+    expect(JSON.parse(fetchFn.mock.calls[0][1].body)).toEqual({
+      name: "Mossy Cells (sub-20/)",
+      sources: [{ kind: "dandi", dandiset: "000003", dandisetVersion: "0.250624.0409", prefix: "sub-20/" }],
+      lifecycle: "run",
+    });
+    const whole = respond([201, view]);
+    await createDandiView({ dandiset: "000003", version: "draft", title: "Mossy Cells" }, { config, getToken, fetchFn: whole });
+    expect(JSON.parse(whole.mock.calls[0][1].body).sources).toEqual([{ kind: "dandi", dandiset: "000003", dandisetVersion: "draft" }]);
+  });
 });
 
 describe("listOpenDataFolder", () => {
@@ -190,7 +212,7 @@ describe("openDataViewName", () => {
 
 describe("openDataCatalog", () => {
   it("reads the catalog once", async () => {
-    const fetchFn = respond([200, { dataset: [{ identifier: "openneuro", "pennsieve:anonymous": true }] }]);
+    const fetchFn = respond([200, { dataset: [{ identifier: "openneuro", isAccessibleForFree: true }] }]);
     const first = await openDataCatalog({ config, getToken, fetchFn });
     const again = await openDataCatalog({ config, getToken, fetchFn });
     expect(first).toBe(again);

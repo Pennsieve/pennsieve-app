@@ -409,12 +409,9 @@ const parseParameter = (raw) => {
     label: raw.label ?? "",
     description: raw.description ?? "",
     type,
-    // A parameter with no default has nothing to pre-populate the run form
-    // with, so it is treated as required unless it says otherwise explicitly.
-    required:
-      raw.required == null
-        ? defaultValue == null || defaultValue === ""
-        : Boolean(raw.required),
+    // `required` is opt-in: a parameter is optional unless the manifest says
+    // `required: true`, whether or not it has a default.
+    required: Boolean(raw.required),
     defaultValue,
     validValues,
     min: raw.min ?? null,
@@ -658,8 +655,7 @@ export const APPLICATION_TYPES = Object.freeze([
  * Three things differ from the editable model. There is no `enum` type — a
  * choice parameter is a `string` carrying `validValues`. Values are written as
  * strings, which is how both the run form and the API carry them. And
- * `required` is implied by the absence of a `defaultValue`, so it is emitted
- * only when the parameter contradicts that.
+ * `required` defaults to false, so it is emitted only when true.
  */
 const manifestParameter = (p) => {
   const out = {
@@ -672,7 +668,7 @@ const manifestParameter = (p) => {
   const def = coerceParameterValue(p, p.defaultValue);
   const hasDefault = def != null && def !== "";
   if (hasDefault) out.defaultValue = String(def);
-  if (Boolean(p.required) !== !hasDefault) out.required = Boolean(p.required);
+  if (p.required) out.required = true;
 
   const choices = asArray(p.validValues).map(String);
   if (choices.length) out.validValues = choices;

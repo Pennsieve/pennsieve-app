@@ -1070,7 +1070,7 @@ const initiateWorkflow = async () => {
           name: pd.name,
           type: pd.type || "string",
           description: pd.description || "",
-          required: pd.defaultValue == null || pd.defaultValue === undefined,
+          required: Boolean(pd.required),
           validValues: pd.validValues || [],
           resolvedDefault: resolved[pd.name] != null ? String(resolved[pd.name]) : (pd.defaultValue != null ? String(pd.defaultValue) : ""),
           value: srcParams[pd.name] != null

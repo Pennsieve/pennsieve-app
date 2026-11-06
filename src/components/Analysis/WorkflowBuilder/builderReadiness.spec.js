@@ -48,6 +48,11 @@ describe("requiredUnset", () => {
     const n = app({ paramSchema: [{ name: "a" }, { name: "b", defaultValue: "1" }, { name: "c", required: false }], defaultParams: { c: "x" } });
     expect(requiredUnset(n)).toEqual(["a"]);
   });
+
+  it("skips a parameter marked required: false, even with no default or value", () => {
+    const n = app({ paramSchema: [{ name: "PHS_ACCESSION", required: false }, { name: "CONSENT_GROUP", required: true }] });
+    expect(requiredUnset(n)).toEqual(["CONSENT_GROUP"]);
+  });
 });
 
 describe("a step that lacks a required input from all its upstream steps", () => {

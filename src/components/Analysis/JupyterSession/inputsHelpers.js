@@ -103,7 +103,7 @@ export function addedSourceName(dataset, prefix = "", n = 1) {
 // "SPARC · sparc-704"). folder is
 // "" when the session can't say (an older sidecar).
 // The Open Data entries a data platform of its own reads from.
-const OPEN_DATA_PLATFORMS = { openneuro: "OpenNeuro", sparc: "SPARC", "epilepsy-science": "Epilepsy.Science" };
+const OPEN_DATA_PLATFORMS = { openneuro: "OpenNeuro", sparc: "SPARC", "epilepsy-science": "Epilepsy.Science", dandiarchive: "DANDI" };
 export function inputSubtitle({ openDataset = "", sourceVersion = null, folder = "" } = {}) {
   const platform =
     OPEN_DATA_PLATFORMS[openDataset]

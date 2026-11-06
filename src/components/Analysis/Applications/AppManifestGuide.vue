@@ -55,6 +55,7 @@ parameters:
     defaultValue: "false"
   - name: channel
     type: string
+    required: true
     description: Channel to analyze (no default, so a run must set it).
 inputs:
   - name: recording
@@ -133,7 +134,8 @@ const parameterFields = [
   { name: "name", type: "string", required: true, desc: "Parameter name. Unique among parameters." },
   { name: "type", type: "string", required: false, desc: "Value type: string (the default), number, integer, or boolean." },
   { name: "description", type: "string", required: false, desc: "What the parameter controls." },
-  { name: "defaultValue", type: "string", required: false, desc: "Value used when the user does not supply one. Written as a string, including for number and boolean parameters. A parameter with no default is treated as required." },
+  { name: "defaultValue", type: "string", required: false, desc: "Value used when the user does not supply one. Written as a string, including for number and boolean parameters." },
+  { name: "required", type: "boolean", required: false, desc: "Whether a value must be supplied before a run. Defaults to false." },
   { name: "validValues", type: "string[]", required: false, desc: "Restricts the parameter to this set of values, rendered as a picker in the workflow builder." },
 ];
 
@@ -291,8 +293,8 @@ const inputOutputFields = [
       <p>
         <code>parameters</code> declares the values a user supplies when the
         application runs. Each entry becomes a field in the workflow builder,
-        pre-filled with its <code>defaultValue</code>. A parameter with no
-        default is treated as required. Note that
+        pre-filled with its <code>defaultValue</code>. A parameter is
+        optional unless it declares <code>required: true</code>. Note that
         <code>defaultValue</code> and <code>validValues</code> are written as
         strings even for <code>number</code> and <code>boolean</code>
         parameters.
