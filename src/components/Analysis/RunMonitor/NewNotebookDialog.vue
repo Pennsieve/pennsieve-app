@@ -65,20 +65,15 @@ import RuntimeMark from "../WorkflowGraph/RuntimeMark.vue";
 import { STANDARD_CPU_OPTIONS, getStandardMemoryOptions, getTargetTypeLabel } from "./runHelpers";
 import { sourceLabel } from "../WorkflowGraph/sourceInputs";
 import * as siteConfig from "@/site-config/site.json";
-import { viewsServiceUrl, viewForDataset, viewDataSource, createOpenDataView, createOpenDataViewOf, createDandiView, openDataCatalog } from "@/utils/viewsService";
-import OpenDataPicker from "../OpenDataPicker.vue";
-import OpenNeuroPicker from "../OpenNeuroPicker.vue";
-import { countOpenNeuro, OPENNEURO_REGISTRY } from "@/utils/openNeuro";
-import DandiPicker from "../DandiPicker.vue";
-import { countDandi, dandiViewTitle } from "@/utils/dandi";
-import BossdbPicker from "../BossdbPicker.vue";
-import { countBossdb, bossdbViewName, BOSSDB_REGISTRY } from "@/utils/bossdb";
-import PortalPicker from "../PortalPicker.vue";
-import { OPEN_DATA_PORTALS, portalDatasetIds } from "@/utils/openDataPortals";
-import DiscoverPicker from "../DiscoverPicker.vue";
-import PlatformMark from "../PlatformMark.vue";
-import { DATA_PLATFORMS, platformCount } from "../dataPlatforms";
-import { countPublicDatasets } from "@/utils/publicDatasets";
+import { viewsServiceUrl, viewForDataset, viewDataSource, createOpenDataView, createOpenDataViewOf, createDandiView } from "@/utils/viewsService";
+import { OPENNEURO_REGISTRY } from "@/utils/openNeuro";
+import { dandiViewTitle } from "@/utils/dandi";
+import PlatformList from "../PlatformList.vue";
+import PlatformPane from "../PlatformPane.vue";
+import { newSelection, clearSelection } from "../platformSelection";
+import { bossdbViewName, BOSSDB_REGISTRY } from "@/utils/bossdb";
+import { OPEN_DATA_PORTALS } from "@/utils/openDataPortals";
+import { DATA_PLATFORMS } from "../dataPlatforms";
 
 const props = defineProps({
   modelValue: { type: Boolean, default: false },
@@ -413,47 +408,11 @@ const INPUT_CHOICES = {
   dandi: { label: DATA_PLATFORMS.dandi.name, desc: DATA_PLATFORMS.dandi.desc, platform: "dandi" },
   none: { label: "No input", desc: "Start with an empty input/ folder" },
 };
-// The data platforms' sizes, shown on their cards.
-const platformCounts = ref({ discover: null, openNeuro: null, sparc: null, epilepsyScience: null, openData: null, bossdb: null, dandi: null });
-function loadPlatformCounts() {
-  if (!publicInputs) return;
-  if (platformCounts.value.discover == null) {
-    countPublicDatasets()
-      .then((n) => (platformCounts.value.discover = n))
-      .catch(() => {});
-  }
-  if (platformCounts.value.openNeuro == null) {
-    countOpenNeuro()
-      .then((n) => (platformCounts.value.openNeuro = n))
-      .catch(() => {});
-  }
-  if (platformCounts.value.bossdb == null) {
-    countBossdb()
-      .then((n) => (platformCounts.value.bossdb = n))
-      .catch(() => {});
-  }
-  if (platformCounts.value.dandi == null) {
-    countDandi()
-      .then((n) => (platformCounts.value.dandi = n))
-      .catch(() => {});
-  }
-  for (const portal of Object.keys(OPEN_DATA_PORTALS)) {
-    if (platformCounts.value[portal] == null) {
-      portalDatasetIds(portal)
-        .then((ids) => (platformCounts.value[portal] = ids.length))
-        .catch(() => {});
-    }
-  }
-  if (platformCounts.value.openData == null) {
-    openDataCatalog()
-      .then((list) => (platformCounts.value.openData = list.filter((d) => d.anonymous).length))
-      .catch(() => {});
-  }
-}
-const platformLine = (c) => {
-  const p = INPUT_CHOICES[c].platform;
-  return platformCount(platformCounts.value[p], DATA_PLATFORMS[p].noun);
-};
+// The data platforms offered (PlatformList's keys), the one chosen, and the
+// dialog's choice for one (Discover's is "public").
+const platformKeys = computed(() => inputChoices.value.map((c) => INPUT_CHOICES[c].platform).filter(Boolean));
+const choicePlatform = computed(() => INPUT_CHOICES[inputChoice.value]?.platform || "");
+const choiceOf = (platform) => Object.keys(INPUT_CHOICES).find((c) => INPUT_CHOICES[c].platform === platform) || "";
 // Chosen before the kernel: every kind of data the dialog can start with
 // here; the kernels are then those that take it.
 const inputChoices = computed(() => {
@@ -668,21 +627,25 @@ const onDatasetSearch = (query) => {
 // view (utils/viewsService). Discover is read anonymously, as on the public
 // dataset pages.
 const publicInputs = !!viewsServiceUrl();
-const publicDataset = ref(null); // a published dataset, chosen with DiscoverPicker
-const publicVersion = ref(null);
+// What's chosen on each data platform (PlatformPane binds its pickers to
+// it); the names below read and write their parts.
+const sel = newSelection();
+const part = (platform, field) => computed({ get: () => sel[platform][field], set: (v) => (sel[platform][field] = v) });
+const publicDataset = part("discover", "dataset"); // a published dataset, chosen with DiscoverPicker
+const publicVersion = part("discover", "version");
 
 /* --------------------------------------------------- AWS Open Data input --- */
 // A dataset of the Registry of Open Data on AWS and a folder of it, chosen
 // with OpenDataPicker: the notebook starts with a view of its files there,
 // listed from its public bucket when the run starts, and the user downloads
 // what they need from the Inputs panel.
-const openDataDataset = ref(null); // a listOpenData entry
-const openDataPrefix = ref("");
+const openDataDataset = part("openData", "dataset"); // a listOpenData entry
+const openDataPrefix = part("openData", "prefix");
 
 // An OpenNeuro dataset, chosen with OpenNeuroPicker: a view of its folder
 // in the Open Data catalog's openneuro entry.
-const openNeuroDataset = ref(null); // a searchOpenNeuro result
-const openNeuroPrefix = ref("");
+const openNeuroDataset = part("openNeuro", "dataset"); // a searchOpenNeuro result
+const openNeuroPrefix = part("openNeuro", "prefix");
 const openNeuroLabel = computed(() => {
   const d = openNeuroDataset.value;
   if (!d) return "";
@@ -692,12 +655,12 @@ const openNeuroLabel = computed(() => {
 // BossDB collections, experiments or volumes, chosen with BossdbPicker: a
 // view of their folders of the bossdb entry, whose volumes views-service
 // takes whole (precomputed, read in place).
-const bossdbPicks = ref([]); // [{ prefix, label, ... }]
+const bossdbPicks = part("bossdb", "picks"); // [{ prefix, label, ... }]
 
 // A dandiset version, chosen with DandiPicker: a view of its files (each
 // read from its blob in the archive's bucket), all or a folder's.
-const dandiDataset = ref(null); // a searchDandi result, at the version chosen
-const dandiPrefix = ref("");
+const dandiDataset = part("dandi", "dataset"); // a searchDandi result, at the version chosen
+const dandiPrefix = part("dandi", "prefix");
 const dandiLabel = computed(() => {
   const d = dandiDataset.value;
   if (!d) return "";
@@ -707,13 +670,12 @@ const dandiLabel = computed(() => {
 // A SPARC or Epilepsy.Science dataset, chosen with PortalPicker: a view of
 // its folder in the portal's Open Data entry. Choosing the other portal
 // starts over.
-const portalDataset = ref(null); // a toPortalDataset
-const portalPrefix = ref("");
+// The portal chosen's (each keeps its own).
 const isPortal = computed(() => inputChoice.value in OPEN_DATA_PORTALS);
-watch(inputChoice, () => {
-  portalDataset.value = null;
-  portalPrefix.value = "";
-});
+const portalPart = (field, none) =>
+  computed({ get: () => (isPortal.value ? sel[inputChoice.value][field] : none), set: (v) => isPortal.value && (sel[inputChoice.value][field] = v) });
+const portalDataset = portalPart("dataset", null); // a toPortalDataset
+const portalPrefix = portalPart("prefix", "");
 const portalLabel = computed(() => {
   const d = portalDataset.value;
   if (!d) return "";
@@ -941,17 +903,7 @@ function reset() {
   nameTouched.value = false;
   computeNodeSearch.value = "";
   datasetSearchQuery.value = "";
-  publicDataset.value = null;
-  publicVersion.value = null;
-  openDataDataset.value = null;
-  openDataPrefix.value = "";
-  openNeuroDataset.value = null;
-  openNeuroPrefix.value = "";
-  dandiDataset.value = null;
-  dandiPrefix.value = "";
-  bossdbPicks.value = [];
-  portalDataset.value = null;
-  portalPrefix.value = "";
+  clearSelection(sel);
   // The data comes first: a workspace's own dataset, else a public one.
   inputChoice.value = props.personal ? (publicInputs ? "public" : "none") : "dataset";
   diskTouched.value = false;
@@ -1003,7 +955,6 @@ watch(visible, (open) => {
         .catch(() => {});
     }
     if (!props.personal) fetchDatasetOptions();
-    loadPlatformCounts();
   }
 });
 
@@ -1504,25 +1455,14 @@ async function execute() {
           </button>
         </div>
       </template>
-      <template v-if="inputChoices.some((c) => INPUT_CHOICES[c].platform)">
-        <div class="io-choices-label io-choices-label--group">Data platforms</div>
-        <div class="io-choices">
-          <button
-            v-for="c in inputChoices.filter((c) => INPUT_CHOICES[c].platform)"
-            :key="c"
-            type="button"
-            class="io-choice io-platform"
-            :class="{ 'is-picked': inputChoice === c }"
-            @click="inputChoice = c"
-          >
-            <PlatformMark :platform="INPUT_CHOICES[c].platform" />
-            <span class="io-platform__text">
-              <span class="io-choice__name">{{ INPUT_CHOICES[c].label }}</span>
-              <span class="io-choice__desc">{{ INPUT_CHOICES[c].desc }}</span>
-              <span v-if="platformLine(c)" class="io-platform__count">{{ platformLine(c) }}</span>
-            </span>
-          </button>
-        </div>
+      <!-- The data platforms, in their groups (PlatformList). -->
+      <template v-if="platformKeys.length">
+        <PlatformList
+          class="io-platforms"
+          :offered="platformKeys"
+          :model-value="choicePlatform"
+          @update:model-value="inputChoice = choiceOf($event)"
+        />
         <p class="io-platform__note">You pick which files to download from the notebook.</p>
       </template>
       </div>
@@ -1530,88 +1470,9 @@ async function execute() {
       <div v-if="step === S.INPUT && inputChoice === 'none'" class="wizard-step">
         <p class="wizard-step-desc">The notebook starts with an empty <code>input/</code> folder.</p>
       </div>
-      <div v-else-if="step === S.INPUT && inputChoice === 'openNeuro'" class="wizard-step">
-        <h4 class="io-section-title io-platform-title">
-          <PlatformMark platform="openNeuro" :size="24" />
-          Choose an OpenNeuro dataset
-        </h4>
-        <p class="wizard-step-desc">
-          A dataset from <a href="https://openneuro.org" target="_blank" rel="noopener">OpenNeuro</a>,
-          read from its copy in the Registry of Open Data on AWS at its latest
-          version. The notebook starts with its file list; you pick which files
-          to download from the notebook.
-        </p>
-        <OpenNeuroPicker v-model:dataset="openNeuroDataset" v-model:prefix="openNeuroPrefix" />
-      </div>
-      <div v-else-if="step === S.INPUT && inputChoice === 'bossdb'" class="wizard-step">
-        <h4 class="io-section-title io-platform-title">
-          <PlatformMark platform="bossdb" :size="24" />
-          Choose BossDB data
-        </h4>
-        <p class="wizard-step-desc">
-          Volumes from <a href="https://bossdb.org" target="_blank" rel="noopener">BossDB</a>, read
-          from its copy in the Registry of Open Data on AWS: whole collections, experiments or
-          channels, as many as you need. The notebook reads each volume in place, a region at a
-          time; nothing is downloaded up front.
-        </p>
-        <BossdbPicker v-model:picks="bossdbPicks" />
-      </div>
-      <div v-else-if="step === S.INPUT && inputChoice === 'dandi'" class="wizard-step">
-        <h4 class="io-section-title io-platform-title">
-          <PlatformMark platform="dandi" :size="24" />
-          Choose a dandiset
-        </h4>
-        <p class="wizard-step-desc">
-          A dandiset from the <a href="https://dandiarchive.org" target="_blank" rel="noopener">DANDI Archive</a>
-          at a published version (or its draft), read from its copy in the
-          Registry of Open Data on AWS. The notebook starts with its file
-          list; you pick which files to download from the notebook.
-        </p>
-        <DandiPicker v-model:dataset="dandiDataset" v-model:prefix="dandiPrefix" />
-      </div>
-      <div v-else-if="step === S.INPUT && isPortal" class="wizard-step">
-        <h4 class="io-section-title io-platform-title">
-          <PlatformMark :platform="inputChoice" :size="24" />
-          Choose a {{ DATA_PLATFORMS[inputChoice].name }} dataset
-        </h4>
-        <p class="wizard-step-desc">
-          A dataset published on
-          <a :href="OPEN_DATA_PORTALS[inputChoice].url" target="_blank" rel="noopener">{{ DATA_PLATFORMS[inputChoice].name }}</a>,
-          read from its copy in the Registry of Open Data on AWS at its latest
-          version. The notebook starts with its file list; you pick which files
-          to download from the notebook.
-        </p>
-        <PortalPicker
-          :key="inputChoice"
-          :portal="inputChoice"
-          v-model:dataset="portalDataset"
-          v-model:prefix="portalPrefix"
-        />
-      </div>
-      <div v-else-if="step === S.INPUT && inputChoice === 'openData'" class="wizard-step">
-        <h4 class="io-section-title io-platform-title">
-          <PlatformMark platform="openData" :size="24" />
-          Choose an AWS Open Data dataset
-        </h4>
-        <p class="wizard-step-desc">
-          A dataset from the
-          <a href="https://registry.opendata.aws/" target="_blank" rel="noopener">Registry of Open Data on AWS</a>,
-          and the folder of it to start with. The notebook starts with its
-          file list; you pick which files to download from the notebook.
-        </p>
-        <OpenDataPicker v-model:dataset="openDataDataset" v-model:prefix="openDataPrefix" />
-      </div>
-      <!-- Dataset -->
-      <div v-else-if="step === S.INPUT && showPublicInput" class="wizard-step">
-        <h4 class="io-section-title io-platform-title">
-          <PlatformMark platform="discover" :size="24" />
-          Choose a Pennsieve Discover dataset
-        </h4>
-        <p class="wizard-step-desc">
-          A published dataset and its version. The notebook starts with its
-          file list; you pick which files to download from the notebook.
-        </p>
-        <DiscoverPicker v-model:dataset="publicDataset" v-model:version="publicVersion" />
+      <!-- A data platform's picker (PlatformPane), bound to the selection. -->
+      <div v-else-if="step === S.INPUT && choicePlatform" class="wizard-step">
+        <PlatformPane :platform="choicePlatform" :selection="sel" />
       </div>
       <div v-else-if="step === S.INPUT && showDatasetInput" class="wizard-step">
         <h4 class="io-section-title">Choose a dataset</h4>
@@ -2003,6 +1864,10 @@ async function execute() {
 }
 .data-hint--card {
   margin: 6px 0 0;
+}
+/* The platforms (PlatformList) below the workspace's choice. */
+.io-choices + .io-platforms {
+  margin-top: 16px;
 }
 .io-choices-label--group {
   margin-top: 16px;

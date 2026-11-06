@@ -51,5 +51,14 @@ export const DATA_PLATFORMS = {
   },
 };
 
+// The platforms as the data pickers list them: one group, in this order.
+export const PLATFORM_GROUPS = [
+  { label: "Data platforms", keys: ["discover", "openData", "sparc", "epilepsyScience", "openNeuro", "bossdb", "dandi"] },
+];
+
+// The groups with only the platforms offered (keys), empty groups left out.
+export const groupsOf = (offered) =>
+  PLATFORM_GROUPS.map((g) => ({ ...g, keys: g.keys.filter((k) => offered.includes(k)) })).filter((g) => g.keys.length);
+
 // "1,213 datasets", or "" before the count is known.
 export const platformCount = (n, noun) => (Number.isFinite(n) ? `${n.toLocaleString("en-US")} ${noun}` : "");
