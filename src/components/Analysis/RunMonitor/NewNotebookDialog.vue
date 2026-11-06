@@ -407,6 +407,7 @@ const INPUT_CHOICES = {
   bossdb: { label: DATA_PLATFORMS.bossdb.name, desc: DATA_PLATFORMS.bossdb.desc, platform: "bossdb" },
   dandi: { label: DATA_PLATFORMS.dandi.name, desc: DATA_PLATFORMS.dandi.desc, platform: "dandi" },
   physionet: { label: DATA_PLATFORMS.physionet.name, desc: DATA_PLATFORMS.physionet.desc, platform: "physionet" },
+  allen: { label: DATA_PLATFORMS.allen.name, desc: DATA_PLATFORMS.allen.desc, platform: "allen" },
   none: { label: "No input", desc: "Start with an empty input/ folder" },
 };
 // The data platforms offered (PlatformList's keys), the one chosen, and the
@@ -419,7 +420,7 @@ const choiceOf = (platform) => Object.keys(INPUT_CHOICES).find((c) => INPUT_CHOI
 const inputChoices = computed(() => {
   const c = [];
   if (!props.personal) c.push("dataset");
-  if (publicInputs) c.push("public", "openData", "sparc", "epilepsyScience", "openNeuro", "bossdb", "dandi", "physionet");
+  if (publicInputs) c.push("public", "openData", "sparc", "epilepsyScience", "openNeuro", "bossdb", "dandi", "physionet", "allen");
   c.push("none");
   return c;
 });
@@ -583,6 +584,8 @@ const canNext = computed(() => {
         ? !!dandiDataset.value
         : inputChoice.value === "physionet"
         ? !!physionetDataset.value && !!physionetPrefix.value
+        : inputChoice.value === "allen"
+        ? !!allenDataset.value
         : isPortal.value
         ? !!portalDataset.value
         : inputChoice.value === "none";
@@ -680,6 +683,17 @@ const physionetLabel = computed(() => {
   return `${d.title} (${d.name}/${physionetPrefix.value.replace(/\/$/, "")})`;
 });
 
+// An Allen Institute dataset and a folder of it, chosen with OpenDataPicker
+// from its part of the catalog: a view of it like any Open Data dataset's.
+const allenDataset = part("allen", "dataset"); // a listOpenData entry
+const allenPrefix = part("allen", "prefix");
+const allenLabel = computed(() => {
+  const d = allenDataset.value;
+  if (!d) return "";
+  const p = allenPrefix.value.trim();
+  return p ? `${d.title} (${p})` : d.title;
+});
+
 // A SPARC or Epilepsy.Science dataset, chosen with PortalPicker: a view of
 // its folder in the portal's Open Data entry. Choosing the other portal
 // starts over.
@@ -711,6 +725,7 @@ const dataContext = computed(() => ({
   openNeuroDataset: openNeuroDataset.value,
   dandiDataset: dandiDataset.value,
   openDataDataset: openDataDataset.value,
+  allenDataset: allenDataset.value,
   portalDataset: portalDataset.value,
   selectedDataset: selectedDataset.value?.content,
 }));
@@ -1033,6 +1048,8 @@ const soFar = computed(() => {
         ? dandiLabel.value || "DANDI"
         : inputChoice.value === "physionet"
         ? physionetLabel.value || "PhysioNet"
+        : inputChoice.value === "allen"
+        ? allenLabel.value || "Allen Institute"
         : isPortal.value
         ? portalLabel.value || DATA_PLATFORMS[inputChoice.value].name
         : inputChoice.value === "dataset"
@@ -1181,6 +1198,16 @@ async function execute() {
         dataset: physionetDataset.value.name,
         title: physionetDataset.value.title,
         prefix: physionetPrefix.value,
+      });
+      personalSources[dataSourceNodes.value[0].id] = viewDataSource(view);
+    }
+    // An Allen Institute dataset: a view of it, or a folder of it.
+    const usesAllen = inputChoice.value === "allen";
+    if (usesAllen && allenDataset.value && dataSourceNodes.value.length) {
+      const view = await createOpenDataView({
+        dataset: allenDataset.value.name,
+        title: allenDataset.value.title,
+        prefix: allenPrefix.value,
       });
       personalSources[dataSourceNodes.value[0].id] = viewDataSource(view);
     }

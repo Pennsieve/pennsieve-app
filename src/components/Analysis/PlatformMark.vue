@@ -4,7 +4,8 @@
 // SPARC's and Epilepsy.Science's own logos (portals
 // Pennsieve runs), DANDI's (from its Apache-2.0 repository), BossDB's (with
 // its owners' blessing), PhysioNet's network (its logo's mark, from its
-// BSD-licensed repository), and a neutral cloud and data store for the Registry of
+// BSD-licensed repository), a letter for the Allen Institute (its logo
+// isn't ours to use), and a neutral cloud and data store for the Registry of
 // Open Data on AWS (not AWS's logo).
 import IconPennsieveMark from "@/components/icons/IconPennsieveMark.vue";
 import IconOpenData from "@/components/icons/IconOpenData.vue";
@@ -18,7 +19,7 @@ import physionetMark from "@/assets/images/logos/physionet-mark.svg";
 const LOGOS = { sparc: sparcLogo, epilepsyScience: epilepsyScienceLogo, dandi: dandiLogo, bossdb: bossdbLogo, openNeuro: openNeuroMark, physionet: physionetMark };
 
 defineProps({
-  platform: { type: String, required: true }, // discover | openNeuro | sparc | epilepsyScience | openData | dandi | bossdb | physionet
+  platform: { type: String, required: true }, // discover | openNeuro | sparc | epilepsyScience | openData | dandi | bossdb | physionet | allen
   size: { type: Number, default: 36 },
 });
 </script>
@@ -38,6 +39,7 @@ defineProps({
       color="currentColor"
     />
     <img v-else-if="LOGOS[platform]" class="pm__logo" :src="LOGOS[platform]" alt="" />
+    <span v-else-if="platform === 'allen'" class="pm__letter" :style="{ fontSize: `${Math.round(size * 0.5)}px` }">A</span>
     <IconOpenData v-else :width="Math.round(size * 0.6)" :height="Math.round(size * 0.6)" />
   </span>
 </template>
@@ -71,6 +73,14 @@ defineProps({
     width: 80%;
     height: 80%;
   }
+}
+.pm--allen {
+  background: theme.$gray_6;
+  color: theme.$white;
+}
+.pm__letter {
+  font-weight: 600;
+  line-height: 1;
 }
 .pm--epilepsyScience {
   overflow: hidden;

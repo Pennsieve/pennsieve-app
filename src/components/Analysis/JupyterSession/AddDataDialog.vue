@@ -39,9 +39,9 @@ const addReady = computed(() => selectionReady(platform.value, sel));
 
 // A view's name for what's chosen: two views of the same name are of the
 // same files. For a Discover dataset version, its id and version instead.
-// An Open Data catalog entry (AWS Open Data's, PhysioNet's) goes by its
-// title; the others' datasets by their names.
-const titled = (p) => p === "openData" || p === "physionet";
+// An Open Data catalog entry (AWS Open Data's, PhysioNet's, the Allen
+// Institute's) goes by its title; the others' datasets by their names.
+const titled = (p) => ["openData", "physionet", "allen"].includes(p);
 const viewNameOf = () => {
   const p = platform.value;
   if (p === "bossdb") return bossdbViewName(sel.bossdb.picks);
@@ -96,7 +96,7 @@ async function addData() {
       folder = (n) => addedSourceName(DANDI_REGISTRY, prefix || `${d.id}/`, n);
     } else {
       // An Open Data dataset or a folder of one: OpenNeuro's, a portal's,
-      // a PhysioNet project's, or any in the registry.
+      // a PhysioNet project's, the Allen Institute's, or any in the registry.
       const { dataset: d, prefix } = sel[p];
       const registry = registryOf();
       view = await createOpenDataView({ dataset: registry, title: titled(p) ? d.title : d.name, prefix });

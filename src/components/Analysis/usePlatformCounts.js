@@ -7,6 +7,7 @@ import { countOpenNeuro } from "@/utils/openNeuro";
 import { countDandi } from "@/utils/dandi";
 import { countBossdb } from "@/utils/bossdb";
 import { countPhysionet } from "@/utils/physionet";
+import { countAllen } from "@/utils/allen";
 import { OPEN_DATA_PORTALS, portalDatasetIds } from "@/utils/openDataPortals";
 import { openDataCatalog } from "@/utils/viewsService";
 
@@ -19,6 +20,7 @@ const COUNTERS = {
   dandi: () => countDandi(),
   bossdb: () => countBossdb(),
   physionet: () => countPhysionet(),
+  allen: () => countAllen(),
   openData: () => openDataCatalog().then((list) => list.filter((d) => d.anonymous).length),
   ...Object.fromEntries(Object.keys(OPEN_DATA_PORTALS).map((p) => [p, () => portalDatasetIds(p).then((ids) => ids.length)])),
 };

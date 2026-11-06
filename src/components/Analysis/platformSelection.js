@@ -1,7 +1,7 @@
 // What's chosen on each data platform, kept while the user moves between
 // them (PlatformPane binds each platform's picker to its part):
 //   discover: { dataset, version }          a Discover dataset version
-//   openData, openNeuro, sparc, epilepsyScience, dandi, physionet: { dataset, prefix }
+//   openData, openNeuro, sparc, epilepsyScience, dandi, physionet, allen: { dataset, prefix }
 //   bossdb: { picks }                        collections, experiments, channels
 import { reactive } from "vue";
 
@@ -14,6 +14,7 @@ export function newSelection() {
     epilepsyScience: { dataset: null, prefix: "" },
     dandi: { dataset: null, prefix: "" },
     physionet: { dataset: null, prefix: "" },
+    allen: { dataset: null, prefix: "" },
     bossdb: { picks: [] },
   });
 }

@@ -15,6 +15,7 @@ import BossdbPicker from "./BossdbPicker.vue";
 import PhysionetPicker from "./PhysionetPicker.vue";
 import { DATA_PLATFORMS } from "./dataPlatforms";
 import { OPEN_DATA_PORTALS } from "@/utils/openDataPortals";
+import { isAllenEntry } from "@/utils/allen";
 
 const props = defineProps({
   platform: { type: String, required: true },
@@ -30,6 +31,7 @@ const TITLES = {
   dandi: "Choose a dandiset",
   bossdb: "Choose BossDB data",
   physionet: "Choose a PhysioNet project",
+  allen: "Choose an Allen Institute dataset",
 };
 const title = computed(() => TITLES[props.platform] || `Choose a ${DATA_PLATFORMS[props.platform]?.name} dataset`);
 </script>
@@ -86,6 +88,21 @@ const title = computed(() => TITLES[props.platform] || `Choose a ${DATA_PLATFORM
       <PhysionetPicker v-model:dataset="selection.physionet.dataset" v-model:prefix="selection.physionet.prefix" />
     </template>
 
+    <template v-else-if="platform === 'allen'">
+      <p class="pp__desc">
+        A dataset from the <a href="https://alleninstitute.org/open-science/" target="_blank" rel="noopener">Allen Institute</a>
+        in the Registry of Open Data on AWS, and the folder of it to take. Most are large: open a
+        folder to start with less. The notebook gets its file list; you pick which files to download.
+      </p>
+      <OpenDataPicker
+        :key="platform"
+        :only="isAllenEntry"
+        source="Allen Institute"
+        v-model:dataset="selection.allen.dataset"
+        v-model:prefix="selection.allen.prefix"
+      />
+    </template>
+
     <template v-else-if="isPortal">
       <p class="pp__desc">
         A dataset published on
@@ -107,7 +124,7 @@ const title = computed(() => TITLES[props.platform] || `Choose a ${DATA_PLATFORM
         <a href="https://registry.opendata.aws/" target="_blank" rel="noopener">Registry of Open Data on AWS</a>,
         and the folder of it to take. The notebook gets its file list; you pick which files to download.
       </p>
-      <OpenDataPicker v-model:dataset="selection.openData.dataset" v-model:prefix="selection.openData.prefix" />
+      <OpenDataPicker :key="platform" v-model:dataset="selection.openData.dataset" v-model:prefix="selection.openData.prefix" />
     </template>
   </div>
 </template>

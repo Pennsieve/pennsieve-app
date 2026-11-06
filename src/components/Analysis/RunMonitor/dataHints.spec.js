@@ -23,6 +23,8 @@ describe("data hints", () => {
     expect(dataRegions("sparc")).toEqual(["us-east-1"]);
     expect(dataRegions("epilepsyScience")).toEqual(["us-east-1"]);
     expect(dataRegions("physionet")).toEqual(["us-east-1"]);
+    expect(dataRegions("allen", { allenDataset: { regions: ["us-west-2"] } })).toEqual(["us-west-2"]);
+    expect(isImagingData("allen", { allenDataset: { keywords: ["neurobiology", "imaging"] } })).toBe(true);
     expect(dataRegions("dandi")).toEqual(["us-east-2"]);
     expect(dataRegions("bossdb")).toEqual(["us-east-1"]);
     expect(nodeDataReason({ deploymentMode: "compliant" }, "dandi")).not.toBe("");

@@ -57,11 +57,18 @@ export const DATA_PLATFORMS = {
     desc: "Physiological signals and clinical data: ECG, EEG, ICU",
     noun: "open projects",
   },
+  // The Allen Institute's atlases, observatories and cell collections, each
+  // an entry of the Registry of Open Data on AWS (utils/allen).
+  allen: {
+    name: "Allen Institute",
+    desc: "Brain atlases, observatories and cell collections",
+    noun: "datasets",
+  },
 };
 
 // The platforms as the data pickers list them: one group, in this order.
 export const PLATFORM_GROUPS = [
-  { label: "Data platforms", keys: ["discover", "openData", "sparc", "epilepsyScience", "openNeuro", "bossdb", "dandi", "physionet"] },
+  { label: "Data platforms", keys: ["discover", "openData", "sparc", "epilepsyScience", "openNeuro", "bossdb", "dandi", "physionet", "allen"] },
 ];
 
 // The groups with only the platforms offered (keys), empty groups left out.
