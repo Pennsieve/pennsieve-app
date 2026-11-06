@@ -12,6 +12,7 @@ import OpenNeuroPicker from "./OpenNeuroPicker.vue";
 import PortalPicker from "./PortalPicker.vue";
 import DandiPicker from "./DandiPicker.vue";
 import BossdbPicker from "./BossdbPicker.vue";
+import PhysionetPicker from "./PhysionetPicker.vue";
 import { DATA_PLATFORMS } from "./dataPlatforms";
 import { OPEN_DATA_PORTALS } from "@/utils/openDataPortals";
 
@@ -28,6 +29,7 @@ const TITLES = {
   openNeuro: "Choose an OpenNeuro dataset",
   dandi: "Choose a dandiset",
   bossdb: "Choose BossDB data",
+  physionet: "Choose a PhysioNet project",
 };
 const title = computed(() => TITLES[props.platform] || `Choose a ${DATA_PLATFORMS[props.platform]?.name} dataset`);
 </script>
@@ -75,6 +77,15 @@ const title = computed(() => TITLES[props.platform] || `Choose a ${DATA_PLATFORM
       <DandiPicker v-model:dataset="selection.dandi.dataset" v-model:prefix="selection.dandi.prefix" />
     </template>
 
+    <template v-else-if="platform === 'physionet'">
+      <p class="pp__desc">
+        An open-access project from <a href="https://physionet.org" target="_blank" rel="noopener">PhysioNet</a>
+        at a published version, read from its copy in the Registry of Open Data on AWS. The notebook
+        gets its file list; you pick which files to download.
+      </p>
+      <PhysionetPicker v-model:dataset="selection.physionet.dataset" v-model:prefix="selection.physionet.prefix" />
+    </template>
+
     <template v-else-if="isPortal">
       <p class="pp__desc">
         A dataset published on
@@ -117,7 +128,8 @@ const title = computed(() => TITLES[props.platform] || `Choose a ${DATA_PLATFORM
 .open-data-picker,
 .pp-picker,
 .dd-picker,
-.bd-picker {
+.bd-picker,
+.pn-picker {
   display: flex;
   flex: 1 1 auto;
   flex-direction: column;
@@ -128,7 +140,8 @@ const title = computed(() => TITLES[props.platform] || `Choose a ${DATA_PLATFORM
 :deep(.od-cards),
 :deep(.pp-cards),
 :deep(.dd-cards),
-:deep(.bd-cards) {
+:deep(.bd-cards),
+:deep(.pn-cards) {
   flex: 1 1 auto;
   min-height: 160px;
   max-height: none;

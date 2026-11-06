@@ -4,10 +4,10 @@
 import { hasInterface } from "./workflowInterface";
 
 // The data platforms whose files come from public S3 buckets.
-const PUBLIC_BUCKET_INPUTS = new Set(["openNeuro", "sparc", "epilepsyScience", "openData", "bossdb", "dandi"]);
+const PUBLIC_BUCKET_INPUTS = new Set(["openNeuro", "sparc", "epilepsyScience", "openData", "bossdb", "dandi", "physionet"]);
 
 // Whether a kernel's workflow can start with the input chosen (dataset,
-// public, openNeuro, sparc, epilepsyScience, openData, bossdb, dandi or none). A workflow that declares its input
+// public, openNeuro, sparc, epilepsyScience, openData, bossdb, dandi, physionet or none). A workflow that declares its input
 // takes any of them, and none when it's optional; one that doesn't reads a
 // workspace dataset's files, or in My Workspace a public dataset or nothing.
 export function acceptsInput(wf, choice, { personal = false } = {}) {
@@ -22,9 +22,9 @@ export function acceptsInput(wf, choice, { personal = false } = {}) {
 }
 
 // Where the chosen data lives, when it's known: OpenNeuro's, SPARC's and
-// Epilepsy.Science's and BossDB's copies are in us-east-1, the DANDI Archive's in
+// Epilepsy.Science's, BossDB's and PhysioNet's copies are in us-east-1, the DANDI Archive's in
 // us-east-2, an Open Data dataset says (its regions).
-const US_EAST_1_INPUTS = new Set(["openNeuro", "sparc", "epilepsyScience", "bossdb"]);
+const US_EAST_1_INPUTS = new Set(["openNeuro", "sparc", "epilepsyScience", "bossdb", "physionet"]);
 export function dataRegions(choice, { openDataDataset } = {}) {
   if (US_EAST_1_INPUTS.has(choice)) return ["us-east-1"];
   if (choice === "dandi") return ["us-east-2"];

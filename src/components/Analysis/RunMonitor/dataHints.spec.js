@@ -22,6 +22,7 @@ describe("data hints", () => {
     expect(dataRegions("openNeuro")).toEqual(["us-east-1"]);
     expect(dataRegions("sparc")).toEqual(["us-east-1"]);
     expect(dataRegions("epilepsyScience")).toEqual(["us-east-1"]);
+    expect(dataRegions("physionet")).toEqual(["us-east-1"]);
     expect(dataRegions("dandi")).toEqual(["us-east-2"]);
     expect(dataRegions("bossdb")).toEqual(["us-east-1"]);
     expect(nodeDataReason({ deploymentMode: "compliant" }, "dandi")).not.toBe("");

@@ -16,6 +16,11 @@ describe("a platform selection", () => {
     sel.bossdb.picks = [{ prefix: "witvliet2020/" }];
     expect(selectionReady("bossdb", sel)).toBe(true);
     expect(selectionReady("nope", sel)).toBe(false);
+    // PhysioNet's once a version is chosen.
+    sel.physionet.dataset = { name: "afdb" };
+    expect(selectionReady("physionet", sel)).toBe(false);
+    sel.physionet.prefix = "1.0.0/";
+    expect(selectionReady("physionet", sel)).toBe(true);
   });
 
   it("keeps each platform's, and starts over", () => {

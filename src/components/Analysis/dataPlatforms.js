@@ -49,11 +49,19 @@ export const DATA_PLATFORMS = {
     desc: "Neurophysiology data, mostly NWB, from the DANDI Archive",
     noun: "dandisets",
   },
+  // PhysioNet's open-access projects are in the Registry of Open Data on
+  // AWS, one entry per project: a notebook takes a version's folder like
+  // any Open Data dataset's (utils/physionet).
+  physionet: {
+    name: "PhysioNet",
+    desc: "Physiological signals and clinical data: ECG, EEG, ICU",
+    noun: "open projects",
+  },
 };
 
 // The platforms as the data pickers list them: one group, in this order.
 export const PLATFORM_GROUPS = [
-  { label: "Data platforms", keys: ["discover", "openData", "sparc", "epilepsyScience", "openNeuro", "bossdb", "dandi"] },
+  { label: "Data platforms", keys: ["discover", "openData", "sparc", "epilepsyScience", "openNeuro", "bossdb", "dandi", "physionet"] },
 ];
 
 // The groups with only the platforms offered (keys), empty groups left out.

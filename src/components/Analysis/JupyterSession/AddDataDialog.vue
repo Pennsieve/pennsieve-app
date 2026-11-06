@@ -39,11 +39,14 @@ const addReady = computed(() => selectionReady(platform.value, sel));
 
 // A view's name for what's chosen: two views of the same name are of the
 // same files. For a Discover dataset version, its id and version instead.
+// An Open Data catalog entry (AWS Open Data's, PhysioNet's) goes by its
+// title; the others' datasets by their names.
+const titled = (p) => p === "openData" || p === "physionet";
 const viewNameOf = () => {
   const p = platform.value;
   if (p === "bossdb") return bossdbViewName(sel.bossdb.picks);
   if (p === "dandi") return openDataViewName(dandiViewTitle(sel.dandi.dataset), sel.dandi.prefix);
-  if (p === "openData") return openDataViewName(sel.openData.dataset.title, sel.openData.prefix);
+  if (titled(p)) return openDataViewName(sel[p].dataset.title, sel[p].prefix);
   return openDataViewName(sel[p].dataset.name, sel[p].prefix);
 };
 const registryOf = () => {
@@ -52,7 +55,7 @@ const registryOf = () => {
   if (p === "dandi") return DANDI_REGISTRY;
   if (p === "bossdb") return BOSSDB_REGISTRY;
   if (p in OPEN_DATA_PORTALS) return OPEN_DATA_PORTALS[p].registry;
-  return sel.openData.dataset?.name;
+  return sel[p].dataset?.name;
 };
 
 // A source already in the session with the same files.
@@ -93,10 +96,10 @@ async function addData() {
       folder = (n) => addedSourceName(DANDI_REGISTRY, prefix || `${d.id}/`, n);
     } else {
       // An Open Data dataset or a folder of one: OpenNeuro's, a portal's,
-      // or any in the registry.
+      // a PhysioNet project's, or any in the registry.
       const { dataset: d, prefix } = sel[p];
       const registry = registryOf();
-      view = await createOpenDataView({ dataset: registry, title: p === "openData" ? d.title : d.name, prefix });
+      view = await createOpenDataView({ dataset: registry, title: titled(p) ? d.title : d.name, prefix });
       folder = (n) => addedSourceName(registry, prefix, n);
     }
     // The next free folder name: input/ may hold one already.

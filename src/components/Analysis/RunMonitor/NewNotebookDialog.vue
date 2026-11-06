@@ -406,6 +406,7 @@ const INPUT_CHOICES = {
   openNeuro: { label: DATA_PLATFORMS.openNeuro.name, desc: DATA_PLATFORMS.openNeuro.desc, platform: "openNeuro" },
   bossdb: { label: DATA_PLATFORMS.bossdb.name, desc: DATA_PLATFORMS.bossdb.desc, platform: "bossdb" },
   dandi: { label: DATA_PLATFORMS.dandi.name, desc: DATA_PLATFORMS.dandi.desc, platform: "dandi" },
+  physionet: { label: DATA_PLATFORMS.physionet.name, desc: DATA_PLATFORMS.physionet.desc, platform: "physionet" },
   none: { label: "No input", desc: "Start with an empty input/ folder" },
 };
 // The data platforms offered (PlatformList's keys), the one chosen, and the
@@ -418,7 +419,7 @@ const choiceOf = (platform) => Object.keys(INPUT_CHOICES).find((c) => INPUT_CHOI
 const inputChoices = computed(() => {
   const c = [];
   if (!props.personal) c.push("dataset");
-  if (publicInputs) c.push("public", "openData", "sparc", "epilepsyScience", "openNeuro", "bossdb", "dandi");
+  if (publicInputs) c.push("public", "openData", "sparc", "epilepsyScience", "openNeuro", "bossdb", "dandi", "physionet");
   c.push("none");
   return c;
 });
@@ -580,6 +581,8 @@ const canNext = computed(() => {
         ? bossdbPicks.value.length > 0
         : inputChoice.value === "dandi"
         ? !!dandiDataset.value
+        : inputChoice.value === "physionet"
+        ? !!physionetDataset.value && !!physionetPrefix.value
         : isPortal.value
         ? !!portalDataset.value
         : inputChoice.value === "none";
@@ -665,6 +668,16 @@ const dandiLabel = computed(() => {
   const d = dandiDataset.value;
   if (!d) return "";
   return `${d.name} (DANDI:${d.id}${dandiPrefix.value ? `/${dandiPrefix.value}` : ""}, ${d.version})`;
+});
+
+// A PhysioNet project's version, chosen with PhysionetPicker: a view of a
+// folder of it, the project being its own Open Data entry.
+const physionetDataset = part("physionet", "dataset"); // a listOpenData entry
+const physionetPrefix = part("physionet", "prefix"); // its version's folder or one below
+const physionetLabel = computed(() => {
+  const d = physionetDataset.value;
+  if (!d) return "";
+  return `${d.title} (${d.name}/${physionetPrefix.value.replace(/\/$/, "")})`;
 });
 
 // A SPARC or Epilepsy.Science dataset, chosen with PortalPicker: a view of
@@ -1018,6 +1031,8 @@ const soFar = computed(() => {
         ? (bossdbPicks.value.length ? bossdbViewName(bossdbPicks.value) : "BossDB")
         : inputChoice.value === "dandi"
         ? dandiLabel.value || "DANDI"
+        : inputChoice.value === "physionet"
+        ? physionetLabel.value || "PhysioNet"
         : isPortal.value
         ? portalLabel.value || DATA_PLATFORMS[inputChoice.value].name
         : inputChoice.value === "dataset"
@@ -1156,6 +1171,16 @@ async function execute() {
         version: dandiDataset.value.version,
         title: dandiViewTitle(dandiDataset.value),
         prefix: dandiPrefix.value,
+      });
+      personalSources[dataSourceNodes.value[0].id] = viewDataSource(view);
+    }
+    // A PhysioNet project: a view of a version's folder of its entry.
+    const usesPhysionet = inputChoice.value === "physionet";
+    if (usesPhysionet && physionetDataset.value && dataSourceNodes.value.length) {
+      const view = await createOpenDataView({
+        dataset: physionetDataset.value.name,
+        title: physionetDataset.value.title,
+        prefix: physionetPrefix.value,
       });
       personalSources[dataSourceNodes.value[0].id] = viewDataSource(view);
     }
