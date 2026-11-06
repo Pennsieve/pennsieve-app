@@ -1823,25 +1823,12 @@ async function execute() {
     flex-direction: column;
     min-height: 0;
   }
-  > .wizard-step > .wizard-cards,
-  .discover-picker > :deep(.wizard-cards),
-  :deep(.on-cards),
-  :deep(.dd-cards),
-  :deep(.bd-cards),
-  :deep(.od-cards),
-  :deep(.pp-cards) {
+  /* The workspace's dataset list fills the column; a platform's picker
+     does so itself (PlatformPane). */
+  > .wizard-step > .wizard-cards {
     flex: 1 1 auto;
     min-height: 160px;
     max-height: none;
-  }
-  .discover-picker,
-  .on-picker,
-  .open-data-picker,
-  .pp-picker {
-    display: flex;
-    flex: 1 1 auto;
-    flex-direction: column;
-    min-height: 0;
   }
 
   > .wizard-step {

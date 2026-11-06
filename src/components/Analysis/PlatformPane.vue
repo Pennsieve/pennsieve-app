@@ -110,6 +110,29 @@ const title = computed(() => TITLES[props.platform] || `Choose a ${DATA_PLATFORM
   flex-direction: column;
   min-height: 0;
 }
+/* A picker fills the column, and its list of results the rest of it: the
+   dialog sets the height, the list scrolls inside. */
+.discover-picker,
+.on-picker,
+.open-data-picker,
+.pp-picker,
+.dd-picker,
+.bd-picker {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+}
+.discover-picker > :deep(.wizard-cards),
+:deep(.on-cards),
+:deep(.od-cards),
+:deep(.pp-cards),
+:deep(.dd-cards),
+:deep(.bd-cards) {
+  flex: 1 1 auto;
+  min-height: 160px;
+  max-height: none;
+}
 .pp__title {
   display: flex;
   align-items: center;

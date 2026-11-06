@@ -147,11 +147,13 @@ async function addData() {
 
 /* The platforms on the left, scrolling on their own; the picker fills the
    right. Stacked on a narrow screen. */
+/* The dialog's height less its title and buttons: the platforms scroll in
+   theirs, the picker's results in theirs. */
 .add {
   display: grid;
   grid-template-columns: minmax(240px, 300px) minmax(0, 1fr);
   gap: 24px;
-  height: min(70vh, 720px);
+  height: calc(90vh - 150px);
 }
 .add__side {
   min-height: 0;
@@ -162,7 +164,6 @@ async function addData() {
   display: flex;
   flex-direction: column;
   min-height: 0;
-  overflow-y: auto;
 }
 .add__note {
   margin: 12px 0 0;
