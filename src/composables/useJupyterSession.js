@@ -23,6 +23,7 @@ import {
   ContentsManager,
   ServerConnection,
 } from "@jupyterlab/services";
+import { PYTHON_PACKAGES_CODE, R_PACKAGES_CODE, parsePackages } from "@/components/Analysis/JupyterSession/environmentHelpers";
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const toWs = (u) => u.replace(/^http/i, "ws");
@@ -119,6 +120,23 @@ export async function postInputsFetch(kernelBaseUrl, token, files, { fetchFn = g
     status = await inputsResponse(resp);
   }
   return status;
+}
+
+// Stops downloads asked for (queued or under way): their partial files go,
+// and they're no longer in the list. A sidecar that can't cancel yet answers
+// 404 or 405: CancelUnavailable.
+//   DELETE {session}/pennsieve/inputs/fetch {"files": [{source, path}]} -> 200
+export class CancelUnavailable extends Error {}
+
+export async function deleteInputsFetch(kernelBaseUrl, token, files, { fetchFn = globalThis.fetch } = {}) {
+  const resp = await fetchFn(`${kernelBaseUrl}${INPUTS_PATH}`, {
+    method: "DELETE",
+    credentials: "include",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ files }),
+  });
+  if (resp.status === 404 || resp.status === 405) throw new CancelUnavailable("This session can't cancel downloads yet.");
+  return inputsResponse(resp);
 }
 
 export async function getInputsFetch(kernelBaseUrl, token, { fetchFn = globalThis.fetch } = {}) {
@@ -794,6 +812,21 @@ export function useJupyterSession() {
     cell.outputs.push(out);
   }
 
+  // The packages the kernel can import, asked silently (no cell, no history):
+  // [{ name, version }], or null when it printed none. It waits behind a
+  // cell that's running.
+  async function kernelPackages() {
+    if (!kernel) throw new Error("No active kernel.");
+    const r = /^r\b/i.test(kernelName.value || "");
+    let out = "";
+    const future = kernel.requestExecute({ code: r ? R_PACKAGES_CODE : PYTHON_PACKAGES_CODE, silent: true, store_history: false, stop_on_error: false });
+    future.onIOPub = (msg) => {
+      if (msg.header.msg_type === "stream" && msg.content.name === "stdout") out += msg.content.text;
+    };
+    await future.done;
+    return parsePackages(out);
+  }
+
   async function executeCell(id) {
     const cell = cells.value[indexOf(id)];
     if (!cell || cell.cell_type !== "code") return;
@@ -967,6 +1000,11 @@ export function useJupyterSession() {
     return getInputsFetch(kernelBaseUrl, sessionToken);
   }
 
+  function cancelInputs(files) {
+    if (!kernelBaseUrl) throw new Error("The session isn't connected.");
+    return deleteInputsFetch(kernelBaseUrl, sessionToken, files);
+  }
+
   // The session's view inputs (see sessionSourcesRequest).
   function inputSources() {
     if (!kernelBaseUrl) throw new Error("The session isn't connected.");
@@ -1038,6 +1076,7 @@ export function useJupyterSession() {
     connectPhase,
     kernelStatus,
     kernelName,
+    kernelPackages,
     error,
     cells,
     dirty,
@@ -1056,6 +1095,7 @@ export function useJupyterSession() {
     listDir,
     fetchInputs,
     inputsStatus,
+    cancelInputs,
     inputSources,
     addInputSource,
     removeInputSource,

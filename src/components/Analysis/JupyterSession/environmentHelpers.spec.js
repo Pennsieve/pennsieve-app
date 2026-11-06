@@ -7,8 +7,7 @@ import {
   packageName,
   packageSummary,
   switchBusy,
-  switchLabel,
-} from "./environmentHelpers";
+  switchLabel, parsePackages, fromEnvironment, requirementsText, PACKAGES_MARK, PYTHON_PACKAGES_CODE } from "./environmentHelpers";
 
 const py = (version, status = "ready", packages = ["numpy==2.1.0"], runtime = { language: "python", version: "3.12" }) => ({
   version, status, packages, runtime,
@@ -84,5 +83,31 @@ describe("environments on a GPU session", () => {
     expect(gpuEnvironmentWarning(["pandas"])).toBe("");
     expect(gpuEnvironmentWarning(["torch==2.4"])).toMatch(/^This environment brings its own torch\. .*Leave it out/);
     expect(gpuEnvironmentWarning(["torch", "jax"])).toMatch(/own torch and jax\. .*Leave them out/);
+  });
+});
+
+describe("installed packages", () => {
+  it("reads the kernel's list from its marked line", () => {
+    const out = `noise\n${PACKAGES_MARK}[["numpy","2.1.0"],["Pandas","2.2.3"],["aiohttp","3.10"]]\n`;
+    expect(parsePackages(out)).toEqual([
+      { name: "aiohttp", version: "3.10" },
+      { name: "numpy", version: "2.1.0" },
+      { name: "Pandas", version: "2.2.3" },
+    ]);
+    expect(parsePackages("no list")).toBe(null);
+    expect(parsePackages(`${PACKAGES_MARK}[not json`)).toBe(null);
+  });
+
+  it("marks the environment's own, by name", () => {
+    const marked = fromEnvironment([{ name: "scikit_image", version: "0.24" }, { name: "numpy", version: "2.1" }], ["scikit-image>=0.22"]);
+    expect(marked.map((p) => p.fromEnvironment)).toEqual([true, false]);
+  });
+
+  it("copies as pinned requirements", () => {
+    expect(requirementsText([{ name: "numpy", version: "2.1.0" }])).toBe("numpy==2.1.0\n");
+  });
+
+  it("asks silently, leaving nothing in the namespace", () => {
+    expect(PYTHON_PACKAGES_CODE).toContain("del __pennsieve_packages");
   });
 });

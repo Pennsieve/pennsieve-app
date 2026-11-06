@@ -29,6 +29,24 @@ describe("stackCode", () => {
     );
     expect(stackCode({ ...zarr, region: undefined })).toContain('storage_options={"anon": True})');
   });
+  it("opens a whole-slide image with highdicom, a region at a time", () => {
+    const slide = { cratePath: "TCGA-A1/SM (sm-12345)/", location: "s3://idc-open-data-two/sm-12345678/", region: "us-east-1", format: "dicom-wsi" };
+    const code = stackCode(slide);
+    expect(code).toContain('fs = s3fs.S3FileSystem(anon=True, default_block_size=500_000, client_kwargs={"region_name": "us-east-1"})');
+    expect(code).toContain('levels = sorted(fs.ls("s3://idc-open-data-two/sm-12345678/"), key=fs.size)');
+    expect(code).toContain("hd.imread(fs.open(levels[-1], \"rb\"), lazy_frame_retrieval=True)");
+    expect(code).toContain("# TCGA-A1/SM (sm-12345): a whole-slide image");
+    // highdicom counts from 1.
+    expect(code).toContain("get_total_pixel_matrix(row_start=1, row_end=513, column_start=1, column_end=513)");
+  });
+
+  it("opens a precomputed volume with CloudVolume over https", () => {
+    const em = { cratePath: "Dataset_1/em/", location: "s3://bossdb-open-data/witvliet2020/Dataset_1/em/", region: "us-east-1", format: "neuroglancer-precomputed" };
+    expect(stackCode(em, "Python 3.12.3")).toBe(
+      'from cloudvolume import CloudVolume\n# Dataset_1/em: a precomputed volume, read in place (mip 0 is full resolution)\nvol = CloudVolume("precomputed://https://s3.us-east-1.amazonaws.com/bossdb-open-data/witvliet2020/Dataset_1/em", mip=0, progress=False)'
+    );
+  });
+
   it("gives its URL in R", () => {
     expect(stackCode(zarr, "R 4.4.1")).toBe('# micr/a.ome.zarr: read it in place (us-east-2, no credentials)\n"s3://dandiarchive/zarr/56/"');
   });

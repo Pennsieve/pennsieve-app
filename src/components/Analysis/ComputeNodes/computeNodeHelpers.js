@@ -298,3 +298,16 @@ export function groupMyNodes(nodes = [], profile = null) {
   for (const n of nodes) (!n.platform && mine(n) ? own : shared).push(n);
   return { own, shared };
 }
+
+// A compute node's AWS region: account-service doesn't record it, but its
+// queue's URL (https://sqs.<region>.amazonaws.com/...; queue.amazonaws.com,
+// SQS's legacy host, is us-east-1's) and its gateway's
+// (https://<id>.lambda-url.<region>.on.aws/) name it. "" when unknown.
+export function nodeRegion(cn) {
+  if (cn?.region) return cn.region;
+  if (/^https:\/\/queue\.amazonaws\.com\//.test(String(cn?.queueUrl || ""))) return "us-east-1";
+  const m =
+    String(cn?.queueUrl || "").match(/^https:\/\/sqs\.([a-z0-9-]+)\.amazonaws\.com\//) ||
+    String(cn?.computeNodeGatewayUrl || "").match(/\.lambda-url\.([a-z0-9-]+)\.on\.aws/);
+  return m ? m[1] : "";
+}

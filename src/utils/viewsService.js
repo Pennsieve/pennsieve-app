@@ -211,6 +211,57 @@ export async function createDandiView({ dandiset, version, title, prefix = '' },
   })
 }
 
+// A view made for one run of several folders of an Open Data dataset (at
+// most 20), named name: each folder a source, its files at their paths in
+// the dataset under open-data-<name>/ (views-service refuses overlapping
+// folders). One folder is createOpenDataView's.
+export async function createOpenDataViewOf({ dataset, name, prefixes = [] }, options = {}) {
+  const ps = prefixes.map(openDataPrefix)
+  return viewsRequest('/me', {
+    ...options,
+    method: 'POST',
+    body: {
+      name,
+      sources: ps.map((p) => ({ kind: 'openData', dataset, ...(p && { prefix: p }) })),
+      lifecycle: 'run',
+    },
+  })
+}
+
+// A view made for one run of some files of an Open Data dataset, named
+// name: each group ({ prefix, paths, folder, names, bucket, stack }) one
+// source. With paths, views-service reads those files by their keys
+// (prefix + path, at most 100 a group); without, all of the prefix. They
+// sit at their paths below the prefix, or in folder (at their names, with
+// paths: an ENCODE experiment's files, spread across dated folders); in a
+// view of several groups, under open-data-<name>/. names (path -> file
+// name) renames those it names (a CELLxGENE dataset's <uuid>.h5ad); bucket
+// picks one of the dataset's buckets; stack takes the prefix whole as a
+// stack of that format, read in place (an IDC slide: dicom-wsi).
+export async function createOpenDataFilesView({ dataset, name, groups = [] }, options = {}) {
+  return viewsRequest('/me', {
+    ...options,
+    method: 'POST',
+    body: {
+      name,
+      sources: groups.map(({ prefix = '', paths = [], folder = '', names = null, bucket = '', stack = '' }) => {
+        const p = openDataPrefix(prefix)
+        return {
+          kind: 'openData',
+          dataset,
+          ...(p && { prefix: p }),
+          ...(paths.length && { paths }),
+          ...(folder && { folder }),
+          ...(names && { names }),
+          ...(bucket && { bucket }),
+          ...(stack && { stack }),
+        }
+      }),
+      lifecycle: 'run',
+    },
+  })
+}
+
 // A view made for one run of an Open Data dataset's files under prefix (all
 // of them when empty). views-service lists them from the dataset's public
 // bucket when the view is made; they sit under open-data-<name>/.

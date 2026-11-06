@@ -113,7 +113,7 @@ const subjectsLine = (n) => (n ? `${n} subject${n === 1 ? "" : "s"}` : "");
       <p v-if="count != null && !loading" class="on-count">
         {{ count.toLocaleString("en-US") }} dataset{{ count === 1 ? "" : "s" }}
       </p>
-      <div class="on-cards">
+      <div class="on-cards pp-list">
         <button v-for="d in results" :key="d.id" type="button" class="on-card" @click="choose(d)">
           <span class="on-card__name">{{ d.name }}</span>
           <span class="on-meta">

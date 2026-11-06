@@ -1,5 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
+  sessionRestrictions,
+  nodeStatusReason,
   notebooksEmptyState,
   launchableKernels,
   offlineNote,
@@ -457,5 +459,43 @@ describe("notebooksEmptyState", () => {
   });
   it("keeps showing a state while refreshing a list it has", () => {
     expect(notebooksEmptyState({ loading: true, runs: [{ status: "SUCCEEDED" }] })).toBe("idle");
+  });
+});
+
+describe("sessionRestrictions", () => {
+  it("says what a compliant node's session can't do", () => {
+    const r = sessionRestrictions({ deploymentMode: "Compliant", region: "us-east-1" });
+    expect(r.title).toMatch(/compliant node, with no internet access/);
+    expect(r.items).toHaveLength(4);
+    expect(r.items[0]).toMatch(/pip, conda, install.packages/);
+    // Every platform whose data sits in one region: those there, and not.
+    expect(r.items[2]).toBe(
+      "Data: your workspace's datasets, Pennsieve Discover, and public data on AWS in us-east-1. That includes SPARC, Epilepsy.Science, OpenNeuro, BossDB, PhysioNet, Human Cell Atlas and Imaging Data Commons; DANDI (us-east-2), CELLxGENE (us-west-2) and ENCODE (us-west-2) can't be read."
+    );
+    // Its region from its queue, as account-service sends it.
+    expect(sessionRestrictions({ deploymentMode: "compliant", queueUrl: "https://sqs.us-west-2.amazonaws.com/1/q" }).items[2]).toMatch(
+      /in us-west-2\. That includes CELLxGENE and ENCODE; .*DANDI \(us-east-2\).* can't be read\.$/
+    );
+    expect(sessionRestrictions({ deploymentMode: "compliant" }).items[2]).toMatch(/in the node's region\.$/);
+  });
+
+  it("says nothing for other nodes", () => {
+    expect(sessionRestrictions({ deploymentMode: "secure", region: "us-east-1" })).toBe(null);
+    expect(sessionRestrictions({ deploymentMode: "basic" })).toBe(null);
+    expect(sessionRestrictions(null)).toBe(null);
+  });
+});
+
+describe("nodeStatusReason", () => {
+  it("says why a node can't take a session now", () => {
+    expect(nodeStatusReason({ status: "Updating" })).toBe("Being updated: try again in a few minutes");
+    expect(nodeStatusReason({ status: "Destroying" })).toBe("Being deleted");
+    expect(nodeStatusReason({ status: "Failed" })).toBe("Its last deploy or update failed");
+    expect(nodeStatusReason({ status: "Paused" })).toBe("Paused");
+  });
+  it("says nothing for an enabled node or an unknown status", () => {
+    expect(nodeStatusReason({ status: "Enabled" })).toBe("");
+    expect(nodeStatusReason({})).toBe("");
+    expect(nodeStatusReason(null)).toBe("");
   });
 });

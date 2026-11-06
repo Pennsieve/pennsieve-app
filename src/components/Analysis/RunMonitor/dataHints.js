@@ -2,14 +2,13 @@
 // guides the later steps: which kernels can take it, which compute nodes
 // can reach it, how much disk it needs, and whether a GPU may help.
 import { hasInterface } from "./workflowInterface";
+import { nodeRegion } from "../ComputeNodes/computeNodeHelpers";
 
-// The data platforms whose files come from public S3 buckets.
-const PUBLIC_BUCKET_INPUTS = new Set(["openNeuro", "sparc", "epilepsyScience", "openData", "dandi"]);
-
-// Whether a kernel's workflow can start with the input chosen (dataset,
-// public, openNeuro, sparc, epilepsyScience, openData, dandi or none). A workflow that declares its input
-// takes any of them, and none when it's optional; one that doesn't reads a
-// workspace dataset's files, or in My Workspace a public dataset or nothing.
+// Whether a kernel's workflow can start with the input chosen (dataset, a
+// data platform's key, public for Discover's, or none). A workflow that
+// declares its input takes any of them, and none when it's optional; one
+// that doesn't reads a workspace dataset's files, or in My Workspace a
+// public dataset or nothing.
 export function acceptsInput(wf, choice, { personal = false } = {}) {
   if (hasInterface(wf)) {
     const input = wf.inputs?.[0];
@@ -21,40 +20,36 @@ export function acceptsInput(wf, choice, { personal = false } = {}) {
   return false;
 }
 
-// Where the chosen data lives, when it's known: OpenNeuro's, SPARC's and
-// Epilepsy.Science's copies are in us-east-1, the DANDI Archive's in
-// us-east-2, an Open Data dataset says (its regions).
-const US_EAST_1_INPUTS = new Set(["openNeuro", "sparc", "epilepsyScience"]);
-export function dataRegions(choice, { openDataDataset } = {}) {
-  if (US_EAST_1_INPUTS.has(choice)) return ["us-east-1"];
-  if (choice === "dandi") return ["us-east-2"];
-  if (choice === "openData") return openDataDataset?.regions || [];
-  return [];
+// Why a compute node can't take the chosen data ("" when it can); data is
+// what the chosen data says (platforms platformData). A compliant node has
+// no internet access: its S3 gateway reaches public buckets only in its own
+// region, so public data must be there.
+export function nodeDataReason(cn, data = {}) {
+  const compliant = (cn?.deploymentMode || "").toLowerCase() === "compliant";
+  if (!compliant || !data.publicBucket) return "";
+  const region = nodeRegion(cn);
+  const regions = data.regions || [];
+  if (region && regions.length && regions.every((r) => r === region)) return "";
+  const where = regions.length ? `data in ${regions.join(", ")}` : "this data";
+  return `Can't reach ${where} (no internet access: only public data in ${region || "its region"})`;
 }
 
-// Why a compute node can't take the chosen data ("" when it can): a
-// compliant node has no internet access, so it can't read a public bucket.
-export function nodeDataReason(cn, choice) {
-  const compliant = (cn?.deploymentMode || "").toLowerCase() === "compliant";
-  if (compliant && PUBLIC_BUCKET_INPUTS.has(choice)) return "Can't reach public data (no internet access)";
-  return "";
+// Why none of the user's notebook nodes can take the chosen data ("" when
+// one can, or before any are listed): said at the data step, so the node
+// step never dead-ends.
+export function dataUnreachable(nodes = [], data = {}) {
+  if (!nodes.length) return "";
+  if (nodes.some((cn) => !nodeDataReason(cn, data))) return "";
+  const regions = data.regions || [];
+  return `Not reachable from your compute nodes${regions.length ? ` (${regions.join(", ")})` : ""}`;
 }
 
 // A note on a compute node for the chosen data ("" for none): reading data
 // from another region costs cross-region transfer.
 export function nodeDataNote(cn, regions = []) {
-  if (!cn?.region || !regions.length || regions.includes(cn.region)) return "";
-  return `Data in ${regions.join(", ")}, node in ${cn.region}: transfer costs apply`;
-}
-
-// The chosen data's size in bytes, when it's known: the whole dataset (the
-// user may download less).
-export function dataSize(choice, { publicDataset, openNeuroDataset, dandiDataset, selectedDataset } = {}) {
-  if (choice === "public") return publicDataset?.size || null;
-  if (choice === "openNeuro") return openNeuroDataset?.size || null;
-  if (choice === "dandi") return dandiDataset?.size || null;
-  if (choice === "dataset") return selectedDataset?.storage || null;
-  return null;
+  const region = nodeRegion(cn);
+  if (!region || !regions.length || regions.includes(region)) return "";
+  return `Data in ${regions.join(", ")}, node in ${region}: transfer costs apply`;
 }
 
 // Room a session needs besides its data: its environment and the user's
@@ -68,15 +63,4 @@ export function suggestedDisk(bytes, options = []) {
   const sizes = options.map((o) => o.value).sort((a, b) => a - b);
   const need = bytes * 1.1 + DISK_HEADROOM_BYTES;
   return sizes.find((gib) => gib * 2 ** 30 >= need) ?? sizes.at(-1);
-}
-
-// Whether the data is imaging, where a GPU may help (deep learning,
-// registration, segmentation): from OpenNeuro's modalities, or an Open Data
-// dataset's or a SPARC or Epilepsy.Science dataset's keywords.
-const IMAGING = /^(mri|pet|ct|microscopy|imaging|medical imaging|computer vision|cryo-em|histopathology|whole slide imaging)$/i;
-export function isImagingData(choice, { openNeuroDataset, openDataDataset, portalDataset } = {}) {
-  if (choice === "openNeuro") return (openNeuroDataset?.modalities || []).some((m) => IMAGING.test(m));
-  if (choice === "sparc" || choice === "epilepsyScience") return (portalDataset?.keywords || []).some((k) => IMAGING.test(k));
-  if (choice === "openData") return (openDataDataset?.keywords || []).some((k) => IMAGING.test(k));
-  return false;
 }
