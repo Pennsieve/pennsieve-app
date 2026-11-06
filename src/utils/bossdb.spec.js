@@ -1,38 +1,40 @@
 import { describe, it, expect, vi } from "vitest";
 import { bossdbCollections, searchBossdb, bossdbExperiments, bossdbChannels, countBossdb } from "./bossdb";
 
-// BossDB's API, as it answers (abridged), by path.
+// BossDB's API, as it answers the public token (abridged), by path: it
+// can't read every public experiment.
 const api = {
-  "/collection/": { collections: ["witvliet2020", "Kasthuri", "not_in_bucket", "kasthuri2015"] },
-  "/collection/witvliet2020/": { name: "witvliet2020", experiments: ["Dataset_2", "Dataset_1", "Dataset_10"] },
   "/collection/witvliet2020/experiment/Dataset_1/": {
     name: "Dataset_1",
     description: "ATUM-SEM volume of a C. elegans L1 larva brain.",
-    channels: ["em", "segmentation", "elsewhere"],
+    channels: ["em", "segmentation"],
     num_hierarchy_levels: 4,
   },
-  "/collection/witvliet2020/experiment/Dataset_2/": { name: "Dataset_2", channels: ["em"] },
-  "/collection/witvliet2020/experiment/Dataset_1/channel/em/": {
-    name: "em", type: "image", datatype: "uint8", bucket: "bossdb-open-data", cv_path: "witvliet2020/Dataset_1/em",
-  },
-  "/collection/witvliet2020/experiment/Dataset_1/channel/segmentation/": {
-    name: "segmentation", type: "annotation", datatype: "uint64", bucket: "bossdb-open-data", cv_path: "/witvliet2020/Dataset_1/segmentation/",
-  },
-  "/collection/witvliet2020/experiment/Dataset_1/channel/elsewhere/": { name: "elsewhere", type: "image", storage_type: "spdb" },
+  "/collection/witvliet2020/experiment/Dataset_1/channel/em/": { name: "em", type: "image", datatype: "uint8" },
+  "/collection/witvliet2020/experiment/Dataset_1/channel/segmentation/": { name: "segmentation", type: "annotation", datatype: "uint64" },
 };
-const fetchFn = vi.fn((url, init) => {
-  const path = url.replace("https://api.bossdb.io/v1", "");
-  const body = api[path];
-  return Promise.resolve({ ok: !!body, status: body ? 200 : 404, json: () => Promise.resolve(body || { detail: "Not found" }), init });
+const fetchFn = vi.fn((url) => {
+  const body = api[url.replace("https://api.bossdb.io/v1", "")];
+  return Promise.resolve({
+    ok: !!body,
+    status: body ? 200 : 403,
+    json: () => Promise.resolve(body || { status: 403, message: "Missing read permissions on the resource" }),
+  });
 });
-const listFolder = vi.fn().mockResolvedValue({ folders: ["Kasthuri", "kasthuri2015", "witvliet2020", "zhang2025"] });
+// The Open Data bucket's folders, by prefix.
+const bucket = {
+  "": ["witvliet2020/", "Kasthuri/", "alonso-nanclares2024/"],
+  "witvliet2020/": ["Dataset_2", "Dataset_1", "Dataset_10"],
+  "witvliet2020/Dataset_1/": ["segmentation", "em"],
+  "alonso-nanclares2024/AB2/": ["MEC_L1_S1_REG"],
+};
+const listFolder = vi.fn(({ prefix = "" }) => Promise.resolve({ folders: bucket[prefix] || [] }));
 
 describe("BossDB", () => {
-  it("lists the public collections that are in the Open Data bucket", async () => {
-    expect(await bossdbCollections({ fetchFn, listFolder })).toEqual(["Kasthuri", "kasthuri2015", "witvliet2020"]);
-    expect(fetchFn.mock.calls[0][1].headers.Authorization).toBe("Token public");
+  it("lists the collections in the Open Data bucket", async () => {
+    expect(await bossdbCollections({ listFolder })).toEqual(["alonso-nanclares2024", "Kasthuri", "witvliet2020"]);
     expect(listFolder).toHaveBeenCalledWith({ dataset: "bossdb" });
-    expect(await countBossdb({ fetchFn, listFolder })).toBe(3);
+    expect(await countBossdb({ listFolder })).toBe(3);
   });
 
   it("searches collections by name", () => {
@@ -40,19 +42,22 @@ describe("BossDB", () => {
     expect(searchBossdb(["a", "b"], "")).toEqual(["a", "b"]);
   });
 
-  it("describes a collection's experiments, in order", async () => {
-    const list = await bossdbExperiments("witvliet2020", { fetchFn });
+  it("lists a collection's experiments from the bucket, described where the API can", async () => {
+    const list = await bossdbExperiments("witvliet2020", { fetchFn, listFolder });
     expect(list.map((e) => e.name)).toEqual(["Dataset_1", "Dataset_2", "Dataset_10"]);
-    expect(list[0]).toEqual({ name: "Dataset_1", description: "ATUM-SEM volume of a C. elegans L1 larva brain.", channels: ["em", "segmentation", "elsewhere"], levels: 4 });
-    // One BossDB couldn't describe is still listed.
-    expect(list[2]).toEqual({ name: "Dataset_10", description: "", channels: [], levels: 0 });
+    expect(list[0]).toEqual({ name: "Dataset_1", description: "ATUM-SEM volume of a C. elegans L1 larva brain.", channels: ["em", "segmentation"], levels: 4 });
+    expect(fetchFn.mock.calls[0][1].headers.Authorization).toBe("Token public");
+    // One the public token can't read is listed without.
+    expect(list[1]).toEqual({ name: "Dataset_2", description: "", channels: null, levels: 0 });
   });
 
-  it("offers only the channels stored in the Open Data bucket, with their folders", async () => {
-    const channels = await bossdbChannels("witvliet2020", "Dataset_1", ["em", "segmentation", "elsewhere"], { fetchFn });
-    expect(channels).toEqual([
+  it("lists an experiment's channels from the bucket, typed where the API can", async () => {
+    expect(await bossdbChannels("witvliet2020", "Dataset_1", { fetchFn, listFolder })).toEqual([
       { name: "em", type: "image", datatype: "uint8", description: "", path: "witvliet2020/Dataset_1/em/" },
       { name: "segmentation", type: "segmentation", datatype: "uint64", description: "", path: "witvliet2020/Dataset_1/segmentation/" },
+    ]);
+    expect(await bossdbChannels("alonso-nanclares2024", "AB2", { fetchFn, listFolder })).toEqual([
+      { name: "MEC_L1_S1_REG", type: "", datatype: "", description: "", path: "alonso-nanclares2024/AB2/MEC_L1_S1_REG/" },
     ]);
   });
 });

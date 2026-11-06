@@ -1,7 +1,7 @@
 <script setup>
-// Choosing a BossDB volume with BossDB's API (utils/bossdb): a collection,
-// then one of its experiments (described), then one of its channels stored
-// in the Open Data bucket. The notebook takes that channel's folder of the
+// Choosing a BossDB volume (utils/bossdb): a collection, then one of its
+// experiments, then one of its channels, as the Open Data bucket has them,
+// described where BossDB's API can. The notebook takes that channel's folder of the
 // bossdb entry, which views-service takes whole as a precomputed volume,
 // read in place. Used by the new notebook dialog and the running session's
 // Inputs panel.
@@ -63,7 +63,7 @@ function openExperiment(e) {
   experiment.value = e;
   channels.value = [];
   run("channels", async (current) => {
-    const list = await bossdbChannels(collection.value, e.name, e.channels);
+    const list = await bossdbChannels(collection.value, e.name);
     if (current()) channels.value = list;
   });
 }
@@ -157,8 +157,8 @@ function up(to) {
         <button v-for="e in experiments" :key="e.name" type="button" class="bd-card" @click="openExperiment(e)">
           <span class="bd-card__name">{{ e.name }}</span>
           <span v-if="e.description" class="bd-desc">{{ e.description }}</span>
-          <span class="bd-meta">
-            <span>{{ e.channels.length }} channel{{ e.channels.length === 1 ? "" : "s" }}</span>
+          <span v-if="e.channels || e.levels" class="bd-meta">
+            <span v-if="e.channels">{{ e.channels.length }} channel{{ e.channels.length === 1 ? "" : "s" }}</span>
             <span v-if="e.levels">{{ e.levels }} resolution levels</span>
           </span>
         </button>
@@ -180,7 +180,7 @@ function up(to) {
         </button>
         <div v-if="loading" class="bd-msg">Loading channels…</div>
         <div v-else-if="error" class="bd-msg">{{ error }}</div>
-        <div v-else-if="!channels.length" class="bd-msg">None of this experiment's channels are in the Open Data bucket</div>
+        <div v-else-if="!channels.length" class="bd-msg">This experiment has no volumes in the Open Data bucket</div>
       </div>
     </template>
   </div>
