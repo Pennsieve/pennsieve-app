@@ -147,7 +147,7 @@ const nextBanner = (d) => (bannerTry.value = { ...bannerTry.value, [d.id]: (bann
       <p v-if="!loading && !error && ids.length" class="pp-count">
         {{ query.trim() ? `${matches.length.toLocaleString("en-US")} of ` : "" }}{{ ids.length.toLocaleString("en-US") }} datasets
       </p>
-      <div class="pp-cards">
+      <div class="pp-cards pp-list">
         <button v-for="d in results" :key="d.id" type="button" class="pp-card" @click="choose(d)">
           <span class="pp-banner">
             <img v-if="bannerOf(d)" :src="bannerOf(d)" alt="" loading="lazy" @error="nextBanner(d)" />

@@ -5,26 +5,38 @@
 
 export const isHidden = (entry) => (entry?.name || "").startsWith(".");
 
-// The entries to show, in the order given.
-export const visibleEntries = (entries, showHidden = false) =>
-  showHidden ? entries || [] : (entries || []).filter((e) => !isHidden(e));
+// Not on the disk: a file or folder a view holds that isn't downloaded. A
+// stack (read in place, never downloaded) isn't one.
+export const isRemote = (entry) => !!entry?.virtual && entry.type !== "stack";
 
-// The user's choice, remembered in this browser. Storage can be unavailable
-// (a private window, blocked site data): then it's off, and not kept.
+// The entries to show, in the order given: without hidden ones unless
+// showHidden, and without remote ones when onlyLocal.
+export const visibleEntries = (entries, showHidden = false, onlyLocal = false) =>
+  (entries || []).filter((e) => (showHidden || !isHidden(e)) && !(onlyLocal && isRemote(e)));
+
+// The user's choices, remembered in this browser. Storage can be
+// unavailable (a private window, blocked site data): then they're off, and
+// not kept.
 const SHOW_HIDDEN_KEY = "pennsieve.sessionFiles.showHidden";
+const ONLY_LOCAL_KEY = "pennsieve.sessionFiles.onlyDownloaded";
 
-export function readShowHidden(storage = globalThis.localStorage) {
+function readFlag(key, storage) {
   try {
-    return storage?.getItem(SHOW_HIDDEN_KEY) === "true";
+    return storage?.getItem(key) === "true";
   } catch {
     return false;
   }
 }
 
-export function writeShowHidden(value, storage = globalThis.localStorage) {
+function writeFlag(key, value, storage) {
   try {
-    storage?.setItem(SHOW_HIDDEN_KEY, value ? "true" : "false");
+    storage?.setItem(key, value ? "true" : "false");
   } catch {
     // not kept
   }
 }
+
+export const readShowHidden = (storage = globalThis.localStorage) => readFlag(SHOW_HIDDEN_KEY, storage);
+export const writeShowHidden = (value, storage = globalThis.localStorage) => writeFlag(SHOW_HIDDEN_KEY, value, storage);
+export const readOnlyLocal = (storage = globalThis.localStorage) => readFlag(ONLY_LOCAL_KEY, storage);
+export const writeOnlyLocal = (value, storage = globalThis.localStorage) => writeFlag(ONLY_LOCAL_KEY, value, storage);

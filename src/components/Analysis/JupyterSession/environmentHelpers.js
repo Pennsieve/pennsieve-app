@@ -93,3 +93,48 @@ export function gpuEnvironmentWarning(packages) {
   const names = f.length === 1 ? f[0] : `${f.slice(0, -1).join(", ")} and ${f[f.length - 1]}`;
   return `This environment brings its own ${names}. On a GPU notebook it can replace the image's CUDA build, so your code may run on the CPU. Leave ${f.length === 1 ? "it" : "them"} out of the environment to use the GPU.`;
 }
+
+// Asking the kernel which packages it can import: silent code (no cell, no
+// history) that prints one line, PACKAGES_MARK then JSON [[name, version]],
+// and leaves nothing behind in the user's namespace.
+export const PACKAGES_MARK = "__PENNSIEVE_PACKAGES__";
+export const PYTHON_PACKAGES_CODE = `def __pennsieve_packages():
+    import importlib.metadata as md, json
+    seen = {}
+    for d in md.distributions():
+        name = d.metadata.get("Name")
+        if name and name.lower() not in seen:
+            seen[name.lower()] = [name, d.version]
+    print("${PACKAGES_MARK}" + json.dumps(list(seen.values())))
+__pennsieve_packages()
+del __pennsieve_packages`;
+export const R_PACKAGES_CODE = `local({
+  p <- installed.packages()[, c("Package", "Version"), drop = FALSE]
+  p <- p[!duplicated(p[, "Package"]), , drop = FALSE]
+  cat("${PACKAGES_MARK}[", paste0('["', p[, "Package"], '","', p[, "Version"], '"]', collapse = ","), "]\\n", sep = "")
+})`;
+
+// The packages from what the kernel printed: [{ name, version }], by name;
+// null when it printed no list.
+export function parsePackages(out) {
+  const line = String(out || "")
+    .split("\n")
+    .find((l) => l.startsWith(PACKAGES_MARK));
+  if (!line) return null;
+  try {
+    return JSON.parse(line.slice(PACKAGES_MARK.length))
+      .map(([name, version]) => ({ name, version }))
+      .sort((a, b) => a.name.localeCompare(b.name, "en", { sensitivity: "base" }));
+  } catch {
+    return null;
+  }
+}
+
+// Which of them the environment asked for (its specs, by name), to mark.
+export function fromEnvironment(packages, specs) {
+  const asked = new Set((specs || []).map((s) => packageName(s).toLowerCase().replace(/_/g, "-")));
+  return (packages || []).map((p) => ({ ...p, fromEnvironment: asked.has(p.name.toLowerCase().replace(/_/g, "-")) }));
+}
+
+// Pinned, one per line: to build the same environment elsewhere.
+export const requirementsText = (packages) => (packages || []).map((p) => `${p.name}==${p.version}`).join("\n") + "\n";

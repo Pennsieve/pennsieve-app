@@ -3,7 +3,8 @@
 // catalog, and the folder of it to take: the whole dataset, or a folder
 // opened one level at a time (the folder shown is the one chosen). A view of
 // it is made from these (viewsService createOpenDataView). Used by the new
-// notebook dialog and the running session's Inputs panel.
+// notebook dialog and the running session's Inputs panel, for the whole
+// catalog or a platform's part of it (only: the Allen Institute's).
 import { computed, onMounted, ref } from "vue";
 import { openDataCatalog, searchOpenData } from "@/utils/viewsService";
 import OpenDataFolders from "./OpenDataFolders.vue";
@@ -11,6 +12,17 @@ import OpenDataFolders from "./OpenDataFolders.vue";
 // The chosen dataset (a listOpenData entry) and folder ("" for all of it,
 // else ending in /).
 const dataset = defineModel("dataset", { default: null });
+const props = defineProps({
+  // The catalog's entries to offer (a listOpenData entry => boolean); all
+  // by default.
+  only: { type: Function, default: null },
+  // Whose datasets they are, for the search box and its messages.
+  source: { type: String, default: "AWS Open Data" },
+  // A note on a dataset ("" for none): the new notebook dialog's, when none
+  // of the user's nodes can reach it.
+  cardNote: { type: Function, default: null },
+});
+const note = (d) => props.cardNote?.(d) || "";
 const prefix = defineModel("prefix", { type: String, default: "" });
 
 const catalog = ref([]);
@@ -25,10 +37,11 @@ async function loadOpenData() {
   openDataLoading.value = true;
   openDataError.value = "";
   try {
-    catalog.value = await openDataCatalog();
+    const list = await openDataCatalog();
+    catalog.value = props.only ? list.filter(props.only) : list;
   } catch (err) {
     console.error("Failed to load the Open Data catalog:", err);
-    openDataError.value = "The AWS Open Data catalog couldn't be loaded.";
+    openDataError.value = `The ${props.source} catalog couldn't be loaded.`;
   } finally {
     openDataLoading.value = false;
   }
@@ -66,6 +79,7 @@ onMounted(() => {
             <a :href="dataset.url" target="_blank" rel="noopener">registry.opendata.aws/{{ dataset.name }}</a>
             <span v-if="dataset.regions.length">{{ dataset.regions.join(", ") }}</span>
           </div>
+          <div v-if="note(dataset)" class="od-note">{{ note(dataset) }}</div>
           <div v-if="dataset.keywords.length" class="od-tags">
             <span v-for="k in dataset.keywords.slice(0, TAGS_SHOWN)" :key="k" class="od-tag">{{ k }}</span>
           </div>
@@ -86,8 +100,8 @@ onMounted(() => {
 
     <!-- Choosing one: search the catalog. -->
     <template v-else>
-      <el-input v-model="openDataQuery" placeholder="Search AWS Open Data..." clearable class="od-search" />
-      <div class="od-cards">
+      <el-input v-model="openDataQuery" :placeholder="`Search ${source}...`" clearable class="od-search" />
+      <div class="od-cards pp-list">
         <div v-if="openDataLoading" class="od-msg">Loading the catalog…</div>
         <div v-else-if="openDataError" class="od-msg">{{ openDataError }}</div>
         <button
@@ -104,6 +118,7 @@ onMounted(() => {
               <span v-if="d.publisher">{{ d.publisher }}</span>
               <span v-if="d.regions.length">{{ d.regions.join(", ") }}</span>
             </span>
+            <span v-if="note(d)" class="od-note">{{ note(d) }}</span>
             <span v-if="d.summary" class="od-summary">{{ d.summary }}</span>
             <span v-if="d.keywords.length" class="od-tags">
               <span v-for="k in d.keywords.slice(0, TAGS_SHOWN)" :key="k" class="od-tag">{{ k }}</span>
@@ -111,7 +126,7 @@ onMounted(() => {
           </span>
         </button>
         <div v-if="!openDataLoading && !openDataError && openDataResults.length === 0" class="od-msg">
-          No AWS Open Data datasets found
+          No {{ source }} datasets found
         </div>
       </div>
     </template>
@@ -176,6 +191,10 @@ onMounted(() => {
   flex-direction: column;
   gap: 3px;
   min-width: 0;
+}
+.od-note {
+  font-size: 12px;
+  color: theme.$orange_2;
 }
 .od-summary {
   font-size: 12px;

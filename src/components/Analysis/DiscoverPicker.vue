@@ -121,7 +121,7 @@ const formatSize = (bytes) => {
       class="wizard-search"
       @input="onPublicSearch"
     />
-    <div class="wizard-cards">
+    <div class="wizard-cards pp-list">
       <div v-if="publicLoading" class="wizard-cards-loading">Searching...</div>
       <div
         v-for="ds in publicResults"

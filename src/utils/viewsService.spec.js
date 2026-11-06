@@ -9,6 +9,7 @@ import {
   listOpenData,
   searchOpenData,
   createOpenDataView,
+  createOpenDataViewOf,
   createDandiView,
   listOpenDataFolder,
   openDataViewName,
@@ -181,6 +182,22 @@ describe("open data", () => {
     const whole = respond([201, view]);
     await createOpenDataView({ dataset: "openneuro", title: "OpenNeuro" }, { config, getToken, fetchFn: whole });
     expect(JSON.parse(whole.mock.calls[0][1].body).sources).toEqual([{ kind: "openData", dataset: "openneuro" }]);
+  });
+
+  it("makes a run view of several folders of one Open Data dataset", async () => {
+    const fetchFn = respond([201, { id: "v-3", version: 1 }]);
+    await createOpenDataViewOf(
+      { dataset: "bossdb", name: "BossDB: witvliet2020 (2 selections)", prefixes: ["witvliet2020/Dataset_1/em/", "/Kasthuri/"] },
+      { config, getToken, fetchFn }
+    );
+    expect(JSON.parse(fetchFn.mock.calls[0][1].body)).toEqual({
+      name: "BossDB: witvliet2020 (2 selections)",
+      sources: [
+        { kind: "openData", dataset: "bossdb", prefix: "witvliet2020/Dataset_1/em/" },
+        { kind: "openData", dataset: "bossdb", prefix: "Kasthuri/" },
+      ],
+      lifecycle: "run",
+    });
   });
 
   it("makes a run view of a dandiset version, all of it or a folder", async () => {
