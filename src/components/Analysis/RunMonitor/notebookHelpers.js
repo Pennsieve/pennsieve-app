@@ -45,6 +45,19 @@ export function offlineNote(cn) {
   return "No internet access: packages can't be installed from the notebook. Add them through an environment.";
 }
 
+// Why a node can't take a session now, by its status ("" when it can, or
+// its status isn't known): workflow-service refuses a run on any but an
+// enabled node.
+const NODE_STATUS_REASONS = {
+  pending: "Not ready yet",
+  updating: "Being updated: try again in a few minutes",
+  paused: "Paused",
+  disabled: "Disabled",
+  destroying: "Being deleted",
+  failed: "Its last deploy or update failed",
+};
+export const nodeStatusReason = (cn) => NODE_STATUS_REASONS[(cn?.status || "").toLowerCase()] || "";
+
 // A notebook's language for people.
 export function kernelLabel(kernel) {
   if (kernel === "python") return "Python";

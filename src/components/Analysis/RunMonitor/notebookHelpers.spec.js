@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
+  nodeStatusReason,
   notebooksEmptyState,
   launchableKernels,
   offlineNote,
@@ -457,5 +458,19 @@ describe("notebooksEmptyState", () => {
   });
   it("keeps showing a state while refreshing a list it has", () => {
     expect(notebooksEmptyState({ loading: true, runs: [{ status: "SUCCEEDED" }] })).toBe("idle");
+  });
+});
+
+describe("nodeStatusReason", () => {
+  it("says why a node can't take a session now", () => {
+    expect(nodeStatusReason({ status: "Updating" })).toBe("Being updated: try again in a few minutes");
+    expect(nodeStatusReason({ status: "Destroying" })).toBe("Being deleted");
+    expect(nodeStatusReason({ status: "Failed" })).toBe("Its last deploy or update failed");
+    expect(nodeStatusReason({ status: "Paused" })).toBe("Paused");
+  });
+  it("says nothing for an enabled node or an unknown status", () => {
+    expect(nodeStatusReason({ status: "Enabled" })).toBe("");
+    expect(nodeStatusReason({})).toBe("");
+    expect(nodeStatusReason(null)).toBe("");
   });
 });

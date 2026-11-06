@@ -54,6 +54,7 @@ import {
   notebookDiskLabel,
   notebookDiskHint,
   notebookProcessorConfigs,
+  nodeStatusReason,
 } from "./notebookHelpers";
 import { nodeGpu, gpuOffer, gpuName, gpuTaskResources } from "../ComputeNodes/computeNodeHelpers";
 import NodeTierBadge from "../ComputeNodes/NodeTierBadge.vue";
@@ -268,6 +269,8 @@ const nodeMustRun = computed(() => {
 const nodeCapacity = ref({});
 const nodeCapacityLabel = (cn) => capacityLabel(nodeCapacity.value[cn?.uuid]);
 const nodeReasons = (cn) => {
+  const status = nodeStatusReason(cn);
+  if (status) return [status];
   const reasons = nodeHardwareUnfit(cn, nodeMustRun.value, gateReason);
   const full = capacityReason(nodeCapacity.value[cn?.uuid]);
   const data = nodeDataReason(cn, inputChoice.value);
@@ -991,6 +994,8 @@ watch(visible, (open) => {
     if (!variantGate.value) fetchVariantGate(config.value.api2Url, useGetToken).then((g) => (variantGate.value = g));
     nodeCapacity.value = {};
     loadCapacity();
+    // Their statuses now: one may have started updating since the page opened.
+    store.dispatch("analysisModule/fetchComputeNodes", { force: true }).catch(() => {});
     if (!gpuTiers.value.length) {
       computeResourcesStore
         .fetchGpuTiers(store.getters.activeOrganization?.organization?.id)
