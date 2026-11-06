@@ -12,7 +12,17 @@ import { ArrowRight } from "@element-plus/icons-vue";
 import IconWarningCircle from "@/components/icons/IconWarningCircle.vue";
 import { environmentsServiceUrl, getEnvironment, listEnvironments } from "@/utils/environmentsService";
 import { SessionEnvironmentsUnavailable } from "@/composables/useJupyterSession";
-import { environmentChoices, gpuEnvironmentWarning, gpuFrameworks, matchesQuery, packageSummary, switchBusy, switchLabel } from "./environmentHelpers";
+import {
+  environmentChoices,
+  fromEnvironment,
+  gpuEnvironmentWarning,
+  gpuFrameworks,
+  matchesQuery,
+  packageSummary,
+  requirementsText,
+  switchBusy,
+  switchLabel,
+} from "./environmentHelpers";
 
 const props = defineProps({
   environmentState: { type: Function, required: true },
@@ -24,6 +34,8 @@ const props = defineProps({
   // A GPU session: environments that bring torch, tensorflow or jax are
   // warned about (their copy can replace the image's CUDA build).
   gpu: { type: Boolean, default: false },
+  // Asks the kernel which packages it can import ([{ name, version }]).
+  kernelPackages: { type: Function, default: null },
 });
 
 const available = ref(false); // the site has environments-service
@@ -46,6 +58,53 @@ const shown = computed(() => choices.value.filter((c) => matchesQuery(c, query.v
 const busy = computed(() => switchBusy(sw.value));
 const progress = computed(() => switchLabel(sw.value));
 const failed = computed(() => (sw.value?.state === "failed" ? sw.value.error : ""));
+
+/* ---------------------------------------------------- installed packages --- */
+// What the kernel can import, asked when the list opens (and on Refresh):
+// the image's, the environment's and any installed in the session. The
+// environment's own are marked.
+const packagesOpen = ref(false);
+const packages = ref(null); // [{ name, version, fromEnvironment }]
+const packagesLoading = ref(false);
+const packagesError = ref("");
+const packagesQuery = ref("");
+const currentSpecs = computed(() => {
+  if (!active.value) return [];
+  const choice = choices.value.find((c) => c.id === active.value.environmentId);
+  return choice?.version === active.value.version ? choice.packages : [];
+});
+const packagesShown = computed(() => {
+  const q = packagesQuery.value.trim().toLowerCase();
+  const list = fromEnvironment(packages.value || [], currentSpecs.value);
+  return q ? list.filter((p) => p.name.toLowerCase().includes(q)) : list;
+});
+const fromEnvCount = computed(() => fromEnvironment(packages.value || [], currentSpecs.value).filter((p) => p.fromEnvironment).length);
+
+async function loadPackages() {
+  if (!props.kernelPackages || packagesLoading.value) return;
+  packagesLoading.value = true;
+  packagesError.value = "";
+  try {
+    const list = await props.kernelPackages();
+    if (!list) throw new Error("The kernel didn't list its packages.");
+    packages.value = list;
+  } catch (e) {
+    packagesError.value = e?.message || String(e);
+  } finally {
+    packagesLoading.value = false;
+  }
+}
+function openPackages() {
+  packagesOpen.value = true;
+  packagesQuery.value = "";
+  if (!packages.value) loadPackages();
+}
+function copyRequirements() {
+  navigator.clipboard
+    ?.writeText(requirementsText(packages.value))
+    .then(() => ElMessage.success("Copied as requirements.txt"))
+    .catch(() => {});
+}
 
 // The active environment, named from the user's list (the sidecar knows ids).
 const current = computed(() => {
@@ -98,6 +157,7 @@ async function readState() {
   active.value = state.active;
   sw.value = state.switch;
   if (wasBusy && sw.value?.state === "done") {
+    packages.value = null; // the kernel restarted with others
     ElMessage.success(active.value ? `Using ${current.value?.name}. The kernel restarted.` : "Back to the image's packages. The kernel restarted.");
   }
   schedulePoll();
@@ -202,6 +262,11 @@ onBeforeUnmount(() => clearTimeout(pollTimer));
         </template>
       </div>
 
+      <!-- With no environment (or while choosing one): the image's packages. -->
+      <div v-if="kernelPackages && ready && !(current && !showPicker && !busy && choices.length)" class="env__actions env__actions--end">
+        <button class="env__link env__packages" @click="openPackages">Installed packages</button>
+      </div>
+
       <p v-if="busy" class="env__msg env__msg--busy">
         <span class="env__spinner" aria-hidden="true" />{{ progress }}
       </p>
@@ -214,6 +279,7 @@ onBeforeUnmount(() => clearTimeout(pollTimer));
         <div v-if="current && !showPicker && !busy" class="env__actions">
           <button class="env__link" @click="changing = true">Change</button>
           <button class="env__link env__link--quiet" @click="stopUsing">Stop using</button>
+          <button v-if="kernelPackages && ready" class="env__link env__packages" @click="openPackages">Installed packages</button>
         </div>
         <el-select
           v-if="showPicker"
@@ -252,6 +318,32 @@ onBeforeUnmount(() => clearTimeout(pollTimer));
       <p v-else class="env__msg">Loading your environments…</p>
       </template>
     </div>
+
+    <!-- What the kernel can import, asked from the kernel itself. -->
+    <el-dialog v-model="packagesOpen" title="Installed packages" width="min(560px, 94vw)" append-to-body>
+      <div class="pk__bar">
+        <el-input v-model="packagesQuery" size="small" placeholder="Filter packages…" clearable class="pk__filter" />
+        <button class="env__link" :disabled="packagesLoading" @click="loadPackages">Refresh</button>
+        <button class="env__link" :disabled="!packages?.length" @click="copyRequirements">Copy as requirements.txt</button>
+      </div>
+      <p v-if="packages" class="pk__count">
+        {{ packages.length }} packages the kernel can import<template v-if="current && fromEnvCount">, {{ fromEnvCount }} from {{ current.name }}</template>: the image's, the
+        environment's and any you installed in this session.
+      </p>
+      <p v-if="packagesLoading" class="env__msg">Asking the kernel… (it answers once a running cell finishes)</p>
+      <p v-else-if="packagesError" class="env__msg env__msg--error">{{ packagesError }}</p>
+      <ul v-if="packages && !packagesLoading" class="pk__list">
+        <li v-for="p in packagesShown" :key="p.name" class="pk__row">
+          <span class="pk__name">{{ p.name }}</span>
+          <!-- Always a cell, so the versions line up. -->
+          <span class="pk__tag-cell">
+            <span v-if="p.fromEnvironment" class="pk__tag" :title="`${current?.name} asks for it`">environment</span>
+          </span>
+          <span class="pk__version">{{ p.version }}</span>
+        </li>
+        <li v-if="!packagesShown.length" class="env__msg">No package by that name.</li>
+      </ul>
+    </el-dialog>
   </div>
 </template>
 
@@ -343,6 +435,70 @@ onBeforeUnmount(() => clearTimeout(pollTimer));
   display: flex;
   align-items: center;
   gap: 10px;
+}
+/* At the end of the actions row. */
+.env__packages {
+  margin-left: auto;
+}
+.env__actions--end {
+  justify-content: flex-end;
+}
+.pk__bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.pk__filter {
+  flex: 1;
+}
+.pk__count {
+  margin: 10px 0 6px;
+  font-size: 12px;
+  color: theme.$gray_4;
+}
+.pk__list {
+  max-height: 50vh;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+  border: 1px solid theme.$gray_2;
+  border-radius: 4px;
+}
+/* Columns: name, the environment's tag, version (left-aligned). */
+.pk__row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 96px 88px;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 10px;
+  border-bottom: 1px solid theme.$gray_1;
+  font-size: 13px;
+}
+.pk__name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: theme.$gray_6;
+}
+.pk__tag {
+  padding: 0 6px;
+  border-radius: 8px;
+  background: theme.$purple_tint;
+  font-size: 11px;
+  color: theme.$purple_2;
+}
+.pk__tag-cell {
+  display: flex;
+}
+.pk__version {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: monospace;
+  font-size: 12px;
+  color: theme.$gray_5;
 }
 .env__link {
   padding: 0;

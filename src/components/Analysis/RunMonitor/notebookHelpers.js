@@ -1,4 +1,5 @@
-import { gpuTaskResources } from "../ComputeNodes/computeNodeHelpers";
+import { gpuTaskResources, nodeRegion } from "../ComputeNodes/computeNodeHelpers";
+import { PLATFORMS, PLATFORM_KEYS } from "../platforms";
 import { RUNNING_STATUSES, runsEmptyState } from "./runHelpers";
 
 // Shared helpers for the Notebooks tab + launcher. A notebook is a workflow
@@ -45,17 +46,34 @@ export function offlineNote(cn) {
   return "No internet access: packages can't be installed from the notebook. Add them through an environment.";
 }
 
+// Which data platforms, of those whose data sits in one place, a compliant
+// node in region can read and which it can't: " That includes OpenNeuro,
+// SPARC; DANDI (us-east-2) can't be read." ("" when none sit anywhere).
+export function platformsByRegion(region) {
+  const fixed = PLATFORM_KEYS.map((k) => PLATFORMS[k])
+    .filter((p) => p.publicBucket)
+    .map((p) => ({ name: p.name, regions: p.regions(p.selection()) }))
+    .filter((p) => p.regions.length);
+  const here = fixed.filter((p) => p.regions.every((r) => r === region)).map((p) => p.name);
+  const elsewhere = fixed.filter((p) => !p.regions.includes(region)).map((p) => `${p.name} (${p.regions.join(", ")})`);
+  const join = (list) => (list.length > 1 ? `${list.slice(0, -1).join(", ")} and ${list.at(-1)}` : list[0]);
+  if (!here.length && !elsewhere.length) return "";
+  return [
+    here.length ? ` That includes ${join(here)}` : "",
+    elsewhere.length ? `${here.length ? ";" : ""} ${join(elsewhere)} can't be read` : "",
+  ].join("") + ".";
+}
+
 // What a session on this node can't do, said when it opens ({ title, items }),
 // or null: a compliant node has no internet access, reads public data only
 // in its own region, and can't add data while a session runs.
 export function sessionRestrictions(cn) {
   if ((cn?.deploymentMode || "").toLowerCase() !== "compliant") return null;
-  const region = cn.region || "";
+  const region = nodeRegion(cn);
   const data = region
     ? `Data: your workspace's datasets, Pennsieve Discover, and public data on AWS in ${region}.`
     : "Data: your workspace's datasets, Pennsieve Discover, and public data on AWS in the node's region.";
-  const examples =
-    region === "us-east-1" ? " That includes OpenNeuro, SPARC and Epilepsy.Science; DANDI (us-east-2) can't be read." : "";
+  const examples = region ? platformsByRegion(region) : "";
   return {
     title: "This notebook runs on a compliant node, with no internet access.",
     items: [
@@ -66,6 +84,19 @@ export function sessionRestrictions(cn) {
     ],
   };
 }
+
+// Why a node can't take a session now, by its status ("" when it can, or
+// its status isn't known): workflow-service refuses a run on any but an
+// enabled node.
+const NODE_STATUS_REASONS = {
+  pending: "Not ready yet",
+  updating: "Being updated: try again in a few minutes",
+  paused: "Paused",
+  disabled: "Disabled",
+  destroying: "Being deleted",
+  failed: "Its last deploy or update failed",
+};
+export const nodeStatusReason = (cn) => NODE_STATUS_REASONS[(cn?.status || "").toLowerCase()] || "";
 
 // A notebook's language for people.
 export function kernelLabel(kernel) {
@@ -257,11 +288,16 @@ export function gpuSessionHelp(gpu) {
   return `Runs on ${where}, with all of its CPU and memory. Slower to start (an instance may need to launch) and billed while the notebook is open.`;
 }
 
-// The session's resources on a GPU, for the review: "8 vCPU · 30 GB (the
-// node's GPU instance)".
+// A GPU session's disk: its instance's root volume, the same on every GPU
+// instance (the provisioner's terraform/infrastructure/ecs-gpu.tf), shared
+// with the notebook's environment. It can't be chosen yet.
+export const GPU_INSTANCE_DISK_GIB = 100;
+
+// The session's resources on a GPU, for the review: "8 vCPU · 30 GB · 100 GB
+// disk (the node's GPU instance)".
 export function gpuReviewResources(gpu) {
-  const res = gpuTaskResources(gpu, " · ");
-  return res ? `${res} (the node's GPU instance)` : "The node's GPU instance";
+  const res = [gpuTaskResources(gpu, " · "), `${GPU_INSTANCE_DISK_GIB} GB disk`].filter(Boolean).join(" · ");
+  return `${res} (the node's GPU instance)`;
 }
 
 // The id of a workflow definition's session step (the one that takes the

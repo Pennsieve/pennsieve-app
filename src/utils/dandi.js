@@ -6,8 +6,8 @@
 // public API (browsers may call it) finds dandisets, lists their versions
 // and gives a version's folder tree with sizes.
 //
-// Zarr assets (a folder of objects, not one file) aren't taken yet: a
-// folder shows them, marked.
+// Zarr assets (a folder of objects, not one file) are read in place: a view
+// lists each as one entry, and a folder shows them, marked.
 
 export const DANDI_API = 'https://api.dandiarchive.org/api'
 // The Open Data catalog's entry for the archive.

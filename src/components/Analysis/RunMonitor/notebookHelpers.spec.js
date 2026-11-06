@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   sessionRestrictions,
+  nodeStatusReason,
   notebooksEmptyState,
   launchableKernels,
   offlineNote,
@@ -353,8 +354,8 @@ describe("the Hardware step", () => {
     expect(gpuSessionHelp(L4)).toContain("billed while the notebook is open");
     expect(gpuSessionHelp(null)).toContain("the node's GPU instance");
     expect(gpuSessionHelp(L4)).not.toContain("T4");
-    expect(gpuReviewResources(L4)).toBe("8 vCPU · 30 GB (the node's GPU instance)");
-    expect(gpuReviewResources(null)).toBe("The node's GPU instance");
+    expect(gpuReviewResources(L4)).toBe("8 vCPU · 30 GB · 100 GB disk (the node's GPU instance)");
+    expect(gpuReviewResources(null)).toBe("100 GB disk (the node's GPU instance)");
   });
 });
 
@@ -467,11 +468,13 @@ describe("sessionRestrictions", () => {
     expect(r.title).toMatch(/compliant node, with no internet access/);
     expect(r.items).toHaveLength(4);
     expect(r.items[0]).toMatch(/pip, conda, install.packages/);
+    // Every platform whose data sits in one region: those there, and not.
     expect(r.items[2]).toBe(
-      "Data: your workspace's datasets, Pennsieve Discover, and public data on AWS in us-east-1. That includes OpenNeuro, SPARC and Epilepsy.Science; DANDI (us-east-2) can't be read."
+      "Data: your workspace's datasets, Pennsieve Discover, and public data on AWS in us-east-1. That includes SPARC, Epilepsy.Science, OpenNeuro, BossDB, PhysioNet, Human Cell Atlas and Imaging Data Commons; DANDI (us-east-2), CELLxGENE (us-west-2) and ENCODE (us-west-2) can't be read."
     );
-    expect(sessionRestrictions({ deploymentMode: "compliant", region: "us-west-2" }).items[2]).toBe(
-      "Data: your workspace's datasets, Pennsieve Discover, and public data on AWS in us-west-2."
+    // Its region from its queue, as account-service sends it.
+    expect(sessionRestrictions({ deploymentMode: "compliant", queueUrl: "https://sqs.us-west-2.amazonaws.com/1/q" }).items[2]).toMatch(
+      /in us-west-2\. That includes CELLxGENE and ENCODE; .*DANDI \(us-east-2\).* can't be read\.$/
     );
     expect(sessionRestrictions({ deploymentMode: "compliant" }).items[2]).toMatch(/in the node's region\.$/);
   });
@@ -480,5 +483,19 @@ describe("sessionRestrictions", () => {
     expect(sessionRestrictions({ deploymentMode: "secure", region: "us-east-1" })).toBe(null);
     expect(sessionRestrictions({ deploymentMode: "basic" })).toBe(null);
     expect(sessionRestrictions(null)).toBe(null);
+  });
+});
+
+describe("nodeStatusReason", () => {
+  it("says why a node can't take a session now", () => {
+    expect(nodeStatusReason({ status: "Updating" })).toBe("Being updated: try again in a few minutes");
+    expect(nodeStatusReason({ status: "Destroying" })).toBe("Being deleted");
+    expect(nodeStatusReason({ status: "Failed" })).toBe("Its last deploy or update failed");
+    expect(nodeStatusReason({ status: "Paused" })).toBe("Paused");
+  });
+  it("says nothing for an enabled node or an unknown status", () => {
+    expect(nodeStatusReason({ status: "Enabled" })).toBe("");
+    expect(nodeStatusReason({})).toBe("");
+    expect(nodeStatusReason(null)).toBe("");
   });
 });

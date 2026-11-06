@@ -11,8 +11,8 @@
 // via v-model and emits `created` with the new run.
 import { isPathPrefixParam, targetParamLabel, defaultsToRunName, targetWritesToDataset, canWriteDataset, searchDatasets } from "./dataTargets";
 import { hasInterface, withInterfaceNodes, destinationChoices, NO_DESTINATION } from "./workflowInterface";
-import { acceptsInput, dataRegions, dataUnreachable, nodeDataReason, nodeDataNote, dataSize, suggestedDisk, isImagingData } from "./dataHints";
-import { computed, reactive, ref, watch } from "vue";
+import { acceptsInput, nodeDataReason, nodeDataNote, dataUnreachable, suggestedDisk } from "./dataHints";
+import { computed, nextTick, reactive, ref, watch } from "vue";
 import { useStore } from "vuex";
 import BfButton from "../../shared/bf-button/BfButton.vue";
 import AnalysisFilesTable from "../../FilesTable/AnalysisFilesTable.vue";
@@ -48,11 +48,13 @@ import {
   hardwareLabel as hardwareOptionLabel,
   gpuSessionHelp,
   gpuReviewResources,
+  GPU_INSTANCE_DISK_GIB,
   DEFAULT_NOTEBOOK_DISK_GIB,
   NOTEBOOK_DISK_OPTIONS,
   notebookDiskLabel,
   notebookDiskHint,
   notebookProcessorConfigs,
+  nodeStatusReason,
 } from "./notebookHelpers";
 import { nodeGpu, gpuOffer, gpuName, gpuTaskResources } from "../ComputeNodes/computeNodeHelpers";
 import NodeTierBadge from "../ComputeNodes/NodeTierBadge.vue";
@@ -63,18 +65,11 @@ import RuntimeMark from "../WorkflowGraph/RuntimeMark.vue";
 import { STANDARD_CPU_OPTIONS, getStandardMemoryOptions, getTargetTypeLabel } from "./runHelpers";
 import { sourceLabel } from "../WorkflowGraph/sourceInputs";
 import * as siteConfig from "@/site-config/site.json";
-import { viewsServiceUrl, viewForDataset, viewDataSource, createOpenDataView, createDandiView, openDataCatalog } from "@/utils/viewsService";
-import OpenDataPicker from "../OpenDataPicker.vue";
-import OpenNeuroPicker from "../OpenNeuroPicker.vue";
-import { countOpenNeuro, OPENNEURO_REGISTRY } from "@/utils/openNeuro";
-import DandiPicker from "../DandiPicker.vue";
-import { countDandi, dandiViewTitle } from "@/utils/dandi";
-import PortalPicker from "../PortalPicker.vue";
-import { OPEN_DATA_PORTALS, portalDatasetIds } from "@/utils/openDataPortals";
-import DiscoverPicker from "../DiscoverPicker.vue";
-import PlatformMark from "../PlatformMark.vue";
-import { DATA_PLATFORMS, platformCount } from "../dataPlatforms";
-import { countPublicDatasets } from "@/utils/publicDatasets";
+import { viewsServiceUrl, viewDataSource } from "@/utils/viewsService";
+import PlatformList from "../PlatformList.vue";
+import PlatformPane from "../PlatformPane.vue";
+import { newSelection, clearSelection, selectionReady } from "../platformSelection";
+import { PLATFORMS, PLATFORM_KEYS, platformData } from "../platforms";
 
 const props = defineProps({
   modelValue: { type: Boolean, default: false },
@@ -137,16 +132,18 @@ const executing = ref(false);
 // The steps, in order (indices into stepTitles).
 // The data first: it decides which kernels can take it, and guides the
 // compute node, hardware and disk (dataHints).
-const S = { INPUT: 0, KERNEL: 1, FILES: 2, NODE: 3, HARDWARE: 4, RESOURCES: 5, OUTPUT: 6, REVIEW: 7 };
+// The last names the session and starts it, with what's chosen.
+// Hardware and its resources are one step: the CPU, memory and disk follow
+// from the hardware chosen (a GPU's are its instance's).
+const S = { INPUT: 0, KERNEL: 1, FILES: 2, NODE: 3, HARDWARE: 4, OUTPUT: 5, REVIEW: 6 };
 const stepTitles = computed(() => [
   "Choose Data",
   "Select Kernel",
   "Select Input Files",
   "Select Compute Node",
-  "Hardware",
-  "Compute Resources",
+  "Hardware & Resources",
   iface.value ? "Results" : "Output Destination",
-  "Review & Start",
+  "Name & Start",
 ]);
 
 /* ------------------------------------------------------ compute resources --- */
@@ -263,9 +260,11 @@ const nodeMustRun = computed(() => {
 const nodeCapacity = ref({});
 const nodeCapacityLabel = (cn) => capacityLabel(nodeCapacity.value[cn?.uuid]);
 const nodeReasons = (cn) => {
+  const status = nodeStatusReason(cn);
+  if (status) return [status];
   const reasons = nodeHardwareUnfit(cn, nodeMustRun.value, gateReason);
   const full = capacityReason(nodeCapacity.value[cn?.uuid]);
-  const data = nodeDataReason(cn, inputChoice.value, dataContext.value);
+  const data = nodeDataReason(cn, chosenData.value);
   return [...reasons, ...(full ? [full] : []), ...(data ? [data] : [])];
 };
 // Reads the capacity of the nodes given (all listed, by default). Failures
@@ -301,7 +300,7 @@ const hardwareLabel = computed(() => {
   const o = currentHardware.value || (isGpu.value ? { gpu: true, name: "GPU" } : selectedVariant.value);
   return o ? hardwareOptionLabel(o, selectedGpu.value) : "";
 });
-// The review's hardware row: on a GPU, its name and the node's GPU ("GPU ·
+// The summary's hardware row: on a GPU, its name and the node's GPU ("GPU ·
 // NVIDIA L4 · 24 GB"; the resources have their own row).
 const reviewHardware = computed(() => {
   if (!isGpu.value) return hardwareLabel.value;
@@ -394,61 +393,25 @@ const selectedDataset = computed(
 const iface = computed(() => hasInterface(selectedWorkflow.value));
 const ifaceInput = computed(() => selectedWorkflow.value?.inputs?.[0] || null);
 const ifaceOutput = computed(() => selectedWorkflow.value?.outputs?.[0] || null);
+// A dataset of this workspace, a data platform's (platforms/, by its key;
+// Discover's is "public"), or none.
+const choiceKey = (platform) => (platform === "discover" ? "public" : platform);
 const INPUT_CHOICES = {
   dataset: { label: "Files from a dataset", desc: "Choose a dataset in this workspace, then the files to start with" },
-  public: { label: DATA_PLATFORMS.discover.name, desc: DATA_PLATFORMS.discover.desc, platform: "discover" },
-  openData: { label: DATA_PLATFORMS.openData.name, desc: DATA_PLATFORMS.openData.desc, platform: "openData" },
-  sparc: { label: DATA_PLATFORMS.sparc.name, desc: DATA_PLATFORMS.sparc.desc, platform: "sparc" },
-  epilepsyScience: { label: DATA_PLATFORMS.epilepsyScience.name, desc: DATA_PLATFORMS.epilepsyScience.desc, platform: "epilepsyScience" },
-  openNeuro: { label: DATA_PLATFORMS.openNeuro.name, desc: DATA_PLATFORMS.openNeuro.desc, platform: "openNeuro" },
-  dandi: { label: DATA_PLATFORMS.dandi.name, desc: DATA_PLATFORMS.dandi.desc, platform: "dandi" },
+  ...Object.fromEntries(PLATFORM_KEYS.map((k) => [choiceKey(k), { label: PLATFORMS[k].name, desc: PLATFORMS[k].desc, platform: k }])),
   none: { label: "No input", desc: "Start with an empty input/ folder" },
 };
-// The data platforms' sizes, shown on their cards.
-const platformCounts = ref({ discover: null, openNeuro: null, sparc: null, epilepsyScience: null, openData: null, dandi: null });
-function loadPlatformCounts() {
-  if (!publicInputs) return;
-  if (platformCounts.value.discover == null) {
-    countPublicDatasets()
-      .then((n) => (platformCounts.value.discover = n))
-      .catch(() => {});
-  }
-  if (platformCounts.value.openNeuro == null) {
-    countOpenNeuro()
-      .then((n) => (platformCounts.value.openNeuro = n))
-      .catch(() => {});
-  }
-  if (platformCounts.value.dandi == null) {
-    countDandi()
-      .then((n) => (platformCounts.value.dandi = n))
-      .catch(() => {});
-  }
-  for (const portal of Object.keys(OPEN_DATA_PORTALS)) {
-    if (platformCounts.value[portal] == null) {
-      portalDatasetIds(portal)
-        .then((ids) => (platformCounts.value[portal] = ids.length))
-        .catch(() => {});
-    }
-  }
-  if (platformCounts.value.openData == null) {
-    openDataCatalog()
-      .then((list) => (platformCounts.value.openData = list.filter((d) => d.anonymous).length))
-      .catch(() => {});
-  }
-}
-// A platform none of the user's nodes can reach (its data in a region only
-// compliant nodes elsewhere would read): said on its card.
-const platformUnreachable = (c) => dataUnreachable(interactiveComputeNodes.value, c);
-const platformLine = (c) => {
-  const p = INPUT_CHOICES[c].platform;
-  return platformCount(platformCounts.value[p], DATA_PLATFORMS[p].noun);
-};
+// The data platforms offered (PlatformList's keys), the one chosen, and the
+// dialog's choice for one (Discover's is "public").
+const platformKeys = computed(() => inputChoices.value.map((c) => INPUT_CHOICES[c].platform).filter(Boolean));
+const choicePlatform = computed(() => INPUT_CHOICES[inputChoice.value]?.platform || "");
+const choiceOf = (platform) => Object.keys(INPUT_CHOICES).find((c) => INPUT_CHOICES[c].platform === platform) || "";
 // Chosen before the kernel: every kind of data the dialog can start with
 // here; the kernels are then those that take it.
 const inputChoices = computed(() => {
   const c = [];
   if (!props.personal) c.push("dataset");
-  if (publicInputs) c.push("public", "openData", "sparc", "epilepsyScience", "openNeuro", "dandi");
+  if (publicInputs) c.push(...PLATFORM_KEYS.map(choiceKey));
   c.push("none");
   return c;
 });
@@ -595,23 +558,12 @@ const canNext = computed(() => {
     case S.NODE:
       return !!form.value.computeNodeId && !(selectedComputeNode.value && nodeReasons(selectedComputeNode.value).length);
     case S.HARDWARE:
+      // Resources always have a valid default (1 vCPU).
       return !allHardware.value.length || nodeHardware.value.includes(currentHardware.value);
-    case S.RESOURCES:
-      return true; // resources always have a valid default (1 vCPU)
     case S.INPUT:
-      return inputChoice.value === "dataset"
-        ? !!form.value.datasetId
-        : inputChoice.value === "public"
-        ? !!publicDataset.value
-        : inputChoice.value === "openData"
-        ? !!openDataDataset.value && !inputUnreachable.value
-        : inputChoice.value === "openNeuro"
-        ? !!openNeuroDataset.value && !inputUnreachable.value
-        : inputChoice.value === "dandi"
-        ? !!dandiDataset.value && !inputUnreachable.value
-        : isPortal.value
-        ? !!portalDataset.value && !inputUnreachable.value
-        : inputChoice.value === "none";
+      if (inputChoice.value === "dataset") return !!form.value.datasetId;
+      if (choicePlatform.value) return selectionReady(choicePlatform.value, sel) && !inputUnreachable.value;
+      return inputChoice.value === "none";
     case S.FILES:
       return dataSourcesComplete.value;
     case S.OUTPUT:
@@ -656,81 +608,38 @@ const onDatasetSearch = (query) => {
 // view (utils/viewsService). Discover is read anonymously, as on the public
 // dataset pages.
 const publicInputs = !!viewsServiceUrl();
-const publicDataset = ref(null); // a published dataset, chosen with DiscoverPicker
-const publicVersion = ref(null);
-
-/* --------------------------------------------------- AWS Open Data input --- */
-// A dataset of the Registry of Open Data on AWS and a folder of it, chosen
-// with OpenDataPicker: the notebook starts with a view of its files there,
-// listed from its public bucket when the run starts, and the user downloads
-// what they need from the Inputs panel.
-const openDataDataset = ref(null); // a listOpenData entry
-const openDataPrefix = ref("");
-
-// An OpenNeuro dataset, chosen with OpenNeuroPicker: a view of its folder
-// in the Open Data catalog's openneuro entry.
-const openNeuroDataset = ref(null); // a searchOpenNeuro result
-const openNeuroPrefix = ref("");
-const openNeuroLabel = computed(() => {
-  const d = openNeuroDataset.value;
-  if (!d) return "";
-  return `${d.name} (${openNeuroPrefix.value || d.id})`;
-});
-
-// A dandiset version, chosen with DandiPicker: a view of its files (each
-// read from its blob in the archive's bucket), all or a folder's.
-const dandiDataset = ref(null); // a searchDandi result, at the version chosen
-const dandiPrefix = ref("");
-const dandiLabel = computed(() => {
-  const d = dandiDataset.value;
-  if (!d) return "";
-  return `${d.name} (DANDI:${d.id}${dandiPrefix.value ? `/${dandiPrefix.value}` : ""}, ${d.version})`;
-});
-
-// A SPARC or Epilepsy.Science dataset, chosen with PortalPicker: a view of
-// its folder in the portal's Open Data entry. Choosing the other portal
-// starts over.
-const portalDataset = ref(null); // a toPortalDataset
-const portalPrefix = ref("");
-const isPortal = computed(() => inputChoice.value in OPEN_DATA_PORTALS);
-watch(inputChoice, () => {
-  portalDataset.value = null;
-  portalPrefix.value = "";
-});
-const portalLabel = computed(() => {
-  const d = portalDataset.value;
-  if (!d) return "";
-  const p = portalPrefix.value.replace(/\/$/, "");
-  return p && p !== String(d.id) ? `${d.name} (${p})` : d.name;
-});
-
-const openDataLabel = computed(() => {
-  const d = openDataDataset.value;
-  if (!d) return "";
-  const p = openDataPrefix.value.trim();
-  return p ? `${d.title} (${p})` : d.title;
-});
+// What's chosen on each data platform (PlatformPane binds its pickers to
+// it; platforms/ say what it is and what's made of it).
+const sel = newSelection();
+const publicDataset = computed(() => sel.discover.dataset); // a published dataset, chosen with DiscoverPicker
 
 // Hints from the data chosen: where it lives (a node elsewhere costs
-// transfer), its size (the disk suggested), and whether it's imaging (a
-// GPU may help).
-const dataContext = computed(() => ({
-  publicDataset: publicDataset.value,
-  openNeuroDataset: openNeuroDataset.value,
-  dandiDataset: dandiDataset.value,
-  openDataDataset: openDataDataset.value,
-  portalDataset: portalDataset.value,
-  selectedDataset: selectedDataset.value?.content,
-}));
-const nodeNote = (cn) => nodeDataNote(cn, dataRegions(inputChoice.value, dataContext.value));
-// The data chosen, when none of the user's nodes can reach it: it stays
-// chosen (a node may be added), but Next waits, and the node step offers
-// other data.
-const inputUnreachable = computed(() => dataUnreachable(interactiveComputeNodes.value, inputChoice.value, dataContext.value));
-const openDataUnreachable = (d) => dataUnreachable(interactiveComputeNodes.value, "openData", { openDataDataset: d });
-const dataBytes = computed(() => dataSize(inputChoice.value, dataContext.value));
+// transfer), its size (the disk suggested), whether it's imaging (a GPU may
+// help) and whether it's in a public bucket (a compliant node can't reach
+// it). A workspace dataset's size is its storage.
+const chosenData = computed(() =>
+  inputChoice.value === "dataset"
+    ? { regions: [], size: selectedDataset.value?.content?.storage || null, imaging: false, publicBucket: false }
+    : platformData(choicePlatform.value, sel[choicePlatform.value])
+);
+const nodeNote = (cn) => nodeDataNote(cn, chosenData.value.regions);
+// The data chosen, when none of the user's nodes can reach it (a compliant
+// node reads public data only in its region): it stays chosen (a node may be
+// added), but Next waits, and the node step offers other data.
+const inputUnreachable = computed(() =>
+  choicePlatform.value && selectionReady(choicePlatform.value, sel) ? dataUnreachable(interactiveComputeNodes.value, chosenData.value) : ""
+);
+// A platform's card, when its data sits in one place none of the user's
+// nodes reach; a dataset of one, when it's chosen by the dataset (AWS Open
+// Data's, the Allen Institute's).
+const platformUnreachable = (key) => {
+  const data = platformData(key, PLATFORMS[key].selection());
+  return data.regions.length ? dataUnreachable(interactiveComputeNodes.value, data) : "";
+};
+const pickNote = (key, part) => dataUnreachable(interactiveComputeNodes.value, platformData(key, part));
+const dataBytes = computed(() => chosenData.value.size);
 const diskSuggestion = computed(() => suggestedDisk(dataBytes.value, diskOptions));
-const imagingData = computed(() => isImagingData(inputChoice.value, dataContext.value));
+const imagingData = computed(() => chosenData.value.imaging);
 // The disk follows the suggestion until the user picks one.
 const diskTouched = ref(false);
 watch(diskSuggestion, (gib) => {
@@ -929,16 +838,7 @@ function reset() {
   nameTouched.value = false;
   computeNodeSearch.value = "";
   datasetSearchQuery.value = "";
-  publicDataset.value = null;
-  publicVersion.value = null;
-  openDataDataset.value = null;
-  openDataPrefix.value = "";
-  openNeuroDataset.value = null;
-  openNeuroPrefix.value = "";
-  dandiDataset.value = null;
-  dandiPrefix.value = "";
-  portalDataset.value = null;
-  portalPrefix.value = "";
+  clearSelection(sel);
   // The data comes first: a workspace's own dataset, else a public one.
   inputChoice.value = props.personal ? (publicInputs ? "public" : "none") : "dataset";
   diskTouched.value = false;
@@ -981,6 +881,8 @@ watch(visible, (open) => {
     if (!variantGate.value) fetchVariantGate(config.value.api2Url, useGetToken).then((g) => (variantGate.value = g));
     nodeCapacity.value = {};
     loadCapacity();
+    // Their statuses now: one may have started updating since the page opened.
+    store.dispatch("analysisModule/fetchComputeNodes", { force: true }).catch(() => {});
     if (!gpuTiers.value.length) {
       computeResourcesStore
         .fetchGpuTiers(store.getters.activeOrganization?.organization?.id)
@@ -988,7 +890,6 @@ watch(visible, (open) => {
         .catch(() => {});
     }
     if (!props.personal) fetchDatasetOptions();
-    loadPlatformCounts();
   }
 });
 
@@ -996,11 +897,11 @@ watch(visible, (open) => {
 // public dataset's files from the notebook itself.
 // A GPU kernel runs with its node's GPU instance's resources, and a variant
 // that declares its own with those: no CPU and memory to choose. A kernel
-// without a hardware choice has no Hardware step.
+// with neither a hardware choice nor resources to choose has no Hardware
+// step.
 const skipsStep = (i) =>
   (i === S.FILES && inputChoice.value !== "dataset") ||
-  (i === S.HARDWARE && !allHardware.value.length) ||
-  (i === S.RESOURCES && variantResourcesSet.value);
+  (i === S.HARDWARE && !allHardware.value.length && variantResourcesSet.value);
 
 const next = async () => {
   if (step.value === S.KERNEL) await loadDefinition(); // leaving Kernel → its inputs and outputs
@@ -1008,6 +909,12 @@ const next = async () => {
   while (skipsStep(n)) n++;
   if (n < stepTitles.value.length) step.value = n;
 };
+// The input step's "No input data": no data, and on to the kernel.
+async function startWithoutData() {
+  inputChoice.value = "none";
+  await nextTick();
+  await next();
+}
 const back = () => {
   let n = step.value - 1;
   while (n > 0 && skipsStep(n)) n--;
@@ -1023,10 +930,9 @@ const STEP_ABOUT = [
   "A notebook is a live Jupyter session on a compute node. Choose its language.",
   "The files copied into the notebook's input/ folder before it starts.",
   "The compute node the session runs on. Only nodes with notebook sessions are offered; each says whether it has a GPU.",
-  "CPU, or the node's GPU when it has one. A GPU notebook gets the whole GPU instance.",
-  "The CPU and memory the session gets. Memory follows the CPU unless you set it.",
+  "CPU, or the node's GPU when it has one. A GPU notebook gets the whole GPU instance; a CPU one the CPU, memory and disk you choose.",
   "Where the notebook's results go when the session ends.",
-  "Check the session, name it, and start it.",
+  "",
 ];
 const stepAbout = computed(() =>
   step.value === S.NODE && gpuFirst.value
@@ -1036,20 +942,12 @@ const stepAbout = computed(() =>
 const soFar = computed(() => {
   const rows = [];
   if (step.value > S.INPUT) {
-    const input =
-      inputChoice.value === "public"
-        ? publicDataset.value?.name || "A public dataset"
-        : inputChoice.value === "openData"
-        ? openDataLabel.value || "AWS Open Data"
-        : inputChoice.value === "openNeuro"
-        ? openNeuroLabel.value || "OpenNeuro"
-        : inputChoice.value === "dandi"
-        ? dandiLabel.value || "DANDI"
-        : isPortal.value
-        ? portalLabel.value || DATA_PLATFORMS[inputChoice.value].name
-        : inputChoice.value === "dataset"
-        ? selectedDataset.value?.content?.name || "A dataset"
-        : "No input";
+    const platform = PLATFORMS[choicePlatform.value];
+    const input = platform
+      ? platform.label(sel[platform.key]) || platform.name
+      : inputChoice.value === "dataset"
+      ? selectedDataset.value?.content?.name || "A dataset"
+      : "No input";
     rows.push({ label: "Data", value: input });
   }
   if (step.value > S.KERNEL && selectedWorkflow.value) rows.push({ label: "Kernel", value: kernelLabel(notebookKernel(selectedWorkflow.value)) });
@@ -1057,11 +955,23 @@ const soFar = computed(() => {
     rows.push({ label: "Files", value: String(dataSourceNodes.value.reduce((n, d) => n + fileCountForNode(d.id), 0)) });
   }
   if (step.value > S.NODE && selectedComputeNode.value) rows.push({ label: "Compute node", value: selectedComputeNode.value.name });
-  if ((step.value > S.HARDWARE || gpuFirst.value) && step.value > S.KERNEL && hardwareLabel.value) rows.push({ label: "Hardware", value: hardwareLabel.value });
-  if (step.value > S.RESOURCES && !variantResourcesSet.value) {
-    rows.push({ label: "Resources", value: `${cpuLabel(resourceCpu.value)} · ${isAutoMemory.value ? memoryLabel(autoMemoryForCpu(resourceCpu.value)) : memoryLabel(resourceMemory.value)} · ${notebookDiskLabel(resourceDisk.value)}` });
+  if ((step.value > S.HARDWARE || gpuFirst.value) && step.value > S.KERNEL && reviewHardware.value) rows.push({ label: "Hardware", value: reviewHardware.value });
+  if (step.value > S.HARDWARE) {
+    // A GPU's are its instance's; a variant may set its own.
+    const resources = isGpu.value
+      ? gpuReviewResources(selectedGpu.value)
+      : variantResourcesSet.value
+      ? variantResources(selectedVariant.value) && `${variantResources(selectedVariant.value)} (set by the kernel)`
+      : `${cpuLabel(resourceCpu.value)} · ${isAutoMemory.value ? memoryLabel(autoMemoryForCpu(resourceCpu.value)) : memoryLabel(resourceMemory.value)} · ${notebookDiskLabel(resourceDisk.value)}`;
+    if (resources) rows.push({ label: "Resources", value: resources });
   }
-  if (step.value > S.OUTPUT && iface.value) rows.push({ label: "Results", value: outputLabel(outputChoice.value) });
+  if (step.value > S.OUTPUT && iface.value) {
+    const to = outputWritesDataset.value
+      ? `Saved to ${chooseResultsDataset.value ? resultsDataset.value?.content?.name : selectedDataset.value?.content?.name}`
+      : outputLabel(outputChoice.value);
+    rows.push({ label: "Results", value: to });
+  }
+  if (step.value > S.OUTPUT && viewOnly.value && !iface.value) rows.push({ label: "Results saved to", value: resultsDataset.value?.content?.name || "" });
   return rows;
 });
 
@@ -1121,58 +1031,12 @@ async function execute() {
         : { cpu: resourceCpu.value, memory: resolvedMemory.value, diskGiB: resourceDisk.value },
     });
 
-    // Outside a workspace, the public dataset is the first data source's view.
-    // It's a source's only input: the session downloads its files into it.
+    // Data from a platform is the first data source's view, made now: its
+    // only input, which the session downloads files into.
     const personalSources = {};
-    const usesPublic = inputChoice.value === "public";
-    if (usesPublic && publicDataset.value && dataSourceNodes.value.length) {
-      const view = await viewForDataset({
-        datasetId: publicDataset.value.id,
-        version: publicVersion.value,
-        name: publicDataset.value.name,
-      });
-      personalSources[dataSourceNodes.value[0].id] = viewDataSource(view);
-    }
-    // An AWS Open Data dataset: a view made for this run, listed now.
-    const usesOpenData = inputChoice.value === "openData";
-    if (usesOpenData && openDataDataset.value && dataSourceNodes.value.length) {
-      const view = await createOpenDataView({
-        dataset: openDataDataset.value.name,
-        title: openDataDataset.value.title,
-        prefix: openDataPrefix.value,
-      });
-      personalSources[dataSourceNodes.value[0].id] = viewDataSource(view);
-    }
-    // An OpenNeuro dataset: a view of its folder in the openneuro entry.
-    const usesOpenNeuro = inputChoice.value === "openNeuro";
-    if (usesOpenNeuro && openNeuroDataset.value && dataSourceNodes.value.length) {
-      const view = await createOpenDataView({
-        dataset: OPENNEURO_REGISTRY,
-        title: openNeuroDataset.value.name,
-        prefix: openNeuroPrefix.value,
-      });
-      personalSources[dataSourceNodes.value[0].id] = viewDataSource(view);
-    }
-    // A dandiset version: a view of its files, each read from its blob.
-    const usesDandi = inputChoice.value === "dandi";
-    if (usesDandi && dandiDataset.value && dataSourceNodes.value.length) {
-      const view = await createDandiView({
-        dandiset: dandiDataset.value.id,
-        version: dandiDataset.value.version,
-        title: dandiViewTitle(dandiDataset.value),
-        prefix: dandiPrefix.value,
-      });
-      personalSources[dataSourceNodes.value[0].id] = viewDataSource(view);
-    }
-    // A SPARC or Epilepsy.Science dataset: a view of its folder in the
-    // portal's Open Data entry.
-    const usesPortal = isPortal.value;
-    if (usesPortal && portalDataset.value && dataSourceNodes.value.length) {
-      const view = await createOpenDataView({
-        dataset: OPEN_DATA_PORTALS[inputChoice.value].registry,
-        title: portalDataset.value.name,
-        prefix: portalPrefix.value,
-      });
+    const fromPlatform = !!choicePlatform.value;
+    if (fromPlatform && selectionReady(choicePlatform.value, sel) && dataSourceNodes.value.length) {
+      const view = await PLATFORMS[choicePlatform.value].createView(sel[choicePlatform.value]);
       personalSources[dataSourceNodes.value[0].id] = viewDataSource(view);
     }
 
@@ -1184,7 +1048,7 @@ async function execute() {
         ...(processorConfigs.length > 0 && { processorConfigs }),
       },
       ...(runDatasetId.value && { datasetId: runDatasetId.value }),
-      dataSources: usesPublic || usesOpenData || usesOpenNeuro || usesDandi || usesPortal ? personalSources : dataSources,
+      dataSources: fromPlatform ? personalSources : dataSources,
       ...(name && { name }),
       ...(Object.keys(dataTargets).length > 0 && { dataTargets }),
     };
@@ -1237,8 +1101,8 @@ async function execute() {
       <!-- Two columns on every step: what it's for and what's chosen so far on
            the left (on Input and Results, the step's own choices are), the
            step on the right. On a narrow screen, the step alone. -->
-      <div class="nb-layout" :class="{ 'has-info': !stepHasChoices, 'is-split': step === S.INPUT }">
-      <aside v-if="!stepHasChoices" class="nb-info">
+      <div class="nb-layout" :class="{ 'has-info': !stepHasChoices && step !== S.REVIEW, 'is-split': step === S.INPUT }">
+      <aside v-if="!stepHasChoices && step !== S.REVIEW" class="nb-info">
         <p class="nb-info__about">{{ stepAbout }}</p>
         <template v-if="soFar.length">
           <h4 class="nb-info__title">This session</h4>
@@ -1355,11 +1219,11 @@ async function execute() {
 
       <!-- Hardware: what the chosen node can run, as cards to compare -->
       <div v-if="step === S.HARDWARE" class="wizard-step">
-        <p class="wizard-step-desc">Where should this notebook run?</p>
+        <p v-if="nodeHardware.length" class="wizard-step-desc">Where should this notebook run?</p>
         <p v-if="imagingData" class="data-hint">
           This is imaging data: a GPU can speed up deep learning, registration and segmentation.
         </p>
-        <div class="hardware-grid" role="radiogroup" aria-label="Hardware">
+        <div v-if="nodeHardware.length" class="hardware-grid" role="radiogroup" aria-label="Hardware">
           <button
             v-for="o in nodeHardware"
             :key="o.workflowId + '|' + o.variant"
@@ -1378,21 +1242,25 @@ async function execute() {
             </template>
             <template v-else-if="!o.gpu && !(o.cpu || o.memory)">
               <span class="hardware-card__main">Fargate task</span>
-              <span class="hardware-card__line">You choose CPU and memory next</span>
+              <span class="hardware-card__line">You choose CPU, memory and disk below</span>
               <span class="hardware-card__meta">Starts in about a minute</span>
             </template>
             <span v-else-if="o.description" class="hardware-card__line">{{ o.description }}</span>
           </button>
         </div>
         <p v-if="noGpuHere" class="resource-hint">{{ noGpuHere }}</p>
-      </div>
 
-      <!-- Compute resources (CPU sessions) -->
-      <div v-if="step === S.RESOURCES" class="wizard-step">
-        <p class="wizard-step-desc">
-          Choose the CPU, memory and disk for this notebook's compute task.
+        <!-- Its resources: chosen for a CPU session, else set. A GPU's disk
+             is its instance's, not chosen yet. -->
+        <p v-if="isGpu" class="resource-hint">
+          Disk: {{ GPU_INSTANCE_DISK_GIB }} GB, the GPU instance's own, shared with the notebook's
+          environment. Download the folders you need rather than a whole large dataset.
         </p>
-        <div class="resource-grid">
+        <p v-if="variantResourcesSet && !isGpu && variantResources(selectedVariant)" class="resource-hint">
+          Resources: {{ variantResources(selectedVariant) }}, set by the kernel.
+        </p>
+        <template v-else-if="!variantResourcesSet">
+        <div class="resource-grid" :class="{ 'resource-grid--below': nodeHardware.length }">
           <div class="resource-field">
             <label class="resource-label">CPU</label>
             <el-select v-model="resourceCpu" size="default" style="width: 100%">
@@ -1440,6 +1308,7 @@ async function execute() {
           environment<template v-if="dataBytes > 180 * 2 ** 30">, but not all of it: download the folders you need</template>.
         </p>
         <p class="resource-hint">{{ diskHint }}</p>
+        </template>
       </div>
 
       <!-- Input (a notebook with an input: what it starts with) -->
@@ -1459,111 +1328,29 @@ async function execute() {
           </button>
         </div>
       </template>
-      <template v-if="inputChoices.some((c) => INPUT_CHOICES[c].platform)">
-        <div class="io-choices-label io-choices-label--group">Data platforms</div>
-        <div class="io-choices">
-          <button
-            v-for="c in inputChoices.filter((c) => INPUT_CHOICES[c].platform)"
-            :key="c"
-            type="button"
-            class="io-choice io-platform"
-            :class="{ 'is-picked': inputChoice === c }"
-            @click="inputChoice = c"
-          >
-            <PlatformMark :platform="INPUT_CHOICES[c].platform" />
-            <span class="io-platform__text">
-              <span class="io-choice__name">{{ INPUT_CHOICES[c].label }}</span>
-              <span class="io-choice__desc">{{ INPUT_CHOICES[c].desc }}</span>
-              <span v-if="platformLine(c)" class="io-platform__count">{{ platformLine(c) }}</span>
-              <span v-if="platformUnreachable(c)" class="io-unreachable">{{ platformUnreachable(c) }}</span>
-            </span>
-          </button>
-        </div>
+      <!-- The data platforms, in their groups (PlatformList). -->
+      <template v-if="platformKeys.length">
+        <PlatformList
+          class="io-platforms"
+          :offered="platformKeys"
+          :model-value="choicePlatform"
+          :note-of="platformUnreachable"
+          @update:model-value="inputChoice = choiceOf($event)"
+        />
         <p class="io-platform__note">You pick which files to download from the notebook.</p>
       </template>
-      <button
-        v-if="inputChoices.includes('none')"
-        type="button"
-        class="io-none"
-        :class="{ 'is-picked': inputChoice === 'none' }"
-        @click="inputChoice = 'none'"
-      >
-        Start without input data →
-      </button>
       </div>
       <div class="io-main">
       <div v-if="step === S.INPUT && inputChoice === 'none'" class="wizard-step">
         <p class="wizard-step-desc">The notebook starts with an empty <code>input/</code> folder.</p>
       </div>
-      <div v-else-if="step === S.INPUT && inputChoice === 'openNeuro'" class="wizard-step">
-        <h4 class="io-section-title io-platform-title">
-          <PlatformMark platform="openNeuro" :size="24" />
-          Choose an OpenNeuro dataset
-        </h4>
-        <p class="wizard-step-desc">
-          A dataset from <a href="https://openneuro.org" target="_blank" rel="noopener">OpenNeuro</a>,
-          read from its copy in the Registry of Open Data on AWS at its latest
-          version. The notebook starts with its file list; you pick which files
-          to download from the notebook.
+      <!-- A data platform's picker (PlatformPane), bound to the selection. -->
+      <div v-else-if="step === S.INPUT && choicePlatform" class="wizard-step">
+        <PlatformPane :platform="choicePlatform" :selection="sel" :note-of="pickNote" />
+        <!-- No node of the user's can reach it: Next waits, and why. -->
+        <p v-if="inputUnreachable" class="io-unreachable-note">
+          {{ inputUnreachable }}. Add a compute node that can reach it, or choose other data.
         </p>
-        <OpenNeuroPicker v-model:dataset="openNeuroDataset" v-model:prefix="openNeuroPrefix" />
-      </div>
-      <div v-else-if="step === S.INPUT && inputChoice === 'dandi'" class="wizard-step">
-        <h4 class="io-section-title io-platform-title">
-          <PlatformMark platform="dandi" :size="24" />
-          Choose a dandiset
-        </h4>
-        <p class="wizard-step-desc">
-          A dandiset from the <a href="https://dandiarchive.org" target="_blank" rel="noopener">DANDI Archive</a>
-          at a published version (or its draft), read from its copy in the
-          Registry of Open Data on AWS. The notebook starts with its file
-          list; you pick which files to download from the notebook.
-        </p>
-        <DandiPicker v-model:dataset="dandiDataset" v-model:prefix="dandiPrefix" />
-      </div>
-      <div v-else-if="step === S.INPUT && isPortal" class="wizard-step">
-        <h4 class="io-section-title io-platform-title">
-          <PlatformMark :platform="inputChoice" :size="24" />
-          Choose a {{ DATA_PLATFORMS[inputChoice].name }} dataset
-        </h4>
-        <p class="wizard-step-desc">
-          A dataset published on
-          <a :href="OPEN_DATA_PORTALS[inputChoice].url" target="_blank" rel="noopener">{{ DATA_PLATFORMS[inputChoice].name }}</a>,
-          read from its copy in the Registry of Open Data on AWS at its latest
-          version. The notebook starts with its file list; you pick which files
-          to download from the notebook.
-        </p>
-        <PortalPicker
-          :key="inputChoice"
-          :portal="inputChoice"
-          v-model:dataset="portalDataset"
-          v-model:prefix="portalPrefix"
-        />
-      </div>
-      <div v-else-if="step === S.INPUT && inputChoice === 'openData'" class="wizard-step">
-        <h4 class="io-section-title io-platform-title">
-          <PlatformMark platform="openData" :size="24" />
-          Choose an AWS Open Data dataset
-        </h4>
-        <p class="wizard-step-desc">
-          A dataset from the
-          <a href="https://registry.opendata.aws/" target="_blank" rel="noopener">Registry of Open Data on AWS</a>,
-          and the folder of it to start with. The notebook starts with its
-          file list; you pick which files to download from the notebook.
-        </p>
-        <OpenDataPicker v-model:dataset="openDataDataset" v-model:prefix="openDataPrefix" :card-note="openDataUnreachable" />
-      </div>
-      <!-- Dataset -->
-      <div v-else-if="step === S.INPUT && showPublicInput" class="wizard-step">
-        <h4 class="io-section-title io-platform-title">
-          <PlatformMark platform="discover" :size="24" />
-          Choose a Pennsieve Discover dataset
-        </h4>
-        <p class="wizard-step-desc">
-          A published dataset and its version. The notebook starts with its
-          file list; you pick which files to download from the notebook.
-        </p>
-        <DiscoverPicker v-model:dataset="publicDataset" v-model:version="publicVersion" />
       </div>
       <div v-else-if="step === S.INPUT && showDatasetInput" class="wizard-step">
         <h4 class="io-section-title">Choose a dataset</h4>
@@ -1627,10 +1414,7 @@ async function execute() {
           </div>
         </template>
       </div>
-      <!-- No node of the user's can reach it: Next waits, and why -->
-      <p v-if="inputUnreachable" class="io-unreachable-note">
-        {{ inputUnreachable }}. Add a compute node that can reach it, or choose other data.
-      </p>
+
       </div>
       </div>
 
@@ -1691,6 +1475,7 @@ async function execute() {
         <p class="wizard-step-desc">
           {{ iface ? "Where the notebook's results (its output/ folder) go when the session ends." : "Configure where the notebook's results are saved." }}
         </p>
+
         <div :class="{ 'io-split': iface }">
         <div v-if="iface" class="io-side">
         <div class="io-choices-label">Results go to</div>
@@ -1797,112 +1582,23 @@ async function execute() {
         </div>
       </div>
 
-      <!-- Review -->
-      <div v-if="step === S.REVIEW" class="wizard-step">
-        <p class="wizard-step-desc">Review and start the notebook session.</p>
-        <div class="wizard-summary">
-          <div class="wizard-summary-row">
-            <span class="wizard-summary-label">Kernel</span>
-            <span class="wizard-summary-value">{{
-              kernelLabel(notebookKernel(selectedWorkflow))
-            }}</span>
-          </div>
-          <div class="wizard-summary-row">
-            <span class="wizard-summary-label">Compute Node</span>
-            <span class="wizard-summary-value">{{ selectedComputeNode?.name }}</span>
-          </div>
-          <div v-if="reviewHardware" class="wizard-summary-row">
-            <span class="wizard-summary-label">Hardware</span>
-            <span class="wizard-summary-value"><RuntimeMark v-if="isGpu" runtime="gpu" compact />{{ reviewHardware }}</span>
-          </div>
-          <!-- A GPU session gets the node's GPU instance's CPU and memory -->
-          <div v-if="isGpu" class="wizard-summary-row">
-            <span class="wizard-summary-label">Resources</span>
-            <span class="wizard-summary-value">{{ gpuReviewResources(selectedGpu) }}</span>
-          </div>
-          <div v-else-if="variantResourcesSet && variantResources(selectedVariant)" class="wizard-summary-row">
-            <span class="wizard-summary-label">Resources</span>
-            <span class="wizard-summary-value">{{ variantResources(selectedVariant) }} (set by the kernel)</span>
-          </div>
-          <div v-else-if="!variantResourcesSet" class="wizard-summary-row">
-            <span class="wizard-summary-label">Resources</span>
-            <span class="wizard-summary-value">
-              {{ cpuLabel(resourceCpu) }} ·
-              {{ isAutoMemory ? `${memoryLabel(autoMemoryForCpu(resourceCpu))} (auto)` : memoryLabel(resourceMemory) }} ·
-              {{ notebookDiskLabel(resourceDisk) }}
-            </span>
-          </div>
-          <div class="wizard-summary-row">
-            <span class="wizard-summary-label">Data</span>
-            <span class="wizard-summary-value">{{
-              inputChoice === "public"
-                ? `${publicDataset?.name} (version ${publicVersion})`
-                : inputChoice === "openData"
-                ? `${openDataLabel} (AWS Open Data)`
-                : inputChoice === "openNeuro"
-                ? `${openNeuroLabel} (OpenNeuro)`
-                : inputChoice === "dandi"
-                ? dandiLabel
-                : isPortal
-                ? `${portalLabel} (${DATA_PLATFORMS[inputChoice].name})`
-                : inputChoice === "dataset"
-                ? `${dataSourceNodes.reduce((n, d) => n + fileCountForNode(d.id), 0)} files from ${selectedDataset?.content?.name}`
-                : "None"
-            }}</span>
-          </div>
-          <div v-if="iface" class="wizard-summary-row">
-            <span class="wizard-summary-label">Results</span>
-            <span class="wizard-summary-value">{{
-              outputWritesDataset
-                ? `Saved to ${chooseResultsDataset ? resultsDataset?.content?.name : selectedDataset?.content?.name}`
-                : outputLabel(outputChoice)
-            }}</span>
-          </div>
-          <div v-if="viewOnly && !iface" class="wizard-summary-row">
-            <span class="wizard-summary-label">Results saved to</span>
-            <span class="wizard-summary-value">{{ resultsDataset?.content?.name }}</span>
-          </div>
-        </div>
+      <!-- Name & Start: one column, what's chosen under the name. -->
+      <div v-if="step === S.REVIEW" class="wizard-step nb-review">
+        <label class="nb-review__name">
+          <span class="nb-review__label">Name</span>
+          <el-input v-model="runName" placeholder="e.g. jupyter-jdoe-2026-06-08" maxlength="64" @input="nameTouched = true" />
+        </label>
+        <dl class="nb-info__list nb-review__list">
+          <template v-for="row in soFar" :key="row.label">
+            <dt>{{ row.label }}</dt>
+            <dd>{{ row.value }}</dd>
+          </template>
+        </dl>
         <p v-if="isGpu" class="resource-hint">{{ selectedGpu?.model ? `Runs on the node's ${selectedGpu.model}. ` : "" }}{{ GPU_NOTE }}</p>
         <p v-if="showPublicInput && publicDataset && !dataSourceNodes.length" class="public-warning">
           This notebook has no input to attach {{ publicDataset.name }} to, so
           it would start without it.
         </p>
-        <p v-else-if="inputChoice === 'openNeuro' && openNeuroDataset" class="resource-hint">
-          The notebook starts with the file list of {{ openNeuroLabel }} in
-          <code>input/</code>, read from OpenNeuro's copy on AWS. Choose which
-          files to download from its <strong>Inputs</strong> panel.
-        </p>
-        <p v-else-if="inputChoice === 'dandi' && dandiDataset" class="resource-hint">
-          The notebook starts with the file list of {{ dandiLabel }} in
-          <code>input/</code>, read from the DANDI Archive's bucket on AWS.
-          Zarr folders aren't included yet. Choose which files to download
-          from its <strong>Inputs</strong> panel.
-        </p>
-        <p v-else-if="isPortal && portalDataset" class="resource-hint">
-          The notebook starts with the file list of {{ portalLabel }} in
-          <code>input/</code>, read from {{ DATA_PLATFORMS[inputChoice].name }}'s
-          copy on AWS. Choose which files to download from its
-          <strong>Inputs</strong> panel.
-        </p>
-        <p v-else-if="inputChoice === 'openData' && openDataDataset" class="resource-hint">
-          The notebook starts with the file list of {{ openDataLabel }} in
-          <code>input/</code>, read from its public bucket. Choose which files
-          to download from its <strong>Inputs</strong> panel.
-        </p>
-        <p v-else-if="showPublicInput && publicDataset" class="resource-hint">
-          The notebook starts with the dataset's file list in
-          <code>input/</code>. Choose which files to download from its
-          <strong>Inputs</strong> panel.
-        </p>
-        <label class="name-label">Name</label>
-        <el-input
-          v-model="runName"
-          placeholder="e.g. jupyter-jdoe-2026-06-08"
-          size="small"
-          maxlength="64"
-          @input="nameTouched = true"
-        />
       </div>
       </div>
       </div>
@@ -1913,6 +1609,10 @@ async function execute() {
         <bf-button class="secondary" @click="visible = false">Cancel</bf-button>
         <div class="wizard-footer-right">
           <bf-button v-if="step > 0" class="secondary" @click="back">Back</bf-button>
+          <!-- No input data: chosen and on, in one click. -->
+          <bf-button v-if="step === S.INPUT && inputChoices.includes('none')" class="secondary" @click="startWithoutData">
+            No input data
+          </bf-button>
           <bf-button
             v-if="step < stepTitles.length - 1"
             :disabled="!canNext"
@@ -1920,7 +1620,7 @@ async function execute() {
           >
             Next
           </bf-button>
-          <bf-button v-else :processing="executing" @click="execute">
+          <bf-button v-else :disabled="!canNext" :processing="executing" @click="execute">
             Start Notebook
           </bf-button>
         </div>
@@ -2001,24 +1701,12 @@ async function execute() {
     flex-direction: column;
     min-height: 0;
   }
-  > .wizard-step > .wizard-cards,
-  .discover-picker > :deep(.wizard-cards),
-  :deep(.on-cards),
-  :deep(.dd-cards),
-  :deep(.od-cards),
-  :deep(.pp-cards) {
+  /* The workspace's dataset list fills the column; a platform's picker
+     does so itself (PlatformPane). */
+  > .wizard-step > .wizard-cards {
     flex: 1 1 auto;
     min-height: 160px;
     max-height: none;
-  }
-  .discover-picker,
-  .on-picker,
-  .open-data-picker,
-  .pp-picker {
-    display: flex;
-    flex: 1 1 auto;
-    flex-direction: column;
-    min-height: 0;
   }
 
   > .wizard-step {
@@ -2042,6 +1730,10 @@ async function execute() {
 .data-hint--card {
   margin: 6px 0 0;
 }
+/* The platforms (PlatformList) below the workspace's choice. */
+.io-choices + .io-platforms {
+  margin-top: 16px;
+}
 .io-choices-label--group {
   margin-top: 16px;
 }
@@ -2060,11 +1752,6 @@ async function execute() {
   margin-top: 2px;
   font-size: 12px;
   color: theme.$gray_4;
-}
-.io-unreachable {
-  margin-top: 2px;
-  font-size: 12px;
-  color: theme.$orange_2;
 }
 .io-unreachable-note {
   flex-shrink: 0;
@@ -2097,23 +1784,6 @@ async function execute() {
   align-items: center;
   gap: 8px;
 }
-.io-none {
-  display: block;
-  margin-top: 16px;
-  padding: 0;
-  border: none;
-  background: none;
-  font: inherit;
-  font-size: 13px;
-  color: theme.$purple_2;
-  cursor: pointer;
-
-  &:hover,
-  &.is-picked {
-    color: theme.$purple_3;
-    text-decoration: underline;
-  }
-}
 .io-section-title {
   margin: 0 0 10px;
   font-size: 14px;
@@ -2136,10 +1806,11 @@ async function execute() {
   &:hover {
     background: theme.$gray_1;
   }
-  /* Calm: a thin accent on the left and a faint tint. */
+  /* Chosen: its whole outline in purple and a faint tint (an accent on
+     one side would curl round the corners). */
   &.is-picked {
+    border-color: theme.$purple_3;
     background: theme.$gray_1;
-    box-shadow: inset 2px 0 0 theme.$purple_3;
   }
 }
 .io-choice__name {
@@ -2660,34 +2331,6 @@ async function execute() {
 }
 
 /* review */
-.wizard-summary {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  margin-bottom: 16px;
-}
-.wizard-summary-row {
-  display: flex;
-  justify-content: space-between;
-  border-bottom: 1px solid theme.$gray_1;
-  padding-bottom: 8px;
-}
-.wizard-summary-label {
-  color: theme.$gray_4;
-  font-size: 13px;
-}
-.wizard-summary-value {
-  color: theme.$gray_6;
-  font-weight: 500;
-  font-size: 13px;
-}
-.name-label {
-  display: block;
-  font-size: 12px;
-  font-weight: 600;
-  color: theme.$gray_5;
-  margin-bottom: 4px;
-}
 .run-dialog-footer {
   display: flex;
   justify-content: space-between;
@@ -2695,7 +2338,38 @@ async function execute() {
 }
 .wizard-footer-right {
   display: flex;
+  align-items: center;
   gap: 8px;
+}
+.resource-grid--below {
+  margin-top: 20px;
+}
+.nb-review {
+  max-width: 560px;
+  margin: 0 auto;
+  width: 100%;
+}
+.nb-review__name {
+  display: block;
+  margin-bottom: 20px;
+}
+.nb-review__label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: theme.$gray_5;
+}
+.nb-review__list {
+  margin: 0 0 12px;
+  padding: 14px 16px;
+  border: 1px solid theme.$gray_2;
+  border-radius: 4px;
+  gap: 8px 16px;
+
+  dd {
+    white-space: normal;
+  }
 }
 </style>
 

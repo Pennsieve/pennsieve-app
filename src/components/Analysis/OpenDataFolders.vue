@@ -6,7 +6,7 @@
 // narrows a level by its names' first letters, which S3 does, so it finds a
 // folder past the first 1,000. list, when given, lists a level instead (a
 // dandiset version's tree, from DANDI's API), as listOpenDataFolder does;
-// a file it marks zarr is a Zarr folder, which a view doesn't take yet.
+// a file it marks zarr is a Zarr folder, which a notebook reads in place.
 import { computed, onMounted, ref, watch } from "vue";
 import { listOpenDataFolder } from "@/utils/viewsService";
 
@@ -66,6 +66,9 @@ const crumbs = computed(() => {
   const parts = prefix.value.slice(props.root.length).split("/").filter(Boolean);
   return parts.map((name, i) => ({ name, prefix: props.root + parts.slice(0, i + 1).join("/") + "/" }));
 });
+// The folder shown, when it's a stack itself (views-service says).
+const STACKS = { "ome-zarr": "an OME-Zarr image", zarr: "a Zarr", "neuroglancer-precomputed": "a precomputed volume" };
+const levelStack = computed(() => STACKS[level.value?.stack] || "");
 const levelFiles = computed(() => (level.value?.files || []).filter((f) => !f.zarr));
 const levelZarrs = computed(() => (level.value?.files || []).filter((f) => f.zarr));
 const levelSize = computed(() => levelFiles.value.reduce((n, f) => n + (f.size || 0), 0));
@@ -107,9 +110,13 @@ const formatSize = (bytes) => {
         @input="onFilter"
       />
     </div>
-    <p class="odf__note">
+    <p v-if="levelStack" class="odf__note">
+      This folder is {{ levelStack }}: the notebook reads it whole, in place, without downloading it.
+    </p>
+    <p v-else class="odf__note">
       The notebook starts with {{ shown ? `everything in ${shown}` : `all of ${rootLabel}` }}.
-      Open a folder to start with less; a notebook lists at most 100,000 files.
+      Open a folder to start with less; a notebook lists at most 100,000 files. Zarr and
+      precomputed volumes in it are read in place.
     </p>
     <div class="odf__level">
       <div v-if="loading" class="odf__msg">Listing…</div>
@@ -132,7 +139,7 @@ const formatSize = (bytes) => {
           {{ levelFiles.length }} file{{ levelFiles.length === 1 ? "" : "s" }} here · {{ formatSize(levelSize) }}
         </div>
         <div v-if="levelZarrs.length" class="odf__msg" :title="levelZarrs.map((f) => f.name).join('\n')">
-          {{ levelZarrs.length }} Zarr folder{{ levelZarrs.length === 1 ? "" : "s" }} here ({{ formatSize(levelZarrs.reduce((n, f) => n + f.size, 0)) }}): not taken into a notebook yet
+          {{ levelZarrs.length }} Zarr folder{{ levelZarrs.length === 1 ? "" : "s" }} here ({{ formatSize(levelZarrs.reduce((n, f) => n + f.size, 0)) }}): read in place from the notebook, not downloaded
         </div>
         <div v-if="!level.folders.length && !level.files.length" class="odf__msg">
           Nothing here{{ filter ? ` starting with "${filter}"` : "" }}

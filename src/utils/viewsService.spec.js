@@ -9,6 +9,7 @@ import {
   listOpenData,
   searchOpenData,
   createOpenDataView,
+  createOpenDataViewOf,
   createDandiView,
   listOpenDataFolder,
   openDataViewName,
@@ -81,6 +82,12 @@ describe("listEntries", () => {
     const entries = await listEntries("v1", 2, { config, getToken, fetchFn });
     expect(entries).toHaveLength(1500);
     expect(fetchFn.mock.calls[1][0]).toBe("https://api2.pennsieve.net/views/v1/versions/2/entries?offset=1000&limit=1000");
+  });
+
+  it("lists stacks too when asked", async () => {
+    const fetchFn = respond([200, { totalCount: 1, entries: [{ cratePath: "a.ome.zarr/", kind: "stack" }] }]);
+    await listEntries("v1", 2, { includeStacks: true, config, getToken, fetchFn });
+    expect(fetchFn.mock.calls[0][0]).toBe("https://api2.pennsieve.net/views/v1/versions/2/entries?offset=0&limit=1000&include=stacks");
   });
 });
 
@@ -175,6 +182,22 @@ describe("open data", () => {
     const whole = respond([201, view]);
     await createOpenDataView({ dataset: "openneuro", title: "OpenNeuro" }, { config, getToken, fetchFn: whole });
     expect(JSON.parse(whole.mock.calls[0][1].body).sources).toEqual([{ kind: "openData", dataset: "openneuro" }]);
+  });
+
+  it("makes a run view of several folders of one Open Data dataset", async () => {
+    const fetchFn = respond([201, { id: "v-3", version: 1 }]);
+    await createOpenDataViewOf(
+      { dataset: "bossdb", name: "BossDB: witvliet2020 (2 selections)", prefixes: ["witvliet2020/Dataset_1/em/", "/Kasthuri/"] },
+      { config, getToken, fetchFn }
+    );
+    expect(JSON.parse(fetchFn.mock.calls[0][1].body)).toEqual({
+      name: "BossDB: witvliet2020 (2 selections)",
+      sources: [
+        { kind: "openData", dataset: "bossdb", prefix: "witvliet2020/Dataset_1/em/" },
+        { kind: "openData", dataset: "bossdb", prefix: "Kasthuri/" },
+      ],
+      lifecycle: "run",
+    });
   });
 
   it("makes a run view of a dandiset version, all of it or a folder", async () => {

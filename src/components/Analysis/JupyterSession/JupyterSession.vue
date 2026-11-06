@@ -10,14 +10,15 @@ import { useJupyterSession } from "@/composables/useJupyterSession";
 import { markSessionEnded } from "../RunMonitor/endedSessions";
 import NotebookCell from "./NotebookCell.vue";
 import FileBrowser from "./FileBrowser.vue";
-import InputsPanel from "./InputsPanel.vue";
+import AddDataDialog from "./AddDataDialog.vue";
+import { useSessionInputs } from "./useSessionInputs";
 import EnvironmentPanel from "./EnvironmentPanel.vue";
-import { sessionPathCode } from "./pathCode";
+import { sessionPathCode, stackCode } from "./pathCode";
 import RuntimeMark from "../WorkflowGraph/RuntimeMark.vue";
-import IconWarningCircle from "@/components/icons/IconWarningCircle.vue";
 import { fetchRun } from "../RunMonitor/runDetails";
 import { runOnGpu, runNodeId, gpuShortLabel, gpuMarkTitle, sessionRestrictions } from "../RunMonitor/notebookHelpers";
-import { nodeGpu } from "../ComputeNodes/computeNodeHelpers";
+import IconWarningCircle from "@/components/icons/IconWarningCircle.vue";
+import { nodeGpu, nodeRegion } from "../ComputeNodes/computeNodeHelpers";
 import { useComputeResourcesStore } from "@/stores/computeResourcesStore";
 import { useStore } from "vuex";
 import * as siteConfig from "@/site-config/site.json";
@@ -40,15 +41,15 @@ const props = defineProps({
 // A GPU session (the session app's gpu variant): marked in the header, and
 // the environment panel warns about environments that bring their own
 // torch, tensorflow or jax. Read from the run; a CPU session until it is.
-// The header names the run's node's GPU (its GPU tier) where known. The
-// run's node also limits the data the Inputs panel can add (a compliant
-// node reads public data only in its region).
+// The header names the run's node's GPU (its GPU tier) where known.
 const onGpu = ref(false);
 const sessionGpu = ref(null);
+// The run's compute node, where known: its region and tier say what a
+// download from another region costs (useSessionInputs).
 const sessionNode = ref(null);
 const vuexStore = useStore();
 const computeResourcesStore = useComputeResourcesStore();
-async function loadSessionNode(run) {
+async function loadRunNode(run) {
   const nodeId = runNodeId(run);
   if (!nodeId) return null;
   try {
@@ -81,9 +82,9 @@ watch(
     const run = await fetchRun(siteConfig.api2Url, id);
     if (id !== props.runId) return;
     onGpu.value = runOnGpu(run);
-    const node = await loadSessionNode(run);
+    const node = await loadRunNode(run);
     if (id !== props.runId) return;
-    sessionNode.value = node;
+    sessionNode.value = node && { region: nodeRegion(node), deploymentMode: node.deploymentMode || "" };
     if (!onGpu.value) return;
     const gpu = await loadSessionGpu(node);
     if (id === props.runId) sessionGpu.value = gpu;
@@ -133,6 +134,7 @@ const {
   connectPhase,
   kernelStatus,
   kernelName,
+  kernelPackages,
   error,
   cells,
   dirty,
@@ -147,6 +149,7 @@ const {
   listDir,
   fetchInputs,
   inputsStatus,
+  cancelInputs,
   inputSources,
   addInputSource,
   removeInputSource,
@@ -328,6 +331,22 @@ function nudgeSidebar(delta) {
   }
 }
 const fileBrowserRef = ref(null);
+
+// The session's view inputs, shown in Session files under input/; adding
+// one opens the platforms' dialog.
+const inputs = useSessionInputs({
+  runId: () => props.runId,
+  node: () => sessionNode.value,
+  fetchInputs,
+  inputsStatus,
+  cancelInputs,
+  inputSources,
+  addInputSource,
+  removeInputSource,
+  ready: computed(() => status.value === "ready"),
+  onDownloaded: () => fileBrowserRef.value?.refresh?.(),
+});
+const addingData = ref(false);
 let lastD = 0;
 
 // One-time info dialog shown when a session opens. Dismissed permanently per
@@ -482,7 +501,13 @@ async function focusCell(id) {
 // Insert a filesystem path (from the file browser) into the selected code cell
 // as a quoted string; if no code cell is selected, create one.
 function insertPath(path) {
-  const literal = sessionPathCode(path, kernelName.value);
+  insertCode(sessionPathCode(path, kernelName.value));
+}
+// The code that opens a stack (a Zarr in an input) in place.
+function insertStack(entry) {
+  insertCode(stackCode(entry, kernelName.value));
+}
+function insertCode(literal) {
   let cell = selectedCell();
   if (!cell || cell.cell_type !== "code") {
     const id = addCell(cell ? cell.id : null, "code");
@@ -839,18 +864,14 @@ const kernelPill = computed(() => {
           :ready="status === 'ready'"
           :kernel-name="kernelName"
           :gpu="onGpu"
+          :kernel-packages="kernelPackages"
         />
-        <InputsPanel
-          :run-id="runId"
-          :fetch-inputs="fetchInputs"
-          :inputs-status="inputsStatus"
-          :input-sources="inputSources"
+        <AddDataDialog
+          v-if="inputs.canAdd"
+          v-model="addingData"
+          :sources="inputs.sources"
           :add-input-source="addInputSource"
-          :remove-input-source="removeInputSource"
-          :ready="status === 'ready'"
-          :node="sessionNode"
-          :width="sidebarWidth"
-          @downloaded="fileBrowserRef?.refresh?.()"
+          @added="inputs.loadSources()"
         />
         <div class="nb-files__browser">
           <FileBrowser
@@ -858,8 +879,11 @@ const kernelPill = computed(() => {
             :list-dir="listDir"
             :ready="status === 'ready'"
             :kernel-name="kernelName"
+            :inputs="inputs"
             @insert-path="insertPath"
             @open-notebook="requestOpen"
+            @insert-stack="insertStack"
+            @add-data="addingData = true"
           />
         </div>
         </div>
