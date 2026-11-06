@@ -33,6 +33,14 @@ export const DATA_PLATFORMS = {
     desc: "Open neuroimaging datasets, from its copy on AWS",
     noun: "public datasets",
   },
+  // BossDB's public volumes are in the Registry of Open Data on AWS, one
+  // Neuroglancer precomputed volume per channel: found with BossDB's own API
+  // (utils/bossdb), read in place.
+  bossdb: {
+    name: "BossDB",
+    desc: "Electron microscopy and connectomics volumes",
+    noun: "collections",
+  },
   // The DANDI Archive's dandisets are in the Registry of Open Data on AWS,
   // as files stored by content: a notebook takes a dandiset version as
   // views-service's own kind of source (utils/dandi).

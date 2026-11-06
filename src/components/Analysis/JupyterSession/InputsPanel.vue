@@ -20,6 +20,8 @@ import { OPENNEURO_REGISTRY } from "@/utils/openNeuro";
 import PortalPicker from "../PortalPicker.vue";
 import DandiPicker from "../DandiPicker.vue";
 import { DANDI_REGISTRY, dandiViewTitle } from "@/utils/dandi";
+import BossdbPicker from "../BossdbPicker.vue";
+import { BOSSDB_REGISTRY } from "@/utils/bossdb";
 import { OPEN_DATA_PORTALS } from "@/utils/openDataPortals";
 import PlatformMark from "../PlatformMark.vue";
 import { DATA_PLATFORMS } from "../dataPlatforms";
@@ -353,7 +355,8 @@ async function download() {
 /* ------------------------------------------------- adding and removing --- */
 // Another view while the session runs, from a data platform: a Pennsieve
 // Discover dataset version, or an OpenNeuro, SPARC, Epilepsy.Science or AWS
-// Open Data dataset or a folder of one, or a dandiset version or a folder
+// Open Data dataset or a folder of one, a BossDB volume, or a dandiset
+// version or a folder
 // of it, made into a view and staged as input/<name>/.
 const addOpen = ref(false);
 const addPlatform = ref("discover");
@@ -365,6 +368,8 @@ const addOpenNeuro = ref(null);
 const addOpenNeuroPrefix = ref("");
 const addDandi = ref(null);
 const addDandiPrefix = ref("");
+const addBossdb = ref(null);
+const addBossdbPrefix = ref("");
 // A SPARC or Epilepsy.Science dataset: a folder of the portal's Open Data
 // entry. Choosing the other portal starts over.
 const addPortal = ref(null);
@@ -387,6 +392,8 @@ function openAdd() {
   addOpenNeuroPrefix.value = "";
   addDandi.value = null;
   addDandiPrefix.value = "";
+  addBossdb.value = null;
+  addBossdbPrefix.value = "";
   addPortal.value = null;
   addPortalPrefix.value = "";
   addError.value = null;
@@ -398,6 +405,8 @@ const addReady = computed(() =>
     ? !!addDiscover.value
     : addPlatform.value === "openNeuro"
     ? !!addOpenNeuro.value
+    : addPlatform.value === "bossdb"
+    ? !!addBossdb.value
     : addPlatform.value === "dandi"
     ? !!addDandi.value
     : addIsPortal.value
@@ -418,6 +427,12 @@ const addDuplicate = computed(() => {
     if (!d) return null;
     const name = openDataViewName(d.name, addOpenNeuroPrefix.value);
     return sources.value.find((s) => s.openDataset === OPENNEURO_REGISTRY && s.viewName === name) || null;
+  }
+  if (addPlatform.value === "bossdb") {
+    const d = addBossdb.value;
+    if (!d) return null;
+    const name = openDataViewName(d.name, addBossdbPrefix.value);
+    return sources.value.find((s) => s.openDataset === BOSSDB_REGISTRY && s.viewName === name) || null;
   }
   if (addPlatform.value === "dandi") {
     const d = addDandi.value;
@@ -441,6 +456,8 @@ const addDuplicateLabel = computed(() =>
     ? `Version ${addDiscoverVersion.value} of ${addDiscover.value?.name}`
     : addPlatform.value === "openNeuro"
     ? `This folder of ${addOpenNeuro.value?.name}`
+    : addPlatform.value === "bossdb"
+    ? `${addBossdb.value?.name}`
     : addPlatform.value === "dandi"
     ? `This folder of ${addDandi.value?.name} (${addDandi.value?.version})`
     : addIsPortal.value
@@ -462,6 +479,11 @@ async function addData() {
       const d = addOpenNeuro.value;
       view = await createOpenDataView({ dataset: OPENNEURO_REGISTRY, title: d.name, prefix: addOpenNeuroPrefix.value });
       folder = (n) => addedSourceName(OPENNEURO_REGISTRY, addOpenNeuroPrefix.value, n);
+    } else if (addPlatform.value === "bossdb") {
+      const d = addBossdb.value;
+      view = await createOpenDataView({ dataset: BOSSDB_REGISTRY, title: d.name, prefix: addBossdbPrefix.value });
+      // Named after the volume: bossdb-witvliet2020-Dataset_1-em.
+      folder = (n) => addedSourceName(BOSSDB_REGISTRY, `${d.collection}-${d.experiment}-${d.channel}/`, n);
     } else if (addPlatform.value === "dandi") {
       const d = addDandi.value;
       const p = addDandiPrefix.value;
@@ -773,6 +795,11 @@ function fmtSize(bytes) {
           v-else-if="addPlatform === 'openNeuro'"
           v-model:dataset="addOpenNeuro"
           v-model:prefix="addOpenNeuroPrefix"
+        />
+        <BossdbPicker
+          v-else-if="addPlatform === 'bossdb'"
+          v-model:dataset="addBossdb"
+          v-model:prefix="addBossdbPrefix"
         />
         <DandiPicker
           v-else-if="addPlatform === 'dandi'"

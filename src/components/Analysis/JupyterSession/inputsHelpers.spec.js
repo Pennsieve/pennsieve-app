@@ -114,6 +114,7 @@ describe("inputSubtitle", () => {
   it("says where an input came from, and its folder", () => {
     expect(inputSubtitle({ openDataset: "openneuro", folder: "openneuro-ds008968" })).toBe("OpenNeuro · openneuro-ds008968");
     expect(inputSubtitle({ openDataset: "dandiarchive", folder: "dandiarchive-000003" })).toBe("DANDI · dandiarchive-000003");
+    expect(inputSubtitle({ openDataset: "bossdb", folder: "bossdb-witvliet2020-Dataset_1-em" })).toBe("BossDB · bossdb-witvliet2020-Dataset_1-em");
     expect(inputSubtitle({ openDataset: "sparc", folder: "sparc-704" })).toBe("SPARC · sparc-704");
     expect(inputSubtitle({ openDataset: "epilepsy-science" })).toBe("Epilepsy.Science");
     expect(inputSubtitle({ openDataset: "1000-genomes", folder: "1000-genomes-HG00096" })).toBe("AWS Open Data · 1000-genomes-HG00096");

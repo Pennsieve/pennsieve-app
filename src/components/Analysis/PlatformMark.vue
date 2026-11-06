@@ -1,7 +1,8 @@
 <script setup>
 // A data platform's mark: the Pennsieve mark for Pennsieve Discover, a
 // brain for OpenNeuro, SPARC's and Epilepsy.Science's own logos (portals
-// Pennsieve runs), DANDI's (from its Apache-2.0 repository), and a neutral cloud and data store for the Registry of
+// Pennsieve runs), DANDI's (from its Apache-2.0 repository), BossDB's (with
+// its owners' blessing), and a neutral cloud and data store for the Registry of
 // Open Data on AWS (not AWS's logo).
 import IconPennsieveMark from "@/components/icons/IconPennsieveMark.vue";
 import IconOpenData from "@/components/icons/IconOpenData.vue";
@@ -9,11 +10,12 @@ import IconBrain from "@/components/icons/IconBrain.vue";
 import sparcLogo from "@/assets/images/logos/sparc-logo.svg";
 import epilepsyScienceLogo from "@/assets/images/logos/epilepsy-science-logo.svg";
 import dandiLogo from "@/assets/images/logos/dandi-logo.svg";
+import bossdbLogo from "@/assets/images/logos/bossdb-logo.svg";
 
-const LOGOS = { sparc: sparcLogo, epilepsyScience: epilepsyScienceLogo, dandi: dandiLogo };
+const LOGOS = { sparc: sparcLogo, epilepsyScience: epilepsyScienceLogo, dandi: dandiLogo, bossdb: bossdbLogo };
 
 defineProps({
-  platform: { type: String, required: true }, // discover | openNeuro | sparc | epilepsyScience | openData | dandi
+  platform: { type: String, required: true }, // discover | openNeuro | sparc | epilepsyScience | openData | dandi | bossdb
   size: { type: Number, default: 36 },
 });
 </script>
@@ -59,7 +61,8 @@ defineProps({
 /* The SPARC and DANDI wordmarks on white, inset; Epilepsy.Science's mark
    is square with its own background, so it fills the tile. */
 .pm--sparc,
-.pm--dandi {
+.pm--dandi,
+.pm--bossdb {
   box-sizing: border-box;
   border: 1px solid theme.$gray_2;
   background: theme.$white;

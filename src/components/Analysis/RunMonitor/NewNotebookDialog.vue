@@ -70,6 +70,8 @@ import OpenNeuroPicker from "../OpenNeuroPicker.vue";
 import { countOpenNeuro, OPENNEURO_REGISTRY } from "@/utils/openNeuro";
 import DandiPicker from "../DandiPicker.vue";
 import { countDandi, dandiViewTitle } from "@/utils/dandi";
+import BossdbPicker from "../BossdbPicker.vue";
+import { countBossdb, BOSSDB_REGISTRY } from "@/utils/bossdb";
 import PortalPicker from "../PortalPicker.vue";
 import { OPEN_DATA_PORTALS, portalDatasetIds } from "@/utils/openDataPortals";
 import DiscoverPicker from "../DiscoverPicker.vue";
@@ -404,11 +406,12 @@ const INPUT_CHOICES = {
   sparc: { label: DATA_PLATFORMS.sparc.name, desc: DATA_PLATFORMS.sparc.desc, platform: "sparc" },
   epilepsyScience: { label: DATA_PLATFORMS.epilepsyScience.name, desc: DATA_PLATFORMS.epilepsyScience.desc, platform: "epilepsyScience" },
   openNeuro: { label: DATA_PLATFORMS.openNeuro.name, desc: DATA_PLATFORMS.openNeuro.desc, platform: "openNeuro" },
+  bossdb: { label: DATA_PLATFORMS.bossdb.name, desc: DATA_PLATFORMS.bossdb.desc, platform: "bossdb" },
   dandi: { label: DATA_PLATFORMS.dandi.name, desc: DATA_PLATFORMS.dandi.desc, platform: "dandi" },
   none: { label: "No input", desc: "Start with an empty input/ folder" },
 };
 // The data platforms' sizes, shown on their cards.
-const platformCounts = ref({ discover: null, openNeuro: null, sparc: null, epilepsyScience: null, openData: null, dandi: null });
+const platformCounts = ref({ discover: null, openNeuro: null, sparc: null, epilepsyScience: null, openData: null, bossdb: null, dandi: null });
 function loadPlatformCounts() {
   if (!publicInputs) return;
   if (platformCounts.value.discover == null) {
@@ -419,6 +422,11 @@ function loadPlatformCounts() {
   if (platformCounts.value.openNeuro == null) {
     countOpenNeuro()
       .then((n) => (platformCounts.value.openNeuro = n))
+      .catch(() => {});
+  }
+  if (platformCounts.value.bossdb == null) {
+    countBossdb()
+      .then((n) => (platformCounts.value.bossdb = n))
       .catch(() => {});
   }
   if (platformCounts.value.dandi == null) {
@@ -448,7 +456,7 @@ const platformLine = (c) => {
 const inputChoices = computed(() => {
   const c = [];
   if (!props.personal) c.push("dataset");
-  if (publicInputs) c.push("public", "openData", "sparc", "epilepsyScience", "openNeuro", "dandi");
+  if (publicInputs) c.push("public", "openData", "sparc", "epilepsyScience", "openNeuro", "bossdb", "dandi");
   c.push("none");
   return c;
 });
@@ -606,6 +614,8 @@ const canNext = computed(() => {
         ? !!openDataDataset.value
         : inputChoice.value === "openNeuro"
         ? !!openNeuroDataset.value
+        : inputChoice.value === "bossdb"
+        ? !!bossdbDataset.value
         : inputChoice.value === "dandi"
         ? !!dandiDataset.value
         : isPortal.value
@@ -675,6 +685,12 @@ const openNeuroLabel = computed(() => {
   if (!d) return "";
   return `${d.name} (${openNeuroPrefix.value || d.id})`;
 });
+
+// A BossDB volume (a channel), chosen with BossdbPicker: a view of its
+// folder of the bossdb entry, which views-service takes whole (a precomputed
+// volume, read in place).
+const bossdbDataset = ref(null); // { collection, experiment, channel, name, ... }
+const bossdbPrefix = ref("");
 
 // A dandiset version, chosen with DandiPicker: a view of its files (each
 // read from its blob in the archive's bucket), all or a folder's.
@@ -931,6 +947,8 @@ function reset() {
   openNeuroPrefix.value = "";
   dandiDataset.value = null;
   dandiPrefix.value = "";
+  bossdbDataset.value = null;
+  bossdbPrefix.value = "";
   portalDataset.value = null;
   portalPrefix.value = "";
   // The data comes first: a workspace's own dataset, else a public one.
@@ -1042,6 +1060,8 @@ const soFar = computed(() => {
         ? openDataLabel.value || "AWS Open Data"
         : inputChoice.value === "openNeuro"
         ? openNeuroLabel.value || "OpenNeuro"
+        : inputChoice.value === "bossdb"
+        ? bossdbDataset.value?.name || "BossDB"
         : inputChoice.value === "dandi"
         ? dandiLabel.value || "DANDI"
         : isPortal.value
@@ -1164,6 +1184,16 @@ async function execute() {
       });
       personalSources[dataSourceNodes.value[0].id] = viewDataSource(view);
     }
+    // A BossDB volume: a view of its channel's folder, a precomputed volume.
+    const usesBossdb = inputChoice.value === "bossdb";
+    if (usesBossdb && bossdbDataset.value && dataSourceNodes.value.length) {
+      const view = await createOpenDataView({
+        dataset: BOSSDB_REGISTRY,
+        title: bossdbDataset.value.name,
+        prefix: bossdbPrefix.value,
+      });
+      personalSources[dataSourceNodes.value[0].id] = viewDataSource(view);
+    }
     // A dandiset version: a view of its files, each read from its blob.
     const usesDandi = inputChoice.value === "dandi";
     if (usesDandi && dandiDataset.value && dataSourceNodes.value.length) {
@@ -1195,7 +1225,7 @@ async function execute() {
         ...(processorConfigs.length > 0 && { processorConfigs }),
       },
       ...(runDatasetId.value && { datasetId: runDatasetId.value }),
-      dataSources: usesPublic || usesOpenData || usesOpenNeuro || usesDandi || usesPortal ? personalSources : dataSources,
+      dataSources: usesPublic || usesOpenData || usesOpenNeuro || usesBossdb || usesDandi || usesPortal ? personalSources : dataSources,
       ...(name && { name }),
       ...(Object.keys(dataTargets).length > 0 && { dataTargets }),
     };
@@ -1509,6 +1539,18 @@ async function execute() {
           to download from the notebook.
         </p>
         <OpenNeuroPicker v-model:dataset="openNeuroDataset" v-model:prefix="openNeuroPrefix" />
+      </div>
+      <div v-else-if="step === S.INPUT && inputChoice === 'bossdb'" class="wizard-step">
+        <h4 class="io-section-title io-platform-title">
+          <PlatformMark platform="bossdb" :size="24" />
+          Choose a BossDB volume
+        </h4>
+        <p class="wizard-step-desc">
+          A volume from <a href="https://bossdb.org" target="_blank" rel="noopener">BossDB</a>, read
+          from its copy in the Registry of Open Data on AWS. The notebook reads it in place, a
+          region at a time; nothing is downloaded up front.
+        </p>
+        <BossdbPicker v-model:dataset="bossdbDataset" v-model:prefix="bossdbPrefix" />
       </div>
       <div v-else-if="step === S.INPUT && inputChoice === 'dandi'" class="wizard-step">
         <h4 class="io-section-title io-platform-title">
@@ -1920,6 +1962,7 @@ async function execute() {
   .discover-picker > :deep(.wizard-cards),
   :deep(.on-cards),
   :deep(.dd-cards),
+  :deep(.bd-cards),
   :deep(.od-cards),
   :deep(.pp-cards) {
     flex: 1 1 auto;

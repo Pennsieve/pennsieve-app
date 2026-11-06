@@ -23,6 +23,7 @@ describe("data hints", () => {
     expect(dataRegions("sparc")).toEqual(["us-east-1"]);
     expect(dataRegions("epilepsyScience")).toEqual(["us-east-1"]);
     expect(dataRegions("dandi")).toEqual(["us-east-2"]);
+    expect(dataRegions("bossdb")).toEqual(["us-east-1"]);
     expect(nodeDataReason({ deploymentMode: "compliant" }, "dandi")).not.toBe("");
     expect(dataRegions("openData", { openDataDataset: { regions: ["us-west-2"] } })).toEqual(["us-west-2"]);
     expect(dataRegions("public")).toEqual([]);
