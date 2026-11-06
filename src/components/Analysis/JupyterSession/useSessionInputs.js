@@ -128,7 +128,7 @@ export function useSessionInputs({
             // An Open Data view's own name says which folder of the dataset.
             name: (first.openDataset ? view?.name : first.name) || view?.name || "Dataset",
             subtitle: inputSubtitle({
-              platform: platformReading(first.openDataset)?.name,
+              platform: platformReading(first.openDataset, first.publisher)?.name,
               openDataset: first.openDataset || "",
               sourceVersion: first.version,
             }),

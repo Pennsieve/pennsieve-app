@@ -26,8 +26,9 @@
 //                            where the data is, its size when known, whether
 //                            a GPU may help, and whether it's in a public
 //                            bucket (which a compliant node can't reach)
-//   reads(entry)             whether an Open Data entry is the platform's
-//                            own (an input's subtitle names it)
+//   reads(entry, publisher)  whether an Open Data entry (with its publisher,
+//                            as a view's source says) is the platform's own
+//                            (an input's subtitle names it)
 import discover from "./discover";
 import openData from "./openData";
 import { sparc, epilepsyScience } from "./portals";
@@ -53,4 +54,4 @@ export function platformData(key, part) {
 }
 
 // The platform whose own Open Data entry this is, if any.
-export const platformReading = (entry) => (entry ? LIST.find((p) => p.reads(entry)) || null : null);
+export const platformReading = (entry, publisher = "") => (entry ? LIST.find((p) => p.reads(entry, publisher)) || null : null);

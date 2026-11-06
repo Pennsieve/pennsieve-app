@@ -44,7 +44,20 @@ describe("a CELLxGENE view", () => {
     expect(create).toHaveBeenCalledWith({
       dataset: "biohub-cellxgene-census",
       name: "CELLxGENE: 2 datasets",
-      groups: [{ prefix: "2025-01-30/h5ads/", paths: ["a1.h5ad", "b2.h5ad"] }],
+      groups: [{
+        prefix: "2025-01-30/h5ads/",
+        paths: ["a1.h5ad", "b2.h5ad"],
+        names: { "a1.h5ad": "Lung epithelium (a1).h5ad", "b2.h5ad": "Cardiomyocytes (b2).h5ad" },
+      }],
     });
+  });
+});
+
+describe("a CELLxGENE file's name", () => {
+  it("is its title and the start of its id", async () => {
+    const { cellxgeneFileName } = await import("./cellxgene");
+    expect(cellxgeneFileName({ id: "9c1b5626-58df-4401-ae7b-f66d068c1551", title: "10X_3-rep2" })).toBe("10X_3-rep2 (9c1b5626).h5ad");
+    expect(cellxgeneFileName({ id: "9c1b5626-58df", title: " Lung / airway\n epithelium " })).toBe("Lung airway epithelium (9c1b5626).h5ad");
+    expect(cellxgeneFileName({ id: "9c1b5626-58df", title: "" })).toBe("(9c1b5626).h5ad");
   });
 });

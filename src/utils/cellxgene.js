@@ -69,9 +69,22 @@ export function cellxgeneFolderName(picks) {
   return collections.length === 1 ? collections[0] : `${picks.length}-datasets`
 }
 
+// A dataset's file name in a session: the Census names it by its id
+// (<uuid>.h5ad), so its title, as a file name may have it, with the start
+// of its id (titles repeat: 10X_3-rep2): "10X_3-rep2 (9c1b5626).h5ad".
+export function cellxgeneFileName({ id, title }) {
+  const t = String(title || '')
+    .replace(/[\/\u0000-\u001f]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 120)
+  return `${t ? `${t} ` : ''}(${String(id).slice(0, 8)}).h5ad`
+}
+
 // A view made for one run of the datasets picked: the release's folder,
-// naming their files.
+// naming their files, each under its title.
 export async function createCellxgeneView(picks, { load = cellxgeneDatasets, create = createOpenDataFilesView } = {}) {
   const { openDataset, prefix } = await load()
-  return create({ dataset: openDataset, name: cellxgeneViewName(picks), groups: [{ prefix, paths: picks.map((p) => p.file) }] })
+  const names = Object.fromEntries(picks.map((p) => [p.file, cellxgeneFileName(p)]))
+  return create({ dataset: openDataset, name: cellxgeneViewName(picks), groups: [{ prefix, paths: picks.map((p) => p.file), names }] })
 }

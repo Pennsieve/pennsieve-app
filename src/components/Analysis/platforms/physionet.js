@@ -2,7 +2,7 @@
 // Open Data on AWS: a notebook takes a version's folder (utils/physionet).
 import { defineAsyncComponent } from "vue";
 import physionetMark from "@/assets/images/logos/physionet-mark.svg";
-import { countPhysionet } from "@/utils/physionet";
+import { countPhysionet, PHYSIONET_PUBLISHER } from "@/utils/physionet";
 import { openDataPlatform } from "./openDataPlatform";
 
 export default openDataPlatform({
@@ -28,4 +28,6 @@ export default openDataPlatform({
   count: () => countPhysionet(),
   regions: () => ["us-east-1"],
   imaging: () => false,
+  // Each project is an entry of its own name, published by PhysioNet.
+  reads: (entry, publisher) => publisher === PHYSIONET_PUBLISHER,
 });

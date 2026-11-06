@@ -104,6 +104,8 @@ describe("the data platforms", () => {
     expect(platformReading("dandiarchive")?.name).toBe("DANDI");
     expect(platformReading("allen-mouse-brain-atlas")?.name).toBe("Allen Institute");
     expect(platformReading("1000-genomes")).toBeNull();
+    expect(platformReading("cgmacros", "PhysioNet")?.name).toBe("PhysioNet");
+    expect(platformReading("encode-project")?.name).toBe("ENCODE");
     expect(platformReading("")).toBeNull();
   });
 });
