@@ -12,7 +12,7 @@
 import { isPathPrefixParam, targetParamLabel, defaultsToRunName, targetWritesToDataset, canWriteDataset, searchDatasets } from "./dataTargets";
 import { hasInterface, withInterfaceNodes, destinationChoices, NO_DESTINATION } from "./workflowInterface";
 import { acceptsInput, dataRegions, nodeDataReason, nodeDataNote, dataSize, suggestedDisk, isImagingData } from "./dataHints";
-import { computed, reactive, ref, watch } from "vue";
+import { computed, nextTick, reactive, ref, watch } from "vue";
 import { useStore } from "vuex";
 import BfButton from "../../shared/bf-button/BfButton.vue";
 import AnalysisFilesTable from "../../FilesTable/AnalysisFilesTable.vue";
@@ -48,6 +48,7 @@ import {
   hardwareLabel as hardwareOptionLabel,
   gpuSessionHelp,
   gpuReviewResources,
+  GPU_INSTANCE_DISK_GIB,
   DEFAULT_NOTEBOOK_DISK_GIB,
   NOTEBOOK_DISK_OPTIONS,
   notebookDiskLabel,
@@ -137,16 +138,18 @@ const executing = ref(false);
 // The steps, in order (indices into stepTitles).
 // The data first: it decides which kernels can take it, and guides the
 // compute node, hardware and disk (dataHints).
-const S = { INPUT: 0, KERNEL: 1, FILES: 2, NODE: 3, HARDWARE: 4, RESOURCES: 5, OUTPUT: 6, REVIEW: 7 };
+// The last names the session and starts it, with what's chosen.
+// Hardware and its resources are one step: the CPU, memory and disk follow
+// from the hardware chosen (a GPU's are its instance's).
+const S = { INPUT: 0, KERNEL: 1, FILES: 2, NODE: 3, HARDWARE: 4, OUTPUT: 5, REVIEW: 6 };
 const stepTitles = computed(() => [
   "Choose Data",
   "Select Kernel",
   "Select Input Files",
   "Select Compute Node",
-  "Hardware",
-  "Compute Resources",
+  "Hardware & Resources",
   iface.value ? "Results" : "Output Destination",
-  "Review & Start",
+  "Name & Start",
 ]);
 
 /* ------------------------------------------------------ compute resources --- */
@@ -301,7 +304,7 @@ const hardwareLabel = computed(() => {
   const o = currentHardware.value || (isGpu.value ? { gpu: true, name: "GPU" } : selectedVariant.value);
   return o ? hardwareOptionLabel(o, selectedGpu.value) : "";
 });
-// The review's hardware row: on a GPU, its name and the node's GPU ("GPU ·
+// The summary's hardware row: on a GPU, its name and the node's GPU ("GPU ·
 // NVIDIA L4 · 24 GB"; the resources have their own row).
 const reviewHardware = computed(() => {
   if (!isGpu.value) return hardwareLabel.value;
@@ -592,9 +595,8 @@ const canNext = computed(() => {
     case S.NODE:
       return !!form.value.computeNodeId && !(selectedComputeNode.value && nodeReasons(selectedComputeNode.value).length);
     case S.HARDWARE:
+      // Resources always have a valid default (1 vCPU).
       return !allHardware.value.length || nodeHardware.value.includes(currentHardware.value);
-    case S.RESOURCES:
-      return true; // resources always have a valid default (1 vCPU)
     case S.INPUT:
       return inputChoice.value === "dataset"
         ? !!form.value.datasetId
@@ -988,11 +990,11 @@ watch(visible, (open) => {
 // public dataset's files from the notebook itself.
 // A GPU kernel runs with its node's GPU instance's resources, and a variant
 // that declares its own with those: no CPU and memory to choose. A kernel
-// without a hardware choice has no Hardware step.
+// with neither a hardware choice nor resources to choose has no Hardware
+// step.
 const skipsStep = (i) =>
   (i === S.FILES && inputChoice.value !== "dataset") ||
-  (i === S.HARDWARE && !allHardware.value.length) ||
-  (i === S.RESOURCES && variantResourcesSet.value);
+  (i === S.HARDWARE && !allHardware.value.length && variantResourcesSet.value);
 
 const next = async () => {
   if (step.value === S.KERNEL) await loadDefinition(); // leaving Kernel → its inputs and outputs
@@ -1000,6 +1002,12 @@ const next = async () => {
   while (skipsStep(n)) n++;
   if (n < stepTitles.value.length) step.value = n;
 };
+// The input step's "No input data": no data, and on to the kernel.
+async function startWithoutData() {
+  inputChoice.value = "none";
+  await nextTick();
+  await next();
+}
 const back = () => {
   let n = step.value - 1;
   while (n > 0 && skipsStep(n)) n--;
@@ -1015,10 +1023,9 @@ const STEP_ABOUT = [
   "A notebook is a live Jupyter session on a compute node. Choose its language.",
   "The files copied into the notebook's input/ folder before it starts.",
   "The compute node the session runs on. Only nodes with notebook sessions are offered; each says whether it has a GPU.",
-  "CPU, or the node's GPU when it has one. A GPU notebook gets the whole GPU instance.",
-  "The CPU and memory the session gets. Memory follows the CPU unless you set it.",
+  "CPU, or the node's GPU when it has one. A GPU notebook gets the whole GPU instance; a CPU one the CPU, memory and disk you choose.",
   "Where the notebook's results go when the session ends.",
-  "Check the session, name it, and start it.",
+  "",
 ];
 const stepAbout = computed(() =>
   step.value === S.NODE && gpuFirst.value
@@ -1049,11 +1056,23 @@ const soFar = computed(() => {
     rows.push({ label: "Files", value: String(dataSourceNodes.value.reduce((n, d) => n + fileCountForNode(d.id), 0)) });
   }
   if (step.value > S.NODE && selectedComputeNode.value) rows.push({ label: "Compute node", value: selectedComputeNode.value.name });
-  if ((step.value > S.HARDWARE || gpuFirst.value) && step.value > S.KERNEL && hardwareLabel.value) rows.push({ label: "Hardware", value: hardwareLabel.value });
-  if (step.value > S.RESOURCES && !variantResourcesSet.value) {
-    rows.push({ label: "Resources", value: `${cpuLabel(resourceCpu.value)} · ${isAutoMemory.value ? memoryLabel(autoMemoryForCpu(resourceCpu.value)) : memoryLabel(resourceMemory.value)} · ${notebookDiskLabel(resourceDisk.value)}` });
+  if ((step.value > S.HARDWARE || gpuFirst.value) && step.value > S.KERNEL && reviewHardware.value) rows.push({ label: "Hardware", value: reviewHardware.value });
+  if (step.value > S.HARDWARE) {
+    // A GPU's are its instance's; a variant may set its own.
+    const resources = isGpu.value
+      ? gpuReviewResources(selectedGpu.value)
+      : variantResourcesSet.value
+      ? variantResources(selectedVariant.value) && `${variantResources(selectedVariant.value)} (set by the kernel)`
+      : `${cpuLabel(resourceCpu.value)} · ${isAutoMemory.value ? memoryLabel(autoMemoryForCpu(resourceCpu.value)) : memoryLabel(resourceMemory.value)} · ${notebookDiskLabel(resourceDisk.value)}`;
+    if (resources) rows.push({ label: "Resources", value: resources });
   }
-  if (step.value > S.OUTPUT && iface.value) rows.push({ label: "Results", value: outputLabel(outputChoice.value) });
+  if (step.value > S.OUTPUT && iface.value) {
+    const to = outputWritesDataset.value
+      ? `Saved to ${chooseResultsDataset.value ? resultsDataset.value?.content?.name : selectedDataset.value?.content?.name}`
+      : outputLabel(outputChoice.value);
+    rows.push({ label: "Results", value: to });
+  }
+  if (step.value > S.OUTPUT && viewOnly.value && !iface.value) rows.push({ label: "Results saved to", value: resultsDataset.value?.content?.name || "" });
   return rows;
 });
 
@@ -1229,8 +1248,8 @@ async function execute() {
       <!-- Two columns on every step: what it's for and what's chosen so far on
            the left (on Input and Results, the step's own choices are), the
            step on the right. On a narrow screen, the step alone. -->
-      <div class="nb-layout" :class="{ 'has-info': !stepHasChoices, 'is-split': step === S.INPUT }">
-      <aside v-if="!stepHasChoices" class="nb-info">
+      <div class="nb-layout" :class="{ 'has-info': !stepHasChoices && step !== S.REVIEW, 'is-split': step === S.INPUT }">
+      <aside v-if="!stepHasChoices && step !== S.REVIEW" class="nb-info">
         <p class="nb-info__about">{{ stepAbout }}</p>
         <template v-if="soFar.length">
           <h4 class="nb-info__title">This session</h4>
@@ -1343,11 +1362,11 @@ async function execute() {
 
       <!-- Hardware: what the chosen node can run, as cards to compare -->
       <div v-if="step === S.HARDWARE" class="wizard-step">
-        <p class="wizard-step-desc">Where should this notebook run?</p>
+        <p v-if="nodeHardware.length" class="wizard-step-desc">Where should this notebook run?</p>
         <p v-if="imagingData" class="data-hint">
           This is imaging data: a GPU can speed up deep learning, registration and segmentation.
         </p>
-        <div class="hardware-grid" role="radiogroup" aria-label="Hardware">
+        <div v-if="nodeHardware.length" class="hardware-grid" role="radiogroup" aria-label="Hardware">
           <button
             v-for="o in nodeHardware"
             :key="o.workflowId + '|' + o.variant"
@@ -1366,21 +1385,25 @@ async function execute() {
             </template>
             <template v-else-if="!o.gpu && !(o.cpu || o.memory)">
               <span class="hardware-card__main">Fargate task</span>
-              <span class="hardware-card__line">You choose CPU and memory next</span>
+              <span class="hardware-card__line">You choose CPU, memory and disk below</span>
               <span class="hardware-card__meta">Starts in about a minute</span>
             </template>
             <span v-else-if="o.description" class="hardware-card__line">{{ o.description }}</span>
           </button>
         </div>
         <p v-if="noGpuHere" class="resource-hint">{{ noGpuHere }}</p>
-      </div>
 
-      <!-- Compute resources (CPU sessions) -->
-      <div v-if="step === S.RESOURCES" class="wizard-step">
-        <p class="wizard-step-desc">
-          Choose the CPU, memory and disk for this notebook's compute task.
+        <!-- Its resources: chosen for a CPU session, else set. A GPU's disk
+             is its instance's, not chosen yet. -->
+        <p v-if="isGpu" class="resource-hint">
+          Disk: {{ GPU_INSTANCE_DISK_GIB }} GB, the GPU instance's own, shared with the notebook's
+          environment. Download the folders you need rather than a whole large dataset.
         </p>
-        <div class="resource-grid">
+        <p v-if="variantResourcesSet && !isGpu && variantResources(selectedVariant)" class="resource-hint">
+          Resources: {{ variantResources(selectedVariant) }}, set by the kernel.
+        </p>
+        <template v-else-if="!variantResourcesSet">
+        <div class="resource-grid" :class="{ 'resource-grid--below': nodeHardware.length }">
           <div class="resource-field">
             <label class="resource-label">CPU</label>
             <el-select v-model="resourceCpu" size="default" style="width: 100%">
@@ -1428,6 +1451,7 @@ async function execute() {
           environment<template v-if="dataBytes > 180 * 2 ** 30">, but not all of it: download the folders you need</template>.
         </p>
         <p class="resource-hint">{{ diskHint }}</p>
+        </template>
       </div>
 
       <!-- Input (a notebook with an input: what it starts with) -->
@@ -1468,15 +1492,6 @@ async function execute() {
         </div>
         <p class="io-platform__note">You pick which files to download from the notebook.</p>
       </template>
-      <button
-        v-if="inputChoices.includes('none')"
-        type="button"
-        class="io-none"
-        :class="{ 'is-picked': inputChoice === 'none' }"
-        @click="inputChoice = 'none'"
-      >
-        Start without input data →
-      </button>
       </div>
       <div class="io-main">
       <div v-if="step === S.INPUT && inputChoice === 'none'" class="wizard-step">
@@ -1675,6 +1690,7 @@ async function execute() {
         <p class="wizard-step-desc">
           {{ iface ? "Where the notebook's results (its output/ folder) go when the session ends." : "Configure where the notebook's results are saved." }}
         </p>
+
         <div :class="{ 'io-split': iface }">
         <div v-if="iface" class="io-side">
         <div class="io-choices-label">Results go to</div>
@@ -1781,112 +1797,23 @@ async function execute() {
         </div>
       </div>
 
-      <!-- Review -->
-      <div v-if="step === S.REVIEW" class="wizard-step">
-        <p class="wizard-step-desc">Review and start the notebook session.</p>
-        <div class="wizard-summary">
-          <div class="wizard-summary-row">
-            <span class="wizard-summary-label">Kernel</span>
-            <span class="wizard-summary-value">{{
-              kernelLabel(notebookKernel(selectedWorkflow))
-            }}</span>
-          </div>
-          <div class="wizard-summary-row">
-            <span class="wizard-summary-label">Compute Node</span>
-            <span class="wizard-summary-value">{{ selectedComputeNode?.name }}</span>
-          </div>
-          <div v-if="reviewHardware" class="wizard-summary-row">
-            <span class="wizard-summary-label">Hardware</span>
-            <span class="wizard-summary-value"><RuntimeMark v-if="isGpu" runtime="gpu" compact />{{ reviewHardware }}</span>
-          </div>
-          <!-- A GPU session gets the node's GPU instance's CPU and memory -->
-          <div v-if="isGpu" class="wizard-summary-row">
-            <span class="wizard-summary-label">Resources</span>
-            <span class="wizard-summary-value">{{ gpuReviewResources(selectedGpu) }}</span>
-          </div>
-          <div v-else-if="variantResourcesSet && variantResources(selectedVariant)" class="wizard-summary-row">
-            <span class="wizard-summary-label">Resources</span>
-            <span class="wizard-summary-value">{{ variantResources(selectedVariant) }} (set by the kernel)</span>
-          </div>
-          <div v-else-if="!variantResourcesSet" class="wizard-summary-row">
-            <span class="wizard-summary-label">Resources</span>
-            <span class="wizard-summary-value">
-              {{ cpuLabel(resourceCpu) }} ·
-              {{ isAutoMemory ? `${memoryLabel(autoMemoryForCpu(resourceCpu))} (auto)` : memoryLabel(resourceMemory) }} ·
-              {{ notebookDiskLabel(resourceDisk) }}
-            </span>
-          </div>
-          <div class="wizard-summary-row">
-            <span class="wizard-summary-label">Data</span>
-            <span class="wizard-summary-value">{{
-              inputChoice === "public"
-                ? `${publicDataset?.name} (version ${publicVersion})`
-                : inputChoice === "openData"
-                ? `${openDataLabel} (AWS Open Data)`
-                : inputChoice === "openNeuro"
-                ? `${openNeuroLabel} (OpenNeuro)`
-                : inputChoice === "dandi"
-                ? dandiLabel
-                : isPortal
-                ? `${portalLabel} (${DATA_PLATFORMS[inputChoice].name})`
-                : inputChoice === "dataset"
-                ? `${dataSourceNodes.reduce((n, d) => n + fileCountForNode(d.id), 0)} files from ${selectedDataset?.content?.name}`
-                : "None"
-            }}</span>
-          </div>
-          <div v-if="iface" class="wizard-summary-row">
-            <span class="wizard-summary-label">Results</span>
-            <span class="wizard-summary-value">{{
-              outputWritesDataset
-                ? `Saved to ${chooseResultsDataset ? resultsDataset?.content?.name : selectedDataset?.content?.name}`
-                : outputLabel(outputChoice)
-            }}</span>
-          </div>
-          <div v-if="viewOnly && !iface" class="wizard-summary-row">
-            <span class="wizard-summary-label">Results saved to</span>
-            <span class="wizard-summary-value">{{ resultsDataset?.content?.name }}</span>
-          </div>
-        </div>
+      <!-- Name & Start: one column, what's chosen under the name. -->
+      <div v-if="step === S.REVIEW" class="wizard-step nb-review">
+        <label class="nb-review__name">
+          <span class="nb-review__label">Name</span>
+          <el-input v-model="runName" placeholder="e.g. jupyter-jdoe-2026-06-08" maxlength="64" @input="nameTouched = true" />
+        </label>
+        <dl class="nb-info__list nb-review__list">
+          <template v-for="row in soFar" :key="row.label">
+            <dt>{{ row.label }}</dt>
+            <dd>{{ row.value }}</dd>
+          </template>
+        </dl>
         <p v-if="isGpu" class="resource-hint">{{ selectedGpu?.model ? `Runs on the node's ${selectedGpu.model}. ` : "" }}{{ GPU_NOTE }}</p>
         <p v-if="showPublicInput && publicDataset && !dataSourceNodes.length" class="public-warning">
           This notebook has no input to attach {{ publicDataset.name }} to, so
           it would start without it.
         </p>
-        <p v-else-if="inputChoice === 'openNeuro' && openNeuroDataset" class="resource-hint">
-          The notebook starts with the file list of {{ openNeuroLabel }} in
-          <code>input/</code>, read from OpenNeuro's copy on AWS. Choose which
-          files to download from its <strong>Inputs</strong> panel.
-        </p>
-        <p v-else-if="inputChoice === 'dandi' && dandiDataset" class="resource-hint">
-          The notebook starts with the file list of {{ dandiLabel }} in
-          <code>input/</code>, read from the DANDI Archive's bucket on AWS.
-          Zarr folders aren't included yet. Choose which files to download
-          from its <strong>Inputs</strong> panel.
-        </p>
-        <p v-else-if="isPortal && portalDataset" class="resource-hint">
-          The notebook starts with the file list of {{ portalLabel }} in
-          <code>input/</code>, read from {{ DATA_PLATFORMS[inputChoice].name }}'s
-          copy on AWS. Choose which files to download from its
-          <strong>Inputs</strong> panel.
-        </p>
-        <p v-else-if="inputChoice === 'openData' && openDataDataset" class="resource-hint">
-          The notebook starts with the file list of {{ openDataLabel }} in
-          <code>input/</code>, read from its public bucket. Choose which files
-          to download from its <strong>Inputs</strong> panel.
-        </p>
-        <p v-else-if="showPublicInput && publicDataset" class="resource-hint">
-          The notebook starts with the dataset's file list in
-          <code>input/</code>. Choose which files to download from its
-          <strong>Inputs</strong> panel.
-        </p>
-        <label class="name-label">Name</label>
-        <el-input
-          v-model="runName"
-          placeholder="e.g. jupyter-jdoe-2026-06-08"
-          size="small"
-          maxlength="64"
-          @input="nameTouched = true"
-        />
       </div>
       </div>
       </div>
@@ -1897,6 +1824,10 @@ async function execute() {
         <bf-button class="secondary" @click="visible = false">Cancel</bf-button>
         <div class="wizard-footer-right">
           <bf-button v-if="step > 0" class="secondary" @click="back">Back</bf-button>
+          <!-- No input data: chosen and on, in one click. -->
+          <bf-button v-if="step === S.INPUT && inputChoices.includes('none')" class="secondary" @click="startWithoutData">
+            No input data
+          </bf-button>
           <bf-button
             v-if="step < stepTitles.length - 1"
             :disabled="!canNext"
@@ -1904,7 +1835,7 @@ async function execute() {
           >
             Next
           </bf-button>
-          <bf-button v-else :processing="executing" @click="execute">
+          <bf-button v-else :disabled="!canNext" :processing="executing" @click="execute">
             Start Notebook
           </bf-button>
         </div>
@@ -2054,23 +1985,6 @@ async function execute() {
   display: flex;
   align-items: center;
   gap: 8px;
-}
-.io-none {
-  display: block;
-  margin-top: 16px;
-  padding: 0;
-  border: none;
-  background: none;
-  font: inherit;
-  font-size: 13px;
-  color: theme.$purple_2;
-  cursor: pointer;
-
-  &:hover,
-  &.is-picked {
-    color: theme.$purple_3;
-    text-decoration: underline;
-  }
 }
 .io-section-title {
   margin: 0 0 10px;
@@ -2618,34 +2532,6 @@ async function execute() {
 }
 
 /* review */
-.wizard-summary {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  margin-bottom: 16px;
-}
-.wizard-summary-row {
-  display: flex;
-  justify-content: space-between;
-  border-bottom: 1px solid theme.$gray_1;
-  padding-bottom: 8px;
-}
-.wizard-summary-label {
-  color: theme.$gray_4;
-  font-size: 13px;
-}
-.wizard-summary-value {
-  color: theme.$gray_6;
-  font-weight: 500;
-  font-size: 13px;
-}
-.name-label {
-  display: block;
-  font-size: 12px;
-  font-weight: 600;
-  color: theme.$gray_5;
-  margin-bottom: 4px;
-}
 .run-dialog-footer {
   display: flex;
   justify-content: space-between;
@@ -2653,7 +2539,38 @@ async function execute() {
 }
 .wizard-footer-right {
   display: flex;
+  align-items: center;
   gap: 8px;
+}
+.resource-grid--below {
+  margin-top: 20px;
+}
+.nb-review {
+  max-width: 560px;
+  margin: 0 auto;
+  width: 100%;
+}
+.nb-review__name {
+  display: block;
+  margin-bottom: 20px;
+}
+.nb-review__label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: theme.$gray_5;
+}
+.nb-review__list {
+  margin: 0 0 12px;
+  padding: 14px 16px;
+  border: 1px solid theme.$gray_2;
+  border-radius: 4px;
+  gap: 8px 16px;
+
+  dd {
+    white-space: normal;
+  }
 }
 </style>
 

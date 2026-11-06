@@ -6,7 +6,7 @@
 // narrows a level by its names' first letters, which S3 does, so it finds a
 // folder past the first 1,000. list, when given, lists a level instead (a
 // dandiset version's tree, from DANDI's API), as listOpenDataFolder does;
-// a file it marks zarr is a Zarr folder, which a view doesn't take yet.
+// a file it marks zarr is a Zarr folder, which a notebook reads in place.
 import { computed, onMounted, ref, watch } from "vue";
 import { listOpenDataFolder } from "@/utils/viewsService";
 
@@ -132,7 +132,7 @@ const formatSize = (bytes) => {
           {{ levelFiles.length }} file{{ levelFiles.length === 1 ? "" : "s" }} here · {{ formatSize(levelSize) }}
         </div>
         <div v-if="levelZarrs.length" class="odf__msg" :title="levelZarrs.map((f) => f.name).join('\n')">
-          {{ levelZarrs.length }} Zarr folder{{ levelZarrs.length === 1 ? "" : "s" }} here ({{ formatSize(levelZarrs.reduce((n, f) => n + f.size, 0)) }}): not taken into a notebook yet
+          {{ levelZarrs.length }} Zarr folder{{ levelZarrs.length === 1 ? "" : "s" }} here ({{ formatSize(levelZarrs.reduce((n, f) => n + f.size, 0)) }}): read in place from the notebook, not downloaded
         </div>
         <div v-if="!level.folders.length && !level.files.length" class="odf__msg">
           Nothing here{{ filter ? ` starting with "${filter}"` : "" }}

@@ -235,11 +235,16 @@ export function gpuSessionHelp(gpu) {
   return `Runs on ${where}, with all of its CPU and memory. Slower to start (an instance may need to launch) and billed while the notebook is open.`;
 }
 
-// The session's resources on a GPU, for the review: "8 vCPU · 30 GB (the
-// node's GPU instance)".
+// A GPU session's disk: its instance's root volume, the same on every GPU
+// instance (the provisioner's terraform/infrastructure/ecs-gpu.tf), shared
+// with the notebook's environment. It can't be chosen yet.
+export const GPU_INSTANCE_DISK_GIB = 100;
+
+// The session's resources on a GPU, for the review: "8 vCPU · 30 GB · 100 GB
+// disk (the node's GPU instance)".
 export function gpuReviewResources(gpu) {
-  const res = gpuTaskResources(gpu, " · ");
-  return res ? `${res} (the node's GPU instance)` : "The node's GPU instance";
+  const res = [gpuTaskResources(gpu, " · "), `${GPU_INSTANCE_DISK_GIB} GB disk`].filter(Boolean).join(" · ");
+  return `${res} (the node's GPU instance)`;
 }
 
 // The id of a workflow definition's session step (the one that takes the

@@ -352,8 +352,8 @@ describe("the Hardware step", () => {
     expect(gpuSessionHelp(L4)).toContain("billed while the notebook is open");
     expect(gpuSessionHelp(null)).toContain("the node's GPU instance");
     expect(gpuSessionHelp(L4)).not.toContain("T4");
-    expect(gpuReviewResources(L4)).toBe("8 vCPU · 30 GB (the node's GPU instance)");
-    expect(gpuReviewResources(null)).toBe("The node's GPU instance");
+    expect(gpuReviewResources(L4)).toBe("8 vCPU · 30 GB · 100 GB disk (the node's GPU instance)");
+    expect(gpuReviewResources(null)).toBe("100 GB disk (the node's GPU instance)");
   });
 });
 

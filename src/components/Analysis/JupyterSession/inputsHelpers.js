@@ -6,9 +6,23 @@ export const inputKey = (source, path) => `${source}\0${path}`;
 
 // The folders and files directly in folder ("" or "a/b/"): folders first,
 // each with the count and size of every file below it.
-export function folderContents(entries, folder = "") {
+// A view's stacks (a Zarr: one entry, read in place, its cratePath ending in
+// /) show in their folders too, as rows of their own; folders count files
+// only.
+export function folderContents(entries, folder = "", stacks = []) {
   const folders = new Map();
   const files = [];
+  for (const e of stacks) {
+    if (!e.cratePath.startsWith(folder)) continue;
+    const rest = e.cratePath.slice(folder.length).replace(/\/$/, "");
+    const slash = rest.indexOf("/");
+    if (slash < 0) {
+      files.push({ type: "stack", name: rest, path: e.cratePath, size: e.size || 0, entry: e });
+      continue;
+    }
+    const name = rest.slice(0, slash);
+    if (!folders.has(name)) folders.set(name, { type: "folder", name, path: `${folder}${name}/`, count: 0, size: 0 });
+  }
   for (const e of entries) {
     if (!e.cratePath.startsWith(folder)) continue;
     const rest = e.cratePath.slice(folder.length);
@@ -26,6 +40,19 @@ export function folderContents(entries, folder = "") {
   const byName = (a, b) => a.name.localeCompare(b.name);
   return [...[...folders.values()].sort(byName), ...files.sort(byName)];
 }
+
+// A view's entries apart: its files, and its stacks (read in place).
+export function splitStacks(entries = []) {
+  const files = [];
+  const stacks = [];
+  for (const e of entries) (e.kind === "stack" ? stacks : files).push(e);
+  return { files, stacks };
+}
+
+// A stack's format for people: "OME-Zarr", "Zarr".
+export const stackFormat = (e) => (e?.format === "ome-zarr" ? "OME-Zarr" : e?.format === "zarr" ? "Zarr" : "Folder");
+// Its icon: an image (OME-Zarr) or data.
+export const stackIcon = (e) => (e?.format === "ome-zarr" ? "/file-icons/icon-microscope.svg" : "/file-icons/icon-data.svg");
 
 // Every entry below a folder path ("a/b/"), or the one entry at a file path.
 export function filesUnder(entries, path) {

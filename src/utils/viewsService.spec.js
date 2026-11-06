@@ -82,6 +82,12 @@ describe("listEntries", () => {
     expect(entries).toHaveLength(1500);
     expect(fetchFn.mock.calls[1][0]).toBe("https://api2.pennsieve.net/views/v1/versions/2/entries?offset=1000&limit=1000");
   });
+
+  it("lists stacks too when asked", async () => {
+    const fetchFn = respond([200, { totalCount: 1, entries: [{ cratePath: "a.ome.zarr/", kind: "stack" }] }]);
+    await listEntries("v1", 2, { includeStacks: true, config, getToken, fetchFn });
+    expect(fetchFn.mock.calls[0][0]).toBe("https://api2.pennsieve.net/views/v1/versions/2/entries?offset=0&limit=1000&include=stacks");
+  });
 });
 
 describe("getView", () => {
