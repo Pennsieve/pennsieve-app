@@ -229,21 +229,33 @@ export async function createOpenDataViewOf({ dataset, name, prefixes = [] }, opt
 }
 
 // A view made for one run of some files of an Open Data dataset, named
-// name: each group ({ prefix, paths, folder, names }) one source, whose
-// files views-service reads by their keys (prefix + path, at most 100 a
-// group). They sit at their paths below the prefix, or in folder at their
-// names (an ENCODE experiment's files, spread across dated folders); in a
+// name: each group ({ prefix, paths, folder, names, bucket, stack }) one
+// source. With paths, views-service reads those files by their keys
+// (prefix + path, at most 100 a group); without, all of the prefix. They
+// sit at their paths below the prefix, or in folder (at their names, with
+// paths: an ENCODE experiment's files, spread across dated folders); in a
 // view of several groups, under open-data-<name>/. names (path -> file
-// name) renames those it names (a CELLxGENE dataset's <uuid>.h5ad).
+// name) renames those it names (a CELLxGENE dataset's <uuid>.h5ad); bucket
+// picks one of the dataset's buckets; stack takes the prefix whole as a
+// stack of that format, read in place (an IDC slide: dicom-wsi).
 export async function createOpenDataFilesView({ dataset, name, groups = [] }, options = {}) {
   return viewsRequest('/me', {
     ...options,
     method: 'POST',
     body: {
       name,
-      sources: groups.map(({ prefix = '', paths = [], folder = '', names = null }) => {
+      sources: groups.map(({ prefix = '', paths = [], folder = '', names = null, bucket = '', stack = '' }) => {
         const p = openDataPrefix(prefix)
-        return { kind: 'openData', dataset, ...(p && { prefix: p }), paths, ...(folder && { folder }), ...(names && { names }) }
+        return {
+          kind: 'openData',
+          dataset,
+          ...(p && { prefix: p }),
+          ...(paths.length && { paths }),
+          ...(folder && { folder }),
+          ...(names && { names }),
+          ...(bucket && { bucket }),
+          ...(stack && { stack }),
+        }
       }),
       lifecycle: 'run',
     },

@@ -29,7 +29,7 @@ describe("the data platforms", () => {
   });
 
   it("are listed in order", () => {
-    expect(PLATFORM_KEYS).toEqual(["discover", "openData", "sparc", "epilepsyScience", "openNeuro", "bossdb", "dandi", "physionet", "allen", "cellxgene", "encode", "hca"]);
+    expect(PLATFORM_KEYS).toEqual(["discover", "openData", "sparc", "epilepsyScience", "openNeuro", "bossdb", "dandi", "physionet", "allen", "cellxgene", "encode", "hca", "idc"]);
   });
 
   it("say where their data lives, and which nodes can reach it", () => {
@@ -98,6 +98,12 @@ describe("the data platforms", () => {
     const proj = { id: "p1", title: "Lung atlas", shortname: "LungAtlas", files: [{ sha256: "aa", name: "a.h5ad", size: 4 }] };
     expect(PLATFORMS.hca.folderName({ picks: [proj] }, 1)).toBe("hca-LungAtlas");
     expect(platformData("hca", { picks: [proj] })).toMatchObject({ regions: ["us-east-1"], size: 4, publicBucket: true });
+    const ct = { uuid: "u1", collection: "4d_lung", size: 30, slide: false };
+    const sm = { uuid: "u2", collection: "tcga_brca", size: 900, slide: true };
+    expect(PLATFORMS.idc.folderName({ picks: [ct] }, 1)).toBe("idc-4d_lung");
+    expect(PLATFORMS.idc.folderName({ picks: [ct, sm] }, 1)).toBe("idc-2-collections");
+    // A slide is read in place: only the radiology is downloaded.
+    expect(platformData("idc", { picks: [ct, sm] })).toMatchObject({ regions: ["us-east-1"], size: 30, imaging: true, publicBucket: true });
     expect(platformData("cellxgene", { picks: [lung, { ...lung, id: "b2", size: 7 }] })).toMatchObject({ regions: ["us-west-2"], size: 12, publicBucket: true });
   });
 

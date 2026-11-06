@@ -18,7 +18,9 @@ const httpsOf = (url, region) => {
 
 // Code that opens a stack in place, from its s3:// location: a Zarr with
 // zarr and anonymous s3fs, a Neuroglancer precomputed volume with
-// CloudVolume over https, in Python; its URL in R, which has no one reader.
+// CloudVolume over https, a DICOM whole-slide image with highdicom's lazy
+// frame retrieval over anonymous s3fs (only the tiles a region needs), in
+// Python; its URL in R, which has no one reader.
 export function stackCode(entry, kernelName = "") {
   const url = entry?.location || "";
   const r = kernelName.toLowerCase().startsWith("r ") || kernelName.toLowerCase() === "r";
@@ -27,6 +29,19 @@ export function stackCode(entry, kernelName = "") {
   if (entry?.format === "neuroglancer-precomputed") {
     const https = httpsOf(url, entry.region);
     return `from cloudvolume import CloudVolume\n# ${name}: a precomputed volume, read in place (mip 0 is full resolution)\nvol = CloudVolume(${quote(`precomputed://${https}`)}, mip=0, progress=False)`;
+  }
+  if (entry?.format === "dicom-wsi") {
+    const region = entry.region ? `, client_kwargs={"region_name": ${quote(entry.region)}}` : "";
+    return [
+      "import s3fs, highdicom as hd",
+      `# ${name}: a whole-slide image, read in place; each file is a level of its pyramid`,
+      `fs = s3fs.S3FileSystem(anon=True, default_block_size=500_000${region})`,
+      `levels = sorted(fs.ls(${quote(url)}), key=fs.size)  # smallest first; the largest is full resolution`,
+      "# Opening a level without an offset table (most of IDC's) reads through it once: seconds near its bucket",
+      'slide = hd.imread(fs.open(levels[-1], "rb"), lazy_frame_retrieval=True)',
+      "# Rows and columns count from 1, as in DICOM; only the tiles the region covers are read",
+      "region = slide.get_total_pixel_matrix(row_start=1, row_end=513, column_start=1, column_end=513)",
+    ].join("\n");
   }
   const options = entry?.region
     ? `{"anon": True, "client_kwargs": {"region_name": ${quote(entry.region)}}}`

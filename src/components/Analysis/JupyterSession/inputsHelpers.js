@@ -50,12 +50,17 @@ export function splitStacks(entries = []) {
 }
 
 // A stack's format for people: "OME-Zarr", "Zarr", "Precomputed volume"
-// (Neuroglancer's, as BossDB's).
-const STACK_FORMATS = { "ome-zarr": "OME-Zarr", zarr: "Zarr", "neuroglancer-precomputed": "Precomputed volume" };
+// (Neuroglancer's, as BossDB's), "Whole-slide image" (DICOM, as IDC's).
+const STACK_FORMATS = {
+  "ome-zarr": "OME-Zarr",
+  zarr: "Zarr",
+  "neuroglancer-precomputed": "Precomputed volume",
+  "dicom-wsi": "Whole-slide image",
+};
 export const stackFormat = (e) => STACK_FORMATS[e?.format] || "Folder";
-// Its icon: an image (OME-Zarr, a precomputed volume) or data.
-export const stackIcon = (e) =>
-  e?.format === "ome-zarr" || e?.format === "neuroglancer-precomputed" ? "/file-icons/icon-microscope.svg" : "/file-icons/icon-data.svg";
+// Its icon: an image (OME-Zarr, a precomputed volume, a slide) or data.
+const IMAGE_STACKS = new Set(["ome-zarr", "neuroglancer-precomputed", "dicom-wsi"]);
+export const stackIcon = (e) => (IMAGE_STACKS.has(e?.format) ? "/file-icons/icon-microscope.svg" : "/file-icons/icon-data.svg");
 
 // Every entry below a folder path ("a/b/"), or the one entry at a file path.
 export function filesUnder(entries, path) {
