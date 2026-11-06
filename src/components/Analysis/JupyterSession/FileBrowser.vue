@@ -13,7 +13,7 @@ import FileNode from "./FileNode.vue";
 import { ArrowRight } from "@element-plus/icons-vue";
 import { fileIconForPath } from "@/utils/fileIconForPath";
 import { sessionPathCode } from "./pathCode";
-import { visibleEntries, readShowHidden, writeShowHidden } from "./fileBrowserHelpers";
+import { visibleEntries, readShowHidden, writeShowHidden, readOnlyLocal, writeOnlyLocal } from "./fileBrowserHelpers";
 import { useRememberedFold } from "./sectionFold";
 
 const props = defineProps({
@@ -38,7 +38,10 @@ const error = ref(null);
 // .datalad/) are hidden unless the user shows them; remembered here.
 const showHidden = ref(readShowHidden());
 watch(showHidden, (v) => writeShowHidden(v));
-const shownRoots = computed(() => visibleEntries(roots.value, showHidden.value));
+// Only what's on the disk: a view's files not downloaded are left out.
+const onlyLocal = ref(readOnlyLocal());
+watch(onlyLocal, (v) => writeOnlyLocal(v));
+const shownRoots = computed(() => visibleEntries(roots.value, showHidden.value, onlyLocal.value));
 
 function decorate(entry) {
   return {
@@ -206,6 +209,10 @@ function copyPath(node) {
     <div class="fb__head" @click="collapsed = !collapsed">
       <span class="fb__title" title="What's on the session's disk: input/, output/ and your notebook">Session files</span>
       <span class="fb__head-actions">
+        <!-- Another view: a dataset from a data platform, as a folder of input/ -->
+        <button v-if="inputs?.canChange" class="fb__add" title="Add data from a data platform: it joins input/" @click.stop="emit('add-data')">
+          + Add data
+        </button>
         <!-- Dot-files and folders, such as each input's .pennsieve/ (its dataset view) -->
         <button
           v-if="!collapsed"
@@ -224,6 +231,21 @@ function copyPath(node) {
             <path d="M1.5 8S4 3.5 8 3.5 14.5 8 14.5 8 12 12.5 8 12.5 1.5 8 1.5 8z" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" />
             <circle cx="8" cy="8" r="2" fill="none" stroke="currentColor" stroke-width="1.3" />
             <path d="M2.5 13.5 13.5 2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" />
+          </svg>
+        </button>
+        <!-- Only what's downloaded: a view's other files left out -->
+        <button
+          v-if="!collapsed && inputs?.sources.length"
+          class="fb__hidden-toggle"
+          :class="{ 'is-on': onlyLocal }"
+          :title="onlyLocal ? 'Show the inputs not downloaded too' : 'Show only what\'s downloaded'"
+          :aria-label="onlyLocal ? 'Show the inputs not downloaded too' : 'Show only what\'s downloaded'"
+          :aria-pressed="onlyLocal"
+          @click.stop="onlyLocal = !onlyLocal"
+        >
+          <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true">
+            <path d="M4.5 12.5h7.2a2.8 2.8 0 0 0 .4-5.6 4 4 0 0 0-7.7-1A3.3 3.3 0 0 0 4.5 12.5z" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" />
+            <path v-if="onlyLocal" d="M2.5 13.5 13.5 2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" />
           </svg>
         </button>
         <button v-if="!collapsed" class="fb__refresh" title="Refresh" aria-label="Refresh" :disabled="loading" @click.stop="refresh">
@@ -251,6 +273,7 @@ function copyPath(node) {
         :node="node"
         :depth="0"
         :show-hidden="showHidden"
+        :only-local="onlyLocal"
         :icon-of="icon"
         :fmt-size="fmtSize"
         :fmt-time="fmtTime"
@@ -354,6 +377,21 @@ function copyPath(node) {
   }
   &.is-on {
     color: theme.$gray_6;
+  }
+}
+.fb__add {
+  margin-right: 4px;
+  border: none;
+  background: none;
+  padding: 2px 4px;
+  border-radius: 3px;
+  font: inherit;
+  font-size: 12px;
+  color: theme.$purple_2;
+  cursor: pointer;
+
+  &:hover {
+    background: theme.$purple_tint;
   }
 }
 /* The header's icon actions: the same size, the same grey as the eye. */

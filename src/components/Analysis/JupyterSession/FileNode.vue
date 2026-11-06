@@ -19,6 +19,8 @@ const props = defineProps({
   node: { type: Object, required: true },
   // Show dot-files and dot-folders (.pennsieve, .datalad); hidden otherwise.
   showHidden: { type: Boolean, default: false },
+  // Leave out what a view holds that isn't downloaded.
+  onlyLocal: { type: Boolean, default: false },
   depth: { type: Number, default: 0 },
   iconOf: { type: Function, required: true },
   fmtSize: { type: Function, required: true },
@@ -28,7 +30,7 @@ const props = defineProps({
 });
 
 const emit = defineEmits(["toggle", "copy", "insert", "open", "insert-stack", "add-data"]);
-const children = computed(() => visibleEntries(props.node.children, props.showHidden));
+const children = computed(() => visibleEntries(props.node.children, props.showHidden, props.onlyLocal));
 
 const isNotebook = (node) => node.type === "notebook" || /\.ipynb$/i.test(node.name || "");
 
@@ -223,6 +225,7 @@ function onRow() {
         :node="child"
         :depth="depth + 1"
         :show-hidden="showHidden"
+        :only-local="onlyLocal"
         :icon-of="iconOf"
         :fmt-size="fmtSize"
         :fmt-time="fmtTime"
