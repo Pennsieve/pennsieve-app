@@ -37,15 +37,15 @@ async function search({ more = false } = {}) {
   loading.value = true;
   error.value = "";
   try {
+    // ENCODE doesn't page: more is the first ones again and the next PAGE.
     const res = await searchEncode({
       query: query.value,
       assay: assay.value,
       organism: organism.value,
-      from: more ? results.value.length : 0,
-      limit: PAGE,
+      limit: more ? results.value.length + PAGE : PAGE,
     });
     if (mine !== seq) return;
-    results.value = more ? [...results.value, ...res.experiments] : res.experiments;
+    results.value = res.experiments;
     total.value = res.total;
     // The filters offer what the other filters and words leave.
     if (!assay.value) assays.value = res.assays;

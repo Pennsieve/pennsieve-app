@@ -36,11 +36,12 @@ async function search(params, fields, fetchFn) {
 const facet = (body, field) =>
   ((body.facets || []).find((f) => f.field === field)?.terms || []).filter((t) => t.doc_count > 0).map((t) => t.key)
 
-// Released experiments matching query, an assay and an organism, a page
-// at a time: { experiments, total, assays, organisms } (the facets'
-// choices, most experiments first).
-export async function searchEncode({ query = '', assay = '', organism = '', from = 0, limit = 25 } = {}, { fetchFn = globalThis.fetch } = {}) {
-  const params = { type: 'Experiment', status: 'released', from: String(from), limit: String(limit) }
+// The first limit released experiments matching query, an assay and an
+// organism: { experiments, total, assays, organisms } (the facets'
+// choices, most experiments first). ENCODE refuses a search that pages
+// (any from, even 0: 403), so more is a bigger limit.
+export async function searchEncode({ query = '', assay = '', organism = '', limit = 25 } = {}, { fetchFn = globalThis.fetch } = {}) {
+  const params = { type: 'Experiment', status: 'released', limit: String(limit) }
   if (query.trim()) params.searchTerm = query.trim()
   if (assay) params.assay_title = assay
   if (organism) params[ORGANISM] = organism

@@ -13,13 +13,15 @@ describe("ENCODE", () => {
         { field: "replicates.library.biosample.donor.organism.scientific_name", terms: [{ key: "Homo sapiens", doc_count: 5 }] },
       ],
     });
-    const res = await searchEncode({ query: " liver ", assay: "Histone ChIP-seq", organism: "Homo sapiens", from: 25 }, { fetchFn });
+    const res = await searchEncode({ query: " liver ", assay: "Histone ChIP-seq", organism: "Homo sapiens", limit: 50 }, { fetchFn });
     const url = new URL(fetchFn.mock.calls[0][0]);
     expect(url.pathname).toBe("/search/");
     expect(url.searchParams.get("searchTerm")).toBe("liver");
     expect(url.searchParams.get("assay_title")).toBe("Histone ChIP-seq");
     expect(url.searchParams.get("replicates.library.biosample.donor.organism.scientific_name")).toBe("Homo sapiens");
-    expect(url.searchParams.get("from")).toBe("25");
+    // ENCODE refuses any from: more is a bigger limit.
+    expect(url.searchParams.has("from")).toBe(false);
+    expect(url.searchParams.get("limit")).toBe("50");
     expect(url.searchParams.getAll("field")).toContain("biosample_summary");
     expect(res.total).toBe(2131);
     expect(res.experiments[0]).toMatchObject({ accession: "ENCSR000AKP", assay: "Histone ChIP-seq", lab: "Bernstein" });
