@@ -260,7 +260,11 @@ onBeforeUnmount(() => clearTimeout(pollTimer));
           <div class="env__name env__name--none">Image packages only</div>
           <div class="env__sub">Pick an environment to add your packages; the kernel restarts.</div>
         </template>
-        <button v-if="kernelPackages && ready" class="env__link env__packages" @click="openPackages">Installed packages</button>
+      </div>
+
+      <!-- With no environment (or while choosing one): the image's packages. -->
+      <div v-if="kernelPackages && ready && !(current && !showPicker && !busy && choices.length)" class="env__actions env__actions--end">
+        <button class="env__link env__packages" @click="openPackages">Installed packages</button>
       </div>
 
       <p v-if="busy" class="env__msg env__msg--busy">
@@ -275,6 +279,7 @@ onBeforeUnmount(() => clearTimeout(pollTimer));
         <div v-if="current && !showPicker && !busy" class="env__actions">
           <button class="env__link" @click="changing = true">Change</button>
           <button class="env__link env__link--quiet" @click="stopUsing">Stop using</button>
+          <button v-if="kernelPackages && ready" class="env__link env__packages" @click="openPackages">Installed packages</button>
         </div>
         <el-select
           v-if="showPicker"
@@ -431,8 +436,12 @@ onBeforeUnmount(() => clearTimeout(pollTimer));
   align-items: center;
   gap: 10px;
 }
+/* At the end of the actions row. */
 .env__packages {
-  margin-top: 6px;
+  margin-left: auto;
+}
+.env__actions--end {
+  justify-content: flex-end;
 }
 .pk__bar {
   display: flex;
