@@ -29,7 +29,7 @@ describe("the data platforms", () => {
   });
 
   it("are listed in order", () => {
-    expect(PLATFORM_KEYS).toEqual(["discover", "openData", "sparc", "epilepsyScience", "openNeuro", "bossdb", "dandi", "physionet", "allen", "cellxgene", "encode"]);
+    expect(PLATFORM_KEYS).toEqual(["discover", "openData", "sparc", "epilepsyScience", "openNeuro", "bossdb", "dandi", "physionet", "allen", "cellxgene", "encode", "hca"]);
   });
 
   it("say where their data lives, and which nodes can reach it", () => {
@@ -95,6 +95,9 @@ describe("the data platforms", () => {
     expect(PLATFORMS.encode.folderName({ picks: [exp] }, 1)).toBe("encode-ENCSR000AKP");
     expect(PLATFORMS.encode.folderName({ picks: [exp, exp] }, 1)).toBe("encode-2-experiments");
     expect(platformData("encode", { picks: [exp] })).toMatchObject({ regions: ["us-west-2"], size: 3, publicBucket: true });
+    const proj = { id: "p1", title: "Lung atlas", shortname: "LungAtlas", files: [{ sha256: "aa", name: "a.h5ad", size: 4 }] };
+    expect(PLATFORMS.hca.folderName({ picks: [proj] }, 1)).toBe("hca-LungAtlas");
+    expect(platformData("hca", { picks: [proj] })).toMatchObject({ regions: ["us-east-1"], size: 4, publicBucket: true });
     expect(platformData("cellxgene", { picks: [lung, { ...lung, id: "b2", size: 7 }] })).toMatchObject({ regions: ["us-west-2"], size: 12, publicBucket: true });
   });
 
@@ -106,6 +109,7 @@ describe("the data platforms", () => {
     expect(platformReading("1000-genomes")).toBeNull();
     expect(platformReading("cgmacros", "PhysioNet")?.name).toBe("PhysioNet");
     expect(platformReading("encode-project")?.name).toBe("ENCODE");
+    expect(platformReading("humancellatlas")?.name).toBe("Human Cell Atlas");
     expect(platformReading("")).toBeNull();
   });
 });
