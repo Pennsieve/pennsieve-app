@@ -123,9 +123,6 @@ function onRow() {
         :title="node.name === VIEW_CRATE_DIR ? 'This input\'s dataset view (.pennsieve/view.json, an RO-Crate): where its files come from, their sizes and checksums.' : undefined"
         >{{ node.name === VIEW_CRATE_DIR ? "input manifest" : node.name }}</span
       >
-      <svg v-if="remote && !under" class="fn__cloud" width="12" height="12" viewBox="0 0 16 16" aria-label="Not downloaded">
-        <path d="M4.5 12.5h7.2a2.8 2.8 0 0 0 .4-5.6 4 4 0 0 0-7.7-1A3.3 3.3 0 0 0 4.5 12.5z" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" />
-      </svg>
       <span
         v-if="depth === 0 && node.type === 'directory' && node.name === 'output'"
         class="fn__tag fn__tag--out"
@@ -138,12 +135,17 @@ function onRow() {
         title="Your data: what the session's views hold, downloaded or not (INPUT_DIR)"
         >← data</span
       >
-      <!-- A view's folder: where it's from, how much is in the session. -->
+      <!-- The row's end, right-aligned: what it is (a view's folder: where it's
+           from and how much is in the session; a file: not downloaded, its
+           size, progress or failure), then its actions on hover. -->
+      <span class="fn__end">
       <span v-if="viewProgress" class="fn__from" :title="`${view.source.name}\n${viewProgress.done} of ${viewProgress.total} files in the session`">
         {{ view.source.subtitle }} · {{ viewProgress.done }}/{{ viewProgress.total }}
       </span>
+      <svg v-if="remote && !under" class="fn__cloud" width="12" height="12" viewBox="0 0 16 16" aria-label="Not downloaded">
+        <path d="M4.5 12.5h7.2a2.8 2.8 0 0 0 .4-5.6 4 4 0 0 0-7.7-1A3.3 3.3 0 0 0 4.5 12.5z" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" />
+      </svg>
 
-      <!-- Its state, at the end: size, progress, failure, format. -->
       <span v-if="under" class="fn__state fn__state--active">{{ progress }}</span>
       <span v-else-if="failed" class="fn__state fn__state--failed" :title="fileState.error">failed · retry</span>
       <span v-else-if="isStack" class="fn__size">{{ view.entry.size ? fmtSize(view.entry.size) : stackFormat(view.entry) }}</span>
@@ -192,6 +194,7 @@ function onRow() {
           <button class="fn__act" title="Insert the path into a cell, as code (INPUT_DIR / …)" @click="emit('insert', node.path)">↩</button>
           <button class="fn__act" title="Copy the path, as code (INPUT_DIR / …)" @click="emit('copy', node)">⧉</button>
         </template>
+      </span>
       </span>
     </div>
 
@@ -281,20 +284,30 @@ function onRow() {
 }
 .fn__icon { flex: 0 0 auto; width: 16px; height: 16px; }
 .fn__name {
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   color: theme.$gray_6;
+}
+/* Sizes, states and actions in a column at the right. */
+.fn__end {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+  padding-left: 8px;
 }
 /* Not on the disk: in the view, a click away. */
 .fn__row.is-remote .fn__name { color: theme.$gray_4; }
 .fn__row.is-remote .fn__icon { opacity: 0.55; }
 .fn__cloud { flex: 0 0 auto; color: theme.$gray_3; }
-.fn__size { color: theme.$gray_4; font-size: 11px; margin-left: 6px; }
-.fn__state { font-size: 11px; margin-left: 6px; }
+.fn__size { color: theme.$gray_4; font-size: 11px; }
+.fn__state { font-size: 11px; }
 .fn__state--active { color: theme.$purple_2; }
 .fn__state--failed { color: theme.$red_2; }
 .fn__from {
-  margin-left: 8px;
+  max-width: 140px;
   overflow: hidden;
   text-overflow: ellipsis;
   font-size: 11px;
@@ -319,10 +332,8 @@ function onRow() {
   opacity: 1;
 }
 .fn__actions {
-  margin-left: auto;
   display: none;
   gap: 1px;
-  padding-left: 6px;
 }
 .fn__row:hover .fn__actions,
 .fn__row:focus-within .fn__actions { display: flex; }
