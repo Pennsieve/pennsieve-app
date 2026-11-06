@@ -14,6 +14,7 @@ import { useGetToken } from "@/composables/useGetToken";
 import { CancelUnavailable } from "@/composables/useJupyterSession";
 import { getView, listEntries } from "@/utils/viewsService";
 import { folderContents, splitStacks, inputKey, inputsDiskUse, inputSubtitle } from "./inputsHelpers";
+import { platformReading } from "../platforms";
 
 const POLL_MS = 2000;
 const GiB = 2 ** 30;
@@ -126,7 +127,11 @@ export function useSessionInputs({
             ...s,
             // An Open Data view's own name says which folder of the dataset.
             name: (first.openDataset ? view?.name : first.name) || view?.name || "Dataset",
-            subtitle: inputSubtitle({ openDataset: first.openDataset || "", sourceVersion: first.version }),
+            subtitle: inputSubtitle({
+              platform: platformReading(first.openDataset)?.name,
+              openDataset: first.openDataset || "",
+              sourceVersion: first.version,
+            }),
             viewName: view?.name || "",
             openDataset: first.openDataset || "",
             sourceDatasetId: first.datasetId || null,

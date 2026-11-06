@@ -5,15 +5,10 @@
 // chosen is made into a view and staged by the session's sidecar as
 // input/<name>/ (useJupyterSession addInputSource); "added" says its name.
 import { computed, ref, watch } from "vue";
-import { createOpenDataView, createOpenDataViewOf, createDandiView, openDataViewName, viewForDataset } from "@/utils/viewsService";
-import { OPENNEURO_REGISTRY } from "@/utils/openNeuro";
-import { DANDI_REGISTRY, dandiViewTitle } from "@/utils/dandi";
-import { BOSSDB_REGISTRY, bossdbViewName } from "@/utils/bossdb";
-import { OPEN_DATA_PORTALS } from "@/utils/openDataPortals";
 import PlatformList from "../PlatformList.vue";
 import PlatformPane from "../PlatformPane.vue";
+import { PLATFORMS } from "../platforms";
 import { newSelection, clearSelection, selectionReady } from "../platformSelection";
-import { addedSourceName } from "./inputsHelpers";
 
 const props = defineProps({
   // The session's views (useSessionInputs), to tell one of the same files.
@@ -35,73 +30,21 @@ watch(addOpen, (open) => {
   addError.value = null;
 });
 
+const p = computed(() => PLATFORMS[platform.value]);
+const part = computed(() => sel[platform.value]);
 const addReady = computed(() => selectionReady(platform.value, sel));
 
-// A view's name for what's chosen: two views of the same name are of the
-// same files. For a Discover dataset version, its id and version instead.
-// An Open Data catalog entry (AWS Open Data's, PhysioNet's, the Allen
-// Institute's) goes by its title; the others' datasets by their names.
-const titled = (p) => ["openData", "physionet", "allen"].includes(p);
-const viewNameOf = () => {
-  const p = platform.value;
-  if (p === "bossdb") return bossdbViewName(sel.bossdb.picks);
-  if (p === "dandi") return openDataViewName(dandiViewTitle(sel.dandi.dataset), sel.dandi.prefix);
-  if (titled(p)) return openDataViewName(sel[p].dataset.title, sel[p].prefix);
-  return openDataViewName(sel[p].dataset.name, sel[p].prefix);
-};
-const registryOf = () => {
-  const p = platform.value;
-  if (p === "openNeuro") return OPENNEURO_REGISTRY;
-  if (p === "dandi") return DANDI_REGISTRY;
-  if (p === "bossdb") return BOSSDB_REGISTRY;
-  if (p in OPEN_DATA_PORTALS) return OPEN_DATA_PORTALS[p].registry;
-  return sel[p].dataset?.name;
-};
-
 // A source already in the session with the same files.
-const addDuplicate = computed(() => {
-  if (!addReady.value) return null;
-  if (platform.value === "discover") {
-    const { dataset, version } = sel.discover;
-    return props.sources.find((s) => s.sourceDatasetId === dataset.id && s.sourceVersion === version) || null;
-  }
-  const name = viewNameOf();
-  return props.sources.find((s) => s.openDataset === registryOf() && s.viewName === name) || null;
-});
-const addDuplicateLabel = computed(() =>
-  platform.value === "discover" ? `Version ${sel.discover.version} of ${sel.discover.dataset?.name}` : viewNameOf()
-);
+const addDuplicate = computed(() => (addReady.value ? props.sources.find((s) => p.value.sameAs(part.value, s)) || null : null));
+const addDuplicateLabel = computed(() => (p.value.sameLabel || p.value.viewName)(part.value));
 
 async function addData() {
   if (!addReady.value || adding.value || addDuplicate.value) return;
   adding.value = true;
   addError.value = null;
   try {
-    const p = platform.value;
-    let view, folder;
-    if (p === "discover") {
-      const { dataset: d, version } = sel.discover;
-      view = await viewForDataset({ datasetId: d.id, version, name: d.name });
-      folder = (n) => `dataset-${d.id}-v${version}${n > 1 ? `-${n}` : ""}`;
-    } else if (p === "bossdb") {
-      const picks = sel.bossdb.picks;
-      view = await createOpenDataViewOf({ dataset: BOSSDB_REGISTRY, name: bossdbViewName(picks), prefixes: picks.map((x) => x.prefix) });
-      // Named after what's chosen: bossdb-witvliet2020-Dataset_1-em for
-      // one, its collection for several of one.
-      const one = picks.length === 1 ? picks[0].prefix : picks[0].prefix.split("/")[0];
-      folder = (n) => addedSourceName(BOSSDB_REGISTRY, `${one.replace(/\/$/, "").replaceAll("/", "-")}/`, n);
-    } else if (p === "dandi") {
-      const { dataset: d, prefix } = sel.dandi;
-      view = await createDandiView({ dandiset: d.id, version: d.version, title: dandiViewTitle(d), prefix });
-      folder = (n) => addedSourceName(DANDI_REGISTRY, prefix || `${d.id}/`, n);
-    } else {
-      // An Open Data dataset or a folder of one: OpenNeuro's, a portal's,
-      // a PhysioNet project's, the Allen Institute's, or any in the registry.
-      const { dataset: d, prefix } = sel[p];
-      const registry = registryOf();
-      view = await createOpenDataView({ dataset: registry, title: titled(p) ? d.title : d.name, prefix });
-      folder = (n) => addedSourceName(registry, prefix, n);
-    }
+    const view = await p.value.createView(part.value);
+    const folder = (n) => p.value.folderName(part.value, n);
     // The next free folder name: input/ may hold one already.
     let added = "";
     for (let n = 1; ; n++) {

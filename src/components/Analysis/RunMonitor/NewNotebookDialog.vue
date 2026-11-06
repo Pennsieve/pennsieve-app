@@ -11,7 +11,7 @@
 // via v-model and emits `created` with the new run.
 import { isPathPrefixParam, targetParamLabel, defaultsToRunName, targetWritesToDataset, canWriteDataset, searchDatasets } from "./dataTargets";
 import { hasInterface, withInterfaceNodes, destinationChoices, NO_DESTINATION } from "./workflowInterface";
-import { acceptsInput, dataRegions, nodeDataReason, nodeDataNote, dataSize, suggestedDisk, isImagingData } from "./dataHints";
+import { acceptsInput, nodeDataReason, nodeDataNote, suggestedDisk } from "./dataHints";
 import { computed, nextTick, reactive, ref, watch } from "vue";
 import { useStore } from "vuex";
 import BfButton from "../../shared/bf-button/BfButton.vue";
@@ -65,15 +65,11 @@ import RuntimeMark from "../WorkflowGraph/RuntimeMark.vue";
 import { STANDARD_CPU_OPTIONS, getStandardMemoryOptions, getTargetTypeLabel } from "./runHelpers";
 import { sourceLabel } from "../WorkflowGraph/sourceInputs";
 import * as siteConfig from "@/site-config/site.json";
-import { viewsServiceUrl, viewForDataset, viewDataSource, createOpenDataView, createOpenDataViewOf, createDandiView } from "@/utils/viewsService";
-import { OPENNEURO_REGISTRY } from "@/utils/openNeuro";
-import { dandiViewTitle } from "@/utils/dandi";
+import { viewsServiceUrl, viewDataSource } from "@/utils/viewsService";
 import PlatformList from "../PlatformList.vue";
 import PlatformPane from "../PlatformPane.vue";
-import { newSelection, clearSelection } from "../platformSelection";
-import { bossdbViewName, BOSSDB_REGISTRY } from "@/utils/bossdb";
-import { OPEN_DATA_PORTALS } from "@/utils/openDataPortals";
-import { DATA_PLATFORMS } from "../dataPlatforms";
+import { newSelection, clearSelection, selectionReady } from "../platformSelection";
+import { PLATFORMS, PLATFORM_KEYS, platformData } from "../platforms";
 
 const props = defineProps({
   modelValue: { type: Boolean, default: false },
@@ -268,7 +264,7 @@ const nodeReasons = (cn) => {
   if (status) return [status];
   const reasons = nodeHardwareUnfit(cn, nodeMustRun.value, gateReason);
   const full = capacityReason(nodeCapacity.value[cn?.uuid]);
-  const data = nodeDataReason(cn, inputChoice.value);
+  const data = nodeDataReason(cn, chosenData.value);
   return [...reasons, ...(full ? [full] : []), ...(data ? [data] : [])];
 };
 // Reads the capacity of the nodes given (all listed, by default). Failures
@@ -397,17 +393,12 @@ const selectedDataset = computed(
 const iface = computed(() => hasInterface(selectedWorkflow.value));
 const ifaceInput = computed(() => selectedWorkflow.value?.inputs?.[0] || null);
 const ifaceOutput = computed(() => selectedWorkflow.value?.outputs?.[0] || null);
+// A dataset of this workspace, a data platform's (platforms/, by its key;
+// Discover's is "public"), or none.
+const choiceKey = (platform) => (platform === "discover" ? "public" : platform);
 const INPUT_CHOICES = {
   dataset: { label: "Files from a dataset", desc: "Choose a dataset in this workspace, then the files to start with" },
-  public: { label: DATA_PLATFORMS.discover.name, desc: DATA_PLATFORMS.discover.desc, platform: "discover" },
-  openData: { label: DATA_PLATFORMS.openData.name, desc: DATA_PLATFORMS.openData.desc, platform: "openData" },
-  sparc: { label: DATA_PLATFORMS.sparc.name, desc: DATA_PLATFORMS.sparc.desc, platform: "sparc" },
-  epilepsyScience: { label: DATA_PLATFORMS.epilepsyScience.name, desc: DATA_PLATFORMS.epilepsyScience.desc, platform: "epilepsyScience" },
-  openNeuro: { label: DATA_PLATFORMS.openNeuro.name, desc: DATA_PLATFORMS.openNeuro.desc, platform: "openNeuro" },
-  bossdb: { label: DATA_PLATFORMS.bossdb.name, desc: DATA_PLATFORMS.bossdb.desc, platform: "bossdb" },
-  dandi: { label: DATA_PLATFORMS.dandi.name, desc: DATA_PLATFORMS.dandi.desc, platform: "dandi" },
-  physionet: { label: DATA_PLATFORMS.physionet.name, desc: DATA_PLATFORMS.physionet.desc, platform: "physionet" },
-  allen: { label: DATA_PLATFORMS.allen.name, desc: DATA_PLATFORMS.allen.desc, platform: "allen" },
+  ...Object.fromEntries(PLATFORM_KEYS.map((k) => [choiceKey(k), { label: PLATFORMS[k].name, desc: PLATFORMS[k].desc, platform: k }])),
   none: { label: "No input", desc: "Start with an empty input/ folder" },
 };
 // The data platforms offered (PlatformList's keys), the one chosen, and the
@@ -420,7 +411,7 @@ const choiceOf = (platform) => Object.keys(INPUT_CHOICES).find((c) => INPUT_CHOI
 const inputChoices = computed(() => {
   const c = [];
   if (!props.personal) c.push("dataset");
-  if (publicInputs) c.push("public", "openData", "sparc", "epilepsyScience", "openNeuro", "bossdb", "dandi", "physionet", "allen");
+  if (publicInputs) c.push(...PLATFORM_KEYS.map(choiceKey));
   c.push("none");
   return c;
 });
@@ -570,25 +561,9 @@ const canNext = computed(() => {
       // Resources always have a valid default (1 vCPU).
       return !allHardware.value.length || nodeHardware.value.includes(currentHardware.value);
     case S.INPUT:
-      return inputChoice.value === "dataset"
-        ? !!form.value.datasetId
-        : inputChoice.value === "public"
-        ? !!publicDataset.value
-        : inputChoice.value === "openData"
-        ? !!openDataDataset.value
-        : inputChoice.value === "openNeuro"
-        ? !!openNeuroDataset.value
-        : inputChoice.value === "bossdb"
-        ? bossdbPicks.value.length > 0
-        : inputChoice.value === "dandi"
-        ? !!dandiDataset.value
-        : inputChoice.value === "physionet"
-        ? !!physionetDataset.value && !!physionetPrefix.value
-        : inputChoice.value === "allen"
-        ? !!allenDataset.value
-        : isPortal.value
-        ? !!portalDataset.value
-        : inputChoice.value === "none";
+      if (inputChoice.value === "dataset") return !!form.value.datasetId;
+      if (choicePlatform.value) return selectionReady(choicePlatform.value, sel);
+      return inputChoice.value === "none";
     case S.FILES:
       return dataSourcesComplete.value;
     case S.OUTPUT:
@@ -634,105 +609,23 @@ const onDatasetSearch = (query) => {
 // dataset pages.
 const publicInputs = !!viewsServiceUrl();
 // What's chosen on each data platform (PlatformPane binds its pickers to
-// it); the names below read and write their parts.
+// it; platforms/ say what it is and what's made of it).
 const sel = newSelection();
-const part = (platform, field) => computed({ get: () => sel[platform][field], set: (v) => (sel[platform][field] = v) });
-const publicDataset = part("discover", "dataset"); // a published dataset, chosen with DiscoverPicker
-const publicVersion = part("discover", "version");
-
-/* --------------------------------------------------- AWS Open Data input --- */
-// A dataset of the Registry of Open Data on AWS and a folder of it, chosen
-// with OpenDataPicker: the notebook starts with a view of its files there,
-// listed from its public bucket when the run starts, and the user downloads
-// what they need from the Inputs panel.
-const openDataDataset = part("openData", "dataset"); // a listOpenData entry
-const openDataPrefix = part("openData", "prefix");
-
-// An OpenNeuro dataset, chosen with OpenNeuroPicker: a view of its folder
-// in the Open Data catalog's openneuro entry.
-const openNeuroDataset = part("openNeuro", "dataset"); // a searchOpenNeuro result
-const openNeuroPrefix = part("openNeuro", "prefix");
-const openNeuroLabel = computed(() => {
-  const d = openNeuroDataset.value;
-  if (!d) return "";
-  return `${d.name} (${openNeuroPrefix.value || d.id})`;
-});
-
-// BossDB collections, experiments or volumes, chosen with BossdbPicker: a
-// view of their folders of the bossdb entry, whose volumes views-service
-// takes whole (precomputed, read in place).
-const bossdbPicks = part("bossdb", "picks"); // [{ prefix, label, ... }]
-
-// A dandiset version, chosen with DandiPicker: a view of its files (each
-// read from its blob in the archive's bucket), all or a folder's.
-const dandiDataset = part("dandi", "dataset"); // a searchDandi result, at the version chosen
-const dandiPrefix = part("dandi", "prefix");
-const dandiLabel = computed(() => {
-  const d = dandiDataset.value;
-  if (!d) return "";
-  return `${d.name} (DANDI:${d.id}${dandiPrefix.value ? `/${dandiPrefix.value}` : ""}, ${d.version})`;
-});
-
-// A PhysioNet project's version, chosen with PhysionetPicker: a view of a
-// folder of it, the project being its own Open Data entry.
-const physionetDataset = part("physionet", "dataset"); // a listOpenData entry
-const physionetPrefix = part("physionet", "prefix"); // its version's folder or one below
-const physionetLabel = computed(() => {
-  const d = physionetDataset.value;
-  if (!d) return "";
-  return `${d.title} (${d.name}/${physionetPrefix.value.replace(/\/$/, "")})`;
-});
-
-// An Allen Institute dataset and a folder of it, chosen with OpenDataPicker
-// from its part of the catalog: a view of it like any Open Data dataset's.
-const allenDataset = part("allen", "dataset"); // a listOpenData entry
-const allenPrefix = part("allen", "prefix");
-const allenLabel = computed(() => {
-  const d = allenDataset.value;
-  if (!d) return "";
-  const p = allenPrefix.value.trim();
-  return p ? `${d.title} (${p})` : d.title;
-});
-
-// A SPARC or Epilepsy.Science dataset, chosen with PortalPicker: a view of
-// its folder in the portal's Open Data entry. Choosing the other portal
-// starts over.
-// The portal chosen's (each keeps its own).
-const isPortal = computed(() => inputChoice.value in OPEN_DATA_PORTALS);
-const portalPart = (field, none) =>
-  computed({ get: () => (isPortal.value ? sel[inputChoice.value][field] : none), set: (v) => isPortal.value && (sel[inputChoice.value][field] = v) });
-const portalDataset = portalPart("dataset", null); // a toPortalDataset
-const portalPrefix = portalPart("prefix", "");
-const portalLabel = computed(() => {
-  const d = portalDataset.value;
-  if (!d) return "";
-  const p = portalPrefix.value.replace(/\/$/, "");
-  return p && p !== String(d.id) ? `${d.name} (${p})` : d.name;
-});
-
-const openDataLabel = computed(() => {
-  const d = openDataDataset.value;
-  if (!d) return "";
-  const p = openDataPrefix.value.trim();
-  return p ? `${d.title} (${p})` : d.title;
-});
+const publicDataset = computed(() => sel.discover.dataset); // a published dataset, chosen with DiscoverPicker
 
 // Hints from the data chosen: where it lives (a node elsewhere costs
-// transfer), its size (the disk suggested), and whether it's imaging (a
-// GPU may help).
-const dataContext = computed(() => ({
-  publicDataset: publicDataset.value,
-  openNeuroDataset: openNeuroDataset.value,
-  dandiDataset: dandiDataset.value,
-  openDataDataset: openDataDataset.value,
-  allenDataset: allenDataset.value,
-  portalDataset: portalDataset.value,
-  selectedDataset: selectedDataset.value?.content,
-}));
-const nodeNote = (cn) => nodeDataNote(cn, dataRegions(inputChoice.value, dataContext.value));
-const dataBytes = computed(() => dataSize(inputChoice.value, dataContext.value));
+// transfer), its size (the disk suggested), whether it's imaging (a GPU may
+// help) and whether it's in a public bucket (a compliant node can't reach
+// it). A workspace dataset's size is its storage.
+const chosenData = computed(() =>
+  inputChoice.value === "dataset"
+    ? { regions: [], size: selectedDataset.value?.content?.storage || null, imaging: false, publicBucket: false }
+    : platformData(choicePlatform.value, sel[choicePlatform.value])
+);
+const nodeNote = (cn) => nodeDataNote(cn, chosenData.value.regions);
+const dataBytes = computed(() => chosenData.value.size);
 const diskSuggestion = computed(() => suggestedDisk(dataBytes.value, diskOptions));
-const imagingData = computed(() => isImagingData(inputChoice.value, dataContext.value));
+const imagingData = computed(() => chosenData.value.imaging);
 // The disk follows the suggestion until the user picks one.
 const diskTouched = ref(false);
 watch(diskSuggestion, (gib) => {
@@ -1035,26 +928,12 @@ const stepAbout = computed(() =>
 const soFar = computed(() => {
   const rows = [];
   if (step.value > S.INPUT) {
-    const input =
-      inputChoice.value === "public"
-        ? publicDataset.value?.name || "A public dataset"
-        : inputChoice.value === "openData"
-        ? openDataLabel.value || "AWS Open Data"
-        : inputChoice.value === "openNeuro"
-        ? openNeuroLabel.value || "OpenNeuro"
-        : inputChoice.value === "bossdb"
-        ? (bossdbPicks.value.length ? bossdbViewName(bossdbPicks.value) : "BossDB")
-        : inputChoice.value === "dandi"
-        ? dandiLabel.value || "DANDI"
-        : inputChoice.value === "physionet"
-        ? physionetLabel.value || "PhysioNet"
-        : inputChoice.value === "allen"
-        ? allenLabel.value || "Allen Institute"
-        : isPortal.value
-        ? portalLabel.value || DATA_PLATFORMS[inputChoice.value].name
-        : inputChoice.value === "dataset"
-        ? selectedDataset.value?.content?.name || "A dataset"
-        : "No input";
+    const platform = PLATFORMS[choicePlatform.value];
+    const input = platform
+      ? platform.label(sel[platform.key]) || platform.name
+      : inputChoice.value === "dataset"
+      ? selectedDataset.value?.content?.name || "A dataset"
+      : "No input";
     rows.push({ label: "Data", value: input });
   }
   if (step.value > S.KERNEL && selectedWorkflow.value) rows.push({ label: "Kernel", value: kernelLabel(notebookKernel(selectedWorkflow.value)) });
@@ -1138,88 +1017,12 @@ async function execute() {
         : { cpu: resourceCpu.value, memory: resolvedMemory.value, diskGiB: resourceDisk.value },
     });
 
-    // Outside a workspace, the public dataset is the first data source's view.
-    // It's a source's only input: the session downloads its files into it.
+    // Data from a platform is the first data source's view, made now: its
+    // only input, which the session downloads files into.
     const personalSources = {};
-    const usesPublic = inputChoice.value === "public";
-    if (usesPublic && publicDataset.value && dataSourceNodes.value.length) {
-      const view = await viewForDataset({
-        datasetId: publicDataset.value.id,
-        version: publicVersion.value,
-        name: publicDataset.value.name,
-      });
-      personalSources[dataSourceNodes.value[0].id] = viewDataSource(view);
-    }
-    // An AWS Open Data dataset: a view made for this run, listed now.
-    const usesOpenData = inputChoice.value === "openData";
-    if (usesOpenData && openDataDataset.value && dataSourceNodes.value.length) {
-      const view = await createOpenDataView({
-        dataset: openDataDataset.value.name,
-        title: openDataDataset.value.title,
-        prefix: openDataPrefix.value,
-      });
-      personalSources[dataSourceNodes.value[0].id] = viewDataSource(view);
-    }
-    // An OpenNeuro dataset: a view of its folder in the openneuro entry.
-    const usesOpenNeuro = inputChoice.value === "openNeuro";
-    if (usesOpenNeuro && openNeuroDataset.value && dataSourceNodes.value.length) {
-      const view = await createOpenDataView({
-        dataset: OPENNEURO_REGISTRY,
-        title: openNeuroDataset.value.name,
-        prefix: openNeuroPrefix.value,
-      });
-      personalSources[dataSourceNodes.value[0].id] = viewDataSource(view);
-    }
-    // BossDB: a view of the folders chosen, their volumes precomputed stacks.
-    const usesBossdb = inputChoice.value === "bossdb";
-    if (usesBossdb && bossdbPicks.value.length && dataSourceNodes.value.length) {
-      const view = await createOpenDataViewOf({
-        dataset: BOSSDB_REGISTRY,
-        name: bossdbViewName(bossdbPicks.value),
-        prefixes: bossdbPicks.value.map((p) => p.prefix),
-      });
-      personalSources[dataSourceNodes.value[0].id] = viewDataSource(view);
-    }
-    // A dandiset version: a view of its files, each read from its blob.
-    const usesDandi = inputChoice.value === "dandi";
-    if (usesDandi && dandiDataset.value && dataSourceNodes.value.length) {
-      const view = await createDandiView({
-        dandiset: dandiDataset.value.id,
-        version: dandiDataset.value.version,
-        title: dandiViewTitle(dandiDataset.value),
-        prefix: dandiPrefix.value,
-      });
-      personalSources[dataSourceNodes.value[0].id] = viewDataSource(view);
-    }
-    // A PhysioNet project: a view of a version's folder of its entry.
-    const usesPhysionet = inputChoice.value === "physionet";
-    if (usesPhysionet && physionetDataset.value && dataSourceNodes.value.length) {
-      const view = await createOpenDataView({
-        dataset: physionetDataset.value.name,
-        title: physionetDataset.value.title,
-        prefix: physionetPrefix.value,
-      });
-      personalSources[dataSourceNodes.value[0].id] = viewDataSource(view);
-    }
-    // An Allen Institute dataset: a view of it, or a folder of it.
-    const usesAllen = inputChoice.value === "allen";
-    if (usesAllen && allenDataset.value && dataSourceNodes.value.length) {
-      const view = await createOpenDataView({
-        dataset: allenDataset.value.name,
-        title: allenDataset.value.title,
-        prefix: allenPrefix.value,
-      });
-      personalSources[dataSourceNodes.value[0].id] = viewDataSource(view);
-    }
-    // A SPARC or Epilepsy.Science dataset: a view of its folder in the
-    // portal's Open Data entry.
-    const usesPortal = isPortal.value;
-    if (usesPortal && portalDataset.value && dataSourceNodes.value.length) {
-      const view = await createOpenDataView({
-        dataset: OPEN_DATA_PORTALS[inputChoice.value].registry,
-        title: portalDataset.value.name,
-        prefix: portalPrefix.value,
-      });
+    const fromPlatform = !!choicePlatform.value;
+    if (fromPlatform && selectionReady(choicePlatform.value, sel) && dataSourceNodes.value.length) {
+      const view = await PLATFORMS[choicePlatform.value].createView(sel[choicePlatform.value]);
       personalSources[dataSourceNodes.value[0].id] = viewDataSource(view);
     }
 
@@ -1231,7 +1034,7 @@ async function execute() {
         ...(processorConfigs.length > 0 && { processorConfigs }),
       },
       ...(runDatasetId.value && { datasetId: runDatasetId.value }),
-      dataSources: usesPublic || usesOpenData || usesOpenNeuro || usesBossdb || usesDandi || usesPortal ? personalSources : dataSources,
+      dataSources: fromPlatform ? personalSources : dataSources,
       ...(name && { name }),
       ...(Object.keys(dataTargets).length > 0 && { dataTargets }),
     };

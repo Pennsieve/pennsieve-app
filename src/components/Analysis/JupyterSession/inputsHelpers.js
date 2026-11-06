@@ -130,19 +130,12 @@ export function addedSourceName(dataset, prefix = "", n = 1) {
 
 // An input's second line: where it came from, and its folder of input/ as
 // the session's files show it ("OpenNeuro · openneuro-ds008968",
-// "SPARC · sparc-704"). folder is
-// "" when the session can't say (an older sidecar).
-// The Open Data entries a data platform of its own reads from.
-const OPEN_DATA_PLATFORMS = { openneuro: "OpenNeuro", sparc: "SPARC", "epilepsy-science": "Epilepsy.Science", dandiarchive: "DANDI", bossdb: "BossDB" };
-export function inputSubtitle({ openDataset = "", sourceVersion = null, folder = "" } = {}) {
+// "SPARC · sparc-704"). platform is the name of the data platform whose own
+// Open Data entry openDataset is (platforms platformReading), if any; folder
+// is "" when the session can't say (an older sidecar).
+export function inputSubtitle({ platform: own = "", openDataset = "", sourceVersion = null, folder = "" } = {}) {
   const platform =
-    OPEN_DATA_PLATFORMS[openDataset]
-      ? OPEN_DATA_PLATFORMS[openDataset]
-      : openDataset
-      ? "AWS Open Data"
-      : sourceVersion
-      ? `Pennsieve Discover v${sourceVersion}`
-      : "Pennsieve Discover";
+    own || (openDataset ? "AWS Open Data" : sourceVersion ? `Pennsieve Discover v${sourceVersion}` : "Pennsieve Discover");
   return folder ? `${platform} · ${folder}` : platform;
 }
 

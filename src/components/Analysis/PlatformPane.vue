@@ -1,21 +1,13 @@
 <script setup>
 // The chosen data platform's picker, under its name and what it gives the
-// notebook: the right column beside PlatformList, in the new notebook
-// dialog and a running session's "Add data". Each picker is bound to its
-// part of the selection (platformSelection), so moving between platforms
-// keeps what was chosen on each.
+// notebook (its module's title, intro and picker: platforms/): the right
+// column beside PlatformList, in the new notebook dialog and a running
+// session's "Add data". Each picker is bound to its platform's part of the
+// selection (platformSelection), a v-model per field, so moving between
+// platforms keeps what was chosen on each.
 import { computed } from "vue";
 import PlatformMark from "./PlatformMark.vue";
-import DiscoverPicker from "./DiscoverPicker.vue";
-import OpenDataPicker from "./OpenDataPicker.vue";
-import OpenNeuroPicker from "./OpenNeuroPicker.vue";
-import PortalPicker from "./PortalPicker.vue";
-import DandiPicker from "./DandiPicker.vue";
-import BossdbPicker from "./BossdbPicker.vue";
-import PhysionetPicker from "./PhysionetPicker.vue";
-import { DATA_PLATFORMS } from "./dataPlatforms";
-import { OPEN_DATA_PORTALS } from "@/utils/openDataPortals";
-import { isAllenEntry } from "@/utils/allen";
+import { PLATFORMS } from "./platforms";
 
 const props = defineProps({
   platform: { type: String, required: true },
@@ -23,109 +15,32 @@ const props = defineProps({
   selection: { type: Object, required: true },
 });
 
-const isPortal = computed(() => props.platform in OPEN_DATA_PORTALS);
-const TITLES = {
-  discover: "Choose a Pennsieve Discover dataset",
-  openData: "Choose an AWS Open Data dataset",
-  openNeuro: "Choose an OpenNeuro dataset",
-  dandi: "Choose a dandiset",
-  bossdb: "Choose BossDB data",
-  physionet: "Choose a PhysioNet project",
-  allen: "Choose an Allen Institute dataset",
-};
-const title = computed(() => TITLES[props.platform] || `Choose a ${DATA_PLATFORMS[props.platform]?.name} dataset`);
+const p = computed(() => PLATFORMS[props.platform]);
+// The picker's v-model:<field> for each field of the platform's part.
+const models = computed(() => {
+  const part = props.selection[props.platform];
+  const out = {};
+  for (const field of Object.keys(part || {})) {
+    out[field] = part[field];
+    out[`onUpdate:${field}`] = (v) => (part[field] = v);
+  }
+  return out;
+});
 </script>
 
 <template>
-  <div class="pp">
+  <div v-if="p" class="pp">
     <h4 class="pp__title">
       <PlatformMark :platform="platform" :size="24" />
-      {{ title }}
+      {{ p.title }}
     </h4>
-
-    <template v-if="platform === 'discover'">
-      <p class="pp__desc">
-        A published dataset and its version. The notebook gets its file list; you pick which files
-        to download.
-      </p>
-      <DiscoverPicker v-model:dataset="selection.discover.dataset" v-model:version="selection.discover.version" />
-    </template>
-
-    <template v-else-if="platform === 'openNeuro'">
-      <p class="pp__desc">
-        A dataset from <a href="https://openneuro.org" target="_blank" rel="noopener">OpenNeuro</a>,
-        read from its copy in the Registry of Open Data on AWS at its latest version. The notebook
-        gets its file list; you pick which files to download.
-      </p>
-      <OpenNeuroPicker v-model:dataset="selection.openNeuro.dataset" v-model:prefix="selection.openNeuro.prefix" />
-    </template>
-
-    <template v-else-if="platform === 'bossdb'">
-      <p class="pp__desc">
-        Volumes from <a href="https://bossdb.org" target="_blank" rel="noopener">BossDB</a>, read from
-        its copy in the Registry of Open Data on AWS: whole collections, experiments or channels, as
-        many as you need. The notebook reads each volume in place, a region at a time; nothing is
-        downloaded up front.
-      </p>
-      <BossdbPicker v-model:picks="selection.bossdb.picks" />
-    </template>
-
-    <template v-else-if="platform === 'dandi'">
-      <p class="pp__desc">
-        A dandiset from the <a href="https://dandiarchive.org" target="_blank" rel="noopener">DANDI Archive</a>
-        at a published version (or its draft), read from its copy in the Registry of Open Data on AWS.
-        The notebook gets its file list; you pick which files to download.
-      </p>
-      <DandiPicker v-model:dataset="selection.dandi.dataset" v-model:prefix="selection.dandi.prefix" />
-    </template>
-
-    <template v-else-if="platform === 'physionet'">
-      <p class="pp__desc">
-        An open-access project from <a href="https://physionet.org" target="_blank" rel="noopener">PhysioNet</a>
-        at a published version, read from its copy in the Registry of Open Data on AWS. The notebook
-        gets its file list; you pick which files to download.
-      </p>
-      <PhysionetPicker v-model:dataset="selection.physionet.dataset" v-model:prefix="selection.physionet.prefix" />
-    </template>
-
-    <template v-else-if="platform === 'allen'">
-      <p class="pp__desc">
-        A dataset from the <a href="https://alleninstitute.org/open-science/" target="_blank" rel="noopener">Allen Institute</a>
-        in the Registry of Open Data on AWS, and the folder of it to take. Most are large: open a
-        folder to start with less. The notebook gets its file list; you pick which files to download.
-      </p>
-      <OpenDataPicker
-        :key="platform"
-        :only="isAllenEntry"
-        source="Allen Institute"
-        v-model:dataset="selection.allen.dataset"
-        v-model:prefix="selection.allen.prefix"
-      />
-    </template>
-
-    <template v-else-if="isPortal">
-      <p class="pp__desc">
-        A dataset published on
-        <a :href="OPEN_DATA_PORTALS[platform].url" target="_blank" rel="noopener">{{ DATA_PLATFORMS[platform].name }}</a>,
-        read from its copy in the Registry of Open Data on AWS at its latest version. The notebook
-        gets its file list; you pick which files to download.
-      </p>
-      <PortalPicker
-        :key="platform"
-        :portal="platform"
-        v-model:dataset="selection[platform].dataset"
-        v-model:prefix="selection[platform].prefix"
-      />
-    </template>
-
-    <template v-else-if="platform === 'openData'">
-      <p class="pp__desc">
-        A dataset from the
-        <a href="https://registry.opendata.aws/" target="_blank" rel="noopener">Registry of Open Data on AWS</a>,
-        and the folder of it to take. The notebook gets its file list; you pick which files to download.
-      </p>
-      <OpenDataPicker :key="platform" v-model:dataset="selection.openData.dataset" v-model:prefix="selection.openData.prefix" />
-    </template>
+    <p class="pp__desc">
+      <template v-for="(bit, i) in p.intro" :key="i">
+        <a v-if="typeof bit === 'object'" :href="bit.href" target="_blank" rel="noopener">{{ bit.text }}</a>
+        <template v-else>{{ bit }}</template>
+      </template>
+    </p>
+    <component :is="p.picker" :key="platform" v-bind="{ ...p.pickerProps, ...models }" />
   </div>
 </template>
 

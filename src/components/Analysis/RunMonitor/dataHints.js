@@ -3,13 +3,11 @@
 // can reach it, how much disk it needs, and whether a GPU may help.
 import { hasInterface } from "./workflowInterface";
 
-// The data platforms whose files come from public S3 buckets.
-const PUBLIC_BUCKET_INPUTS = new Set(["openNeuro", "sparc", "epilepsyScience", "openData", "bossdb", "dandi", "physionet", "allen"]);
-
-// Whether a kernel's workflow can start with the input chosen (dataset,
-// public, openNeuro, sparc, epilepsyScience, openData, bossdb, dandi, physionet, allen or none). A workflow that declares its input
-// takes any of them, and none when it's optional; one that doesn't reads a
-// workspace dataset's files, or in My Workspace a public dataset or nothing.
+// Whether a kernel's workflow can start with the input chosen (dataset, a
+// data platform's key, public for Discover's, or none). A workflow that
+// declares its input takes any of them, and none when it's optional; one
+// that doesn't reads a workspace dataset's files, or in My Workspace a
+// public dataset or nothing.
 export function acceptsInput(wf, choice, { personal = false } = {}) {
   if (hasInterface(wf)) {
     const input = wf.inputs?.[0];
@@ -21,24 +19,12 @@ export function acceptsInput(wf, choice, { personal = false } = {}) {
   return false;
 }
 
-// Where the chosen data lives, when it's known: OpenNeuro's, SPARC's and
-// Epilepsy.Science's, BossDB's and PhysioNet's copies are in us-east-1, the DANDI Archive's in
-// us-east-2, an Open Data dataset (the Allen Institute's too) says (its
-// regions).
-const US_EAST_1_INPUTS = new Set(["openNeuro", "sparc", "epilepsyScience", "bossdb", "physionet"]);
-export function dataRegions(choice, { openDataDataset, allenDataset } = {}) {
-  if (US_EAST_1_INPUTS.has(choice)) return ["us-east-1"];
-  if (choice === "dandi") return ["us-east-2"];
-  if (choice === "openData") return openDataDataset?.regions || [];
-  if (choice === "allen") return allenDataset?.regions || [];
-  return [];
-}
-
 // Why a compute node can't take the chosen data ("" when it can): a
 // compliant node has no internet access, so it can't read a public bucket.
-export function nodeDataReason(cn, choice) {
+// data is what the chosen data says (platforms platformData).
+export function nodeDataReason(cn, data = {}) {
   const compliant = (cn?.deploymentMode || "").toLowerCase() === "compliant";
-  if (compliant && PUBLIC_BUCKET_INPUTS.has(choice)) return "Can't reach public data (no internet access)";
+  if (compliant && data.publicBucket) return "Can't reach public data (no internet access)";
   return "";
 }
 
@@ -47,16 +33,6 @@ export function nodeDataReason(cn, choice) {
 export function nodeDataNote(cn, regions = []) {
   if (!cn?.region || !regions.length || regions.includes(cn.region)) return "";
   return `Data in ${regions.join(", ")}, node in ${cn.region}: transfer costs apply`;
-}
-
-// The chosen data's size in bytes, when it's known: the whole dataset (the
-// user may download less).
-export function dataSize(choice, { publicDataset, openNeuroDataset, dandiDataset, selectedDataset } = {}) {
-  if (choice === "public") return publicDataset?.size || null;
-  if (choice === "openNeuro") return openNeuroDataset?.size || null;
-  if (choice === "dandi") return dandiDataset?.size || null;
-  if (choice === "dataset") return selectedDataset?.storage || null;
-  return null;
 }
 
 // Room a session needs besides its data: its environment and the user's
@@ -70,17 +46,4 @@ export function suggestedDisk(bytes, options = []) {
   const sizes = options.map((o) => o.value).sort((a, b) => a - b);
   const need = bytes * 1.1 + DISK_HEADROOM_BYTES;
   return sizes.find((gib) => gib * 2 ** 30 >= need) ?? sizes.at(-1);
-}
-
-// Whether the data is imaging, where a GPU may help (deep learning,
-// registration, segmentation): from OpenNeuro's modalities, or an Open Data
-// dataset's (the Allen Institute's too) or a SPARC or Epilepsy.Science
-// dataset's keywords.
-const IMAGING = /^(mri|pet|ct|microscopy|imaging|medical imaging|computer vision|cryo-em|histopathology|whole slide imaging)$/i;
-export function isImagingData(choice, { openNeuroDataset, openDataDataset, allenDataset, portalDataset } = {}) {
-  if (choice === "openNeuro") return (openNeuroDataset?.modalities || []).some((m) => IMAGING.test(m));
-  if (choice === "sparc" || choice === "epilepsyScience") return (portalDataset?.keywords || []).some((k) => IMAGING.test(k));
-  if (choice === "openData") return (openDataDataset?.keywords || []).some((k) => IMAGING.test(k));
-  if (choice === "allen") return (allenDataset?.keywords || []).some((k) => IMAGING.test(k));
-  return false;
 }
