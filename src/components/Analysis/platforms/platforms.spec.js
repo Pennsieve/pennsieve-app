@@ -29,7 +29,7 @@ describe("the data platforms", () => {
   });
 
   it("are listed in order", () => {
-    expect(PLATFORM_KEYS).toEqual(["discover", "openData", "sparc", "epilepsyScience", "openNeuro", "bossdb", "dandi", "physionet", "allen", "cellxgene", "encode", "hca", "idc"]);
+    expect(PLATFORM_KEYS).toEqual(["discover", "openData", "sparc", "epilepsyScience", "openNeuro", "bossdb", "dandi", "physionet", "allen", "cellxgene", "encode", "hca", "idc", "ibl"]);
   });
 
   it("say where their data lives, and which nodes can reach it", () => {
@@ -116,6 +116,7 @@ describe("the data platforms", () => {
     expect(platformReading("cgmacros", "PhysioNet")?.name).toBe("PhysioNet");
     expect(platformReading("encode-project")?.name).toBe("ENCODE");
     expect(platformReading("humancellatlas")?.name).toBe("Human Cell Atlas");
+    expect(platformReading("ibl-brain-wide-map", "International Brain Laboratory")?.name).toBe("International Brain Laboratory");
     expect(platformReading("")).toBeNull();
   });
 });
