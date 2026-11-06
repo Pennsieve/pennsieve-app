@@ -1,6 +1,9 @@
 import { describe, it, expect } from "vitest";
 import {
   folderContents,
+  splitStacks,
+  stackFormat,
+  stackIcon,
   filesUnder,
   inputKey,
   middleTruncate,
@@ -127,5 +130,31 @@ describe("inputsDiskUse", () => {
     expect(use.full).toBe(false);
     expect(inputsDiskUse(60e9, 64).full).toBe(true);
     expect(inputsDiskUse(2e9, null)).toEqual({ text: "2.0 GB of inputs in the session", share: null, full: false });
+  });
+});
+
+describe("stacks", () => {
+  const files = [
+    { cratePath: "sub-1/micr/photo.jpg", size: 3 },
+    { cratePath: "sub-1/micr/a.json", size: 1 },
+  ];
+  const zarr = { cratePath: "sub-1/micr/a.ome.zarr/", kind: "stack", format: "ome-zarr", size: 9000, location: "s3://dandiarchive/zarr/56/" };
+  const only = { cratePath: "sub-2/b.zarr/", kind: "stack", format: "zarr", size: 5 };
+
+  it("keeps a view's stacks apart from its files", () => {
+    expect(splitStacks([...files, zarr])).toEqual({ files, stacks: [zarr] });
+    expect(stackFormat(zarr)).toBe("OME-Zarr");
+    expect(stackFormat(only)).toBe("Zarr");
+    expect(stackIcon(zarr)).toBe("/file-icons/icon-microscope.svg");
+    expect(stackIcon(only)).toBe("/file-icons/icon-data.svg");
+  });
+
+  it("shows a stack in its folder, and a folder that has only stacks", () => {
+    const top = folderContents(files, "", [zarr, only]);
+    // Folders count their files only.
+    expect(top.map((r) => [r.type, r.name, r.count])).toEqual([["folder", "sub-1", 2], ["folder", "sub-2", 0]]);
+    const micr = folderContents(files, "sub-1/micr/", [zarr, only]);
+    expect(micr.map((r) => [r.type, r.name])).toEqual([["file", "a.json"], ["stack", "a.ome.zarr"], ["file", "photo.jpg"]]);
+    expect(micr[1]).toMatchObject({ path: "sub-1/micr/a.ome.zarr/", size: 9000, entry: zarr });
   });
 });
