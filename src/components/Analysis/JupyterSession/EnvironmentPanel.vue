@@ -330,7 +330,10 @@ onBeforeUnmount(() => clearTimeout(pollTimer));
       <ul v-if="packages && !packagesLoading" class="pk__list">
         <li v-for="p in packagesShown" :key="p.name" class="pk__row">
           <span class="pk__name">{{ p.name }}</span>
-          <span v-if="p.fromEnvironment" class="pk__tag" :title="`${current?.name} asks for it`">environment</span>
+          <!-- Always a cell, so the versions line up. -->
+          <span class="pk__tag-cell">
+            <span v-if="p.fromEnvironment" class="pk__tag" :title="`${current?.name} asks for it`">environment</span>
+          </span>
           <span class="pk__version">{{ p.version }}</span>
         </li>
         <li v-if="!packagesShown.length" class="env__msg">No package by that name.</li>
@@ -453,8 +456,10 @@ onBeforeUnmount(() => clearTimeout(pollTimer));
   border: 1px solid theme.$gray_2;
   border-radius: 4px;
 }
+/* Columns: name, the environment's tag, version (left-aligned). */
 .pk__row {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 96px 88px;
   align-items: center;
   gap: 8px;
   padding: 4px 10px;
@@ -462,7 +467,6 @@ onBeforeUnmount(() => clearTimeout(pollTimer));
   font-size: 13px;
 }
 .pk__name {
-  flex: 1;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -476,7 +480,13 @@ onBeforeUnmount(() => clearTimeout(pollTimer));
   font-size: 11px;
   color: theme.$purple_2;
 }
+.pk__tag-cell {
+  display: flex;
+}
 .pk__version {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-family: monospace;
   font-size: 12px;
   color: theme.$gray_5;
