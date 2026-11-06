@@ -323,20 +323,21 @@
               </template>
               <!-- A file or a folder: its format -->
               <div v-if="portMode(port) === 'file' || portMode(port) === 'folder'" class="field-row full-width" :data-field="`${block.key}.${index}.mediaTypes`" :class="{ 'has-problem': formatProblems(port, `${block.key}.${index}.mediaTypes`).length > 0 }">
-                <label class="field-label">{{ portMode(port) === "folder" ? "Folder format" : "Media type" }}</label>
+                <label class="field-label">{{ portMode(port) === "folder" ? "Folder formats" : "Media types" }}</label>
                 <div class="field-control">
-                  <!-- Searchable by format name, extension or media type -->
+                  <!-- Searchable by format name, extension or media type; any number of them -->
                   <el-select
-                    :model-value="portMode(port) === 'folder' && port.dataType === 'any' ? '' : port.dataType"
+                    :model-value="portTypes(port)"
                     class="full"
+                    multiple
                     filterable
                     :filter-method="(q) => (mediaTypeQuery = q)"
-                    :placeholder="portMode(port) === 'folder' ? 'e.g. OME-Zarr, MEF3' : 'Search formats, e.g. NWB, .edf'"
+                    :placeholder="portMode(port) === 'folder' ? 'e.g. OME-Zarr, MEF3' : 'Any file. Search formats, e.g. NWB, .edf'"
                     @visible-change="(open) => open || ((mediaTypeQuery = ''), formatTouched.add(toRaw(port)))"
-                    @change="(v) => onPortDataTypeChange(port, v)"
+                    @change="(v) => onPortMediaTypesChange(port, v)"
                   >
                     <el-option
-                      v-for="dt in formatChoices(port).filter((o) => mediaTypeMatches(o, mediaTypeQuery))"
+                      v-for="dt in formatChoices(port).filter((o) => o.value !== 'any' && mediaTypeMatches(o, mediaTypeQuery))"
                       :key="dt.value"
                       :label="dt.formats && dt.formats.length ? `${dt.formats.join(' / ')} (${dt.value})` : dt.label"
                       :value="dt.value"
@@ -350,10 +351,10 @@
                     </el-option>
                   </el-select>
                   <!-- A folder format picked as files: say what the app gets -->
-                  <p v-if="portMode(port) === 'file' && optionFor(port.dataType)?.kind === 'directory'" class="field-hint">
-                    {{ optionFor(port.dataType).formats?.[0] || port.dataType }} is a folder format. As files, the app
-                    {{ block.key === "inputs" ? "gets" : "writes" }} each one as stored<template v-if="optionFor(port.dataType).extensions?.length"> ({{ optionFor(port.dataType).extensions.join(", ") }})</template>.
-                    <button type="button" class="link-button" @click="setPortMode(port, 'folder')">Use folders<template v-if="optionFor(port.dataType).folderExtensions?.length"> ({{ optionFor(port.dataType).folderExtensions.map((e) => `*${e}/`).join(", ") }})</template> instead</button>
+                  <p v-if="portMode(port) === 'file' && folderFormatOf(port)" class="field-hint">
+                    {{ folderFormatOf(port).formats?.[0] || folderFormatOf(port).value }} is a folder format. As files, the app
+                    {{ block.key === "inputs" ? "gets" : "writes" }} each one as stored<template v-if="folderFormatOf(port).extensions?.length"> ({{ folderFormatOf(port).extensions.join(", ") }})</template>.
+                    <button type="button" class="link-button" @click="setPortMode(port, 'folder')">Use folders<template v-if="folderFormatOf(port).folderExtensions?.length"> ({{ folderFormatOf(port).folderExtensions.map((e) => `*${e}/`).join(", ") }})</template> instead</button>
                   </p>
                   <p v-for="m in formatProblems(port, `${block.key}.${index}.mediaTypes`)" :key="m" class="field-error">{{ m }}</p>
                 </div>
@@ -558,7 +559,7 @@ import { computed, onMounted, reactive, ref, toRaw, watch } from "vue";
 import { useStore } from "vuex";
 import MoreOptions from "./MoreOptions.vue";
 import FieldHint from "./FieldHint.vue";
-import { PARAM_TYPES, PARAM_TYPE_OPTIONS, createParameter, createPort, portDataTypeOptions, STANDARD_CPU_OPTIONS, getStandardMemoryOptions, isNumericType, mediaTypeMatches, structureId, structureOptionsFor, structureMatches, isStructureLink, conformsToList, rootInputCollisions } from "./applicationSchema";
+import { PARAM_TYPES, PARAM_TYPE_OPTIONS, createParameter, createPort, portDataTypeOptions, normalizeMediaType, keptFormats, STANDARD_CPU_OPTIONS, getStandardMemoryOptions, isNumericType, mediaTypeMatches, structureId, structureOptionsFor, structureMatches, isStructureLink, conformsToList, rootInputCollisions } from "./applicationSchema";
 import { environmentsServiceUrl, findReferences } from "@/utils/environmentsService";
 import { useOntologyStore } from "@/stores/ontologyStore";
 import { REFERENCE_KINDS, assetClassName, isAppDefault, organismName, referenceBlock, referenceKindText, referenceLabel, taxonFromTerm, rankOrganisms, COMMON_ORGANISMS } from "../RunMonitor/referenceSources";
@@ -833,8 +834,8 @@ const assetClassOptions = (port) => {
 const mediaTypeQuery = ref("");
 const portDataTypes = computed(() =>
   portDataTypeOptions(store.state.analysisModule.packageFormats, [
-    ...(schema.value.inputs || []).map((p) => p.dataType),
-    ...(schema.value.outputs || []).map((p) => p.dataType),
+    ...(schema.value.inputs || []).flatMap(portTypes),
+    ...(schema.value.outputs || []).flatMap(portTypes),
   ])
 );
 
@@ -896,16 +897,21 @@ const onParamNameInput = (param, value) => {
 };
 
 /*
-  A port's media type is what the author picks. Its name and description are
-  the package format's, copied from the option the platform served, and its
-  `mediaTypes` is kept in step so a manifest round-trips. With "Any", the
-  author names the port.
+  A port's media types are what the author picks, any number (EDF or NWB).
+  Its name and description are the first format's, copied from the option
+  the platform served, and `dataType` is kept as the first type. With none,
+  the port takes any file and the author names it.
 */
 const optionFor = (value) => portDataTypes.value.find((o) => o.value === value);
-// The EDAM formats a port has beyond its media type's (kept from app.yml).
+// The types a port takes: its media types, else an older manifest's dataType.
+const portTypes = (port) =>
+  asList(port.mediaTypes).length ? asList(port.mediaTypes) : port.dataType && port.dataType !== "any" ? [port.dataType] : [];
+// The first folder format among a port's types (OME-Zarr), for the files/folders hint.
+const folderFormatOf = (port) => portTypes(port).map(optionFor).find((o) => o?.kind === "directory");
+// The EDAM formats a port has beyond its media types' (kept from app.yml).
 const extraFormats = (port) => {
-  const edam = optionFor(port.dataType)?.edam;
-  return (port.formats || []).filter((f) => f !== edam);
+  const edams = portTypes(port).map((t) => optionFor(t)?.edam);
+  return (port.formats || []).filter((f) => !edams.includes(f));
 };
 // A format's name as an identifier: "TS-Zarr timeseries" -> ts-zarr-timeseries.
 const identifierFrom = (text) =>
@@ -913,24 +919,24 @@ const identifierFrom = (text) =>
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "");
-const onPortDataTypeChange = (port, value) => {
-  const before = optionFor(port.dataType);
-  const previous = before?.edam;
-  port.dataType = value || "any";
-  const option = optionFor(port.dataType);
-  if (port.dataType !== "any") {
+const onPortMediaTypesChange = (port, values) => {
+  const previous = portTypes(port);
+  const types = [...new Set(asList(values).map(normalizeMediaType).filter((v) => v && v !== "any"))];
+  const before = optionFor(previous[0]);
+  const option = optionFor(types[0]);
+  if (types.length) {
     // The name is the author's identifier: only an empty one, or one the
-    // previous format suggested, follows the format.
+    // previous first format suggested, follows the first format.
     const suggested = (o) => [identifierFrom(o?.name), o?.name || ""].filter(Boolean);
     if (!port.name || suggested(before).includes(port.name)) port.name = identifierFrom(option?.name);
     if (!port.description || port.description === (before?.description || "")) port.description = option?.description || "";
   }
-  port.mediaTypes = port.dataType && port.dataType !== "any" ? [port.dataType] : [];
+  port.dataType = types[0] || "any";
+  port.mediaTypes = types;
   // EDAM ids aren't written: the registry maps each media type to its own.
-  // Ones the app.yml had stay, apart from the previous media type's, unless
-  // the port goes back to any file.
-  const kept = (port.formats || []).filter((f) => f !== previous);
-  port.formats = port.dataType === "any" ? [] : kept;
+  // Ones the app.yml had stay, apart from those of media types taken out,
+  // unless the port goes back to any file.
+  port.formats = keptFormats(port.formats, previous, types, (t) => optionFor(t)?.edam);
 };
 
 /*
@@ -968,7 +974,7 @@ const chosenModes = reactive(new WeakMap());
 // and left it empty, rather than appearing the moment Folders is chosen.
 const formatTouched = reactive(new WeakSet());
 const formatProblems = (port, key) =>
-  portMode(port) === "folder" && port.dataType === "any" && !formatTouched.has(toRaw(port)) ? [] : at(key);
+  portMode(port) === "folder" && !portTypes(port).length && !formatTouched.has(toRaw(port)) ? [] : at(key);
 const portMode = (port) => {
   if (showsReference(port)) return "reference";
   if (conformsToList(port.conformsTo).length) return "layout";
@@ -996,15 +1002,19 @@ const setPortMode = (port, mode) => {
     propertyDrafts.delete(toRaw(port));
     delete port.reference;
   }
-  const before = optionFor(port.dataType);
+  const before = optionFor(portTypes(port)[0]);
   chosenModes.set(toRaw(port), mode);
   port.conformsTo = [];
   port.container = mode === "folder" ? "directory" : "";
-  // A format carries over when it fits: any format as files, a folder
+  // Formats carry over when they fit: any format as files, a folder
   // format as folders. Otherwise start clean, and drop a name and
   // description that were only the old format's suggestion.
-  const fits = before && port.dataType !== "any" && (mode === "file" || (mode === "folder" && before.kind === "directory"));
-  if (fits) return;
+  const fitting = portTypes(port).filter((t) => mode === "file" || optionFor(t)?.kind === "directory");
+  if (fitting.length) {
+    port.mediaTypes = fitting;
+    port.dataType = fitting[0];
+    return;
+  }
   port.dataType = "any";
   port.mediaTypes = [];
   port.formats = [];
@@ -1014,7 +1024,7 @@ const setPortMode = (port, mode) => {
 // A file is any format; a folder only a folder format.
 const formatChoices = (port) =>
   portMode(port) === "folder"
-    ? portDataTypes.value.filter((o) => o.kind === "directory" || (o.value === port.dataType && o.value !== "any"))
+    ? portDataTypes.value.filter((o) => o.kind === "directory" || portTypes(port).includes(o.value))
     : portDataTypes.value;
 
 const isStructurePort = (port) => portMode(port) === "layout";
@@ -1045,7 +1055,7 @@ const onInnerStructure = (port, id) => {
   port.conformsTo = id ? [port.conformsTo[0], id] : port.conformsTo.slice(0, 1);
 };
 const onContainsChange = (port, values) => {
-  port.mediaTypes = asList(values);
+  port.mediaTypes = asList(values).map(normalizeMediaType).filter(Boolean);
   if (!showsContainer(port)) port.container = "";
 };
 const asList = (v) => (Array.isArray(v) ? v.map(String) : []);

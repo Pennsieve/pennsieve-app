@@ -23,6 +23,11 @@ import {
   MANIFEST_SHAPES,
   detectManifestShape,
   isEarlierLayout,
+  parseMediaType,
+  normalizeMediaType,
+  mediaTypeAccepts,
+  rootInputCollisions,
+  keptFormats,
 } from './applicationSchema'
 import { dump as dumpYaml, load as loadYaml } from 'js-yaml'
 
@@ -1155,5 +1160,64 @@ describe("the optimize opt-out", () => {
     expect(out.runtime.optimize).toBe(false)
     expect(buildManifest(out, { name: "A" }).runtime).toEqual({ computeTypes: ["standard"], optimize: false })
     expect(createApplicationSchema().runtime.optimize).toBe(true)
+  })
+})
+
+describe('media type profiles (NWB is application/x-hdf5; profile=nwb)', () => {
+  const HDF5 = 'application/x-hdf5'
+  const NWB = 'application/x-hdf5; profile=nwb'
+  const port = (mediaTypes, extra = {}) => createPort({ name: 'p', mediaTypes, ...extra })
+
+  it('reads and writes the profile one way', () => {
+    expect(parseMediaType('Application/X-HDF5 ;profile=NWB')).toEqual({ base: HDF5, profile: 'nwb' })
+    expect(normalizeMediaType('application/x-hdf5;profile=nwb')).toBe(NWB)
+    expect(normalizeMediaType('text/csv')).toBe('text/csv')
+  })
+
+  it('a bare type takes its profiles; a profile only itself', () => {
+    expect(mediaTypeAccepts(HDF5, NWB)).toBe(true)
+    expect(mediaTypeAccepts(NWB, HDF5)).toBe(false)
+    expect(mediaTypeAccepts(NWB, 'image/tiff; profile=ome-tiff')).toBe(false)
+    expect(mediaTypeAccepts('*/*', NWB)).toBe(true)
+  })
+
+  it('connects NWB to HDF5 either way, but not two different profiles', () => {
+    expect(arePortsCompatible(port([NWB]), port([HDF5]))).toBe(true)
+    expect(arePortsCompatible(port([HDF5]), port([NWB]))).toBe(true)
+    expect(arePortsCompatible(port(['application/x-hdf5; profile=other']), port([NWB]))).toBe(false)
+    expect(arePortsCompatible(port(['application/edf']), port([NWB, 'application/edf']))).toBe(true)
+  })
+
+  it('keeps every media type, profiled ones included, when parsed and written', () => {
+    const app = parseApplication({ inputs: [{ name: 'signals', mediaTypes: ['application/edf', 'application/x-hdf5;profile=NWB'] }] })
+    expect(app.inputs[0].mediaTypes).toEqual(['application/edf', NWB])
+    const yml = loadYaml(manifestToYaml(buildManifest(app)))
+    expect(yml.inputs[0].mediaTypes).toEqual(['application/edf', NWB])
+  })
+
+  it('root inputs of HDF5 and NWB mix; of NWB and EDF they do not', () => {
+    const a = port([HDF5], { name: 'tables' })
+    const b = port([NWB], { name: 'recording' })
+    expect(rootInputCollisions([a, b]).get(a).why).toBe(`both take ${NWB}`)
+    expect(rootInputCollisions([port(['application/edf']), b]).size).toBe(0)
+  })
+
+  it('keeps HDF5\'s EDAM id when HDF5 is swapped for one of its profiles', () => {
+    const edamOf = (t) => ({ [HDF5]: 'format_3590', 'text/csv': 'format_3752' })[t]
+    const anndata = 'application/x-hdf5; profile=anndata'
+    expect(keptFormats(['format_3590'], [HDF5, 'application/json'], ['application/json', anndata], edamOf)).toEqual(['format_3590'])
+    expect(keptFormats(['format_3590', 'format_3752'], [HDF5, 'text/csv'], [HDF5], edamOf)).toEqual(['format_3590'])
+    expect(keptFormats(['format_3590'], [HDF5], ['text/csv'], edamOf)).toEqual([])
+    expect(keptFormats(['format_3590'], [HDF5], [], edamOf)).toEqual([])
+  })
+
+  it('offers NWB and HDF5 apart once the registry profiles NWB', () => {
+    const opts = portDataTypeOptions([
+      { value: HDF5, label: HDF5, name: 'HDF5', extensions: ['.h5'], edam: 'format_3590' },
+      { value: NWB, label: NWB, name: 'NeuroData Without Borders', extensions: ['.nwb'] },
+    ])
+    expect(opts.find((o) => o.value === HDF5).formats).toEqual(['HDF5'])
+    expect(opts.find((o) => o.value === HDF5).edam).toBe('format_3590')
+    expect(opts.find((o) => o.value === NWB).formats).toEqual(['NeuroData Without Borders'])
   })
 })

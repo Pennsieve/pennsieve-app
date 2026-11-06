@@ -356,12 +356,12 @@
         "description": { "type": "string", "description": "What it is." },
         "mediaTypes": {
           "type": "array",
-          "description": "The MIME types it takes or makes, e.g. application/x-rds.",
-          "items": { "type": "string", "pattern": "^[\\w.+-]+/[\\w.+-]+$" }
+          "description": "The MIME types it takes or makes, e.g. application/x-rds. A profile parameter, a Pennsieve convention (after RFC 6906; these types don't register one), names one format that shares its container's type: application/x-hdf5; profile=nwb is NWB only, while application/x-hdf5 takes any HDF5 file, NWB included. The profiles are the platform format registry's (GET /packages/formats).",
+          "items": { "type": "string", "pattern": "^[\\w.+-]+/[\\w.+-]+(\\s*;\\s*profile=[A-Za-z0-9-]+)?$" }
         },
         "formats": {
           "type": "array",
-          "description": "EDAM format identifiers (https://edamontology.org/page), for scientific formats without a MIME type, e.g. format_3590 (HDF5) or http://edamontology.org/format_3549 (NIfTI-1). EDAM has no id for some formats (EDF, NWB, MEF3); use mediaTypes for those.",
+          "description": "EDAM format identifiers (https://edamontology.org/page), for scientific formats without a MIME type, e.g. format_3590 (HDF5) or http://edamontology.org/format_3549 (NIfTI-1). EDAM has no id for some formats (EDF, NWB, MEF3); use mediaTypes for those (NWB: application/x-hdf5; profile=nwb).",
           "items": { "type": "string", "pattern": "^(http://edamontology\\.org/)?format_\\d{4}$" }
         },
         "container": {
