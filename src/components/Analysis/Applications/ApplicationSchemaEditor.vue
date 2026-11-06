@@ -559,7 +559,7 @@ import { computed, onMounted, reactive, ref, toRaw, watch } from "vue";
 import { useStore } from "vuex";
 import MoreOptions from "./MoreOptions.vue";
 import FieldHint from "./FieldHint.vue";
-import { PARAM_TYPES, PARAM_TYPE_OPTIONS, createParameter, createPort, portDataTypeOptions, normalizeMediaType, STANDARD_CPU_OPTIONS, getStandardMemoryOptions, isNumericType, mediaTypeMatches, structureId, structureOptionsFor, structureMatches, isStructureLink, conformsToList, rootInputCollisions } from "./applicationSchema";
+import { PARAM_TYPES, PARAM_TYPE_OPTIONS, createParameter, createPort, portDataTypeOptions, normalizeMediaType, keptFormats, STANDARD_CPU_OPTIONS, getStandardMemoryOptions, isNumericType, mediaTypeMatches, structureId, structureOptionsFor, structureMatches, isStructureLink, conformsToList, rootInputCollisions } from "./applicationSchema";
 import { environmentsServiceUrl, findReferences } from "@/utils/environmentsService";
 import { useOntologyStore } from "@/stores/ontologyStore";
 import { REFERENCE_KINDS, assetClassName, isAppDefault, organismName, referenceBlock, referenceKindText, referenceLabel, taxonFromTerm, rankOrganisms, COMMON_ORGANISMS } from "../RunMonitor/referenceSources";
@@ -936,8 +936,7 @@ const onPortMediaTypesChange = (port, values) => {
   // EDAM ids aren't written: the registry maps each media type to its own.
   // Ones the app.yml had stay, apart from those of media types taken out,
   // unless the port goes back to any file.
-  const removed = previous.filter((t) => !types.includes(t)).map((t) => optionFor(t)?.edam);
-  port.formats = types.length ? (port.formats || []).filter((f) => !removed.includes(f)) : [];
+  port.formats = keptFormats(port.formats, previous, types, (t) => optionFor(t)?.edam);
 };
 
 /*

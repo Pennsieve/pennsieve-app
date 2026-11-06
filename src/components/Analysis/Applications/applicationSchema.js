@@ -190,6 +190,24 @@ export const mediaTypeAccepts = (accepted, type) => {
  */
 export const mediaTypesOverlap = (a, b) => mediaTypeAccepts(a, b) || mediaTypeAccepts(b, a);
 
+/**
+ * A port's EDAM formats after its media types change from `previous` to
+ * `types`: a type taken out takes its EDAM id along, unless a type it overlaps
+ * stays (HDF5 swapped for AnnData, application/x-hdf5; profile=anndata: an
+ * AnnData file is still HDF5, format_3590). With no types, none.
+ *
+ * @param {string[]} formats  the port's EDAM ids
+ * @param {(type: string) => string|undefined} edamOf  a media type's EDAM id
+ */
+export const keptFormats = (formats, previous, types, edamOf) => {
+  if (!asArray(types).length) return [];
+  const dropped = asArray(previous)
+    .filter((t) => !types.includes(t) && !types.some((u) => mediaTypesOverlap(t, u)))
+    .map(edamOf)
+    .filter(Boolean);
+  return asArray(formats).filter((f) => !dropped.includes(f));
+};
+
 export const portDataTypeOptions = (packageFormats, declared = []) => {
   const options = [...FALLBACK_PORT_DATA_TYPES];
   const seen = new Set(options.map((o) => o.value));
