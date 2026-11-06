@@ -10,7 +10,8 @@ import { useJupyterSession } from "@/composables/useJupyterSession";
 import { markSessionEnded } from "../RunMonitor/endedSessions";
 import NotebookCell from "./NotebookCell.vue";
 import FileBrowser from "./FileBrowser.vue";
-import InputsPanel from "./InputsPanel.vue";
+import AddDataDialog from "./AddDataDialog.vue";
+import { useSessionInputs } from "./useSessionInputs";
 import EnvironmentPanel from "./EnvironmentPanel.vue";
 import { sessionPathCode, stackCode } from "./pathCode";
 import RuntimeMark from "../WorkflowGraph/RuntimeMark.vue";
@@ -106,6 +107,7 @@ const {
   listDir,
   fetchInputs,
   inputsStatus,
+  cancelInputs,
   inputSources,
   addInputSource,
   removeInputSource,
@@ -287,6 +289,21 @@ function nudgeSidebar(delta) {
   }
 }
 const fileBrowserRef = ref(null);
+
+// The session's view inputs, shown in Session files under input/; adding
+// one opens the platforms' dialog.
+const inputs = useSessionInputs({
+  runId: () => props.runId,
+  fetchInputs,
+  inputsStatus,
+  cancelInputs,
+  inputSources,
+  addInputSource,
+  removeInputSource,
+  ready: computed(() => status.value === "ready"),
+  onDownloaded: () => fileBrowserRef.value?.refresh?.(),
+});
+const addingData = ref(false);
 let lastD = 0;
 
 // One-time info dialog shown when a session opens. Dismissed permanently per
@@ -805,17 +822,12 @@ const kernelPill = computed(() => {
           :kernel-name="kernelName"
           :gpu="onGpu"
         />
-        <InputsPanel
-          :run-id="runId"
-          :fetch-inputs="fetchInputs"
-          :inputs-status="inputsStatus"
-          :input-sources="inputSources"
+        <AddDataDialog
+          v-if="inputs.canChange"
+          v-model="addingData"
+          :sources="inputs.sources"
           :add-input-source="addInputSource"
-          :remove-input-source="removeInputSource"
-          :ready="status === 'ready'"
-          :width="sidebarWidth"
-          @downloaded="fileBrowserRef?.refresh?.()"
-          @insert-stack="insertStack"
+          @added="inputs.loadSources()"
         />
         <div class="nb-files__browser">
           <FileBrowser
@@ -823,8 +835,11 @@ const kernelPill = computed(() => {
             :list-dir="listDir"
             :ready="status === 'ready'"
             :kernel-name="kernelName"
+            :inputs="inputs"
             @insert-path="insertPath"
             @open-notebook="requestOpen"
+            @insert-stack="insertStack"
+            @add-data="addingData = true"
           />
         </div>
         </div>

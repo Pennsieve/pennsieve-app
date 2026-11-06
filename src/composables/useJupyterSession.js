@@ -121,6 +121,23 @@ export async function postInputsFetch(kernelBaseUrl, token, files, { fetchFn = g
   return status;
 }
 
+// Stops downloads asked for (queued or under way): their partial files go,
+// and they're no longer in the list. A sidecar that can't cancel yet answers
+// 404 or 405: CancelUnavailable.
+//   DELETE {session}/pennsieve/inputs/fetch {"files": [{source, path}]} -> 200
+export class CancelUnavailable extends Error {}
+
+export async function deleteInputsFetch(kernelBaseUrl, token, files, { fetchFn = globalThis.fetch } = {}) {
+  const resp = await fetchFn(`${kernelBaseUrl}${INPUTS_PATH}`, {
+    method: "DELETE",
+    credentials: "include",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ files }),
+  });
+  if (resp.status === 404 || resp.status === 405) throw new CancelUnavailable("This session can't cancel downloads yet.");
+  return inputsResponse(resp);
+}
+
 export async function getInputsFetch(kernelBaseUrl, token, { fetchFn = globalThis.fetch } = {}) {
   const resp = await fetchFn(`${kernelBaseUrl}${INPUTS_PATH}`, {
     credentials: "include",
@@ -967,6 +984,11 @@ export function useJupyterSession() {
     return getInputsFetch(kernelBaseUrl, sessionToken);
   }
 
+  function cancelInputs(files) {
+    if (!kernelBaseUrl) throw new Error("The session isn't connected.");
+    return deleteInputsFetch(kernelBaseUrl, sessionToken, files);
+  }
+
   // The session's view inputs (see sessionSourcesRequest).
   function inputSources() {
     if (!kernelBaseUrl) throw new Error("The session isn't connected.");
@@ -1056,6 +1078,7 @@ export function useJupyterSession() {
     listDir,
     fetchInputs,
     inputsStatus,
+    cancelInputs,
     inputSources,
     addInputSource,
     removeInputSource,
