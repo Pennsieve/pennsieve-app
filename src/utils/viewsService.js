@@ -125,7 +125,10 @@ export async function createRunView({ name, picks }, options = {}) {
 // The AWS Open Data Registry datasets a view can take, from views-service's
 // catalog (GET /open-data, a schema.org DataCatalog), as
 // { name, title, summary, keywords, publisher, regions, anonymous, url }.
-// name is the registry name (registry.opendata.aws/<name>).
+// name is the registry name (registry.opendata.aws/<name>); its regions are
+// in its distribution's URLs (https://s3.<region>.amazonaws.com/...), and
+// anyone can read it when it's free to read.
+const regionOf = (url = '') => url.match(/^https:\/\/s3\.([a-z0-9-]+)\.amazonaws\.com\//)?.[1]
 export async function listOpenData(options = {}) {
   const catalog = await viewsRequest('/open-data', options)
   return (catalog.dataset || []).map((d) => ({
@@ -134,8 +137,8 @@ export async function listOpenData(options = {}) {
     summary: d.description || '',
     keywords: d.keywords || [],
     publisher: d.publisher || '',
-    regions: d['pennsieve:regions'] || [],
-    anonymous: !!d['pennsieve:anonymous'],
+    regions: [...new Set((d.distribution || []).map((x) => regionOf(x.contentUrl)).filter(Boolean))].sort(),
+    anonymous: !!d.isAccessibleForFree,
     url: d.url,
   }))
 }

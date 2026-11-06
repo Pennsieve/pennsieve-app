@@ -130,9 +130,16 @@ describe("open data", () => {
   const catalog = {
     "@type": "DataCatalog",
     dataset: [
-      { identifier: "openneuro", name: "OpenNeuro", publisher: "OpenNeuro", keywords: ["neuroimaging", "bids"], "pennsieve:regions": ["us-east-1"], "pennsieve:anonymous": true, url: "https://registry.opendata.aws/openneuro/" },
-      { identifier: "hcp-openaccess", name: "Human Connectome Project", keywords: ["neuroimaging"], "pennsieve:anonymous": false },
-      { identifier: "dandiarchive", name: "DANDI: Distributed Archives for Neurophysiology Data Integration", keywords: ["neurophysiology", "openneuro-like"], "pennsieve:anonymous": true },
+      {
+        identifier: "openneuro", name: "OpenNeuro", publisher: "OpenNeuro", keywords: ["neuroimaging", "bids"], isAccessibleForFree: true,
+        distribution: [
+          { contentUrl: "https://s3.us-east-1.amazonaws.com/openneuro.org/", isAccessibleForFree: true },
+          { contentUrl: "https://s3.us-east-1.amazonaws.com/openneuro-derivatives/", isAccessibleForFree: true },
+        ],
+        url: "https://registry.opendata.aws/openneuro/",
+      },
+      { identifier: "hcp-openaccess", name: "Human Connectome Project", keywords: ["neuroimaging"], isAccessibleForFree: false },
+      { identifier: "dandiarchive", name: "DANDI: Distributed Archives for Neurophysiology Data Integration", keywords: ["neurophysiology", "openneuro-like"], isAccessibleForFree: true },
     ],
   };
 
@@ -205,7 +212,7 @@ describe("openDataViewName", () => {
 
 describe("openDataCatalog", () => {
   it("reads the catalog once", async () => {
-    const fetchFn = respond([200, { dataset: [{ identifier: "openneuro", "pennsieve:anonymous": true }] }]);
+    const fetchFn = respond([200, { dataset: [{ identifier: "openneuro", isAccessibleForFree: true }] }]);
     const first = await openDataCatalog({ config, getToken, fetchFn });
     const again = await openDataCatalog({ config, getToken, fetchFn });
     expect(first).toBe(again);
