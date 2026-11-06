@@ -147,6 +147,8 @@ describe("formats sharing a media type (profiles)", () => {
   const formats = [
     { value: "application/x-hdf5", extensions: [".hdf5", ".h5"] },
     { value: "application/x-hdf5; profile=nwb", extensions: [".nwb"] },
+    { value: "application/x-hdf5; profile=anndata", extensions: [".h5ad"] },
+    { value: "application/x-hdf5; profile=tenx-h5", extensions: [] },
     { value: "image/tiff", extensions: [".tiff", ".tif"] },
     { value: "image/tiff; profile=ome-tiff", extensions: [".ome.tiff", ".ome.tif"] },
   ];
@@ -160,9 +162,14 @@ describe("formats sharing a media type (profiles)", () => {
     expect(fileMediaTypes("notes.pdf", formats)).toEqual([]);
   });
 
-  it("an HDF5 input takes NWB files; an NWB input not plain HDF5", () => {
-    expect(fileTypeMismatches(["a.h5", "b.nwb"], hintsFor(["application/x-hdf5"]), formats)).toBeNull();
-    expect(fileTypeMismatches(["a.h5", "b.nwb"], hintsFor(["application/x-hdf5; profile=nwb"]), formats)).toEqual({ names: ["a.h5"], expected: "NWB" });
+  it("an HDF5 input takes NWB files; an NWB input not AnnData", () => {
+    expect(fileTypeMismatches(["a.h5", "b.nwb", "c.h5ad"], hintsFor(["application/x-hdf5"]), formats)).toBeNull();
+    expect(fileTypeMismatches(["b.nwb", "c.h5ad"], hintsFor(["application/x-hdf5; profile=nwb"]), formats)).toEqual({ names: ["c.h5ad"], expected: "NWB" });
+  });
+
+  it("a plain .h5 may be a 10x matrix; an .h5ad isn't", () => {
+    const hints = hintsFor(["application/x-hdf5; profile=tenx-h5"]);
+    expect(fileTypeMismatches(["sample.raw.h5", "cells.h5ad"], hints, formats)).toEqual({ names: ["cells.h5ad"], expected: "TENX-H5" });
   });
 
   it("an OME-TIFF input names and takes OME-TIFFs", () => {
