@@ -43,8 +43,9 @@ import cellxgene from "./cellxgene";
 import encode from "./encode";
 import hca from "./hca";
 import idc from "./idc";
+import ibl from "./ibl";
 
-const LIST = [discover, openData, sparc, epilepsyScience, openNeuro, bossdb, dandi, physionet, allen, cellxgene, encode, hca, idc];
+const LIST = [discover, openData, sparc, epilepsyScience, openNeuro, bossdb, dandi, physionet, allen, cellxgene, encode, hca, idc, ibl];
 
 export const PLATFORMS = Object.fromEntries(LIST.map((p) => [p.key, p]));
 export const PLATFORM_KEYS = LIST.map((p) => p.key);
