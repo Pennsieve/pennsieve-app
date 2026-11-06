@@ -29,6 +29,9 @@ import IconDoneCheckCircle from "@/components/icons/IconDoneCheckCircle.vue";
 import IconWarningCircle from "@/components/icons/IconWarningCircle.vue";
 import {
   folderContents,
+  splitStacks,
+  stackFormat,
+  stackIcon,
   filesUnder,
   inputKey,
   middleTruncate,
@@ -55,7 +58,9 @@ const props = defineProps({
   width: { type: Number, default: 300 },
 });
 // downloaded: files finished downloading, so the file browser can refresh.
-const emit = defineEmits(["downloaded"]);
+// insert-stack: a stack's entry, to open in place from the notebook (the
+// session writes its code).
+const emit = defineEmits(["downloaded", "insert-stack"]);
 
 // One per view source: { nodeId, viewId, version, name, entries, folder,
 // added }. nodeId is the source's input folder: the run's data source, or
@@ -130,8 +135,10 @@ async function loadSources() {
       list.map(async (s) => {
         const [view, entries] = await Promise.all([
           getView(s.viewId).catch(() => null),
-          listEntries(s.viewId, s.version),
+          listEntries(s.viewId, s.version, { includeStacks: true }),
         ]);
+        // Its files are downloaded; its stacks (a Zarr) are read in place.
+        const { files, stacks } = splitStacks(entries);
         return {
           ...s,
           // An Open Data view's own name says which folder of the dataset
@@ -142,7 +149,8 @@ async function loadSources() {
           viewName: view?.name || "",
           openDataset: view?.sources?.[0]?.openDataset || "",
           sourceDatasetId: view?.sources?.[0]?.datasetId || null,
-          entries,
+          entries: files,
+          stacks,
           folder: before.get(s.nodeId)?.folder || "",
         };
       })
@@ -254,7 +262,10 @@ const pane = computed(() => {
   return {
     source,
     crumbs: crumbs(source),
-    rows: folderContents(source.entries, source.folder).map((row) => {
+    rows: folderContents(source.entries, source.folder, source.stacks).map((row) => {
+      if (row.type === "stack") {
+        return { ...row, label: middleTruncate(row.name, labelChars.value), format: stackFormat(row.entry) };
+      }
       const files = filesUnder(source.entries, row.path);
       const stateOf = (e) => states.value[inputKey(source.nodeId, e.cratePath)];
       const failed = files
@@ -293,7 +304,8 @@ function toggle(source, row) {
 }
 
 // Every row of the folder that isn't already in the session, for "select all".
-const selectable = (rows) => rows.filter((r) => !r.done);
+// A stack is read in place: there's nothing of it to download.
+const selectable = (rows) => rows.filter((r) => !r.done && r.type !== "stack");
 
 function allSelected(source, rows) {
   const open = selectable(rows);
@@ -613,8 +625,28 @@ function fmtSize(bytes) {
             v-for="row in pane.rows"
             :key="row.path"
             class="inp__row"
-            :class="{ 'is-selected': selected.has(selectKey(pane.source, row)), 'is-done': row.done }"
+            :class="{ 'is-selected': selected.has(selectKey(pane.source, row)), 'is-done': row.done, 'is-stack': row.type === 'stack' }"
           >
+            <!-- A Zarr: read in place from the notebook, not downloaded. Its
+                 size, and on hover the code that opens it, where a file's
+                 size is; its checkbox keeps only its place. -->
+            <template v-if="row.type === 'stack'">
+              <input type="checkbox" class="inp__stack-gap" disabled tabindex="-1" aria-hidden="true" />
+              <span class="inp__label inp__label--stack" :title="`${row.path}\n${row.format}, read in place from the notebook · ${fmtSize(row.size)}`">
+                <img class="inp__icon" :src="stackIcon(row.entry)" alt="" />
+                <span class="inp__text">{{ row.label }}</span>
+              </span>
+              <span class="inp__meta inp__stack-size">{{ fmtSize(row.size) }}</span>
+              <button
+                type="button"
+                class="inp__stack-code"
+                :title="`Add code that opens this ${row.format} in place to the notebook`"
+                @click="emit('insert-stack', row.entry)"
+              >
+                Code
+              </button>
+            </template>
+            <template v-else>
             <input
               type="checkbox"
               :checked="row.done || selected.has(selectKey(pane.source, row))"
@@ -661,6 +693,7 @@ function fmtSize(bytes) {
             <span v-else class="inp__meta">
               <template v-if="row.type === 'folder'">{{ row.count }} · </template>{{ fmtSize(row.size) }}
             </span>
+            </template>
           </li>
         </ul>
       </div>
@@ -1181,6 +1214,49 @@ function fmtSize(bytes) {
   color: theme.$gray_4;
   font-size: 11px;
   white-space: nowrap;
+}
+/* A stack has nothing to select: its checkbox keeps only its place, so
+   names line up with the files'. */
+.inp__stack-gap {
+  visibility: hidden;
+}
+.inp__label--stack {
+  cursor: default;
+}
+/* Its size, or on hover (or keyboard focus) the code that opens it: hidden
+   but still reachable from the keyboard. */
+.inp__stack-code {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  flex-shrink: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  font-size: 11px;
+  color: theme.$purple_2;
+  cursor: pointer;
+
+  &:hover {
+    text-decoration: underline;
+  }
+}
+.inp__row.is-stack:hover,
+.inp__row.is-stack:focus-within {
+  .inp__stack-size {
+    display: none;
+  }
+  .inp__stack-code {
+    position: static;
+    width: auto;
+    height: auto;
+    overflow: visible;
+    clip-path: none;
+  }
 }
 .inp__state {
   display: flex;

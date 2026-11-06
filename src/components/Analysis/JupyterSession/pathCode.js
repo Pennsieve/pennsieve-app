@@ -9,6 +9,19 @@ const ROOTS = { input: "INPUT_DIR", output: "OUTPUT_DIR" };
 
 const quote = (s) => JSON.stringify(s);
 
+// Code that opens a stack (a Zarr) in place, from its s3:// location: zarr
+// with anonymous s3fs in Python; its URL in R, which has no one reader.
+export function stackCode(entry, kernelName = "") {
+  const url = entry?.location || "";
+  const r = kernelName.toLowerCase().startsWith("r ") || kernelName.toLowerCase() === "r";
+  const name = String(entry?.cratePath || "").replace(/\/$/, "");
+  if (r) return `# ${name}: read it in place (${entry?.region || "AWS"}, no credentials)\n${quote(url)}`;
+  const options = entry?.region
+    ? `{"anon": True, "client_kwargs": {"region_name": ${quote(entry.region)}}}`
+    : `{"anon": True}`;
+  return `import zarr\n# ${name}: read in place, only the chunks you index\nz = zarr.open(${quote(url)}, mode="r", storage_options=${options})`;
+}
+
 export function sessionPathCode(path, kernelName = "") {
   const p = String(path).replace(/^\/+/, "");
   const [top, ...rest] = p.split("/");

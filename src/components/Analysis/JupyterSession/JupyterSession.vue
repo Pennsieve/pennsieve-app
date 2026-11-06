@@ -12,7 +12,7 @@ import NotebookCell from "./NotebookCell.vue";
 import FileBrowser from "./FileBrowser.vue";
 import InputsPanel from "./InputsPanel.vue";
 import EnvironmentPanel from "./EnvironmentPanel.vue";
-import { sessionPathCode } from "./pathCode";
+import { sessionPathCode, stackCode } from "./pathCode";
 import RuntimeMark from "../WorkflowGraph/RuntimeMark.vue";
 import { fetchRun } from "../RunMonitor/runDetails";
 import { runOnGpu, runNodeId, gpuShortLabel, gpuMarkTitle } from "../RunMonitor/notebookHelpers";
@@ -441,7 +441,13 @@ async function focusCell(id) {
 // Insert a filesystem path (from the file browser) into the selected code cell
 // as a quoted string; if no code cell is selected, create one.
 function insertPath(path) {
-  const literal = sessionPathCode(path, kernelName.value);
+  insertCode(sessionPathCode(path, kernelName.value));
+}
+// The code that opens a stack (a Zarr in an input) in place.
+function insertStack(entry) {
+  insertCode(stackCode(entry, kernelName.value));
+}
+function insertCode(literal) {
   let cell = selectedCell();
   if (!cell || cell.cell_type !== "code") {
     const id = addCell(cell ? cell.id : null, "code");
@@ -809,6 +815,7 @@ const kernelPill = computed(() => {
           :ready="status === 'ready'"
           :width="sidebarWidth"
           @downloaded="fileBrowserRef?.refresh?.()"
+          @insert-stack="insertStack"
         />
         <div class="nb-files__browser">
           <FileBrowser

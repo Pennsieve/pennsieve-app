@@ -86,11 +86,14 @@ export async function getView(viewId, options = {}) {
 // cratePath (where the file goes, below the run's input folder) and size.
 const ENTRIES_PAGE = 1000
 
-export async function listEntries(viewId, version, options = {}) {
+// With includeStacks, its stacks too (a Zarr: kind "stack", read in place,
+// its cratePath and location ending in /).
+export async function listEntries(viewId, version, { includeStacks = false, ...options } = {}) {
   const entries = []
+  const include = includeStacks ? '&include=stacks' : ''
   for (let offset = 0; ; offset += ENTRIES_PAGE) {
     const page = await viewsRequest(
-      `/${encodeURIComponent(viewId)}/versions/${version}/entries?offset=${offset}&limit=${ENTRIES_PAGE}`,
+      `/${encodeURIComponent(viewId)}/versions/${version}/entries?offset=${offset}&limit=${ENTRIES_PAGE}${include}`,
       options
     )
     entries.push(...(page.entries || []))
