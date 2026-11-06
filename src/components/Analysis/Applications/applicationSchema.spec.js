@@ -27,6 +27,7 @@ import {
   normalizeMediaType,
   mediaTypeAccepts,
   rootInputCollisions,
+  keptFormats,
 } from './applicationSchema'
 import { dump as dumpYaml, load as loadYaml } from 'js-yaml'
 
@@ -1216,6 +1217,15 @@ describe('media type profiles (NWB is application/x-hdf5; profile=nwb)', () => {
     const b = port([NWB], { name: 'recording' })
     expect(rootInputCollisions([a, b]).get(a).why).toBe(`both take ${NWB}`)
     expect(rootInputCollisions([port(['application/edf']), b]).size).toBe(0)
+  })
+
+  it('keeps HDF5\'s EDAM id when HDF5 is swapped for one of its profiles', () => {
+    const edamOf = (t) => ({ [HDF5]: 'format_3590', 'text/csv': 'format_3752' })[t]
+    const anndata = 'application/x-hdf5; profile=anndata'
+    expect(keptFormats(['format_3590'], [HDF5, 'application/json'], ['application/json', anndata], edamOf)).toEqual(['format_3590'])
+    expect(keptFormats(['format_3590', 'format_3752'], [HDF5, 'text/csv'], [HDF5], edamOf)).toEqual(['format_3590'])
+    expect(keptFormats(['format_3590'], [HDF5], ['text/csv'], edamOf)).toEqual([])
+    expect(keptFormats(['format_3590'], [HDF5], [], edamOf)).toEqual([])
   })
 
   it('offers NWB and HDF5 apart once the registry profiles NWB', () => {
