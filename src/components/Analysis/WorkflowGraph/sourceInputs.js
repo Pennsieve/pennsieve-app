@@ -7,7 +7,7 @@
 // Pure: on DAG steps ({ id, inputs }) and app.yml ports.
 
 import { shortMediaType, versionManifest } from "../WorkflowBuilder/appManifestInfo";
-import { mediaTypeAccepts, normalizeMediaType } from "../Applications/applicationSchema";
+import { mediaTypesOverlap, normalizeMediaType } from "../Applications/applicationSchema";
 
 // The inputs a source feeds: { step, input } per link from it.
 export function inputsFedBy(sourceId, steps) {
@@ -154,14 +154,16 @@ export function fileMediaTypes(name, formats) {
 // hints): { names, expected: "JSON" }, or null when they all fit, when an
 // input takes any file or a folder layout, or when its app declares no types
 // (nothing to compare). With the platform's formats, a file also fits by
-// media type: an NWB file fits an HDF5 input, an .h5 file not an NWB one.
+// media type: an NWB file fits an HDF5 input, an AnnData file not an NWB one.
+// A file its extension only shows as the container (an .h5: HDF5) may be any
+// of its profiles, so it fits a profiled input (a 10x matrix is a plain .h5).
 export function fileTypeMismatches(fileNames, hints, formats = []) {
   const accepted = acceptedFileTypes(hints);
   if (!accepted) return null;
   const media = (hints || []).flatMap((h) => h.mediaTypes || []);
   const fits = (n) =>
     fileShortTypes(n).some((t) => accepted.has(t)) ||
-    fileMediaTypes(n, formats).some((t) => media.some((a) => mediaTypeAccepts(a, t)));
+    fileMediaTypes(n, formats).some((t) => media.some((a) => mediaTypesOverlap(a, t)));
   const names = (fileNames || []).filter((n) => !fits(n));
   return names.length ? { names, expected: [...accepted].join(" or ") } : null;
 }
