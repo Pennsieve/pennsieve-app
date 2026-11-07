@@ -46,7 +46,6 @@ const initialState = () => ({
   applicationsLoaded: false,
   // The app whose page is open (fetchApplication): the page header's title.
   currentApplication: null,
-  deletingApplications: [],
   processors: [],
   preprocessors: [],
   postprocessors: [],
@@ -93,24 +92,6 @@ export const mutations = {
   UPDATE_APPLICATIONS(state, applications) {
     state.applications = applications;
     state.applicationsLoaded = true;
-    // Clear any in-flight delete markers for apps that are no longer
-    // present — the backend has confirmed they're gone.
-    if (state.deletingApplications.length > 0) {
-      const presentIds = new Set(applications.map((a) => a.uuid));
-      state.deletingApplications = state.deletingApplications.filter((u) =>
-        presentIds.has(u)
-      );
-    }
-  },
-  ADD_DELETING_APPLICATION(state, uuid) {
-    if (uuid && !state.deletingApplications.includes(uuid)) {
-      state.deletingApplications.push(uuid);
-    }
-  },
-  REMOVE_DELETING_APPLICATION(state, uuid) {
-    state.deletingApplications = state.deletingApplications.filter(
-      (u) => u !== uuid
-    );
   },
   UPDATE_APPLICATION_STATUS(state, { uuid, status }) {
     // Applications are referenced by both the master list and the
@@ -825,7 +806,6 @@ export const actions = {
     });
     return result;
   },
-  // Note that this to to deploy application, there is another action for editing application
   updateApplication: async ({ commit, rootState }, newApplication) => {
     // Deploying acts in the workspace being viewed (required by the API).
     const url = withWorkspace(`${rootState.config.api2Url}/applications/deploy`, rootState);
@@ -1076,37 +1056,6 @@ export const actions = {
   hideActivityLogDialog: ({ commit, rootState }) => {
     commit("HIDE_ACTIVITY_LOG_DIALOG");
   },
-  editApplication: async ({ commit, rootState }, application) => {
-    const url = `${rootState.config.api2Url}/applications/${application?.uuid}`;
-    const userToken = await useGetToken();
-
-    try {
-      const response = await fetch(url, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${userToken}`,
-        },
-        body: JSON.stringify(application),
-      });
-
-      if (!response.ok) {
-        const errorDetails = await response.text();
-        throw new Error(
-          `Error ${response.status}: ${response.statusText} - ${errorDetails}`
-        );
-      }
-
-      const result = await response.json();
-      return result;
-    } catch (err) {
-      console.error("Failed to update application:", err.message);
-      throw err;
-    }
-  },
-  // Partially update an app store application's lifecycle status.
-  // status is one of "active" | "archived".
-  // PATCH /applications/store/{uuid}
   setApplicationStatus: async ({ commit, rootState }, { uuid, status }) => {
     if (!uuid) throw new Error("Missing application uuid");
     const url = `${rootState.config.api2Url}/applications/store/${uuid}`;
@@ -1152,36 +1101,6 @@ export const actions = {
         return;
       }
     } catch (err) {
-      console.error("Failed to update application:", err.message);
-      throw err;
-    }
-  },
-  deleteApplication: async ({ commit, rootState }, application) => {
-    const uuid = application?.uuid;
-    if (!uuid) return;
-    commit("ADD_DELETING_APPLICATION", uuid);
-    try {
-      // Deleting acts in the workspace being viewed (required by the API).
-      const url = withWorkspace(`${rootState.config.api2Url}/applications/${uuid}`, rootState);
-      const userToken = await useGetToken();
-      const response = await fetch(url, {
-        method: "DELETE",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${userToken}`,
-        },
-      });
-
-      if (!response.ok) {
-        // Clear the marker on failure so the user can retry.
-        commit("REMOVE_DELETING_APPLICATION", uuid);
-        return;
-      }
-      // Success: keep the marker set. It will be cleared on the next
-      // successful applications refetch when the entry is gone from
-      // the list — the backend deletion is asynchronous.
-    } catch (err) {
-      commit("REMOVE_DELETING_APPLICATION", uuid);
       console.error("Failed to update application:", err.message);
       throw err;
     }

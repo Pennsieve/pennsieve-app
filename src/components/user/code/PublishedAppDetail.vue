@@ -5,7 +5,6 @@ import { useStore } from 'vuex'
 import { ElMessage } from 'element-plus'
 
 import BfStage from '@/components/layout/BfStage/BfStage.vue'
-import EventBus from '@/utils/event-bus'
 import { useGetToken } from '@/composables/useGetToken'
 import { useSendXhr } from '@/mixins/request/request_composable'
 import AppPermissions from './AppPermissions.vue'
@@ -32,8 +31,6 @@ const detailError = ref('')
 const versionsPageSize = 5
 const versionsPage = ref(1)
 
-const showDeleteDialog = ref(false)
-const isDeleting = ref(false)
 
 const versionsExpanded = ref(true)
 
@@ -141,13 +138,6 @@ const statusLabel = (status) => {
   return status.charAt(0).toUpperCase() + status.slice(1).toLowerCase()
 }
 
-const deletingApplications = computed(
-  () => store.state.analysisModule.deletingApplications || []
-)
-const isAppDeleting = computed(() =>
-  deletingApplications.value.includes(appUuid.value)
-)
-
 // Visibility is sourced from the `isPrivate` flag on the application.
 // `isPrivate === false` ⇒ public; everything else (true / undefined) ⇒ private.
 const isAppPublic = computed(() => detail.value?.isPrivate === false)
@@ -207,38 +197,6 @@ const loadDetail = async (uuid) => {
 watch(appUuid, (uuid) => loadDetail(uuid))
 onMounted(() => loadDetail(appUuid.value))
 
-/* Delete */
-const confirmDelete = async () => {
-  if (!detail.value) return
-  isDeleting.value = true
-  showDeleteDialog.value = false
-  try {
-    await store.dispatch('analysisModule/deleteApplication', detail.value)
-    EventBus.$emit('toast', {
-      detail: {
-        type: 'success',
-        msg: 'Your request was successful. It may take some time to complete.',
-      },
-    })
-    // Refresh the applications list so the My Code view either reflects
-    // the deletion or keeps the in-flight marker until the backend finishes.
-    store
-      .dispatch('analysisModule/fetchApplications', { force: true })
-      .catch(() => {})
-    router.push({ name: 'my-code' })
-  } catch (error) {
-    console.error(error)
-    EventBus.$emit('toast', {
-      detail: {
-        type: 'error',
-        msg: 'Something went wrong, please try again later.',
-      },
-    })
-  } finally {
-    isDeleting.value = false
-  }
-}
-
 /* Archive / restore — handled by the shared AppArchiveToggle component. */
 const isArchived = computed(() => detail.value?.status === 'archived')
 
@@ -260,8 +218,6 @@ const onArchiveChange = (status) => {
     <div
       v-else-if="detail"
       class="application-management"
-      :class="{ 'is-deleting': isAppDeleting }"
-      :aria-busy="isAppDeleting"
     >
       <!-- Back link -->
       <div class="app-breadcrumb">
@@ -275,9 +231,6 @@ const onArchiveChange = (status) => {
         <div class="app-header-top">
           <h1>{{ repoName }}</h1>
           <div class="app-header-status">
-            <span v-if="isAppDeleting" class="archiving-pill">
-              Archiving...
-            </span>
             <span
               v-if="visibilityLabel"
               class="visibility-pill"
@@ -452,43 +405,6 @@ const onArchiveChange = (status) => {
       </div>
     </div>
 
-    <!-- Delete Confirmation Dialog -->
-    <el-dialog
-      v-model="showDeleteDialog"
-      title="Delete Application"
-      width="480px"
-      :close-on-click-modal="false"
-    >
-      <div v-if="detail" class="delete-app-dialog">
-        <h4>Are you sure you want to delete this application?</h4>
-        <p class="warning-message">
-          Deleting <strong>{{ repoName }}</strong> will permanently remove
-          this application and all of its versions from the Pennsieve App
-          Store.
-        </p>
-        <p class="impact-message">This action cannot be undone.</p>
-        <div class="app-summary">
-          <div class="summary-row">
-            <strong>Repository:</strong> {{ repoName }}
-          </div>
-          <div class="summary-row">
-            <strong>Application UUID:</strong> {{ detail.uuid }}
-          </div>
-        </div>
-      </div>
-      <template #footer>
-        <div class="dialog-footer">
-          <el-button @click="showDeleteDialog = false">Cancel</el-button>
-          <el-button
-            type="danger"
-            :loading="isDeleting"
-            @click="confirmDelete"
-          >
-            Delete Application
-          </el-button>
-        </div>
-      </template>
-    </el-dialog>
   </bf-stage>
 </template>
 
@@ -500,30 +416,12 @@ const onArchiveChange = (status) => {
   margin: 0;
   padding: 0;
   transition: opacity 0.2s ease;
-
-  &.is-deleting {
-    opacity: 0.5;
-    pointer-events: none;
-    filter: grayscale(0.5);
-  }
 }
 
 .app-header-status {
   display: flex;
   align-items: center;
   gap: 8px;
-}
-
-.archiving-pill {
-  font-size: 11px;
-  font-weight: 600;
-  padding: 4px 12px;
-  border-radius: 12px;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  background: rgba(#F59E0B, 0.12);
-  color: #B45309;
-  border: 1px solid rgba(#F59E0B, 0.25);
 }
 
 .app-breadcrumb {
@@ -699,56 +597,6 @@ const onArchiveChange = (status) => {
   align-items: center;
   gap: 8px;
   flex-shrink: 0;
-}
-
-.delete-app-dialog {
-  h4 {
-    font-size: 16px;
-    font-weight: 600;
-    color: theme.$gray_6;
-    margin: 0 0 12px 0;
-  }
-
-  .warning-message {
-    font-size: 14px;
-    color: theme.$gray_6;
-    margin: 0 0 12px 0;
-    line-height: 1.5;
-  }
-
-  .impact-message {
-    font-size: 13px;
-    color: #D97706;
-    margin: 0 0 16px 0;
-    font-weight: 500;
-  }
-
-  .app-summary {
-    background: theme.$gray_1;
-    border: 1px solid theme.$gray_2;
-    border-radius: 6px;
-    padding: 16px;
-
-    .summary-row {
-      font-size: 13px;
-      margin-bottom: 6px;
-
-      &:last-child {
-        margin-bottom: 0;
-      }
-
-      strong {
-        color: theme.$gray_6;
-        margin-right: 6px;
-      }
-    }
-  }
-}
-
-.dialog-footer {
-  display: flex;
-  gap: 12px;
-  justify-content: flex-end;
 }
 
 .info-content {
