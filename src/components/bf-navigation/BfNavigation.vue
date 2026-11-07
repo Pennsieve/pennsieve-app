@@ -87,7 +87,7 @@
       </bf-navigation-item>
 
       <bf-navigation-item
-        v-if="!(pageNotFound || isWelcomeOrg) && !isWorkspaceGuest && hasFeature('compute_node_chat')"
+        v-if="!(pageNotFound || isWelcomeOrg) && !isWorkspaceGuest"
         :link="{ name: 'workspace-insights', params: { orgId: orgId } }"
         label="Insights"
         :condensed="primaryNavCondensed"
@@ -292,7 +292,6 @@ export default {
   computed: {
     ...mapGetters([
       "activeOrganization",
-      "hasFeature",
       "isUserPublisher",
       "isWelcomeOrg",
     ]),

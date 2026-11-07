@@ -60,15 +60,8 @@ let route = useRoute();
        and the message is enqueued into the same conversation the
        Insights page renders. See chat-frontend-handoff notes /
        Spotlight.vue for the full rationale.
-
-       Gated behind the `compute_node_chat` org feature flag — orgs that
-       haven't enabled it never see the modal, never bind the Cmd+K
-       handler, and never wire the event-bus listener (see mounted()
-       below). -->
-  <chat-spotlight
-    v-if="hasFeature('compute_node_chat')"
-    v-model:visible="spotlightOpen"
-  />
+-->
+  <chat-spotlight v-model:visible="spotlightOpen" />
 </template>
 
 <script>
@@ -168,12 +161,8 @@ export default {
     this._spotlightKeyHandler = (e) => {
       if ((e.metaKey || e.ctrlKey) && (e.key === "k" || e.key === "K")) {
         // Only intercept when the user has an active workspace. On the
-        // sign-in page we let the browser default fire. Also skip when
-        // the org hasn't enabled the compute_node_chat feature — we don't
-        // want to steal Cmd+K from the browser for users who can't use
-        // Spotlight anyway.
+        // sign-in page we let the browser default fire.
         if (!this.activeOrganization?.organization?.id) return;
-        if (!this.hasFeature("compute_node_chat")) return;
         e.preventDefault();
         this.spotlightOpen = !this.spotlightOpen;
       }
@@ -182,10 +171,9 @@ export default {
 
     // Also expose an event-bus listener so other components (e.g. a
     // header button) can open Spotlight without importing App.vue's
-    // state directly. Same feature-flag gate as the Cmd+K path.
+    // state directly. Same workspace check as the Cmd+K path.
     EventBus.$on("open-chat-spotlight", () => {
       if (!this.activeOrganization?.organization?.id) return;
-      if (!this.hasFeature("compute_node_chat")) return;
       this.spotlightOpen = true;
     });
   },
@@ -214,7 +202,6 @@ export default {
       "activeOrganization",
       "getActiveOrganization",
       "config",
-      "hasFeature",
       "isOrgSynced",
     ]),
     ...mapState("datasetModule", ["datasetSearchParams"]),
