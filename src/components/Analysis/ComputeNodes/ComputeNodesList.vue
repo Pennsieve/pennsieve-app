@@ -1,5 +1,5 @@
 <script setup>
-import { reactive, ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
+import { reactive, ref, computed, onMounted, onBeforeUnmount, watch, h } from 'vue'
 import { useStore } from 'vuex'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
@@ -11,6 +11,7 @@ import CreateComputeNodeDialog from './CreateComputeNodeDialog.vue'
 import ConnectAwsAccountDialog from '@/components/user/integrations/ConnectAwsAccountDialog.vue'
 import ComputeNodeCard from './ComputeNodeCard.vue'
 import { groupMyNodes } from './computeNodeHelpers'
+import { remainingResourcesNote, serverMessage } from '@/components/user/integrations/awsConnect'
 import AnalysisViewBar from '../AnalysisViewBar.vue'
 import { useComputeResourcesStore } from '@/stores/computeResourcesStore'
 
@@ -321,30 +322,30 @@ async function confirmDeleteNode() {
   if (!selectedNodeForDeletion.value) return
   
   try {
-    const token = await useGetToken()
-    const url = `${siteConfig.api2Url}/compute/resources/compute-nodes/${selectedNodeForDeletion.value.uuid}`
-    
-    const response = await fetch(url, {
-      method: 'DELETE',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      }
-    })
-    
-    if (response.ok) {
-      // Refresh the compute nodes list after deletion
-      await fetchComputeNodes(true)
-      
-      ElMessage.success('Compute node deleted successfully')
-      closeDeleteDialog()
+    const result = await computeResourcesStore.deleteComputeNode(selectedNodeForDeletion.value.uuid)
+    // Refresh the compute nodes list after deletion
+    await fetchComputeNodes(true)
+
+    // Removed without reaching the node's AWS account (its role is gone):
+    // say what may be left there, and stay until it's closed.
+    const note = remainingResourcesNote(result)
+    if (note) {
+      ElMessage({
+        type: 'warning',
+        duration: 0,
+        showClose: true,
+        message: h('span', [
+          'Compute node removed. ', note.text, ' ',
+          h('a', { href: note.url, target: '_blank', rel: 'noopener' }, 'How to remove it'),
+        ]),
+      })
     } else {
-      console.error('Failed to delete node:', response.status, response.statusText)
-      ElMessage.error('Failed to delete compute node')
+      ElMessage.success('Compute node deleted successfully')
     }
+    closeDeleteDialog()
   } catch (error) {
     console.error('Failed to delete node:', error)
-    ElMessage.error('Failed to delete compute node')
+    ElMessage.error(serverMessage(error?.body) || 'Failed to delete compute node')
   }
 }
 </script>

@@ -2,13 +2,14 @@
 // A compute node's Advanced tab: its deployment mode, the version of the
 // node software and its update, the technical details (cloud account, node
 // id, image), and destroying the node.
-import { ref, computed } from 'vue'
+import { ref, computed, h } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { useComputeResourcesStore } from '@/stores/computeResourcesStore'
 import BfButton from '@/components/shared/bf-button/BfButton.vue'
 import IconCopyDocument from '@/components/icons/IconCopyDocument.vue'
 import { deploymentMode, formatAccountId, cloudLabel } from './computeNodeHelpers'
+import { remainingResourcesNote, serverMessage } from '@/components/user/integrations/awsConnect'
 
 const props = defineProps({
   node: { type: Object, required: true },
@@ -80,13 +81,28 @@ const listRoute = computed(() => route.params.orgId
 async function confirmDestroy() {
   isDestroying.value = true
   try {
-    await computeResourcesStore.deleteComputeNode(props.node.uuid)
-    ElMessage.success('Compute node destroyed')
+    const result = await computeResourcesStore.deleteComputeNode(props.node.uuid)
+    // Removed without reaching the node's AWS account (its role is gone):
+    // say what may be left there, and stay until it's closed.
+    const note = remainingResourcesNote(result)
+    if (note) {
+      ElMessage({
+        type: 'warning',
+        duration: 0,
+        showClose: true,
+        message: h('span', [
+          'Compute node removed. ', note.text, ' ',
+          h('a', { href: note.url, target: '_blank', rel: 'noopener' }, 'How to remove it'),
+        ]),
+      })
+    } else {
+      ElMessage.success('Compute node destroyed')
+    }
     showDestroyDialog.value = false
     router.push(listRoute.value)
   } catch (error) {
     console.error('Failed to destroy compute node:', error)
-    ElMessage.error('Failed to destroy the compute node')
+    ElMessage.error(serverMessage(error?.body) || 'Failed to destroy the compute node')
   } finally {
     isDestroying.value = false
   }

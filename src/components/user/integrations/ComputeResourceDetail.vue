@@ -8,6 +8,7 @@ import BfStage from '@/components/layout/BfStage/BfStage.vue'
 import IconRemove from '@/components/icons/IconRemove.vue'
 import { useComputeResourcesStore } from '@/stores/computeResourcesStore'
 import { useStorageResourcesStore } from '@/stores/storageResourcesStore'
+import { errorMessage, remainingResourcesNote, roleCleanup } from './awsConnect'
 
 const store = useStore()
 const route = useRoute()
@@ -103,6 +104,56 @@ function getStorageNodesForWorkspace(orgId) {
   return accountStorageNodes.value.filter(n => {
     return (n.workspaces || []).some(ws => ws.workspaceId === orgId)
   })
+}
+
+// Disconnect: the account's registration goes; its role stays in AWS for the
+// owner to delete (roleCleanup). Only without nodes: account-service refuses
+// otherwise, and this page doesn't force it, which would leave their
+// resources running. The role details are the owner's (blanked for others).
+const canDisconnect = computed(() => !!account.value?.roleName)
+const showDisconnectDialog = ref(false)
+const isDisconnecting = ref(false)
+const disconnected = ref(null) // { kind, name, url } of what to delete in AWS
+// What may be left in the AWS account, when Pennsieve could no longer reach it
+// (remainingResourcesNote); and why a disconnect was refused, shown in the dialog.
+const disconnectNote = ref(null)
+const disconnectRefusal = ref('')
+// This registration's nodes (a node names its account by uuid; older records
+// only by the AWS account ID).
+const nodesBlockingDisconnect = computed(() => [
+  ...accountComputeNodes.value.filter(n => !n.account?.uuid || n.account.uuid === accountId.value),
+  ...accountStorageNodes.value,
+])
+
+function openDisconnectDialog() {
+  disconnected.value = null
+  disconnectNote.value = null
+  disconnectRefusal.value = ''
+  showDisconnectDialog.value = true
+}
+
+// Also tried with nodes listed ("Pennsieve can't reach this account
+// anymore?"): account-service disconnects an account whose role is gone, nodes
+// and all, and says what may be left; one it can still reach it refuses (409)
+// while nodes remain, and that answer is shown here. Never forced.
+async function confirmDisconnect() {
+  const cleanup = roleCleanup(account.value)
+  isDisconnecting.value = true
+  disconnectRefusal.value = ''
+  try {
+    const removed = await computeResourcesStore.disconnectComputeAccount(accountId.value)
+    disconnectNote.value = remainingResourcesNote(removed)
+    disconnected.value = roleCleanup({ ...account.value, ...removed, connection: account.value?.connection }) || cleanup || { kind: 'none' }
+  } catch (e) {
+    disconnectRefusal.value = errorMessage(e?.status, e?.body)
+  } finally {
+    isDisconnecting.value = false
+  }
+}
+
+function finishDisconnect() {
+  showDisconnectDialog.value = false
+  router.push({ name: 'user-compute-resource' })
 }
 
 // Loading
@@ -584,6 +635,20 @@ function isStorageOpLoading(nodeUuid) {
           No workspaces enabled. Enable a workspace to allow resource creation.
         </div>
       </div>
+
+      <!-- Danger Zone -->
+      <div v-if="canDisconnect" class="management-section danger-section">
+        <div class="section-header">
+          <h2>Danger Zone</h2>
+        </div>
+        <div class="danger-content">
+          <p class="danger-info">
+            Disconnect this account from Pennsieve. Its compute and storage nodes must be deleted first.
+            The role Pennsieve used stays in your AWS account for you to delete.
+          </p>
+          <bf-button class="red small" @click="openDisconnectDialog">Disconnect</bf-button>
+        </div>
+      </div>
     </div>
 
     <!-- Dialogs -->
@@ -651,6 +716,74 @@ function isStorageOpLoading(nodeUuid) {
       <template #footer>
         <bf-button class="secondary" @click="closeRemoveWorkspaceDialog">Cancel</bf-button>
         <bf-button class="red" @click="confirmRemoveWorkspace">Remove Access</bf-button>
+      </template>
+    </el-dialog>
+
+    <!-- Disconnect Account Dialog -->
+    <el-dialog
+      v-model="showDisconnectDialog"
+      title="Disconnect account"
+      width="520px"
+      :close-on-click-modal="false"
+      :before-close="(done) => (disconnected ? finishDisconnect() : done())"
+    >
+      <div v-if="disconnected" class="dialog-content">
+        <p class="dialog-description">The account is disconnected from Pennsieve.</p>
+        <p v-if="disconnectNote" class="warning-text">
+          {{ disconnectNote.text }}
+          <a :href="disconnectNote.url" target="_blank" rel="noopener">How to remove it</a>.
+        </p>
+        <p v-if="disconnected.kind === 'stack'" class="dialog-description">
+          Delete the stack <code>{{ disconnected.name }}</code> in your AWS account, which removes Pennsieve's role:
+          <a :href="disconnected.url" target="_blank" rel="noopener">open it in the AWS console</a>.
+        </p>
+        <p v-else-if="disconnected.kind === 'role'" class="dialog-description">
+          Delete the role <code>{{ disconnected.name }}</code> in your AWS account:
+          <a :href="disconnected.url" target="_blank" rel="noopener">open it in the AWS console</a>.
+        </p>
+      </div>
+      <div v-else-if="nodesBlockingDisconnect.length" class="dialog-content">
+        <p class="warning-text">
+          This account still has {{ nodesBlockingDisconnect.length }}
+          {{ nodesBlockingDisconnect.length === 1 ? 'node' : 'nodes' }}. Delete
+          {{ nodesBlockingDisconnect.length === 1 ? 'it' : 'them' }} first, so nothing is left running in your
+          AWS account:
+        </p>
+        <ul class="disconnect-node-list">
+          <li v-for="node in nodesBlockingDisconnect" :key="node.uuid">{{ node.name || node.uuid }}</li>
+        </ul>
+        <p class="dialog-description">
+          <button
+            type="button"
+            class="disconnect-unreachable"
+            :disabled="isDisconnecting"
+            @click="confirmDisconnect"
+          >Pennsieve can't reach this account anymore?</button>
+          If its role was removed in AWS, the account and these nodes can be disconnected anyway.
+        </p>
+        <p v-if="disconnectRefusal" class="error-text disconnect-refusal">{{ disconnectRefusal }}</p>
+      </div>
+      <div v-else class="dialog-content">
+        <p class="warning-text">
+          Disconnect <strong>{{ account?.name || formatAccountId(account?.accountId) }}</strong> from Pennsieve?
+          Workspaces can no longer use it, and connecting it again needs a new role.
+        </p>
+        <p v-if="disconnectRefusal" class="error-text disconnect-refusal">{{ disconnectRefusal }}</p>
+      </div>
+      <template #footer>
+        <template v-if="disconnected">
+          <bf-button class="primary" @click="finishDisconnect">Done</bf-button>
+        </template>
+        <template v-else>
+          <bf-button class="secondary" @click="showDisconnectDialog = false">Cancel</bf-button>
+          <bf-button
+            v-if="!nodesBlockingDisconnect.length"
+            class="red"
+            :processing="isDisconnecting"
+            :disabled="isDisconnecting"
+            @click="confirmDisconnect"
+          >Disconnect</bf-button>
+        </template>
       </template>
     </el-dialog>
 
@@ -1095,5 +1228,64 @@ function isStorageOpLoading(nodeUuid) {
     font-weight: 500;
     margin-top: 8px;
   }
+}
+
+// Danger Zone (disconnect)
+.danger-section .section-header h2 {
+  color: theme.$red_1;
+}
+
+.danger-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+
+  .danger-info {
+    margin: 0;
+    font-size: 14px;
+    color: theme.$gray_5;
+    line-height: 1.5;
+  }
+}
+
+.disconnect-unreachable {
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  color: theme.$link-color;
+  cursor: pointer;
+
+  &:hover {
+    text-decoration: underline;
+  }
+
+  &:disabled {
+    cursor: default;
+    opacity: 0.6;
+  }
+}
+
+.disconnect-refusal {
+  margin: 8px 0 0 0;
+  font-size: 13px;
+  color: theme.$red_1;
+}
+
+.disconnect-node-list {
+  margin: 8px 0 0 0;
+  padding-left: 20px;
+  font-size: 14px;
+  line-height: 1.7;
+  color: theme.$gray_6;
+}
+
+.dialog-content code {
+  font-size: 12px;
+}
+
+.dialog-content a {
+  color: theme.$link-color;
 }
 </style>
