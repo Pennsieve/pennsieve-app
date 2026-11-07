@@ -82,4 +82,27 @@ describe("ComputeResourceDetail: disconnect", () => {
     await wrapper.find(".dialog").findAll("button").find((b) => b.text() === "Done").trigger("click");
     expect(push).toHaveBeenCalledWith({ name: "user-compute-resource" });
   });
+
+  it("disconnects an account Pennsieve can't reach, nodes and all, and says what may be left", async () => {
+    state.computeNodes = [{ uuid: "n1", name: "Node one", account: { accountId: "123456789012", uuid: "acct-1" } }];
+    disconnectComputeAccount.mockResolvedValue({ uuid: "acct-1", roleName: "Pennsieve-Compute-dev-1a", resourcesMayRemain: true });
+    const wrapper = await openDialog();
+    await wrapper.find(".dialog").findAll("button").find((b) => b.text().includes("can't reach this account")).trigger("click");
+    await flushPromises();
+    expect(disconnectComputeAccount).toHaveBeenCalledWith("acct-1");
+    const dialog = wrapper.find(".dialog");
+    expect(dialog.text()).toContain("may still exist and cost money");
+    expect(dialog.html()).toContain("disconnect-without-pennsieve.md");
+    expect(dialog.text()).toContain("Delete the stack");
+  });
+
+  it("shows why, in the dialog, when Pennsieve can still reach the account", async () => {
+    state.computeNodes = [{ uuid: "n1", name: "Node one", account: { accountId: "123456789012", uuid: "acct-1" } }];
+    disconnectComputeAccount.mockRejectedValue({ status: 409, body: { error: "account has 1 active compute nodes and 0 active storage nodes" } });
+    const wrapper = await openDialog();
+    await wrapper.find(".dialog").findAll("button").find((b) => b.text().includes("can't reach this account")).trigger("click");
+    await flushPromises();
+    expect(wrapper.find(".dialog").text()).toContain("account has 1 active compute nodes");
+    expect(push).not.toHaveBeenCalled();
+  });
 });

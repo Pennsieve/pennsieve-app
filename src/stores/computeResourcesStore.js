@@ -877,6 +877,12 @@ export const useComputeResourcesStore = defineStore('computeResources', () => {
     }
   }
 
+  // A response's text as JSON, or { message: text } when it isn't JSON.
+  const parseResponseBody = (text) => {
+    if (!text) return {}
+    try { return JSON.parse(text) } catch { return { message: text } }
+  }
+
   const deleteComputeNode = async (nodeUuid) => {
     setNodeUpdating(nodeUuid, true)
 
@@ -906,11 +912,17 @@ export const useComputeResourcesStore = defineStore('computeResources', () => {
           delete isLoadingPermissions.value[nodeUuid]
         }
         
-        return true
+        // The response body ({ message }, and resourcesMayRemain when
+        // Pennsieve could no longer reach the node's AWS account).
+        return parseResponseBody(await response.text())
       } else {
         const errorDetails = await response.text()
         console.error('Failed to delete compute node:', response.status, response.statusText, errorDetails)
-        return Promise.reject(new Error(`Failed to delete compute node: ${response.statusText} - ${errorDetails}`))
+        // status and body, so the caller can show the server's message
+        const error = new Error(`Failed to delete compute node: ${response.statusText} - ${errorDetails}`)
+        error.status = response.status
+        error.body = parseResponseBody(errorDetails)
+        return Promise.reject(error)
       }
     } catch (error) {
       console.error('Failed to delete compute node:', error)

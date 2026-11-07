@@ -6,6 +6,9 @@ import {
   connectionState,
   roleCleanup,
   errorMessage,
+  serverMessage,
+  remainingResourcesNote,
+  DISCONNECT_RUNBOOK_URL,
 } from "./awsConnect";
 
 describe("parseAwsAccountInput", () => {
@@ -78,5 +81,27 @@ describe("roleCleanup", () => {
   it("has nothing to say without a role", () => {
     expect(roleCleanup({})).toBeNull();
     expect(roleCleanup(null)).toBeNull();
+  });
+});
+
+describe("remainingResourcesNote", () => {
+  it("says what may be left, with Pennsieve's runbook, when the server says so", () => {
+    const note = remainingResourcesNote({ message: "removed", resourcesMayRemain: true, runbookUrl: "https://evil.example" });
+    expect(note.text).toMatch(/may still exist and cost money/);
+    expect(note.url).toBe(DISCONNECT_RUNBOOK_URL);
+  });
+
+  it("is null for a normal delete or no body", () => {
+    expect(remainingResourcesNote({ message: "Compute node deletion initiated" })).toBeNull();
+    expect(remainingResourcesNote(undefined)).toBeNull();
+  });
+});
+
+describe("serverMessage", () => {
+  it("takes message or error, trimmed, else empty", () => {
+    expect(serverMessage({ message: " forbidden " })).toBe("forbidden");
+    expect(serverMessage({ error: "account has 1 active compute nodes" })).toBe("account has 1 active compute nodes");
+    expect(serverMessage(null)).toBe("");
+    expect(serverMessage({ message: 3 })).toBe("");
   });
 });

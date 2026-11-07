@@ -8,7 +8,7 @@ import BfStage from '@/components/layout/BfStage/BfStage.vue'
 import IconRemove from '@/components/icons/IconRemove.vue'
 import { useComputeResourcesStore } from '@/stores/computeResourcesStore'
 import { useStorageResourcesStore } from '@/stores/storageResourcesStore'
-import { errorMessage, roleCleanup } from './awsConnect'
+import { errorMessage, remainingResourcesNote, roleCleanup } from './awsConnect'
 
 const store = useStore()
 const route = useRoute()
@@ -114,6 +114,10 @@ const canDisconnect = computed(() => !!account.value?.roleName)
 const showDisconnectDialog = ref(false)
 const isDisconnecting = ref(false)
 const disconnected = ref(null) // { kind, name, url } of what to delete in AWS
+// What may be left in the AWS account, when Pennsieve could no longer reach it
+// (remainingResourcesNote); and why a disconnect was refused, shown in the dialog.
+const disconnectNote = ref(null)
+const disconnectRefusal = ref('')
 // This registration's nodes (a node names its account by uuid; older records
 // only by the AWS account ID).
 const nodesBlockingDisconnect = computed(() => [
@@ -123,17 +127,25 @@ const nodesBlockingDisconnect = computed(() => [
 
 function openDisconnectDialog() {
   disconnected.value = null
+  disconnectNote.value = null
+  disconnectRefusal.value = ''
   showDisconnectDialog.value = true
 }
 
+// Also tried with nodes listed ("Pennsieve can't reach this account
+// anymore?"): account-service disconnects an account whose role is gone, nodes
+// and all, and says what may be left; one it can still reach it refuses (409)
+// while nodes remain, and that answer is shown here. Never forced.
 async function confirmDisconnect() {
   const cleanup = roleCleanup(account.value)
   isDisconnecting.value = true
+  disconnectRefusal.value = ''
   try {
     const removed = await computeResourcesStore.disconnectComputeAccount(accountId.value)
+    disconnectNote.value = remainingResourcesNote(removed)
     disconnected.value = roleCleanup({ ...account.value, ...removed, connection: account.value?.connection }) || cleanup || { kind: 'none' }
   } catch (e) {
-    ElMessage.error(errorMessage(e?.status, e?.body))
+    disconnectRefusal.value = errorMessage(e?.status, e?.body)
   } finally {
     isDisconnecting.value = false
   }
@@ -717,6 +729,10 @@ function isStorageOpLoading(nodeUuid) {
     >
       <div v-if="disconnected" class="dialog-content">
         <p class="dialog-description">The account is disconnected from Pennsieve.</p>
+        <p v-if="disconnectNote" class="warning-text">
+          {{ disconnectNote.text }}
+          <a :href="disconnectNote.url" target="_blank" rel="noopener">How to remove it</a>.
+        </p>
         <p v-if="disconnected.kind === 'stack'" class="dialog-description">
           Delete the stack <code>{{ disconnected.name }}</code> in your AWS account, which removes Pennsieve's role:
           <a :href="disconnected.url" target="_blank" rel="noopener">open it in the AWS console</a>.
@@ -736,12 +752,23 @@ function isStorageOpLoading(nodeUuid) {
         <ul class="disconnect-node-list">
           <li v-for="node in nodesBlockingDisconnect" :key="node.uuid">{{ node.name || node.uuid }}</li>
         </ul>
+        <p class="dialog-description">
+          <button
+            type="button"
+            class="disconnect-unreachable"
+            :disabled="isDisconnecting"
+            @click="confirmDisconnect"
+          >Pennsieve can't reach this account anymore?</button>
+          If its role was removed in AWS, the account and these nodes can be disconnected anyway.
+        </p>
+        <p v-if="disconnectRefusal" class="error-text disconnect-refusal">{{ disconnectRefusal }}</p>
       </div>
       <div v-else class="dialog-content">
         <p class="warning-text">
           Disconnect <strong>{{ account?.name || formatAccountId(account?.accountId) }}</strong> from Pennsieve?
           Workspaces can no longer use it, and connecting it again needs a new role.
         </p>
+        <p v-if="disconnectRefusal" class="error-text disconnect-refusal">{{ disconnectRefusal }}</p>
       </div>
       <template #footer>
         <template v-if="disconnected">
@@ -1220,6 +1247,30 @@ function isStorageOpLoading(nodeUuid) {
     color: theme.$gray_5;
     line-height: 1.5;
   }
+}
+
+.disconnect-unreachable {
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  color: theme.$link-color;
+  cursor: pointer;
+
+  &:hover {
+    text-decoration: underline;
+  }
+
+  &:disabled {
+    cursor: default;
+    opacity: 0.6;
+  }
+}
+
+.disconnect-refusal {
+  margin: 8px 0 0 0;
+  font-size: 13px;
+  color: theme.$red_1;
 }
 
 .disconnect-node-list {

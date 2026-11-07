@@ -65,11 +65,36 @@ export function connectionState(account) {
   return { kind: "current", label: "" };
 }
 
+// The server's message in a response body ({ message } or { error }), or "".
+export function serverMessage(body) {
+  const fromServer = body && (body.message || body.error);
+  return typeof fromServer === "string" ? fromServer.trim() : "";
+}
+
+// How to remove what Pennsieve built in an AWS account without Pennsieve.
+export const DISCONNECT_RUNBOOK_URL =
+  "https://github.com/Pennsieve/account-service/blob/main/docs/disconnect-without-pennsieve.md";
+
+// After deleting a node or disconnecting an account Pennsieve could no longer
+// reach (its role was removed outside Pennsieve), account-service says so with
+// resourcesMayRemain: what Pennsieve built there may still exist. The note to
+// show then, else null. The link is always Pennsieve's runbook, never a URL
+// taken from the response.
+export function remainingResourcesNote(body) {
+  if (!body?.resourcesMayRemain) return null;
+  return {
+    text:
+      "Pennsieve could no longer reach this AWS account, so what it set up there may still exist and cost money. " +
+      "Remove it from your AWS account.",
+    url: DISCONNECT_RUNBOOK_URL,
+  };
+}
+
 // The message to show for a failed call: the server's ({ message } or
 // { error }), else one for its status.
 export function errorMessage(status, body) {
-  const fromServer = body && (body.message || body.error);
-  if (typeof fromServer === "string" && fromServer.trim()) return fromServer.trim();
+  const fromServer = serverMessage(body);
+  if (fromServer) return fromServer;
   if (status === 404) return "Pennsieve couldn't find that. Try again in a minute.";
   if (status === 409 || status === 422) return "This AWS account is already connected.";
   if (status >= 500) return "Something went wrong on Pennsieve's side. Try again in a moment.";
