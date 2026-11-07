@@ -30,7 +30,7 @@ function respond(status, body) {
 describe('environmentsServiceUrl', () => {
   it('is set only where environments-service is deployed', () => {
     expect(environmentsServiceUrl(dev)).toBe('https://api2.pennsieve.net/environments')
-    expect(environmentsServiceUrl(prod)).toBe('')
+    expect(environmentsServiceUrl(prod)).toBe('https://api2.pennsieve.io/environments')
     expect(environmentsServiceUrl(config)).toBe('https://api2.pennsieve.net/environments')
   })
 })
