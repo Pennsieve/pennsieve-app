@@ -7,7 +7,7 @@ import IconApi from '@/components/icons/IconApi.vue'
 import { useComputeResourcesStore } from '@/stores/computeResourcesStore'
 import BfButton from '@/components/shared/bf-button/BfButton.vue'
 import ConnectAwsAccountDialog from './ConnectAwsAccountDialog.vue'
-import { connectionState, stackConsoleUrl } from './awsConnect'
+import { connectionState } from './awsConnect'
 
 const store = useStore()
 const router = useRouter()
@@ -41,7 +41,9 @@ function getStatusLabel(resource) {
   return resource.status ? resource.status.charAt(0).toUpperCase() + resource.status.slice(1).toLowerCase() : 'Enabled'
 }
 
-// Connect a new account, or upgrade one an older agent registered.
+// Connect a new account, upgrade one an older agent registered, or update one
+// made from an older template: an upgrade and an update are the same, a new
+// role from the latest template, which the account switches to.
 const connectVisible = ref(false)
 const upgrading = ref(null)
 // Hidden for the session once this Pennsieve says it can't switch roles yet.
@@ -57,7 +59,7 @@ function openUpgrade(resource) {
 // The account's own role details are the owner's (blanked for others), so an
 // account without a role name isn't one this user can upgrade.
 const canUpgrade = (resource) =>
-  upgradeAvailable.value && !!resource.roleName && connectionState(resource)?.kind === 'legacy'
+  upgradeAvailable.value && !!resource.roleName && ['legacy', 'outdated'].includes(connectionState(resource)?.kind)
 
 function navigateToDetail(resource) {
   router.push({ name: 'user-compute-resource-detail', params: { accountId: resource.uuid } })
@@ -123,15 +125,15 @@ function navigateToDetail(resource) {
                   Upgrade
                 </bf-button>
               </template>
-              <a
-                v-else-if="connectionState(resource)?.kind === 'outdated'"
-                class="connection-badge connection-badge--update"
-                :href="stackConsoleUrl(resource.roleName)"
-                target="_blank"
-                rel="noopener"
-                title="A newer version of Pennsieve's role template is out: update the stack in your AWS console"
-                @click.stop
-              >Update available</a>
+              <template v-else-if="connectionState(resource)?.kind === 'outdated' && resource.roleName">
+                <span
+                  class="connection-badge connection-badge--update"
+                  title="A newer version of Pennsieve's role template is out"
+                >Update available</span>
+                <bf-button v-if="canUpgrade(resource)" class="secondary compact flex" @click.stop="openUpgrade(resource)">
+                  Update
+                </bf-button>
+              </template>
               <span :class="['status-badge', getStatusLabel(resource).toLowerCase()]">
                 {{ getStatusLabel(resource) }}
               </span>

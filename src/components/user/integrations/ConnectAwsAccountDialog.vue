@@ -11,13 +11,13 @@ import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import BfButton from '@/components/shared/bf-button/BfButton.vue'
 import { useComputeResourcesStore } from '@/stores/computeResourcesStore'
-import { errorMessage, iamRoleConsoleUrl, parseAwsAccountInput } from './awsConnect'
+import { errorMessage, iamRoleConsoleUrl, parseAwsAccountInput, stackConsoleUrl } from './awsConnect'
 import { formatAccountId } from '@/components/Analysis/ComputeNodes/computeNodeHelpers'
 
 const props = defineProps({
   modelValue: { type: Boolean, default: false },
-  // An account to upgrade (a role made from the template replaces its
-  // older one); none to connect a new account.
+  // An account to upgrade or update (a role made from the latest template
+  // replaces its older one); none to connect a new account.
   account: { type: Object, default: null },
 })
 const emit = defineEmits(['update:modelValue', 'connected', 'upgrade-unavailable'])
@@ -26,6 +26,11 @@ const router = useRouter()
 const computeResourcesStore = useComputeResourcesStore()
 
 const isUpgrade = computed(() => !!props.account)
+// Its role was made from an older template (else an agent made it): an update.
+const isUpdate = computed(() => props.account?.connection === 'cloudformation')
+// The role the account used before the switch, for the user to delete: the
+// stack when the template made it, else the role itself.
+const oldRole = ref(null) // { name, fromTemplate }
 const visible = computed({
   get: () => props.modelValue,
   set: (v) => emit('update:modelValue', v),
@@ -57,6 +62,7 @@ watch(visible, (open) => {
   inputError.value = ''
   verifyError.value = ''
   connected.value = null
+  oldRole.value = null
 })
 
 async function openConsole() {
@@ -109,7 +115,9 @@ async function verify() {
   isVerifying.value = true
   try {
     if (isUpgrade.value) {
-      await computeResourcesStore.switchComputeAccountRole(props.account.uuid, { roleName, externalId, templateVersion })
+      const before = { name: props.account.roleName, fromTemplate: isUpdate.value }
+      const result = await computeResourcesStore.switchComputeAccountRole(props.account.uuid, { roleName, externalId, templateVersion })
+      oldRole.value = { ...before, name: result?.oldRoleName || before.name }
       step.value = 'done'
       emit('connected', props.account)
       return
@@ -150,7 +158,7 @@ function createNode() {
 <template>
   <el-dialog
     v-model="visible"
-    :title="isUpgrade ? 'Upgrade the connection' : 'Connect an AWS account'"
+    :title="isUpdate ? 'Update the connection' : isUpgrade ? 'Upgrade the connection' : 'Connect an AWS account'"
     width="560px"
     append-to-body
     class="connect-aws-dialog"
@@ -158,7 +166,11 @@ function createNode() {
     <!-- Start -->
     <div v-if="step === 'start'" class="ca-step">
       <p class="ca-text">
-        <template v-if="isUpgrade">
+        <template v-if="isUpdate">
+          This replaces the role Pennsieve uses in <strong>{{ account.name || 'this account' }}</strong> with one
+          made from the latest version of Pennsieve's template. Its compute nodes and sharing stay as they are.
+        </template>
+        <template v-else-if="isUpgrade">
           This replaces the role Pennsieve uses in <strong>{{ account.name || 'this account' }}</strong> with one
           made from Pennsieve's template, which you can update from your AWS console later. Its compute nodes and
           sharing stay as they are.
@@ -218,10 +230,16 @@ function createNode() {
     <!-- Done -->
     <div v-else class="ca-step">
       <template v-if="isUpgrade">
-        <p class="ca-text">The connection is upgraded. Pennsieve now uses the new role.</p>
         <p class="ca-text">
-          Delete the old role <code>{{ account.roleName }}</code> in your AWS account:
-          <a :href="iamRoleConsoleUrl(account.roleName)" target="_blank" rel="noopener">open it in the AWS console</a>.
+          The connection is {{ isUpdate ? 'updated' : 'upgraded' }}. Pennsieve now uses the new role.
+        </p>
+        <p v-if="oldRole?.fromTemplate" class="ca-text">
+          Delete the old stack <code>{{ oldRole.name }}</code> in your AWS account, which removes the old role:
+          <a :href="stackConsoleUrl(oldRole.name)" target="_blank" rel="noopener">open it in the AWS console</a>.
+        </p>
+        <p v-else-if="oldRole" class="ca-text">
+          Delete the old role <code>{{ oldRole.name }}</code> in your AWS account:
+          <a :href="iamRoleConsoleUrl(oldRole.name)" target="_blank" rel="noopener">open it in the AWS console</a>.
         </p>
       </template>
       <template v-else>
