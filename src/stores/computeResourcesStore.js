@@ -306,8 +306,10 @@ export const useComputeResourcesStore = defineStore('computeResources', () => {
 
   // A role setup: { roleName, externalId, cloudFormation?: { quickCreateUrl,
   // cloudShellCommand, templateUrl, templateVersion }, ... }. The external ID
-  // is issued to this user, for this role, for 24 hours.
-  const requestRoleSetup = () => accountRequest('GET', '/role-policy?externalId=true')
+  // is issued to this user, for this role, for 24 hours. With the AWS account
+  // being connected, the template creates the role only in that account.
+  const requestRoleSetup = (accountId) => accountRequest('GET',
+    `/role-policy?externalId=true${accountId ? `&accountId=${encodeURIComponent(accountId)}` : ''}`)
 
   // Registers the account once its role exists; account-service checks the
   // role works with the external ID (and refuses without it). Then, as the

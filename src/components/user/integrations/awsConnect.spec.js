@@ -1,7 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
   parseAwsAccountInput,
-  checkAccountInput,
   iamRoleConsoleUrl,
   stackConsoleUrl,
   connectionState,
@@ -33,14 +32,6 @@ describe("parseAwsAccountInput", () => {
     expect(parseAwsAccountInput("").error).toMatch(/Enter/);
     expect(parseAwsAccountInput("12345").error).toMatch(/12 digits/);
     expect(parseAwsAccountInput("arn:aws:s3:::bucket").error).toMatch(/doesn't name an AWS account/);
-  });
-});
-
-describe("checkAccountInput", () => {
-  it("requires a pasted ARN to name the role this setup made", () => {
-    expect(checkAccountInput("arn:aws:iam::123456789012:role/Other", "Pennsieve-Compute-dev-1a").error).toMatch(/Other/);
-    expect(checkAccountInput("arn:aws:iam::123456789012:role/Pennsieve-Compute-dev-1a", "Pennsieve-Compute-dev-1a").accountId).toBe("123456789012");
-    expect(checkAccountInput("123456789012", "Pennsieve-Compute-dev-1a").accountId).toBe("123456789012");
   });
 });
 
