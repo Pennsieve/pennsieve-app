@@ -36,7 +36,7 @@ function respond(...bodies) {
 describe("viewsServiceUrl", () => {
   it("is set only where views-service is deployed", () => {
     expect(viewsServiceUrl(dev)).toBe("https://api2.pennsieve.net/views");
-    expect(viewsServiceUrl(prod)).toBe("");
+    expect(viewsServiceUrl(prod)).toBe("https://api2.pennsieve.io/views");
   });
 });
 

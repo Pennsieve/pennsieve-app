@@ -66,15 +66,22 @@ watch(visible, (open) => {
 })
 
 async function openConsole() {
-  if (!isUpgrade.value) {
-    const parsed = parseAwsAccountInput(accountInput.value)
-    if (parsed.error) {
+  // The account is read now, not when the dialog opened: the account to
+  // upgrade can arrive after it did. Without its ID the console can't fill in
+  // the template's AccountId, and the stack fails.
+  const parsed = isUpgrade.value
+    ? parseAwsAccountInput(props.account?.accountId)
+    : parseAwsAccountInput(accountInput.value)
+  if (parsed.error) {
+    if (isUpgrade.value) {
+      ElMessage.error("This account's AWS account ID isn't known. Reload the page and try again.")
+    } else {
       inputError.value = parsed.error
-      return
     }
-    inputError.value = ''
-    accountId.value = parsed.accountId
+    return
   }
+  inputError.value = ''
+  accountId.value = parsed.accountId
   isStarting.value = true
   try {
     // A fresh setup each time: its external ID is issued to this user, for
