@@ -4,7 +4,11 @@ import {
   iamRoleConsoleUrl,
   stackConsoleUrl,
   connectionState,
+  roleCleanup,
   errorMessage,
+  serverMessage,
+  remainingResourcesNote,
+  DISCONNECT_RUNBOOK_URL,
 } from "./awsConnect";
 
 describe("parseAwsAccountInput", () => {
@@ -61,5 +65,43 @@ describe("errorMessage", () => {
     expect(errorMessage(400, { error: "bad" })).toBe("bad");
     expect(errorMessage(422, null)).toMatch(/already connected/);
     expect(errorMessage(503, {})).toMatch(/Pennsieve's side/);
+  });
+});
+
+describe("roleCleanup", () => {
+  it("deletes a template-made role through its stack", () => {
+    const c = roleCleanup({ roleName: "Pennsieve-Compute-dev-1a", connection: "cloudformation" });
+    expect(c.kind).toBe("stack");
+    expect(c.url).toContain("filteringText=Pennsieve-Compute-dev-1a");
+  });
+  it("deletes an older role directly", () => {
+    const c = roleCleanup({ roleName: "ROLE-x" });
+    expect(c).toEqual({ kind: "role", name: "ROLE-x", url: "https://console.aws.amazon.com/iam/home#/roles/details/ROLE-x" });
+  });
+  it("has nothing to say without a role", () => {
+    expect(roleCleanup({})).toBeNull();
+    expect(roleCleanup(null)).toBeNull();
+  });
+});
+
+describe("remainingResourcesNote", () => {
+  it("says what may be left, with Pennsieve's runbook, when the server says so", () => {
+    const note = remainingResourcesNote({ message: "removed", resourcesMayRemain: true, runbookUrl: "https://evil.example" });
+    expect(note.text).toMatch(/may still exist and cost money/);
+    expect(note.url).toBe(DISCONNECT_RUNBOOK_URL);
+  });
+
+  it("is null for a normal delete or no body", () => {
+    expect(remainingResourcesNote({ message: "Compute node deletion initiated" })).toBeNull();
+    expect(remainingResourcesNote(undefined)).toBeNull();
+  });
+});
+
+describe("serverMessage", () => {
+  it("takes message or error, trimmed, else empty", () => {
+    expect(serverMessage({ message: " forbidden " })).toBe("forbidden");
+    expect(serverMessage({ error: "account has 1 active compute nodes" })).toBe("account has 1 active compute nodes");
+    expect(serverMessage(null)).toBe("");
+    expect(serverMessage({ message: 3 })).toBe("");
   });
 });
