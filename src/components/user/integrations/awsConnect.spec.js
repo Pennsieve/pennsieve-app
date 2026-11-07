@@ -4,6 +4,7 @@ import {
   iamRoleConsoleUrl,
   stackConsoleUrl,
   connectionState,
+  roleCleanup,
   errorMessage,
 } from "./awsConnect";
 
@@ -61,5 +62,21 @@ describe("errorMessage", () => {
     expect(errorMessage(400, { error: "bad" })).toBe("bad");
     expect(errorMessage(422, null)).toMatch(/already connected/);
     expect(errorMessage(503, {})).toMatch(/Pennsieve's side/);
+  });
+});
+
+describe("roleCleanup", () => {
+  it("deletes a template-made role through its stack", () => {
+    const c = roleCleanup({ roleName: "Pennsieve-Compute-dev-1a", connection: "cloudformation" });
+    expect(c.kind).toBe("stack");
+    expect(c.url).toContain("filteringText=Pennsieve-Compute-dev-1a");
+  });
+  it("deletes an older role directly", () => {
+    const c = roleCleanup({ roleName: "ROLE-x" });
+    expect(c).toEqual({ kind: "role", name: "ROLE-x", url: "https://console.aws.amazon.com/iam/home#/roles/details/ROLE-x" });
+  });
+  it("has nothing to say without a role", () => {
+    expect(roleCleanup({})).toBeNull();
+    expect(roleCleanup(null)).toBeNull();
   });
 });

@@ -35,6 +35,19 @@ export const iamRoleConsoleUrl = (roleName) =>
 export const stackConsoleUrl = (stackName, region = "us-east-1") =>
   `https://console.aws.amazon.com/cloudformation/home?region=${region}#/stacks?filteringText=${encodeURIComponent(stackName)}&filteringStatus=active&viewNested=true`;
 
+// What to delete in AWS once an account is disconnected: Pennsieve can't
+// delete the role itself (its policy denies changing Pennsieve-Compute-*
+// roles). A role made from the template belongs to its stack, so the stack
+// goes; an older role the agent made goes on its own. Null without a role.
+export function roleCleanup(account) {
+  const name = account?.roleName;
+  if (!name) return null;
+  if (account.connection === "cloudformation") {
+    return { kind: "stack", name, url: stackConsoleUrl(name) };
+  }
+  return { kind: "role", name, url: iamRoleConsoleUrl(name) };
+}
+
 // How an account is connected, for its badge: made from Pennsieve's template
 // ("cloudformation", up to date or with a newer template to update to), or an
 // older role the agent made, without a template ("legacy", the default when

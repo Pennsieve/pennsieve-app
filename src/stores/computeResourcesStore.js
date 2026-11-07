@@ -347,6 +347,16 @@ export const useComputeResourcesStore = defineStore('computeResources', () => {
     return result
   }
 
+  // Disconnect: removes the account's registration. account-service refuses
+  // (409) while it has compute or storage nodes; no force here, which would
+  // leave their resources running. Resolves to the removed account (its role
+  // name, for the user to delete in AWS).
+  const disconnectComputeAccount = async (accountUuid) => {
+    const removed = await accountRequest('DELETE', `/accounts/${accountUuid}`)
+    await fetchComputeAccounts(true)
+    return removed
+  }
+
   const fetchNodePermissions = async (nodeId, forceRefresh = false) => {
     // Return cached permissions if available and not forcing refresh
     if (!forceRefresh && permissionsLoaded.value[nodeId]) {
@@ -1548,6 +1558,7 @@ export const useComputeResourcesStore = defineStore('computeResources', () => {
     requestRoleSetup,
     registerComputeAccount,
     switchComputeAccountRole,
+    disconnectComputeAccount,
 
     // State - Accounts
     computeAccounts,
