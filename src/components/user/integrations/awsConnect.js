@@ -1,8 +1,8 @@
 // Connecting an AWS account in the browser: Pennsieve issues a role setup
 // (a role name and the external ID the role will require), the user creates
-// the role from Pennsieve's CloudFormation template in their own AWS console,
-// then gives back their account ID for Pennsieve to verify. Pure, so the
-// rules are easy to test.
+// the role from Pennsieve's CloudFormation template in their own AWS console
+// (only in the account they named first), and Pennsieve verifies it. Pure, so
+// the rules are easy to test.
 
 const ACCOUNT_ID = /^\d{12}$/;
 // arn:aws:iam::123456789012:role/Name, or role/path/Name
@@ -11,7 +11,7 @@ const ROLE_ARN = /^arn:aws[a-z-]*:iam::(\d{12}):role\/(?:[\w+=,.@-]+\/)*([\w+=,.
 // console shows (arn:aws:cloudformation:us-east-1:123456789012:stack/…).
 const ANY_ARN = /^arn:aws[a-z-]*:[a-z0-9-]+:[a-z0-9-]*:(\d{12}):/;
 
-// What the user typed in the Verify step: a 12-digit account ID (spaces and
+// The account the user is connecting: a 12-digit account ID (spaces and
 // dashes allowed, as the console shows it: 1234-5678-9012), the role's ARN
 // from the stack's Outputs, or any ARN in the account (the stack's).
 // { accountId, roleName } or { error }.
@@ -26,17 +26,6 @@ export function parseAwsAccountInput(input) {
   const digits = text.replace(/[\s-]/g, "");
   if (ACCOUNT_ID.test(digits)) return { accountId: digits, roleName: null };
   return { error: "An AWS account ID is 12 digits." };
-}
-
-// The parsed input, checked against the role Pennsieve set up: a pasted ARN
-// must name that role.
-export function checkAccountInput(input, expectedRoleName) {
-  const parsed = parseAwsAccountInput(input);
-  if (parsed.error) return parsed;
-  if (parsed.roleName && expectedRoleName && parsed.roleName !== expectedRoleName) {
-    return { error: `That ARN is for role ${parsed.roleName}; this setup created ${expectedRoleName}.` };
-  }
-  return parsed;
 }
 
 export const iamRoleConsoleUrl = (roleName) =>
