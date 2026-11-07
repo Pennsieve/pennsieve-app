@@ -54,7 +54,12 @@ describe('PeopleList.vue', () => {
     cmp = mount(PeopleList, {
       attachToDocument: true,
       global:{
-        plugins: [store]
+        plugins: [store],
+        // element-plus's v-loading removes its overlay on a timer, which can
+        // fire after the test environment is torn down ("Cannot read
+        // properties of undefined (reading '_callbacks')"); nothing here
+        // tests the overlay.
+        directives: { loading: {} }
       }
     })
   })

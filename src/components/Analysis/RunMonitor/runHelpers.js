@@ -1,3 +1,5 @@
+import { sourceLabel } from "../WorkflowGraph/sourceInputs";
+import { LAMBDA_MAX_MEMORY } from "../Applications/lambdaEligibility";
 /**
  * Shared pure utility functions for RunsOverview and RunDetail.
  */
@@ -34,8 +36,22 @@ export const statusBorderColor = (status) => {
   }
 };
 
+// A step's status on a run's graph card, which keeps its shape: a mark once
+// it has ended (✓ done, ✕ failed, – canceled), none while pending or
+// running (its type strip pulses then). kind: done | failed | canceled.
+const STATUS_MARKS = {
+  SUCCEEDED: { glyph: "✓", kind: "done" },
+  FAILED: { glyph: "✕", kind: "failed" },
+  CANCELED: { glyph: "–", kind: "canceled" },
+};
+export const statusMarkOf = (status) => STATUS_MARKS[status] || null;
+
+// On a run's graph, colour marks what needs a look (running, failed): a
+// step that succeeded is as quiet as one yet to start, its ✓ says it's done.
+export const graphStatusColor = (status) => statusBorderColor(status === "SUCCEEDED" ? "NOT_STARTED" : status);
+
 export const nodeBorderColor = (type, status) => {
-  if (status) return statusBorderColor(status);
+  if (status) return graphStatusColor(status);
   if (type === "data-source") return "#6366f1";
   if (type === "data-target") return "#64748b";
   return "#cccccc";
@@ -65,6 +81,24 @@ export const statusLabel = (status) => {
   }
 };
 
+// A run that's running or on its way, as Live's "Active" cards count it:
+// queued (NOT_STARTED), running (STARTED), or ending (FINALIZING).
+export const RUNNING_STATUSES = ["NOT_STARTED", "STARTED", "FINALIZING"];
+export const isRunningStatus = (status) => RUNNING_STATUSES.includes(status);
+
+// Which empty state a run list shows (Notebooks and Workflows Live):
+// - "empty": nothing at all (none loaded, no more pages, no history
+//   counted elsewhere: hasHistory);
+// - "idle": a history, but none running;
+// - null: still loading the first page (no flash), filtered (the list's own
+//   "no results" applies), or some are running.
+export function runsEmptyState({ loading = false, runs = [], hasMore = false, hasHistory = false, filtered = false } = {}) {
+  if (loading && !runs.length) return null;
+  if (filtered) return null;
+  if (runs.some((r) => isRunningStatus(r.status))) return null;
+  return runs.length || hasMore || hasHistory ? "idle" : "empty";
+}
+
 export const isTerminalStatus = (status) => {
   return ["SUCCEEDED", "FAILED", "CANCELLED"].includes(status);
 };
@@ -92,14 +126,21 @@ export const findAppByUrl = (sourceUrl, applications) => {
   );
 };
 
-export const getTargetTypeLabel = (targetType, targetTypes = []) => {
-  if (!targetType) return "Data Target";
+// A target type's name for people: the registry's label, else the type itself.
+export const targetTypeName = (targetType, targetTypes = []) => {
   const tt = targetTypes.find((t) => t.targetType === targetType);
   return tt?.label || targetType;
 };
 
-export const labelForDagNode = (d, applications, targetTypes = []) => {
-  if (d.type === "data-source") return "Data Source";
+export const getTargetTypeLabel = (targetType, targetTypes = []) =>
+  targetType ? targetTypeName(targetType, targetTypes) : "Data Target";
+
+// A data source is named after the app inputs its links feed ("signals"),
+// given the run's or workflow's DAG; else "Data Source".
+export const labelForDagNode = (d, applications, targetTypes = [], dag = []) => {
+  // A workflow input's or output's own name (workflowInterface.js).
+  if (d.name && (d.type === "data-source" || d.type === "data-target")) return d.name;
+  if (d.type === "data-source") return sourceLabel(d.id, dag, "Data Source");
   if (d.type === "data-target") return getTargetTypeLabel(d.targetType, targetTypes);
   const matchedApp = findAppByUrl(d.sourceUrl, applications);
   return matchedApp ? matchedApp.name : extractRepoName(d.sourceUrl) || d.type || d.id;
@@ -165,6 +206,8 @@ export const formatDuration = (start, end) => {
 export const formatCost = (cost) => {
   if (cost == null) return "N/A";
   if (cost === 0) return "$0.00";
+  // Not "$0.0000": a cost too small for four decimals isn't none.
+  if (cost < 0.0001) return "< $0.0001";
   if (cost < 0.01) return `$${cost.toFixed(4)}`;
   return `$${cost.toFixed(2)}`;
 };
@@ -217,6 +260,52 @@ export const formatMetricValue = (key, value) => {
 };
 
 // Fargate resources
+// nodeMetricRows is a step's receipt from its node metrics: what it ran as,
+// how long, what it used of what it was given (the peak over its minute
+// samples, Container Insights; a Lambda step's from its REPORT line), its
+// cost, its image. Each row: {label, value, title?, note?}. A step with no
+// usage sample says so rather than showing nothing.
+export const nodeMetricRows = (nm) => {
+  if (!nm) return [];
+  const rows = [];
+  const push = (label, value, extra = {}) => rows.push({ label, value, ...extra });
+  push("Compute type", nm.computeType || "standard");
+  if (nm.status) push("Status", statusLabel(nm.status));
+  if (nm.durationSec != null) push("Duration", formatDurationSec(nm.durationSec));
+  if (nm.billedDurationMs != null) push("Billed", `${Math.round(nm.billedDurationMs).toLocaleString()} ms`);
+
+  const cpuGiven = nm.cpuUnits > 0 ? nm.cpuUnits / 1024 : null;
+  const cpuUsed = nm.maxCpuUtilized != null && cpuGiven ? nm.maxCpuUtilized / 1024 : null;
+  if (cpuUsed != null) {
+    push("CPU used", `${cpuUsed.toFixed(2)} of ${cpuGiven.toFixed(cpuGiven < 1 ? 2 : 1)} vCPU (${Math.round((cpuUsed / cpuGiven) * 100)}%)`);
+  } else if (cpuGiven) {
+    push("CPU", `${cpuGiven.toFixed(cpuGiven < 1 ? 2 : 1)} vCPU`);
+  }
+  const memGiven = nm.memoryConfiguredMiB || nm.memoryMiB || null;
+  const memUsed = nm.maxMemoryUsedMiB != null && memGiven ? Math.round(nm.maxMemoryUsedMiB) : null;
+  if (memUsed != null) {
+    push("Memory used", `${memUsed.toLocaleString()} of ${Math.round(memGiven).toLocaleString()} MiB (${Math.round((memUsed / memGiven) * 100)}%)`);
+  } else if (memGiven) {
+    push("Memory", `${Math.round(memGiven).toLocaleString()} MiB`);
+  }
+  // The node's EBS volume; omitted when the step had none
+  if (nm.volumeGiB > 0) push("Volume (EBS)", `${Math.round(nm.volumeGiB).toLocaleString()} GiB`);
+  if (nm.imageUri) push("Image", shortImage(nm.imageUri), { title: nm.imageUri });
+  // The cost last: it is the receipt's total line.
+  if (nm.estimatedCost != null) push("Estimated cost", formatCost(nm.estimatedCost), { cost: true });
+  if (cpuUsed == null && memUsed == null && (nm.computeType === "standard" || nm.computeType === "gpu") && cpuGiven) {
+    rows.push({ note: "No usage sample: usage is sampled once a minute, and this step ran under a minute, or its node has no Container Insights." });
+  }
+  return rows;
+};
+
+// shortImage is an image reference without its registry, with a short digest.
+export const shortImage = (uri) => {
+  if (!uri) return "";
+  const noRegistry = uri.replace(/^[^/]+\.amazonaws\.com\//, "");
+  return noRegistry.replace(/@sha256:([0-9a-f]{12})[0-9a-f]*$/, "@sha256:$1…");
+};
+
 export const FARGATE_CPU_OPTIONS = ["256", "512", "1024", "2048", "4096", "8192"];
 export const FARGATE_MEMORY_MAP = {
   "256": ["512", "1024", "2048"],
@@ -233,6 +322,37 @@ export const getMemoryOptionsForCpu = (cpu) => FARGATE_MEMORY_MAP[cpu] || [];
 export const LAMBDA_MEMORY_OPTIONS = [
   "128", "256", "512", "1024", "1769", "2048", "3072", "4096", "5120", "6144", "7168", "8192", "10240",
 ];
+
+// A step's memory setting as Lambda takes it: capped at Lambda's most.
+export const lambdaMemory = (memory) => {
+  const mb = parseInt(memory, 10);
+  return mb > LAMBDA_MAX_MEMORY ? String(LAMBDA_MAX_MEMORY) : memory;
+};
+
+/*
+  An app step's processorConfigs entry for a run's submission, from its
+  configure-page settings (cfg: executionTarget, version, cpu, memory,
+  interactive, sessionType) and its version's Lambda eligibility
+  (lambdaEligibility.js). A Lambda step's memory is capped at Lambda's most;
+  lambdaOverride is set only when Lambda was chosen though the version
+  doesn't fit it but may be overridden.
+*/
+export function processorConfigEntry(nodeId, cfg = {}, lambda = null) {
+  const entry = { nodeId };
+  const onLambda = cfg.executionTarget === "lambda";
+  if (cfg.executionTarget) entry.executionTarget = cfg.executionTarget;
+  if (onLambda && lambda && !lambda.available && lambda.overridable) entry.lambdaOverride = true;
+  if (cfg.version) entry.version = cfg.version;
+  if (cfg.cpu) entry.cpu = cfg.cpu;
+  if (cfg.memory) entry.memory = onLambda ? lambdaMemory(cfg.memory) : cfg.memory;
+  // Interactive (Jupyter) override: workflow-service applies it to the run
+  // DAG node's runtimeConfig (interactive waitForTaskToken step).
+  if (cfg.interactive) {
+    entry.interactive = true;
+    entry.sessionType = cfg.sessionType || "jupyter";
+  }
+  return entry;
+}
 
 // Find a reasonable Fargate CPU for a given memory value.
 // Targets a ~2:1 memory-to-CPU ratio for a balanced configuration.
@@ -327,4 +447,16 @@ export const getUserName = (userId, profile, orgMembers) => {
     return `${member.firstName} ${member.lastName}`.trim() || "Unknown User";
   }
   return String(userId).includes(":") ? String(userId).split(":").pop() : String(userId);
+};
+
+// An input's download while a run's inputs are staged (workflow-service's
+// progress: files and bytes done of the totals), as its pill's second line:
+// "38% · 1,204 of 3,400 files". The share goes by bytes, else files.
+export const inputProgressLine = (progress) => {
+  if (!progress) return "";
+  const { files = 0, filesTotal = 0, bytes = 0, bytesTotal = 0 } = progress;
+  const share = bytesTotal > 0 ? bytes / bytesTotal : filesTotal > 0 ? files / filesTotal : 0;
+  const pct = Math.min(100, Math.floor(share * 100));
+  const count = `${files.toLocaleString("en-US")} of ${filesTotal.toLocaleString("en-US")} file${filesTotal === 1 ? "" : "s"}`;
+  return `${pct}% · ${count}`;
 };

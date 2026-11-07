@@ -106,7 +106,7 @@
                 >
                   <div class="cell-name-content">
                     <bf-waiting-icon
-                      v-if="scope.row.status === 'Processing' || scope.row.status === 'Uploading'"
+                      v-if="scope.row.status === 'Processing' || scope.row.status === 'Uploading' || scope.row.status === 'Scanning…'"
                       class="icon-package icon-waiting"
                     />
                     <img
@@ -633,19 +633,6 @@ export default {
   },
 
   methods: {
-    /**
-     * Get API Url for processing packages
-     * @returns {String}
-     */
-    processFileUrl: async function() {
-      return useGetToken()
-        .then(token => {
-          const packageId = propOr('', ['recordId'], this.activeRow)
-          return `${this.config.apiUrl}/packages/${packageId}/process?api_key=${
-            token}`
-        }).catch(err => useHandleXhrError(err))
-    },
-
     toggleCollapse: function() {
     },
 
@@ -713,7 +700,8 @@ export default {
         const statusRows = {
           'Processing': 'processing-row',
           'Failed': 'failed-row',
-          'Unprocessed': 'unprocessed-row',
+          'Quarantined': 'failed-row',
+          'Scanning…': 'unprocessed-row',
           'Uploading': 'unprocessed-row'
         }
         return statusRows[row.status] !== '' ? statusRows[row.status] : 'no-status-row'
@@ -786,24 +774,6 @@ export default {
       this.$emit('delete-files', [file])
     },
 
-    /**
-     * Used to process a file if state
-     * is set to 'Unprocessed'
-     */
-    process: function() {
-
-      this.processFileUrl()
-        .then(url => {
-          return this.sendXhr(url, {
-            method: 'PUT',
-          })
-            .then(response => {
-              this.activeRow.status = 'Processing'
-            })
-        }).catch(err => useHandleXhrError(err))
-
-
-    },
 
     /**
      * Get the arrow direction based on section name and if it is active
@@ -1171,7 +1141,8 @@ export default {
 
               const fileStates = {
                 'ERROR': 'Failed',
-                'UPLOADED': 'Unprocessed',
+                'INFECTED': 'Quarantined',
+                'UPLOADED': 'Scanning…',
                 'PROCESSING': 'Processing',
                 'UNAVAILABLE': 'Uploading',
                 'RUNNING': 'Processing',

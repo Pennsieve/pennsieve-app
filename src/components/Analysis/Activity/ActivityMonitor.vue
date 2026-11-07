@@ -17,6 +17,7 @@ import { Controls } from "@vue-flow/controls";
 import ActivitySidePanel from "./ActivitySidePanel.vue";
 import ActivityLogs from "./ActivityLogs.vue";
 import EventBus from "../../../utils/event-bus";
+import { targetTypeName } from "../RunMonitor/runHelpers";
 
 const { onNodeClick, onNodeDragStop } = useVueFlow();
 
@@ -382,7 +383,7 @@ onNodeDragStop(({ node }) => {
             <div class="activity-node data-target-node">
               <span class="node-type-badge target-badge">Target</span>
               {{ data.label }}
-              <span v-if="data.targetType" class="target-type-label">{{ data.targetType }}</span>
+              <span v-if="data.targetType" class="target-type-label">{{ targetTypeName(data.targetType) }}</span>
             </div>
           </template>
         </VueFlow>

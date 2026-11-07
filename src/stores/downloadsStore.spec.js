@@ -11,6 +11,10 @@ vi.mock("@/utils/downloadService", () => ({
   getPublicArchive: vi.fn(),
   getPublicArchiveUrl: vi.fn(),
   deletePublicArchive: vi.fn(),
+  listRunArchives: vi.fn(),
+  getRunArchive: vi.fn(),
+  getRunArchiveUrl: vi.fn(),
+  deleteRunArchive: vi.fn(),
 }));
 vi.mock("@/utils/triggerBrowserDownload", () => ({ triggerBrowserDownload: vi.fn() }));
 
@@ -25,6 +29,10 @@ import {
   getPublicArchive,
   getPublicArchiveUrl,
   deletePublicArchive,
+  listRunArchives,
+  getRunArchive,
+  getRunArchiveUrl,
+  deleteRunArchive,
 } from "@/utils/downloadService";
 import { triggerBrowserDownload } from "@/utils/triggerBrowserDownload";
 
@@ -210,6 +218,39 @@ describe("downloads store", () => {
     await store.remove(store.downloads.find((d) => d.id === "pa_1"));
     expect(deletePublicArchive).toHaveBeenCalledWith({ id: "pa_1" });
     expect(deleteArchive).not.toHaveBeenCalled();
+  });
+
+  it("follows a run's results through the run routes, and keeps them when a workspace list loads", async () => {
+    const store = useDownloadsStore();
+    const run = { id: "ra_1", scope: "run", runId: "run-1", status: "RUNNING", fileCount: 3, filesDone: 1, createdAt: "2026-10-23T15:00:00Z" };
+    listRunArchives.mockResolvedValue([run]);
+    listArchives.mockResolvedValue([{ ...queued, organizationNodeId: "N:organization:1", createdAt: "2026-10-23T14:00:00Z" }]);
+
+    await store.loadRuns();
+    await store.load("N:organization:1");
+    expect(store.downloads.map((d) => d.id)).toEqual(["ra_1", "d1"]);
+    expect(store.forRun("run-1").id).toBe("ra_1");
+    expect(store.forRun("run-2")).toBe(null);
+
+    // Polled while it's prepared, so the service knows its creator is
+    // watching; not downloaded by itself, since this tab didn't ask for it.
+    getRunArchive.mockResolvedValueOnce({ ...run, status: "READY", filesDone: 3 });
+    getArchive.mockResolvedValue(queued);
+    await vi.advanceTimersByTimeAsync(POLL_MS);
+    expect(getRunArchive).toHaveBeenCalledWith({ id: "ra_1" });
+    expect(getArchive).not.toHaveBeenCalledWith(expect.objectContaining({ id: "ra_1" }));
+    expect(store.forRun("run-1").status).toBe("READY");
+    expect(triggerBrowserDownload).not.toHaveBeenCalled();
+    expect(store.attentionCount).toBe(2);
+
+    getRunArchiveUrl.mockResolvedValue({ url: "https://s3/results.zip" });
+    await store.download(store.forRun("run-1"));
+    expect(triggerBrowserDownload).toHaveBeenCalledWith("https://s3/results.zip");
+
+    deleteRunArchive.mockResolvedValue({});
+    await store.remove(store.forRun("run-1"));
+    expect(deleteRunArchive).toHaveBeenCalledWith({ id: "ra_1" });
+    expect(store.forRun("run-1")).toBe(null);
   });
 
 });

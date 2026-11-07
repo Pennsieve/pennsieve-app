@@ -70,10 +70,16 @@ async function send(url, { method, body, token, fetchFn }) {
 // (`download`), or to open it in a viewer (`view`, recorded apart from
 // downloads).
 //
+// short asks for a short link that redirects to the presigned one, for a
+// client that can't carry a presigned link (Microsoft's Office viewer caps
+// the URL it opens).
+//
 // Resolves to { url, expiresAt, fileName, size }. Rejects with a 409
 // 'scan_pending' while the file is still being scanned for malware.
-export function getFileUrl({ datasetId, packageId, purpose = 'download' }, options = {}) {
-  return downloadServiceRequest('/files/url', { ...options, method: 'POST', datasetId, body: { packageId, purpose } })
+export function getFileUrl({ datasetId, packageId, purpose = 'download', short = false }, options = {}) {
+  const body = { packageId, purpose }
+  if (short) body.short = true
+  return downloadServiceRequest('/files/url', { ...options, method: 'POST', datasetId, body })
 }
 
 // Archives: a selection zipped by the service, fetched when ready. Records
@@ -177,8 +183,43 @@ export function deletePublicArchive({ id }, options = {}) {
   return publicDownloadsRequest(`/archives/${encodeURIComponent(id)}`, { ...options, method: 'DELETE' })
 }
 
-// Selections too large to zip download with the Pennsieve agent instead.
+// A compute run's results, zipped by the service when the run's download
+// data target asks for it. Its record has scope "run" and runId. A run
+// archive is its creator's, outside any dataset and whatever workspace the
+// run was in, so these routes name only the archive: the user's token is
+// enough.
+export async function listRunArchives(options = {}) {
+  const data = await downloadServiceRequest('/runs/archives', options)
+  return data.downloads || []
+}
+
+// Polling an active run archive also tells the service its creator is
+// watching, so it skips the email.
+export function getRunArchive({ id }, options = {}) {
+  return downloadServiceRequest(`/runs/archives/${encodeURIComponent(id)}`, options)
+}
+
+export function getRunArchiveUrl({ id }, options = {}) {
+  return downloadServiceRequest(`/runs/archives/${encodeURIComponent(id)}/url`, options)
+}
+
+export function deleteRunArchive({ id }, options = {}) {
+  return downloadServiceRequest(`/runs/archives/${encodeURIComponent(id)}`, { ...options, method: 'DELETE' })
+}
+
+// Saves a selection of a dataset for the agent to download by a short id,
+// for two days. The id grants nothing: whoever downloads it is checked
+// against the dataset. Resolves to { id, expiresAt, count, size,
+// blockedCount }.
+export function createSelection({ datasetId, nodeIds }, options = {}) {
+  return downloadServiceRequest('/selections', { ...options, method: 'POST', datasetId, body: { nodeIds } })
+}
+
+// Selections too large to zip download with the Pennsieve agent instead:
+// by a saved selection's id (AGENT_SELECTION_MIN_VERSION), or, if it can't
+// be saved, by node ids (AGENT_MIN_VERSION).
 export const AGENT_MIN_VERSION = '2.2.1'
+export const AGENT_SELECTION_MIN_VERSION = '2.3.0'
 export const AGENT_DOCS_URL = 'https://docs.pennsieve.io/docs/the-pennsieve-agent'
 export const AGENT_RELEASES_URL = 'https://github.com/Pennsieve/pennsieve-agent/releases/latest'
 
@@ -194,4 +235,10 @@ export function agentDownloadCommand({ datasetId, nodeIds = [], folderName }) {
   const parts = ['pennsieve', 'download', 'dataset', datasetId, `./${agentFolderName(folderName)}`]
   if (nodeIds.length) parts.push('--node', nodeIds.join(','))
   return parts.join(' ')
+}
+
+// The agent command that downloads a saved selection into a new folder:
+// short however many items were selected.
+export function agentSelectionCommand({ selectionId, folderName }) {
+  return ['pennsieve', 'download', 'selection', selectionId, `./${agentFolderName(folderName)}`].join(' ')
 }

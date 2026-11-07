@@ -6,12 +6,14 @@ import clin from '../clin.json'
 
 const doc = yaml.load(fs.readFileSync(path.join(__dirname, 'customHttp_clin.yml'), 'utf8'))
 const headers = doc.customHeaders.flatMap((c) => c.headers)
-const csp = headers.find((h) => /^content-security-policy(-report-only)?$/i.test(h.key)).value
+const csp = headers.find((h) => /^content-security-policy$/i.test(h.key)).value
+const reportOnly = headers.find((h) => /^content-security-policy-report-only$/i.test(h.key)).value
 
-const directive = (name) => {
-  const part = csp.split(';').map((p) => p.trim()).find((p) => p.split(/\s+/)[0] === name)
-  return part ? part.split(/\s+/).slice(1) : []
-}
+const directives = (policy) =>
+  Object.fromEntries(
+    policy.split(';').map((p) => p.trim().split(/\s+/)).filter((a) => a[0]).map((a) => [a[0], a.slice(1)])
+  )
+const directive = (name) => directives(csp)[name] || []
 
 // A CSP source like https://*.s3.amazonaws.com or https://api.pennsieve.ai.
 const allows = (sources, url) => {
@@ -64,5 +66,55 @@ describe('clin custom headers', () => {
   it('allows presigned S3 links for downloads, images and media', () => {
     const link = 'https://sparc-prod-aod-discover-publish50-use1.s3.amazonaws.com/x'
     ;['connect-src', 'img-src', 'media-src'].forEach((d) => expect(allows(directive(d), link), d).toBe(true))
+  })
+
+  // POAM-006: only the third parties clin actually loads.
+  it('carries no telemetry or retired third parties', () => {
+    ;[
+      /polyfill\.io/, /doubleclick/, /getsentry/, /prodpad/,
+      /newrelic|nr-data/, /mapbox|maptiler|tilehosting|maps\.g/, /jquery|cdnjs|bootstrapcdn|fontawesome/,
+      /youtube|vimeo|wistia/, /gravatar/,
+    ].forEach((re) => {
+      expect(csp, String(re)).not.toMatch(re)
+      expect(reportOnly, String(re)).not.toMatch(re)
+    })
+  })
+
+  it('lets gtag.js load and report to GA4', () => {
+    expect(allows(directive('script-src'), 'https://www.googletagmanager.com/gtag/js?id=G-X')).toBe(true)
+    ;['https://region1.google-analytics.com/g/collect', 'https://region1.analytics.google.com/g/collect',
+      'https://www.google-analytics.com/g/collect']
+      .forEach((url) => expect(allows(directive('connect-src'), url), url).toBe(true))
+  })
+
+  it('lets dataset pages fetch ORCID records and DOI citations', () => {
+    ;[clin.ORCIDpubUrl, 'https://doi.org/10.26275/x', 'https://citation.doi.org/format',
+      'https://data.crosscite.org/x', 'https://api.crossref.org/v1/works/x']
+      .forEach((url) => expect(allows(directive('connect-src'), url), url).toBe(true))
+  })
+
+  it('limits Google to reCAPTCHA paths, fonts and analytics', () => {
+    const google = Object.values(directives(csp)).flat().filter((s) => /google\.com|gstatic\.com/.test(s))
+    google.filter((s) => !/fonts\.|analytics\.google\.com/.test(s)).forEach((s) => expect(s).toMatch(/\/recaptcha\/$/))
+  })
+
+  // The Report-Only policy is the next step: the same, without inline or data: scripts.
+  it('report-only policy is the enforced one minus inline and data: scripts', () => {
+    const enforced = directives(csp)
+    const next = directives(reportOnly)
+    expect(Object.keys(next)).toEqual(Object.keys(enforced))
+    Object.keys(enforced).forEach((name) => {
+      const want = name === 'script-src'
+        ? enforced[name].filter((s) => s !== "'unsafe-inline'" && s !== 'data:')
+        : enforced[name]
+      expect(next[name], name).toEqual(want)
+    })
+  })
+
+  it('index.html has no inline scripts', () => {
+    const html = fs.readFileSync(path.join(__dirname, '../../../index.html'), 'utf8')
+      .replace(/<!--[\s\S]*?-->/g, '')
+    const scripts = html.match(/<script\b[^>]*>/g) || []
+    scripts.forEach((tag) => expect(tag, tag).toMatch(/\ssrc=/))
   })
 })

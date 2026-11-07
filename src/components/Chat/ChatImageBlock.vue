@@ -176,7 +176,12 @@
 //      {name, asset_type}, newest first. Works for plain (non-chat-scoped)
 //      figures only.
 //
-// Either way we build a query-string-signed URL:
+//   3. By source file. When the package itself is a PNG upload, show_figure
+//      sends `source.sourceFileId` and no viewer-asset coordinates: we show
+//      the file through a signed view link (viewerModule/fetchFileUrl), with
+//      download only.
+//
+// For 1 and 2 we build a query-string-signed URL:
 //   `${asset.asset_url}${fileName}?Policy=…&Signature=…&Key-Pair-Id=…`
 // (fileName defaults to the figure-asset convention `figure.png`).
 //
@@ -193,7 +198,7 @@ import { useStore } from 'vuex'
 const props = defineProps({
   // The image block from AssistantMessage.blocks[]. Required on `source`:
   // datasetNodeId, plus EITHER assetId OR packageNodeId. Optional: assetName,
-  // assetType, fileName.
+  // assetType, fileName, sourceFileId.
   block: { type: Object, required: true },
 })
 
@@ -402,6 +407,22 @@ const resolveByAssetId = async () => {
   return buildSignedUrl(result)
 }
 
+// Source-file path: the package is itself a PNG, so there's no viewer-asset;
+// show the file through a signed view link (download-service, or
+// pennsieve-api's link where there's none).
+const resolveBySourceFile = async () => {
+  const { packageNodeId, sourceFileId } = source.value
+  if (!packageNodeId || !sourceFileId) return false
+  const url = await store.dispatch('viewerModule/fetchFileUrl', {
+    datasetId: datasetNodeId.value,
+    packageId: packageNodeId,
+    file: { content: { id: sourceFileId, objectType: 'source' } },
+  })
+  if (!url) return false
+  resolvedUrl.value = url
+  return true
+}
+
 // Fallback path: list the package's assets and match on {name, asset_type},
 // newest first. Only finds plain (non-chat-scoped) figures.
 const resolveByListing = async () => {
@@ -441,6 +462,9 @@ onMounted(async () => {
   try {
     if (assetId.value) {
       if (await resolveByAssetId()) return
+    }
+    if (source.value.sourceFileId) {
+      if (await resolveBySourceFile()) return
     }
     // Fall back to the coordinate listing path (older frames / no assetId,
     // or an asset-id lookup that returned nothing).

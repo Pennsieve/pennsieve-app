@@ -16,17 +16,36 @@ const extractErrorMessage = async (response) => {
 // (organization_id) and verify it; without one they work in your personal
 // scope. Pass the workspace being viewed, never a preferred organization
 // (deprecated).
+// runTenant is who a run is for, as workflow-service takes it: the
+// workspace being viewed (ORG#<uuid>), or the user in My Workspace
+// (USER#<uuid>). Without it a run is put in the compute node's workspace,
+// which fails on a node of another workspace (the Pennsieve public node):
+// "user has no access to dataset ... the run declared no tenant".
+export const runTenant = (rootState) => {
+  const uuid = (nodeId) => String(nodeId || "").split(":").pop();
+  const orgId = rootState.activeOrganization?.organization?.id;
+  if (orgId) return `ORG#${uuid(orgId)}`;
+  const userId = rootState.profile?.id;
+  return userId ? `USER#${uuid(userId)}` : undefined;
+};
+
 const withWorkspace = (url, rootState) => {
   const orgId = rootState.activeOrganization?.organization?.id;
   if (!orgId) return url;
   return `${url}${url.includes("?") ? "&" : "?"}organization_id=${encodeURIComponent(orgId)}`;
 };
 
+// Debounce for refetching the runs list when a status event names an unknown run
+let runListRefetchTimer = null;
+const RUN_LIST_REFETCH_DELAY_MS = 1500;
+
 const initialState = () => ({
   computeNodes: [],
   computeNodesLoaded: false,
   applications: [],
   applicationsLoaded: false,
+  // The app whose page is open (fetchApplication): the page header's title.
+  currentApplication: null,
   deletingApplications: [],
   processors: [],
   preprocessors: [],
@@ -56,6 +75,9 @@ const initialState = () => ({
   // by GET {api2Url}/packages/formats so the vocabulary follows the platform
   // rather than a list maintained in the front end.
   packageFormats: [],
+  // Folder structures (BIDS), from the same registry: what app.yml's
+  // conformsTo names.
+  packageStructures: [],
   packageFormatsLoaded: false,
   analyticsChannel: null,
   pendingRunConfig: null,
@@ -163,6 +185,9 @@ export const mutations = {
   SET_WORKFLOW_LOGS(state, logs) {
     state.workflowLogs = logs;
   },
+  SET_CURRENT_APPLICATION(state, app) {
+    state.currentApplication = app;
+  },
   SET_SELECTED_WORKFLOW(state, workflow) {
     state.selectedWorkflow = workflow;
   },
@@ -200,17 +225,21 @@ export const mutations = {
     state.packageFormats = packageFormats;
     state.packageFormatsLoaded = true;
   },
+  UPDATE_PACKAGE_STRUCTURES(state, structures) {
+    state.packageStructures = structures;
+  },
   UPDATE_WORKFLOW_ACTIVE_STATUS(state, { uuid, isActive }) {
     const workflow = state.workflows.find((w) => w.uuid === uuid);
     if (workflow) {
       workflow.isActive = isActive;
     }
   },
-  UPDATE_WORKFLOW_DETAILS(state, { uuid, name, description }) {
+  UPDATE_WORKFLOW_DETAILS(state, { uuid, name, description, tags }) {
     const workflow = state.workflows.find((w) => w.uuid === uuid);
     if (workflow) {
       if (name !== undefined) workflow.name = name;
       if (description !== undefined) workflow.description = description;
+      if (tags !== undefined) workflow.tags = tags;
     }
   },
   UPDATE_WORKFLOW_VISIBILITY(state, { uuid, visibility, official }) {
@@ -257,12 +286,49 @@ export const mutations = {
   },
 };
 
+// exampleUnavailable: the run-examples routes aren't there (not deployed in
+// this environment, or turned off): the reads show nothing rather than fail.
+export const exampleUnavailable = (err) =>
+  !err?.status || err.status === 404 || err.status === 501 || err.status === 503;
+
+export // A workflow-service request (api2/compute/workflows/...) with the user's
+// token; rejects with an Error carrying the response status.
+async function workflowRequest(rootState, path, { method = "GET", body } = {}) {
+  const token = await useGetToken();
+  const resp = await fetch(`${rootState.config.api2Url}/compute/workflows/${path}`, {
+    method,
+    headers: { Authorization: `Bearer ${token}`, ...(body !== undefined && { "Content-Type": "application/json" }) },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  const text = await resp.text();
+  let data = {};
+  try {
+    data = text ? JSON.parse(text) : {};
+  } catch {
+    data = { message: text };
+  }
+  if (!resp.ok) {
+    const err = new Error(data.message || `workflow-service responded ${resp.status}`);
+    err.status = resp.status;
+    // The response body, for errors that say more than a message (a 429's
+    // limit and reset time, a 409's job in flight).
+    err.body = data;
+    throw err;
+  }
+  return data;
+}
+
 export const actions = {
   fetchComputeNodes: async ({ state, commit, rootState }, { force } = {}) => {
     if (!force && state.computeNodesLoaded) return;
     return useGetToken()
       .then((token) => {
-        const url = `${rootState.config.api2Url}/compute/resources/compute-nodes?organization_id=${rootState.activeOrganization.organization.id}`;
+        // Outside a workspace (My Workspace) there is no organization: the API
+        // then lists the user's own nodes outside any workspace.
+        const orgId = rootState.activeOrganization?.organization?.id;
+        const url = orgId
+          ? `${rootState.config.api2Url}/compute/resources/compute-nodes?organization_id=${orgId}`
+          : `${rootState.config.api2Url}/compute/resources/compute-nodes`;
         return fetch(url, {
           method: "GET",
           headers: {
@@ -290,22 +356,26 @@ export const actions = {
   },
   fetchApplications: async (
     { state, commit, rootState },
-    { force, includeArchived } = {}
+    { force, includeArchived, includeDeployments } = {}
   ) => {
     if (!force && state.applicationsLoaded) return;
     try {
       const userToken = await useGetToken();
 
-      // /applications/store requires organization_id. On user routes (My Workspace)
-      // there is no activeOrganization, so fall back to preferredOrganization
-      // or the first org so we can still populate app data for repo cards.
-      const orgId = rootState.activeOrganization?.organization?.id
-        || rootState.profile?.preferredOrganization
-        || rootState.organizations?.[0]?.organization?.id;
-      if (!orgId) return;
+      // In a workspace: the apps usable there (including apps shared with the
+      // workspace or your teams in it). Outside one (My Workspace): public
+      // apps, your own, and apps shared with you directly. Never another
+      // workspace's, e.g. the preferred organization's (deprecated).
+      const orgId = rootState.activeOrganization?.organization?.id;
+      const params = new URLSearchParams();
+      if (orgId) params.set("organization_id", orgId);
       // Archived applications are excluded by default; opt in with includeArchived.
-      let url = `${rootState.config.api2Url}/applications/store?organization_id=${orgId}`;
-      if (includeArchived) url += `&includeArchived=true`;
+      if (includeArchived) params.set("includeArchived", "true");
+      // Deployment histories only when a page shows them (app-deploy-service
+      // leaves them out of lists by default).
+      if (includeDeployments) params.set("include", "deployments");
+      const path = orgId ? "store" : "store/me";
+      const url = `${rootState.config.api2Url}/applications/${path}?${params}`;
       const resp = await fetch(url, {
         method: "GET",
         headers: {
@@ -319,10 +389,12 @@ export const actions = {
           const rc = app.runtimeConfig || {};
           return {
             ...app,
+            // Lambda isn't assumed: whether a version may run there is its
+            // own (lambdaEligibility.js, from the version's lambda record).
             runtimeConfig: {
               cpu: rc.cpu || null,
               memory: rc.memory || null,
-              computeTypes: (rc.computeTypes && rc.computeTypes.length ? rc.computeTypes : ["standard", "lambda"])
+              computeTypes: (rc.computeTypes && rc.computeTypes.length ? rc.computeTypes : ["standard"])
                 .map((t) => (t === "ecs" ? "standard" : t)),
             },
           };
@@ -348,7 +420,7 @@ export const actions = {
       return Promise.reject(err);
     }
   },
-  fetchApplication: async ({ rootState }, uuid) => {
+  fetchApplication: async ({ rootState, commit }, uuid) => {
     if (!uuid) throw new Error("Missing application uuid");
     const url = withWorkspace(`${rootState.config.api2Url}/applications/store/${uuid}`, rootState);
     const userToken = await useGetToken();
@@ -361,7 +433,9 @@ export const actions = {
     if (!resp.ok) {
       throw new Error(`Failed to fetch application: ${resp.status}`);
     }
-    return await resp.json();
+    const app = await resp.json();
+    commit("SET_CURRENT_APPLICATION", app);
+    return app;
   },
   fetchApplicationPermissions: async ({ rootState }, uuid) => {
     if (!uuid) throw new Error("Missing application uuid");
@@ -380,7 +454,9 @@ export const actions = {
   },
   updateApplicationPermissions: async ({ rootState }, { uuid, payload }) => {
     if (!uuid) throw new Error("Missing application uuid");
-    const url = `${rootState.config.api2Url}/applications/store/${uuid}/permissions`;
+    // The workspace being viewed, when there is one: never the token's
+    // active organization (app-deploy-service verifies it).
+    const url = withWorkspace(`${rootState.config.api2Url}/applications/store/${uuid}/permissions`, rootState);
     const userToken = await useGetToken();
     const resp = await fetch(url, {
       method: "PUT",
@@ -549,6 +625,117 @@ export const actions = {
       throw err;
     }
   },
+  // Workflow versions (workflow-service): each save is a version.
+  // saveWorkflowVersion: { uuid, payload: { name, description, processors, note } }
+  // -> the workflow at its new version. Errors carry the response status.
+  saveWorkflowVersion: async ({ rootState }, { uuid, payload }) =>
+    workflowRequest(rootState, `definitions/${uuid}/versions`, { method: "POST", body: payload }),
+  fetchWorkflowVersions: async ({ rootState }, uuid) =>
+    (await workflowRequest(rootState, `definitions/${uuid}/versions`)).versions || [],
+  fetchWorkflowVersion: async ({ rootState }, { uuid, version }) =>
+    workflowRequest(rootState, `definitions/${uuid}/versions/${version}`),
+  // Run examples (workflow-service): a workflow version's example is a PDF
+  // summary of one successful run of it. Where the routes aren't deployed
+  // (404, 501, 503, or no response) the reads resolve null, so the UI shows
+  // nothing; the writes reject with the status for the caller to explain.
+  //
+  // fetchRunExample: runId -> { job, limits } or null.
+  fetchRunExample: async ({ rootState }, runId) => {
+    try {
+      const data = await workflowRequest(rootState, `runs/${encodeURIComponent(runId)}/example`);
+      return { job: data.job || null, limits: data.limits || null };
+    } catch (err) {
+      if (exampleUnavailable(err)) return null;
+      throw err;
+    }
+  },
+  // setRunExample: { runId, refresh } -> { job, example? } (202: a job started
+  // or running; 200: this run's PDF exists and refresh is false).
+  setRunExample: async ({ rootState }, { runId, refresh = false }) => {
+    const data = await workflowRequest(rootState, `runs/${encodeURIComponent(runId)}/example`, {
+      method: "POST",
+      body: { refresh: !!refresh },
+    });
+    return { job: data.job || null, example: data.example || null };
+  },
+  // fetchWorkflowExample: uuid, or { uuid, strict } -> the example of the
+  // newest version that has one (fromVersion set when that isn't the
+  // latest), or null. strict rejects where the routes aren't there too (the
+  // library's cache stops asking then).
+  fetchWorkflowExample: async ({ rootState }, arg) => {
+    const { uuid, strict = false } = typeof arg === "string" ? { uuid: arg } : arg || {};
+    try {
+      return (await workflowRequest(rootState, `definitions/${encodeURIComponent(uuid)}/example`)).example || null;
+    } catch (err) {
+      if (!strict && exampleUnavailable(err)) return null;
+      throw err;
+    }
+  },
+  // fetchAppRunDefinition: { sourceUrl, tag, variant? } -> the one-step
+  // workflow an app run of that app version runs (RunMonitor/appRuns.js).
+  fetchAppRunDefinition: async ({ rootState }, { sourceUrl, tag, variant } = {}) => {
+    const params = new URLSearchParams({ sourceUrl, tag });
+    if (variant) params.set("variant", variant);
+    return workflowRequest(rootState, `apps/run-definition?${params}`);
+  },
+  // listWorkflowDefinitions: { visibility, cursor, limit } -> { workflows,
+  // nextCursor }, the workspace's (or with visibility "public", the public
+  // catalog's) workflow definitions, without touching the library's list.
+  listWorkflowDefinitions: async ({ rootState }, { visibility, cursor, limit = 100 } = {}) => {
+    const params = new URLSearchParams();
+    if (visibility === "public") params.set("visibility", "public");
+    else {
+      const orgId = rootState.activeOrganization?.organization?.id;
+      if (orgId) params.set("organization_id", orgId);
+    }
+    if (limit) params.set("limit", limit);
+    if (cursor) params.set("cursor", cursor);
+    const result = await workflowRequest(rootState, `definitions?${params}`);
+    return Array.isArray(result)
+      ? { workflows: result, nextCursor: "" }
+      : { workflows: result?.workflows || [], nextCursor: result?.nextCursor || "" };
+  },
+  // fetchAppExample: sourceUrl -> the app's sample output (a PDF of one of
+  // its app runs, example.app set), or null.
+  // sourceUrl, or { sourceUrl, strict } (strict rejects where the route
+  // isn't there too, so the App Store's cache stops asking).
+  fetchAppExample: async ({ rootState }, arg) => {
+    const { sourceUrl, strict = false } = typeof arg === "string" ? { sourceUrl: arg } : arg || {};
+    try {
+      return (await workflowRequest(rootState, `apps/example?sourceUrl=${encodeURIComponent(sourceUrl)}`)).example || null;
+    } catch (err) {
+      if (!strict && exampleUnavailable(err)) return null;
+      throw err;
+    }
+  },
+  // fetchWorkflowVersionExample: { uuid, version } -> that version's example, or null.
+  fetchWorkflowVersionExample: async ({ rootState }, { uuid, version }) => {
+    try {
+      return (
+        (await workflowRequest(rootState, `definitions/${encodeURIComponent(uuid)}/versions/${version}/example`))
+          .example || null
+      );
+    } catch (err) {
+      if (exampleUnavailable(err)) return null;
+      throw err;
+    }
+  },
+  // deleteWorkflowVersionExample: { uuid, version } -> removes the version's
+  // example (204).
+  deleteWorkflowVersionExample: async ({ rootState }, { uuid, version }) =>
+    workflowRequest(rootState, `definitions/${encodeURIComponent(uuid)}/versions/${version}/example`, {
+      method: "DELETE",
+    }),
+  // duplicateWorkflow: { uuid, version?, name? } -> the new workflow, in the
+  // active workspace (or the user's own outside one).
+  duplicateWorkflow: async ({ rootState }, { uuid, version, name }) => {
+    const organizationId = rootState.activeOrganization?.organization?.id;
+    return workflowRequest(rootState, `definitions/${uuid}/duplicate`, {
+      method: "POST",
+      body: { ...(version && { version }), ...(name && { name }), ...(organizationId && { organizationId }) },
+    });
+  },
+
   updateWorkflow: async ({ commit, rootState }, { uuid, payload }) => {
     const url = `${rootState.config.api2Url}/compute/workflows/definitions/${uuid}`;
     const userToken = await useGetToken();
@@ -572,7 +759,7 @@ export const actions = {
 
       const result = await response.json();
 
-      if (payload.name !== undefined || payload.description !== undefined) {
+      if (payload.name !== undefined || payload.description !== undefined || payload.tags !== undefined) {
         commit("UPDATE_WORKFLOW_DETAILS", { uuid, ...payload });
       }
       if (payload.isActive !== undefined) {
@@ -673,9 +860,11 @@ export const actions = {
   },
   fetchWorkflowInstances: async ({ commit, rootState }, { status, workflowId, limit, startDate, endDate } = {}) => {
     try {
-      const params = new URLSearchParams({
-        organization_id: rootState.activeOrganization.organization.id,
-      });
+      // Outside a workspace (My Workspace) there is no organization: the API
+      // then lists the runs the user created outside any workspace.
+      const params = new URLSearchParams();
+      const orgId = rootState.activeOrganization?.organization?.id;
+      if (orgId) params.set("organization_id", orgId);
       if (status) params.set("status", status);
       if (workflowId) params.set("workflow_id", workflowId);
       if (limit) params.set("limit", limit);
@@ -711,14 +900,30 @@ export const actions = {
       return Promise.reject(err);
     }
   },
+  // Apply a workflow-run-status event: update a run in the list, or refetch the
+  // list (once per burst) when the run is not in it yet.
+  applyRunStatusEvent: ({ state, commit, dispatch }, { runId, status, fetchParams } = {}) => {
+    if (!runId) return;
+    if (state.workflowInstances.some((r) => r.uuid === runId)) {
+      commit("UPDATE_RUN_STATUS", { runId, status });
+      return;
+    }
+    clearTimeout(runListRefetchTimer);
+    runListRefetchTimer = setTimeout(() => {
+      runListRefetchTimer = null;
+      dispatch("fetchWorkflowInstances", fetchParams).catch((err) =>
+        console.error("Failed to refetch runs:", err)
+      );
+    }, RUN_LIST_REFETCH_DELAY_MS);
+  },
   fetchMoreWorkflowInstances: async ({ commit, state, rootState }, { status, workflowId, limit, startDate, endDate } = {}) => {
     const cursor = state.workflowInstancesCursor;
     if (!cursor) return;
     try {
-      const params = new URLSearchParams({
-        organization_id: rootState.activeOrganization.organization.id,
-        cursor,
-      });
+      // As in fetchWorkflowInstances: no organization outside a workspace.
+      const params = new URLSearchParams({ cursor });
+      const orgId = rootState.activeOrganization?.organization?.id;
+      if (orgId) params.set("organization_id", orgId);
       if (status) params.set("status", status);
       if (workflowId) params.set("workflow_id", workflowId);
       if (limit) params.set("limit", limit);
@@ -818,6 +1023,14 @@ export const actions = {
           status: statusEntry.status || node.status,
           startedAt: statusEntry.startedAt || node.startedAt,
           completedAt: statusEntry.completedAt || node.completedAt,
+          // An input's download while the run's inputs are staged.
+          progress: statusEntry.progress || null,
+          errorMessage: statusEntry.errorMessage || "",
+          // Why a step ended, and the size its task had (compute node contract §4.3).
+          reason: statusEntry.reason || null,
+          exitCode: statusEntry.exitCode ?? null,
+          cpuUnits: statusEntry.cpuUnits || null,
+          memoryMiB: statusEntry.memoryMiB || null,
         };
       });
 
@@ -994,7 +1207,9 @@ export const actions = {
       throw err;
     }
   },
-  createRun: async ({ commit, rootState }, payload) => {
+  createRun: async ({ state, commit, rootState }, payload) => {
+    const tenant = payload?.tenant || runTenant(rootState);
+    if (tenant) payload = { ...payload, tenant };
     const tokens = await useGetAllTokens();
     const url = `${rootState.config.api2Url}/compute/workflows/runs`;
     const resp = await fetch(url, {
@@ -1020,7 +1235,24 @@ export const actions = {
     if (payload?.name && newRun && !newRun.name) {
       newRun.name = payload.name;
     }
-    commit("PREPEND_WORKFLOW_INSTANCE", newRun);
+    // The response is not a run summary ({message, executionRunId, budget}),
+    // so add a list-shaped entry that status events and refetches can match.
+    const runId = newRun?.executionRunId || newRun?.uuid;
+    if (runId && !state.workflowInstances.some((r) => r.uuid === runId)) {
+      const cfg = payload?.workflowInstanceConfiguration || {};
+      const workflow = state.workflows.find((w) => w.uuid === cfg.workflowId);
+      commit("PREPEND_WORKFLOW_INSTANCE", {
+        uuid: runId,
+        name: newRun.name || payload?.name || "",
+        status: "NOT_STARTED",
+        startedAt: new Date().toISOString(),
+        workflowUuid: cfg.workflowId,
+        workflowName: workflow?.name,
+        computeNodeUuid: cfg.computeNodeId,
+        datasetId: payload?.datasetId,
+        createdBy: rootState.profile?.id,
+      });
+    }
     return newRun;
   },
   setSelectedProcessor: ({ commit, rootState }, processor) => {
@@ -1041,7 +1273,9 @@ export const actions = {
 
       if (resp.ok) {
         const raw = await resp.json();
-        const result = raw.map((tt) => {
+        // Node layers are retired: the persistent-layer target type is never
+        // offered, even from a registry that still lists it.
+        const result = raw.filter((tt) => tt.targetType !== "persistent-layer").map((tt) => {
           const rc = tt.runtimeConfig || {};
           return {
             ...tt,
@@ -1101,19 +1335,43 @@ export const actions = {
           const mediaTypes = Array.isArray(t?.mediaTypes)
             ? t.mediaTypes
             : [t?.mediaType ?? t?.format ?? t?.value ?? t?.name];
+          const extensions = Array.isArray(t?.extensions) ? t.extensions.map(String) : [];
+          // The format's EDAM id, where EDAM has one (packages-service's registry).
+          const edam = t?.edam ? String(t.edam) : "";
+          const kind = t?.kind === "directory" ? "directory" : "";
+          // A folder format's own endings (.ome.zarr, .mefd).
+          const folderExtensions = Array.isArray(t?.folderExtensions) ? t.folderExtensions.map(String) : [];
           return mediaTypes.filter(Boolean).map((m) => ({
             value: String(m),
             label: String(m),
             name,
             description,
+            extensions,
+            ...(edam && { edam }),
+            ...(kind && { kind }),
+            ...(folderExtensions.length && { folderExtensions }),
           }));
         })
         .filter((t) => t.value);
 
+      const structures = (Array.isArray(raw?.structures) ? raw.structures : [])
+        .filter((s) => s?.id)
+        .map((s) => ({
+          id: String(s.id),
+          name: String(s.name || s.id),
+          description: String(s.description || ""),
+          spec: String(s.spec || ""),
+          uri: String(s.uri || ""),
+          // Where another structure may start (files/ in a published dataset).
+          contentRoot: String(s.contentRoot || ""),
+          versions: Array.isArray(s.versions) ? s.versions.map(String) : [],
+        }));
+      commit("UPDATE_PACKAGE_STRUCTURES", structures);
       commit("UPDATE_PACKAGE_FORMATS", result);
       return result;
     } catch (err) {
       console.warn("Unable to load package formats; using built-in list.", err);
+      commit("UPDATE_PACKAGE_STRUCTURES", []);
       commit("UPDATE_PACKAGE_FORMATS", []);
       return [];
     }
@@ -1139,13 +1397,15 @@ export const actions = {
     try {
       const userToken = await useGetToken();
       // Public discovery lists the cross-organization catalog, so it must NOT be
-      // scoped to the active workspace. Otherwise list the active workspace.
+      // scoped to the active workspace. Otherwise list the active workspace, or,
+      // outside one (My Workspace), the user's own workflows made outside any.
       const params = new URLSearchParams();
       if (visibility === "public") {
         params.set("visibility", "public");
         if (official) params.set("official", "true");
       } else {
-        params.set("organization_id", rootState.activeOrganization.organization.id);
+        const orgId = rootState.activeOrganization?.organization?.id;
+        if (orgId) params.set("organization_id", orgId);
       }
       if (limit) params.set("limit", limit);
       if (search) params.set("search", search);
@@ -1187,6 +1447,7 @@ export const getters = {
   activityDialogVisible: (state) => state.activityDialogVisible,
   selectedProcessor: (state) => state.selectedProcessor,
   applications: (state) => state.applications,
+  currentApplication: (state) => state.currentApplication,
   computeNodes: (state) => state.computeNodes,
   targetTypes: (state) => state.targetTypes,
   packageFormats: (state) => state.packageFormats,

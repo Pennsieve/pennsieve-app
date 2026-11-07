@@ -92,13 +92,14 @@ const crumbs = computed(() => [
 
 <template>
   <bf-page>
-    <bf-rafter slot="heading" class="primary" :org-id="resolvedOrgId">
+    <!-- In My Workspace there is no organization; its page shows the breadcrumb -->
+    <bf-rafter v-if="resolvedOrgId" slot="heading" class="primary" :org-id="resolvedOrgId">
       <template #breadcrumb>
         <org-breadcrumb
           v-if="resolvedOrgId"
           page-name="Analysis"
           :crumbs="crumbs"
-          :page-route="{ name: 'runs', params: { orgId: resolvedOrgId } }"
+          :page-route="{ name: 'notebooks', params: { orgId: resolvedOrgId } }"
           :workspace-route="workspaceRoute"
         />
       </template>

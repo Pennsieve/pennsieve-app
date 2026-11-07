@@ -17,6 +17,13 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
+  // statsTop puts the summary tiles in a row across the top, the charts
+  // side by side under them: the charts then have a height of their own,
+  // not one set by how many tiles there are.
+  statsTop: {
+    type: Boolean,
+    default: false,
+  },
   hideHeader: {
     type: Boolean,
     default: false,
@@ -76,7 +83,7 @@ const formatCost = (v) => {
 </script>
 
 <template>
-  <div class="metrics-dashboard" :class="{ vertical, 'hide-header': hideHeader }">
+  <div class="metrics-dashboard" :class="{ vertical, 'stats-top': statsTop, 'hide-header': hideHeader }">
     <div v-if="!hideHeader" class="metrics-header">
       <span class="metrics-title">Metrics</span>
     </div>
@@ -109,19 +116,22 @@ const formatCost = (v) => {
           <span class="stat-value">{{ formatCost(avgCost) }}</span>
           <span class="stat-label">Avg Cost</span>
         </div>
+        <!-- More observed figures the page has (an app's peak usage). -->
+        <slot name="summary" />
       </div>
 
       <!-- Duration histogram (from parquet/DuckDB — loads in background) -->
       <div class="metrics-panel chart-panel">
         <div v-if="histogramLoading" class="histogram-loading">Loading distribution...</div>
-        <div v-else-if="histogramError" class="histogram-error">{{ histogramError }}</div>
+        <div v-else-if="histogramError" class="histogram-error">
+          <span>Chart unavailable</span>
+          <button type="button" class="metrics-retry" @click="refresh">Retry</button>
+        </div>
         <SparkHistogram
           v-else
           :bins="durationBins"
           label="Duration Distribution"
           color="#7C3AED"
-          :width="280"
-          :height="100"
           :format-fn="formatDuration"
         />
       </div>
@@ -129,14 +139,15 @@ const formatCost = (v) => {
       <!-- Cost histogram -->
       <div class="metrics-panel chart-panel">
         <div v-if="histogramLoading" class="histogram-loading">Loading distribution...</div>
-        <div v-else-if="histogramError" class="histogram-error">{{ histogramError }}</div>
+        <div v-else-if="histogramError" class="histogram-error">
+          <span>Chart unavailable</span>
+          <button type="button" class="metrics-retry" @click="refresh">Retry</button>
+        </div>
         <SparkHistogram
           v-else
           :bins="costBins"
           label="Cost Distribution"
           color="#2563EB"
-          :width="280"
-          :height="100"
           :format-fn="formatCost"
         />
       </div>
@@ -204,6 +215,10 @@ const formatCost = (v) => {
   .vertical & {
     flex-direction: column;
   }
+
+  .stats-top & {
+    flex-wrap: wrap;
+  }
 }
 
 .metrics-panel {
@@ -235,19 +250,47 @@ const formatCost = (v) => {
     flex-direction: row;
     justify-content: space-evenly;
   }
+
+  // A row across the top, each tile with its share of the width.
+  .stats-top & {
+    flex: 1 0 100%;
+    flex-direction: row;
+    justify-content: space-evenly;
+    align-items: center;
+    padding: 8px 12px;
+    border-right: none;
+    border-bottom: 1px solid theme.$gray_3;
+
+    .summary-stat,
+    :deep(.summary-stat) {
+      flex: 1;
+      padding: 4px 0;
+    }
+
+    .summary-divider,
+    :deep(.summary-divider) {
+      height: 28px;
+      width: 1px;
+      margin: 0;
+    }
+  }
 }
 
 .chart-panel {
   flex: 1;
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+  // The chart draws itself at the panel's size (SparkHistogram).
+  min-height: 150px;
 
-  :deep(.spark-histogram) {
-    width: 100%;
+  .vertical & {
+    min-height: 140px;
   }
 
-  :deep(svg) {
-    width: 100%;
-    height: auto;
+  .stats-top & {
+    height: 130px;
+    min-height: 0;
   }
 }
 
@@ -296,7 +339,8 @@ const formatCost = (v) => {
   color: theme.$gray_4;
 }
 
+// Quiet: the summary still shows, and the cause is in the console.
 .histogram-error {
-  color: theme.$status_red;
+  gap: 8px;
 }
 </style>

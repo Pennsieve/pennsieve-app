@@ -215,15 +215,13 @@ async function saveSharedSecrets() {
           </p>
         </div>
         <div class="secrets-actions" v-if="!isEditingUser">
-          <button @click="startEditingUser" class="edit-button">
-            {{ userSecretKeys.length > 0 ? 'Edit' : 'Add Secrets' }}
+          <button type="button" class="cn-action" @click="startEditingUser">
+            {{ userSecretKeys.length > 0 ? 'Edit' : '+ Add secrets' }}
           </button>
         </div>
         <div class="secrets-actions" v-else>
-          <button @click="saveUserSecrets" :disabled="isSavingUser" class="save-button">
-            {{ isSavingUser ? 'Saving...' : 'Save' }}
-          </button>
-          <button @click="cancelEditingUser" class="cancel-button">Cancel</button>
+          <button type="button" class="cn-action" @click="cancelEditingUser">Cancel</button>
+          <button type="button" class="cn-action cn-action--primary" :disabled="isSavingUser" @click="saveUserSecrets">Save</button>
         </div>
       </div>
 
@@ -279,15 +277,13 @@ async function saveSharedSecrets() {
           </p>
         </div>
         <div class="secrets-actions" v-if="isOwner && !isEditingShared">
-          <button @click="startEditingShared" class="edit-button">
-            {{ sharedSecretKeys.length > 0 ? 'Edit' : 'Add Secrets' }}
+          <button type="button" class="cn-action" @click="startEditingShared">
+            {{ sharedSecretKeys.length > 0 ? 'Edit' : '+ Add secrets' }}
           </button>
         </div>
         <div class="secrets-actions" v-else-if="isOwner && isEditingShared">
-          <button @click="saveSharedSecrets" :disabled="isSavingShared" class="save-button">
-            {{ isSavingShared ? 'Saving...' : 'Save' }}
-          </button>
-          <button @click="cancelEditingShared" class="cancel-button">Cancel</button>
+          <button type="button" class="cn-action" @click="cancelEditingShared">Cancel</button>
+          <button type="button" class="cn-action cn-action--primary" :disabled="isSavingShared" @click="saveSharedSecrets">Save</button>
         </div>
       </div>
 
@@ -336,6 +332,7 @@ async function saveSharedSecrets() {
 
 <style scoped lang="scss">
 @use '../../../styles/_theme.scss';
+@use './computeNodePage';
 
 .secrets-container {
   display: flex;
@@ -377,37 +374,6 @@ async function saveSharedSecrets() {
   gap: 8px;
   flex-shrink: 0;
   margin-left: 16px;
-
-  .edit-button,
-  .save-button,
-  .cancel-button {
-    background: theme.$purple_1;
-    color: white;
-    border: none;
-    border-radius: 4px;
-    padding: 6px 12px;
-    font-size: 12px;
-    font-weight: 500;
-    cursor: pointer;
-    transition: all 0.2s ease;
-
-    &:hover {
-      background: theme.$purple_2;
-    }
-
-    &:disabled {
-      background: theme.$gray_4;
-      cursor: not-allowed;
-    }
-  }
-
-  .cancel-button {
-    background: theme.$gray_4;
-
-    &:hover {
-      background: theme.$gray_5;
-    }
-  }
 }
 
 // View mode: key list

@@ -1,119 +1,116 @@
 <template>
-  <div class="node-card">
-    <div class="node-header">
-      <div class="node-info">
-        <h3>
-          <router-link
-            :to="{ name: 'compute-node-management', params: { nodeId: node.uuid } }"
-            class="node-name-link"
-          >
-            {{ node.name }}
-          </router-link>
-        </h3>
-        <div class="node-subtitle">
-          {{ getAccountTypeLabel(node.account?.accountType) }} Account
-        </div>
-        <div class="node-description" v-if="node.description">
-          {{ node.description }}
-        </div>
-        <div class="node-account">
-          <strong>Account ID:</strong> {{ formatAccountId(node.account?.accountId) }}
-        </div>
-        <div class="node-identifier">
-          <strong>Node UUID:</strong> {{ node.uuid }}
-        </div>
-        <div v-if="ownerName" class="node-owner">
-          <strong>Node Owner:</strong> {{ ownerName }}
-        </div>
-        <div class="node-tags">
-          <el-tooltip
-            :content="deploymentModeTooltip"
-            placement="top"
-            :show-after="300"
-            :popper-style="{ maxWidth: '320px' }"
-          >
-            <span class="tag" :class="node.deploymentMode || 'basic'">
-              {{ (node.deploymentMode || 'basic').charAt(0).toUpperCase() + (node.deploymentMode || 'basic').slice(1) }}
-            </span>
-          </el-tooltip>
-          <span v-if="node.defaultComputeType" class="tag compute-type">{{ node.defaultComputeType }}</span>
-          <span v-if="node.enableLLMAccess === true || node.enableLLMAccess === 'true'" class="tag llm">LLM</span>
-          <span v-if="node.maxGpuInstances > 0" class="tag gpu">GPU</span>
-          <el-tooltip
-            v-if="node.maxInteractiveSessions > 0"
-            content="Supports interactive Jupyter notebook sessions"
-            placement="top"
-            :show-after="300"
-          >
-            <span class="tag interactive">Interactive</span>
-          </el-tooltip>
-          <el-tooltip
-            v-if="hasProvisionerUpdate && !canManagePermissions"
-            :content="`This node is running version ${node.provisionerImageTag || 'latest'}. Version ${node.latestVersion} is available. The node owner can update it.`"
-            placement="top"
-            :show-after="300"
-            :popper-style="{ maxWidth: '320px' }"
-          >
-            <span class="tag update">Update available</span>
-          </el-tooltip>
-        </div>
-      </div>
-      <div class="node-header-actions">
-        <div class="node-status-badge" @click.stop v-if="canManagePermissions && getStatusForNode(node) !== 'Pending' && getStatusForNode(node) !== 'Destroying' && getStatusForNode(node) !== 'Failed'">
-          <el-select
-            :model-value="getStatusForNode(node)"
-            @change="(value) => updateStatus(value)"
-            :loading="isUpdatingPermissions"
-            size="small"
-            :class="['status-select', getStatusForNode(node).toLowerCase()]"
-            @click.stop
-          >
-            <el-option label="Enabled" value="Enabled" />
-            <el-option label="Paused" value="Paused" />
-          </el-select>
-        </div>
-        <div class="node-status-badge" @click.stop v-else>
-          <span
-            :class="['node-status-badge', getStatusForNode(node).toLowerCase()]"
-          >
-            {{ getStatusForNode(node) }}
-          </span>
-        </div>
-      </div>
+  <!--
+    A compute node, as the Library draws a workflow: a white card with its
+    name (and its status, only when it isn't Enabled), two lines of
+    description, its tier badge with what it runs in quiet grey, its budget
+    inline when it has one, and one muted line of where it runs, whose it is
+    and its provisioner, the actions on hover. The whole card opens the
+    node's page.
+  -->
+  <div
+    class="cn-card-tile"
+    :class="{ 'is-off': ['Paused', 'Failed', 'Destroying'].includes(statusLabel) }"
+    :style="{ '--tier': tier.color }"
+    role="link"
+    tabindex="0"
+    @click="openNode"
+    @keydown.enter="openNode"
+  >
+    <div class="tile-title">
+      <router-link :to="detailRoute" class="tile-name" @click.stop>{{ node.name }}</router-link>
+      <el-tooltip v-if="node.platform" content="Pennsieve's compute node, open to every user." placement="top">
+        <span class="official-mark" @click.stop>
+          <IconPennsieveMark :width="14" :height="14" color="currentColor" />
+        </span>
+      </el-tooltip>
+      <span v-if="statusLabel !== 'Enabled'" class="tile-badge" :class="`status-${statusLabel.toLowerCase()}`">
+        {{ statusLabel }}{{ statusLabel === 'Updating' && node.pendingProvisionerImageTag ? ` to ${node.pendingProvisionerImageTag}` : '' }}
+      </span>
     </div>
 
-    <div class="node-card-actions">
-      <el-tooltip
-        v-if="hasProvisionerUpdate && canManagePermissions"
-        :content="`This node is running version ${node.provisionerImageTag || 'latest'}. Version ${node.latestVersion} is available. Updating re-provisions the node with the latest infrastructure changes in your cloud account and typically takes 6-8 minutes.`"
-        placement="top"
-        :show-after="300"
-        :popper-style="{ maxWidth: '320px' }"
-      >
-        <button
-          class="card-action-button update"
-          :disabled="isUpdatingPermissions"
-          @click.stop="updateNode"
+    <p class="tile-description">{{ node.description || 'No description.' }}</p>
+
+    <!-- Its tier, then what it runs: neutral, so the badge is the colour -->
+    <div class="tile-caps">
+      <NodeTierBadge :node="node" />
+      <template v-for="(chip, i) in chips" :key="chip.key">
+        <span v-if="i > 0" class="sep">·</span>
+        <el-tooltip :content="chip.detail" placement="top" :show-after="300">
+          <span class="tile-cap" :class="{ 'tile-cap--warn': chip.kind === 'update' }">
+            <el-icon v-if="CAP_ICONS[chip.kind]" class="tile-cap-icon"><component :is="CAP_ICONS[chip.kind]" /></el-icon>
+            {{ chip.label }}
+          </span>
+        </el-tooltip>
+      </template>
+    </div>
+
+    <!-- What the caller has left to spend on this node, once known. Only
+         nodes with spend caps show it (the meter hides itself otherwise). -->
+    <PipelineBudgetMeter
+      v-if="meterBudget"
+      class="tile-budget"
+      inline
+      :budget="meterBudget"
+      :spend-axes="meterSpendAxes"
+      :concurrency-axes="meterConcurrencyAxes"
+      :level="meterLevel"
+      :per-run-usd="meterPerRunUsd"
+      :loading="meterLoading"
+      :error="meterError"
+      @click.stop
+    />
+
+    <div class="tile-foot">
+      <!-- Where it runs, whose it is, its provisioner: one muted line -->
+      <span class="tile-version" :title="footLine">{{ footLine }}</span>
+      <span class="tile-actions" @click.stop>
+        <el-tooltip
+          v-if="hasProvisionerUpdate && canUpdateNode"
+          :content="`Version ${node.latestVersion} is available. Updating re-provisions the node in your cloud account and typically takes 6-8 minutes.`"
+          placement="top"
+          :show-after="300"
+          :popper-style="{ maxWidth: '320px' }"
         >
-          {{ isUpdatingPermissions ? 'Updating...' : 'Update node' }}
+          <button type="button" class="tile-action tile-action--warn" :disabled="isUpdatingPermissions" @click="updateNode">
+            {{ isUpdatingPermissions ? 'Updating…' : `Update to ${node.latestVersion}` }}
+          </button>
+        </el-tooltip>
+        <button
+          v-if="canManagePermissions && statusLabel === 'Enabled'"
+          type="button"
+          class="tile-action"
+          :disabled="isUpdatingPermissions"
+          @click="updateStatus('Paused')"
+        >
+          Pause
         </button>
-      </el-tooltip>
-      <router-link
-        :to="{ name: 'compute-node-management', params: { nodeId: node.uuid } }"
-        class="card-action-link"
-      >
-        <span>View details</span>
-        <span class="arrow">&rarr;</span>
-      </router-link>
+        <button
+          v-else-if="canManagePermissions && statusLabel === 'Paused'"
+          type="button"
+          class="tile-action"
+          :disabled="isUpdatingPermissions"
+          @click="updateStatus('Enabled')"
+        >
+          Resume
+        </button>
+        <button type="button" class="tile-action tile-action--open" @click="openNode">Open</button>
+      </span>
     </div>
   </div>
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, onMounted } from 'vue'
 import { useStore } from 'vuex'
+import { useRoute, useRouter } from 'vue-router'
+import IconPennsieveMark from '../../icons/IconPennsieveMark.vue'
+import { deploymentMode, nodeCapabilities } from './computeNodeHelpers'
+import NodeTierBadge from './NodeTierBadge.vue'
+import { Cpu, MagicStick, Notebook } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { useComputeResourcesStore } from '@/stores/computeResourcesStore'
+import { usePipelineBudgetStore } from '@/stores/pipelineBudgetStore'
+import PipelineBudgetMeter from './PipelineBudgetMeter.vue'
 
 const props = defineProps({
   node: {
@@ -136,11 +133,70 @@ const profile = computed(() => store.state.profile)
 
 const isUpdatingPermissions = computed(() => computeResourcesStore.isNodeUpdating(props.node.uuid))
 
+// The caller's remaining pipeline budget on this node, from the same read the
+// run-creation gate uses (pipelineBudgetStore). Fetched per card; the store
+// dedupes and keeps stale numbers on a failed refresh.
+const budgetStore = usePipelineBudgetStore()
+const meterBudget = computed(() => budgetStore.getBudget(props.node.uuid))
+const meterSpendAxes = computed(() => budgetStore.spendAxes(props.node.uuid))
+const meterConcurrencyAxes = computed(() => budgetStore.concurrencyAxes(props.node.uuid))
+const meterLevel = computed(() => budgetStore.warningLevel(props.node.uuid))
+const meterPerRunUsd = computed(() => budgetStore.perRunUsd(props.node.uuid))
+const meterLoading = computed(() => budgetStore.isLoading(props.node.uuid))
+const meterError = computed(() => budgetStore.getError(props.node.uuid))
+onMounted(() => budgetStore.fetch(props.node.uuid))
+
+// Link to the node's page in the current context: the workspace's route under
+// /:orgId, or My Workspace's when there is no workspace.
+const route = useRoute()
+const router = useRouter()
+const detailRoute = computed(() => ({
+  name: route.params.orgId ? 'compute-node-management' : 'my-compute-node-management',
+  params: { nodeId: props.node.uuid }
+}))
+const openNode = () => router.push(detailRoute.value)
+
+const statusLabel = computed(() => getStatusForNode(props.node))
+// What it runs, each with a small icon (Element Plus's).
+const CAP_ICONS = { notebooks: Notebook, gpu: Cpu, ai: MagicStick }
+// The foot line: "AWS · Owned by … · Provisioner v1.36.3".
+const footLine = computed(() =>
+  [
+    shortAccountType(props.node.account?.accountType),
+    ownerName.value && `Owned by ${ownerName.value}`,
+    props.node.provisionerImageTag && `Provisioner ${props.node.provisionerImageTag}`,
+  ]
+    .filter(Boolean)
+    .join(' · ')
+)
+// Its tier, for the card's accent stripe (the badge shows the name).
+const tier = computed(() => deploymentMode(props.node))
+// What the node runs, as the Library's app chips: notebooks, GPUs, AI
+// models when on, and an update when one is waiting for someone else.
+const chips = computed(() => {
+  const on = nodeCapabilities(props.node).filter((c) => c.on)
+    .map((c) => ({ key: c.key, label: c.label, detail: c.detail, kind: c.key }))
+  if (hasProvisionerUpdate.value && !canUpdateNode.value) {
+    on.push({
+      key: 'update', kind: 'update', label: 'Update available',
+      detail: `Version ${props.node.latestVersion} is available; the node owner or a workspace admin can update it.`,
+    })
+  }
+  return on
+})
+
 const isNodeOwner = computed(() => {
   return props.node.ownerId === profile.value?.id
 })
 
 const canManagePermissions = computed(() => isNodeOwner.value)
+
+// Mirrors the API: node owner, account owner, or a workspace admin when the account is Admin Managed
+const canUpdateNode = computed(() =>
+  isNodeOwner.value ||
+  (!!profile.value?.id && props.node.account?.ownerId === profile.value.id) ||
+  (props.hasAdminRights && computeResourcesStore.isNodeAdminManaged(props.node))
+)
 const hasProvisionerUpdate = computed(() => props.node.updateAvailable === true && !!props.node.latestVersion)
 
 const ownerName = computed(() => {
@@ -151,34 +207,13 @@ const ownerName = computed(() => {
   return null
 })
 
-const deploymentModeTooltip = computed(() => {
-  const mode = (props.node.deploymentMode || 'basic').toLowerCase()
-  switch (mode) {
-    case 'basic':
-      return 'Basic — Lowest cost option for development and testing. Processors run with direct internet access. Uses standard AWS encryption.'
-    case 'secure':
-      return 'Secure — Production-ready with network isolation. Processors run in private subnets with full internet access via NAT. Includes KMS encryption and network audit logs.'
-    case 'compliant':
-      return 'Compliant — For regulated environments (HIPAA, NIST). No internet access — all traffic stays within the AWS network. Includes KMS encryption and network audit logs.'
-    default:
-      return ''
-  }
-})
 
-function formatAccountId(accountId) {
-  if (!accountId) return ''
-  if (accountId.length === 12) {
-    return `${accountId.slice(0, 4)}-${accountId.slice(4, 8)}-${accountId.slice(8)}`
-  }
-  return accountId
-}
-
-function getAccountTypeLabel(type) {
+function shortAccountType(type) {
   switch (type) {
-    case 'AWS': return 'Amazon Web Services'
-    case 'GCP': return 'Google Cloud Platform'
-    case 'AZURE': return 'Microsoft Azure'
-    default: return type || 'Unknown'
+    case 'AWS': return 'AWS'
+    case 'GCP': return 'Google Cloud'
+    case 'AZURE': return 'Azure'
+    default: return type || ''
   }
 }
 
@@ -191,6 +226,7 @@ function getStatusForNode(node) {
     case 'paused': case 'stopped': case 'disabled': return 'Paused'
     case 'destroying': return 'Destroying'
     case 'failed': return 'Failed'
+    case 'updating': return 'Updating'
     default: return 'Pending'
   }
 }
@@ -225,308 +261,215 @@ async function updateNode() {
 <style scoped lang="scss">
 @use '../../../styles/_theme.scss';
 
-.node-card {
-  background: white;
-  border: 1px solid theme.$gray_2;
-  padding: 20px;
-  transition: all 0.2s ease;
-
-  &:hover {
-    border-color: theme.$gray_3;
-  }
-}
-
-.node-header {
+/* As the Library's cards: white, square, a quiet border that turns purple
+   on hover, the actions only then. */
+.cn-card-tile {
+  position: relative;
   display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-}
-
-.node-info {
-  flex: 1;
-
-  h3 {
-    font-size: 16px;
-    font-weight: 500;
-    color: theme.$gray_6;
-    margin: 0 0 8px 0;
-  }
-
-  .node-name-link {
-    color: theme.$gray_6;
-    text-decoration: none;
-    transition: color 0.2s ease;
-
-    &:hover {
-      color: theme.$purple_2;
-      text-decoration: underline;
-    }
-  }
-}
-
-.node-subtitle {
-  font-size: 13px;
-  color: theme.$gray_5;
-  margin-bottom: 6px;
-  font-weight: 400;
-}
-
-.node-description {
-  font-size: 14px;
-  color: theme.$gray_5;
-  margin: 8px 0;
-  line-height: 1.4;
-}
-
-.node-tags {
-  display: flex;
+  flex-direction: column;
   gap: 6px;
-  margin-top: 8px;
+  min-width: 0;
+  min-height: 150px;
+  padding: 14px 16px 12px;
+  border: 1px solid theme.$gray_2;
+  background: theme.$white;
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 
-  .tag {
-    display: inline-block;
-    padding: 2px 8px;
-    border-radius: 3px;
-    font-size: 11px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-
-    &.basic {
-      background: rgba(#6B7280, 0.1);
-      color: #6B7280;
-    }
-
-    &.secure {
-      background: rgba(#3B82F6, 0.1);
-      color: #2563EB;
-    }
-
-    &.compliant {
-      background: rgba(#8B5CF6, 0.1);
-      color: #7C3AED;
-    }
-
-    &.llm {
-      background: rgba(#10B981, 0.1);
-      color: #059669;
-    }
-
-    &.gpu {
-      background: rgba(#F59E0B, 0.1);
-      color: #D97706;
-    }
-
-    &.interactive {
-      background: rgba(#011F5B, 0.1);
-      color: #011F5B; /* brand navy */
-    }
-
-    &.update {
-      background: rgba(#F59E0B, 0.12);
-      color: #B45309;
-    }
+  &:hover,
+  &:focus-visible {
+    border-color: theme.$purple_1;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+    outline: none;
+  }
+  &:hover .tile-actions,
+  &:focus-within .tile-actions {
+    opacity: 1;
+  }
+  &.is-off {
+    opacity: 0.75;
+  }
+  /* A light tint of its tier's colour, a 2px stripe down the left (the
+     badge is the tier's marker): over the padding, so nothing moves. */
+  &::before {
+    content: '';
+    position: absolute;
+    top: -1px;
+    bottom: -1px;
+    left: -1px;
+    width: 2px;
+    background: var(--tier);
+    opacity: 0.45;
+    pointer-events: none;
   }
 }
 
-.node-account,
-.node-identifier,
-.node-owner {
-  font-size: 13px;
-  color: theme.$gray_5;
-  margin-bottom: 4px;
-
-  strong {
-    color: theme.$gray_6;
-    font-weight: 500;
-  }
-}
-
-.node-header-actions {
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
-}
-
-.node-status-badge {
-  display: inline-block;
-  text-align: center;
-  padding: 4px 12px;
-  font-size: 12px;
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-
-  &.pending {
-    background: rgba(#6B7280, 0.1);
-    color: #6B7280;
-    border: 1px solid rgba(#6B7280, 0.2);
-  }
-
-  &.enabled {
-    background: rgba(#10B981, 0.1);
-    color: #059669;
-    border: 1px solid rgba(#10B981, 0.2);
-  }
-
-  &.paused {
-    background: rgba(#F59E0B, 0.1);
-    color: #D97706;
-    border: 1px solid rgba(#F59E0B, 0.2);
-  }
-
-  &.destroying {
-    background: rgba(#F59E0B, 0.1);
-    color: #D97706;
-    border: 1px solid rgba(#F59E0B, 0.2);
-  }
-
-  &.failed {
-    background: rgba(#EF4444, 0.1);
-    color: #DC2626;
-    border: 1px solid rgba(#EF4444, 0.2);
-  }
-}
-
-.status-select {
-  min-width: 120px;
-
-  :deep(.el-select__wrapper) {
-    min-width: 120px;
-    border: 1px solid transparent;
-    font-size: 12px;
-    font-weight: 500;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    height: 28px;
-    padding: 4px 12px;
-    transition: all 0.2s ease;
-    box-shadow: none;
-
-    &:hover {
-      border-color: theme.$gray_3;
-      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-    }
-
-    &.is-focused {
-      border-color: theme.$purple_2;
-      box-shadow: 0 0 0 2px rgba(theme.$purple_2, 0.1);
-    }
-  }
-
-  :deep(.el-input__inner) {
-    color: theme.$gray_6;
-    text-align: left;
-    font-size: 12px;
-    font-weight: 500;
-  }
-
-  :deep(.el-select__caret) {
-    color: theme.$gray_4;
-  }
-
-  &.enabled {
-    :deep(.el-select__wrapper) {
-      background: rgba(#10B981, 0.08);
-      border-color: rgba(#10B981, 0.2);
-
-      &:hover {
-        background: rgba(#10B981, 0.12);
-        border-color: rgba(#10B981, 0.3);
-      }
-    }
-
-    :deep(.el-input__inner) {
-      color: #059669;
-    }
-
-    :deep(.el-select__caret) {
-      color: #059669;
-    }
-  }
-
-  &.paused {
-    :deep(.el-select__wrapper) {
-      background: rgba(#F59E0B, 0.08);
-      border-color: rgba(#F59E0B, 0.2);
-
-      &:hover {
-        background: rgba(#F59E0B, 0.12);
-        border-color: rgba(#F59E0B, 0.3);
-      }
-    }
-
-    :deep(.el-input__inner) {
-      color: #D97706;
-    }
-
-    :deep(.el-select__caret) {
-      color: #D97706;
-    }
-  }
-}
-
-.node-card-actions {
+.tile-title {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
-  gap: 18px;
-  margin-top: 14px;
-  padding-top: 14px;
-  border-top: 1px solid theme.$gray_2;
-  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 0;
+}
+.tile-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 15px;
+  font-weight: 600;
+  color: theme.$gray_6;
+  text-decoration: none;
+  &:hover {
+    color: theme.$purple_3;
+  }
+}
+/* Pennsieve's mark sits where the badges do, as on an official workflow. */
+.official-mark {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  margin-left: auto;
+  color: theme.$purple_3;
+}
+.official-mark + .tile-badge {
+  margin-left: 0;
+}
+/* The node's status, top right, as the Library's badges. */
+.tile-badge {
+  flex-shrink: 0;
+  margin-left: auto;
+  padding: 0 6px;
+  border-radius: 3px;
+  background: theme.$gray_0;
+  color: theme.$gray_5;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+
+  /* Only states that need a look show (Enabled doesn't). */
+  &.status-paused,
+  &.status-disabled,
+  &.status-updating,
+  &.status-pending,
+  &.status-destroying {
+    background: theme.$orange_tint;
+    color: theme.$orange_2;
+  }
+  &.status-failed {
+    background: theme.$red_tint;
+    color: theme.$red_2;
+  }
 }
 
-.card-action-button {
+.tile-description {
+  display: -webkit-box;
+  flex-shrink: 0;
+  margin: 0;
+  overflow: hidden;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  font-size: 13px;
+  line-height: 1.4;
+  color: theme.$gray_5;
+  word-break: break-word;
+}
+
+/* The tier badge, then what the node runs in quiet grey, with icons. */
+.tile-caps {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  font-size: 12px;
+  color: theme.$gray_5;
+
+  .sep {
+    color: theme.$gray_3;
+  }
+}
+.tile-caps > .tier-badge {
+  margin-right: 4px;
+}
+.tile-cap {
   display: inline-flex;
   align-items: center;
-  padding: 4px 12px;
+  gap: 4px;
+}
+.tile-cap-icon {
+  font-size: 12px;
+  color: theme.$gray_4;
+}
+/* An update waiting for someone else: the one cap that asks for a look. */
+.tile-cap--warn {
+  color: theme.$orange_2;
+}
+
+.tile-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+  margin-top: auto;
+  padding-top: 6px;
+}
+.tile-version {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  color: theme.$gray_4;
+}
+.tile-actions {
+  display: flex;
+  flex-shrink: 0;
+  gap: 6px;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+.tile-action {
+  white-space: nowrap;
+  padding: 3px 10px;
+  border: 1px solid theme.$gray_3;
   border-radius: 4px;
+  background: theme.$white;
   font: inherit;
-  font-size: 13px;
-  font-weight: 600;
+  font-size: 12px;
+  color: theme.$gray_6;
   cursor: pointer;
 
-  &.update {
-    background: rgba(#F59E0B, 0.12);
-    border: 1px solid rgba(#F59E0B, 0.4);
-    color: #B45309;
-
-    &:hover:not(:disabled) {
-      background: rgba(#F59E0B, 0.2);
-    }
+  &:hover:not(:disabled) {
+    border-color: theme.$purple_1;
+    color: theme.$purple_3;
   }
-
   &:disabled {
     opacity: 0.6;
     cursor: default;
   }
+  &--open {
+    border-color: theme.$purple_3;
+    background: theme.$purple_3;
+    color: theme.$white;
+    &:hover:not(:disabled) {
+      background: theme.$purple_2;
+      color: theme.$white;
+    }
+  }
+  &--warn {
+    border-color: theme.$orange_1;
+    color: theme.$orange_2;
+    &:hover:not(:disabled) {
+      background: theme.$orange_tint;
+      border-color: theme.$orange_1;
+      color: theme.$orange_2;
+    }
+  }
 }
-
-.card-action-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  background: none;
-  border: none;
-  padding: 0;
-  font: inherit;
-  font-size: 13px;
-  font-weight: 500;
-  color: theme.$purple_3;
-  text-decoration: none;
-  cursor: pointer;
-
-  &:hover {
-    text-decoration: underline;
-  }
-
-  .arrow {
-    transition: transform 0.15s ease;
-  }
-
-  &:hover .arrow {
-    transform: translateX(2px);
+@media (hover: none) {
+  .tile-actions {
+    opacity: 1;
   }
 }
 </style>

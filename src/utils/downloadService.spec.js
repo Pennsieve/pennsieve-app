@@ -16,8 +16,14 @@ import {
   getPublicArchive,
   getPublicArchiveUrl,
   deletePublicArchive,
+  listRunArchives,
+  getRunArchive,
+  getRunArchiveUrl,
+  deleteRunArchive,
   agentDownloadCommand,
   agentFolderName,
+  agentSelectionCommand,
+  createSelection,
 } from './downloadService'
 import dev from '../site-config/dev.json'
 import prod from '../site-config/prod.json'
@@ -108,6 +114,12 @@ describe('getFileUrl', () => {
     await getFileUrl({ datasetId: 'N:dataset:1', packageId: 'N:package:1', fileId: 7, purpose: 'view' }, { config, getToken, fetchFn })
     expect(JSON.parse(fetchFn.mock.calls[0][1].body)).toEqual({ packageId: 'N:package:1', purpose: 'view' })
   })
+
+  it('asks for a short link only when told to', async () => {
+    const fetchFn = respond(200, {})
+    await getFileUrl({ datasetId: 'N:dataset:1', packageId: 'N:package:1', purpose: 'view', short: true }, { config, getToken, fetchFn })
+    expect(JSON.parse(fetchFn.mock.calls[0][1].body)).toEqual({ packageId: 'N:package:1', purpose: 'view', short: true })
+  })
 })
 
 describe('archives', () => {
@@ -135,6 +147,21 @@ describe('archives', () => {
       'GET https://api2.pennsieve.net/downloads/archives/d1/url?dataset_id=N%3Adataset%3A1',
       'DELETE https://api2.pennsieve.net/downloads/archives/d1?dataset_id=N%3Adataset%3A1',
     ])
+  })
+
+  it("reaches a run's results archives by id alone, with the user's token", async () => {
+    const fetchFn = respond(200, { downloads: [{ id: 'ra_1', scope: 'run' }], url: 'https://s3/zip' })
+    expect(await listRunArchives({ config, getToken, fetchFn })).toEqual([{ id: 'ra_1', scope: 'run' }])
+    await getRunArchive({ id: 'ra_1' }, { config, getToken, fetchFn })
+    await getRunArchiveUrl({ id: 'ra_1' }, { config, getToken, fetchFn })
+    await deleteRunArchive({ id: 'ra_1' }, { config, getToken, fetchFn })
+    expect(fetchFn.mock.calls.map(([url, init]) => `${init.method} ${url}`)).toEqual([
+      'GET https://api2.pennsieve.net/downloads/runs/archives',
+      'GET https://api2.pennsieve.net/downloads/runs/archives/ra_1',
+      'GET https://api2.pennsieve.net/downloads/runs/archives/ra_1/url',
+      'DELETE https://api2.pennsieve.net/downloads/runs/archives/ra_1',
+    ])
+    expect(fetchFn.mock.calls[0][1].headers.Authorization).toBe('Bearer tok')
   })
 
   it('treats an empty response (204) as done', async () => {
@@ -216,5 +243,24 @@ describe('published datasets', () => {
     const fetchFn = respond(413, { message: 'this selection is too large to download as one archive' })
     await expect(createPublicArchive({ datasetId: 1, paths: [''] }, { config: prod, getToken, fetchFn }))
       .rejects.toMatchObject({ status: 413, message: 'this selection is too large to download as one archive' })
+  })
+})
+
+describe('createSelection', () => {
+  it('saves the selected folders and packages of the dataset', async () => {
+    const fetchFn = respond(201, { id: 'sel_l2uw6ebgbzymzzusdedg64i5wm', count: 2, size: 30 })
+    const sel = await createSelection({ datasetId: 'N:dataset:1', nodeIds: ['N:collection:1', 'N:package:2'] }, { config, getToken, fetchFn })
+    expect(sel.id).toBe('sel_l2uw6ebgbzymzzusdedg64i5wm')
+    const [url, init] = fetchFn.mock.calls[0]
+    expect(url).toBe('https://api2.pennsieve.net/downloads/selections?dataset_id=N%3Adataset%3A1')
+    expect(init.method).toBe('POST')
+    expect(JSON.parse(init.body)).toEqual({ nodeIds: ['N:collection:1', 'N:package:2'] })
+  })
+})
+
+describe('agentSelectionCommand', () => {
+  it('downloads a saved selection into a new folder', () => {
+    expect(agentSelectionCommand({ selectionId: 'sel_l2uw6ebgbzymzzusdedg64i5wm', folderName: 'Mouse EEG (day 1)' }))
+      .toBe('pennsieve download selection sel_l2uw6ebgbzymzzusdedg64i5wm ./Mouse-EEG-day-1')
   })
 })

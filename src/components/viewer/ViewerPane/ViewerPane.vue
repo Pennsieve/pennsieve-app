@@ -87,6 +87,8 @@ import {
   cleanupViewerStore,
 } from "@/composables/useViewerInstance";
 import { useViewerAssets } from "@/composables/useViewerAssets";
+import { usePackageViewerData } from "@/composables/usePackageViewerData";
+import { isPackageReady } from "@/utils/package-state";
 
 import "@pennsieve-viz/micro-ct/style.css";
 import "@pennsieve-viz/core/style.css";
@@ -143,7 +145,8 @@ export default {
 
   setup() {
     const { fetchViewerAssets: fetchPackageViewerAssets } = useViewerAssets();
-    return { fetchPackageViewerAssets };
+    const { probeViewerData } = usePackageViewerData();
+    return { fetchPackageViewerAssets, probeViewerData };
   },
 
   props: {
@@ -164,6 +167,8 @@ export default {
   data: function () {
     return {
       cmpViewer: "",
+      // { id, state } of the package the viewer was last loaded for
+      loadedPackage: null,
       availableViewers: [],
       viewerAssets: [],
       thumbnailAsset: null,
@@ -192,14 +197,31 @@ export default {
         // Activate on packageType as before, and additionally whenever loadViewer resolved a
         // timeseries viewer asset: a Zarr bundle's package need not carry packageType
         // Timeseries, and without this such a package mounts the viewer but never feeds it.
-        const isTimeseriesPackage =
-          pathOr("", ["content", "packageType"], pkg).toLowerCase() ===
-          "timeseries";
-        if (isTimeseriesPackage || this.timeseriesAsset) {
+        if (this.availableViewers.includes("TimeseriesViewer")) {
           await this.fetchTimeseriesData();
         }
       },
       immediate: true,
+    },
+
+    /**
+     * The scan verdict moves a package from UPLOADED to READY (or ERROR):
+     * reload so a file cleared while it is open becomes viewable.
+     */
+    "pkg.content.state": async function (state) {
+      // Only for the package already loaded; a new package loads above.
+      const loaded = this.loadedPackage;
+      if (
+        !loaded ||
+        loaded.id !== this.pkg?.content?.id ||
+        loaded.state === state
+      ) {
+        return;
+      }
+      await this.loadViewer(this.pkg);
+      if (this.availableViewers.includes("TimeseriesViewer")) {
+        await this.fetchTimeseriesData();
+      }
     },
   },
 
@@ -368,6 +390,10 @@ export default {
      * loads appropriate viewer based on package type
      */
     loadViewer: async function (activeViewer) {
+      this.loadedPackage = {
+        id: pathOr("", ["content", "id"], activeViewer),
+        state: pathOr("", ["content", "state"], activeViewer),
+      };
       // Reset viewers
       this.cmpViewer = "";
       this.omeTiffSource = "";
@@ -376,18 +402,26 @@ export default {
         viewerWrap.innerHTML = "";
       }
 
-      let viewers = this.checkViewerType(activeViewer) || ['UnknownViewer'];
+      this.viewerAssets = [];
+      this.thumbnailAsset = null;
+      this.timeseriesAsset = null;
 
-      // A ready Zarr bundle makes the package viewable regardless of the legacy
-      // package state; set below once the asset listing comes back.
-      let hasReadyZarrTimeseries = false;
+      // Only a package the malware scan has cleared (READY) can be viewed.
+      if (!isPackageReady(activeViewer)) {
+        this.availableViewers = ["UnknownViewer"];
+        this.omeTiffSlowWarning = false;
+        this.loadVueViewer("UnknownViewer");
+        return;
+      }
+
+      // Viewers are chosen by the data that exists: channels (checked by
+      // checkViewerType), a ready Zarr bundle and other viewer assets
+      // (below), slide tiles (below).
+      let viewers = this.checkViewerType(activeViewer) || ['UnknownViewer'];
 
       // Check for neuroglancer-compatible viewer assets (ome-zarr, etc.)
       const pkgId = pathOr("", ["content", "id"], activeViewer);
       const datasetId = pathOr("", ["content", "datasetNodeId"], activeViewer);
-      this.viewerAssets = [];
-      this.thumbnailAsset = null;
-      this.timeseriesAsset = null;
       if (pkgId && datasetId) {
         try {
           const result = await this.fetchPackageViewerAssets(
@@ -414,7 +448,6 @@ export default {
               : null;
 
             if (zarrAsset) {
-              hasReadyZarrTimeseries = true;
               if (!viewers.includes("TimeseriesViewer")) {
                 viewers = [
                   "TimeseriesViewer",
@@ -461,6 +494,22 @@ export default {
         }
       }
 
+      // A slide opens only when its deep-zoom tiles exist; otherwise it can
+      // only be downloaded.
+      if (viewers.includes("SlideViewer")) {
+        const hasTiles = await this.probeViewerData({
+          datasetId,
+          packageId: pkgId,
+          packageType: "Slide",
+        });
+        if (!hasTiles) {
+          viewers = viewers.filter((v) => v !== "SlideViewer");
+          if (viewers.length === 0) {
+            viewers = ["UnknownViewer"];
+          }
+        }
+      }
+
       // Warn when an OME-TIFF has interleaved channels (processed into
       // zarr for Neuroglancer) — the raw TIFF will be slow to render.
       const hasNgViewers = viewers.some((v) =>
@@ -470,37 +519,27 @@ export default {
 
       this.availableViewers = viewers;
 
-      // `state` is only a signal about the legacy processing pipeline: a package
-      // with a ready Zarr bundle is viewable whether or not it ever ran.
-      if (
-        this.isTimeseriesPackageUnprocessed(activeViewer) &&
-        !hasReadyZarrTimeseries &&
-        !this.isLayFile(activeViewer)
-      ) {
-        this.loadVueViewer("UnknownViewer");
-      } else {
-        const viewerToLoad = this.availableViewers[0];
+      const viewerToLoad = this.availableViewers[0];
 
-        // Fetch presigned URL for OmeViewer from the original source
-        // files — not /view which returns processed zarr chunks.
-        if (viewers.includes("OmeViewer")) {
-          try {
-            const sourceFiles = await this.fetchSourceFiles(pkgId);
+      // Fetch presigned URL for OmeViewer from the original source
+      // files — not /view which returns processed zarr chunks.
+      if (viewers.includes("OmeViewer")) {
+        try {
+          const sourceFiles = await this.fetchSourceFiles(pkgId);
 
-            if (sourceFiles && sourceFiles.length > 0) {
-              this.omeTiffSource = await this.fetchFileUrl({
-                datasetId,
-                packageId: pkgId,
-                file: sourceFiles[0],
-              });
-            }
-          } catch (err) {
-            console.error("Failed to fetch source file URL:", err);
+          if (sourceFiles && sourceFiles.length > 0) {
+            this.omeTiffSource = await this.fetchFileUrl({
+              datasetId,
+              packageId: pkgId,
+              file: sourceFiles[0],
+            });
           }
+        } catch (err) {
+          console.error("Failed to fetch source file URL:", err);
         }
-
-        this.loadVueViewer(viewerToLoad);
       }
+
+      this.loadVueViewer(viewerToLoad);
     },
 
     /**
@@ -511,16 +550,6 @@ export default {
       this.cmpViewer = component;
       // component name is an enumerable viewer type, not user content
       trackEvent("viewer_opened", { viewer: String(component || "").replace(/Viewer$/, "").toLowerCase() });
-    },
-
-    isTimeseriesPackageUnprocessed: function (pkg) {
-      const isTimeseriesFile =
-        pathOr("unknown", ["content", "packageType"], pkg).toLowerCase() ===
-        "timeseries";
-      const isUnprocessed =
-        pathOr("unknown", ["content", "state"], pkg).toLowerCase() ===
-        "uploaded";
-      return isTimeseriesFile && isUnprocessed;
     },
   },
 

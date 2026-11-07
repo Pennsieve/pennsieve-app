@@ -73,7 +73,7 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-@use "./src/styles/theme";
+@use "@/styles/theme";
 
 .checked {
   color: theme.$green_2;

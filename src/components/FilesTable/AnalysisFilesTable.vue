@@ -5,6 +5,7 @@
       :border="true"
       :data="data"
       :default-sort="{ prop: 'content.name', order: 'ascending' }"
+      :row-class-name="({ row }) => (whyNot(row) ? 'is-unfit' : '')"
       @selection-change="handleTableSelectionChange"
       @select="onSelect"
       @row-click="onRowClick"
@@ -14,6 +15,7 @@
         align="center"
         fixed
         width="50"
+        :selectable="(row) => !whyNot(row)"
       />
 
       <el-table-column
@@ -27,11 +29,13 @@
       >
         <template #header> Name </template>
         <template #default="scope">
-          <bf-file-label
-            :file="scope.row"
-            :search-all-data-menu="true"
-            @click-name="onFileLabelClick(scope.row)"
-          />
+          <span :title="whyNot(scope.row) || undefined">
+            <bf-file-label
+              :file="scope.row"
+              :search-all-data-menu="true"
+              @click-name="onFileLabelClick(scope.row)"
+            />
+          </span>
         </template>
       </el-table-column>
 
@@ -80,6 +84,12 @@ export default {
   mixins: [BfStorageMetrics, FormatDate],
 
   props: {
+    // Why a file can't be chosen ("signals takes CSV files"), or "" when it
+    // can: one that can't is dimmed and its box can't be ticked.
+    whyNot: {
+      type: Function,
+      default: () => "",
+    },
     data: {
       type: Array,
       default: () => [],
@@ -255,7 +265,7 @@ export default {
             const originalRow = this.data.find(
               (item) => item.content.id === sortedRow.content.id
             );
-            if (originalRow) {
+            if (originalRow && !this.whyNot(originalRow)) {
               rowsToSelect.push(originalRow);
             }
           }
@@ -279,6 +289,10 @@ export default {
     onRowClick: function (row, column, event) {
       // Ignore clicks on the checkbox column - onSelect handles those
       if (column?.type === 'selection') {
+        return;
+      }
+      // A file that can't be chosen isn't, by a click on its row either
+      if (this.whyNot(row)) {
         return;
       }
 
@@ -309,7 +323,7 @@ export default {
             const originalRow = this.data.find(
               (item) => item.content.id === sortedRow.content.id
             );
-            if (originalRow) {
+            if (originalRow && !this.whyNot(originalRow)) {
               rowsToSelect.push(originalRow);
             }
           }
@@ -348,6 +362,11 @@ export default {
 <style lang="scss" scoped>
 @use "../../styles/theme";
 @use "../../styles/element/table";
+
+// A file this input doesn't take: dimmed, its box not tickable.
+:deep(.el-table__row.is-unfit) td {
+  opacity: 0.45;
+}
 
 .analysis-files-table {
   position: relative;

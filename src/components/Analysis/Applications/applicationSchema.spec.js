@@ -18,10 +18,18 @@ import {
   manifestToYaml,
   serializeManifestYaml,
   parseManifest,
+  mediaTypeMatches,
   createPort,
   MANIFEST_SHAPES,
   detectManifestShape,
+  isEarlierLayout,
+  parseMediaType,
+  normalizeMediaType,
+  mediaTypeAccepts,
+  rootInputCollisions,
+  keptFormats,
 } from './applicationSchema'
+import { dump as dumpYaml, load as loadYaml } from 'js-yaml'
 
 describe('applicationSchema', () => {
   describe('parseParameters', () => {
@@ -89,12 +97,13 @@ describe('applicationSchema', () => {
       expect(explicitOn.required).toBe(true)
     })
 
-    it('reads the legacy `allowedValues` / `default` keys', () => {
+    it('reads only `validValues` / `defaultValue`, not the earlier `allowedValues` / `default` / `enum`', () => {
       const [p] = parseParameters({
-        paramSchema: [{ name: 'algo', allowedValues: ['a'], default: 'a' }],
+        paramSchema: [{ name: 'algo', type: 'enum', allowedValues: ['a'], default: 'a' }],
       })
-      expect(p.validValues).toEqual(['a'])
-      expect(p.defaultValue).toBe('a')
+      expect(p.validValues).toEqual([])
+      expect(p.defaultValue).toBeNull()
+      expect(p.type).toBe(PARAM_TYPES.STRING)
     })
   })
 
@@ -112,6 +121,7 @@ describe('applicationSchema', () => {
         tags: ['mri'],
         categories: ['Segmentation'],
       })
+      // Categories aren't part of the schema: tags say what an app is for.
       expect(schema.resources).toEqual({ cpu: 1024, memory: 2048 })
       // "ecs" is mapped to "standard", and a legacy gpu block becomes the
       // "gpu" compute type rather than a capability of its own.
@@ -120,7 +130,7 @@ describe('applicationSchema', () => {
       expect(schema.inputs[0]).toMatchObject({ name: 'in', dataType: 'file', required: true })
       expect(schema.outputs[0]).toMatchObject({ name: 'out', dataType: 'package' })
       expect(schema.tags).toEqual(['mri'])
-      expect(schema.categories).toEqual(['Segmentation'])
+      expect(schema).not.toHaveProperty('categories')
     })
 
     it('defaults gracefully for a bare application', () => {
@@ -170,7 +180,7 @@ describe('applicationSchema', () => {
       expect(payload.runtimeConfig).not.toHaveProperty('gpu')
     })
 
-    it('drops empty inputs/outputs/tags/categories', () => {
+    it('drops empty inputs/outputs/tags', () => {
       const payload = buildSchemaPayload(createApplicationSchema())
       expect(payload.inputs).toBeUndefined()
       expect(payload.tags).toBeUndefined()
@@ -470,13 +480,13 @@ describe('applicationSchema', () => {
   })
 
   describe('buildManifest', () => {
-    it('emits the version and metadata under `application`, with no $schema', () => {
+    it('emits the version and metadata under `application`, pointing at the published schema', () => {
       const m = buildManifest(createApplicationSchema(), {
         name: 'My App',
         description: 'Does things.',
         applicationType: 'processor',
       })
-      expect(m).not.toHaveProperty('$schema')
+      expect(m.$schema).toBe('https://schemas.pennsieve.io/app-manifest/v1.json')
       expect(m.schemaVersion).toBe('1.0')
       expect(m.application).toEqual({
         name: 'My App',
@@ -610,29 +620,47 @@ describe('applicationSchema', () => {
   })
 
   describe('parseManifest (round-trip)', () => {
-    it('parses YAML text back into meta + editable schema', () => {
+    it('reports an app.yml in the earlier flat layout and reads nothing from it', () => {
       const yaml = [
         'schemaVersion: "1.0"',
         'name: Spike Sorter',
         'description: Sorts spikes.',
-        'applicationType: preprocessor',
+        'applicationType: processor',
         'categories:',
         '  - Preprocessing',
-        'runtime:',
-        '  computeTypes:',
-        '    - standard',
-        '  gpu:',
-        '    enabled: true',
-        '    count: 2',
-        '    type: nvidia-t4',
         'resources:',
         '  cpu: 4096',
         '  memory: 16384',
         'parameters:',
         '  - name: threshold',
         '    type: number',
-        '    required: true',
         '    default: 5',
+      ].join('\n')
+
+      const { meta, schema } = parseManifest(yaml)
+      expect(meta).toMatchObject({ name: '', description: '', shape: MANIFEST_SHAPES.FLAT })
+      expect(isEarlierLayout(loadYaml(yaml))).toBe(true)
+      expect(schema).toEqual(createApplicationSchema())
+    })
+
+    it('reads a nested app.yml: metadata under application, cpu/memory and a legacy gpu block on runtime', () => {
+      const yaml = [
+        'application:',
+        '  name: Spike Sorter',
+        '  description: Sorts spikes.',
+        '  type: preprocessor',
+        'runtime:',
+        '  cpu: 4096',
+        '  memory: 16384',
+        '  computeTypes:',
+        '    - standard',
+        '  gpu:',
+        '    enabled: true',
+        'parameters:',
+        '  - name: threshold',
+        '    type: number',
+        '    required: true',
+        '    defaultValue: 5',
         '    min: 1',
         '    max: 20',
         'inputs:',
@@ -647,26 +675,13 @@ describe('applicationSchema', () => {
         description: 'Sorts spikes.',
         // `processor` is the only supported type, so any other value normalizes.
         applicationType: 'processor',
-        shape: MANIFEST_SHAPES.FLAT,
+        shape: MANIFEST_SHAPES.NESTED,
       })
       expect(schema.resources).toEqual({ cpu: 4096, memory: 16384 })
-      // The legacy gpu block folds into the compute types.
+      // The (deprecated, still allowed) gpu block folds into the compute types.
       expect(schema.runtime.computeTypes).toEqual(['standard', 'gpu'])
-      expect(schema.categories).toEqual(['Preprocessing'])
-      // Manifest `default` maps back onto the editable `defaultValue`.
-      expect(schema.parameters[0]).toMatchObject({
-        name: 'threshold',
-        type: 'number',
-        required: true,
-        defaultValue: 5,
-        min: 1,
-        max: 20,
-      })
-      expect(schema.inputs[0]).toMatchObject({
-        name: 'recording',
-        dataType: 'timeseries',
-        required: true,
-      })
+      expect(schema.parameters[0]).toMatchObject({ name: 'threshold', type: 'number', required: true, defaultValue: 5, min: 1, max: 20 })
+      expect(schema.inputs[0]).toMatchObject({ name: 'recording', dataType: 'timeseries', required: true })
     })
 
     it('round-trips serialize -> parse without loss of meaningful fields', () => {
@@ -684,7 +699,6 @@ describe('applicationSchema', () => {
         inputs: [createPort({ name: 'recording', dataType: 'timeseries', required: true })],
         outputs: [createPort({ name: 'units', dataType: 'package' })],
         tags: ['ephys'],
-        categories: ['Preprocessing'],
       })
       const meta = { name: 'Spike Sorter', description: 'Sorts spikes.', applicationType: 'processor' }
 
@@ -699,7 +713,7 @@ describe('applicationSchema', () => {
     })
 
     it('accepts an already-parsed object and falls back to defaults on partial input', () => {
-      const { meta, schema } = parseManifest({ name: 'Only A Name' })
+      const { meta, schema } = parseManifest({ application: { name: 'Only A Name' } })
       expect(meta).toMatchObject({
         name: 'Only A Name',
         description: '',
@@ -778,7 +792,7 @@ describe('applicationSchema', () => {
         timeoutSeconds: 300,
         shape: MANIFEST_SHAPES.NESTED,
       })
-      expect(meta.maintainers).toEqual([{ name: 'edmore', email: '' }])
+      expect(meta.maintainers).toEqual([{ name: 'edmore', email: '', orcid: '' }])
     })
 
     it('reads cpu/memory off `runtime` rather than `resources`', () => {
@@ -829,8 +843,8 @@ describe('applicationSchema', () => {
   */
   describe('canonical parameter form', () => {
     const CANONICAL = [
-      'schemaVersion: "1.0"',
-      'name: Demo',
+      'application:',
+      '  name: Demo',
       'parameters:',
       '  - name: threshold',
       '    type: number',
@@ -962,5 +976,265 @@ describe('applicationSchema', () => {
       expect(byName.channel).toMatchObject({ required: true, defaultValue: undefined })
       expect(byName.accession).toMatchObject({ required: false, defaultValue: undefined })
     })
+  })
+})
+
+describe('live sessions (runtime.interactive / sessionType)', () => {
+  it('writes them only for a live session, with a session type', () => {
+    const batch = buildManifest(createApplicationSchema(), { name: 'a' })
+    expect(batch.runtime).not.toHaveProperty('interactive')
+    expect(batch.runtime).not.toHaveProperty('sessionType')
+
+    const live = createApplicationSchema()
+    live.runtime.interactive = true
+    expect(buildManifest(live, { name: 'a' }).runtime).toMatchObject({ interactive: true, sessionType: 'jupyter', kernel: 'python' })
+    live.runtime.kernel = 'r'
+    expect(buildManifest(live, { name: 'a' }).runtime).toMatchObject({ interactive: true, sessionType: 'jupyter', kernel: 'r' })
+  })
+
+  it('reads them back as written; an earlier sessionType r is not turned into jupyter + r', () => {
+    const read = (runtime) => parseManifest(dumpYaml({ application: { name: 'a' }, runtime })).schema.runtime
+    expect(read({ interactive: true })).toMatchObject({ interactive: true, sessionType: 'jupyter', kernel: 'python' })
+    expect(read({ interactive: true, sessionType: 'jupyter', kernel: 'r' })).toMatchObject({ sessionType: 'jupyter', kernel: 'r' })
+    expect(read({ sessionType: 'r' })).toMatchObject({ interactive: true, sessionType: 'r', kernel: '' })
+    expect(read({ computeTypes: ['standard'] })).toMatchObject({ interactive: false, sessionType: '', kernel: '' })
+  })
+})
+
+describe('whole-number parameters', () => {
+  it('reads and writes type: integer', () => {
+    const { schema } = parseManifest({
+      application: { name: 'n' },
+      parameters: [{ name: 'SIZE', type: 'integer', defaultValue: '256', min: 1, max: 4096 }],
+    })
+    expect(schema.parameters[0].type).toBe('integer')
+    const out = buildManifest(schema, { name: 'n' })
+    expect(out.parameters[0]).toMatchObject({ name: 'SIZE', type: 'integer', min: 1, max: 4096 })
+  })
+  it('rejects a fractional value', () => {
+    expect(validateParameterValue({ name: 'SIZE', type: 'integer' }, '2.5').valid).toBe(false)
+    expect(validateParameterValue({ name: 'SIZE', type: 'integer' }, '3').valid).toBe(true)
+  })
+})
+
+describe('media type options', () => {
+  const formats = [
+    { value: 'application/x-hdf5', label: 'application/x-hdf5', name: 'HDF5', extensions: ['.h5'] },
+    { value: 'application/x-hdf5', label: 'application/x-hdf5', name: 'NeuroData Without Borders', extensions: ['.nwb'] },
+    { value: 'application/vnd.pennsieve.edf', label: 'application/vnd.pennsieve.edf', name: 'EDF Timeseries', extensions: ['.edf'] },
+  ]
+  it('names every format that shares a media type, and finds them by name or extension', () => {
+    const opts = portDataTypeOptions(formats)
+    const hdf5 = opts.find((o) => o.value === 'application/x-hdf5')
+    expect(hdf5.formats).toEqual(['HDF5', 'NeuroData Without Borders'])
+    expect(opts.filter((o) => o.value === 'application/x-hdf5')).toHaveLength(1)
+    expect(mediaTypeMatches(hdf5, 'nwb')).toBe(true)
+    expect(mediaTypeMatches(hdf5, '.h5')).toBe(true)
+    expect(mediaTypeMatches(opts.find((o) => o.value.endsWith('edf')), 'nwb')).toBe(false)
+  })
+})
+
+describe('EDAM from the media type', () => {
+  it("gives an option the formats' EDAM id only when all formats sharing it agree", () => {
+    const opts = portDataTypeOptions([
+      { value: 'text/csv', label: 'text/csv', name: 'CSV', edam: 'format_3752' },
+      { value: 'application/x-hdf5', label: 'application/x-hdf5', name: 'HDF5', edam: 'format_3590' },
+      { value: 'application/x-hdf5', label: 'application/x-hdf5', name: 'NeuroData Without Borders' },
+      { value: 'application/vnd.pennsieve.edf', label: 'application/vnd.pennsieve.edf', name: 'EDF Timeseries' },
+    ])
+    const by = (v) => opts.find((o) => o.value === v)
+    expect(by('text/csv').edam).toBe('format_3752')
+    expect(by('application/x-hdf5').edam).toBeUndefined()
+    expect(by('application/vnd.pennsieve.edf').edam).toBeUndefined()
+    expect(mediaTypeMatches(by('text/csv'), 'format_3752')).toBe(true)
+  })
+  it('keeps formats an app.yml declares through a round trip', () => {
+    const { schema } = parseManifest({
+      application: { name: 'n' },
+      inputs: [{ name: 'table', mediaTypes: ['text/csv'], formats: ['format_3752', 'format_3475'] }],
+    })
+    const out = buildManifest(schema, { name: 'n' })
+    expect(out.inputs[0].formats).toEqual(['format_3752', 'format_3475'])
+  })
+})
+
+
+describe('variants and build (kept, not edited)', () => {
+  const yaml = `
+application:
+  name: Seizure Onset (DynaSD)
+runtime:
+  cpu: 4096
+  memory: 8192
+build:
+  args:
+    DYNASD_COMMIT: 48b2b95
+parameters:
+  - name: MODEL
+    type: string
+    defaultValue: lindda
+    validValues: [lindda, oncet]
+variants:
+  - id: cpu
+    name: CPU
+    default: true
+    build:
+      args:
+        TORCH_FLAVOUR: cpu
+    runtime:
+      computeTypes: [standard]
+  - id: gpu
+    name: GPU (ONCET)
+    build:
+      args:
+        TORCH_FLAVOUR: cuda
+    runtime:
+      computeTypes: [gpu]
+      memory: 14336
+    parameters:
+      MODEL:
+        defaultValue: oncet
+`
+
+  it('reads them as they are and writes them back', () => {
+    const doc = loadYaml(yaml)
+    const { meta, schema } = parseManifest(yaml)
+    expect(meta.variants).toEqual(doc.variants)
+    expect(meta.build).toEqual(doc.build)
+    const out = buildManifest(schema, meta)
+    expect(out.variants).toEqual(doc.variants)
+    expect(out.build).toEqual(doc.build)
+    // Through YAML too, variants last.
+    const again = loadYaml(manifestToYaml(out))
+    expect(again.variants).toEqual(doc.variants)
+    expect(Object.keys(again).pop()).toBe('variants')
+    // A copy: editing the form's manifest doesn't change what was read.
+    out.variants[0].name = 'changed'
+    expect(meta.variants[0].name).toBe('CPU')
+  })
+
+  it('writes none when the app.yml has none', () => {
+    const { meta, schema } = parseManifest('application:\n  name: a\n')
+    expect(meta).not.toHaveProperty('variants')
+    expect(meta).not.toHaveProperty('build')
+    const out = buildManifest(schema, meta)
+    expect(out).not.toHaveProperty('variants')
+    expect(out).not.toHaveProperty('build')
+    expect(buildManifest(schema, { ...meta, variants: [], build: null })).not.toHaveProperty('variants')
+  })
+})
+
+describe('review, relations and reference inputs (kept, not edited)', () => {
+  const yaml = `
+application:
+  name: rnaseq-quant
+  relations:
+    10.1038/nmeth.4197: IsDerivedFrom
+runtime:
+  computeTypes: [standard]
+inputs:
+  - name: reads
+    placement: subfolder
+  - name: index
+    placement: subfolder
+    reference:
+      kind: genome
+      assetClass: salmon-index
+      toolVersion: ">=2 <3"
+      choice: user
+      organisms: [9606, 10090]
+review:
+  version: 1
+  generate:
+    command: python -m tests.make_fixture "$REVIEW_INPUT_DIR"
+`
+
+  it('reads them as they are and writes them back', () => {
+    const doc = loadYaml(yaml)
+    const { meta, schema } = parseManifest(yaml)
+    const again = loadYaml(manifestToYaml(buildManifest(schema, meta)))
+    expect(again.review).toEqual(doc.review)
+    expect(again.application.relations).toEqual(doc.application.relations)
+    expect(again.inputs[1].reference).toEqual(doc.inputs[1].reference)
+    expect(again.inputs[0]).not.toHaveProperty('reference')
+  })
+
+  it('writes none when the app.yml has none', () => {
+    const { meta, schema } = parseManifest('application:\n  name: a\n')
+    const out = buildManifest(schema, meta)
+    expect(out).not.toHaveProperty('review')
+    expect(out.application).not.toHaveProperty('relations')
+  })
+})
+
+describe("the optimize opt-out", () => {
+  it("is allowed unless the app.yml says optimize: false, and keeps a listed lambda", () => {
+    const listed = parseManifest("application:\n  name: A\nruntime:\n  computeTypes: [standard, lambda]\n").schema
+    expect(listed.runtime.computeTypes).toEqual(["standard", "lambda"])
+    expect(listed.runtime.optimize).toBe(true)
+    expect(buildManifest(listed, { name: "A" }).runtime).toEqual({ computeTypes: ["standard", "lambda"] })
+    const out = parseManifest("application:\n  name: A\nruntime:\n  computeTypes: [standard]\n  optimize: false\n").schema
+    expect(out.runtime.optimize).toBe(false)
+    expect(buildManifest(out, { name: "A" }).runtime).toEqual({ computeTypes: ["standard"], optimize: false })
+    expect(createApplicationSchema().runtime.optimize).toBe(true)
+  })
+})
+
+describe('media type profiles (NWB is application/x-hdf5; profile=nwb)', () => {
+  const HDF5 = 'application/x-hdf5'
+  const NWB = 'application/x-hdf5; profile=nwb'
+  const port = (mediaTypes, extra = {}) => createPort({ name: 'p', mediaTypes, ...extra })
+
+  it('reads and writes the profile one way', () => {
+    expect(parseMediaType('Application/X-HDF5 ;profile=NWB')).toEqual({ base: HDF5, profile: 'nwb' })
+    expect(normalizeMediaType('application/x-hdf5;profile=nwb')).toBe(NWB)
+    expect(normalizeMediaType('text/csv')).toBe('text/csv')
+  })
+
+  it('a bare type takes its profiles; a profile only itself', () => {
+    expect(mediaTypeAccepts(HDF5, NWB)).toBe(true)
+    expect(mediaTypeAccepts(NWB, HDF5)).toBe(false)
+    expect(mediaTypeAccepts(NWB, 'image/tiff; profile=ome-tiff')).toBe(false)
+    expect(mediaTypeAccepts('*/*', NWB)).toBe(true)
+  })
+
+  it('connects NWB to HDF5 either way, but not two different profiles', () => {
+    expect(arePortsCompatible(port([NWB]), port([HDF5]))).toBe(true)
+    expect(arePortsCompatible(port([HDF5]), port([NWB]))).toBe(true)
+    expect(arePortsCompatible(port(['application/x-hdf5; profile=other']), port([NWB]))).toBe(false)
+    expect(arePortsCompatible(port(['application/edf']), port([NWB, 'application/edf']))).toBe(true)
+  })
+
+  it('keeps every media type, profiled ones included, when parsed and written', () => {
+    const app = parseApplication({ inputs: [{ name: 'signals', mediaTypes: ['application/edf', 'application/x-hdf5;profile=NWB'] }] })
+    expect(app.inputs[0].mediaTypes).toEqual(['application/edf', NWB])
+    const yml = loadYaml(manifestToYaml(buildManifest(app)))
+    expect(yml.inputs[0].mediaTypes).toEqual(['application/edf', NWB])
+  })
+
+  it('root inputs of HDF5 and NWB mix; of NWB and EDF they do not', () => {
+    const a = port([HDF5], { name: 'tables' })
+    const b = port([NWB], { name: 'recording' })
+    expect(rootInputCollisions([a, b]).get(a).why).toBe(`both take ${NWB}`)
+    expect(rootInputCollisions([port(['application/edf']), b]).size).toBe(0)
+  })
+
+  it('keeps HDF5\'s EDAM id when HDF5 is swapped for one of its profiles', () => {
+    const edamOf = (t) => ({ [HDF5]: 'format_3590', 'text/csv': 'format_3752' })[t]
+    const anndata = 'application/x-hdf5; profile=anndata'
+    expect(keptFormats(['format_3590'], [HDF5, 'application/json'], ['application/json', anndata], edamOf)).toEqual(['format_3590'])
+    expect(keptFormats(['format_3590', 'format_3752'], [HDF5, 'text/csv'], [HDF5], edamOf)).toEqual(['format_3590'])
+    expect(keptFormats(['format_3590'], [HDF5], ['text/csv'], edamOf)).toEqual([])
+    expect(keptFormats(['format_3590'], [HDF5], [], edamOf)).toEqual([])
+  })
+
+  it('offers NWB and HDF5 apart once the registry profiles NWB', () => {
+    const opts = portDataTypeOptions([
+      { value: HDF5, label: HDF5, name: 'HDF5', extensions: ['.h5'], edam: 'format_3590' },
+      { value: NWB, label: NWB, name: 'NeuroData Without Borders', extensions: ['.nwb'] },
+    ])
+    expect(opts.find((o) => o.value === HDF5).formats).toEqual(['HDF5'])
+    expect(opts.find((o) => o.value === HDF5).edam).toBe('format_3590')
+    expect(opts.find((o) => o.value === NWB).formats).toEqual(['NeuroData Without Borders'])
   })
 })

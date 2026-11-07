@@ -1,0 +1,571 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.pennsieve.io/app-manifest/v1.json",
+  "title": "Pennsieve app manifest (app.yml)",
+  "description": "What a Pennsieve app is and needs: its metadata, how it runs, its parameters, and what goes in and comes out. Kept at the root of the app's repository as app.yml and read when a release is registered. Version 1 grows only by optional, backward-compatible additions; a breaking change is a new major version (v2.json). Field names follow CodeMeta/schema.org, Boutiques and CWL where they overlap, so a manifest can be translated to them.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["application"],
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "The schema this file follows. Prefer the editor comment `# yaml-language-server: $schema=https://schemas.pennsieve.io/app-manifest/v1.json` on the first line."
+    },
+    "schemaVersion": {
+      "type": ["string", "number"],
+      "description": "The manifest format version the file was written for, e.g. \"1.0\". Informational."
+    },
+    "application": { "$ref": "#/$defs/application" },
+    "runtime": { "$ref": "#/$defs/runtime" },
+    "parameters": {
+      "type": "array",
+      "description": "The app's parameters, which a workflow sets per step.",
+      "items": { "$ref": "#/$defs/parameter" }
+    },
+    "inputs": {
+      "type": "array",
+      "description": "What the app reads.",
+      "items": { "$ref": "#/$defs/port" }
+    },
+    "outputs": {
+      "type": "array",
+      "description": "What the app writes. With one output it is the whole of OUTPUT_DIR; with two or more, each is written to its own folder, OUTPUT_DIR/<name>/, so a workflow can route each output on its own (names must then be folder-safe).",
+      "items": { "$ref": "#/$defs/port" },
+      "if": { "minItems": 2 },
+      "then": { "items": { "properties": { "name": { "pattern": "^[a-z0-9][a-z0-9-]*$" } } } }
+    },
+    "build": { "$ref": "#/$defs/build" },
+    "variants": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 8,
+      "description": "Flavours of the app built from the same repository and release, each its own image (e.g. a CPU and a GPU build). Each variant is the top-level manifest with its own overrides; inputs, outputs, the parameter set, interactive/session settings and tags are always the top level's. The order is the display order. The default is the variant with default: true, otherwise the first; it keeps the app's usual image tag. Ids must be unique (checked on registration), and a release tag of an app with variants must not contain \"--\". See https://github.com/Pennsieve/app-deploy-service/blob/main/docs/app-manifest-variants.md.",
+      "items": { "$ref": "#/$defs/variant" },
+      "contains": { "type": "object", "required": ["default"], "properties": { "default": { "const": true } } },
+      "minContains": 0,
+      "maxContains": 1
+    },
+    "commandArguments": {
+      "type": "array",
+      "deprecated": true,
+      "description": "Deprecated and not read from app.yml."
+    },
+    "review": { "$ref": "#/$defs/review" }
+  },
+  "$defs": {
+    "application": {
+      "type": "object",
+      "description": "What the app is (CodeMeta/schema.org SoftwareSourceCode terms). Its version comes from the release tag, its repository from where it's registered, and its license from the repository's LICENSE file, so none of those are declared here.",
+      "additionalProperties": false,
+      "required": ["name"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "An identifier the author chooses for the app. Optional; Pennsieve identifies an app by its repository."
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The app's display name."
+        },
+        "description": {
+          "type": "string",
+          "description": "What the app does, in a sentence or two."
+        },
+        "type": {
+          "type": "string",
+          "enum": ["processor"],
+          "description": "The role the app plays in a workflow. Only \"processor\" today."
+        },
+        "version": {
+          "type": ["string", "number"],
+          "description": "Optional and informational: the version Pennsieve shows is the release tag."
+        },
+        "maintainers": {
+          "type": "array",
+          "description": "Who maintains the app (schema.org maintainer).",
+          "items": { "$ref": "#/$defs/maintainer" }
+        },
+        "tags": {
+          "type": "array",
+          "description": "Keywords (schema.org keywords) that say what the app is for, e.g. eeg, spikes, visualization. A known subject or task places the app in the Gallery's colours and filters.",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "relations": {
+          "type": "object",
+          "description": "How the app relates to works listed in the repository's CITATION.cff, for those that aren't plain references. CITATION.cff (Citation File Format 1.2.0, at the repository root) is where an app keeps its authors, how to cite it (preferred-citation) and the works it builds on (references). Pennsieve reads it at release and gives each listed work a DataCite relation type: the preferred citation IsDescribedBy, every reference References. Map a work's DOI (10.1038/nbt.4314; https://doi.org/ and doi: forms are accepted) to another relation type here, e.g. IsDerivedFrom for a dataset the app's model was trained on. Each DOI must be listed in CITATION.cff. Cites is not a relation type; a plain reference is References.",
+          "propertyNames": {
+            "pattern": "^((https?://(dx\\.)?doi\\.org/)|([dD][oO][iI]: ?))?10\\.[0-9]{4,9}/\\S+$"
+          },
+          "additionalProperties": {
+            "type": "string",
+            "enum": [
+              "Describes", "Documents", "IsCitedBy", "IsDerivedFrom",
+              "IsDescribedBy", "IsDocumentedBy", "IsMetadataFor", "IsReferencedBy",
+              "IsRequiredBy", "IsSourceOf", "IsSupplementedBy", "IsSupplementTo",
+              "IsOriginalFormOf", "IsVariantFormOf", "References", "Requires"
+            ]
+          }
+        },
+        "categories": {
+          "type": "array",
+          "deprecated": true,
+          "description": "Deprecated: use tags. Older manifests' categories are read as tags.",
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "maintainer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1, "description": "The maintainer's name." },
+        "email": { "type": "string", "format": "email", "description": "How to reach them." },
+        "orcid": {
+          "type": "string",
+          "pattern": "^(https://orcid\\.org/)?\\d{4}-\\d{4}-\\d{4}-\\d{3}[\\dX]$",
+          "description": "Their ORCID iD, e.g. 0000-0002-1825-0097 (the https://orcid.org/ form is accepted too)."
+        }
+      }
+    },
+    "runtime": {
+      "type": "object",
+      "description": "How the app runs: its size, the compute it runs on, its time limit, and whether it's a live session.",
+      "additionalProperties": false,
+      "properties": {
+        "cpu": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "CPU units (1024 = 1 vCPU). Optional; the platform picks a default."
+        },
+        "memory": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Memory in MiB. Optional; the platform picks a default."
+        },
+        "computeTypes": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "description": "The compute the app can run on: standard (a container), lambda, or gpu. Default: [standard].",
+          "items": { "type": "string", "enum": ["standard", "lambda", "gpu"] }
+        },
+        "optimize": {
+          "type": "boolean",
+          "description": "false runs the app only as computeTypes declares it; otherwise Pennsieve may run it on an optimized runtime it fits, such as Lambda."
+        },
+        "timeoutSeconds": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "How long a run may take before it's stopped."
+        },
+        "llm": {
+          "type": "boolean",
+          "description": "The app calls language models through Pennsieve (the LLM governor): its runs get the LLM proxy (ANTHROPIC_BASE_URL) and LLM_GOVERNOR_FUNCTION_NAME, with usage metered against the workspace's budget. Apps that don't declare it run without them. Default: false."
+        },
+        "interactive": {
+          "type": "boolean",
+          "description": "A live session a person works in, rather than a batch step: the workflow waits while it runs. Default: false."
+        },
+        "sessionType": {
+          "type": "string",
+          "enum": ["jupyter"],
+          "description": "The kind of live session. \"jupyter\" is a Jupyter notebook. Needs interactive: true."
+        },
+        "kernel": {
+          "type": "string",
+          "enum": ["python", "r"],
+          "description": "A Jupyter notebook's language. Needs sessionType: jupyter."
+        },
+        "gpu": {
+          "deprecated": true,
+          "description": "Deprecated: list \"gpu\" in computeTypes instead."
+        }
+      },
+      "allOf": [
+        {
+          "if": { "required": ["sessionType"] },
+          "then": { "required": ["interactive"], "properties": { "interactive": { "const": true } } }
+        },
+        {
+          "if": { "required": ["sessionType"], "properties": { "sessionType": { "const": "jupyter" } } },
+          "then": { "required": ["kernel"] }
+        },
+        {
+          "if": { "required": ["kernel"] },
+          "then": { "required": ["sessionType"], "properties": { "sessionType": { "const": "jupyter" } } }
+        }
+      ]
+    },
+    "build": {
+      "type": "object",
+      "description": "How the image is built from the repository. At the top level it applies to the app's image (or to every variant); a variant's build is merged over it: its args over the top-level args, and its target and dockerfile replace the top level's.",
+      "additionalProperties": false,
+      "properties": {
+        "args": {
+          "type": "object",
+          "description": "Docker build arguments (ARG), passed as --build-arg NAME=value.",
+          "propertyNames": { "pattern": "^[A-Za-z_][A-Za-z0-9_]*$" },
+          "additionalProperties": { "$ref": "#/$defs/scalar" }
+        },
+        "target": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The Dockerfile stage to build (--target)."
+        },
+        "dockerfile": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The Dockerfile's path, relative to the repository root, without \"..\". Default: Dockerfile.",
+          "allOf": [
+            { "not": { "pattern": "^/" } },
+            { "not": { "pattern": "(^|/)\\.\\.(/|$)" } }
+          ]
+        }
+      }
+    },
+    "variant": {
+      "type": "object",
+      "description": "One variant: its id and what it changes.",
+      "additionalProperties": false,
+      "required": ["id"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9]([a-z0-9-]{0,30}[a-z0-9])?$",
+          "allOf": [
+            { "not": { "const": "default" } },
+            { "not": { "pattern": "--" } }
+          ],
+          "description": "Lowercase letters, numbers and single dashes inside (no leading, trailing or double dashes), at most 32 characters; \"default\" is reserved. Workflows refer to the variant by it, so keep it stable across releases."
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "description": "A short label, e.g. \"GPU (ONCET)\". Default: the id."
+        },
+        "description": {
+          "type": "string",
+          "description": "When to pick this variant, in a sentence."
+        },
+        "default": {
+          "type": "boolean",
+          "description": "This is the default variant. At most one variant sets it; without one, the first is the default."
+        },
+        "build": { "$ref": "#/$defs/build" },
+        "runtime": { "$ref": "#/$defs/variantRuntime" },
+        "parameters": {
+          "type": "object",
+          "description": "Overrides of existing top-level parameters, by name. A variant can't add or remove parameters.",
+          "propertyNames": { "minLength": 1 },
+          "additionalProperties": { "$ref": "#/$defs/parameterOverride" }
+        }
+      }
+    },
+    "variantRuntime": {
+      "type": "object",
+      "description": "The runtime fields a variant may set; each replaces the top-level value. interactive, sessionType and kernel stay the top level's.",
+      "additionalProperties": false,
+      "properties": {
+        "cpu": { "$ref": "#/$defs/runtime/properties/cpu" },
+        "memory": { "$ref": "#/$defs/runtime/properties/memory" },
+        "computeTypes": { "$ref": "#/$defs/runtime/properties/computeTypes" },
+        "optimize": { "$ref": "#/$defs/runtime/properties/optimize" },
+        "timeoutSeconds": { "$ref": "#/$defs/runtime/properties/timeoutSeconds" },
+        "llm": { "$ref": "#/$defs/runtime/properties/llm" }
+      }
+    },
+    "parameterOverride": {
+      "type": "object",
+      "description": "What a variant changes about a top-level parameter. A defaultValue must be one of the validValues and within min and max, whether those are the variant's or the top level's.",
+      "additionalProperties": false,
+      "properties": {
+        "label": { "$ref": "#/$defs/parameter/properties/label" },
+        "description": { "$ref": "#/$defs/parameter/properties/description" },
+        "required": { "$ref": "#/$defs/parameter/properties/required" },
+        "defaultValue": { "$ref": "#/$defs/parameter/properties/defaultValue" },
+        "validValues": { "$ref": "#/$defs/parameter/properties/validValues" }
+      }
+    },
+    "scalar": {
+      "type": ["string", "number", "boolean"]
+    },
+    "parameter": {
+      "type": "object",
+      "description": "One parameter. Types are JSON Schema's; they correspond to Boutiques String/Number/Flag and CWL string/float/int/boolean. A choice is a string (or number) with validValues.",
+      "additionalProperties": false,
+      "required": ["name"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The name the app reads it by (its environment variable)."
+        },
+        "type": {
+          "type": "string",
+          "enum": ["string", "number", "integer", "boolean"],
+          "description": "string, number, integer or boolean. Default: string."
+        },
+        "label": { "type": "string", "description": "A short display name." },
+        "description": { "type": "string", "description": "What it does." },
+        "required": {
+          "type": "boolean",
+          "description": "Whether a run must set it. Default: required when it has no defaultValue."
+        },
+        "defaultValue": {
+          "$ref": "#/$defs/scalar",
+          "description": "The value used when a run doesn't set one."
+        },
+        "validValues": {
+          "type": "array",
+          "minItems": 1,
+          "description": "The values it may take, making it a choice.",
+          "items": { "$ref": "#/$defs/scalar" }
+        },
+        "min": { "type": "number", "description": "For a number or integer: the smallest value." },
+        "max": { "type": "number", "description": "For a number or integer: the largest value." }
+      }
+    },
+    "structureRef": {
+      "type": "string",
+      "description": "A structure id from the Pennsieve format registry, optionally with a version (bids, bids@1.9), or a link to a specification.",
+      "anyOf": [
+        { "pattern": "^[a-z0-9][a-z0-9-]*(@[0-9A-Za-z.+-]+)?$" },
+        { "pattern": "^https://[^\\s]+$" }
+      ]
+    },
+    "port": {
+      "type": "object",
+      "description": "An input or output. Without mediaTypes, formats or conformsTo it accepts any file.",
+      "additionalProperties": false,
+      "required": ["name"],
+      "allOf": [
+        {
+          "if": { "required": ["placement"], "properties": { "placement": { "const": "subfolder" } } },
+          "then": { "properties": { "name": { "pattern": "^[a-z0-9][a-z0-9-]*$" } } }
+        },
+        {
+          "$comment": "Folders of a format need the format: container directory without conformsTo names at least one media type.",
+          "if": { "required": ["container"], "properties": { "container": { "const": "directory" } }, "not": { "required": ["conformsTo"] } },
+          "then": { "required": ["mediaTypes"], "properties": { "mediaTypes": { "minItems": 1 } } }
+        }
+      ],
+      "properties": {
+        "name": { "type": "string", "minLength": 1, "description": "Its name: an identifier, e.g. study. With placement subfolder it is also the input's folder name." },
+        "description": { "type": "string", "description": "What it is." },
+        "mediaTypes": {
+          "type": "array",
+          "description": "The MIME types it takes or makes, e.g. application/x-rds. A profile parameter, a Pennsieve convention (after RFC 6906; these types don't register one), names one format that shares its container's type: application/x-hdf5; profile=nwb is NWB only, while application/x-hdf5 takes any HDF5 file, NWB included. The profiles are the platform format registry's (GET /packages/formats).",
+          "items": { "type": "string", "pattern": "^[\\w.+-]+/[\\w.+-]+(\\s*;\\s*profile=[A-Za-z0-9-]+)?$" }
+        },
+        "formats": {
+          "type": "array",
+          "description": "EDAM format identifiers (https://edamontology.org/page), for scientific formats without a MIME type, e.g. format_3590 (HDF5) or http://edamontology.org/format_3549 (NIfTI-1). EDAM has no id for some formats (EDF, NWB, MEF3); use mediaTypes for those (NWB: application/x-hdf5; profile=nwb).",
+          "items": { "type": "string", "pattern": "^(http://edamontology\\.org/)?format_\\d{4}$" }
+        },
+        "container": {
+          "type": "string",
+          "enum": ["file", "directory"],
+          "default": "file",
+          "description": "How folder-format items (a registry format with kind directory, such as OME-Zarr or MEF3) are given to the app, or written by it. directory: each item as a plain folder with the format's folder ending (e.g. brain-01.ome.zarr/, session.mefd/); an input can take several, so expect one or more folders. file: each item as Pennsieve stores it, one compressed file. The default is file, except with conformsTo, where it is directory, since a structure is specified in its unpacked form (BIDS expects .ome.zarr folders). See https://github.com/Pennsieve/app-deploy-service/blob/main/docs/app-manifest-folders.md."
+        },
+        "conformsTo": {
+          "description": "The folder structure the whole input follows, or that the app writes: a structure id from the Pennsieve format registry with an optional version (bids, bids@1.9), or a link to any other specification (https://…, matched only by the same link). A list nests structures, outermost first: [pennsieve-published-dataset, bids] is a published dataset whose files/ folder is BIDS. The input is always a folder tree with its paths kept; mediaTypes then say what the tree holds, and container how folder-format items in it are given (directory unless set).",
+          "oneOf": [
+            { "$ref": "#/$defs/structureRef" },
+            { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/structureRef" } }
+          ]
+        },
+        "placement": {
+          "type": "string",
+          "enum": ["root", "subfolder"],
+          "default": "root",
+          "description": "Where an input's data is placed. root (the default): at the root of INPUT_DIR. subfolder: in its own folder, INPUT_DIR/<name>/, so inputs that would collide (two BIDS trees) stay apart; the name must then be folder-safe (lowercase letters, numbers, dashes). Inputs of different media types can share the root (the app tells them apart by type); inputs that share a type, take any file, or are a layout need their own folders."
+        },
+        "reference": { "$ref": "#/$defs/portReference" },
+        "required": { "type": "boolean", "description": "For an input: whether a run must give it something. For an output: false when a run may leave it empty (e.g. a section only made for some inputs); outputs are otherwise expected to receive files, which a review checks." },
+        "dataType": {
+          "type": "string",
+          "deprecated": true,
+          "description": "Deprecated: use mediaTypes or formats."
+        },
+        "cardinality": {
+          "type": "string",
+          "deprecated": true,
+          "description": "Deprecated and unused."
+        }
+      }
+    },
+    "portReference": {
+      "type": "object",
+      "description": "An input filled from Pennsieve's reference catalog: shared, published data such as a genome index or a brain template, described by public identifiers so the app isn't tied to one platform. A run's reference source fills it (the app's default when the workflow has none); the reference is unpacked into the input's folder. choice: app pins one (a genome by assembly or seqcol and annotation, a template by its properties); choice: user, the default, lets a run pick among the matching ones (optionally of the given organisms), with a default. Elsewhere, put a copy in the input's folder. See https://github.com/Pennsieve/app-deploy-service/blob/main/docs/app-manifest-references.md.",
+      "additionalProperties": false,
+      "required": ["kind", "assetClass"],
+      "properties": {
+        "kind": { "type": "string", "enum": ["genome", "template"], "description": "genome: a genome asset, such as a FASTA or an aligner index. template: a template or atlas image, such as the MNI152 brain template." },
+        "assetClass": {
+          "type": "string",
+          "minLength": 1,
+          "description": "What the reference is, such as salmon-index or brain-template; it names the files it holds.",
+          "examples": ["salmon-index", "brain-template"]
+        },
+        "toolVersion": {
+          "type": "string",
+          "pattern": "^\\s*(?:(?:>=|<=|==|>|<|=)?[0-9][0-9A-Za-z.]*\\s*)+$",
+          "description": "For an index: the versions of its tool the app can read, as space-separated comparisons that must all hold.",
+          "examples": [">=2 <3", ">=2.7.10a <2.8", "2.8.0"]
+        },
+        "choice": {
+          "type": "string",
+          "enum": ["app", "user"],
+          "description": "app: the app pins the reference. user (the default): a run picks among the matching references."
+        },
+        "taxonomyId": { "type": "integer", "minimum": 1, "description": "choice app: the organism's NCBI taxonomy id." },
+        "assembly": { "$ref": "#/$defs/referenceAssembly" },
+        "seqcol": { "type": "string", "minLength": 1, "description": "The assembly's GA4GH sequence-collection digest." },
+        "annotation": { "$ref": "#/$defs/referenceAnnotation" },
+        "properties": { "$ref": "#/$defs/referenceProperties" },
+        "organisms": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "description": "choice user: the NCBI taxonomy ids a run may pick from. Default: any.",
+          "items": { "type": "integer", "minimum": 1 }
+        },
+        "default": {
+          "type": "object",
+          "description": "choice user: the reference preselected for a run.",
+          "additionalProperties": false,
+          "properties": {
+            "taxonomyId": { "type": "integer", "minimum": 1 },
+            "assembly": { "$ref": "#/$defs/referenceAssembly" },
+            "seqcol": { "type": "string", "minLength": 1 },
+            "annotation": { "$ref": "#/$defs/referenceAnnotation" },
+            "properties": { "$ref": "#/$defs/referenceProperties" }
+          }
+        },
+        "source": { "type": "string", "description": "Where to get it outside Pennsieve: a URL, or how to build it." },
+        "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$", "description": "Of the pinned reference's archive, when the app pins one exact build." },
+        "license": { "type": "string", "description": "An SPDX id or expression; LicenseRef-<name> for other terms." }
+      },
+      "allOf": [
+        {
+          "if": { "required": ["choice", "kind"], "properties": { "choice": { "const": "app" }, "kind": { "const": "genome" } } },
+          "then": { "required": ["annotation"], "anyOf": [{ "required": ["assembly"] }, { "required": ["seqcol"] }] }
+        },
+        {
+          "if": { "required": ["choice", "kind"], "properties": { "choice": { "const": "app" }, "kind": { "const": "template" } } },
+          "then": { "required": ["properties"] }
+        }
+      ]
+    },
+    "referenceProperties": {
+      "type": "object",
+      "description": "What a reference is in its own terms, matched exactly: a template's space, resolution and desc (TemplateFlow's entities). On the reference, every match has them; on default, the default's.",
+      "maxProperties": 20,
+      "propertyNames": { "pattern": "^[a-zA-Z][a-zA-Z0-9_-]{0,39}$" },
+      "additionalProperties": { "type": "string", "minLength": 1, "maxLength": 200 },
+      "examples": [{ "space": "MNI152NLin2009cAsym", "resolution": "1", "desc": "brain" }]
+    },
+    "referenceAssembly": {
+      "type": "string",
+      "pattern": "^GC[AF]_[0-9]{9}\\.[0-9]+$",
+      "description": "An assembly accession, such as GCA_000001405.29 (GRCh38).",
+      "examples": ["GCA_000001405.29"]
+    },
+    "referenceAnnotation": {
+      "type": "object",
+      "description": "An annotation release: its provider and version, such as GENCODE 50.",
+      "additionalProperties": false,
+      "required": ["provider", "version"],
+      "properties": {
+        "provider": { "type": "string", "minLength": 1, "examples": ["GENCODE", "Ensembl"] },
+        "version": { "type": "string", "minLength": 1, "examples": ["50", "M39"] }
+      }
+    },
+    "review": {
+      "type": "object",
+      "description": "How the app is tested when a release is reviewed before it is made public: the inputs a review run uses and the parameters it sets. A review run must write files to every output except those with required: false. Reviews run the app with no network and no Pennsieve credentials. Port and parameter names must be the app's own (checked on registration). See https://github.com/Pennsieve/app-deploy-service/blob/main/docs/app-manifest-review.md.",
+      "additionalProperties": false,
+      "required": ["version"],
+      "properties": {
+        "version": { "const": 1, "description": "The version of this block's format: 1." },
+        "generate": {
+          "$ref": "#/$defs/reviewGenerate",
+          "description": "A command that writes the whole input directory, as the app reads INPUT_DIR. Ports listed under inputs are taken from there instead."
+        },
+        "inputs": {
+          "type": "object",
+          "description": "Per input port (by name), where a review run gets its data, instead of (or without) review.generate.",
+          "minProperties": 1,
+          "additionalProperties": { "$ref": "#/$defs/reviewInput" }
+        },
+        "parameters": {
+          "type": "object",
+          "description": "Parameter values for review runs only (by name), e.g. a smaller sample. Others keep their defaultValue.",
+          "additionalProperties": { "$ref": "#/$defs/scalar" }
+        }
+      }
+    },
+    "reviewInput": {
+      "type": "object",
+      "description": "One source for an input port's review data: generate (a command that writes it), files (committed in the repository) or dataset (a public dataset).",
+      "minProperties": 1,
+      "maxProperties": 1,
+      "additionalProperties": false,
+      "properties": {
+        "generate": { "$ref": "#/$defs/reviewGenerate" },
+        "files": {
+          "type": "array",
+          "minItems": 1,
+          "description": "Files or glob patterns, relative to the repository root, e.g. tests/fixtures/*.fcs.",
+          "items": { "type": "string", "minLength": 1, "not": { "pattern": "^/|(^|/)\\.\\.(/|$)" }, "$comment": "Relative, without .. segments." }
+        },
+        "dataset": { "$ref": "#/$defs/reviewDataset" }
+      }
+    },
+    "reviewGenerate": {
+      "type": "object",
+      "description": "A command that writes review input into $REVIEW_INPUT_DIR, run from the repository root (read-only) in a platform generator image, with no network. Under review it writes the whole input directory (every port, in subfolders for placement: subfolder ports); under review.inputs.<port> it writes that port's input.",
+      "additionalProperties": false,
+      "required": ["command"],
+      "properties": {
+        "image": {
+          "type": "string",
+          "enum": ["python", "r"],
+          "default": "python",
+          "description": "The platform generator image: python (Python 3.12 with numpy 2, pandas, scipy, h5py, anndata, zarr, scanpy, FlowIO, edfio, nibabel, pyarrow and openpyxl) or r (base R). The image version a review used is recorded with it."
+        },
+        "command": { "type": "string", "minLength": 1, "description": "The command, run with sh -c, e.g. python tests/make_fixture.py \"$REVIEW_INPUT_DIR\". It writes into $REVIEW_INPUT_DIR and must not delete or replace that directory." },
+        "root": {
+          "type": "string",
+          "minLength": 1,
+          "default": ".",
+          "not": { "pattern": "^/|(^|/)\\.\\.(/|$)" },
+          "description": "The folder within what the command wrote that is used, e.g. linked when a generator writes linked/ and flat/ layouts. Default: all of it."
+        },
+        "source": {
+          "$ref": "#/$defs/reviewDataset",
+          "description": "A public dataset the generator reads, e.g. to subsample: fetched by the platform first and mounted read-only at $REVIEW_SOURCE_DIR."
+        }
+      }
+    },
+    "reviewDataset": {
+      "type": "object",
+      "description": "A public dataset, fetched by the platform from an allowed host (Zenodo, Figshare, OSF, OpenNeuro): its DOI or HTTPS URL, and optionally which of its files.",
+      "additionalProperties": false,
+      "oneOf": [{ "required": ["doi"] }, { "required": ["url"] }],
+      "properties": {
+        "doi": { "type": "string", "pattern": "^10\\.\\d{4,9}/\\S+$", "description": "e.g. 10.5281/zenodo.15388817" },
+        "url": { "type": "string", "format": "uri", "pattern": "^https://", "description": "An HTTPS URL of the dataset or a file in it." },
+        "files": {
+          "type": "array",
+          "minItems": 1,
+          "description": "Files or glob patterns within the dataset; default: all of it.",
+          "items": { "type": "string", "minLength": 1 }
+        }
+      }
+    }
+  }
+}

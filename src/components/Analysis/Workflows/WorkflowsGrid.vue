@@ -1,18 +1,80 @@
+<script>
+import { createExampleCache } from "./runExamples";
+import { exampleUnavailable } from "@/store/analysisModule";
+
+// The cards' examples, shared by the library's visits in this page load
+// (module scope), so where the feature isn't served it's found out once.
+const exampleCache = createExampleCache(exampleUnavailable);
+</script>
+
 <script setup>
 import { computed, ref, watch, onMounted } from "vue";
+import { interfaceDag } from "../RunMonitor/workflowInterface";
 import { useStore } from "vuex";
-import { useRouter } from "vue-router";
+import { useRouter, useRoute } from "vue-router";
 
 import BfButton from "../../shared/bf-button/BfButton.vue";
 import IconAnalysis from "../../icons/IconAnalysis.vue";
 import IconPennsieveMark from "../../icons/IconPennsieveMark.vue";
+import IconPDF from "../../icons/IconPDF.vue";
+import WorkflowThumbnail from "../WorkflowGraph/WorkflowThumbnail.vue";
+import RunWizardDialog from "../RunMonitor/RunWizardDialog.vue";
+import { ioSummary, usageLine, cardText } from "./workflowSummary";
+import { activeFilters, applyFilters, domainOptions, FACET_DEFAULTS, INPUT_OPTIONS, fieldOptions, inheritedTags, libraryWorkflows, outputOptions, sortWorkflows, SORTS } from "./galleryFilter";
+import { isNotebookWorkflow } from "../RunMonitor/notebookHelpers";
+import { exampleLabel, exampleVersion, PDF_URL_FRESH_MS } from "./runExamples";
+import SampleOutputViewer from "./SampleOutputViewer.vue";
+import FacetLayout from "../Facets/FacetLayout.vue";
+import FacetSection from "../Facets/FacetSection.vue";
+import FacetOptions from "../Facets/FacetOptions.vue";
+import FacetRadios from "../Facets/FacetRadios.vue";
+import FacetCheck from "../Facets/FacetCheck.vue";
+import CardTags from "../Facets/CardTags.vue";
+import { domainFacetOptions, fieldFacetOptions, toggleKey } from "../Facets/facets";
+
+defineProps({
+  // Inside the Workflows tab's Library, whose bar has the New Workflow button.
+  embedded: { type: Boolean, default: false },
+});
+// List notebook workflows too: "Include notebooks", in the filter panel when
+// embedded (the Workflows tab keeps it in the URL, for Live too).
+const includeNotebooks = defineModel("includeNotebooks", { type: Boolean, default: false });
 
 const store = useStore();
 const router = useRouter();
+const route = useRoute();
+
+// Shown in a workspace (/:orgId/analysis/workflows) and in My Workspace
+// (/my-workspace/analysis/workflows), where "mine" is the user's own workflows
+// made outside any workspace.
+const isMyWorkspace = computed(() => !route.params.orgId);
 
 const searchQuery = ref("");
 const statusFilter = ref("active");
-const scopeFilter = ref("workspace"); // "workspace" | "public"
+const scopeFilter = ref("workspace"); // "workspace" | "public" | "pennsieve" (public, official only)
+const inputFilter = ref("any"); // "any" | "dataset" | "none"
+const outputFilter = ref("any"); // "any" | a target type
+const domainFilter = ref([]); // domains' keys (any of them); none: all
+const fieldFilter = ref([]); // research fields' keys (any of them); none: all
+
+// The sort is the viewer's, kept in this browser.
+const SORT_KEY = "pennsieve.gallery.workflowSort";
+const storedSort = () => {
+  try {
+    const v = localStorage.getItem(SORT_KEY);
+    return SORTS.some((o) => o.value === v) ? v : "recommended";
+  } catch {
+    return "recommended";
+  }
+};
+const sortBy = ref(storedSort());
+watch(sortBy, (v) => {
+  try {
+    localStorage.setItem(SORT_KEY, v);
+  } catch {
+    // not remembered; it still applies now
+  }
+});
 const pageSize = ref(10);
 const currentPage = ref(1);
 const isLoadingAll = ref(false);
@@ -20,37 +82,86 @@ const isLoadingAll = ref(false);
 const workflows = computed(
   () => store.state.analysisModule.workflows || []
 );
+// What the cards name: target types (outputs) and applications (steps).
+const targetTypes = computed(() => store.getters["analysisModule/targetTypes"] || []);
+const applications = computed(() => store.getters["analysisModule/applications"] || []);
 const nextCursor = computed(
   () => store.state.analysisModule.workflowsNextCursor || ""
 );
 
-const filterOptions = [
-  { label: "Active", value: "active" },
-  { label: "Archived", value: "archived" },
-  { label: "All", value: "all" },
-];
-
-const scopeOptions = [
-  { label: "This workspace", value: "workspace" },
+const scopeOptions = computed(() => [
+  { label: isMyWorkspace.value ? "My workflows" : "This workspace", value: "workspace" },
   { label: "Public", value: "public" },
-];
+  { label: "Pennsieve", value: "pennsieve" },
+]);
 
-const isPublicScope = computed(() => scopeFilter.value === "public");
+// Pennsieve's are the public ones it has reviewed (official).
+const isPublicScope = computed(() => scopeFilter.value !== "workspace");
 
-const filteredWorkflows = computed(() => {
-  let list = [...workflows.value];
-  const q = searchQuery.value.trim().toLowerCase();
-  if (q) {
-    list = list.filter((wf) => {
-      const name = (wf.name || "").toLowerCase();
-      const desc = (wf.description || "").toLowerCase();
-      return name.includes(q) || desc.includes(q);
-    });
-  }
-  return list.sort(
-    (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
-  );
+const outputChoices = computed(() => outputOptions(workflows.value, targetTypes.value));
+// What the workflows are for (their tags' domains, and their apps'), with
+// their domains' colours, and the research fields their apps serve, as on the
+// Apps tab: the panel's Domain and Field.
+const domainChips = computed(() => domainOptions(libraryWorkflows(workflows.value), applications.value));
+const fieldChips = computed(() => fieldOptions(libraryWorkflows(workflows.value), applications.value));
+
+// The facets set, as removable chips over the cards; Clear all resets them.
+const facetRefs = { domain: domainFilter, field: fieldFilter, input: inputFilter, output: outputFilter, status: statusFilter };
+const activeChips = computed(() =>
+  activeFilters(
+    { domain: domainFilter.value, field: fieldFilter.value, input: inputFilter.value, output: outputFilter.value, status: statusFilter.value },
+    { domains: domainChips.value, fields: fieldChips.value, outputs: outputChoices.value }
+  )
+);
+// Clear a facet, or (a chip of a multi-select one) one of its keys.
+const clearFacet = (key, value) =>
+  (facetRefs[key].value = value === undefined ? FACET_DEFAULTS[key] : facetRefs[key].value.filter((k) => k !== value));
+const removeChip = (chip) => clearFacet(chip.key, chip.value);
+const clearFacets = () => Object.keys(facetRefs).forEach((key) => clearFacet(key));
+
+// The panel's Domain and Field, one at a time (ticking a chosen one clears
+// it); Show archived lists all, unticked Active.
+const domainFacets = computed(() => domainFacetOptions(domainChips.value));
+const fieldFacets = computed(() => fieldFacetOptions(fieldChips.value));
+const toggleDomain = (key) => (domainFilter.value = toggleKey(domainFilter.value, key));
+const toggleField = (key) => (fieldFilter.value = toggleKey(fieldFilter.value, key));
+const showArchived = computed({
+  get: () => statusFilter.value !== FACET_DEFAULTS.status,
+  set: (on) => (statusFilter.value = on ? "all" : FACET_DEFAULTS.status),
 });
+
+const filtersSet = computed(
+  () =>
+    !!searchQuery.value.trim() ||
+    inputFilter.value !== "any" ||
+    outputFilter.value !== "any" ||
+    domainFilter.value.length > 0 ||
+    fieldFilter.value.length > 0
+);
+function clearFilters() {
+  searchQuery.value = "";
+  inputFilter.value = "any";
+  outputFilter.value = "any";
+  domainFilter.value = [];
+  fieldFilter.value = [];
+}
+
+const filteredWorkflows = computed(() =>
+  sortWorkflows(
+    applyFilters(libraryWorkflows(workflows.value, includeNotebooks.value), {
+      query: searchQuery.value,
+      input: inputFilter.value,
+      output: outputFilter.value,
+      domain: domainFilter.value,
+      field: fieldFilter.value,
+      officialOnly: scopeFilter.value === "pennsieve",
+      applications: applications.value,
+      targetTypes: targetTypes.value,
+    }),
+    sortBy.value,
+    { applications: applications.value }
+  )
+);
 
 const paginatedWorkflows = computed(() => {
   const start = (currentPage.value - 1) * pageSize.value;
@@ -65,26 +176,8 @@ watch(filteredWorkflows, () => {
   currentPage.value = 1;
 });
 
-const getWorkflowMetrics = (wf) => {
-  const m = wf.metrics;
-  if (!m || !m.totalRuns) return null;
-  return m;
-};
 
-const formatDuration = (v) => {
-  if (v == null) return "--";
-  if (v < 1) return `${(v * 1000).toFixed(0)}ms`;
-  if (v < 60) return `${v.toFixed(1)}s`;
-  if (v < 3600) return `${(v / 60).toFixed(1)}m`;
-  return `${(v / 3600).toFixed(1)}h`;
-};
 
-const formatCost = (v) => {
-  if (v == null) return "--";
-  if (v < 0.01) return `$${v.toFixed(4)}`;
-  if (v < 1) return `$${v.toFixed(3)}`;
-  return `$${v.toFixed(2)}`;
-};
 
 const formatRelativeTime = (dateString) => {
   if (!dateString) return null;
@@ -140,11 +233,16 @@ const lastRunStatusKey = (status, successRate) => {
 };
 
 const goToCreate = () => {
-  router.push({ name: "workflow-create" });
+  // The Workflows tab's Builder view.
+  router.push({ name: isMyWorkspace.value ? "my-workflows" : "workflows", query: { view: "builder" } });
 };
+defineExpose({ goToCreate });
 
 const goToDetail = (wf) => {
-  router.push({ name: "workflow-detail", params: { uuid: wf.uuid } });
+  router.push({
+    name: isMyWorkspace.value ? "my-workflow-detail" : "workflow-detail",
+    params: { uuid: wf.uuid },
+  });
 };
 
 const getStatusParam = () => {
@@ -182,21 +280,90 @@ const fetchAllWorkflows = async () => {
   }
 };
 
+
+// Run from a card: the run dialog, here, on this workflow. A notebook
+// workflow (listed only with Include notebooks) starts on the Notebooks tab.
+const runDialog = ref(null);
+const runWorkflow = (wf) =>
+  isNotebookWorkflow(wf)
+    ? router.push({ name: "notebooks", params: route.params })
+    : runDialog.value?.open(wf.uuid);
+
+// The cards' example PDFs (a run's summary per workflow), for the cards on
+// the page; none where the feature isn't served.
+const examples = ref({}); // uuid -> example
+watch(
+  paginatedWorkflows,
+  (list) => {
+    for (const wf of list || []) {
+      if (!wf?.uuid || wf.uuid in examples.value) continue;
+      examples.value = { ...examples.value, [wf.uuid]: null };
+      exampleCache
+        .get(wf.uuid, (uuid) => store.dispatch("analysisModule/fetchWorkflowExample", { uuid, strict: true }))
+        .then((example) => {
+          if (example) examples.value = { ...examples.value, [wf.uuid]: { ...example, fetchedAt: Date.now() } };
+        });
+    }
+  },
+  { immediate: true }
+);
+const cardExampleLabel = (example) => (example?.fromVersion ? `Sample output (v${example.fromVersion})` : "Sample output");
+const viewer = ref({ open: false, source: null, name: "", version: null, subtitle: "" });
+const exampleSubtitle = (example) => {
+  if (!example) return "";
+  const parts = [];
+  const v = exampleVersion(example);
+  if (v) parts.push(`Version ${v}`);
+  if (example.runName || example.runId) parts.push(`run ${example.runName || example.runId}`);
+  if (example.pages) parts.push(`${example.pages} page${example.pages === 1 ? "" : "s"}`);
+  return parts.join(" · ");
+};
+const openExample = (wf) => {
+  const cached = examples.value[wf.uuid];
+  const fresh = cached?.pdfUrl && Date.now() - cached.fetchedAt < PDF_URL_FRESH_MS ? cached.pdfUrl : null;
+  const refetch = async () => {
+    exampleCache.forget(wf.uuid);
+    const example = await exampleCache.get(wf.uuid, (uuid) =>
+      store.dispatch("analysisModule/fetchWorkflowExample", { uuid, strict: true })
+    );
+    examples.value = { ...examples.value, [wf.uuid]: example ? { ...example, fetchedAt: Date.now() } : null };
+    return example?.pdfUrl || null;
+  };
+  let first = true;
+  viewer.value = {
+    open: true,
+    // The card's link the first time where it's fresh; a new one after that.
+    source: async () => {
+      if (first && fresh) {
+        first = false;
+        return fresh;
+      }
+      first = false;
+      return refetch();
+    },
+    name: wf.name || "",
+    version: exampleVersion(cached),
+    subtitle: exampleSubtitle(cached),
+  };
+};
+
 // Re-fetch all when the status or scope filter changes
-watch([statusFilter, scopeFilter], () => {
+watch([statusFilter, isPublicScope], () => {
   currentPage.value = 1;
   fetchAllWorkflows();
 });
 
 onMounted(async () => {
+  store.dispatch("analysisModule/fetchTargetTypes").catch(() => {});
+  store.dispatch("analysisModule/fetchApplications").catch(() => {});
   await fetchAllWorkflows();
 });
 </script>
 
 <template>
   <div class="workflows-container">
-    <!-- Info Section -->
-    <div class="info-section">
+    <!-- Info Section (the Workflows tab has its own toolbar) -->
+    <div v-if="!embedded" class="info-section">
       <div class="info-card">
         <h3>Compute Workflows</h3>
         <p>
@@ -210,143 +377,135 @@ onMounted(async () => {
       </div>
     </div>
 
-    <!-- Workflows Section -->
-    <div class="workflows-section">
-      <div class="workflows-section-header">
-        <h3>Workflows</h3>
+    <!-- The filters on the left (a rail when folded, a drawer on a phone),
+         the search and Sort in one row, the chips and cards -->
+    <FacetLayout
+      class="workflows-section"
+      storage-key="pennsieve.library.filtersPanel"
+      :chips="activeChips"
+      @remove="removeChip"
+      @clear-all="clearFacets"
+    >
+      <template #filters>
+        <FacetSection title="Scope">
+          <FacetRadios v-model="scopeFilter" :options="scopeOptions" label="Scope" />
+          <FacetCheck v-if="embedded" v-model="includeNotebooks" label="Include notebooks" />
+          <FacetCheck v-model="showArchived" label="Show archived" />
+        </FacetSection>
+        <FacetSection v-if="domainFacets.length" title="Domain" :clearable="domainFilter.length > 0" @clear="clearFacet('domain')">
+          <FacetOptions :options="domainFacets" :selected="domainFilter" @toggle="toggleDomain" />
+        </FacetSection>
+        <FacetSection v-if="fieldFacets.length" title="Field" :clearable="fieldFilter.length > 0" @clear="clearFacet('field')">
+          <FacetOptions :options="fieldFacets" :selected="fieldFilter" @toggle="toggleField" />
+        </FacetSection>
+        <FacetSection title="Input" :clearable="inputFilter !== FACET_DEFAULTS.input" @clear="clearFacet('input')">
+          <el-select v-model="inputFilter" size="small" aria-label="Input">
+            <el-option label="Any input" value="any" />
+            <el-option v-for="o in INPUT_OPTIONS" :key="o.value" :label="o.label" :value="o.value" />
+          </el-select>
+        </FacetSection>
+        <FacetSection title="Output" :clearable="outputFilter !== FACET_DEFAULTS.output" @clear="clearFacet('output')">
+          <el-select v-model="outputFilter" size="small" aria-label="Output">
+            <el-option label="Any output" value="any" />
+            <el-option v-for="o in outputChoices" :key="o.value" :label="o.label" :value="o.value" />
+          </el-select>
+        </FacetSection>
+      </template>
+
+      <template #toolbar>
         <el-input
-          v-if="workflows.length > 0"
           v-model="searchQuery"
-          placeholder="Search workflows..."
-          size="default"
+          placeholder="Search by name, tag, app, input or output…"
           clearable
-          class="workflows-search-input"
+          class="toolbar-search"
         />
-      </div>
+        <label class="sort-control toolbar-sort">
+          Sort
+          <el-select v-model="sortBy" size="small" class="sort-select">
+            <el-option v-for="o in SORTS" :key="o.value" :label="o.label" :value="o.value" />
+          </el-select>
+        </label>
+      </template>
 
-      <div class="filter-row">
-        <div class="status-buttons scope-buttons">
-          <button
-            v-for="option in scopeOptions"
-            :key="option.value"
-            class="filter-btn"
-            :class="{ active: scopeFilter === option.value }"
-            @click="scopeFilter = option.value"
-          >
-            {{ option.label }}
-          </button>
-        </div>
-
-        <div class="status-buttons">
-          <button
-            v-for="option in filterOptions"
-            :key="option.value"
-            class="filter-btn"
-            :class="{ active: statusFilter === option.value }"
-            @click="statusFilter = option.value"
-          >
-            {{ option.label }}
-          </button>
-        </div>
-      </div>
-
-      <p v-if="isPublicScope" class="scope-hint">
+      <p v-if="scopeFilter === 'pennsieve'" class="scope-hint">
+        Workflows Pennsieve has reviewed and validated. They can be run from any workspace.
+      </p>
+      <p v-else-if="isPublicScope" class="scope-hint">
         Public workflows published across all workspaces. They can be run from
         any workspace; only the creator can edit or unpublish them.
       </p>
 
       <div v-if="filteredWorkflows.length > 0" class="workflows-grid">
+        <!-- A card: the graph on the left; what it is, does and runs on the
+             right; Open and Run. -->
         <div
           v-for="wf in paginatedWorkflows"
           :key="wf.uuid"
           class="wf-card"
+          :class="{ 'is-inactive': !wf.isActive }"
+          role="link"
+          tabindex="0"
           @click="goToDetail(wf)"
+          @keydown.enter="goToDetail(wf)"
         >
-          <div class="wf-header">
-            <div class="wf-info">
-              <h3>
-                <button
-                  type="button"
-                  class="wf-name-link"
-                  @click.stop="goToDetail(wf)"
-                >
-                  {{ wf.name }}
-                </button>
-              </h3>
-              <div class="wf-subtitle">Workflow</div>
-              <div v-if="wf.description" class="wf-description">
-                {{ wf.description }}
-              </div>
-              <div class="wf-tags">
-                <span
-                  class="tag"
-                  :class="wf.isActive ? 'active' : 'inactive'"
-                >
-                  {{ wf.isActive ? 'Active' : 'Inactive' }}
+          <div class="wf-thumb">
+            <WorkflowThumbnail :dag="interfaceDag(wf)" :aspect="1" />
+          </div>
+          <div class="wf-body">
+            <div class="wf-title">
+              <span class="wf-name">{{ wf.name }}</span>
+              <el-tooltip
+                v-if="wf.official"
+                content="Reviewed and validated by Pennsieve."
+                placement="top"
+              >
+                <span class="official-mark" @click.stop>
+                  <IconPennsieveMark :width="14" :height="14" color="currentColor" />
                 </span>
-                <span class="tag nodes">
-                  {{ (wf.dag || []).length }} nodes
-                </span>
-                <span class="tag created">
-                  {{ new Date(wf.createdAt).toLocaleDateString() }}
-                </span>
-                <span v-if="wf.visibility === 'public'" class="tag public">
-                  Public
-                </span>
+              </el-tooltip>
+              <span v-if="!wf.isActive" class="wf-badge">Inactive</span>
+              <span v-else-if="wf.visibility === 'public' && !wf.official" class="wf-badge">Public</span>
+            </div>
+            <p class="wf-description">{{ cardText(wf) || "No description." }}</p>
+            <div class="wf-io">{{ ioSummary(wf, targetTypes) }}</div>
+            <!-- Its tags, a few, as the filter panel lists them (a domain
+                 with its coloured dot, a field in grey); the steps are found
+                 by search and seen on the card's graph. Without tags of its
+                 own, what its apps are for, in italics: why a filter finds
+                 it, and that it can be given its own. -->
+            <CardTags v-if="wf.tags?.length" :tags="wf.tags" />
+            <CardTags
+              v-else-if="inheritedTags(wf, applications).length"
+              :tags="inheritedTags(wf, applications)"
+              inherited
+              title="From its apps. Edit the workflow to give it tags of its own."
+            />
+            <div class="wf-foot">
+              <span class="wf-usage">
+                <span class="last-run-dot" :class="lastRunInfo(wf).statusKey" />
+                <span class="wf-usage-text">{{ usageLine(wf, formatRelativeTime) }}</span>
+              </span>
+              <span class="wf-actions" @click.stop>
+                <button type="button" class="wf-action" @click="goToDetail(wf)">Open</button>
                 <el-tooltip
-                  v-if="wf.official"
-                  content="This workflow has been reviewed and validated by Pennsieve."
+                  v-if="examples[wf.uuid]"
+                  :content="`${cardExampleLabel(examples[wf.uuid])}: a PDF summary of a run`"
                   placement="top"
                 >
-                  <span class="official-mark" @click.stop>
-                    <IconPennsieveMark :width="14" :height="14" color="currentColor" />
-                  </span>
+                  <button
+                    type="button"
+                    class="wf-action wf-action--icon"
+                    :aria-label="`${exampleLabel(examples[wf.uuid])}: a PDF summary of a run (opens in a new tab)`"
+                    @click="openExample(wf)"
+                  >
+                    <IconPDF :width="16" :height="16" color="currentColor" />
+                  </button>
                 </el-tooltip>
-              </div>
-            </div>
-
-            <div
-              class="last-run-pill"
-              :class="lastRunInfo(wf).statusKey"
-            >
-              <span class="last-run-dot" />
-              {{ lastRunInfo(wf).label }}
-            </div>
-          </div>
-
-          <div class="wf-card-actions">
-            <div v-if="getWorkflowMetrics(wf)" class="wf-metrics">
-              <span class="metric-item">
-                <span class="metric-value">
-                  {{ getWorkflowMetrics(wf).totalRuns }}
-                </span>
-                <span class="metric-label">runs</span>
-              </span>
-              <span class="metric-divider" />
-              <span class="metric-item">
-                <span class="metric-value">
-                  {{ Math.round(getWorkflowMetrics(wf).successRate) }}%
-                </span>
-                <span class="metric-label">success</span>
-              </span>
-              <span class="metric-divider" />
-              <span class="metric-item">
-                <span class="metric-value">
-                  {{ formatDuration(getWorkflowMetrics(wf).avgDurationSec) }}
-                </span>
-                <span class="metric-label">avg duration</span>
+                <button v-if="wf.isActive" type="button" class="wf-action wf-action--run" @click="runWorkflow(wf)">
+                  ▶ Run
+                </button>
               </span>
             </div>
-            <span v-else class="empty-footer-text">No runs to report</span>
-
-            <button
-              type="button"
-              class="card-action-link"
-              @click.stop="goToDetail(wf)"
-            >
-              <span>View details</span>
-              <span class="arrow">&rarr;</span>
-            </button>
           </div>
         </div>
       </div>
@@ -354,12 +513,16 @@ onMounted(async () => {
       <div v-else class="empty-state">
         <IconAnalysis :width="48" :height="48" color="#9ca3af" />
         <span v-if="isLoadingAll">Loading workflows...</span>
-        <span v-else-if="workflows.length === 0">No workflows yet</span>
+        <template v-else-if="workflows.length === 0">
+          <span>No workflows yet</span>
+          <button type="button" class="clear-filters" @click="router.replace({ query: { ...route.query, view: 'builder' } })">Build one in the Builder</button>
+        </template>
         <span v-else-if="searchQuery">
           No workflows match
           <strong>"{{ searchQuery }}"</strong>
         </span>
         <span v-else>No workflows match your filters</span>
+        <button v-if="filtersSet" type="button" class="clear-filters" @click="clearFilters">Clear search and filters</button>
       </div>
 
       <el-pagination
@@ -372,7 +535,15 @@ onMounted(async () => {
         :total="filteredWorkflows.length"
         @current-change="onPageChange"
       />
-    </div>
+    </FacetLayout>
+    <RunWizardDialog ref="runDialog" />
+    <SampleOutputViewer
+      v-model="viewer.open"
+      :source="viewer.source"
+      :workflow-name="viewer.name"
+      :version="viewer.version"
+      :subtitle="viewer.subtitle"
+    />
   </div>
 </template>
 
@@ -380,14 +551,14 @@ onMounted(async () => {
 @use "../../../styles/theme";
 @use "../../../styles/element/input";
 
+/* No padding of its own: the filter panel (or its rail) sits against the
+   page's edges; FacetLayout pads the list (20px/32px, as the Analysis tabs). */
 .workflows-container {
-  max-width: 1000px;
-  margin: 0;
-  padding: 16px 24px;
+  min-height: 100%;
 }
 
 .info-section {
-  margin-bottom: 32px;
+  margin: 20px 32px 12px;
 }
 
 .info-card {
@@ -414,13 +585,11 @@ onMounted(async () => {
   }
 }
 
-.workflows-section {
-  margin-bottom: 48px;
-}
 
 .workflows-section-header {
   display: flex;
-  align-items: center;
+  /* The sort lines up with the bottom of the (taller) search box. */
+  align-items: flex-end;
   justify-content: space-between;
   gap: 16px;
   margin-bottom: 16px;
@@ -433,27 +602,46 @@ onMounted(async () => {
   }
 }
 
-.workflows-search-input {
-  max-width: 320px;
+/* The search fills the toolbar's row up to Sort. */
+.toolbar-search {
+  flex: 1;
+  min-width: 0;
 }
-
-.filter-row {
+.sort-control {
   display: flex;
-  align-items: center;
-  gap: 16px;
-  flex-wrap: wrap;
-}
-
-.status-buttons {
-  display: flex;
+  flex-shrink: 0;
   align-items: center;
   gap: 8px;
-  margin-bottom: 16px;
+  font-size: 12px;
+  color: theme.$gray_5;
 }
+.sort-select {
+  width: 160px;
+}
+@media (max-width: 767px) {
+  .info-section {
+    margin: 16px 16px 0;
+  }
+  /* The select alone says what it sorts by. */
+  .toolbar-sort {
+    font-size: 0;
+  }
+  .sort-select {
+    width: 130px;
+  }
+}
+.clear-filters {
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  font-size: 13px;
+  color: theme.$link-color;
+  cursor: pointer;
 
-.scope-buttons {
-  padding-right: 16px;
-  border-right: 1px solid theme.$gray_2;
+  &:hover {
+    color: theme.$link-color-hover;
+  }
 }
 
 .scope-hint {
@@ -463,257 +651,224 @@ onMounted(async () => {
   line-height: 1.4;
 }
 
-.filter-btn {
-  padding: 4px 16px;
-  border: 1px solid theme.$gray_2;
-  border-radius: 4px;
-  background: white;
-  color: theme.$gray_5;
-  font-size: 12px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s;
-  line-height: 1.4;
+$card-height: 172px;
 
-  &:hover {
-    border-color: theme.$purple_1;
-    color: theme.$purple_1;
-  }
-
-  &.active {
-    background: theme.$purple_1;
-    border-color: theme.$purple_1;
-    color: white;
-  }
-}
-
+/* Cards two or more to a row where 340px each fit (16px apart), each as
+   tall as its square graph (172px; 140px in a narrow card), as the apps'
+   (ApplicationsGrid): the rows line up, and the text fits the card. */
 .workflows-grid {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(340px, 100%), 1fr));
   gap: 16px;
 }
 
 .wf-card {
-  background: white;
+  display: flex;
+  min-width: 0;
+  container: wf-card / inline-size;
   border: 1px solid theme.$gray_2;
-  padding: 20px;
-  transition: border-color 0.2s ease;
+  background: theme.$white;
+  overflow: hidden;
   cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 
-  &:hover {
-    border-color: theme.$gray_3;
+  &:hover,
+  &:focus-visible {
+    border-color: theme.$purple_1;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+    outline: none;
+  }
+  &:hover .wf-actions,
+  &:focus-within .wf-actions {
+    opacity: 1;
+  }
+  &.is-inactive {
+    opacity: 0.7;
   }
 }
-
-.wf-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 16px;
+/* The graph, on the builder's dotted canvas. */
+.wf-thumb {
+  flex: 0 0 auto;
+  align-self: flex-start;
+  width: $card-height;
+  aspect-ratio: 1 / 1;
+  box-sizing: border-box;
+  padding: 8px;
+  border-right: 1px solid theme.$gray_2;
+  background-color: theme.$gray_1;
+  background-image: radial-gradient(theme.$gray_3 1px, transparent 1px);
+  background-size: 12px 12px;
 }
-
-.wf-info {
+/* The text fits the graph's height: it doesn't size the card (contain),
+   and what doesn't fit is cut (overflow), never the card stretched. */
+.wf-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
   flex: 1;
   min-width: 0;
-
-  h3 {
-    font-size: 16px;
-    font-weight: 500;
-    color: theme.$gray_6;
-    margin: 0 0 8px 0;
+  padding: 14px 16px 12px;
+  contain: size;
+  overflow: hidden;
+}
+/* A narrow card: a smaller square, tighter text, no input/output line. */
+@container wf-card (max-width: 440px) {
+  .wf-thumb {
+    width: 140px;
+  }
+  .wf-body {
+    gap: 4px;
+    padding: 10px 12px;
+  }
+  .wf-io {
+    display: none;
   }
 }
-
-.wf-name-link {
-  background: none;
-  border: none;
-  padding: 0;
+.wf-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.wf-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 15px;
+  font-weight: 600;
+  color: theme.$gray_6;
+}
+/* What the card is (public, archived…), in its top-right corner: the
+   badges line up down the grid. */
+.wf-badge {
+  flex-shrink: 0;
+  margin-left: auto;
+  padding: 0 6px;
+  border-radius: 3px;
+  background: theme.$gray_0;
+  color: theme.$gray_5;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+.wf-description {
+  display: -webkit-box;
+  margin: 0;
+  overflow: hidden;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  font-size: 13px;
+  line-height: 1.4;
+  color: theme.$gray_5;
+}
+.wf-io {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  color: theme.$gray_6;
+}
+/* One line at the card's foot: the usage gives way (…) to the buttons,
+   which always show. */
+.wf-foot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: auto;
+}
+.wf-usage {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  font-size: 12px;
+  color: theme.$gray_4;
+}
+.wf-usage-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.wf-actions {
+  display: flex;
+  flex-shrink: 0;
+  margin-left: auto;
+  gap: 6px;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+.wf-action {
+  white-space: nowrap;
+  padding: 3px 10px;
+  border: 1px solid theme.$gray_3;
+  border-radius: 4px;
+  background: theme.$white;
   font: inherit;
+  font-size: 12px;
   color: theme.$gray_6;
   cursor: pointer;
-  text-align: left;
-  text-decoration: none;
-  transition: color 0.2s ease;
 
   &:hover {
-    color: theme.$purple_2;
-    text-decoration: underline;
+    border-color: theme.$purple_1;
+    color: theme.$purple_3;
   }
 }
+.wf-action--icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3px 6px;
+}
+.wf-action--run {
+  border-color: theme.$purple_3;
+  background: theme.$purple_3;
+  color: theme.$white;
 
-.wf-subtitle {
-  font-size: 13px;
-  color: theme.$gray_5;
-  margin-bottom: 6px;
-  font-weight: 400;
+  &:hover {
+    background: theme.$purple_2;
+    color: theme.$white;
+  }
+}
+@media (hover: none) {
+  .wf-actions {
+    opacity: 1;
+  }
 }
 
 .wf-description {
+  /* Two whole lines: the card has a fixed height, and shrinking the
+     description to fit cut its second line in half. */
+  flex-shrink: 0;
   font-size: 13px;
   color: theme.$gray_5;
-  margin: 4px 0 8px 0;
+  margin: 0;
   line-height: 1.4;
   word-break: break-word;
 }
 
-.last-run-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
+/* A card's last run, as a dot by its usage line. */
+.last-run-dot {
+  width: 8px;
+  height: 8px;
   flex-shrink: 0;
-  padding: 4px 12px;
-  border-radius: 999px;
-  font-size: 12px;
-  font-weight: 500;
-  white-space: nowrap;
+  border-radius: 50%;
+  background: theme.$gray_4;
 
-  .last-run-dot {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    flex-shrink: 0;
-  }
-
-  &.gray {
-    background: theme.$gray_2;
-    color: theme.$gray_5;
-    .last-run-dot { background: theme.$gray_4; }
-  }
-
-  &.enabled {
-    background: rgba(theme.$status_green, 0.12);
-    color: theme.$status_green;
-    .last-run-dot { background: theme.$status_green; }
-  }
-
-  &.pending {
-    background: rgba(#F59E0B, 0.12);
-    color: #B45309;
-    .last-run-dot { background: #F59E0B; }
-  }
-
-  &.failed {
-    background: rgba(#EF4444, 0.12);
-    color: #DC2626;
-    .last-run-dot { background: #DC2626; }
-  }
+  &.enabled { background: theme.$status_green; }
+  &.pending { background: #f59e0b; }
+  &.failed { background: theme.$status_red; }
 }
-
-.wf-tags {
-  display: flex;
-  gap: 6px;
-  margin-top: 8px;
-  flex-wrap: wrap;
-
-  .tag {
-    display: inline-block;
-    padding: 2px 8px;
-    border-radius: 3px;
-    font-size: 11px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-
-    &.active {
-      background: rgba(theme.$status_green, 0.12);
-      color: theme.$status_green;
-    }
-
-    &.inactive {
-      background: theme.$gray_2;
-      color: theme.$gray_5;
-    }
-
-    &.nodes,
-    &.created {
-      background: theme.$gray_1;
-      color: theme.$gray_5;
-    }
-
-    &.public {
-      background: theme.$green_tint;
-      color: theme.$status_green;
-    }
-  }
-}
-
+/* Pennsieve's mark sits where the other badges do, in the top-right corner. */
 .official-mark {
   display: inline-flex;
+  flex-shrink: 0;
   align-items: center;
+  margin-left: auto;
   color: theme.$purple_3;
 }
-
-.wf-card-actions {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 18px;
-  margin-top: 14px;
-  padding-top: 14px;
-  border-top: 1px solid theme.$gray_2;
-  flex-wrap: wrap;
-}
-
-.wf-metrics {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.metric-item {
-  display: flex;
-  align-items: baseline;
-  gap: 3px;
-}
-
-.metric-value {
-  font-size: 14px;
-  font-weight: 700;
-  color: theme.$black;
-}
-
-.metric-label {
-  font-size: 10px;
-  color: theme.$gray_4;
-}
-
-.metric-divider {
-  width: 1px;
-  height: 14px;
-  background: theme.$gray_3;
-}
-
-.empty-footer-text {
-  font-size: 12px;
-  color: theme.$gray_4;
-  font-style: italic;
-}
-
-.card-action-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  background: none;
-  border: none;
-  padding: 0;
-  font: inherit;
-  font-size: 13px;
-  font-weight: 500;
-  color: theme.$purple_3;
-  text-decoration: none;
-  cursor: pointer;
-
-  &:hover {
-    text-decoration: underline;
-  }
-
-  .arrow {
-    transition: transform 0.15s ease;
-  }
-
-  &:hover .arrow {
-    transform: translateX(2px);
-  }
+.official-mark + .wf-badge {
+  margin-left: 0;
 }
 
 .workflows-pagination {

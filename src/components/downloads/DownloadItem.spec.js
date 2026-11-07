@@ -39,4 +39,19 @@ describe("DownloadItem", () => {
   it("says nothing about scans when no file was left out", () => {
     expect(statusOf(ready)).toBe("Ready · 2.0 KB");
   });
+
+  it("links a run's results to the run, in its workspace or in My Analysis", () => {
+    const linkOf = (download) =>
+      mount(DownloadItem, {
+        props: { download },
+        global: { stubs: { "el-button": true, "el-progress": true, "router-link": { props: ["to"], template: "<a :data-to='JSON.stringify(to)'><slot /></a>" } } },
+      }).find(".run-link");
+    const run = { ...ready, scope: "run", runId: "run-1" };
+    expect(JSON.parse(linkOf(run).attributes("data-to"))).toEqual({ name: "my-run-detail", params: { runId: "run-1" } });
+    expect(JSON.parse(linkOf({ ...run, organizationNodeId: "N:organization:1" }).attributes("data-to"))).toEqual({
+      name: "run-detail",
+      params: { orgId: "N:organization:1", runId: "run-1" },
+    });
+    expect(linkOf(ready).exists()).toBe(false);
+  });
 });

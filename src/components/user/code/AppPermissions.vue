@@ -289,11 +289,11 @@ const confirmAddWorkspace = () => {
 // the Publishing dialog from the My Code page, getPrimaryData() in main.js
 // may not have run for the current org yet. Fall back to loading them here.
 const ensureOrgData = async () => {
+  // The workspace given or being viewed; never the preferred organization
+  // (deprecated) or the first one.
   const orgId =
     props.organizationId ||
-    store.state.activeOrganization?.organization?.id ||
-    store.state.profile?.preferredOrganization ||
-    store.state.organizations?.[0]?.organization?.id
+    store.state.activeOrganization?.organization?.id
   if (!orgId) return
   const needsMembers = !store.state.orgMembers?.length
   const needsTeams = !store.state.teams?.length

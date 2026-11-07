@@ -1,59 +1,114 @@
+<script>
+import { createExampleCache } from "../Workflows/runExamples";
+import { exampleUnavailable } from "@/store/analysisModule";
+
+// The apps' own sample outputs, kept a while per app across visits.
+const appSampleCache = createExampleCache(exampleUnavailable);
+</script>
+
 <script setup>
-import { computed, ref, watch } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import { useStore } from "vuex";
-import { useRouter } from "vue-router";
+import { useRouter, useRoute } from "vue-router";
 
 import IconAnalysis from "../../icons/IconAnalysis.vue";
+import AppBanner from "./AppBanner.vue";
+import { domainCounts, fieldCounts } from "./appDomains";
+import {
+  APP_FILTER_DEFAULTS,
+  VISIBILITY_OPTIONS,
+  appActiveFilters,
+  appsInStatus,
+  filterApps,
+  readmeSummary,
+  visibilityLabel,
+} from "./appFilters";
+import FacetLayout from "../Facets/FacetLayout.vue";
+import FacetSection from "../Facets/FacetSection.vue";
+import FacetOptions from "../Facets/FacetOptions.vue";
+import FacetRadios from "../Facets/FacetRadios.vue";
+import FacetCheck from "../Facets/FacetCheck.vue";
+import CardTags from "../Facets/CardTags.vue";
+import { domainFacetOptions, fieldFacetOptions, toggleKey } from "../Facets/facets";
+import { paletteVariants, versionManifest } from "../WorkflowBuilder/appManifestInfo";
+import RuntimeMark from "../WorkflowGraph/RuntimeMark.vue";
+import IconPDF from "../../icons/IconPDF.vue";
+import { MoreFilled } from "@element-plus/icons-vue";
+import SampleOutputViewer from "../Workflows/SampleOutputViewer.vue";
+import { PDF_URL_FRESH_MS } from "../Workflows/runExamples";
+import { versionsToWatch, withLiveStatus } from "./liveStatus";
+import { useAppStatusEvents } from "@/composables/useAppStatusEvents";
+import {
+  APP_SORTS,
+  appTitle,
+  githubRepo,
+  appDescription,
+  versionLabel,
+  appNeedsGpu,
+  sortApps,
+  versionState,
+  workflowUses,
+} from "./appCards";
+
+defineProps({
+  // Inside the Apps tab, whose bar has the actions.
+  embedded: { type: Boolean, default: false },
+});
 
 
 /*
   Local State
 */
-const searchQuery = ref("");
+const searchQuery = defineModel("search", { type: String, default: "" });
 const visibilityFilter = ref("all");
 const statusFilter = ref("active");
 
 const pageSize = 10;
 const currentPage = ref(1);
 
-const visibilityOptions = [
-  { label: "All", value: "all" },
-  { label: "Public", value: "public" },
-  { label: "Private", value: "private" },
-];
-
-const statusOptions = [
-  { label: "All", value: "all" },
-  { label: "Active", value: "active" },
-  { label: "Archived", value: "archived" },
-];
 
 /*
   Store computed
 */
 const store = useStore();
 const router = useRouter();
+const route = useRoute();
+// Shown in a workspace and in My Workspace (My Analysis), where there's no
+// organization in the route and route names carry a "my-" prefix.
+const isMyWorkspace = computed(() => !route.params.orgId);
+const scopedRoute = (name, params = {}) => ({ name: isMyWorkspace.value ? `my-${name}` : name, params });
 
-const applications = computed(
-  () => store.state.analysisModule.applications || []
+// The apps as listed, with live build statuses over their newest versions
+// (liveStatus.js): a variant's build event moves that variant's chip only,
+// the version's event its status dot.
+const listedApps = computed(() => store.state.analysisModule.applications || []);
+const { live } = useAppStatusEvents((l) =>
+  listedApps.value.flatMap((app) => versionsToWatch(withLiveStatus(app, l), { latest: true }))
 );
+const applications = computed(() => listedApps.value.map((app) => withLiveStatus(app, live.value)));
+// A variant chip's state, without a badge: building or failed.
+const chipState = (v) => {
+  const s = String(v.status || "").toLowerCase();
+  if (s === "error" || s.startsWith("error")) return "app-variant--failed";
+  if (["registering", "building", "deploying", "pending"].includes(s)) return "app-variant--building";
+  return "";
+};
+const chipTitle = (v) =>
+  [
+    v.name,
+    v.description,
+    v.gpu && "Runs on a GPU",
+    chipState(v) === "app-variant--failed" && `Failed to build${v.failureReason ? `: ${v.failureReason}` : ""}`,
+    chipState(v) === "app-variant--building" && "Building",
+  ]
+    .filter(Boolean)
+    .join(" · ");
 
 /*
   Derived helpers
 */
-const parseGitHubRepo = (sourceUrl) => {
-  if (!sourceUrl) return null;
-  const match = sourceUrl.match(/github\.com\/([^/]+)\/([^/\s.]+)/);
-  if (!match) return null;
-  return { owner: match[1], repo: match[2].replace(/\.git$/, "") };
-};
-
-const parseGitHubDisplay = (sourceUrl) => {
-  const info = parseGitHubRepo(sourceUrl);
-  return info ? `${info.owner}/${info.repo}` : null;
-};
-
-const repoName = (app) => parseGitHubDisplay(app.sourceUrl) || "Unknown repo";
+// The app.yml's tags, a few: the rest are found by search.
+const appTags = (app) => (versionManifest(app)?.tags || []).slice(0, 4);
 
 const latestVersion = (app) => {
   const versions = app.versions || [];
@@ -65,115 +120,172 @@ const latestVersion = (app) => {
   })[0];
 };
 
-const totalDeployments = (app) =>
-  (app.versions || []).reduce(
-    (sum, v) => sum + (v.deployments || []).length,
-    0
-  );
 
 /*
-  README previews (fetched lazily per app from GitHub)
+  A card's text when the app has no description: the short README summary
+  app-deploy-service sends with each app (its first paragraph, read at
+  release). Nothing is fetched from GitHub per card: that was one request
+  per app, rate-limited (60/hour), and failing for private repositories.
 */
-const readmePreviews = ref({});
-
-const stripMarkdown = (md) =>
-  md
-    .replace(/```[\s\S]*?```/g, "")
-    .replace(/!\[[^\]]*\]\([^)]+\)/g, "")
-    .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
-    .replace(/<[^>]+>/g, "")
-    .replace(/^#{1,6}\s+/gm, "")
-    .replace(/[*_`~>]/g, "")
-    .replace(/\s+/g, " ")
-    .trim();
-
-const fetchReadmeFor = async (app) => {
-  if (!app?.uuid || readmePreviews.value[app.uuid] !== undefined) return;
-  const info = parseGitHubRepo(app.sourceUrl);
-  if (!info) {
-    readmePreviews.value[app.uuid] = "";
-    return;
-  }
-  readmePreviews.value[app.uuid] = "";
-  try {
-    const resp = await fetch(
-      `https://api.github.com/repos/${info.owner}/${info.repo}/readme`,
-      { headers: { Accept: "application/vnd.github.v3.json" } }
-    );
-    if (!resp.ok) return;
-    const data = await resp.json();
-    const decoded = new TextDecoder().decode(
-      Uint8Array.from(atob(data.content.replace(/\n/g, "")), (c) =>
-        c.charCodeAt(0)
-      )
-    );
-    readmePreviews.value[app.uuid] = stripMarkdown(decoded);
-  } catch {
-    // leave preview empty
-  }
-};
-
-watch(
-  applications,
-  (apps) => {
-    (apps || []).forEach((app) => fetchReadmeFor(app));
-  },
-  { immediate: true }
-);
-
-const visibilityLabel = (app) => {
-  const visibility = app?.visibility;
-  if (visibility !== "public" && visibility !== "private") return null;
-  return visibility === "private" ? "Private" : "Public";
-};
+// (readmeSummary, appFilters.js)
 
 /*
   Filtered & sorted applications (newest first, matching workflows)
 */
-const filteredApplications = computed(() => {
-  let list = applications.value;
+// Where an app runs (from its runtime config), and the choices the list has.
+// Domains' keys (any of them), none for every app.
+const domainFilter = ref([]);
+// Research fields' keys (any of them; with the domains, both must hold).
+const fieldFilter = ref([]);
 
-  // Filter by lifecycle status. "Active" (the default) hides archived apps.
-  if (statusFilter.value === "active") {
-    list = list.filter((app) => app.status !== "archived");
-  } else if (statusFilter.value === "archived") {
-    list = list.filter((app) => app.status === "archived");
+// The sort is the viewer's, kept in this browser.
+const SORT_KEY = "pennsieve.gallery.appSort";
+const storedSort = () => {
+  try {
+    const v = localStorage.getItem(SORT_KEY);
+    return APP_SORTS.some((o) => o.value === v) ? v : "recommended";
+  } catch {
+    return "recommended";
   }
-
-  const q = searchQuery.value.trim().toLowerCase();
-  if (q) {
-    list = list.filter((app) => {
-      const url = (app.sourceUrl || "").toLowerCase();
-      const name = repoName(app).toLowerCase();
-      const visibility = (visibilityLabel(app) || "").toLowerCase();
-      const latest = (latestVersion(app)?.version || "").toLowerCase();
-      return (
-        url.includes(q) ||
-        name.includes(q) ||
-        visibility.includes(q) ||
-        latest.includes(q)
-      );
-    });
+};
+const sortBy = ref(storedSort());
+watch(sortBy, (v) => {
+  try {
+    localStorage.setItem(SORT_KEY, v);
+  } catch {
+    // not remembered; it still applies now
   }
-
-  if (visibilityFilter.value !== "all") {
-    list = list.filter(
-      (app) => (visibilityLabel(app) || "").toLowerCase() === visibilityFilter.value
-    );
-  }
-
-  return [...list].sort(
-    (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
-  );
 });
+
+// "Used in 3 workflows" counts the workflows loaded for the Library.
+const workflows = computed(() => store.state.analysisModule.workflows || []);
+const usageText = (app) => {
+  const n = workflowUses(app, workflows.value);
+  return n ? `Used in ${n} workflow${n === 1 ? "" : "s"}` : "Not in a workflow yet";
+};
+const githubUrl = (app) => {
+  const r = githubRepo(app.sourceUrl);
+  return r ? `https://github.com/${r.owner}/${r.repo}` : "";
+};
+
+const filtersSet = computed(
+  () =>
+    !!searchQuery.value.trim() || visibilityFilter.value !== "all" || domainFilter.value.length > 0 || fieldFilter.value.length > 0
+);
+function clearFilters() {
+  searchQuery.value = "";
+  visibilityFilter.value = "all";
+  domainFilter.value = [];
+  fieldFilter.value = [];
+}
+
+// The domains among the apps in this status (active, archived…), with
+// their colours' dots: what the banners' colours mean, and a filter; then
+// the research fields among them. One at a time each; both must hold.
+const statusApps = computed(() => appsInStatus(applications.value, statusFilter.value));
+const domainChips = computed(() => domainCounts(statusApps.value));
+const fieldChips = computed(() => fieldCounts(statusApps.value));
+const domainFacets = computed(() => domainFacetOptions(domainChips.value));
+const fieldFacets = computed(() => fieldFacetOptions(fieldChips.value));
+const toggleDomain = (key) => (domainFilter.value = toggleKey(domainFilter.value, key));
+const toggleField = (key) => (fieldFilter.value = toggleKey(fieldFilter.value, key));
+// Show archived: all (Active and Archived) when ticked, Active when not.
+const showArchived = computed({
+  get: () => statusFilter.value !== APP_FILTER_DEFAULTS.status,
+  set: (on) => (statusFilter.value = on ? "all" : APP_FILTER_DEFAULTS.status),
+});
+
+// The filters set, as removable chips over the cards; Clear all resets them
+// (the search stays: it's in the toolbar).
+const facetRefs = { visibility: visibilityFilter, status: statusFilter, domain: domainFilter, field: fieldFilter };
+const activeChips = computed(() =>
+  appActiveFilters(
+    { visibility: visibilityFilter.value, status: statusFilter.value, domain: domainFilter.value, field: fieldFilter.value },
+    { domains: domainChips.value, fields: fieldChips.value }
+  )
+);
+// Clear a facet, or (a chip of a multi-select one) one of its keys.
+const clearFacet = (key, value) =>
+  (facetRefs[key].value = value === undefined ? APP_FILTER_DEFAULTS[key] : facetRefs[key].value.filter((k) => k !== value));
+const removeChip = (chip) => clearFacet(chip.key, chip.value);
+const clearFacets = () => Object.keys(facetRefs).forEach((key) => clearFacet(key));
+
+const filteredApplications = computed(() =>
+  sortApps(
+    filterApps(applications.value, {
+      status: statusFilter.value,
+      query: searchQuery.value,
+      visibility: visibilityFilter.value,
+      domain: domainFilter.value,
+      field: fieldFilter.value,
+    }),
+    sortBy.value,
+    workflows.value
+  )
+);
 
 const paginatedApplications = computed(() => {
   const start = (currentPage.value - 1) * pageSize;
   return filteredApplications.value.slice(start, start + pageSize);
 });
 
+// The apps' own sample outputs (a PDF of one of their app runs), for the
+// cards on the page: a chip on the card opens it.
+const appSamples = ref({}); // sourceUrl -> example (null: none)
+const fetchAppSample = (sourceUrl) => store.dispatch("analysisModule/fetchAppExample", { sourceUrl, strict: true });
+watch(
+  paginatedApplications,
+  (list) => {
+    for (const app of list || []) {
+      const url = app?.sourceUrl;
+      if (!url || url in appSamples.value) continue;
+      appSamples.value = { ...appSamples.value, [url]: null };
+      appSampleCache.get(url, fetchAppSample).then((example) => {
+        if (example) appSamples.value = { ...appSamples.value, [url]: { ...example, fetchedAt: Date.now() } };
+      });
+    }
+  },
+  { immediate: true }
+);
+const sampleViewer = ref({ open: false, source: null, name: "", subtitle: "" });
+const openAppSample = (app) => {
+  const url = app.sourceUrl;
+  const cached = appSamples.value[url];
+  let first = true;
+  sampleViewer.value = {
+    open: true,
+    source: async () => {
+      if (first && cached?.pdfUrl && Date.now() - cached.fetchedAt < PDF_URL_FRESH_MS) {
+        first = false;
+        return cached.pdfUrl;
+      }
+      first = false;
+      appSampleCache.forget(url);
+      const again = await appSampleCache.get(url, fetchAppSample);
+      appSamples.value = { ...appSamples.value, [url]: again ? { ...again, fetchedAt: Date.now() } : null };
+      return again?.pdfUrl || null;
+    },
+    name: appTitle(app),
+    subtitle: [cached?.app?.tag, cached?.runName && `run ${cached.runName}`, cached?.pages && `${cached.pages} pages`]
+      .filter(Boolean)
+      .join(" · "),
+  };
+};
+
 watch(filteredApplications, () => {
   currentPage.value = 1;
+});
+
+// Load the list if nothing has yet: My Workspace clears the analysis cache on
+// entry, and in a workspace this is a no-op once the list is loaded.
+onMounted(() => {
+  store
+    .dispatch("analysisModule/fetchApplications", { includeArchived: statusFilter.value !== "active" })
+    .catch(() => {});
+  // The workflows "Used in" counts, when Apps opened before the Library.
+  if (!workflows.value.length) {
+    store.dispatch("analysisModule/fetchWorkflows", { limit: 100 }).catch(() => {});
+  }
 });
 
 // Archived applications are excluded from the default list response, so any
@@ -190,15 +302,6 @@ watch(statusFilter, (val) => {
 /*
   Status helpers
 */
-const statusBadgeClass = (status) => {
-  if (!status) return "badge-gray";
-  const s = status.toLowerCase();
-  if (["deployed", "active", "running"].includes(s)) return "badge-green";
-  if (["registering", "deploying", "re-deploying", "pending"].includes(s))
-    return "badge-blue";
-  if (s.startsWith("error") || s === "stopped") return "badge-red";
-  return "badge-gray";
-};
 
 const statusLabel = (status) => {
   if (!status) return "Unknown";
@@ -209,22 +312,32 @@ const statusLabel = (status) => {
   Navigation
 */
 const goToDetail = (app) => {
-  router.push({ name: "application-detail", params: { uuid: app.uuid } });
+  router.push(scopedRoute("application-detail", { uuid: app.uuid }));
+};
+
+// The card's menu: its repository, or its sample output.
+const onAppMenu = (command, app) => {
+  if (command === "github") window.open(githubUrl(app), "_blank", "noopener");
+  else if (command === "sample") openAppSample(app);
 };
 
 const goToManifestBuilder = () => {
-  router.push({ name: "application-manifest-builder" });
+  router.push(scopedRoute("application-manifest-builder"));
 };
 </script>
 
 <template>
   <div class="applications-container">
-    <!-- Info Section -->
-    <div class="info-section">
+    <!-- Info Section (the Apps tab has its own toolbar) -->
+    <div v-if="!embedded" class="info-section">
       <div class="info-card">
         <h3>Applications</h3>
         <p>
-          Browse the applications available in this workspace. Each
+          <template v-if="isMyWorkspace">
+            Browse the public applications, your own, and the ones shared
+            with you directly. Each
+          </template>
+          <template v-else>Browse the applications available in this workspace. Each</template>
           application is sourced from a GitHub repository published to the
           Pennsieve App Store and can be wired into compute workflows.
         </p>
@@ -243,7 +356,7 @@ const goToManifestBuilder = () => {
           <strong>Configure your application's defaults.</strong>
           Generate an <code>app.yml</code> manifest with the
           <router-link
-            :to="{ name: 'application-manifest-builder' }"
+            :to="scopedRoute('application-manifest-builder')"
             class="info-link"
           >
             manifest builder
@@ -251,7 +364,7 @@ const goToManifestBuilder = () => {
           to declare your application's runtime, resources, parameters, and
           inputs/outputs, then add it to your repository. See the
           <router-link
-            :to="{ name: 'application-manifest-guide' }"
+            :to="scopedRoute('application-manifest-guide')"
             class="info-link"
           >
             manifest guide
@@ -261,135 +374,118 @@ const goToManifestBuilder = () => {
       </div>
     </div>
 
-    <!-- Applications Section -->
-    <div class="applications-section">
-      <div class="applications-section-header">
-        <h3>Applications</h3>
-        <div class="applications-section-actions">
-          <el-input
-            v-if="applications.length > 0"
-            v-model="searchQuery"
-            placeholder="Search applications..."
-            size="default"
-            clearable
-            class="applications-search-input"
-          />
-          <!-- <el-button type="primary" @click="goToManifestBuilder">
-            Create app.yml
-          </el-button> -->
-        </div>
-      </div>
+    <!-- The filters on the left (a rail when folded, a drawer on a phone),
+         as the Workflows Library's; the search and Sort in one row; the
+         chips and cards -->
+    <FacetLayout
+      class="applications-section"
+      storage-key="pennsieve.apps.filtersPanel"
+      :chips="activeChips"
+      @remove="removeChip"
+      @clear-all="clearFacets"
+    >
+      <template #filters>
+        <FacetSection title="Visibility" :clearable="visibilityFilter !== APP_FILTER_DEFAULTS.visibility" @clear="clearFacet('visibility')">
+          <FacetRadios v-model="visibilityFilter" :options="VISIBILITY_OPTIONS" label="Visibility" />
+          <FacetCheck v-model="showArchived" label="Show archived" />
+        </FacetSection>
+        <FacetSection v-if="domainFacets.length" title="Domain" :clearable="domainFilter.length > 0" @clear="clearFacet('domain')">
+          <FacetOptions :options="domainFacets" :selected="domainFilter" @toggle="toggleDomain" />
+        </FacetSection>
+        <FacetSection v-if="fieldFacets.length" title="Field" :clearable="fieldFilter.length > 0" @clear="clearFacet('field')">
+          <FacetOptions :options="fieldFacets" :selected="fieldFilter" @toggle="toggleField" />
+        </FacetSection>
+      </template>
 
-      <div class="filter-bar">
-        <label class="filter-field">
-          <span class="filter-field-label">Visibility</span>
-          <el-select
-            v-model="visibilityFilter"
-            size="default"
-            class="filter-select"
-          >
-            <el-option
-              v-for="option in visibilityOptions"
-              :key="option.value"
-              :label="option.label"
-              :value="option.value"
-            />
+      <template #toolbar>
+        <el-input
+          v-model="searchQuery"
+          placeholder="Search by name, description or repository…"
+          clearable
+          class="toolbar-search"
+        />
+        <label class="sort-control toolbar-sort">
+          Sort
+          <el-select v-model="sortBy" size="small" class="sort-select">
+            <el-option v-for="o in APP_SORTS" :key="o.value" :label="o.label" :value="o.value" />
           </el-select>
         </label>
-
-        <label class="filter-field">
-          <span class="filter-field-label">Status</span>
-          <el-select
-            v-model="statusFilter"
-            size="default"
-            class="filter-select"
-          >
-            <el-option
-              v-for="option in statusOptions"
-              :key="option.value"
-              :label="option.label"
-              :value="option.value"
-            />
-          </el-select>
-        </label>
-      </div>
+      </template>
 
       <div v-if="filteredApplications.length > 0" class="applications-grid">
+        <!-- A card: the app's banner on the left (what goes in and comes
+             out, on its domain's colour); what the app is, where it runs
+             and how much it's used on the right. -->
         <div
           v-for="app in paginatedApplications"
           :key="app.uuid"
           class="app-card"
+          :class="{ 'is-archived': app.status === 'archived' }"
+          role="link"
+          tabindex="0"
           @click="goToDetail(app)"
+          @keydown.enter="goToDetail(app)"
         >
-          <div class="app-header">
-            <div class="app-info">
-              <h3>
-                <button
-                  type="button"
-                  class="app-name-link"
-                  @click.stop="goToDetail(app)"
-                >
-                  {{ repoName(app) }}
-                </button>
-              </h3>
-              <div class="app-subtitle">Application</div>
-              <div v-if="readmePreviews[app.uuid]" class="app-description">
-                {{ readmePreviews[app.uuid] }}
-              </div>
-              <div class="app-tags">
-                <span
-                  class="status-badge"
-                  :class="statusBadgeClass(latestVersion(app)?.status)"
-                >
-                  {{ statusLabel(latestVersion(app)?.status) }}
-                </span>
-                <span
-                  v-if="visibilityLabel(app)"
-                  class="tag visibility"
-                  :class="visibilityLabel(app).toLowerCase()"
-                >
-                  {{ visibilityLabel(app) }}
-                </span>
-                <span class="tag created">
-                  {{ new Date(app.createdAt).toLocaleDateString() }}
-                </span>
-                <span v-if="app.status === 'archived'" class="tag archived">
-                  Archived
-                </span>
-              </div>
-            </div>
+          <div class="app-thumb">
+            <AppBanner :app="app" />
           </div>
-
-          <div class="app-card-actions">
-            <div class="app-metrics">
-              <span class="metric-item">
-                <span class="metric-value">
-                  {{ (app.versions || []).length }}
-                </span>
-                <span class="metric-label">versions</span>
+          <div class="app-body">
+            <div class="app-title">
+              <span class="app-name">{{ appTitle(app) }}</span>
+              <span v-if="latestVersion(app)?.version" class="app-version">{{ versionLabel(latestVersion(app).version) }}</span>
+              <span v-if="app.status === 'archived'" class="app-badge">Archived</span>
+              <span v-else-if="visibilityLabel(app)" class="app-badge">{{ visibilityLabel(app) }}</span>
+            </div>
+            <p class="app-description">
+              {{ appDescription(app) || readmeSummary(app) || "No description." }}
+            </p>
+            <!-- Its variants (a CPU and a GPU build), then its tags -->
+            <div v-if="appTags(app).length || paletteVariants(app).length || appNeedsGpu(app)" class="app-tags">
+              <span
+                v-for="v in paletteVariants(app)"
+                :key="`v:${v.id}`"
+                class="app-tag app-variant"
+                :class="chipState(v)"
+                :title="chipTitle(v)"
+              ><RuntimeMark v-if="v.gpu" runtime="gpu" compact />{{ v.name }}</span>
+              <CardTags :tags="appTags(app)" />
+              <!-- Runs on a GPU: muted, as a field tag (a GPU variant's chip
+                   already says so) -->
+              <el-tooltip v-if="appNeedsGpu(app) && !paletteVariants(app).some((v) => v.gpu)" content="Needs a GPU compute node" placement="top">
+                <span class="app-gpu">GPU</span>
+              </el-tooltip>
+            </div>
+            <div class="app-foot">
+              <span class="app-usage">
+                <span class="app-dot" :class="versionState(app)" :title="statusLabel(latestVersion(app)?.status)" />
+                <span class="app-usage-text">{{ usageText(app) }}</span>
               </span>
-              <span class="metric-divider" />
-              <span class="metric-item">
-                <span class="metric-value">{{ totalDeployments(app) }}</span>
-                <span class="metric-label">deployments</span>
-              </span>
-              <span class="metric-divider" />
-              <span class="metric-item">
-                <span class="metric-value">
-                  {{ latestVersion(app)?.version || '--' }}
-                </span>
-                <span class="metric-label">latest</span>
+              <!-- Open, then the rest (GitHub, the sample PDF) in a menu, so
+                   the usage keeps its room on a narrow card -->
+              <span class="app-actions" @click.stop>
+                <button type="button" class="app-action app-action--open" @click="goToDetail(app)">Open</button>
+                <el-dropdown
+                  v-if="githubUrl(app) || appSamples[app.sourceUrl]"
+                  trigger="click"
+                  placement="bottom-end"
+                  @command="(c) => onAppMenu(c, app)"
+                >
+                  <button type="button" class="app-action app-action--icon" aria-label="More: GitHub, sample output" title="More">
+                    <el-icon><MoreFilled /></el-icon>
+                  </button>
+                  <template #dropdown>
+                    <el-dropdown-menu>
+                      <el-dropdown-item v-if="githubUrl(app)" command="github">View on GitHub</el-dropdown-item>
+                      <el-dropdown-item v-if="appSamples[app.sourceUrl]" command="sample">
+                        <span class="app-menu-item" title="A PDF summary of a run of this app">
+                          <IconPDF :width="14" :height="14" color="currentColor" /> Sample output (PDF)
+                        </span>
+                      </el-dropdown-item>
+                    </el-dropdown-menu>
+                  </template>
+                </el-dropdown>
               </span>
             </div>
-
-            <button
-              type="button"
-              class="card-action-link"
-              @click.stop="goToDetail(app)"
-            >
-              <span>View details</span>
-              <span class="arrow">&rarr;</span>
-            </button>
           </div>
         </div>
       </div>
@@ -397,7 +493,10 @@ const goToManifestBuilder = () => {
       <div v-if="filteredApplications.length === 0" class="empty-state">
         <IconAnalysis :width="48" :height="48" color="#9ca3af" />
         <span v-if="applications.length === 0">No applications yet</span>
-        <span v-else>No applications match your filters</span>
+        <span v-else>No applications match your search and filters</span>
+        <button v-if="filtersSet" type="button" class="clear-filters" @click="clearFilters">
+          Clear search and filters
+        </button>
       </div>
 
       <el-pagination
@@ -410,7 +509,13 @@ const goToManifestBuilder = () => {
         :total="filteredApplications.length"
         @current-change="currentPage = $event"
       />
-    </div>
+    </FacetLayout>
+    <SampleOutputViewer
+      v-model="sampleViewer.open"
+      :source="sampleViewer.source"
+      :workflow-name="sampleViewer.name"
+      :subtitle="sampleViewer.subtitle"
+    />
   </div>
 </template>
 
@@ -418,14 +523,14 @@ const goToManifestBuilder = () => {
 @use "../../../styles/theme";
 @use "../../../styles/element/input";
 
+/* No padding of its own: the filter panel (or its rail) sits against the
+   page's edges; FacetLayout pads the list (20px/32px, as the Analysis tabs). */
 .applications-container {
-  max-width: 1000px;
-  margin: 0;
-  padding: 16px 24px;
+  min-height: 100%;
 }
 
 .info-section {
-  margin-bottom: 32px;
+  margin: 20px 32px 12px;
 }
 
 .info-card {
@@ -475,252 +580,309 @@ const goToManifestBuilder = () => {
   }
 }
 
-.applications-section {
-  margin-bottom: 48px;
+/* The search fills the toolbar's row up to Sort, then the tab's actions. */
+.toolbar-search {
+  flex: 1;
+  min-width: 0;
 }
-
-.applications-section-header {
+.sort-control {
   display: flex;
+  flex-shrink: 0;
   align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 16px;
-
-  h3 {
-    font-size: 20px;
-    font-weight: 500;
-    color: theme.$gray_6;
-    margin: 0;
+  gap: 8px;
+  font-size: 12px;
+  color: theme.$gray_5;
+}
+.sort-select {
+  width: 170px;
+}
+@media (max-width: 767px) {
+  .info-section {
+    margin: 16px 16px 0;
+  }
+  /* The select alone says what it sorts by. */
+  .toolbar-sort {
+    font-size: 0;
+  }
+  .sort-select {
+    width: 130px;
   }
 }
 
-.applications-section-actions {
+/* Cards two or more to a row where 340px each fit (16px apart), each as
+   tall as its square banner (172px; 140px in a narrow card), as the
+   workflows': the rows line up, and the text fits the card. */
+$card-height: 172px;
+
+.applications-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(340px, 100%), 1fr));
+  gap: 16px;
+}
+.app-card {
+  display: flex;
+  min-width: 0;
+  container: app-card / inline-size;
+  border: 1px solid theme.$gray_2;
+  background: theme.$white;
+  overflow: hidden;
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+
+  &:hover,
+  &:focus-visible {
+    border-color: theme.$purple_1;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+    outline: none;
+  }
+  &:hover .app-actions,
+  &:focus-within .app-actions {
+    opacity: 1;
+    pointer-events: auto;
+  }
+  &.is-archived {
+    opacity: 0.7;
+  }
+}
+/* The app's banner, where the workflows show their graph. */
+.app-thumb {
+  display: flex;
+  flex: 0 0 auto;
+  align-self: flex-start;
+  width: $card-height;
+  aspect-ratio: 1 / 1;
+  border-right: 1px solid theme.$gray_2;
+}
+/* A narrow card: a smaller square, tighter text, two lines of
+   description. */
+@container app-card (max-width: 440px) {
+  .app-thumb {
+    width: 140px;
+  }
+  .app-body {
+    gap: 4px;
+    padding: 10px 12px;
+  }
+  .app-body .app-description {
+    -webkit-line-clamp: 2;
+  }
+}
+/* Its variants (boxed), then its tags as the panel lists them (CardTags). */
+/* One line: the tags give way (dropping whole ones) to the GPU marker. */
+.app-tags {
+  display: flex;
+  flex-shrink: 0;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 0 4px;
+  height: 18px;
+  overflow: hidden;
+}
+/* The tags take the rest of the row, so the ones that don't fit drop
+   whole (CardTags) rather than being cut. */
+.app-tags .card-tags {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+/* Runs on a GPU: muted, as a field tag, after the tags. */
+.app-gpu {
+  flex-shrink: 0;
+  margin-left: 12px;
+  font-size: 12px;
+  line-height: 18px;
+  color: theme.$gray_5;
+}
+.app-variant + .card-tags {
+  margin-left: 8px;
+}
+.app-tag {
+  flex-shrink: 0;
+  padding: 0 6px;
+  border-radius: 3px;
+  background: theme.$gray_0;
+  font-size: 11px;
+  color: theme.$gray_5;
+}
+.app-variant {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid theme.$gray_2;
+  background: theme.$white;
+}
+.app-variant--building {
+  border-style: dashed;
+  color: theme.$gray_4;
+}
+.app-variant--failed {
+  border-color: theme.$red_2;
+  color: theme.$red_2;
+  text-decoration: line-through;
+}
+/* The text fits the banner's height: it doesn't size the card (contain),
+   and what doesn't fit is cut, never the card stretched. */
+.app-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+  padding: 14px 16px 12px;
+  contain: size;
+  overflow: hidden;
+}
+.app-title {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 6px;
+  min-width: 0;
 }
-
-.applications-search-input {
-  max-width: 320px;
+.app-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 15px;
+  font-weight: 600;
+  color: theme.$gray_6;
 }
-
-.filter-bar {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 20px;
-  margin-bottom: 16px;
+.app-version {
+  flex-shrink: 0;
+  font-size: 12px;
+  color: theme.$gray_4;
 }
-
-.filter-field {
+/* What the card is (public, archived…), in its top-right corner: the
+   badges line up down the grid. */
+.app-badge {
+  flex-shrink: 0;
+  margin-left: auto;
+  padding: 0 6px;
+  border-radius: 3px;
+  background: theme.$gray_0;
+  color: theme.$gray_5;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+/* Three lines where the card has room (two in a narrow one). */
+.app-description {
+  display: -webkit-box;
+  flex-shrink: 0;
+  margin: 0;
+  overflow: hidden;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  font-size: 13px;
+  line-height: 1.4;
+  color: theme.$gray_5;
+}
+/* One line at the card's foot: the usage gives way (…) to the buttons,
+   which always show. */
+.app-foot {
   display: flex;
   align-items: center;
   gap: 8px;
+  margin-top: auto;
 }
-
-.filter-field-label {
-  font-size: 12px;
-  font-weight: 600;
-  color: theme.$gray_5;
-}
-
-.filter-select {
-  width: 150px;
-}
-
-.applications-grid {
+.app-usage {
   display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.app-card {
-  background: white;
-  border: 1px solid theme.$gray_2;
-  padding: 20px;
-  transition: border-color 0.2s ease;
-  cursor: pointer;
-
-  &:hover {
-    border-color: theme.$gray_3;
-  }
-}
-
-.app-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 16px;
-}
-
-.app-info {
-  flex: 1;
-  min-width: 0;
-
-  h3 {
-    font-size: 16px;
-    font-weight: 500;
-    color: theme.$gray_6;
-    margin: 0 0 8px 0;
-  }
-}
-
-.app-name-link {
-  background: none;
-  border: none;
-  padding: 0;
-  font: inherit;
-  color: theme.$gray_6;
-  cursor: pointer;
-  text-align: left;
-  text-decoration: none;
-  transition: color 0.2s ease;
-
-  &:hover {
-    color: theme.$purple_2;
-    text-decoration: underline;
-  }
-}
-
-.app-subtitle {
-  font-size: 13px;
-  color: theme.$gray_5;
-  margin-bottom: 6px;
-  font-weight: 400;
-}
-
-.app-description {
-  font-size: 13px;
-  color: theme.$gray_5;
-  margin: 4px 0 8px 0;
-  line-height: 1.4;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
-.app-tags {
-  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
   gap: 6px;
-  margin-top: 8px;
-  flex-wrap: wrap;
-
-  .tag {
-    display: inline-block;
-    padding: 2px 8px;
-    border-radius: 3px;
-    font-size: 11px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-
-    &.visibility {
-      &.private {
-        background: rgba(#EF4444, 0.1);
-        color: #DC2626;
-      }
-      &.public {
-        background: rgba(#10B981, 0.1);
-        color: #059669;
-      }
-      &.unknown {
-        background: theme.$gray_2;
-        color: theme.$gray_5;
-      }
-    }
-
-    &.created {
-      background: theme.$gray_1;
-      color: theme.$gray_5;
-    }
-
-    &.archived {
-      background: theme.$gray_2;
-      color: theme.$gray_5;
-    }
-  }
-}
-
-.status-badge {
-  font-size: 10px;
-  font-weight: 600;
-  padding: 2px 8px;
-  border-radius: 4px;
-  white-space: nowrap;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-
-  &.badge-gray { background: theme.$gray_2; color: theme.$gray_5; }
-  &.badge-blue { background: #dbeafe; color: #1d4ed8; }
-  &.badge-green { background: rgba(23, 187, 98, 0.12); color: #17BB62; }
-  &.badge-red { background: #fee2e2; color: #b91c1c; }
-}
-
-.app-card-actions {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 18px;
-  margin-top: 14px;
-  padding-top: 14px;
-  border-top: 1px solid theme.$gray_2;
-  flex-wrap: wrap;
-}
-
-.app-metrics {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.metric-item {
-  display: flex;
-  align-items: baseline;
-  gap: 3px;
-}
-
-.metric-value {
-  font-size: 14px;
-  font-weight: 700;
-  color: theme.$black;
-}
-
-.metric-label {
-  font-size: 10px;
+  min-width: 0;
+  font-size: 12px;
   color: theme.$gray_4;
 }
-
-.metric-divider {
-  width: 1px;
-  height: 14px;
-  background: theme.$gray_3;
+.app-usage-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
+/* The latest version's state. */
+.app-dot {
+  width: 8px;
+  height: 8px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: theme.$gray_4;
 
-.card-action-link {
+  &.ok { background: theme.$status_green; }
+  &.pending { background: #f59e0b; }
+  &.failed { background: theme.$status_red; }
+}
+/* Over the usage's end, on hover only: the usage keeps the whole line
+   until then (on a touch screen, in the line). */
+.app-foot {
+  position: relative;
+}
+.app-actions {
+  position: absolute;
+  right: 0;
+  display: flex;
+  gap: 6px;
+  padding-left: 12px;
+  background: linear-gradient(to right, rgba(255, 255, 255, 0), theme.$white 12px);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+.app-menu-item {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  background: none;
-  border: none;
-  padding: 0;
+}
+.app-action--icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3px 6px;
+}
+.app-action {
+  padding: 3px 10px;
+  border: 1px solid theme.$gray_3;
+  border-radius: 4px;
+  background: theme.$white;
   font: inherit;
-  font-size: 13px;
-  font-weight: 500;
-  color: theme.$purple_3;
+  font-size: 12px;
+  color: theme.$gray_6;
   text-decoration: none;
   cursor: pointer;
 
   &:hover {
-    text-decoration: underline;
+    border-color: theme.$purple_1;
+    color: theme.$purple_3;
   }
+}
+.app-action--open {
+  border-color: theme.$purple_3;
+  background: theme.$purple_3;
+  color: theme.$white;
 
-  .arrow {
-    transition: transform 0.15s ease;
+  &:hover {
+    background: theme.$purple_2;
+    color: theme.$white;
   }
+}
+@media (hover: none) {
+  .app-actions {
+    position: static;
+    flex-shrink: 0;
+    margin-left: auto;
+    padding-left: 0;
+    background: none;
+    opacity: 1;
+    pointer-events: auto;
+  }
+}
+.clear-filters {
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  font-size: 13px;
+  color: theme.$link-color;
+  cursor: pointer;
 
-  &:hover .arrow {
-    transform: translateX(2px);
+  &:hover {
+    color: theme.$link-color-hover;
   }
 }
 

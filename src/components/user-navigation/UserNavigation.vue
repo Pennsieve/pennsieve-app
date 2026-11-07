@@ -97,6 +97,7 @@
         :link="{ name: 'my-analysis' }"
         label="My Analysis"
         :condensed="primaryNavCondensed"
+        :active-for-routes="['my-analysis']"
       >
         <template v-slot:icon>
           <IconAnalysis :width="20" :height="20" color="currentColor" />

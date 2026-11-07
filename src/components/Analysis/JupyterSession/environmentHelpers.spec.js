@@ -1,0 +1,113 @@
+import { describe, it, expect } from "vitest";
+import {
+  environmentChoices,
+  gpuEnvironmentWarning,
+  gpuFrameworks,
+  matchesQuery,
+  packageName,
+  packageSummary,
+  switchBusy,
+  switchLabel, parsePackages, fromEnvironment, requirementsText, PACKAGES_MARK, PYTHON_PACKAGES_CODE } from "./environmentHelpers";
+
+const py = (version, status = "ready", packages = ["numpy==2.1.0"], runtime = { language: "python", version: "3.12" }) => ({
+  version, status, packages, runtime,
+});
+
+describe("packageSummary", () => {
+  it("names the first packages and counts the rest", () => {
+    expect(packageName("scikit-learn>=1.4")).toBe("scikit-learn");
+    expect(packageSummary(["numpy==2.1", "pandas==2.2", "scipy==1.14", "mne==1.8", "h5py==3.12"])).toBe("numpy, pandas, scipy +2");
+    expect(packageSummary(["numpy==2.1"])).toBe("numpy");
+    expect(packageSummary([])).toBe("");
+  });
+});
+
+describe("environmentChoices", () => {
+  const envs = [
+    { id: "b", name: "zeta", language: "python", latest: py(2) },
+    { id: "a", name: "alpha", language: "python", latest: py(3, "building") },
+    { id: "c", name: "old-python", language: "python", latest: py(1, "ready", [], { language: "python", version: "3.11" }) },
+    { id: "d", name: "never", language: "python", latest: py(1, "failed") },
+    { id: "r", name: "r-env", language: "r", latest: py(1) },
+  ];
+
+  it("offers each environment's newest ready version for the kernel", () => {
+    const choices = environmentChoices(envs, "Python 3.12.3", { a: [py(3, "building"), py(2, "ready", ["mne==1.8"])] });
+    expect(choices.map((c) => [c.name, c.version, c.disabled])).toEqual([
+      ["alpha", 2, ""],
+      ["zeta", 2, ""],
+      ["never", 0, "No ready version"],
+      ["old-python", 1, "Python 3.11"],
+    ]);
+  });
+
+  it("says a first version is still building", () => {
+    const choices = environmentChoices([envs[1]], "Python 3.12.3");
+    expect(choices[0].disabled).toBe("Building…");
+  });
+});
+
+describe("matchesQuery", () => {
+  const choice = { name: "neuro", packages: ["mne==1.8", "numpy==2.1"] };
+  it("matches the name or a package", () => {
+    expect(matchesQuery(choice, "")).toBe(true);
+    expect(matchesQuery(choice, "NEU")).toBe(true);
+    expect(matchesQuery(choice, "mne")).toBe(true);
+    expect(matchesQuery(choice, "1.8")).toBe(false);
+    expect(matchesQuery(choice, "pandas")).toBe(false);
+  });
+});
+
+describe("switchLabel", () => {
+  it("describes each stage", () => {
+    expect(switchLabel(null)).toBe("");
+    expect(switchLabel({ state: "resolving", environmentId: "e" })).toBe("Preparing the environment…");
+    expect(switchLabel({ state: "resolving", environmentId: "" })).toBe("Switching back…");
+    expect(switchLabel({ state: "downloading", bytes: 12e6, sizeBytes: 90e6 })).toBe("Downloading… 12 MB of 90 MB");
+    expect(switchLabel({ state: "restarting" })).toBe("Restarting the kernel…");
+    expect(switchLabel({ state: "done" })).toBe("");
+    expect(switchBusy({ state: "downloading" })).toBe(true);
+    expect(switchBusy({ state: "failed" })).toBe(false);
+    expect(switchBusy(null)).toBe(false);
+  });
+});
+
+describe("environments on a GPU session", () => {
+  it("finds the frameworks that would shadow the image's CUDA build", () => {
+    expect(gpuFrameworks(["numpy==2.1", "torch==2.4.0", "jaxlib>=0.4", "jax", "tensorflow-cpu"])).toEqual(["torch", "jax", "tensorflow"]);
+    expect(gpuFrameworks(["pandas", "torchvision==0.19"])).toEqual([]);
+    expect(gpuFrameworks(null)).toEqual([]);
+  });
+
+  it("warns only when there is one", () => {
+    expect(gpuEnvironmentWarning(["pandas"])).toBe("");
+    expect(gpuEnvironmentWarning(["torch==2.4"])).toMatch(/^This environment brings its own torch\. .*Leave it out/);
+    expect(gpuEnvironmentWarning(["torch", "jax"])).toMatch(/own torch and jax\. .*Leave them out/);
+  });
+});
+
+describe("installed packages", () => {
+  it("reads the kernel's list from its marked line", () => {
+    const out = `noise\n${PACKAGES_MARK}[["numpy","2.1.0"],["Pandas","2.2.3"],["aiohttp","3.10"]]\n`;
+    expect(parsePackages(out)).toEqual([
+      { name: "aiohttp", version: "3.10" },
+      { name: "numpy", version: "2.1.0" },
+      { name: "Pandas", version: "2.2.3" },
+    ]);
+    expect(parsePackages("no list")).toBe(null);
+    expect(parsePackages(`${PACKAGES_MARK}[not json`)).toBe(null);
+  });
+
+  it("marks the environment's own, by name", () => {
+    const marked = fromEnvironment([{ name: "scikit_image", version: "0.24" }, { name: "numpy", version: "2.1" }], ["scikit-image>=0.22"]);
+    expect(marked.map((p) => p.fromEnvironment)).toEqual([true, false]);
+  });
+
+  it("copies as pinned requirements", () => {
+    expect(requirementsText([{ name: "numpy", version: "2.1.0" }])).toBe("numpy==2.1.0\n");
+  });
+
+  it("asks silently, leaving nothing in the namespace", () => {
+    expect(PYTHON_PACKAGES_CODE).toContain("del __pennsieve_packages");
+  });
+});

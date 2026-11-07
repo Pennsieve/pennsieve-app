@@ -18,8 +18,13 @@ import { useGetToken } from "@/composables/useGetToken";
 import { useSendXhr } from "@/mixins/request/request_composable";
 import { useMetricsCounters } from "@/composables/useMetricsCounters";
 import toQueryParams from "@/utils/toQueryParams";
-import LayerNameSelector from "./LayerNameSelector.vue";
-import { validateRunName, runDisplayName, RUN_NAME_MAX_LENGTH } from "./runHelpers";
+import TargetDatasetField from "./TargetDatasetField.vue";
+import { targetWritesToDataset, targetParamFields, buildDataTargets, targetDatasetId, datasetName } from "./dataTargets";
+import { validateRunName, runDisplayName, RUN_NAME_MAX_LENGTH, targetTypeName,
+  nodeMetricRows, processorConfigEntry, lambdaMemory,
+} from "./runHelpers";
+import { sourceLabel, sourceHints, hintLine, portsOfStep, missingFilesMessage } from "../WorkflowGraph/sourceInputs";
+import { appLambdaEligibility, lambdaUnavailableHint, lambdaOverrideWarning, withLambdaChoice } from "../Applications/lambdaEligibility";
 
 const { onNodeClick, onPaneClick, fitView, updateNodeData } = useVueFlow();
 
@@ -74,6 +79,17 @@ const rerunSource = ref(null); // the run object to copy config from when rerunn
 
 // File picker dialog state
 const filePickerVisible = ref(false);
+// The picker names the input its source feeds and what that input takes
+// (sourceInputs.js): "Select files for signals", "signals takes CSV files".
+const sourcePicker = computed(() => {
+  const id = filePickerNodeId.value;
+  const dag = configDefinition.value?.dag || [];
+  const name = id ? sourceLabel(id, dag, "") : "";
+  return {
+    title: name ? `Select files for ${name}` : "Select Files",
+    hint: id ? hintLine(sourceHints(id, dag, portsOfStep(dag, availableApplications.value))) : "",
+  };
+});
 const filePickerNodeId = ref(null);
 const filePickerFiles = ref([]);
 const filePickerAncestorList = ref([]);
@@ -147,11 +163,59 @@ const getComputeTypesForTarget = (targetType) => {
   return types && types.length ? withGpu(types) : [];
 };
 
+// An app step's choices: the app's, with GPU, and Lambda always listed (it
+// is disabled, with why, unless the pinned version fits Lambda).
 const getComputeTypesForProcessor = (sourceUrl) => {
   if (!sourceUrl) return DEFAULT_COMPUTE_TYPES;
-  const app = availableApplications.value.find((a) => a.source?.url === sourceUrl);
+  const app = findMatchedApp(sourceUrl);
   const types = app?.runtimeConfig?.computeTypes;
-  return types && types.length ? withGpu(types) : DEFAULT_COMPUTE_TYPES;
+  return withLambdaChoice(types && types.length ? withGpu(types) : DEFAULT_COMPUTE_TYPES);
+};
+
+// Whether a step's pinned version (and variant) may run on Lambda
+// (lambdaEligibility.js): app-deploy-service's check, else its app.yml.
+const stepLambda = (nodeId, sourceUrl, version) => {
+  const d = (configDefinition.value?.dag || []).find((n) => n.id === nodeId);
+  const app = findMatchedApp(sourceUrl || d?.sourceUrl);
+  return appLambdaEligibility(app, version ?? nodeConfigs[nodeId]?.version ?? d?.tag, d?.variant);
+};
+// A version that doesn't fit Lambda only for its declared resources may still
+// be put on Lambda for this run (an override); the others can't.
+const isProcessorComputeTypeDisabled = (ct, nodeId) => {
+  if (ct !== "lambda") return false;
+  const e = stepLambda(nodeId);
+  return !e.available && !e.overridable;
+};
+const processorComputeTypeHint = (ct, nodeId) => (ct === "lambda" ? lambdaUnavailableHint(stepLambda(nodeId)) : "");
+// A step left on Lambda when its version doesn't fit it runs standard,
+// unless the user picked Lambda as an override the version allows.
+const processorTargetFor = (ct, nodeId, sourceUrl, version, picked = false) => {
+  if (ct !== "lambda") return ct;
+  const e = stepLambda(nodeId, sourceUrl, version);
+  return e.available || (picked && e.overridable) ? ct : "standard";
+};
+const onStepVersionChange = (nodeId) => {
+  const cfg = nodeConfigs[nodeId];
+  if (!cfg) return;
+  cfg.executionTarget = processorTargetFor(cfg.executionTarget, nodeId, undefined, undefined, cfg.lambdaPicked);
+  if (cfg.executionTarget === "lambda") cfg.memory = lambdaMemory(cfg.memory);
+};
+// "Lambda (override)" when Lambda is only there as an override.
+const processorComputeTypeLabel = (ct, nodeId) => {
+  if (ct !== "lambda") return formatComputeTypeLabel(ct);
+  const e = stepLambda(nodeId);
+  return !e.available && e.overridable ? "Lambda (override)" : formatComputeTypeLabel(ct);
+};
+// The override's warning for a step on Lambda; "" when none.
+const stepLambdaWarning = (nodeId) =>
+  nodeConfigs[nodeId]?.executionTarget === "lambda" ? lambdaOverrideWarning(stepLambda(nodeId)) : "";
+// A Lambda chosen here is the user's pick (kept as an override on a version
+// change); the resource settings start over for the new target.
+const onProcessorTargetChange = (nodeId) => {
+  const cfg = nodeConfigs[nodeId];
+  cfg.cpu = "";
+  cfg.memory = "";
+  cfg.lambdaPicked = cfg.executionTarget === "lambda";
 };
 
 /* Version helpers — match WorkflowBuilder */
@@ -449,11 +513,8 @@ const findAppByUrl = (sourceUrl) => {
   );
 };
 
-const getTargetTypeLabel = (targetType) => {
-  if (!targetType) return "Data Target";
-  const tt = targetTypes.value.find((t) => t.targetType === targetType);
-  return tt?.label || targetType;
-};
+const getTargetTypeLabel = (targetType) =>
+  targetType ? targetTypeName(targetType, targetTypes.value) : "Data Target";
 
 const labelForDagNode = (d) => {
   if (d.type === "data-source") return "Data Source";
@@ -479,7 +540,7 @@ const definitionToNodesAndEdges = (definition) => {
       id: d.id,
       type: nodeType,
       data: {
-        label: labelForDagNode(d),
+        label: labelForDagNode(d, undefined, undefined, dag),
         nodeType: d.type,
         sourceUrl: d.sourceUrl,
         targetType: d.targetType || null,
@@ -547,6 +608,7 @@ const runToNodesAndEdges = (run) => {
       extra.computeType = cfg?.executionTarget || d.computeType || null;
       const targetParams = runDataTargets[d.id]?.params || {};
       extra.params = Object.entries(targetParams).map(([key, value]) => ({ key, value: String(value) }));
+      extra.datasetId = targetWritesToDataset(d.targetType) ? targetDatasetId(runDataTargets[d.id], run.datasetId) : "";
     } else {
       const cfg = runProcessorConfigs.find((c) => c.nodeId === d.id);
       extra.executionTarget = cfg?.executionTarget || null;
@@ -558,7 +620,7 @@ const runToNodesAndEdges = (run) => {
       id: d.id,
       type: nodeType,
       data: {
-        label: labelForDagNode(d),
+        label: labelForDagNode(d, undefined, undefined, dag),
         status: d.status || "NOT_STARTED",
         processorType: d.type,
         sourceUrl: d.sourceUrl,
@@ -605,10 +667,11 @@ const parseEventData = (data) => {
 const onRunStatusUpdate = async (raw) => {
   const data = parseEventData(raw);
 
-  // Update the run in the instances list
-  store.commit("analysisModule/UPDATE_RUN_STATUS", {
+  // Update the run in the instances list (refetches it for an unknown run)
+  store.dispatch("analysisModule/applyRunStatusEvent", {
     runId: data.runId,
     status: data.status,
+    fetchParams: getRunFilterParams(),
   });
 
   // If this is the currently selected run, update the detailed view
@@ -985,18 +1048,18 @@ const initiateWorkflow = async () => {
         const ttDef = getTargetTypeDefinition(d.targetType);
         const paramDefs = ttDef?.params || [];
 
-        // Build params from the target type definition, pre-filling from rerun source or defaults
-        const targetParams = paramDefs.map((pd) => ({
-          name: pd.name,
-          type: pd.type || "string",
-          description: pd.description || "",
-          required: pd.defaultValue == null || pd.defaultValue === undefined,
-          value: srcTargetParams[pd.name] != null ? String(srcTargetParams[pd.name]) : (pd.defaultValue != null ? String(pd.defaultValue) : ""),
-        }));
+        // Values: the run being rerun, then the definition's defaults on the
+        // node, then the registry's (workflow-service applies them in that order).
+        const targetParams = targetParamFields(paramDefs, {
+          sourceParams: srcTargetParams,
+          definitionDefaults: d.defaultParams || {},
+        });
 
         nodeConfigs[d.id] = {
           computeType: srcCfg?.executionTarget || d.computeType || fallback,
           targetType: d.targetType || null,
+          // The target's own dataset; "" means the run's.
+          datasetId: source?.dataTargets?.[d.id]?.datasetId || "",
           params: targetParams,
         };
       } else if (d.type !== "data-source") {
@@ -1021,11 +1084,17 @@ const initiateWorkflow = async () => {
           .map(([key, value]) => ({ key, value: String(value) }));
 
         const matchedApp = findMatchedApp(d.sourceUrl);
+        const version = srcCfg?.version || d.tag || latestVersion(matchedApp)?.version || "";
+        // A rerun of a run that overrode Lambda keeps that pick.
+        const lambdaPicked = srcCfg?.lambdaOverride === true;
+        const executionTarget = processorTargetFor(srcCfg?.executionTarget || d.computeType || "standard", d.id, d.sourceUrl, version, lambdaPicked);
+        const memory = srcCfg?.memory || (d.runtimeConfig?.memory ? String(d.runtimeConfig.memory) : "");
         nodeConfigs[d.id] = {
-          executionTarget: srcCfg?.executionTarget || d.computeType || "standard",
-          version: srcCfg?.version || d.tag || latestVersion(matchedApp)?.version || "",
+          executionTarget,
+          lambdaPicked,
+          version,
           cpu: srcCfg?.cpu || (d.runtimeConfig?.cpu ? String(d.runtimeConfig.cpu) : ""),
-          memory: srcCfg?.memory || (d.runtimeConfig?.memory ? String(d.runtimeConfig.memory) : ""),
+          memory: executionTarget === "lambda" ? lambdaMemory(memory) : memory,
           schemaParams,
           extraParams,
         };
@@ -1095,7 +1164,7 @@ const executeWorkflow = async () => {
   );
   if (missingSources.length > 0) {
     EventBus.$emit("toast", {
-      detail: { type: "error", msg: `Select files for ${missingSources.length === 1 ? "data source" : `${missingSources.length} data sources`}` },
+      detail: { type: "error", msg: missingFilesMessage(missingSources.map((d) => d.id), configDefinition.value?.dag || []) },
     });
     return;
   }
@@ -1155,12 +1224,8 @@ const executeWorkflow = async () => {
         }
       } else if (dagNode.type !== "data-source") {
         // Processor node: version + executionTarget + optional cpu/memory
-        const entry = { nodeId };
-        if (cfg.executionTarget) entry.executionTarget = cfg.executionTarget;
-        if (cfg.version) entry.version = cfg.version;
-        if (cfg.cpu) entry.cpu = cfg.cpu;
-        if (cfg.memory) entry.memory = cfg.memory;
-        processorConfigs.push(entry);
+        // lambdaOverride when Lambda was picked as an override (runHelpers.js).
+        processorConfigs.push(processorConfigEntry(nodeId, cfg, stepLambda(nodeId)));
       }
     });
 
@@ -1182,17 +1247,7 @@ const executeWorkflow = async () => {
     });
 
     // Build dataTargets: keyed by data-target node ID
-    const dataTargets = {};
-    Object.entries(nodeConfigs).forEach(([nodeId, cfg]) => {
-      const dagNode = dag.find((n) => n.id === nodeId);
-      if (dagNode?.type === "data-target" && cfg.params && cfg.params.length > 0) {
-        const obj = {};
-        cfg.params.forEach((p) => { if (p.name && p.value) obj[p.name] = p.value; });
-        if (Object.keys(obj).length > 0) {
-          dataTargets[nodeId] = { params: obj };
-        }
-      }
-    });
+    const dataTargets = buildDataTargets(dag, nodeConfigs, initiateForm.value.datasetId);
 
     const trimmedName = nameResult.value;
     const payload = {
@@ -1225,7 +1280,7 @@ const executeWorkflow = async () => {
     runNameError.value = "";
 
     // Set a temporary placeholder so the canvas doesn't show the dashboard
-    const runId = newRun?.uuid || newRun?.id || newRun?.runId;
+    const runId = newRun?.executionRunId || newRun?.uuid || newRun?.id || newRun?.runId;
     selectedRun.value = newRun || { uuid: runId, status: "STARTED" };
     nodes.value = [];
     edges.value = [];
@@ -1560,7 +1615,7 @@ const nodeMetricLabel = (nodeId) => {
   const activity = selectedWorkflowActivity.value;
   if (!activity?.dag) return nodeId;
   const d = activity.dag.find((n) => n.id === nodeId);
-  return d ? labelForDagNode(d) : nodeId;
+  return d ? labelForDagNode(d, undefined, undefined, activity.dag) : nodeId;
 };
 
 const selectedNodeMetrics = computed(() => {
@@ -1902,7 +1957,7 @@ onUnmounted(() => {
                 <div class="custom-node data-target-node" :class="mode === 'browse' ? statusClass(data.status) : ''">
                   <span v-if="nodeUnmetCount(id, 'data-target') > 0" class="node-unmet-badge">{{ nodeUnmetCount(id, 'data-target') }}</span>
                   <div class="node-header">
-                    <span class="node-title">{{ data.targetType || data.label }}</span>
+                    <span class="node-title">{{ data.targetType ? getTargetTypeLabel(data.targetType) : data.label }}</span>
                   </div>
                   <div class="node-tags">
                     <span class="node-type-badge target-badge">Target</span>
@@ -1975,15 +2030,32 @@ onUnmounted(() => {
                     v-model="nodeConfigs[selectedNode.id].executionTarget"
                     size="small"
                     style="width: 100%"
-                    @change="() => { nodeConfigs[selectedNode.id].cpu = ''; nodeConfigs[selectedNode.id].memory = '' }"
+                    @change="() => onProcessorTargetChange(selectedNode.id)"
                   >
                     <el-option
                       v-for="ct in getComputeTypesForProcessor(selectedNode.data?.sourceUrl)"
                       :key="ct"
-                      :label="formatComputeTypeLabel(ct)"
+                      :label="processorComputeTypeLabel(ct, selectedNode.id)"
                       :value="ct"
-                    />
+                      :disabled="isProcessorComputeTypeDisabled(ct, selectedNode.id)"
+                    >
+                      <el-tooltip
+                        :disabled="!isProcessorComputeTypeDisabled(ct, selectedNode.id)"
+                        :content="processorComputeTypeHint(ct, selectedNode.id)"
+                        placement="right"
+                      >
+                        <span>{{ processorComputeTypeLabel(ct, selectedNode.id) }}</span>
+                      </el-tooltip>
+                    </el-option>
                   </el-select>
+                  <el-alert
+                    v-if="stepLambdaWarning(selectedNode.id)"
+                    :title="stepLambdaWarning(selectedNode.id)"
+                    type="warning"
+                    :closable="false"
+                    show-icon
+                    style="margin-top: 6px"
+                  />
                 </div>
                 <div class="config-field">
                   <label>Version</label>
@@ -1992,6 +2064,7 @@ onUnmounted(() => {
                     size="small"
                     style="width: 100%"
                     placeholder="latest"
+                    @change="() => onStepVersionChange(selectedNode.id)"
                     :disabled="sortedVersions(findMatchedApp(selectedNode.data?.sourceUrl)).length <= 1"
                   >
                     <el-option
@@ -2058,6 +2131,7 @@ onUnmounted(() => {
                       type="number"
                       :min="128"
                       :max="10240"
+                      @change="(v) => { nodeConfigs[selectedNode.id].memory = lambdaMemory(v) }"
                     />
                   </div>
                 </template>
@@ -2140,6 +2214,9 @@ onUnmounted(() => {
             <!-- CONFIGURE MODE: Selected data-target node -->
             <template v-else-if="mode === 'configure' && selectedNode && selectedNode.type === 'data-target' && nodeConfigs[selectedNode.id]">
               <h4 class="sidebar-section-title">Data Target Configuration</h4>
+              <div v-if="!getTargetTypeDefinition(selectedNode.data?.targetType)" class="target-type-missing">
+                Target type "{{ selectedNode.data?.targetType }}" is no longer available, so it has no parameters or runtimes here. Edit the workflow and choose a current target type.
+              </div>
               <div class="info-card">
                 <div class="info-row">
                   <span class="info-label">Target Type</span>
@@ -2170,6 +2247,18 @@ onUnmounted(() => {
                   </el-select>
                 </div>
 
+                <!-- Which dataset the target writes to (the run's, by default) -->
+                <div
+                  v-if="targetWritesToDataset(selectedNode.data?.targetType)"
+                  class="config-field"
+                >
+                  <TargetDatasetField
+                    v-model="nodeConfigs[selectedNode.id].datasetId"
+                    :run-dataset-id="initiateForm.datasetId"
+                    :datasets="datasetOptions"
+                  />
+                </div>
+
                 <!-- Target type params -->
                 <div v-if="nodeConfigs[selectedNode.id].params.length > 0" class="config-field">
                   <label>Parameters</label>
@@ -2183,13 +2272,7 @@ onUnmounted(() => {
                       <span v-if="param.required" class="target-param-required">required</span>
                     </div>
                     <div v-if="param.description" class="target-param-description">{{ param.description }}</div>
-                    <LayerNameSelector
-                      v-if="nodeConfigs[selectedNode.id].targetType === 'persistent-layer' && param.name === 'layerName'"
-                      v-model="param.value"
-                      :compute-node-id="initiateForm.computeNodeId"
-                    />
                     <el-input
-                      v-else
                       v-model="param.value"
                       size="small"
                       :placeholder="param.required ? 'Required' : 'Optional'"
@@ -2323,6 +2406,10 @@ onUnmounted(() => {
                 <div v-if="selectedNode.data?.processorType" class="info-row">
                   <span class="info-label">Type</span>
                   <span class="info-value">{{ selectedNode.data.processorType }}</span>
+                </div>
+                <div v-if="selectedNode.data?.datasetId" class="info-row">
+                  <span class="info-label">Writes to</span>
+                  <span class="info-value">{{ datasetName(selectedNode.data.datasetId, datasetOptions) }}</span>
                 </div>
               </div>
 
@@ -2703,12 +2790,13 @@ onUnmounted(() => {
     <!-- File Picker Dialog -->
     <el-dialog
       v-model="filePickerVisible"
-      title="Select Files"
+      :title="sourcePicker.title"
       width="800px"
       :close-on-click-modal="false"
       @close="closeFilePicker"
     >
       <div class="file-picker-content">
+        <p v-if="sourcePicker.hint" class="file-picker-hint">{{ sourcePicker.hint }}</p>
         <div class="file-picker-header">
           <span class="selected-count">
             <strong>{{ fileCountForNode(filePickerNodeId) }}</strong>
@@ -2832,7 +2920,11 @@ onUnmounted(() => {
             </div>
             <div v-if="nm.maxMemoryUsedMiB != null" class="receipt-row">
               <span>Memory Used</span>
-              <span>{{ nm.maxMemoryUsedMiB }} / {{ nm.memoryConfiguredMiB }} MiB</span>
+              <span>{{ Math.round(nm.maxMemoryUsedMiB) }} / {{ nm.memoryConfiguredMiB }} MiB</span>
+            </div>
+            <div v-if="nm.maxCpuUtilized != null && nm.cpuUnits" class="receipt-row">
+              <span>CPU Used</span>
+              <span>{{ (nm.maxCpuUtilized / 1024).toFixed(2) }} / {{ (nm.cpuUnits / 1024).toFixed(1) }} vCPU</span>
             </div>
             <div class="receipt-row">
               <span>Status</span>
@@ -2875,9 +2967,29 @@ onUnmounted(() => {
               <span>Memory GB Hours</span>
               <span>{{ runMetrics.costEstimate.ecs.memoryGBHours?.toFixed(4) }}</span>
             </div>
+            <div v-if="runMetrics.costEstimate.ecs.volumeGBHours" class="receipt-row">
+              <span>Volume storage (EBS) GB Hours</span>
+              <span>{{ runMetrics.costEstimate.ecs.volumeGBHours.toFixed(4) }}</span>
+            </div>
             <div class="receipt-row receipt-row-cost">
               <span>Subtotal</span>
               <span>{{ formatCost(runMetrics.costEstimate.ecs.estimatedCost) }}</span>
+            </div>
+          </div>
+
+          <div v-if="runMetrics.costEstimate.gpu?.taskCount" class="receipt-cost-group">
+            <div class="receipt-cost-group-title">GPU</div>
+            <div class="receipt-row">
+              <span>Instance</span>
+              <span>{{ runMetrics.costEstimate.gpu.instanceType || 'default tier' }}</span>
+            </div>
+            <div class="receipt-row">
+              <span>Instance Hours</span>
+              <span>{{ runMetrics.costEstimate.gpu.instanceHours?.toFixed(4) }}</span>
+            </div>
+            <div class="receipt-row receipt-row-cost">
+              <span>Subtotal</span>
+              <span>{{ formatCost(runMetrics.costEstimate.gpu.estimatedCost) }}</span>
             </div>
           </div>
 
@@ -2905,15 +3017,35 @@ onUnmounted(() => {
             </div>
           </div>
 
-          <div v-if="runMetrics.costEstimate.efsThroughput" class="receipt-cost-group">
-            <div class="receipt-cost-group-title">EFS Throughput</div>
+          <div v-if="runMetrics.costEstimate.efsStorage" class="receipt-cost-group">
+            <div class="receipt-cost-group-title">EFS Storage</div>
             <div class="receipt-row">
-              <span>Read</span>
-              <span>{{ formatBytes(runMetrics.costEstimate.efsThroughput.readBytes) }}</span>
+              <span>Stored</span>
+              <span>{{ runMetrics.costEstimate.efsStorage.storageGB?.toFixed(2) }} GB</span>
             </div>
             <div class="receipt-row">
-              <span>Write</span>
+              <span>Hours</span>
+              <span>{{ runMetrics.costEstimate.efsStorage.durationHours?.toFixed(2) }}</span>
+            </div>
+            <div class="receipt-row receipt-row-cost">
+              <span>Subtotal</span>
+              <span>{{ formatCost(runMetrics.costEstimate.efsStorage.estimatedCost) }}</span>
+            </div>
+          </div>
+
+          <div v-if="runMetrics.costEstimate.efsThroughput?.readBytes || runMetrics.costEstimate.efsThroughput?.writeBytes" class="receipt-cost-group">
+            <div class="receipt-cost-group-title">EFS I/O</div>
+            <div class="receipt-row">
+              <span>Read</span>
+              <span>{{ formatBytes(runMetrics.costEstimate.efsThroughput.readBytes + (runMetrics.costEstimate.efsThroughput.metadataBytes || 0)) }}</span>
+            </div>
+            <div class="receipt-row">
+              <span>Written</span>
               <span>{{ formatBytes(runMetrics.costEstimate.efsThroughput.writeBytes) }}</span>
+            </div>
+            <div v-if="runMetrics.costEstimate.efsThroughput.maxConcurrentRuns > 1" class="receipt-row">
+              <span>Shared with</span>
+              <span>up to {{ runMetrics.costEstimate.efsThroughput.maxConcurrentRuns - 1 }} other run(s)</span>
             </div>
             <div class="receipt-row receipt-row-cost">
               <span>Subtotal</span>
@@ -2925,7 +3057,7 @@ onUnmounted(() => {
             <div class="receipt-cost-group-title">CloudWatch Logs</div>
             <div class="receipt-row">
               <span>Ingest</span>
-              <span>{{ runMetrics.costEstimate.cloudWatchLogs.estimatedIngestGB?.toFixed(6) }} GB</span>
+              <span>{{ runMetrics.costEstimate.cloudWatchLogs.ingestGB?.toFixed(6) }} GB</span>
             </div>
             <div class="receipt-row receipt-row-cost">
               <span>Subtotal</span>
@@ -2933,7 +3065,7 @@ onUnmounted(() => {
             </div>
           </div>
 
-          <div v-if="runMetrics.costEstimate.llm" class="receipt-cost-group">
+          <div v-if="runMetrics.costEstimate.llm?.requestCount" class="receipt-cost-group">
             <div class="receipt-cost-group-title">LLM</div>
             <div class="receipt-row">
               <span>Model</span>
@@ -3047,16 +3179,13 @@ onUnmounted(() => {
         </div>
 
         <div class="receipt-section">
-          <div
-            v-for="(value, key) in selectedNodeMetrics"
-            :key="key"
-            class="receipt-row"
-          >
-            <template v-if="key !== 'nodeId'">
-              <span>{{ formatMetricKey(key) }}</span>
-              <span>{{ formatMetricValue(key, value) }}</span>
-            </template>
-          </div>
+          <template v-for="(row, i) in nodeMetricRows(selectedNodeMetrics)" :key="i">
+            <div v-if="row.note" class="receipt-note">{{ row.note }}</div>
+            <div v-else class="receipt-row" :class="{ 'receipt-row-cost': row.cost }">
+              <span>{{ row.label }}</span>
+              <span class="receipt-value" :title="row.title">{{ row.value }}</span>
+            </div>
+          </template>
         </div>
       </div>
 
@@ -4081,6 +4210,16 @@ onUnmounted(() => {
   }
 }
 
+.target-type-missing {
+  margin: 0 0 12px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: #fef3c7;
+  color: #92400e;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
 .target-param {
   margin-bottom: 10px;
   padding: 8px;
@@ -4326,12 +4465,27 @@ onUnmounted(() => {
   border-bottom: 1px solid theme.$gray_2;
 }
 
+.receipt-note {
+  margin-top: 6px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: theme.$gray_4;
+}
 .receipt-row {
   display: flex;
   justify-content: space-between;
+  gap: 12px;
   padding: 3px 0;
   font-size: 13px;
   color: theme.$gray_5;
+
+  .receipt-value {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    text-align: right;
+  }
 
   &.receipt-row-cost {
     font-weight: 600;
@@ -4379,7 +4533,7 @@ onUnmounted(() => {
   text-transform: uppercase;
   letter-spacing: 0.5px;
   padding: 2px 8px;
-  border-radius: 10px;
+  border-radius: 3px;
   white-space: nowrap;
 
   &.lambda {
@@ -4733,5 +4887,10 @@ onUnmounted(() => {
 .wizard-footer-right {
   display: flex;
   gap: 8px;
+}
+.file-picker-hint {
+  margin: 0 0 8px;
+  font-size: 13px;
+  color: #6b7280;
 }
 </style>

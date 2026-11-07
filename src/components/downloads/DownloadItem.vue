@@ -2,7 +2,12 @@
   <div class="download-item" :data-status="download.status">
     <div class="details">
       <div class="name" :title="download.archiveName">{{ download.archiveName }}</div>
-      <div class="status">{{ statusText }}</div>
+      <div class="status">
+        {{ statusText }}
+        <template v-if="runLink">
+          · <router-link :to="runLink" class="run-link">Results of a run</router-link>
+        </template>
+      </div>
       <el-progress
         v-if="download.status === 'RUNNING'"
         :percentage="percent"
@@ -32,7 +37,7 @@
 
 <script setup>
 import { computed, ref } from "vue";
-import { useDownloadsStore, isActive, humanSize } from "@/stores/downloadsStore";
+import { useDownloadsStore, isActive, isRun, humanSize } from "@/stores/downloadsStore";
 import EventBus from "@/utils/event-bus";
 import { scanPendingCountText } from "@/utils/scan-status";
 
@@ -44,6 +49,16 @@ const store = useDownloadsStore();
 const busy = ref(false);
 
 const active = computed(() => isActive(props.download));
+
+// A run archive links to its run: in its workspace, or in My Analysis for a
+// personal run.
+const runLink = computed(() => {
+  const d = props.download;
+  if (!isRun(d) || !d.runId) return null;
+  return d.organizationNodeId
+    ? { name: "run-detail", params: { orgId: d.organizationNodeId, runId: d.runId } }
+    : { name: "my-run-detail", params: { runId: d.runId } };
+});
 
 const percent = computed(() => {
   const { bytesDone = 0, totalBytes = 0 } = props.download;
@@ -121,6 +136,11 @@ const onRemove = () => run(() => store.remove(props.download), "Unable to update
     color: theme.$gray_4;
     font-size: 12px;
     margin: 2px 0 4px;
+  }
+
+  .run-link {
+    color: inherit;
+    text-decoration: underline;
   }
 
   &[data-status="FAILED"] .status {

@@ -183,6 +183,7 @@ defineExpose({ isEmbargoDateAllowed });
   display: flex;
   flex-direction: column;
   align-items: center;
+
 }
 
 .embargo-date-label {

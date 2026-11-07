@@ -12,7 +12,7 @@
           />
 
           <bf-button
-            :disabled="isUploading || isFileProcessing || holdDownloadForScan"
+            :disabled="!isReady || holdDownloadForScan"
             class="primary mr-8 flex"
             data-cy="btnDownloadFiles"
             @click="downloadFile"
@@ -141,7 +141,10 @@
           {{ fileType }}
         </concept-instance-static-property>
 
-        <concept-instance-static-property :label="fileStatusLabel">
+        <concept-instance-static-property
+          v-if="getDisplayFileStatus"
+          :label="fileStatusLabel"
+        >
           {{ getDisplayFileStatus }}
         </concept-instance-static-property>
 
@@ -338,6 +341,7 @@
         <bf-button
           v-if="isMSOfficeFile"
           class="primary"
+          :disabled="!isReady"
           @click="openMSOfficeFile"
         >
           Open with Office 365
@@ -413,6 +417,12 @@ import {
   SCAN_POLL_MS,
   SCAN_POLL_LIMIT,
 } from "../../../../utils/scan-status";
+import { isPackageReady, packageStateLabel } from "@/utils/package-state";
+import {
+  hasTimeseriesChannels,
+  usePackageViewerData,
+  viewerNeedsData,
+} from "@/composables/usePackageViewerData";
 import { useGetToken } from "@/composables/useGetToken";
 import {
   useHandleXhrError,
@@ -471,11 +481,14 @@ export default {
   setup() {
     const { formatRecordKeyValues } = useRecordKeyProperties();
     const { viewerAssets, removeViewerAsset } = useViewerAssets();
+    const { hasViewerData, probeViewerData } = usePackageViewerData();
 
     return {
       formatRecordKeyValues,
       viewerAssets,
       removeViewerAsset,
+      hasViewerData,
+      probeViewerData,
     };
   },
 
@@ -532,13 +545,15 @@ export default {
       isUnlinkFileDialogVisible: false,
       relationshipNameTruncated: false,
       packageSourceFiles: {},
+      // The package re-fetched once its scan verdict landed (see
+      // refreshStateAfterScan).
+      stateRefreshedFor: "",
       // download-service held this file's download (409 scan_pending): the
       // scan wait is on here, so Download stays off until the scan settles.
       scanWaitConfirmed: false,
       scanPendingMessage: SCAN_PENDING_MESSAGE,
       scanPollTimer: null,
       scanPollCount: 0,
-      isDisabled: false,
       stringSubtypes: [],
       deleteDialogVisible: false,
       renameDialogVisible: false,
@@ -582,12 +597,44 @@ export default {
      */
     isOpenViewerBtnEnabled: function () {
       return (
-        this.checkViewerType(this.proxyRecord) !== "UnknownViewer" &&
-        !this.isUploading &&
-        this.getFileStatus !== "Failed" &&
+        this.isReady &&
+        this.hasViewerDataForType &&
         this.computePackageType !== "Unknown" &&
         !this.displayDirectoryViewer &&
         this.fileType !== "External File"
+      );
+    },
+
+    /**
+     * READY: the malware scan cleared the file, so it can be downloaded
+     * and opened.
+     * @returns {Boolean}
+     */
+    isReady: function () {
+      return isPackageReady(this.proxyRecord);
+    },
+
+    /**
+     * Timeseries and slides open only when their derived data exists:
+     * channels (on this package's GET) or a Zarr bundle; slide tiles.
+     * Everything else needs only its source file.
+     * @returns {Boolean}
+     */
+    needsViewerDataProbe: function () {
+      return (
+        this.isReady &&
+        viewerNeedsData(this.computePackageType) &&
+        !hasTimeseriesChannels(this.proxyRecord)
+      );
+    },
+
+    hasViewerDataForType: function () {
+      if (!viewerNeedsData(this.computePackageType)) {
+        return true;
+      }
+      return (
+        hasTimeseriesChannels(this.proxyRecord) ||
+        this.hasViewerData(pathOr("", ["content", "id"], this.proxyRecord))
       );
     },
 
@@ -645,7 +692,7 @@ export default {
       ).toLowerCase();
       return (
         (packageType === "hdf5" || packageType === "zip") &&
-        this.getFileStatus === "Processed"
+        this.isReady
       );
     },
 
@@ -685,35 +732,20 @@ export default {
     },
 
     /**
-     * Computed property to retrieve file status for source
-     * files in package
-     * @returns {String}
-     */
-    getFileStatus: function () {
-      const states = {
-        UPLOADED: "Unprocessed",
-        ERROR: "Failed",
-        PROCESSING: "Processing",
-        RUNNING: "Processing",
-        PENDING: "Processing",
-        READY: "Processed",
-        UNAVAILABLE: "Uploading",
-      };
-
-      const fileState = path(["content", "state"], this.proxyRecord);
-      return states[fileState];
-    },
-
-    /**
-     * Computed property to display the correct file status
-     * in the File Details table
+     * The file's state for the File Details table: "Scanning…" while the
+     * malware scan runs, "Quarantined" / "Failed" for ERROR, and nothing
+     * once it is READY (just available).
      * @returns {String}
      */
     getDisplayFileStatus: function () {
-      return this.computePackageType === "Unknown" &&
-        this.getFileStatus === "Processed"
-        ? "Processed: Unable to View"
-        : this.getFileStatus;
+      const sources = Array.isArray(this.packageSourceFiles)
+        ? this.packageSourceFiles
+        : [];
+      const scan = aggregateScanStatus(sources);
+      return packageStateLabel(
+        path(["content", "state"], this.proxyRecord),
+        scan ? scan.status : undefined
+      );
     },
 
     /**
@@ -836,77 +868,6 @@ export default {
         this.proxyRecord
       );
       return Boolean(validUrl.isUri(location));
-    },
-
-    /**
-     * Open Viewer CTA
-     * @returns {String}
-     */
-    buttonText: function () {
-      let states = {};
-
-      if (this.isMSOfficeFile) {
-        states = {
-          Unprocessed: "Process",
-          Processed: "Open with Office 365",
-          Processing: "Processing",
-          Failed: "Open with Office 365",
-          Uploading: "Uploading",
-        };
-      } else {
-        states = {
-          Unprocessed: "Process",
-          Processed: "Open Viewer",
-          Processing: "Processing",
-          Failed: "Open Viewer",
-          Uploading: "Uploading",
-        };
-      }
-
-      states[this.getFileStatus] === "Processing"
-        ? (this.isDisabled = true)
-        : (this.isDisabled = false);
-
-      return states[this.getFileStatus];
-    },
-
-    /**
-     * Generates function call for button on file details page
-     * based on file state
-     */
-    buttonMenu: function () {
-      let menu = {};
-      if (this.isMSOfficeFile) {
-        menu = {
-          Unprocessed: this.processFile,
-          Processed: this.openMSOfficeFile,
-        };
-      } else {
-        menu = {
-          Unprocessed: this.processFile,
-          Processed: this.openViewer,
-        };
-      }
-      return menu[this.getFileStatus];
-    },
-
-    /**
-     * Compute if the file is processing
-     * @returns {Boolean}
-     */
-    isFileProcessing: function () {
-      const isProcessing = ["UNAVAILABLE", "PENDING", "RUNNING", "PROCESSING"];
-      const state = path(["content", "state"], this.proxyRecord);
-      return isProcessing.indexOf(state) >= 0;
-    },
-
-    /**
-     * Compute if the file is uploading
-     * @returns {Boolean}
-     */
-    isUploading: function () {
-      const state = path(["content", "state"], this.proxyRecord);
-      return state == "UNAVAILABLE";
     },
 
     /**
@@ -1119,17 +1080,6 @@ export default {
     },
 
     /**
-     * Computed property to generate API Url for Process File API
-     * @returns {String}
-     */
-    processFileUrl: async function () {
-      return useGetToken().then((token) => {
-        const packageId = this.fileId;
-        return `${this.config.apiUrl}/packages/${packageId}/process?api_key=${token}`;
-      });
-    },
-
-    /**
      * Compute list items for the Add Relationship dropdown menu
      * @return {Array}
      */
@@ -1331,6 +1281,27 @@ export default {
      */
     packageSourceFiles: function () {
       this.scheduleScanPoll();
+      this.refreshStateAfterScan();
+    },
+
+    /**
+     * A READY timeseries or slide package opens only when its channels,
+     * Zarr bundle or tiles exist; ask once (cached per package).
+     */
+    needsViewerDataProbe: {
+      immediate: true,
+      handler: function (needed) {
+        if (!needed) {
+          return;
+        }
+        this.probeViewerData({
+          datasetId:
+            pathOr("", ["content", "datasetNodeId"], this.proxyRecord) ||
+            pathOr("", ["params", "datasetId"], this.$route),
+          packageId: pathOr("", ["content", "id"], this.proxyRecord),
+          packageType: this.computePackageType,
+        });
+      },
     },
 
     /**
@@ -1565,23 +1536,6 @@ export default {
     },
 
     /**
-     * XHR request to process a file
-     * of an unprocessed state
-     */
-    processFile: function () {
-      this.processFileUrl.then((url) => {
-        this.sendXhr(url, {
-          method: "PUT",
-        })
-          .then(() => {
-            this.proxyRecord.content.state = "PROCESSING";
-            this.getFileStatus;
-          })
-          .catch(this.handleXhrError.bind(this));
-      });
-    },
-
-    /**
      * API call to get source files data for table
      */
     getSourceFiles: function () {
@@ -1592,6 +1546,29 @@ export default {
           })
           .catch(this.handleXhrError.bind(this));
       });
+    },
+
+    /**
+     * The scan verdict moves the package out of UPLOADED (READY, or ERROR
+     * when infected). Once the source files show a settled verdict while the
+     * package still reads UPLOADED, re-fetch the package for its new state.
+     */
+    refreshStateAfterScan: function () {
+      const state = path(["content", "state"], this.proxyRecord);
+      const sources = Array.isArray(this.packageSourceFiles)
+        ? this.packageSourceFiles
+        : [];
+      if (
+        this.isFile &&
+        state === "UPLOADED" &&
+        aggregateScanStatus(sources) &&
+        !this.scanInProgress &&
+        this.stateRefreshedFor !== this.fileId
+      ) {
+        // Once per package: a failed scan leaves it UPLOADED.
+        this.stateRefreshedFor = this.fileId;
+        this.getInstanceDetails();
+      }
     },
 
     /**

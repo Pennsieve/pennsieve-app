@@ -21,12 +21,21 @@
         :route="ontologyBrowserRoute"
         icon="ontology-browser"
       />
+
+      <user-dashboard-card
+        v-if="hasReferenceData"
+        title="Reference Data"
+        description="Browse the genomes, indexes and templates analysis apps use, and which apps use them"
+        :route="referenceCatalogRoute"
+        icon="reference-data"
+      />
     </div>
   </div>
 </template>
 
 <script>
 import UserDashboardCard from "@/components/user/dashboard/UserDashboardCard.vue";
+import { environmentsServiceUrl } from "@/utils/environmentsService";
 
 export default {
   name: "ResourcesList",
@@ -46,6 +55,15 @@ export default {
       return this.orgId
         ? { name: "workspace-ontology-browser", params: { orgId: this.orgId } }
         : { name: "ontology-browser" };
+    },
+    referenceCatalogRoute() {
+      return this.orgId
+        ? { name: "workspace-reference-catalog", params: { orgId: this.orgId } }
+        : { name: "reference-catalog" };
+    },
+    // Only where the platform has environments-service, which keeps the catalog.
+    hasReferenceData() {
+      return !!environmentsServiceUrl();
     }
   }
 };
