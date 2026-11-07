@@ -2,6 +2,12 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { setActivePinia, createPinia } from "pinia";
 
 vi.mock("@/composables/useGetToken", () => ({ useGetToken: vi.fn(async () => "token") }));
+// The provisioner version cap comes from the site config (prod.json sets one)
+// and has its own spec; here nodes pass through unchanged in every build.
+vi.mock("@/utils/provisionerVersionCap", () => ({
+  cappedVersion: (v) => v,
+  capNodeVersion: (n) => n,
+}));
 
 import { useComputeResourcesStore } from "./computeResourcesStore";
 import * as siteConfig from "@/site-config/site.json";
