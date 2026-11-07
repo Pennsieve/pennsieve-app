@@ -1,15 +1,18 @@
 <script setup>
 // Connect an AWS account from the browser, or upgrade an older connection:
-// Pennsieve sets up a role (name + external ID), the user creates it from
-// Pennsieve's CloudFormation template in their own AWS console, then Verify
-// has Pennsieve register it (or, upgrading, switch the account to it). No
-// AWS keys leave AWS; no agent or CLI is needed.
+// Pennsieve sets up a role (name + external ID) for the account, the user
+// creates it from Pennsieve's CloudFormation template in their own AWS
+// console, then Verify has Pennsieve register it (or, upgrading, switch the
+// account to it). No AWS keys leave AWS; no agent or CLI is needed. The
+// account is known before the console opens: the template refuses to create
+// the role in any other one.
 import { computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import BfButton from '@/components/shared/bf-button/BfButton.vue'
 import { useComputeResourcesStore } from '@/stores/computeResourcesStore'
-import { checkAccountInput, errorMessage, iamRoleConsoleUrl } from './awsConnect'
+import { errorMessage, iamRoleConsoleUrl, parseAwsAccountInput } from './awsConnect'
+import { formatAccountId } from '@/components/Analysis/ComputeNodes/computeNodeHelpers'
 
 const props = defineProps({
   modelValue: { type: Boolean, default: false },
@@ -36,6 +39,7 @@ const unavailable = ref(false) // no template on this Pennsieve yet
 const isStarting = ref(false)
 const showCloudShell = ref(false)
 const accountInput = ref('')
+const accountId = ref('') // the account the role is made in
 const inputError = ref('')
 const verifyError = ref('')
 const isVerifying = ref(false)
@@ -49,17 +53,27 @@ watch(visible, (open) => {
   unavailable.value = false
   showCloudShell.value = false
   accountInput.value = ''
+  accountId.value = props.account?.accountId || ''
   inputError.value = ''
   verifyError.value = ''
   connected.value = null
 })
 
 async function openConsole() {
+  if (!isUpgrade.value) {
+    const parsed = parseAwsAccountInput(accountInput.value)
+    if (parsed.error) {
+      inputError.value = parsed.error
+      return
+    }
+    inputError.value = ''
+    accountId.value = parsed.accountId
+  }
   isStarting.value = true
   try {
     // A fresh setup each time: its external ID is issued to this user, for
     // its role, for 24 hours.
-    const s = await computeResourcesStore.requestRoleSetup()
+    const s = await computeResourcesStore.requestRoleSetup(accountId.value)
     if (!s?.cloudFormation?.quickCreateUrl) {
       unavailable.value = true
       return
@@ -100,14 +114,8 @@ async function verify() {
       emit('connected', props.account)
       return
     }
-    const parsed = checkAccountInput(accountInput.value, roleName)
-    if (parsed.error) {
-      inputError.value = parsed.error
-      return
-    }
-    inputError.value = ''
     const created = await computeResourcesStore.registerComputeAccount({
-      accountId: parsed.accountId,
+      accountId: accountId.value,
       roleName,
       externalId,
       templateVersion,
@@ -161,6 +169,12 @@ function createNode() {
         </template>
       </p>
       <label v-if="!isUpgrade" class="ca-field">
+        <span class="ca-label">Your AWS account ID</span>
+        <el-input v-model="accountInput" placeholder="123456789012" @keyup.enter="openConsole" />
+        <span v-if="inputError" class="ca-error">{{ inputError }}</span>
+        <span v-else class="ca-muted">The role is created only in this account.</span>
+      </label>
+      <label v-if="!isUpgrade" class="ca-field">
         <span class="ca-label">Name <span class="ca-optional">optional</span></span>
         <el-input v-model="name" placeholder="e.g. Lab AWS account" />
       </label>
@@ -175,10 +189,14 @@ function createNode() {
     <div v-else-if="step === 'console'" class="ca-step">
       <p class="ca-text">The AWS console opened in a new tab. There:</p>
       <ol class="ca-list">
-        <li>Sign in to the AWS account you want to use.</li>
+        <li>Make sure you're signed in to AWS account <strong>{{ formatAccountId(accountId) }}</strong>.</li>
         <li>Tick <em>I acknowledge that AWS CloudFormation might create IAM resources</em>.</li>
         <li>Click <strong>Create stack</strong>. It takes about a minute.</li>
       </ol>
+      <p class="ca-muted">
+        In another account, the stack stops before it creates anything and says so: switch accounts, then
+        create it again.
+      </p>
       <p class="ca-muted">
         Didn't open?
         <a :href="setup.cloudFormation.quickCreateUrl" target="_blank" rel="noopener">Open the AWS console</a>
@@ -188,21 +206,12 @@ function createNode() {
         </template>
       </p>
       <div v-if="showCloudShell" class="ca-shell">
-        <p class="ca-muted">Paste this into AWS CloudShell, in the account you want to use:</p>
+        <p class="ca-muted">Paste this into AWS CloudShell, in account {{ formatAccountId(accountId) }}:</p>
         <pre class="ca-command">{{ setup.cloudFormation.cloudShellCommand }}</pre>
         <bf-button class="secondary compact flex" @click="copyCommand">Copy</bf-button>
       </div>
 
-      <label v-if="!isUpgrade" class="ca-field">
-        <span class="ca-label">Your AWS account ID</span>
-        <el-input
-          v-model="accountInput"
-          placeholder="123456789012, or the role's ARN from the stack's Outputs"
-          @keyup.enter="verify"
-        />
-        <span v-if="inputError" class="ca-error">{{ inputError }}</span>
-      </label>
-      <p v-else class="ca-text">Once the stack is created, click <strong>Verify</strong>.</p>
+      <p class="ca-text">Once the stack is created, click <strong>Verify</strong>.</p>
       <p v-if="verifyError" class="ca-error">{{ verifyError }}</p>
     </div>
 
