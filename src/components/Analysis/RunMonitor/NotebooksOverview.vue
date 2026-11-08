@@ -489,7 +489,7 @@ onBeforeUnmount(() => {
 
       <template v-else>
         <p class="nb-view-desc">
-          Python package environments for your notebooks. Build one from a requirements list, then switch to it from a
+          Python and R package environments for your notebooks. Build one from a package list, then switch to it from a
           notebook's sidebar while it runs.
         </p>
         <environments-section
