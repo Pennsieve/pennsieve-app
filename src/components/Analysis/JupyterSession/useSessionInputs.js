@@ -46,6 +46,14 @@ export function sourceAt(sources, dirPath) {
   return { source: best, rel: dirPath === base ? "" : `${dirPath.slice(base.length + 1)}/` };
 }
 
+// Whether views can be added to the session: as its sidecar says, or, from a
+// sidecar that doesn't say, on a node that isn't compliant (whose sidecar
+// couldn't fetch a view's crate then).
+export function canAddViews(sidecarSays, node) {
+  if (typeof sidecarSays === "boolean") return sidecarSays;
+  return (node?.deploymentMode || "").toLowerCase() !== "compliant";
+}
+
 // When a download is big enough to ask first: over 1 GiB, or over a tenth
 // of the disk left, whichever is less. null when it doesn't fit at all.
 export function downloadCheck(bytes, freeBytes) {
@@ -76,6 +84,9 @@ export function useSessionInputs({
   const sources = ref([]);
   // Whether views can be added and removed while the session runs.
   const canChange = ref(false);
+  // Whether the session's sidecar says it can add views (null when it
+  // doesn't say: one from before compliant sessions could add them).
+  const sidecarCanAdd = ref(null);
   // The disk the session was started with (GiB); null for one without
   // (a GPU session: its instance's).
   const diskGiB = ref(null);
@@ -113,6 +124,7 @@ export function useSessionInputs({
         }
       }
       canChange.value = staged !== null && !!addInputSource;
+      sidecarCanAdd.value = typeof staged?.canAdd === "boolean" ? staged.canAdd : null;
       const list = staged
         ? staged
             .map((s) => ({
@@ -376,6 +388,6 @@ export function useSessionInputs({
     removable: computed(() => canChange.value && !!removeInputSource),
     // Whether data can be added: not on a compliant node, whose sidecar
     // can't fetch a new view's crate (removing still works).
-    canAdd: computed(() => canChange.value && (node()?.deploymentMode || "").toLowerCase() !== "compliant"),
+    canAdd: computed(() => canChange.value && canAddViews(sidecarCanAdd.value, node())),
   });
 }

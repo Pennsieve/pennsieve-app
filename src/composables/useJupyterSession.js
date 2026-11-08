@@ -174,7 +174,9 @@ export async function sessionSourcesRequest(kernelBaseUrl, token, method = "GET"
     throw err;
   }
   const out = await resp.json();
-  return out.sources || [];
+  // The list, carrying canAdd: whether the sidecar can add views (undefined
+  // from a sidecar that doesn't say).
+  return Object.assign(out.sources || [], { canAdd: out.canAdd });
 }
 
 // The session's environment, switched while it runs. The sidecar fetches the

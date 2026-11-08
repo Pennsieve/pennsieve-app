@@ -10,7 +10,7 @@ import { useRememberedFold } from "./sectionFold";
 import { ElMessage, ElMessageBox } from "element-plus";
 import { ArrowRight } from "@element-plus/icons-vue";
 import IconWarningCircle from "@/components/icons/IconWarningCircle.vue";
-import { environmentsServiceUrl, getEnvironment, listEnvironments } from "@/utils/environmentsService";
+import { environmentsServiceUrl, getEnvironment, kernelLanguage, listEnvironments } from "@/utils/environmentsService";
 import { SessionEnvironmentsUnavailable } from "@/composables/useJupyterSession";
 import {
   environmentChoices,
@@ -52,7 +52,8 @@ const sw = ref(null); // the sidecar's latest switch
 const picked = ref("");
 const query = ref("");
 
-const isPython = computed(() => !props.kernelName || props.kernelName.toLowerCase().startsWith("python"));
+// Python and R kernels load environments of their language.
+const language = computed(() => kernelLanguage(props.kernelName));
 const choices = computed(() => environmentChoices(environments.value, props.kernelName, versionsById.value));
 const shown = computed(() => choices.value.filter((c) => matchesQuery(c, query.value)));
 const busy = computed(() => switchBusy(sw.value));
@@ -136,7 +137,7 @@ async function load() {
     environments.value = list;
     // An environment whose latest version is building or failed may still
     // have an older ready one.
-    const others = list.filter((e) => e.language === "python" && e.latest?.status !== "ready" && e.latestVersion > 1);
+    const others = list.filter((e) => (e.language || "python") === language.value && e.latest?.status !== "ready" && e.latestVersion > 1);
     const read = await Promise.all(others.map((e) => getEnvironment(e.id).catch(() => null)));
     versionsById.value = Object.fromEntries(others.map((e, i) => [e.id, read[i]?.versions || []]));
   } catch (e) {
@@ -234,7 +235,7 @@ onBeforeUnmount(() => clearTimeout(pollTimer));
 </script>
 
 <template>
-  <div v-if="available && isPython" class="env" :class="{ 'env--collapsed': collapsed }">
+  <div v-if="available" class="env" :class="{ 'env--collapsed': collapsed }">
     <button class="env__head" :aria-expanded="!collapsed" @click="collapsed = !collapsed">
       <span class="env__title">Environment</span>
       <span v-if="collapsed && !outdated" class="env__peek">{{ current ? current.name : "Image packages" }}</span>

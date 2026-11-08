@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { sourceAt, sourceBase, downloadCheck } from "./useSessionInputs";
+import { sourceAt, sourceBase, downloadCheck, canAddViews } from "./useSessionInputs";
 
 const GiB = 2 ** 30;
 
@@ -21,6 +21,17 @@ describe("a view's folder in the tree", () => {
     // A view staged in input/ itself holds what no other view's folder does.
     expect(sourceAt([root, bossdb], "input/bossdb-x/a")).toEqual({ source: bossdb, rel: "a/" });
     expect(sourceAt([root, bossdb], "input/sub-01")).toEqual({ source: root, rel: "sub-01/" });
+  });
+});
+
+describe("adding views", () => {
+  it("follows the sidecar when it says, else refuses compliant nodes", () => {
+    const compliant = { deploymentMode: "compliant" };
+    expect(canAddViews(true, compliant)).toBe(true);
+    expect(canAddViews(false, { deploymentMode: "secure" })).toBe(false);
+    expect(canAddViews(null, compliant)).toBe(false);
+    expect(canAddViews(null, { deploymentMode: "basic" })).toBe(true);
+    expect(canAddViews(null, null)).toBe(true);
   });
 });
 
