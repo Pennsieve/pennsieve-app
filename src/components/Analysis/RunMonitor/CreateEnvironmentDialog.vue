@@ -1,5 +1,5 @@
 <script setup>
-// Builds a Python environment from a requirements list, in environments-
+// Builds a Python or R environment from a requirements list, in environments-
 // service. A new name is a new environment; editing one (initial.name) builds
 // its next version, and a failed build is retried the same way. With the
 // same requirements as a ready version, that version is reused and nothing is
@@ -8,11 +8,12 @@
 import { ref, computed, watch } from "vue";
 import { ElMessage } from "element-plus";
 import BfButton from "../../shared/bf-button/BfButton.vue";
-import { createEnvironment, ENVIRONMENT_NAME, requirementsProblem } from "@/utils/environmentsService";
+import { createEnvironment, ENVIRONMENT_LANGUAGES, ENVIRONMENT_NAME, requirementsProblem } from "@/utils/environmentsService";
 
 const props = defineProps({
   modelValue: { type: Boolean, default: false },
-  // An edit or a retry: { name, requirements, retry }. Its name is kept.
+  // An edit or a retry: { name, language, requirements, retry }. Its name
+  // and language are kept.
   initial: { type: Object, default: null },
   // Names of the user's environments, so a new one can't take one.
   takenNames: { type: Array, default: () => [] },
@@ -25,23 +26,41 @@ const visible = computed({
   set: (v) => emit("update:modelValue", v),
 });
 
-// The builder's Python: environments run on notebooks with the same one.
-const PYTHON_VERSION = "3.12";
+// Each language's builder version: environments run on notebooks with the
+// same one.
+const LANGUAGES = Object.entries(ENVIRONMENT_LANGUAGES).map(([id, l]) => ({ id, ...l }));
+const HINTS = {
+  python: {
+    label: "Packages (requirements.txt)",
+    placeholder: "numpy\npandas==3.1.0\nmatplotlib\nscikit-learn",
+    hint: "One package per line, as pip takes them. Versions are optional.",
+  },
+  r: {
+    label: "Packages",
+    placeholder: "tidyverse\ndata.table\nbioc::DESeq2",
+    hint: "One package name per line; bioc:: before a Bioconductor package. CRAN packages come from the R notebooks' dated snapshot, so no versions.",
+  },
+};
 
-const form = ref({ name: "", requirements: "" });
+const form = ref({ name: "", language: "python", requirements: "" });
 const submitting = ref(false);
 const touched = ref(false);
 const editing = computed(() => !!props.initial?.name);
 
 watch(visible, (open) => {
   if (!open) return;
-  form.value = { name: props.initial?.name || "", requirements: props.initial?.requirements || "" };
+  form.value = {
+    name: props.initial?.name || "",
+    language: props.initial?.language || "python",
+    requirements: props.initial?.requirements || "",
+  };
   touched.value = false;
 });
 
 const nameValid = computed(() => ENVIRONMENT_NAME.test(form.value.name));
 const nameTaken = computed(() => !editing.value && props.takenNames.includes(form.value.name));
-const reqProblem = computed(() => requirementsProblem(form.value.requirements));
+const reqProblem = computed(() => requirementsProblem(form.value.requirements, form.value.language));
+const hints = computed(() => HINTS[form.value.language]);
 const canSubmit = computed(() => nameValid.value && !nameTaken.value && !reqProblem.value && !submitting.value);
 
 const title = computed(() =>
@@ -65,7 +84,7 @@ async function submit() {
   if (!canSubmit.value) return;
   submitting.value = true;
   try {
-    const out = await createEnvironment({ name: form.value.name, requirements: form.value.requirements });
+    const out = await createEnvironment({ name: form.value.name, language: form.value.language, requirements: form.value.requirements });
     const n = out.version?.version;
     ElMessage.success(
       out.reused
@@ -100,11 +119,15 @@ async function submit() {
       Lowercase letters, numbers and dashes, starting with a letter or number.
     </span>
 
-    <label class="env-label">Python</label>
-    <div class="env-version" title="Environments are built for the notebooks' Python">{{ PYTHON_VERSION }}</div>
+    <label class="env-label">Language</label>
+    <el-radio-group v-model="form.language" :disabled="editing" size="small">
+      <el-radio-button v-for="l in LANGUAGES" :key="l.id" :value="l.id" :title="`Built for the notebooks' ${l.label}`">
+        {{ l.label }} {{ l.version }}
+      </el-radio-button>
+    </el-radio-group>
 
     <div class="env-req-head">
-      <label class="env-label" for="env-reqs">Packages (requirements.txt)</label>
+      <label class="env-label" for="env-reqs">{{ hints.label }}</label>
       <label class="env-upload">
         Upload file
         <input type="file" accept=".txt,text/plain" style="display: none" @change="onFile" />
@@ -115,12 +138,12 @@ async function submit() {
       v-model="form.requirements"
       type="textarea"
       :rows="9"
-      placeholder="numpy&#10;pandas==3.1.0&#10;matplotlib&#10;scikit-learn"
+      :placeholder="hints.placeholder"
       spellcheck="false"
       @blur="touched = true"
     />
     <span v-if="touched && reqProblem" class="env-hint err">{{ reqProblem }}</span>
-    <span v-else class="env-hint">One package per line, as pip takes them. Versions are optional.</span>
+    <span v-else class="env-hint">{{ hints.hint }}</span>
 
     <template #footer>
       <div class="env-footer">
@@ -155,18 +178,6 @@ async function submit() {
   &.err {
     color: theme.$red_1;
   }
-}
-.env-version {
-  width: 140px;
-  height: 32px;
-  display: flex;
-  align-items: center;
-  padding: 0 11px;
-  border: 1px solid theme.$gray_2;
-  border-radius: 3px;
-  background: theme.$gray_1;
-  color: theme.$gray_6;
-  font-size: 13px;
 }
 .env-footer {
   display: flex;

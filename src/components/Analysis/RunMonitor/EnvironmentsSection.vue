@@ -1,6 +1,6 @@
 <script setup>
 // The user's environments, and Pennsieve's official ones, from environments-
-// service: named, versioned Python package sets, built once and usable by
+// service: named, versioned Python and R package sets, built once and usable by
 // any of the user's notebooks, which switch to one from their sidebar. A grid
 // of cards, searchable by name or package; each shows the newest ready
 // version and the latest build's status, and opens its details. Polls while
@@ -13,6 +13,7 @@ import EnvironmentIcon from "./EnvironmentIcon.vue";
 import {
   buildLog,
   deleteEnvironment,
+  ENVIRONMENT_LANGUAGES,
   environmentsServiceUrl,
   getEnvironment,
   listEnvironments,
@@ -20,12 +21,15 @@ import {
 import { cardStatus, formatBytes, shownVersion, since, sortEnvironments } from "./environmentCards";
 import { matchesQuery, packageSummary } from "../JupyterSession/environmentHelpers";
 
+const languageLabel = (language) => ENVIRONMENT_LANGUAGES[language || "python"]?.label || language;
+
 const props = defineProps({
   // Off where the page names the section (the Notebooks page's Environments
   // tab), which also has the New button.
   showTitle: { type: Boolean, default: true },
 });
-// create(), edit({ name, requirements }), retry({ name, requirements, retry }),
+// create(), edit({ name, language, requirements }),
+// retry({ name, language, requirements, retry }),
 // use(): the page opens the dialogs.
 const emit = defineEmits(["create", "edit", "retry", "use"]);
 
@@ -76,7 +80,6 @@ load();
 const cards = computed(() =>
   sortEnvironments(
     environments.value
-      .filter((env) => env.language === "python")
       .map((env) => {
         const versions = versionsById.value[env.id];
         return {
@@ -167,8 +170,8 @@ async function onCommand(command, card) {
   // Edits start from the requirements the latest build was given.
   const requirements = env.latest?.requirements || (card.shown?.packages || []).join("\n");
   if (command === "use") emit("use");
-  if (command === "edit") emit("edit", { name: env.name, requirements });
-  if (command === "retry") emit("retry", { name: env.name, requirements, retry: true });
+  if (command === "edit") emit("edit", { name: env.name, language: env.language, requirements });
+  if (command === "retry") emit("retry", { name: env.name, language: env.language, requirements, retry: true });
   if (command === "log") openLog(card);
   if (command === "delete") await remove(env);
 }
@@ -304,7 +307,7 @@ const STATUS_LABEL = { ready: "Ready", building: "Building", failed: "Failed", u
       <template v-if="detail">
         <p class="env-detail-sub">
           <template v-if="detail.shown?.status === 'ready'">
-            Version {{ detail.shown.version }} · Python {{ detail.shown.runtime?.version }} ·
+            Version {{ detail.shown.version }} · {{ languageLabel(detail.shown.runtime?.language) }} {{ detail.shown.runtime?.version }} ·
             {{ (detail.shown.packages || []).length }} packages<template v-if="formatBytes(detail.shown.archive?.unpackedBytes)">
               · {{ formatBytes(detail.shown.archive.unpackedBytes) }}</template
             >

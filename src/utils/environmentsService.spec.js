@@ -96,6 +96,14 @@ describe('fitsKernel', () => {
     expect(fitsKernel(py312, '')).toBe(true)
     expect(fitsKernel({}, 'Python 3.12.3')).toBe(false)
   })
+
+  it('matches R environments to R kernels of the same minor version', () => {
+    const r44 = { runtime: { language: 'r', version: '4.4' } }
+    expect(fitsKernel(r44, 'R 4.4.1')).toBe(true)
+    expect(fitsKernel(r44, 'R 4.3.2')).toBe(false)
+    expect(fitsKernel(r44, 'Python 3.12.3')).toBe(false)
+    expect(fitsKernel(r44, '')).toBe(false)
+  })
 })
 
 describe('createEnvironment', () => {
@@ -131,5 +139,12 @@ describe('names and requirements', () => {
     expect(requirementsProblem('  \n')).toBe('List at least one package.')
     expect(requirementsProblem('--index-url https://x\nnumpy')).toMatch('"--index-url"')
     expect(requirementsProblem(Array.from({ length: 501 }, (_, i) => `p${i}`).join('\n'))).toBe('At most 500 packages.')
+  })
+
+  it('takes R package names, bioc:: for Bioconductor, and no versions', () => {
+    expect(requirementsProblem('tidyverse\ndata.table\nbioc::DESeq2', 'r')).toBe('')
+    expect(requirementsProblem('dplyr@1.1.4', 'r')).toMatch("isn't an R package name")
+    expect(requirementsProblem('pandas==3.1', 'r')).toMatch("isn't an R package name")
+    expect(requirementsProblem('pandas==3.1', 'python')).toBe('')
   })
 })

@@ -75,6 +75,17 @@
             {{ isUpdatingPermissions ? 'Updating…' : `Update to ${node.latestVersion}` }}
           </button>
         </el-tooltip>
+        <el-tooltip
+          v-else-if="canRetrySetup"
+          content="Its last deploy or update failed. Retrying runs the same version again in your cloud account, continuing from what it set up, and typically takes 6-8 minutes."
+          placement="top"
+          :show-after="300"
+          :popper-style="{ maxWidth: '320px' }"
+        >
+          <button type="button" class="tile-action tile-action--warn" :disabled="isUpdatingPermissions" @click="retrySetup">
+            {{ isUpdatingPermissions ? 'Retrying…' : 'Retry setup' }}
+          </button>
+        </el-tooltip>
         <button
           v-if="canManagePermissions && statusLabel === 'Enabled'"
           type="button"
@@ -198,6 +209,9 @@ const canUpdateNode = computed(() =>
   (props.hasAdminRights && computeResourcesStore.isNodeAdminManaged(props.node))
 )
 const hasProvisionerUpdate = computed(() => props.node.updateAvailable === true && !!props.node.latestVersion)
+// A failed node with no newer version to update to: its setup can be run
+// again at the version it has (the API takes a failed node's update).
+const canRetrySetup = computed(() => statusLabel.value === 'Failed' && canUpdateNode.value && !!props.node.provisionerImageTag)
 
 const ownerName = computed(() => {
   const member = store.getters.getOrgMember(props.node.ownerId)
@@ -238,6 +252,20 @@ async function updateStatus(newStatus) {
   } catch (error) {
     console.error('Failed to update compute node status:', error)
     ElMessage.error('Failed to update compute node status')
+  }
+}
+
+// Run a failed node's setup again, at the version it has
+async function retrySetup() {
+  try {
+    await computeResourcesStore.updateComputeNodeDeployment(props.node.uuid, {
+      provisionerImage: props.node.provisionerImage || computeResourcesStore.DEFAULT_PROVISIONER_IMAGE,
+      provisionerImageTag: props.node.provisionerImageTag
+    })
+    ElMessage.success('Retrying the compute node setup. This typically takes 6-8 minutes.')
+  } catch (error) {
+    console.error('Failed to retry compute node setup:', error)
+    ElMessage.error('Failed to retry the compute node setup')
   }
 }
 

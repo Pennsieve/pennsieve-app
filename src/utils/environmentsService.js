@@ -98,13 +98,29 @@ export async function findReferences(query = {}, options = {}) {
 // Environment names: lowercase letters, digits and dashes, at most 63.
 export const ENVIRONMENT_NAME = /^[a-z0-9][a-z0-9-]{0,62}$/
 
-// Why requirements can't be built, or '': one pip spec per line, no pip
-// options, at most 500 lines and 32 KB (as environments-service checks).
-export function requirementsProblem(text) {
+// The languages environments are built for, and the runtime each is built
+// with (environments-service's model.Runtimes): notebooks of that language
+// and version run them.
+export const ENVIRONMENT_LANGUAGES = {
+  python: { label: 'Python', version: '3.12' },
+  r: { label: 'R', version: '4.4' },
+}
+
+// An R requirement: a package name, bioc::<name> for Bioconductor.
+const R_PACKAGE = /^(bioc::)?[A-Za-z][A-Za-z0-9.]*[A-Za-z0-9]$/
+
+// Why requirements can't be built, or '' (as environments-service checks):
+// one pip spec per line and no pip options for Python, one package name per
+// line for R; at most 500 lines and 32 KB.
+export function requirementsProblem(text, language = 'python') {
   const lines = String(text || '').split('\n').map((l) => l.trim()).filter((l) => l && !l.startsWith('#'))
   if (!lines.length) return 'List at least one package.'
   const option = lines.find((l) => l.startsWith('-'))
   if (option) return `Pip options like "${option.split(/\s/)[0]}" aren't allowed; list one package per line.`
+  if (language === 'r') {
+    const bad = lines.find((l) => !R_PACKAGE.test(l))
+    if (bad) return `"${bad}" isn't an R package name. List one package per line, with bioc:: before a Bioconductor package, and no versions.`
+  }
   if (lines.length > 500) return 'At most 500 packages.'
   if (new Blob([text]).size > 32 * 1024) return 'The list must be under 32 KB.'
   return ''
@@ -117,16 +133,19 @@ export function newestReady(versions) {
     .sort((a, b) => b.version - a.version)[0] || null
 }
 
-// Whether an environment's version runs on a kernel: the same language,
-// and for Python the same minor version ("3.12" against "Python 3.12.3").
+// The language of a kernel, from its name ("Python 3.12.3", "R 4.4.1"):
+// python (also when unknown) or r.
+export function kernelLanguage(kernelName) {
+  return /^r\b/i.test(kernelName || '') ? 'r' : 'python'
+}
+
+// Whether an environment's version runs on a kernel: the same language and
+// minor version ("3.12" against "Python 3.12.3", "4.4" against "R 4.4.1").
 export function fitsKernel(version, kernelName) {
   const runtime = version?.runtime
   if (!runtime) return false
-  const name = (kernelName || '').toLowerCase()
-  if (runtime.language === 'python') {
-    if (name && !name.startsWith('python')) return false
-    const m = name.match(/(\d+\.\d+)/)
-    return !m || !runtime.version || m[1] === runtime.version
-  }
-  return name.startsWith(runtime.language)
+  const name = kernelName || ''
+  if (runtime.language !== kernelLanguage(name)) return false
+  const m = name.match(/(\d+\.\d+)/)
+  return !m || !runtime.version || m[1] === runtime.version
 }

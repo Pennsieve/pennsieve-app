@@ -479,6 +479,12 @@ describe("sessionRestrictions", () => {
     expect(sessionRestrictions({ deploymentMode: "compliant" }).items[2]).toMatch(/in the node's region\.$/);
   });
 
+  it("doesn't say data can't be added when the session can add it", () => {
+    const items = sessionRestrictions({ deploymentMode: "compliant" }, { canAddData: true }).items;
+    expect(items).toHaveLength(3);
+    expect(items.some((i) => /can't be added/.test(i))).toBe(false);
+  });
+
   it("says nothing for other nodes", () => {
     expect(sessionRestrictions({ deploymentMode: "secure", region: "us-east-1" })).toBe(null);
     expect(sessionRestrictions({ deploymentMode: "basic" })).toBe(null);
