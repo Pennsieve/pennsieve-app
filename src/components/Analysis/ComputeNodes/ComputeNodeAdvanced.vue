@@ -35,8 +35,12 @@ const updateAvailable = computed(() =>
 const currentVersion = computed(() => props.node.provisionerImageTag || '')
 const isUpdating = ref(false)
 
+// A failed node with no newer version: its setup runs again at the version
+// it has (the API takes a failed node's update).
+const canRetry = computed(() => props.node.status === 'Failed' && !updateAvailable.value && !!currentVersion.value)
+
 async function updateNodeSoftware() {
-  const targetTag = latestVersion.value
+  const targetTag = updateAvailable.value ? latestVersion.value : currentVersion.value
   if (!targetTag) return
   isUpdating.value = true
   try {
@@ -45,7 +49,11 @@ async function updateNodeSoftware() {
       provisionerImageTag: targetTag
     })
     emit('updated')
-    ElMessage.success(`Updating the node to ${targetTag}. This typically takes 6-8 minutes.`)
+    ElMessage.success(
+      updateAvailable.value
+        ? `Updating the node to ${targetTag}. This typically takes 6-8 minutes.`
+        : 'Retrying the node setup. This typically takes 6-8 minutes.'
+    )
   } catch (error) {
     console.error('Failed to update provisioner:', error)
     ElMessage.error('Failed to update the node')
@@ -137,13 +145,19 @@ async function confirmDestroy() {
               <span v-else-if="updateAvailable" class="cn-pill is-warn">Update available: {{ latestVersion }}</span>
               <span v-else-if="latestVersion" class="cn-pill is-on">Up to date</span>
               <button type="button"
-                v-if="canManage && updateAvailable"
+                v-if="canManage && (updateAvailable || canRetry)"
                 class="cn-action cn-action--primary"
                 :disabled="isUpdating"
                 @click="updateNodeSoftware"
               >
-                Update node
+                {{ updateAvailable ? 'Update node' : 'Retry setup' }}
               </button>
+            </dd>
+          </div>
+          <div v-if="canManage && canRetry">
+            <dt />
+            <dd class="cn-muted">
+              The node's last deploy or update failed. Retrying runs {{ currentVersion }} again in your cloud account, continuing from what it set up. It typically takes 6-8 minutes.
             </dd>
           </div>
           <div v-if="canManage && updateAvailable">
