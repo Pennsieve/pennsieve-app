@@ -94,7 +94,8 @@ watch(
 
 // What a session on its node can't do (a compliant node: no internet), said
 // when it opens until dismissed. Dismissed per session, in this browser.
-const restrictions = computed(() => sessionRestrictions(sessionNode.value));
+// (inputs is set up below; the computed reads it when the page renders.)
+const restrictions = computed(() => sessionRestrictions(sessionNode.value, { canAddData: inputs.canAdd }));
 const restrictionsKey = computed(() => `nb-restrictions-dismissed:${props.runId}`);
 const restrictionsDismissed = ref(false);
 watch(

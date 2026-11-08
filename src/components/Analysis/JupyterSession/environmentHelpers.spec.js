@@ -41,6 +41,20 @@ describe("environmentChoices", () => {
     ]);
   });
 
+  it("offers an R kernel the R environments only", () => {
+    const r = (v) => py(v, "ready", ["data.table==1.16.2"], { language: "r", version: "4.4" });
+    const choices = environmentChoices(
+      [...envs, { id: "r2", name: "old-r", language: "r", latest: py(1, "ready", [], { language: "r", version: "4.3" }) }].map((e) =>
+        e.id === "r" ? { ...e, latest: r(1) } : e
+      ),
+      "R 4.4.1"
+    );
+    expect(choices.map((c) => [c.name, c.disabled])).toEqual([
+      ["r-env", ""],
+      ["old-r", "R 4.3"],
+    ]);
+  });
+
   it("says a first version is still building", () => {
     const choices = environmentChoices([envs[1]], "Python 3.12.3");
     expect(choices[0].disabled).toBe("Building…");

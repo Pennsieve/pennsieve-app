@@ -67,7 +67,9 @@ export function platformsByRegion(region) {
 // What a session on this node can't do, said when it opens ({ title, items }),
 // or null: a compliant node has no internet access, reads public data only
 // in its own region, and can't add data while a session runs.
-export function sessionRestrictions(cn) {
+// canAddData: the session's sidecar can add data while it runs (a compliant
+// node's can from provisioner v1.41.0), so that isn't a restriction.
+export function sessionRestrictions(cn, { canAddData = false } = {}) {
   if ((cn?.deploymentMode || "").toLowerCase() !== "compliant") return null;
   const region = nodeRegion(cn);
   const data = region
@@ -80,7 +82,7 @@ export function sessionRestrictions(cn) {
       "Packages can't be installed from the notebook (pip, conda, install.packages): use an environment that has them.",
       "Code can't reach the web: APIs, git clone and downloads from URLs won't connect.",
       data + examples,
-      "Data can't be added while the session runs: choose it when you start a notebook.",
+      ...(canAddData ? [] : ["Data can't be added while the session runs: choose it when you start a notebook."]),
     ],
   };
 }
