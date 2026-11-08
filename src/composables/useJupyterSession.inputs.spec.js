@@ -78,6 +78,14 @@ describe("sessionSourcesRequest", () => {
     expect(init.method).toBe("DELETE");
   });
 
+  it("carries whether the sidecar can add views", async () => {
+    const list = await sessionSourcesRequest("https://k", "tok", "GET", {}, { fetchFn: respond(200, { sources, canAdd: true }) });
+    expect(list.canAdd).toBe(true);
+    expect(list).toHaveLength(2);
+    const older = await sessionSourcesRequest("https://k", "tok", "GET", {}, { fetchFn: respond(200, { sources }) });
+    expect(older.canAdd).toBeUndefined();
+  });
+
   it("is null from a sidecar that can't change its inputs", async () => {
     expect(await sessionSourcesRequest("https://k", "tok", "GET", {}, { fetchFn: respond(404, "not found") })).toBeNull();
   });
