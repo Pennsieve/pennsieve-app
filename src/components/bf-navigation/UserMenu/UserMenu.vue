@@ -421,7 +421,7 @@ export default {
     onSignOutClick: function () {
       this.closeMenus();
 
-      EventBus.$emit("logout");
+      EventBus.$emit("logout", { toDiscover: true });
     },
   },
 };

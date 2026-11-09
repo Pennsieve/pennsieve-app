@@ -390,6 +390,17 @@ export default {
      * @param {Object} payload
      */
     onLogout: async function(payload) {
+      // The profile menu's Sign out: signed out on every site (the session
+      // is the cookies shared with Discover), then to Discover.
+      if (payload?.toDiscover) {
+        try {
+          await signOut()
+        } catch (error) {
+          console.warn('Sign out failed:', error)
+        }
+        window.location.replace(siteConfig.discoverAppUrl)
+        return
+      }
       if (isFeatureEnabled('inAppLogin')) {
         try {
           await signOut()
