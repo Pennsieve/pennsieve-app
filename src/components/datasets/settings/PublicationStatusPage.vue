@@ -88,17 +88,22 @@
           </checklist-item>
 
           <checklist-item
+            v-if="isDatasetOwner"
             :is-complete="datasetOwnerHasOrcidId"
-            :externalLinkUrl="getROrcidLink()"
-            externalLinkText="Link ORCID Account"
-            :enableLink="isDatasetOwner"
+            cta="Link ORCID Account"
+            :route="{ name: 'user-orcid' }"
           >
-            <template v-if="isDatasetOwner">
-              link your ORCID iD to distinguish yourself from other researchers.
-            </template>
-            <template v-else>
-              the dataset owner needs to link their ORCID iD.
-            </template>
+            link your ORCID iD to distinguish yourself from other researchers.
+          </checklist-item>
+
+          <!-- Only the owner's ORCID counts, so other managers can't complete this item themselves. -->
+          <checklist-item
+            v-else
+            :is-complete="datasetOwnerHasOrcidId"
+            externalLinkText="Link ORCID Account"
+            :enableLink="false"
+          >
+            the dataset owner needs to link their ORCID iD.
           </checklist-item>
         </data-card>
 
@@ -238,12 +243,6 @@ export default {
   methods: {
     scrollToDoiRegistration() {
       this.$refs.doiRegistrationSection?.scrollIntoView({ behavior: "smooth", block: "center" });
-    },
-
-    getROrcidLink() {
-      return this.config.environment === 'prod'
-        ? 'https://discover.pennsieve.io/user/profile'
-        : 'https://discover.pennsieve.net/user/profile';
     },
   },
 };
