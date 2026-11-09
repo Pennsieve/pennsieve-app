@@ -117,10 +117,13 @@
             <router-link class="exit-link" :to="{ name: 'my-settings' }" @click="closeMenus">
               <span>Account settings</span>
             </router-link>
-            <a class="exit-link" href="#" @click.prevent="onSignOutClick">
-
-              <span>{{ showWorkspaces ? "Exit Workspaces" : "Sign out" }}</span>
+            <!-- Out of the workspaces to Discover, still signed in -->
+            <a class="exit-link" :href="discoverAppUrl" @click="closeMenus">
+              <span>Exit Workspaces</span>
               <IconArrowRight class="exit-icon" :width="14" :height="14" />
+            </a>
+            <a class="exit-link" href="#" @click.prevent="onSignOutClick">
+              <span>Sign out</span>
             </a>
           </div>
         </div>
@@ -139,6 +142,7 @@ import FilterInput from "../../shared/FilterInput/FilterInput.vue";
 import FilterEmptyState from "../../shared/FilterEmptyState/FilterEmptyState.vue";
 
 import EventBus from "../../../utils/event-bus";
+import * as siteConfig from "@/site-config/site.json";
 import IconArrowRight from "../../icons/IconArrowRight.vue";
 import IconCheck from "../../icons/IconCheck.vue";
 import IconPerson from "../../icons/IconPerson.vue";
@@ -174,6 +178,11 @@ export default {
 
   computed: {
     ...mapState(["profile", "activeOrganization", "organizations"]),
+
+    // Pennsieve Discover (discover.pennsieve.io; .net off production).
+    discoverAppUrl: function () {
+      return siteConfig.discoverAppUrl;
+    },
 
     /**
      * Check if profile and organization data is loaded
