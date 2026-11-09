@@ -5,17 +5,12 @@
       primaryNavCondensed || secondaryNavOpen ? 'condensed' : '',
     ]"
   >
-    <div class="logo-wrap">
-      <router-link tag="button" :to="{ name: 'home' }">
-        <icon-pennsieve-mark
-          v-show="!primaryNavCondensed || secondaryNavOpen"
-          class="logo"
-          :width="24"
-          :height="24"
-          color="currentColor"
-        />
-      </router-link>
-    </div>
+    <!-- Where you are, and the way to your workspaces (Shared Workspaces
+         is its "All shared workspaces") -->
+    <workspace-switcher
+      :condensed="primaryNavCondensed || secondaryNavOpen"
+      :active="$route.name === 'shared-workspaces'"
+    />
 
     <!-- Same control as the workspace nav: a hover-revealed chevron on the
          rail seam rather than a button sharing the logo row. -->
@@ -37,16 +32,6 @@
     </button>
 
     <div class="menu-wrap">
-
-      <user-navigation-item
-        :link="{ name: 'shared-workspaces' }"
-        label="Shared Workspaces"
-        :condensed="primaryNavCondensed"
-      >
-        <template v-slot:icon>
-          <IconOrganization :width="20" :height="20" color="currentColor" />
-        </template>
-      </user-navigation-item>
 
       <user-navigation-item
         :link="{ name: 'shared-datasets' }"
@@ -73,7 +58,7 @@
 
       <user-navigation-item
         :link="{ name: 'my-code' }"
-        label="My Code"
+        label="Code"
         :condensed="primaryNavCondensed"
       >
         <template v-slot:icon>
@@ -84,7 +69,7 @@
 
       <user-navigation-item
         :link="{ name: 'my-collections' }"
-        label="My Collections"
+        label="Collections"
         :condensed="primaryNavCondensed"
       >
         <template v-slot:icon>
@@ -95,7 +80,7 @@
 
       <user-navigation-item
         :link="{ name: 'my-analysis' }"
-        label="My Analysis"
+        label="Analysis"
         :condensed="primaryNavCondensed"
         :active-for-routes="['my-analysis']"
       >
@@ -126,16 +111,6 @@
         </template>
       </user-navigation-item>
 
-      <user-navigation-item
-        :link="{ name: 'my-settings' }"
-        label="Account Settings"
-        :condensed="primaryNavCondensed"
-      >
-        <template v-slot:icon>
-          <IconSettings :width="20" :height="20" color="currentColor" />
-        </template>
-      </user-navigation-item>
-
     </div>
 
     <div class="menu-wrap bottom">
@@ -153,37 +128,33 @@
 import { mapGetters, mapState, mapActions } from 'vuex'
 import UserNavigationItem from './UserNavigationItem.vue'
 import BfNavigationTertiary from '../bf-navigation-tertiary/BfNavigationTertiary.vue'
-import IconPennsieveMark from '../icons/IconPennsieveMark.vue'
 import IconArrowLeft from '../icons/IconArrowLeft.vue'
 import IconUser from '../icons/IconUser.vue'
 import IconUpload from '../icons/IconUpload.vue'
 import IconAnalysis from '../icons/IconAnalysis.vue'
 import IconGitHub from '../icons/IconGitHub.vue'
 import IconShare from '../icons/IconShare.vue'
-import IconSettings from "@/components/icons/IconSettings.vue";
 import IconCollection from "@/components/icons/IconCollection.vue";
-import IconOrganization from "@/components/icons/IconOrganization.vue";
 import IconGlobeCheck from "@/components/icons/IconGlobeCheck.vue";
 import IconDocumentation from "@/components/icons/IconDocumentation.vue";
+import WorkspaceSwitcher from "./WorkspaceSwitcher.vue";
 
 export default {
   name: 'UserNavigation',
   
   components: {
-    IconSettings,
     IconCollection,
     UserNavigationItem,
     BfNavigationTertiary,
-    IconPennsieveMark,
     IconArrowLeft,
     IconUser,
     IconUpload,
     IconAnalysis,
     IconGitHub,
     IconShare,
-    IconOrganization,
     IconGlobeCheck,
-    IconDocumentation
+    IconDocumentation,
+    WorkspaceSwitcher
   },
 
   computed: {
@@ -241,7 +212,9 @@ export default {
 
 
 .user-navigation {
-  background: linear-gradient(160deg, theme.$purple_2 0%, theme.$purple_3 100%);
+  // Deep navy, nearly flat (a touch lighter at the foot): calm next to
+  // the workspaces' own colours, and the active bar and logos stand out.
+  background: linear-gradient(180deg, theme.$purple_3 0%, #0a2766 100%);
   box-sizing: border-box;
   color: theme.$white;
   display: flex;
@@ -258,11 +231,6 @@ export default {
       margin: 0 0 16px -6px;
     }
 
-    .logo-wrap {
-      padding: 20px 12px;
-      justify-content: center;
-    }
-
     .nav-divider {
       margin: 8px 12px;
     }
@@ -272,18 +240,6 @@ export default {
     height: 1px;
     margin: 8px 24px;
     background: rgba(255, 255, 255, 0.12);
-  }
-
-  .logo-wrap {
-    padding: 20px 16px;
-    display: flex;
-    align-items: center;
-    // Branding only now that the collapse control lives on the rail seam.
-    justify-content: center;
-
-    .logo {
-      color: #fff;
-    }
   }
 
   .menu-wrap {

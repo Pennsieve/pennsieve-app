@@ -8,8 +8,9 @@
 
 
 
+    <!-- A guest's way back (a member's is the switcher at the top) -->
     <bf-navigation-item
-      v-if="orgId"
+      v-if="orgId && guest"
       :link="{ name: 'shared-with-me', params: {}}"
       label="My Workspace"
       :condensed="primaryNavCondensed"
@@ -46,7 +47,9 @@
 
 <!--    </bf-navigation-item>-->
 
-    <user-menu :style="{ backgroundColor: darkenedBkColor }"/>
+    <!-- Members switch at the top of the navigation (WorkspaceSwitcher);
+         a workspace guest, here -->
+    <user-menu :style="{ backgroundColor: darkenedBkColor }" :show-workspaces="!!orgId && guest" />
 
 
   </div>
@@ -83,6 +86,12 @@
     ],
 
     props: {
+      // A guest in this workspace: no switcher at the top (it lists only
+      // the workspaces you're a member of).
+      guest: {
+        type: Boolean,
+        default: false
+      },
       orgId: {
         type: String,
         default: ''

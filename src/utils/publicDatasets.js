@@ -26,6 +26,10 @@ export const toPublicDataset = (d) => ({
   organizationName: d.organizationName || '',
   authors: authorsLine(d.contributors),
   embargo: !!d.embargo,
+  tags: d.tags || [],
+  license: d.license || '',
+  datasetType: d.datasetType || '',
+  publishedAt: d.versionPublishedAt || d.updatedAt || '',
 })
 
 // Up to 25 datasets matching query, or the latest research datasets without
@@ -38,6 +42,37 @@ export async function searchPublicDatasets(query = '', { sendXhr = useSendXhr, c
   const response = await sendXhr(url, { method: 'GET' })
   return (response?.datasets || []).map(toPublicDataset).filter((d) => !d.embargo)
 }
+
+// One published dataset version (the latest without one), as the pickers
+// offer it.
+export async function fetchPublicDataset(id, version = null, { sendXhr = useSendXhr, config = siteConfig } = {}) {
+  const base = `${config.discoverUrl}/datasets/${encodeURIComponent(id)}`
+  const url = version != null ? `${base}/versions/${encodeURIComponent(version)}` : base
+  return toPublicDataset(await sendXhr(url, { method: 'GET' }))
+}
+
+// Every openly published dataset matching query (all without one), in
+// Discover's order (orderBy: relevance, date, name or size): the public
+// datasets page filters and pages them itself. Code releases are left out.
+export async function listPublicDatasets(
+  { query = '', orderBy = 'date', orderDirection = 'desc' } = {},
+  { sendXhr = useSendXhr, config = siteConfig } = {}
+) {
+  const params = new URLSearchParams({ limit: 1000, offset: 0, embargo: false, orderBy, orderDirection })
+  if (query) params.set('query', query)
+  const response = await sendXhr(`${config.discoverUrl}/search/datasets?${params.toString()}`, { method: 'GET' })
+  return (response?.datasets || [])
+    .map(toPublicDataset)
+    .filter((d) => !d.embargo && d.datasetType !== 'release')
+}
+
+// Where a published dataset version opens in a notebook: My Workspace's
+// notebook launcher, its data already chosen (NotebooksOverview's
+// ?publicDataset).
+export const notebookRoute = (d) => ({
+  name: 'my-notebooks',
+  query: { publicDataset: d.id, ...(d.version != null && { version: d.version }) },
+})
 
 // How many openly published research datasets Discover has.
 export async function countPublicDatasets({ sendXhr = useSendXhr, config = siteConfig } = {}) {

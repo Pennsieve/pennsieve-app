@@ -21,6 +21,8 @@ import AnalysisViewBar from "../AnalysisViewBar.vue";
 import EnvironmentsSection from "./EnvironmentsSection.vue";
 import CreateEnvironmentDialog from "./CreateEnvironmentDialog.vue";
 import { environmentsServiceUrl } from "@/utils/environmentsService";
+import { fetchPublicDataset } from "@/utils/publicDatasets";
+import EventBus from "@/utils/event-bus";
 import { endInteractiveSession } from "@/composables/useJupyterSession";
 import { useGetToken } from "@/composables/useGetToken";
 import {
@@ -100,9 +102,13 @@ const dialogVisible = ref(false);
 // workflow lands here with ?start=<workflow>. The query goes once it's
 // open, so a reload doesn't open it again.
 const startWorkflowId = ref("");
-function openNewNotebook(workflowId = "") {
+// The published dataset it opens on: a public dataset page's "Open in
+// notebook" lands here with ?publicDataset=<id>&version=<n>.
+const startPublicDataset = ref(null);
+function openNewNotebook(workflowId = "", publicDataset = null) {
   view.value = "live";
   startWorkflowId.value = workflowId;
+  startPublicDataset.value = publicDataset;
   dialogVisible.value = true;
 }
 function openFromQuery() {
@@ -113,6 +119,23 @@ function openFromQuery() {
   openNewNotebook(String(id));
 }
 watch(() => route.query.start, openFromQuery);
+async function openPublicFromQuery() {
+  const id = route.query.publicDataset;
+  if (!id || notebookWorkflows.value.length === 0) return;
+  const { publicDataset, version, ...rest } = route.query;
+  await router.replace({ query: rest });
+  try {
+    const dataset = await fetchPublicDataset(String(id), version || null);
+    if (dataset.embargo) throw new Error("embargoed");
+    openNewNotebook("", dataset);
+  } catch (err) {
+    console.error("Failed to load the public dataset:", err);
+    EventBus.$emit("toast", {
+      detail: { type: "error", msg: "That public dataset can't be opened in a notebook." },
+    });
+  }
+}
+watch(() => route.query.publicDataset, openPublicFromQuery);
 // The sub-tab, kept in the URL so it can be linked to and survives reloads.
 // Environments only where the site has environments-service.
 const VIEWS = [
@@ -345,6 +368,7 @@ onMounted(async () => {
     isLoading.value = false;
   }
   openFromQuery();
+  openPublicFromQuery();
   computeResourcesStore
     .fetchGpuTiers(store.getters.activeOrganization?.organization?.id)
     .then((t) => (gpuTiers.value = t || []))
@@ -506,6 +530,7 @@ onBeforeUnmount(() => {
       v-model="dialogVisible"
       :notebook-workflows="notebookWorkflows"
       :initial-workflow-id="startWorkflowId"
+      :initial-public-dataset="startPublicDataset"
       :personal="isMyWorkspace"
       @created="onNotebookCreated"
     />

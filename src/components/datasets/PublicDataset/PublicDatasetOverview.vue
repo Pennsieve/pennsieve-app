@@ -1,13 +1,5 @@
 <template>
   <div class="public-dataset-overview">
-    <!-- Dataset-level actions (top-right; grows with Download / pipeline) -->
-    <div v-if="dataset.doi" class="overview-actions">
-      <el-button @click="showAddToCollection = true">
-        <IconCollection class="mr-8" :width="16" :height="16" color="currentColor" />
-        Add to Collection
-      </el-button>
-    </div>
-
     <div class="header-row">
       <!-- Left: title, authors, description, metadata -->
       <div class="header-info">
@@ -133,12 +125,6 @@
         <references-panel-widget :publications="dataset.externalPublications" />
       </section>
     </div>
-
-    <add-to-collection-dialog
-      v-model:visible="showAddToCollection"
-      :doi="dataset.doi"
-      :dataset-name="dataset.name"
-    />
   </div>
 </template>
 
@@ -153,11 +139,9 @@ import IconLicense from "@/components/icons/IconLicense.vue";
 import IconGlobeCheck from "@/components/icons/IconGlobeCheck.vue";
 import IconEyeball from "@/components/icons/IconEyeball.vue";
 import BfPill from "@/components/shared/BfPill/BfPill.vue";
-import IconCollection from "@/components/icons/IconCollection.vue";
 import MarkdownPanelWidget from "@/components/datasets/DatasetOverview/widgets/MarkdownPanelWidget.vue";
 import CitationPanelWidget from "./widgets/CitationPanelWidget.vue";
 import ReferencesPanelWidget from "./widgets/ReferencesPanelWidget.vue";
-import AddToCollectionDialog from "./AddToCollectionDialog.vue";
 
 const props = defineProps({
   dataset: {
@@ -169,8 +153,6 @@ const props = defineProps({
 const store = useReadOnlyDatasetStore();
 const route = useRoute();
 const router = useRouter();
-
-const showAddToCollection = ref(false);
 
 // ---- Version selection ----
 const hasMultipleVersions = computed(() => store.versions.length > 1);
@@ -275,13 +257,6 @@ const formatDate = (value) => {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
-  margin-bottom: 16px;
-}
-
-.overview-actions {
-  display: flex;
-  justify-content: flex-end;
   gap: 8px;
   margin-bottom: 16px;
 }
