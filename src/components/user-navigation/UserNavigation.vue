@@ -212,7 +212,9 @@ export default {
 
 
 .user-navigation {
-  background: linear-gradient(160deg, theme.$purple_2 0%, theme.$purple_3 100%);
+  // Deep navy, nearly flat (a touch lighter at the foot): calm next to
+  // the workspaces' own colours, and the active bar and logos stand out.
+  background: linear-gradient(180deg, theme.$purple_3 0%, #0a2766 100%);
   box-sizing: border-box;
   color: theme.$white;
   display: flex;

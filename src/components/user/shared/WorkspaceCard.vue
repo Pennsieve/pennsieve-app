@@ -25,12 +25,11 @@
       />
     </div>
     <div class="ws-body">
-      <div class="ws-title">
-        <span class="ws-name" :title="workspace.organization.name">{{ workspace.organization.name }}</span>
-        <span class="ws-role">{{ role }}</span>
-      </div>
+      <span class="ws-name" :title="workspace.organization.name">{{ workspace.organization.name }}</span>
+      <!-- Your role and whether you were here last; the ways in over its
+           end on hover, as the gallery cards' -->
       <div class="ws-foot">
-        <span class="ws-note">{{ lastOpened ? "Last opened" : "" }}</span>
+        <span class="ws-note">{{ note }}</span>
         <span class="ws-actions" @click.stop>
           <button type="button" class="ws-action" @click="open('analysis')">Analysis</button>
           <button type="button" class="ws-action ws-action--open" @click="open('datasets')">Datasets</button>
@@ -81,8 +80,8 @@ export default {
       return ['#808fad', '#4d628c']
     },
 
-    role() {
-      return workspaceRole(this.workspace)
+    note() {
+      return [workspaceRole(this.workspace), this.lastOpened && 'Last opened'].filter(Boolean).join(' · ')
     }
   },
 
@@ -115,6 +114,11 @@ export default {
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
     outline: none;
   }
+  &:hover .ws-actions,
+  &:focus-within .ws-actions {
+    opacity: 1;
+    pointer-events: auto;
+  }
 }
 
 /* The logo on the workspace's colours; a wide wordmark kept off the edges. */
@@ -122,24 +126,17 @@ export default {
   display: flex;
   align-items: center;
   justify-content: center;
-  height: 112px;
+  height: 88px;
   padding: 0 24px;
 }
 
 .ws-body {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  padding: 14px 16px 12px;
-}
-.ws-title {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
+  gap: 4px;
+  padding: 12px 16px;
 }
 .ws-name {
-  flex: 1;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -148,33 +145,43 @@ export default {
   font-weight: 600;
   color: theme.$gray_6;
 }
-/* Your role, as the gallery cards' badges. */
-.ws-role {
-  flex-shrink: 0;
-  padding: 0 6px;
-  border-radius: 3px;
-  background: theme.$gray_0;
-  color: theme.$gray_5;
-  font-size: 10px;
-  font-weight: 600;
-  text-transform: uppercase;
-}
-
+/* One line: the note, and over its end on hover the ways in (in the line
+   on a touch screen), as the gallery cards' foot. */
 .ws-foot {
+  position: relative;
   display: flex;
   align-items: center;
-  gap: 8px;
+  min-height: 24px;
 }
 .ws-note {
   flex: 1;
   min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-size: 12px;
   color: theme.$gray_4;
 }
 .ws-actions {
+  position: absolute;
+  right: 0;
   display: flex;
-  flex-shrink: 0;
   gap: 6px;
+  padding-left: 12px;
+  background: linear-gradient(to right, rgba(255, 255, 255, 0), theme.$white 12px);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+@media (hover: none) {
+  .ws-actions {
+    position: static;
+    flex-shrink: 0;
+    padding-left: 0;
+    background: none;
+    pointer-events: auto;
+    opacity: 1;
+  }
 }
 .ws-action {
   white-space: nowrap;
