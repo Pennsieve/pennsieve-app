@@ -81,10 +81,11 @@ export default {
   max-width: 600px;
 }
 
-/* As the galleries: cards 300px or more, as many to a row as fit. */
+/* Cards 280-360px, as many to a row as fit: they don't stretch to fill
+   it, so one or two workspaces (as most people have) stay card-sized. */
 .workspace-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(300px, 100%), 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(280px, 100%), 360px));
   gap: 16px;
 }
 
