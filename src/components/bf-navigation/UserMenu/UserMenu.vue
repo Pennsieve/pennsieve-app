@@ -66,6 +66,9 @@
         @mouseleave="onUserMenuMouseleave"
       >
         <div class="bf-menu">
+          <!-- Members switch at the top of the navigation
+               (WorkspaceSwitcher): here, only the account. -->
+          <template v-if="showWorkspaces">
           <div class="menu-header">
             <span class="menu-title">Switch Workspace</span>
           </div>
@@ -108,11 +111,15 @@
               No shared workspaces available
             </div>
           </div>
-          
-          <div class="menu-footer">
+          </template>
+
+          <div class="menu-footer" :class="{ 'is-only': !showWorkspaces }">
+            <router-link class="exit-link" :to="{ name: 'my-settings' }" @click="closeMenus">
+              <span>Account settings</span>
+            </router-link>
             <a class="exit-link" href="#" @click.prevent="onSignOutClick">
 
-              <span>Exit Workspaces</span>
+              <span>{{ showWorkspaces ? "Exit Workspaces" : "Sign out" }}</span>
               <IconArrowRight class="exit-icon" :width="14" :height="14" />
             </a>
           </div>
@@ -138,6 +145,12 @@ import IconPerson from "../../icons/IconPerson.vue";
 
 export default {
   name: "UserMenu",
+
+  props: {
+    // The workspaces to switch to: a workspace guest's (members switch at
+    // the top of the navigation).
+    showWorkspaces: { type: Boolean, default: true },
+  },
 
   components: {
     IconPerson,
@@ -539,6 +552,10 @@ export default {
   .menu-footer {
     border-top: 1px solid theme.$gray_2;
     padding: 8px 0;
+
+    &.is-only {
+      border-top: none;
+    }
     
     .exit-link {
       display: flex;

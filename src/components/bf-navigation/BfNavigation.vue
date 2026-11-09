@@ -8,33 +8,27 @@
     ]"
     :style="{ backgroundImage: `${workspaceBackgroundStyle}` }"
   >
-    <div class="logo-wrap">
-      <router-link v-if="!pageNotFound && !isWorkspaceGuest" tag="button" :to="logoRoute">
-        <!-- Condensed always shows something, logo or not: at 56px the
-             monogram identifies the workspace, which is the whole job of this
-             slot. Only the expanded, logo-less case falls through to the
-             Pennsieve mark. -->
-        <workspace-logo
-          v-if="hasUploadedLogo || isRailCondensed"
-          :fit="isRailCondensed ? 'square' : 'natural'"
-          :size="isRailCondensed ? 28 : 30"
-          :max-width="navLogoMaxWidth"
-          :initials-only="isRailCondensed"
-          plain-initials
-        />
-        <!-- Referenced by its import identifier, not as <pennsieve-mark>.
-             Two components declare name: "PennsieveMark" - the real mark in
-             IconPennsieveMark.vue and an unused placeholder shield in
-             PennsieveMark.vue - and the kebab-case tag resolved to the
-             placeholder despite the local registration pointing here. -->
-        <IconPennsieveMark
-          v-else
-          class="logo-fallback-mark"
-          :width="24"
-          :height="24"
-          color="currentColor"
-        />
-      </router-link>
+    <div class="logo-wrap" :class="{ 'has-switcher': !pageNotFound && !isWorkspaceGuest }">
+      <!-- A member: where you are (the workspace's logo, else its initials
+           and name) and the way to My Workspace or another workspace, as
+           at the top of My Workspace's navigation. -->
+      <workspace-switcher
+        v-if="!pageNotFound && !isWorkspaceGuest"
+        :condensed="isRailCondensed"
+        :current-id="activeOrganizationId"
+        :name="activeOrganizationName"
+        :show-name="!hasUploadedLogo"
+      >
+        <template #mark>
+          <workspace-logo
+            :fit="isRailCondensed || !hasUploadedLogo ? 'square' : 'natural'"
+            :size="isRailCondensed ? 28 : hasUploadedLogo ? 30 : 24"
+            :max-width="isRailCondensed ? 28 : 150"
+            :initials-only="isRailCondensed || !hasUploadedLogo"
+            plain-initials
+          />
+        </template>
+      </workspace-switcher>
       <button v-else-if="!pageNotFound && isWorkspaceGuest" @click.prevent>
         <!-- Condensed always shows something, logo or not: at 56px the
              monogram identifies the workspace, which is the whole job of this
@@ -228,6 +222,7 @@
     <bf-navigation-tertiary
       :bkColor="userMenuBackgroundColor"
       :org-id="orgId"
+      :guest="isWorkspaceGuest"
     />
 
   </div>
@@ -252,6 +247,7 @@ import IconDocument from "../icons/IconDocument.vue";
 import IconPublic from "../icons/IconPublic.vue";
 import IconArrowLeft from "../icons/IconArrowLeft.vue";
 import WorkspaceLogo from "../shared/WorkspaceLogo/WorkspaceLogo.vue";
+import WorkspaceSwitcher from "../user-navigation/WorkspaceSwitcher.vue";
 import IconCollection from "../icons/IconCollection.vue";
 import CustomTheme from "../../mixins/custom-theme";
 
@@ -271,6 +267,7 @@ export default {
 
   components: {
     WorkspaceLogo,
+    WorkspaceSwitcher,
     IconArrowLeft,
     IconPublic,
     IconDocument,
@@ -400,24 +397,6 @@ export default {
       return PublicationTabs;
     },
 
-    /**
-     * Compute what route the logo should
-     * take the user based on their organization
-     * @returns {Object}
-     */
-    logoRoute: function () {
-      // If user is a guest, redirect to shared-with-me page
-      if (this.isWorkspaceGuest) {
-        return { name: 'shared-with-me' };
-      }
-      
-      let routeName = "datasets-list";
-      return {
-        name: routeName,
-        params: { orgId: this.orgId },
-      };
-    },
-    
     /**
      * Compute datasets navigation link based on guest status
      * @returns {Object}
@@ -611,6 +590,12 @@ export default {
 }
 .logo-wrap {
   margin: 20px 0;
+}
+// The switcher (WorkspaceSwitcher) spaces itself, the rail's width.
+.logo-wrap.has-switcher {
+  display: block;
+  margin: 0;
+  padding: 0;
 }
 .logo-arrow {
   color: theme.$white;

@@ -35,6 +35,14 @@ export default {
     OrgBreadcrumb
   },
 
+  // The route's (router/index.js: its meta's). Declared so they aren't
+  // set on the page as attributes: a title attribute showed the page's
+  // title as a tooltip wherever the pointer rested.
+  props: {
+    title: { type: String, default: '' },
+    description: { type: String, default: '' }
+  },
+
   mounted() {
     this.$store.commit('UPDATE_ACTIVE_ORGANIZATION', {})
     // Analysis data (compute nodes, runs, workflows, applications) is cached per
