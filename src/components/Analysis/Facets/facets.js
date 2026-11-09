@@ -55,3 +55,12 @@ export const matchesAny = (itemKeys = [], chosen) => {
   const want = selectedKeys(chosen);
   return !want.length || itemKeys.some((k) => want.includes(k));
 };
+
+// A section's options as shown folded: the first `limit`, and any chosen
+// past them (a choice is never hidden); unfolded, all. hidden: how many
+// the "Show n more" link adds.
+export function foldedOptions(options = [], selected = [], limit = Infinity, open = false) {
+  if (open || options.length <= limit) return { shown: options, hidden: 0 };
+  const shown = options.filter((o, i) => i < limit || selected.includes(o.key));
+  return { shown, hidden: options.length - shown.length };
+}
