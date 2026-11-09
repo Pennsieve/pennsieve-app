@@ -367,18 +367,17 @@ $card-height: 172px;
     object-fit: cover;
   }
 }
-/* A narrow card: a smaller square, tighter text, two lines of
-   description. */
+/* A narrow card: a smaller square, tighter text, one line of
+   description (a dataset's card has a byline more than an app's). */
 @container ds-card (max-width: 440px) {
   .ds-thumb {
     width: 140px;
   }
   .ds-body {
-    gap: 4px;
     padding: 10px 12px;
   }
   .ds-body .ds-description {
-    -webkit-line-clamp: 2;
+    -webkit-line-clamp: 1;
   }
 }
 /* The text fits the banner's height: it doesn't size the card (contain),
@@ -386,7 +385,7 @@ $card-height: 172px;
 .ds-body {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
   flex: 1;
   min-width: 0;
   padding: 14px 16px 12px;
@@ -395,6 +394,7 @@ $card-height: 172px;
 }
 .ds-title {
   display: flex;
+  flex-shrink: 0;
   align-items: baseline;
   gap: 6px;
   min-width: 0;
@@ -421,13 +421,16 @@ $card-height: 172px;
   font-weight: 500;
   color: theme.$purple_3;
 }
-/* Three lines where the card has room (two in a narrow one). */
+/* Two lines where the card has room (one in a narrow one): with the title,
+   byline, tags and foot, what fits the banner's height. Should a line still
+   not fit, the description gives way, never the foot. */
 .ds-description {
   display: -webkit-box;
-  flex-shrink: 0;
+  flex-shrink: 1;
+  min-height: 0;
   margin: 0;
   overflow: hidden;
-  -webkit-line-clamp: 3;
+  -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   font-size: 13px;
   line-height: 1.4;
@@ -438,8 +441,11 @@ $card-height: 172px;
 .ds-foot {
   position: relative;
   display: flex;
+  flex-shrink: 0;
   align-items: center;
   gap: 8px;
+  // As tall as its buttons, which show over it on hover.
+  min-height: 24px;
   margin-top: auto;
 }
 .ds-facts {
