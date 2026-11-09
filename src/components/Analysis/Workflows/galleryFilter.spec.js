@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { activeFilters, applyFilters, domainOptions, FACET_DEFAULTS, fieldOptions, inheritedTags, libraryWorkflows, workflowDomains, workflowFields, matchesSearch, outputOptions, sortWorkflows, workflowsView } from "./galleryFilter";
+import { activeFilters, applyFilters, mergeWorkflows, matchesVisibility, domainOptions, FACET_DEFAULTS, fieldOptions, inheritedTags, libraryWorkflows, workflowDomains, workflowFields, matchesSearch, outputOptions, sortWorkflows, workflowsView } from "./galleryFilter";
 
 const spikes = {
   name: "EEG spikes",
@@ -250,5 +250,36 @@ describe("activeFilters", () => {
 
   it("counts the status only away from Active (Show archived lists all)", () => {
     expect(activeFilters({ ...FACET_DEFAULTS, status: "all" })).toEqual([{ key: "status", label: "Including archived" }]);
+  });
+});
+
+describe("visibility", () => {
+  const own = [{ uuid: "a", visibility: "private" }, { uuid: "b", visibility: "public" }];
+  const published = [{ uuid: "b", visibility: "public" }, { uuid: "c", visibility: "public", official: true }];
+
+  it("merges this workspace's and the public workflows, each once, its own first", () => {
+    expect(mergeWorkflows(own, published).map((wf) => wf.uuid)).toEqual(["a", "b", "c"]);
+    expect(mergeWorkflows([], published).map((wf) => wf.uuid)).toEqual(["b", "c"]);
+  });
+
+  it("filters by the workflow's own visibility", () => {
+    const all = mergeWorkflows(own, published);
+    expect(all.filter((wf) => matchesVisibility(wf, "public")).map((wf) => wf.uuid)).toEqual(["b", "c"]);
+    expect(all.filter((wf) => matchesVisibility(wf, "private")).map((wf) => wf.uuid)).toEqual(["a"]);
+    expect(applyFilters(all, { visibility: "all" })).toHaveLength(3);
+    expect(applyFilters(all, { visibility: "public", officialOnly: true }).map((wf) => wf.uuid)).toEqual(["c"]);
+  });
+
+  it("recommends your own first, then Pennsieve's", () => {
+    const list = [{ uuid: "c", official: true, name: "C" }, { uuid: "x", name: "X" }, { uuid: "a", name: "A" }];
+    const sorted = sortWorkflows(list, "recommended", { ownIds: new Set(["a"]) });
+    expect(sorted.map((wf) => wf.uuid)).toEqual(["a", "c", "x"]);
+  });
+
+  it("names visibility and Pennsieve-reviewed as chips", () => {
+    expect(activeFilters({ ...FACET_DEFAULTS, visibility: "private", official: true })).toEqual([
+      { key: "visibility", label: "Private" },
+      { key: "official", label: "Pennsieve-reviewed" },
+    ]);
   });
 });
