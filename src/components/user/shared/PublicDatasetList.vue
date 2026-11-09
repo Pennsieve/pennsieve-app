@@ -2,6 +2,12 @@
   <!-- As the Apps tab and My Code: the filters on the left, the search and
        Sort in one row, the chips and cards -->
   <div class="public-datasets">
+    <!-- The page's action, on the right of its title row as My Code's and
+         a dataset's: propose a dataset of your own for publication -->
+    <Teleport defer to="#page-title-actions">
+      <bf-button class="compact flex" @click="submitDataset">Submit a dataset</bf-button>
+    </Teleport>
+
     <FacetLayout
       storage-key="pennsieve.publicDatasets.filtersPanel"
       :chips="chips"
@@ -136,6 +142,7 @@ import FacetOptions from "@/components/Analysis/Facets/FacetOptions.vue";
 import CardTags from "@/components/Analysis/Facets/CardTags.vue";
 import { toggleKey } from "@/components/Analysis/Facets/facets";
 import IconCompass from "@/components/icons/IconCompass.vue";
+import BfButton from "@/components/shared/bf-button/BfButton.vue";
 import { viewsServiceUrl } from "@/utils/viewsService";
 import { listPublicDatasets, notebookRoute } from "@/utils/publicDatasets";
 import {
@@ -256,6 +263,9 @@ const paged = computed(() => {
   const start = (state.page - 1) * PAGE_SIZE;
   return filtered.value.slice(start, start + PAGE_SIZE);
 });
+
+// Data Publishing, its new-proposal dialog open.
+const submitDataset = () => router.push({ name: "data-publishing", query: { openSubmitModal: "true" } });
 
 const openDataset = (dataset) => {
   router.push({ name: "public-dataset-overview", params: { datasetId: dataset.id } });
