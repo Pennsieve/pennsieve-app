@@ -66,6 +66,9 @@
         @mouseleave="onUserMenuMouseleave"
       >
         <div class="bf-menu">
+          <!-- Members switch at the top of the navigation
+               (WorkspaceSwitcher): here, only the account. -->
+          <template v-if="showWorkspaces">
           <div class="menu-header">
             <span class="menu-title">Switch Workspace</span>
           </div>
@@ -108,12 +111,19 @@
               No shared workspaces available
             </div>
           </div>
-          
-          <div class="menu-footer">
-            <a class="exit-link" href="#" @click.prevent="onSignOutClick">
+          </template>
 
+          <div class="menu-footer" :class="{ 'is-only': !showWorkspaces }">
+            <router-link class="exit-link" :to="{ name: 'my-settings' }" @click="closeMenus">
+              <span>Account settings</span>
+            </router-link>
+            <!-- Out of the workspaces to Discover, still signed in -->
+            <a class="exit-link" :href="discoverAppUrl" @click="closeMenus">
               <span>Exit Workspaces</span>
               <IconArrowRight class="exit-icon" :width="14" :height="14" />
+            </a>
+            <a class="exit-link" href="#" @click.prevent="onSignOutClick">
+              <span>Sign out</span>
             </a>
           </div>
         </div>
@@ -132,12 +142,19 @@ import FilterInput from "../../shared/FilterInput/FilterInput.vue";
 import FilterEmptyState from "../../shared/FilterEmptyState/FilterEmptyState.vue";
 
 import EventBus from "../../../utils/event-bus";
+import * as siteConfig from "@/site-config/site.json";
 import IconArrowRight from "../../icons/IconArrowRight.vue";
 import IconCheck from "../../icons/IconCheck.vue";
 import IconPerson from "../../icons/IconPerson.vue";
 
 export default {
   name: "UserMenu",
+
+  props: {
+    // The workspaces to switch to: a workspace guest's (members switch at
+    // the top of the navigation).
+    showWorkspaces: { type: Boolean, default: true },
+  },
 
   components: {
     IconPerson,
@@ -161,6 +178,11 @@ export default {
 
   computed: {
     ...mapState(["profile", "activeOrganization", "organizations"]),
+
+    // Pennsieve Discover (discover.pennsieve.io; .net off production).
+    discoverAppUrl: function () {
+      return siteConfig.discoverAppUrl;
+    },
 
     /**
      * Check if profile and organization data is loaded
@@ -399,7 +421,7 @@ export default {
     onSignOutClick: function () {
       this.closeMenus();
 
-      EventBus.$emit("logout");
+      EventBus.$emit("logout", { toDiscover: true });
     },
   },
 };
@@ -539,6 +561,10 @@ export default {
   .menu-footer {
     border-top: 1px solid theme.$gray_2;
     padding: 8px 0;
+
+    &.is-only {
+      border-top: none;
+    }
     
     .exit-link {
       display: flex;

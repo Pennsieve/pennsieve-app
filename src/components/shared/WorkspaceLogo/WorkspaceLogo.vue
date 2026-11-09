@@ -186,9 +186,10 @@ export default {
 <style scoped lang="scss">
 @use "../../../styles/_theme.scss";
 
+/* Square corners: with overflow hidden, a radius trimmed the corners of a
+   logo that runs to its edges (a wordmark). */
 .workspace-logo {
   align-items: center;
-  border-radius: 4px;
   display: flex;
   flex-shrink: 0;
   justify-content: center;
@@ -221,7 +222,6 @@ export default {
 .workspace-logo-initials {
   align-items: center;
   background: theme.$purple_1;
-  border-radius: 4px;
   color: theme.$white;
   display: flex;
   font-weight: 600;
@@ -230,16 +230,15 @@ export default {
   letter-spacing: 0.02em;
 }
 
-/* A translucent rounded square rather than bare letters: enough of a
-   container that the initials read as an identity token instead of stray
-   text, without the weight of the filled chip used on light surfaces.
+/* A translucent square rather than bare letters: enough of a container that
+   the initials read as an identity token instead of stray text, without the
+   weight of the filled chip used on light surfaces.
 
-   Square, deliberately. Rounded squares mean organisations and circles mean
-   people or status, so this stays distinct from the round dot marking dataset
+   Square, deliberately. Squares mean organisations and circles mean people
+   or status, so this stays distinct from the round dot marking dataset
    context in the secondary rail. */
 .workspace-logo-initials.is-plain {
   background: rgba(theme.$white, 0.16);
-  border-radius: 6px;
   // Explicit white, not currentColor: the nav sets its own colour and the
   // monogram must stay legible against the solid rail regardless.
   color: theme.$white;

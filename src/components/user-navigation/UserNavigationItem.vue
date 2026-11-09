@@ -65,11 +65,13 @@ export default {
   cursor: pointer;
   display: flex;
   font-size: 14px;
-  font-weight: 500;
+  // Regular, 44px: the active item (bold, its bar) stands out of a calm
+  // list; the switcher above stays 56px.
+  font-weight: 400;
   overflow: hidden;
   padding: 0 24px;
   text-decoration: none;
-  height: 56px;
+  height: 44px;
   position: relative;
   
   &:first-child {
@@ -90,6 +92,7 @@ export default {
   &.router-link-active {
     background: rgba(255, 255, 255, 0.15);
     color: theme.$white !important;
+    font-weight: 600;
 
     .svg-icon {
       color: theme.$white !important;

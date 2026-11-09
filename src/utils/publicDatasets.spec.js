@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { searchPublicDatasets, browsePublicFiles, authorsLine, countPublicDatasets } from "./publicDatasets";
+import { searchPublicDatasets, fetchPublicDataset, listPublicDatasets, notebookRoute, browsePublicFiles, authorsLine, countPublicDatasets } from "./publicDatasets";
 
 const config = { discoverUrl: "https://api.pennsieve.net/discover" };
 
@@ -15,6 +15,36 @@ describe("public datasets", () => {
     expect(sendXhr.mock.calls[0][0]).toBe("https://api.pennsieve.net/discover/search/datasets?limit=25&offset=0&query=eeg%20%26%20sleep");
     expect(found.map((d) => d.name)).toEqual(["Open"]);
     expect(found[0].authors).toBe("A B");
+  });
+
+  it("fetches one version, or the latest without one", async () => {
+    const sendXhr = vi.fn().mockResolvedValue({ id: 7, name: "Sleep", version: 3, fileCount: 12, embargo: false });
+    const d = await fetchPublicDataset(7, 3, { sendXhr, config });
+    expect(sendXhr.mock.calls[0][0]).toBe("https://api.pennsieve.net/discover/datasets/7/versions/3");
+    expect(d).toMatchObject({ id: 7, name: "Sleep", version: 3, fileCount: 12, embargo: false });
+    await fetchPublicDataset("7", null, { sendXhr, config });
+    expect(sendXhr.mock.calls[1][0]).toBe("https://api.pennsieve.net/discover/datasets/7");
+  });
+
+  it("opens a version in My Workspace's notebook launcher", () => {
+    expect(notebookRoute({ id: 7, version: 3 })).toEqual({ name: "my-notebooks", query: { publicDataset: 7, version: 3 } });
+    expect(notebookRoute({ id: 7 })).toEqual({ name: "my-notebooks", query: { publicDataset: 7 } });
+  });
+
+  it("lists every match in Discover's order, without embargoed datasets or code releases", async () => {
+    const sendXhr = vi.fn().mockResolvedValue({
+      datasets: [
+        { id: 1, name: "Open", version: 2, tags: ["eeg"], license: "MIT License", versionPublishedAt: "2026-11-05T00:00:00Z" },
+        { id: 2, name: "Closed", version: 1, embargo: true },
+        { id: 3, name: "Code", version: 1, datasetType: "release" },
+      ],
+    });
+    const found = await listPublicDatasets({ query: "eeg", orderBy: "name", orderDirection: "asc" }, { sendXhr, config });
+    expect(sendXhr.mock.calls[0][0]).toBe(
+      "https://api.pennsieve.net/discover/search/datasets?limit=1000&offset=0&embargo=false&orderBy=name&orderDirection=asc&query=eeg"
+    );
+    expect(found).toHaveLength(1);
+    expect(found[0]).toMatchObject({ id: 1, tags: ["eeg"], license: "MIT License", publishedAt: "2026-11-05T00:00:00Z" });
   });
 
   it("browses a folder with its path in the query, and the ids in the path encoded", async () => {

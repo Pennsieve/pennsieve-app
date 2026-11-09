@@ -62,6 +62,9 @@ function toggle() {
   text-align: left;
   cursor: pointer;
   position: relative;
+  // As the menu's items above: 44px, regular.
+  height: 44px;
+  font-weight: 400;
 
   .label {
     flex: 1;

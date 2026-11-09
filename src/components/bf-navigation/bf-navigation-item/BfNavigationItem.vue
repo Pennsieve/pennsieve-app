@@ -232,6 +232,16 @@ export default {
         color: theme.$gray_2;
       }
     }
+    // The main list's items as My Workspace's (UserNavigationItem): regular,
+    // 44px, the active one bold. Downloads and the profile keep their size.
+    .primary .menu-wrap & {
+      height: 44px;
+      font-weight: 400;
+
+      &.router-link-active {
+        font-weight: 600;
+      }
+    }
     .icon-main {
       display: inline-block;
       flex-shrink: 0;

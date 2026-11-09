@@ -8,7 +8,7 @@
           :page-route="sectionRoute"
           workspace-label="My Workspace"
           :workspace-route="{ name: 'my-workspace' }"
-          :actions="$route.matched.some((r) => r.name === 'my-analysis' || r.name === 'my-code')"
+          :actions="$route.matched.some((r) => ['my-analysis', 'my-code', 'public-datasets', 'public-dataset'].includes(r.name))"
         />
       </template>
     </bf-rafter>
@@ -33,6 +33,14 @@ export default {
     BfRafter,
     RouterTabs,
     OrgBreadcrumb
+  },
+
+  // The route's (router/index.js: its meta's). Declared so they aren't
+  // set on the page as attributes: a title attribute showed the page's
+  // title as a tooltip wherever the pointer rested.
+  props: {
+    title: { type: String, default: '' },
+    description: { type: String, default: '' }
   },
 
   mounted() {
