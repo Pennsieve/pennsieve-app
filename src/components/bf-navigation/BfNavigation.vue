@@ -126,6 +126,10 @@
         </bf-navigation-item> -->
       </div>
 
+      <!-- Groups, as My Workspace's: the data and its analysis; people;
+           the rest. Shown with the groups after them (not to guests). -->
+      <div v-if="!(pageNotFound || isWelcomeOrg) && !isWorkspaceGuest" class="nav-divider" />
+
       <bf-navigation-item
         v-if="!(pageNotFound || isWelcomeOrg) && !isWorkspaceGuest"
         :link="{ name: 'people-list', params: { orgId: activeOrganizationId } }"
@@ -149,6 +153,8 @@
           <IconTeam :width="20" :height="20" />
         </template>
       </bf-navigation-item>
+
+      <div v-if="!(pageNotFound || isWelcomeOrg) && !isWorkspaceGuest" class="nav-divider" />
 
       <!--
         Publishing is the Publishers team's review queue end to end; members
@@ -589,6 +595,16 @@ export default {
 }
 .logo-wrap {
   margin: 20px 0;
+}
+// Between the item groups, as My Workspace's (UserNavigation).
+.nav-divider {
+  height: 1px;
+  margin: 8px 24px;
+  background: rgba(255, 255, 255, 0.12);
+
+  .condensed & {
+    margin: 8px 12px;
+  }
 }
 // The switcher (WorkspaceSwitcher) spaces itself, the rail's width.
 .logo-wrap.has-switcher {
