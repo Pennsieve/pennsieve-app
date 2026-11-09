@@ -5,7 +5,7 @@
       <IconInfo v-else class="mr-8" :height="20" :width="20" />
 
       <div class="link-wrap mr-8">
-        <router-link v-if="cta" :to="route" @click.native="$emit('click-link', $event)">
+        <router-link v-if="cta" :to="route" @click="$emit('click-link', $event)">
           {{ cta }}
         </router-link>
         <template v-if="enableLink">

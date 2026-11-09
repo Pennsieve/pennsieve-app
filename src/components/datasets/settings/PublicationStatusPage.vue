@@ -81,10 +81,8 @@
           <checklist-item
             :is-complete="hasDatasetDoi"
             cta="Reserve a DOI"
-            :route="{
-              name: 'publication-settings',
-              query: { focusInput: 'dataciteDoi' },
-            }"
+            :route="{ name: 'publication-status' }"
+            @click-link="scrollToDoiRegistration"
           >
             reserve a DataCite DOI for published research.
           </checklist-item>
@@ -104,7 +102,7 @@
           </checklist-item>
         </data-card>
 
-        <div class="pub-section">
+        <div ref="doiRegistrationSection" class="pub-section">
           <div class="pub-section-header">DOI Registration</div>
           <div class="pub-section-content">
             <dataset-settings-doi ref="dataciteDoi" />
@@ -238,6 +236,10 @@ export default {
   },
 
   methods: {
+    scrollToDoiRegistration() {
+      this.$refs.doiRegistrationSection?.scrollIntoView({ behavior: "smooth", block: "center" });
+    },
+
     getROrcidLink() {
       return this.config.environment === 'prod'
         ? 'https://discover.pennsieve.io/user/profile'
