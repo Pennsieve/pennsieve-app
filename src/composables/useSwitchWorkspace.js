@@ -6,8 +6,11 @@ import {checkIsSubscribed} from "@/composables/useCheckTerms";
 import router from "@/router";
 import {useComputeResourcesStore} from "@/stores/computeResourcesStore";
 import {useGetPrimaryData} from "@/composables/useGetPrimaryData";
+import {landingPath} from "@/components/user/shared/workspaceCards";
 
-export async function useSwitchWorkspace(org) {
+// to: the page to land on ("datasets", the default, or "analysis"), e.g.
+// a Shared Workspaces card's links.
+export async function useSwitchWorkspace(org, { to } = {}) {
     const orgId = org.organization.id
 
     // Set loading state to true at the beginning
@@ -46,7 +49,7 @@ export async function useSwitchWorkspace(org) {
         if (!checkIsSubscribed) {
             await router.replace(`/${orgId}/welcome/terms-of-service`)
         } else {
-            await router.replace(`/${orgId}/datasets`)
+            await router.replace(landingPath(orgId, to))
         }
         
         // Clear loading state only after everything is complete
