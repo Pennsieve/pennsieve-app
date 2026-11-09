@@ -122,9 +122,6 @@
               <span>Exit Workspaces</span>
               <IconArrowRight class="exit-icon" :width="14" :height="14" />
             </a>
-            <a class="exit-link" href="#" @click.prevent="onSignOutClick">
-              <span>Sign out</span>
-            </a>
           </div>
         </div>
       </div>
@@ -412,16 +409,6 @@ export default {
           this.menuOpen = true;
         }, 200);
       }
-    },
-
-    /**
-     * Callback for sign out menu option click
-     * Dispatch event to log the user out
-     */
-    onSignOutClick: function () {
-      this.closeMenus();
-
-      EventBus.$emit("logout", { toDiscover: true });
     },
   },
 };
