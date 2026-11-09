@@ -92,12 +92,20 @@ export function fieldOptions(list, applications = []) {
     .sort((a, b) => b.count - a.count || a.field.label.localeCompare(b.field.label));
 }
 
-// officialOnly keeps Pennsieve's; domain and field are lists of keys (any
-// of them: OR within each, AND between them; empty, or "any", for all).
-export function applyFilters(list, { query, input = "any", output = "any", domain = "any", field = "any", officialOnly = false, ...context } = {}) {
+// A workflow's visibility as the Library filters it (VISIBILITY_OPTIONS):
+// published (public) or not (private).
+const isPublished = (wf) => wf?.visibility === "public";
+export const matchesVisibility = (wf, visibility = "all") =>
+  visibility === "all" || (visibility === "public" ? isPublished(wf) : !isPublished(wf));
+
+// officialOnly keeps Pennsieve's; visibility all, public or private; domain
+// and field are lists of keys (any of them: OR within each, AND between
+// them; empty, or "any", for all).
+export function applyFilters(list, { query, input = "any", output = "any", domain = "any", field = "any", officialOnly = false, visibility = "all", ...context } = {}) {
   return list.filter(
     (wf) =>
       (!officialOnly || wf.official) &&
+      matchesVisibility(wf, visibility) &&
       (input === "any" || inputKind(wf) === input) &&
       (output === "any" || outputTypes(wf).includes(output)) &&
       matchesAny(workflowDomains(wf, context.applications).map((d) => d.key), domain) &&
@@ -107,6 +115,13 @@ export function applyFilters(list, { query, input = "any", output = "any", domai
 }
 
 // The Library's facets: what each takes, and its value when nothing is chosen.
+// Visibility as the Apps tab's: every workflow you can run (this
+// workspace's and the public ones), or the published or unpublished.
+export const VISIBILITY_OPTIONS = [
+  { label: "All", value: "all" },
+  { label: "Public", value: "public" },
+  { label: "Private", value: "private" },
+];
 export const INPUT_OPTIONS = [
   { value: "dataset", label: "Takes a dataset" },
   { value: "none", label: "No input" },
@@ -114,16 +129,21 @@ export const INPUT_OPTIONS = [
 // The panel's "Show archived" lists all (Active and Archived); archived
 // alone isn't offered there, but a chip names it should it be set.
 const STATUS_CHIPS = { all: "Including archived", archived: "Archived only" };
-export const FACET_DEFAULTS = Object.freeze({ domain: [], field: [], input: "any", output: "any", status: "active" });
+export const FACET_DEFAULTS = Object.freeze({ visibility: "all", official: false, domain: [], field: [], input: "any", output: "any", status: "active" });
 
 // The facets set away from their defaults, as removable chips: { key, value,
 // label }, one per chosen domain and field (value: its key), in the panel's
-// order (status, domain, field, input, output). The labels come from the
+// order (visibility, Pennsieve-reviewed, status, domain, field, input,
+// output). The labels come from the
 // options shown (domainOptions, fieldOptions, outputOptions); a value no
 // longer offered (another scope's) shows by its key.
 export function activeFilters(state = {}, { domains = [], fields = [], outputs = [] } = {}) {
   const set = (key) => state[key] !== undefined && state[key] !== FACET_DEFAULTS[key];
   const chips = [];
+  if (set("visibility")) {
+    chips.push({ key: "visibility", label: VISIBILITY_OPTIONS.find((o) => o.value === state.visibility)?.label || state.visibility });
+  }
+  if (set("official")) chips.push({ key: "official", label: "Pennsieve-reviewed" });
   if (set("status")) {
     chips.push({ key: "status", label: STATUS_CHIPS[state.status] || `Status: ${state.status}` });
   }
@@ -161,18 +181,24 @@ function appsDeclared(wf, applications) {
   return stepApps(wf, applications).every((app) => versionManifest(app));
 }
 
-// Recommended, in tiers that can be explained: official first, then active
-// ones, then those whose apps all have an app.yml, then the most run, then
-// the most recently run.
-export function recommendedTier(wf, applications = []) {
-  return [wf?.official ? 0 : 1, wf?.isActive === false ? 1 : 0, appsDeclared(wf, applications) ? 0 : 1];
+// Recommended, in tiers that can be explained: your own (this workspace's,
+// where the list mixes in public ones: ownIds) first, then official, then
+// active ones, then those whose apps all have an app.yml, then the most
+// run, then the most recently run.
+export function recommendedTier(wf, applications = [], ownIds = null) {
+  return [
+    ownIds && !ownIds.has(wf?.uuid) ? 1 : 0,
+    wf?.official ? 0 : 1,
+    wf?.isActive === false ? 1 : 0,
+    appsDeclared(wf, applications) ? 0 : 1,
+  ];
 }
 
 // Sorted copies; ties go to the newest, then by name.
-export function sortWorkflows(list, sort = "recent", { applications = [] } = {}) {
+export function sortWorkflows(list, sort = "recent", { applications = [], ownIds = null } = {}) {
   const byName = (a, b) => (a.name || "").localeCompare(b.name || "");
   const tie = (a, b) => created(b) - created(a) || byName(a, b);
-  const tiers = sort === "recommended" ? new Map(list.map((wf) => [wf, recommendedTier(wf, applications)])) : null;
+  const tiers = sort === "recommended" ? new Map(list.map((wf) => [wf, recommendedTier(wf, applications, ownIds)])) : null;
   const byTier = (a, b) => tiers.get(a).reduce((d, t, i) => d || t - tiers.get(b)[i], 0);
   const cmp = {
     recommended: (a, b) => byTier(a, b) || runs(b) - runs(a) || lastRun(b) - lastRun(a) || tie(a, b),
@@ -201,6 +227,13 @@ export function workflowsView(requested, last, hasRuns = false) {
   if (known(requested)) return requested;
   if (known(last)) return last;
   return hasRuns ? "live" : "library";
+}
+
+// The Library's list: this workspace's (own) and the public ones, each once
+// (a workspace's published workflow is in both), its own first.
+export function mergeWorkflows(own = [], published = []) {
+  const seen = new Set(own.map((wf) => wf.uuid));
+  return [...own, ...published.filter((wf) => wf?.uuid && !seen.has(wf.uuid))];
 }
 
 // The Library lists workflows to run; notebooks start on the Notebooks tab,
