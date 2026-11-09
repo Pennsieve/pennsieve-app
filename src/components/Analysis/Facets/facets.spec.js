@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { displayTags, domainFacetOptions, fieldFacetOptions, matchesAny, selectedKeys, tagDisplay, toggleKey } from "./facets";
+import { displayTags, domainFacetOptions, fieldFacetOptions, matchesAny, selectedKeys, tagDisplay, toggleKey, foldedOptions } from "./facets";
 import { domainOfTag, fieldOfTag, domainColors } from "../Applications/appDomains";
 
 describe("facet options", () => {
@@ -54,5 +54,13 @@ describe("displayTags", () => {
   });
   it("keeps different domains and words apart", () => {
     expect(displayTags(["imaging", "genomics", "lab"]).map((t) => t.tag)).toEqual(["imaging", "genomics", "lab"]);
+  });
+
+  it("folds a section's options to its first few, keeping the chosen ones", () => {
+    const opts = ["a", "b", "c", "d"].map((key) => ({ key }));
+    expect(foldedOptions(opts, [], 2)).toEqual({ shown: opts.slice(0, 2), hidden: 2 });
+    expect(foldedOptions(opts, ["d"], 2)).toEqual({ shown: [opts[0], opts[1], opts[3]], hidden: 1 });
+    expect(foldedOptions(opts, [], 2, true)).toEqual({ shown: opts, hidden: 0 });
+    expect(foldedOptions(opts, [], 4)).toEqual({ shown: opts, hidden: 0 });
   });
 });

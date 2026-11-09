@@ -20,7 +20,8 @@ import IconPDF from "../../icons/IconPDF.vue";
 import WorkflowThumbnail from "../WorkflowGraph/WorkflowThumbnail.vue";
 import RunWizardDialog from "../RunMonitor/RunWizardDialog.vue";
 import { ioSummary, usageLine, cardText } from "./workflowSummary";
-import { activeFilters, applyFilters, domainOptions, FACET_DEFAULTS, INPUT_OPTIONS, fieldOptions, inheritedTags, libraryWorkflows, outputOptions, sortWorkflows, SORTS } from "./galleryFilter";
+import { activeFilters, applyFilters, domainOptions, FACET_DEFAULTS, INPUT_OPTIONS, VISIBILITY_OPTIONS, fieldOptions, inheritedTags, libraryWorkflows, mergeWorkflows, outputOptions, sortWorkflows, SORTS } from "./galleryFilter";
+import { useGetToken } from "@/composables/useGetToken";
 import { isNotebookWorkflow } from "../RunMonitor/notebookHelpers";
 import { exampleLabel, exampleVersion, PDF_URL_FRESH_MS } from "./runExamples";
 import SampleOutputViewer from "./SampleOutputViewer.vue";
@@ -51,7 +52,10 @@ const isMyWorkspace = computed(() => !route.params.orgId);
 
 const searchQuery = ref("");
 const statusFilter = ref("active");
-const scopeFilter = ref("workspace"); // "workspace" | "public" | "pennsieve" (public, official only)
+// As the Apps tab's: all (this workspace's and the public ones), public or
+// private; and only those Pennsieve has reviewed.
+const visibilityFilter = ref(FACET_DEFAULTS.visibility); // "all" | "public" | "private"
+const officialFilter = ref(FACET_DEFAULTS.official);
 const inputFilter = ref("any"); // "any" | "dataset" | "none"
 const outputFilter = ref("any"); // "any" | a target type
 const domainFilter = ref([]); // domains' keys (any of them); none: all
@@ -79,24 +83,21 @@ const pageSize = ref(10);
 const currentPage = ref(1);
 const isLoadingAll = ref(false);
 
-const workflows = computed(
+// This workspace's workflows (in My Workspace, your own), as the store has
+// them for the other tabs, and the public ones, loaded here: the Library is
+// both, each once, so a new workspace's isn't empty.
+const ownWorkflows = computed(
   () => store.state.analysisModule.workflows || []
 );
+const publicWorkflows = ref([]);
+const workflows = computed(() => mergeWorkflows(ownWorkflows.value, publicWorkflows.value));
+const ownIds = computed(() => new Set(ownWorkflows.value.map((wf) => wf.uuid)));
 // What the cards name: target types (outputs) and applications (steps).
 const targetTypes = computed(() => store.getters["analysisModule/targetTypes"] || []);
 const applications = computed(() => store.getters["analysisModule/applications"] || []);
 const nextCursor = computed(
   () => store.state.analysisModule.workflowsNextCursor || ""
 );
-
-const scopeOptions = computed(() => [
-  { label: isMyWorkspace.value ? "My workflows" : "This workspace", value: "workspace" },
-  { label: "Public", value: "public" },
-  { label: "Pennsieve", value: "pennsieve" },
-]);
-
-// Pennsieve's are the public ones it has reviewed (official).
-const isPublicScope = computed(() => scopeFilter.value !== "workspace");
 
 const outputChoices = computed(() => outputOptions(workflows.value, targetTypes.value));
 // What the workflows are for (their tags' domains, and their apps'), with
@@ -106,10 +107,10 @@ const domainChips = computed(() => domainOptions(libraryWorkflows(workflows.valu
 const fieldChips = computed(() => fieldOptions(libraryWorkflows(workflows.value), applications.value));
 
 // The facets set, as removable chips over the cards; Clear all resets them.
-const facetRefs = { domain: domainFilter, field: fieldFilter, input: inputFilter, output: outputFilter, status: statusFilter };
+const facetRefs = { visibility: visibilityFilter, official: officialFilter, domain: domainFilter, field: fieldFilter, input: inputFilter, output: outputFilter, status: statusFilter };
 const activeChips = computed(() =>
   activeFilters(
-    { domain: domainFilter.value, field: fieldFilter.value, input: inputFilter.value, output: outputFilter.value, status: statusFilter.value },
+    { visibility: visibilityFilter.value, official: officialFilter.value, domain: domainFilter.value, field: fieldFilter.value, input: inputFilter.value, output: outputFilter.value, status: statusFilter.value },
     { domains: domainChips.value, fields: fieldChips.value, outputs: outputChoices.value }
   )
 );
@@ -133,6 +134,8 @@ const showArchived = computed({
 const filtersSet = computed(
   () =>
     !!searchQuery.value.trim() ||
+    visibilityFilter.value !== FACET_DEFAULTS.visibility ||
+    officialFilter.value ||
     inputFilter.value !== "any" ||
     outputFilter.value !== "any" ||
     domainFilter.value.length > 0 ||
@@ -140,6 +143,8 @@ const filtersSet = computed(
 );
 function clearFilters() {
   searchQuery.value = "";
+  visibilityFilter.value = FACET_DEFAULTS.visibility;
+  officialFilter.value = FACET_DEFAULTS.official;
   inputFilter.value = "any";
   outputFilter.value = "any";
   domainFilter.value = [];
@@ -154,12 +159,14 @@ const filteredWorkflows = computed(() =>
       output: outputFilter.value,
       domain: domainFilter.value,
       field: fieldFilter.value,
-      officialOnly: scopeFilter.value === "pennsieve",
+      officialOnly: officialFilter.value,
+      visibility: visibilityFilter.value,
       applications: applications.value,
       targetTypes: targetTypes.value,
     }),
     sortBy.value,
-    { applications: applications.value }
+    // Recommended puts this workspace's own first.
+    { applications: applications.value, ownIds: ownIds.value }
   )
 );
 
@@ -252,29 +259,57 @@ const getStatusParam = () => {
 const ALL_FETCH_BATCH = 100;
 const ALL_FETCH_CAP = 50; // hard stop at 5,000 workflows
 
+// This workspace's workflows, into the store (the other tabs use them).
+const fetchOwnWorkflows = async () => {
+  // First batch replaces, subsequent batches append.
+  await store.dispatch("analysisModule/fetchWorkflows", {
+    cursor: undefined,
+    limit: ALL_FETCH_BATCH,
+    status: getStatusParam(),
+    append: false,
+  });
+  let safety = ALL_FETCH_CAP;
+  while (nextCursor.value && safety-- > 0) {
+    await store.dispatch("analysisModule/fetchWorkflows", {
+      cursor: nextCursor.value,
+      limit: ALL_FETCH_BATCH,
+      status: getStatusParam(),
+      append: true,
+    });
+  }
+};
+
+// The public workflows of every workspace, here only (as the store's
+// fetchWorkflows asks for them, a page at a time).
+const fetchPublicWorkflows = async () => {
+  const token = await useGetToken();
+  const list = [];
+  let cursor = "";
+  let safety = ALL_FETCH_CAP;
+  do {
+    const params = new URLSearchParams({ visibility: "public", limit: ALL_FETCH_BATCH });
+    const status = getStatusParam();
+    if (status) params.set("status", status);
+    if (cursor) params.set("cursor", cursor);
+    const resp = await fetch(`${store.state.config.api2Url}/compute/workflows/definitions?${params}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const result = await resp.json();
+    list.push(...(Array.isArray(result) ? result : result.workflows || []));
+    cursor = Array.isArray(result) ? "" : result.nextCursor || "";
+  } while (cursor && safety-- > 0);
+  return list;
+};
+
 const fetchAllWorkflows = async () => {
   if (isLoadingAll.value) return;
   isLoadingAll.value = true;
-  const visibility = isPublicScope.value ? "public" : undefined;
   try {
-    // First batch replaces, subsequent batches append.
-    await store.dispatch("analysisModule/fetchWorkflows", {
-      cursor: undefined,
-      limit: ALL_FETCH_BATCH,
-      status: getStatusParam(),
-      visibility,
-      append: false,
-    });
-    let safety = ALL_FETCH_CAP;
-    while (nextCursor.value && safety-- > 0) {
-      await store.dispatch("analysisModule/fetchWorkflows", {
-        cursor: nextCursor.value,
-        limit: ALL_FETCH_BATCH,
-        status: getStatusParam(),
-        visibility,
-        append: true,
-      });
-    }
+    // Either can fail alone: the Library shows what came.
+    const [, pub] = await Promise.allSettled([fetchOwnWorkflows(), fetchPublicWorkflows()]);
+    publicWorkflows.value = pub.status === "fulfilled" ? pub.value : [];
+    if (pub.status === "rejected") console.error("Failed to load public workflows:", pub.reason);
   } finally {
     isLoadingAll.value = false;
   }
@@ -347,8 +382,9 @@ const openExample = (wf) => {
   };
 };
 
-// Re-fetch all when the status or scope filter changes
-watch([statusFilter, isPublicScope], () => {
+// Re-fetch all when the status filter changes (visibility filters what's
+// loaded)
+watch(statusFilter, () => {
   currentPage.value = 1;
   fetchAllWorkflows();
 });
@@ -387,8 +423,9 @@ onMounted(async () => {
       @clear-all="clearFacets"
     >
       <template #filters>
-        <FacetSection title="Scope">
-          <FacetRadios v-model="scopeFilter" :options="scopeOptions" label="Scope" />
+        <FacetSection title="Visibility" :clearable="visibilityFilter !== FACET_DEFAULTS.visibility || officialFilter" @clear="clearFacet('visibility'); clearFacet('official')">
+          <FacetRadios v-model="visibilityFilter" :options="VISIBILITY_OPTIONS" label="Visibility" />
+          <FacetCheck v-model="officialFilter" label="Pennsieve-reviewed only" />
           <FacetCheck v-if="embedded" v-model="includeNotebooks" label="Include notebooks" />
           <FacetCheck v-model="showArchived" label="Show archived" />
         </FacetSection>
@@ -427,10 +464,10 @@ onMounted(async () => {
         </label>
       </template>
 
-      <p v-if="scopeFilter === 'pennsieve'" class="scope-hint">
+      <p v-if="officialFilter" class="scope-hint">
         Workflows Pennsieve has reviewed and validated. They can be run from any workspace.
       </p>
-      <p v-else-if="isPublicScope" class="scope-hint">
+      <p v-else-if="visibilityFilter === 'public'" class="scope-hint">
         Public workflows published across all workspaces. They can be run from
         any workspace; only the creator can edit or unpublish them.
       </p>

@@ -85,6 +85,10 @@ const props = defineProps({
   // with the dataset's file list, and the user downloads files from the
   // notebook's Inputs panel.
   personal: { type: Boolean, default: false },
+  // A published dataset version to open ({ id, name, version, ... }, as
+  // utils/publicDatasets gives it): a public dataset page's "Open in
+  // notebook". The data is chosen, so the dialog starts at the kernel.
+  initialPublicDataset: { type: Object, default: null },
 });
 const emit = defineEmits(["update:modelValue", "created"]);
 
@@ -612,6 +616,8 @@ const publicInputs = !!viewsServiceUrl();
 // it; platforms/ say what it is and what's made of it).
 const sel = newSelection();
 const publicDataset = computed(() => sel.discover.dataset); // a published dataset, chosen with DiscoverPicker
+// Opened on a published dataset (initialPublicDataset): it's the data.
+const dataPinned = computed(() => publicInputs && !!props.initialPublicDataset);
 
 // Hints from the data chosen: where it lives (a node elsewhere costs
 // transfer), its size (the disk suggested), whether it's imaging (a GPU may
@@ -841,6 +847,12 @@ function reset() {
   clearSelection(sel);
   // The data comes first: a workspace's own dataset, else a public one.
   inputChoice.value = props.personal ? (publicInputs ? "public" : "none") : "dataset";
+  // Or the published dataset the dialog was opened on.
+  if (dataPinned.value) {
+    inputChoice.value = "public";
+    sel.discover.dataset = props.initialPublicDataset;
+    sel.discover.version = props.initialPublicDataset.version;
+  }
   diskTouched.value = false;
   resourceCpu.value = DEFAULT_CPU;
   resourceMemory.value = AUTO_MEMORY;
@@ -872,6 +884,7 @@ function reset() {
   // Seed the suggested name ({kernel}-{user}-{date}) now that the kernel (if any)
   // is selected; the watcher keeps it current until the user edits it.
   runName.value = defaultRunName.value;
+  step.value = firstStep.value;
 }
 
 // Reset + load datasets each time the dialog opens.
@@ -899,9 +912,12 @@ watch(visible, (open) => {
 // that declares its own with those: no CPU and memory to choose. A kernel
 // with neither a hardware choice nor resources to choose has no Hardware
 // step.
+// Opened on a published dataset, the data is already chosen.
 const skipsStep = (i) =>
+  (i === S.INPUT && dataPinned.value) ||
   (i === S.FILES && inputChoice.value !== "dataset") ||
   (i === S.HARDWARE && !allHardware.value.length && variantResourcesSet.value);
+const firstStep = computed(() => (skipsStep(S.INPUT) ? S.KERNEL : S.INPUT));
 
 const next = async () => {
   if (step.value === S.KERNEL) await loadDefinition(); // leaving Kernel → its inputs and outputs
@@ -917,8 +933,8 @@ async function startWithoutData() {
 }
 const back = () => {
   let n = step.value - 1;
-  while (n > 0 && skipsStep(n)) n--;
-  if (n >= 0) step.value = n;
+  while (n > firstStep.value && skipsStep(n)) n--;
+  if (n >= firstStep.value) step.value = n;
 };
 
 /* ------------------------------------------------------- info column ------ */
@@ -1120,7 +1136,7 @@ async function execute() {
       <div v-if="step === S.KERNEL" class="wizard-step">
         <p class="wizard-step-desc">Choose the kernel for this notebook.</p>
         <p v-if="!kernelChoices.length" class="wizard-step-desc">
-          No notebook kernel can start with this data here. Go back to choose other data, or none.
+          No notebook kernel can start with this data here.<template v-if="!dataPinned"> Go back to choose other data, or none.</template>
         </p>
         <div class="kernel-grid">
           <div
@@ -1608,7 +1624,7 @@ async function execute() {
       <div class="run-dialog-footer">
         <bf-button class="secondary" @click="visible = false">Cancel</bf-button>
         <div class="wizard-footer-right">
-          <bf-button v-if="step > 0" class="secondary" @click="back">Back</bf-button>
+          <bf-button v-if="step > firstStep" class="secondary" @click="back">Back</bf-button>
           <!-- No input data: chosen and on, in one click. -->
           <bf-button v-if="step === S.INPUT && inputChoices.includes('none')" class="secondary" @click="startWithoutData">
             No input data

@@ -320,6 +320,12 @@ const handleQueryParameters = () => {
         repo.displayName?.toLowerCase() === repositoryName.toLowerCase()
       )
     }
+
+    // Neither named (Public Datasets' "Submit a dataset"): the first, as
+    // New Proposal does; the dialog lets the user pick another
+    if (!repositoryId && !repositoryName) {
+      repository = repositories.value[0] || null
+    }
     
     if (repository) {
       // Set the repository and open modal
