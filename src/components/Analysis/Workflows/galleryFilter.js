@@ -210,25 +210,6 @@ export function sortWorkflows(list, sort = "recent", { applications = [], ownIds
   return [...list].sort(cmp);
 }
 
-// The Workflows tab's views: Library (the workflows), Live (their runs),
-// Builder. Without one in the URL, the view last used, else Library.
-// Live first: what's running and how it went is what's looked at most; then
-// the Library, to start a workflow; then the Builder, to make one.
-export const WORKFLOW_VIEWS = [
-  { key: "live", label: "Live" },
-  { key: "library", label: "Library" },
-  { key: "builder", label: "Builder" },
-];
-// The view to show: the one asked for (?view), else the one last used here,
-// else, on a first visit, Live when the workspace has runs (hasRuns) and the
-// Library when it has none (nothing to watch yet).
-export function workflowsView(requested, last, hasRuns = false) {
-  const known = (v) => WORKFLOW_VIEWS.some((o) => o.key === v);
-  if (known(requested)) return requested;
-  if (known(last)) return last;
-  return hasRuns ? "live" : "library";
-}
-
 // The Library's list: this workspace's (own) and the public ones, each once
 // (a workspace's published workflow is in both), its own first.
 export function mergeWorkflows(own = [], published = []) {

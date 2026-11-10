@@ -540,10 +540,10 @@ hr {
 .heading-wrap {
   box-sizing: border-box;
   color: theme.$gray_6;
-  // Symmetrical: bottom padding was 0 because the collapse button was the
-  // only thing giving this row height. With the dropdown alone it needs to
-  // match the top, or it sits flush against the items below.
-  padding: 21px 24px;
+  // 69px, the dropdown centred: the rule under it is then at 69px from the
+  // top, as the page header's and the primary nav's divider (OrgBreadcrumb).
+  height: 69px;
+  padding: 0 24px;
 
   display: flex;
   // The dropdown is the only child now, so there is nothing to space apart.
@@ -554,7 +554,6 @@ hr {
 
   .condensed & {
     background: theme.$purple_0_7;
-    height: 56px;
     // Centred: flex-start suits the expanded dropdown, but leaves the lone
     // marker against the left edge of a 56px rail.
     justify-content: center;

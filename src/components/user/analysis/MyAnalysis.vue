@@ -1,48 +1,27 @@
 <script setup>
-import RouterTabs from '@/components/shared/routerTabs/routerTabs.vue'
-import { useStore } from 'vuex'
-import { runPageIsNotebook } from '@/components/Analysis/RunMonitor/notebookHelpers'
+import { provide, ref } from 'vue'
+import { useAnalysisStageTop } from '@/composables/useAnalysisStageTop'
 
-const store = useStore()
-// A run's page sits under no tab's path: it lights up Notebooks for a
-// notebook's run, else Workflows (as do configuring a run, a new workflow
-// and a workflow's page). An app's pages are under the Apps tab's path.
-const runPage = (route) => route.name === 'my-run-detail'
-const isNotebook = (route) => runPageIsNotebook(route, store.getters['analysisModule/workflowInstances'])
-
-// Analysis outside any workspace, laid out like a workspace's Analysis page.
-const tabs = [
-  {
-    name: 'Workflows',
-    to: 'my-workflows',
-    activeWhen: (route) =>
-      (runPage(route) && !isNotebook(route)) ||
-      ['my-run-configure', 'my-workflow-create', 'my-workflow-detail'].includes(route.name),
-  },
-  {
-    name: 'Notebooks',
-    to: 'my-notebooks',
-    activeWhen: (route) => runPage(route) && isNotebook(route),
-  },
-  {
-    name: 'Apps',
-    to: 'my-apps',
-  },
-  {
-    name: 'Compute Nodes',
-    to: 'my-compute-nodes',
-  },
-]
+// Analysis outside any workspace, laid out like a workspace's Analysis page:
+// its sections in the secondary nav (AnalysisNavigationSecondary, through
+// MyWorkspaceNavigationSecondary), a section's views as the page's tabs, its
+// actions on My Workspace's title row.
+const stageMarker = ref(null)
+const tabsRow = ref(null)
+useAnalysisStageTop(stageMarker, [tabsRow])
+provide('analysisLayout', 'sections')
 </script>
 
 <template>
   <div class="my-analysis">
-    <div class="content-tabs">
-      <router-tabs class="content-tabs-list" :tabs="tabs" />
-      <!-- The current tab's views (AnalysisViewBar); its actions are on the
-           title row -->
-      <div id="analysis-tab-views" class="tab-views" />
+    <!-- The section's views as the page's tabs (AnalysisViewBar); without
+         views (most sections), no row. -->
+    <div ref="tabsRow" class="tab-header">
+      <div class="views-row">
+        <div id="analysis-tab-views" class="tab-views" />
+      </div>
     </div>
+    <div ref="stageMarker" class="stage-marker" />
     <router-view />
   </div>
 </template>
@@ -50,48 +29,38 @@ const tabs = [
 <style scoped lang="scss">
 @use '@/styles/theme';
 
-.content-tabs {
-  display: flex;
-  align-items: flex-end;
-  gap: 32px;
+/* The views row: the page's tabs, their underline on the one rule under
+   the header. */
+.tab-header {
   box-sizing: border-box;
-  height: 44px;
+  padding: 0 32px;
   background: white;
   border-bottom: 1px solid theme.$gray_2;
-  padding: 0 32px;
 }
-/* The tabs at the row's bottom (their underline on its rule). */
-.content-tabs-list {
-  flex-shrink: 0;
-  max-width: 100%;
-}
-/* The current tab's views (AnalysisViewBar), on the right. */
-.tab-views {
+.views-row {
   display: flex;
-  flex: 1;
-  align-self: center;
-  justify-content: flex-end;
+  height: 40px;
   min-width: 0;
 }
-/* A phone: the views on a line below the tabs. */
+/* No views (most sections): no row, only the rule under the title. */
+.views-row:has(> .tab-views:empty) {
+  display: none;
+}
+.tab-views {
+  display: flex;
+  align-items: stretch;
+  min-width: 0;
+}
+.stage-marker {
+  height: 0;
+}
+/* A phone: the views scroll rather than the page. */
 @media (max-width: 767px) {
-  .content-tabs {
-    flex-wrap: wrap;
-    row-gap: 0;
-    height: auto;
+  .tab-header {
     padding: 0 16px;
   }
-  /* A long row of tabs scrolls rather than the page. */
-  .content-tabs-list {
+  .views-row {
     overflow-x: auto;
-  }
-  .tab-views {
-    flex-basis: 100%;
-    justify-content: flex-start;
-    padding: 4px 0 8px;
-  }
-  .tab-views:empty {
-    display: none;
   }
 }
 </style>

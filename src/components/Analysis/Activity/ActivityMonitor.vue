@@ -486,7 +486,7 @@ onNodeDragStop(({ node }) => {
 }
 
 .graph-browser {
-  height: calc(100vh - 112px);
+  height: calc(100vh - var(--analysis-stage-top, 112px));
   overflow: hidden;
   position: relative;
 }

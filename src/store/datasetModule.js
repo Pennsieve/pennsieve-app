@@ -225,6 +225,15 @@ export const actions = {
     commit('UPDATE_DATASET_OFFSET', 0)
   },
 
+  // The dataset list's filter panel: status, role and collection together
+  // (each "" for any), back to the first page.
+  updateDatasetSearchFilters: ({commit}, { status = '', withRole = '', collectionId = '' } = {}) => {
+    commit('UPDATE_DATASET_SEARCH_STATUS', status)
+    commit('UPDATE_DATASET_SEARCH_WITH_ROLE', withRole)
+    commit('UPDATE_DATASET_SEARCH_WITH_COLLECTION', collectionId)
+    commit('UPDATE_DATASET_SEARCH_ONLY_MY_DATASETS', false)
+    commit('UPDATE_DATASET_OFFSET', 0)
+  },
   updateDatasetSearchWithCollection: ({commit}, evt) => {
     commit('UPDATE_DATASET_SEARCH_WITH_COLLECTION', evt)
     commit('UPDATE_DATASET_SEARCH_WITH_ROLE', '')

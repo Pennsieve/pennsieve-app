@@ -4,11 +4,12 @@
     v-loading="teamsLoading"
     element-loading-background="transparent"
   >
-    <template #actions>
-      <bf-button v-if="hasAdminRights && !isEmpty" @click="openCreateDialog">
-        Create Team
-      </bf-button>
-    </template>
+    <!-- As every page: what's listed on the left, the action on the right -->
+    <ContentIntro class="teams-intro" text="Teams group this workspace's members, so you can share a dataset with all of them at once.">
+      <template #actions>
+        <bf-button v-if="hasAdminRights && !isEmpty" @click="openCreateDialog">+ New Team</bf-button>
+      </template>
+    </ContentIntro>
 
     <div v-if="!isEmpty" class="bf-table">
       <div class="bf-table-header">
@@ -92,6 +93,7 @@ import CreateEditTeam from "../windows/CreateEditTeam.vue";
 import RemoveTeam from "../windows/RemoveTeam.vue";
 import BfRafter from "../../shared/bf-rafter/BfRafter.vue";
 import BfButton from "../../shared/bf-button/BfButton.vue";
+import ContentIntro from '@/components/shared/ContentIntro/ContentIntro.vue';
 import BfEmptyPageState from "../../shared/bf-empty-page-state/BfEmptyPageState.vue";
 import Team from "../team/Team.vue";
 
@@ -110,6 +112,7 @@ export default {
     BfRafter,
     BfButton,
     Team,
+    ContentIntro,
   },
 
   mixins: [Sorter, UserRoles],
@@ -240,6 +243,11 @@ export default {
 @use "../../../styles/theme";
 @use "../../../styles/element/table";
 @use "../../../styles/element/dialog";
+
+/* 20px under the header, as the other pages (the stage pads 8px). */
+.teams-intro {
+  margin-top: 12px;
+}
 
 .empty {
   display: flex;

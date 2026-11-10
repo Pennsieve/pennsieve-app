@@ -1,69 +1,44 @@
 <script setup>
-// The Workflows tab: Live, the workflow runs going on and before (without
-// standalone notebook sessions; "Include notebooks" brings them back, e.g. to
-// compare costs); Library, the workflows to run (your own and public ones;
-// notebooks start on the Notebooks tab, so they aren't listed); and Builder,
-// the canvas for a new workflow. The view is in the URL (?view=library,
-// ?view=builder), else the view last used in this browser, else, on a first
-// visit, Live when the workspace has runs and the Library when it has none.
+// Two sections of Analysis: Runs (section="runs": the workflow runs going on
+// and before, without standalone notebook sessions; "Include notebooks"
+// brings them back, e.g. to compare costs) and Workflows (the Library, the
+// workflows to run: your own and public ones; notebooks start on the
+// Notebooks section, so they aren't listed; and the Builder, the canvas for
+// a new workflow, at ?view=builder). An older link to Workflows' Live
+// (?view=live) goes to Runs.
 import { computed, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import { useStore } from "vuex";
-import { useGetToken } from "@/composables/useGetToken";
 import BfButton from "../../shared/bf-button/BfButton.vue";
 import RunsOverview from "../RunMonitor/RunsOverview.vue";
 import WorkflowBuilder from "../WorkflowBuilder/WorkflowBuilder.vue";
 import WorkflowsGrid from "./WorkflowsGrid.vue";
-import { workflowsView, WORKFLOW_VIEWS } from "./galleryFilter";
 import AnalysisViewBar from "../AnalysisViewBar.vue";
 import RunWizardDialog from "../RunMonitor/RunWizardDialog.vue";
 
+const props = defineProps({
+  section: { type: String, default: "workflows" }, // "workflows" | "runs"
+});
+
 const route = useRoute();
 const router = useRouter();
-const store = useStore();
 
-const VIEWS = WORKFLOW_VIEWS;
-// The view last used here, for a visit without ?view (kept in this browser).
-const VIEW_KEY = "pennsieve.workflows.view";
-const lastView = () => {
-  try {
-    return localStorage.getItem(VIEW_KEY);
-  } catch {
-    return null;
-  }
-};
-// A first visit (no ?view, no view last used) waits for whether the
-// workspace has runs, to open on Live or the Library (null until known).
-const firstVisit = !route.query.view && !lastView();
-const hasRuns = ref(firstVisit ? null : false);
-onMounted(async () => {
-  if (!firstVisit) return;
-  try {
-    const orgId = store.state.activeOrganization?.organization?.id;
-    const params = new URLSearchParams({ limit: "1" });
-    if (orgId) params.set("organization_id", orgId);
-    const resp = await fetch(`${store.state.config.api2Url}/compute/workflows/runs?${params}`, {
-      headers: { Authorization: `Bearer ${await useGetToken()}` },
-    });
-    const body = resp.ok ? await resp.json() : null;
-    hasRuns.value = ((body?.runs || body || []).length || 0) > 0;
-  } catch {
-    hasRuns.value = false;
-  }
-});
+// My Analysis's routes are the workspace's prefixed "my-".
+const routeName = (name) => ((route.name || "").startsWith("my-") ? `my-${name}` : name);
+
+if (props.section === "workflows" && route.query.view === "live") {
+  const { view: _view, ...rest } = route.query;
+  router.replace({ name: routeName("runs"), query: rest });
+}
+
 const view = computed({
-  // A view the URL names needs no wait for whether there are runs.
-  get: () =>
-    hasRuns.value === null && !VIEWS.some((v) => v.key === route.query.view)
-      ? null
-      : workflowsView(route.query.view, lastView(), hasRuns.value ?? false),
+  get: () => (props.section === "runs" ? "live" : route.query.view === "builder" ? "builder" : "library"),
   set: (v) => {
-    try {
-      localStorage.setItem(VIEW_KEY, v);
-    } catch {
-      // not remembered; the URL still says it
+    if (v === "live") {
+      router.push({ name: routeName("runs") });
+      return;
     }
-    router.replace({ query: { ...route.query, view: v } });
+    const { view: _view, ...rest } = route.query;
+    router.replace({ query: v === "builder" ? { ...rest, view: "builder" } : rest });
   },
 });
 
@@ -90,18 +65,19 @@ watch(() => route.query.run, openRunFromQuery);
 
 <template>
   <div class="wf-page">
-    <AnalysisViewBar v-model="view" :views="VIEWS">
-      <!-- Each view's primary action, in one place: running a workflow,
-           making one (the Builder, on its start screen), saving it. -->
+    <!-- No views of its own (Runs and Workflows are sections). The Builder
+         has no content row (its canvas): its Save stays on the title row. -->
+    <AnalysisViewBar v-model="view" :actions-at="view === 'builder' ? 'title' : ''">
+      <!-- Each view's primary action: running a workflow, making one (the
+           Builder, on its start screen), saving it. -->
       <bf-button v-if="view === 'live'" @click="runsRef?.openWizardDialog()">+ Run Workflow</bf-button>
       <bf-button v-else-if="view === 'library'" @click="view = 'builder'">+ New Workflow</bf-button>
       <span v-else-if="view === 'builder'" id="wf-builder-save" class="wf-builder-save" />
     </AnalysisViewBar>
     <!-- The builder's bar (name, readiness, Save): its own row over the
-         canvas; the views are on the tab row. -->
+         canvas. -->
     <div v-if="view === 'builder'" id="wf-toolbar-builder" class="wf-builder-bar" />
-    <!-- Nothing until a first visit knows whether to open on Live -->
-    <div v-if="view" class="wf-body">
+    <div class="wf-body">
       <div v-if="view === 'library'" class="wf-library">
         <!-- Include notebooks is in its filter panel -->
         <WorkflowsGrid v-model:include-notebooks="includeNotebooks" embedded />
@@ -113,7 +89,7 @@ watch(() => route.query.run, openRunFromQuery);
         :exclude-notebooks="!includeNotebooks"
         notebooks-toggle
         @update:exclude-notebooks="(v) => (includeNotebooks = !v)"
-        @open-library="view = 'library'"
+        @open-library="router.push({ name: routeName('workflows') })"
       />
       <div v-else class="wf-builder">
         <WorkflowBuilder toolbar-target="#wf-toolbar-builder" save-target="#wf-builder-save" />
@@ -127,7 +103,7 @@ watch(() => route.query.run, openRunFromQuery);
 @use "../../../styles/theme";
 
 .wf-page {
-  height: calc(100vh - 112px);
+  height: calc(100vh - var(--analysis-stage-top, 112px));
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -142,6 +118,11 @@ watch(() => route.query.run, openRunFromQuery);
   padding: 0 32px;
   border-bottom: 1px solid theme.$gray_2;
   background: theme.$white;
+}
+/* Empty on the Builder's start screen: no band until it has a workflow's
+   name and Save. */
+.wf-builder-bar:empty {
+  display: none;
 }
 .wf-builder-save {
   display: inline-flex;

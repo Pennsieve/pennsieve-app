@@ -487,14 +487,14 @@ export default {
   },
 
   methods: {
-    ...mapActions(["togglePrimaryNav", "condensePrimaryNav"]),
+    ...mapActions(["togglePrimaryNav", "condensePrimaryNav", "setPrimaryNavPreference"]),
     ...mapActions("workspaceLogoModule", ["fetchLogo"]),
 
     /**
      * Toggles primary nav open and closed
      */
     toggleMenu: function () {
-      this.condensePrimaryNav(!this.primaryNavCondensed);
+      this.setPrimaryNavPreference(!this.primaryNavCondensed);
     },
 
     /**
