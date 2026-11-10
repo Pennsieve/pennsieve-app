@@ -1,10 +1,11 @@
 <script setup>
-// A view's first row, under the tabs: what it shows on the left (the
-// Collections page's description style), its actions on the right: the
-// #actions slot's, or a section's (#analysis-content-actions: AnalysisViewBar
-// teleports them there).
+// A page's (or a view's) first row, under its header: what it shows on the
+// left (the Collections page's description style), its actions on the
+// right: the #actions slot's, or, with actionsId, ones teleported there (an
+// Analysis section's, by AnalysisViewBar: "analysis-content-actions").
 defineProps({
   text: { type: String, default: "" },
+  actionsId: { type: String, default: "" },
 });
 </script>
 
@@ -14,14 +15,14 @@ defineProps({
       {{ text }}
       <slot />
     </p>
-    <div id="analysis-content-actions" class="content-actions">
+    <div :id="actionsId || undefined" class="content-actions">
       <slot name="actions" />
     </div>
   </div>
 </template>
 
 <style scoped lang="scss">
-@use "../../styles/theme";
+@use "../../../styles/theme";
 
 .content-intro {
   display: flex;

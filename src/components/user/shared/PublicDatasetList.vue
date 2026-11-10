@@ -13,7 +13,7 @@
            page's action on the right (propose a dataset of your own for
            publication), over the search and Sort -->
       <template #intro>
-        <AnalysisContentIntro
+        <ContentIntro
           :text="canOpenNotebook
             ? 'Read-only datasets published to Pennsieve Discover: browse one, or open it in a notebook to work with its files on your own compute node.'
             : 'Read-only datasets published to Pennsieve Discover: open one to browse its files.'"
@@ -21,7 +21,7 @@
           <template #actions>
             <bf-button @click="submitDataset">+ Submit a Dataset</bf-button>
           </template>
-        </AnalysisContentIntro>
+        </ContentIntro>
       </template>
 
       <template #filters>
@@ -51,7 +51,7 @@
         />
         <label class="sort-control toolbar-sort">
           Sort
-          <el-select v-model="state.sort" size="small" class="sort-select">
+          <el-select v-model="state.sort" class="sort-select">
             <el-option v-for="o in sortChoices(state.search)" :key="o.value" :label="o.label" :value="o.value" />
           </el-select>
         </label>
@@ -142,7 +142,7 @@ const cache = { key: "", datasets: [] };
 import { ref, computed, watch, onMounted } from "vue";
 import { useRouter } from "vue-router";
 import FacetLayout from "@/components/Analysis/Facets/FacetLayout.vue";
-import AnalysisContentIntro from "@/components/Analysis/AnalysisContentIntro.vue";
+import ContentIntro from '@/components/shared/ContentIntro/ContentIntro.vue';
 import FacetSection from "@/components/Analysis/Facets/FacetSection.vue";
 import FacetOptions from "@/components/Analysis/Facets/FacetOptions.vue";
 import CardTags from "@/components/Analysis/Facets/CardTags.vue";

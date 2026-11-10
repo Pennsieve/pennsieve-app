@@ -217,10 +217,11 @@ export default {
   margin-bottom: 32px;
 
   .section-description {
-    font-size: 14px;
-    color: theme.$gray_4;
+    font-size: 16px;
+    line-height: 1.6;
+    color: theme.$gray_5;
     margin: 0;
-    max-width: 600px;
+    max-width: 800px;
   }
 }
 

@@ -8,28 +8,26 @@
       v-loading="isLoading"
       element-loading-background="transparent"
     >
-      <template #actions>
-        <stage-actions>
-          <template #left>
-            <el-input
-              v-model="searchQuery"
-              placeholder="Search by name or email..."
-              prefix-icon="el-icon-search"
-              class="search-input"
-              clearable
-              @input="handleSearch"
-            />
+      <!-- As every page: what's listed and the action, then the search -->
+      <ContentIntro class="people-intro" text="The members of this workspace and their roles: invite someone, or change what a member can do.">
+        <template #actions>
+          <bf-button v-if="hasAdminRights" @click="openDialog">+ Invite Member</bf-button>
+        </template>
+      </ContentIntro>
+
+      <div class="people-search">
+        <el-input
+          v-model="searchQuery"
+          placeholder="Search by name or email…"
+          class="search-input"
+          clearable
+          @input="handleSearch"
+        >
+          <template #prefix>
+            <IconMagnifyingGlass :height="20" :width="20" color="#71747c" />
           </template>
-          <template #right>
-            <bf-button
-              v-if="hasAdminRights"
-              @click="openDialog"
-            >
-              Send Invitation
-            </bf-button>
-          </template>
-        </stage-actions>
-      </template>
+        </el-input>
+      </div>
 
       <div class="pagination-header mb-16" v-if="filteredPeople.length > 0">
         <pagination-page-menu
@@ -162,7 +160,8 @@ import Sorter from '../../../mixins/sorter'
 import UserRoles from '../../../mixins/user-roles'
 import Request from '../../../mixins/request'
 import IconSort from "../../icons/IconSort.vue";
-import StageActions from "../../shared/StageActions/StageActions.vue";
+import ContentIntro from '@/components/shared/ContentIntro/ContentIntro.vue';
+import IconMagnifyingGlass from "../../icons/IconMagnifyingGlass.vue";
 import {useGetToken} from "@/composables/useGetToken";
 
 export default {
@@ -170,7 +169,8 @@ export default {
 
   components: {
     IconSort,
-    StageActions,
+    ContentIntro,
+    IconMagnifyingGlass,
     BfRafter,
     BfButton,
     OrgMember,
@@ -486,9 +486,18 @@ export default {
 .col-spacer {
   height: 17px;
 }
+/* 20px under the header, as the other pages (the stage pads 8px). */
+.people-intro {
+  margin-top: 12px;
+}
+/* The search under the intro, the row's width, as on Apps and Datasets. */
+.people-search {
+  display: flex;
+  margin-bottom: 16px;
+}
 .search-input {
-  max-width: 600px;
-  margin-left: 16px;
+  flex: 1;
+  min-width: 0;
 }
 
 .pagination-header {

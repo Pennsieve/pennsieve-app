@@ -16,7 +16,7 @@
         </template>
         <span class="breadcrumb-separator">/</span>
       </nav>
-      <h1 class="page-title" :title="currentTitle">{{ currentTitle }}</h1>
+      <h1 class="page-title" :title="currentTitle" :style="titleStyle">{{ currentTitle }}</h1>
       <span id="page-title-extra" class="page-title-extra" />
       <span v-if="actions" id="page-title-actions" class="page-title-actions" />
     </div>
@@ -35,7 +35,7 @@
       </template>
     </div>
     <div class="page-title-row">
-      <h1 class="page-title">{{ currentTitle }}</h1>
+      <h1 class="page-title" :style="titleStyle">{{ currentTitle }}</h1>
       <!-- A page can put something next to its title here (a compute node's
            status), with <Teleport defer to="#page-title-extra">. -->
       <span id="page-title-extra" class="page-title-extra" />
@@ -48,6 +48,8 @@
 
 <script>
 import { mapState } from 'vuex'
+import CustomTheme from '@/mixins/custom-theme'
+import { readableOnWhite } from '@/utils/readableOnWhite'
 
 export default {
   name: 'OrgBreadcrumb',
@@ -95,7 +97,18 @@ export default {
     }
   },
 
+  mixins: [CustomTheme],
+
   computed: {
+    // The title in the workspace's own colour (its primary, as the nav's),
+    // darkened until it reads on white (4.5:1); outside a workspace (My
+    // Workspace) or without a theme, the default navy.
+    titleStyle() {
+      if (this.workspaceLabel) return null
+      const color = readableOnWhite(this.getTheme()[0])
+      return color ? { color } : null
+    },
+
     ...mapState(['activeOrganization']),
 
     rootLabel() {
@@ -284,5 +297,44 @@ export default {
   font-weight: 600;
   color: theme.$purple_3;
   line-height: 1.3;
+}
+</style>
+
+<style lang="scss">
+/* Every page's header (the rafter around a one-row breadcrumb title): 70px
+   with its rule, the title centred, so the rule is at 69px from the top,
+   where the nav's divider under its first row is (the workspace switcher:
+   8px + 56px, its line 5px under; the secondary nav's heading, 69px). One
+   line across the nav and the page. Unscoped: it styles the rafter around. */
+.bf-rafter.compact.primary:has(.org-breadcrumb.trail-title) {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  height: 70px;
+  padding-top: 0;
+  padding-bottom: 0;
+
+  > .rafter-inset {
+    flex: 1;
+    min-width: 0;
+  }
+  .bf-rafter-breadcrumb {
+    margin-bottom: 0;
+  }
+}
+/* Tabs right under it (Publishing, a dataset's Activity or Permissions):
+   their rule is the header's only one, as in Analysis. */
+.bf-rafter.compact.primary:has(.org-breadcrumb.trail-title):has(+ .content-tabs) {
+  border-bottom: none;
+}
+/* A phone: the title row can wrap (its actions under the title), so the
+   header grows from 70px instead of cutting it off. */
+@media (max-width: 767px) {
+  .bf-rafter.compact.primary:has(.org-breadcrumb.trail-title) {
+    height: auto;
+    min-height: 70px;
+    padding-top: 12px;
+    padding-bottom: 12px;
+  }
 }
 </style>

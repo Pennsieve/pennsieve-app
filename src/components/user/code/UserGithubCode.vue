@@ -50,7 +50,7 @@
       @clear-all="clearFacets"
     >
       <template #intro>
-        <AnalysisContentIntro text="Your GitHub repositories: publish one to the App Store as an app, or release it with a DOI." />
+        <ContentIntro actions-id="analysis-content-actions" text="Your GitHub repositories: publish one to the App Store as an app, or release it with a DOI." />
       </template>
 
       <template #filters>
@@ -79,7 +79,7 @@
         />
         <label class="sort-control toolbar-sort">
           Sort
-          <el-select v-model="sortBy" size="small" class="sort-select">
+          <el-select v-model="sortBy" class="sort-select">
             <el-option v-for="o in REPO_SORTS" :key="o.value" :label="o.label" :value="o.value" />
           </el-select>
         </label>
@@ -193,7 +193,7 @@ import AddRepositoryDialog from '@/components/Analysis/Applications/AddRepositor
 import { parseRepoInput } from '@/components/Analysis/Applications/addRepository'
 import { Refresh } from '@element-plus/icons-vue'
 import AnalysisViewBar from '@/components/Analysis/AnalysisViewBar.vue'
-import AnalysisContentIntro from '@/components/Analysis/AnalysisContentIntro.vue'
+import ContentIntro from '@/components/shared/ContentIntro/ContentIntro.vue'
 import FacetLayout from '@/components/Analysis/Facets/FacetLayout.vue'
 import FacetSection from '@/components/Analysis/Facets/FacetSection.vue'
 import FacetOptions from '@/components/Analysis/Facets/FacetOptions.vue'
@@ -223,7 +223,7 @@ export default {
     AddRepositoryDialog,
     Refresh,
     AnalysisViewBar,
-    AnalysisContentIntro,
+    ContentIntro,
     FacetLayout,
     FacetSection,
     FacetOptions,
