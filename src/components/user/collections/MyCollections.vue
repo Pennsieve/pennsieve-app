@@ -2,11 +2,11 @@
   <div class="my-collections">
     <!-- As Analysis's views: what's listed on the left, the action on the
          right; the search under them -->
-    <AnalysisContentIntro text="Browse and manage your collections: they organize and share related datasets. A collection holds only datasets published on Pennsieve.">
+    <ContentIntro text="Browse and manage your collections: they organize and share related datasets. A collection holds only datasets published on Pennsieve.">
       <template #actions>
         <bf-button class="primary" @click="showCreateDialog">+ New Collection</bf-button>
       </template>
-    </AnalysisContentIntro>
+    </ContentIntro>
 
     <div class="collections-header">
       <div class="header-actions">
@@ -40,7 +40,7 @@ import IconSearch from '../../icons/IconSearch.vue'
 import CollectionsList from './CollectionsList.vue'
 import CreateCollectionDialog from './CreateCollectionDialog.vue'
 import BfButton from "@/components/shared/bf-button/BfButton.vue"
-import AnalysisContentIntro from "@/components/Analysis/AnalysisContentIntro.vue"
+import ContentIntro from '@/components/shared/ContentIntro/ContentIntro.vue'
 
 export default {
   name: 'MyCollections',
@@ -50,7 +50,7 @@ export default {
     CollectionsList,
     CreateCollectionDialog,
     BfButton,
-    AnalysisContentIntro
+    ContentIntro
   },
 
   data() {

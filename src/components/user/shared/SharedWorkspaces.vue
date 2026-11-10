@@ -75,10 +75,11 @@ export default {
 @use '../../../styles/_theme.scss';
 
 .section-description {
-  font-size: 14px;
-  color: theme.$gray_4;
+  font-size: 16px;
+  line-height: 1.6;
+  color: theme.$gray_5;
   margin: 0 0 24px;
-  max-width: 600px;
+  max-width: 800px;
 }
 
 /* Cards 280-360px, as many to a row as fit: they don't stretch to fill

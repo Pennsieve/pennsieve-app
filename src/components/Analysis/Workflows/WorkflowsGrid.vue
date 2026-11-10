@@ -26,7 +26,7 @@ import { isNotebookWorkflow } from "../RunMonitor/notebookHelpers";
 import { exampleLabel, exampleVersion, PDF_URL_FRESH_MS } from "./runExamples";
 import SampleOutputViewer from "./SampleOutputViewer.vue";
 import FacetLayout from "../Facets/FacetLayout.vue";
-import AnalysisContentIntro from "../AnalysisContentIntro.vue";
+import ContentIntro from '@/components/shared/ContentIntro/ContentIntro.vue';
 import FacetSection from "../Facets/FacetSection.vue";
 import FacetOptions from "../Facets/FacetOptions.vue";
 import FacetRadios from "../Facets/FacetRadios.vue";
@@ -453,7 +453,7 @@ onMounted(async () => {
 
       <!-- In its tab: what's listed, and the tab's actions (AnalysisViewBar) -->
       <template v-if="embedded" #intro>
-        <AnalysisContentIntro text="Workflows chain apps into a pipeline you run on a dataset: Pennsieve's, your own and the community's." />
+        <ContentIntro actions-id="analysis-content-actions" text="Workflows chain apps into a pipeline you run on a dataset: Pennsieve's, your own and the community's." />
       </template>
 
       <template #toolbar>
@@ -465,7 +465,7 @@ onMounted(async () => {
         />
         <label class="sort-control toolbar-sort">
           Sort
-          <el-select v-model="sortBy" size="small" class="sort-select">
+          <el-select v-model="sortBy" class="sort-select">
             <el-option v-for="o in SORTS" :key="o.value" :label="o.label" :value="o.value" />
           </el-select>
         </label>

@@ -42,7 +42,7 @@ import {
 } from "./runHelpers";
 import EmptyState from "../EmptyState.vue";
 import RunningNote from "../RunningNote.vue";
-import AnalysisContentIntro from "../AnalysisContentIntro.vue";
+import ContentIntro from '@/components/shared/ContentIntro/ContentIntro.vue';
 // The pipeline illustration in Pennsieve's colours; at the slim note's size,
 // its graph and gear alone (the faint lines read as noise there).
 import pipelineIllo from "@/assets/images/illustrations/illo-data-model-pennsieve.svg";
@@ -393,7 +393,7 @@ onBeforeUnmount(() => {
       <!-- Main content area: Dashboard -->
       <div class="runs-main">
         <!-- In the Workflows tab: what Live shows, and its actions -->
-        <AnalysisContentIntro v-if="embedded" text="Your workflows' runs: what's running now, and how earlier runs went." />
+        <ContentIntro actions-id="analysis-content-actions" v-if="embedded" text="Your workflows' runs: what's running now, and how earlier runs went." />
         <!-- A history, but nothing running: a slim note over it -->
         <!-- Embedded, "+ Run Workflow" is right above it, so only the status -->
         <RunningNote v-if="emptyState === 'idle'" :image="pipelineMark" text="No workflows running right now">

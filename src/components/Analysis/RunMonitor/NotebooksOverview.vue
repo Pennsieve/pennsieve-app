@@ -37,7 +37,7 @@ import { isNotebookWorkflow, notebookGpu, runOnGpu, runNodeId, gpuMarkTitle, not
 import drAzumi from "@/assets/images/illustrations/illo-dr_azumi_1.svg";
 import EmptyState from "../EmptyState.vue";
 import RunningNote from "../RunningNote.vue";
-import AnalysisContentIntro from "../AnalysisContentIntro.vue";
+import ContentIntro from '@/components/shared/ContentIntro/ContentIntro.vue';
 import { nodeGpu } from "../ComputeNodes/computeNodeHelpers";
 import { useComputeResourcesStore } from "@/stores/computeResourcesStore";
 import RuntimeMark from "../WorkflowGraph/RuntimeMark.vue";
@@ -417,7 +417,7 @@ onBeforeUnmount(() => {
     </AnalysisViewBar>
     <div class="notebooks-container">
       <!-- What the view shows, and the tab's actions (AnalysisViewBar) -->
-      <AnalysisContentIntro
+      <ContentIntro actions-id="analysis-content-actions"
         :text="view === 'live'
           ? 'Interactive notebook sessions on your compute nodes: open now, and earlier ones.'
           : 'Python and R package environments for your notebooks: build one from a package list, then switch to it from a notebook\'s sidebar while it runs.'"

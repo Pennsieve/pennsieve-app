@@ -13,7 +13,7 @@ import ComputeNodeCard from './ComputeNodeCard.vue'
 import { groupMyNodes } from './computeNodeHelpers'
 import { remainingResourcesNote, serverMessage } from '@/components/user/integrations/awsConnect'
 import AnalysisViewBar from '../AnalysisViewBar.vue'
-import AnalysisContentIntro from '../AnalysisContentIntro.vue'
+import ContentIntro from '@/components/shared/ContentIntro/ContentIntro.vue'
 import { useComputeResourcesStore } from '@/stores/computeResourcesStore'
 
 const props = defineProps({
@@ -360,7 +360,7 @@ async function confirmDeleteNode() {
   </AnalysisViewBar>
   <div class="compute-nodes-container">
     <!-- What's listed (with its link), and the tab's action (AnalysisViewBar) -->
-    <AnalysisContentIntro>
+    <ContentIntro actions-id="analysis-content-actions">
       <template v-if="isMyWorkspace && hasPublicNode">
         Your personal compute nodes, on AWS accounts you registered, and the Pennsieve Public Compute Node, available to everyone.
       </template>
@@ -372,7 +372,7 @@ async function confirmDeleteNode() {
       </template>
       <router-link v-if="isMyWorkspace" :to="{ name: 'user-compute-resource' }">Your compute resources</router-link>
       <a v-else href="https://docs.pennsieve.io/docs/compute-nodes" target="_blank" rel="noopener">Documentation</a>
-    </AnalysisContentIntro>
+    </ContentIntro>
 
       <div class="nodes-content">
         <div v-if="hasNoResources && !isLoading" class="info-section">

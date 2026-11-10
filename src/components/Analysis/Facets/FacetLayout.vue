@@ -203,6 +203,10 @@ const drawerOpen = ref(false);
   display: flex;
   flex-shrink: 0;
 }
+/* A select in the row (Sort) as tall as the search: the app's 40px inputs. */
+.facet-toolbar :deep(.el-select__wrapper) {
+  min-height: 40px;
+}
 /* Filters opens the drawer, on a phone only. */
 .filters-button {
   display: none;

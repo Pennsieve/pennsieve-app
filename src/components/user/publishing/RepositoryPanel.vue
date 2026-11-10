@@ -126,7 +126,6 @@ function openRepository(repository) {
   margin: 0;
   padding: 0;
   border: 1px solid theme.$gray_2;
-  border-radius: 8px;
   background: theme.$white;
   overflow: hidden;
 
@@ -169,7 +168,6 @@ function openRepository(repository) {
   justify-content: center;
   width: 40px;
   height: 40px;
-  border-radius: 8px;
   border: 1px solid theme.$gray_2;
   background: theme.$white;
   overflow: hidden;
@@ -234,7 +232,6 @@ function openRepository(repository) {
 
   .repository-row {
     border: 1px solid theme.$gray_2;
-    border-radius: 8px;
     background: theme.$white;
   }
 }

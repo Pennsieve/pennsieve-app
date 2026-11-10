@@ -177,16 +177,11 @@ export default {
 
 /* The title and the tabs read as one header: one rule, under the tabs.
    (The class thrice: over the rafter's own .bf-rafter.compact.primary.) */
-/* 21px under the title, as the secondary nav's heading (21px padding),
-   so the rule under the header lines up with the rule under "Analysis". */
-.bf-rafter.analysis-header.analysis-header.analysis-header {
+/* No rule of its own: the tab header's, at 69px as every page's (the
+   rafter's 69px, OrgBreadcrumb), so it meets the nav's dividers. */
+.bf-rafter.compact.primary.analysis-header.analysis-header {
   border-bottom: none;
-  padding-bottom: 21px;
-}
-/* With tabs under the title (a detail page's, as a compute node's), they
-   sit close to it. */
-.bf-page:has(.tab-views:not(:empty)) .bf-rafter.analysis-header.analysis-header.analysis-header {
-  padding-bottom: 4px;
+  height: 69px;
 }
 /* The views row: the page's tabs (a detail page's, as a compute node's),
    their underline on the one rule under the header. */

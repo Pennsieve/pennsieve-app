@@ -378,15 +378,17 @@ hr {
 
 /* As a dataset's heading row: the section's name; condensed, a 56px block
    in the darkened theme colour with the Analysis icon. */
+/* 69px, so the rule under it is at 69px from the top, as the page header's
+   and the primary nav's divider (OrgBreadcrumb). */
 .heading-wrap {
   box-sizing: border-box;
   display: flex;
   align-items: center;
-  padding: 21px 24px;
+  height: 69px;
+  padding: 0 24px;
   white-space: nowrap;
 
   .condensed & {
-    height: 56px;
     justify-content: center;
     margin-left: 6px;
     padding: 10px;

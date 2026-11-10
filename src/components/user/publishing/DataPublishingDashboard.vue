@@ -1,5 +1,6 @@
 <script setup>
 import { useTemplateRef } from "vue";
+import ContentIntro from '@/components/shared/ContentIntro/ContentIntro.vue';
 import BfButton from "@/components/shared/bf-button/BfButton.vue";
 import DatasetProposals from "./DatasetProposals.vue";
 import RepositoryPanel from "./RepositoryPanel.vue";
@@ -16,17 +17,17 @@ const workflowSteps = [
   {
     icon: IconCompass,
     title: "Explore repositories",
-    description: "Click a repository under Open Repositories to see its scope and what it accepts.",
+    description: "See each repository's scope and what it accepts.",
   },
   {
     icon: IconPlus,
     title: "Propose a dataset",
-    description: "Click New Proposal to begin. Drafts remain editable until submitted.",
+    description: "Drafts stay editable until you submit.",
   },
   {
     icon: IconEyeball,
     title: "Track status",
-    description: "Follow each proposal from submission through acceptance.",
+    description: "Follow each proposal through review.",
   },
 ];
 
@@ -38,17 +39,15 @@ function startNewProposal() {
 <template>
   <div class="data-publishing-page">
     <header class="page-header">
-      <div class="header-row">
-        <p class="page-intro">
-          Propose your datasets to open repositories on Pennsieve and follow them through review.
-        </p>
-        <bf-button class="primary" @click="startNewProposal">
-          <template #prefix>
-            <IconPlus :width="14" :height="14" color="currentColor" />
-          </template>
-          New Proposal
-        </bf-button>
-      </div>
+      <!-- As every page: what it's for on the left, the action on the right -->
+      <ContentIntro text="Propose your datasets to open repositories on Pennsieve and follow them through review.">
+        Accepted proposals become datasets in
+        <router-link :to="{ name: 'shared-datasets' }" class="info-link">Shared With Me</router-link>;
+        already in a repository's workspace? Create the dataset there and skip the review.
+        <template #actions>
+          <bf-button class="primary" @click="startNewProposal">+ New Proposal</bf-button>
+        </template>
+      </ContentIntro>
 
       <ul class="workflow-steps">
         <li v-for="step in workflowSteps" :key="step.title" class="workflow-step">
@@ -61,13 +60,6 @@ function startNewProposal() {
           </div>
         </li>
       </ul>
-
-      <p class="info-note">
-        Accepted proposals become datasets you can find in
-        <router-link :to="{ name: 'shared-datasets' }" class="info-link">Shared With Me</router-link> Page.
-        If you already collaborate in a repository's workspace, create your dataset there directly to
-        skip the proposal review.
-      </p>
     </header>
 
     <div class="publishing-layout">
@@ -84,64 +76,47 @@ function startNewProposal() {
   // Query the page's own width: the side nav changes the space available,
   // so viewport breakpoints would misjudge it
   container-type: inline-size;
-  padding: 32px;
+  // As the other pages' content: 20px under the header, 32px in
+  padding: 20px 32px 32px;
   max-width: 1200px;
 }
 
 .page-header {
-  margin-bottom: 40px;
-
-  .header-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 24px;
-    margin-bottom: 24px;
-  }
-
-  .page-intro {
-    font-size: 18px;
-    color: theme.$gray_6;
-    line-height: 1.5;
-    margin: 0;
-  }
+  margin-bottom: 32px;
 }
 
+/* The three steps: no boxes (a short list, not cards); three columns where
+   they fit, else one under another, never two and one. */
 .workflow-steps {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  grid-template-columns: minmax(0, 1fr);
   gap: 16px;
   list-style: none;
-  margin: 0 0 16px 0;
+  margin: 8px 0 0;
   padding: 0;
 }
 
 .workflow-step {
   display: flex;
   align-items: flex-start;
-  gap: 16px;
-  padding: 16px;
-  background: theme.$gray_1;
-  border: 1px solid theme.$gray_2;
-  border-radius: 8px;
+  gap: 12px;
 
   .step-icon {
     flex-shrink: 0;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 40px;
-    height: 40px;
-    border-radius: 8px;
+    width: 32px;
+    height: 32px;
     background: theme.$purple_tint;
     color: theme.$purple_3;
   }
 
   .step-title {
     font-size: 15px;
-    font-weight: 500;
+    font-weight: 600;
     color: theme.$gray_6;
-    margin: 0 0 4px 0;
+    margin: 4px 0 4px 0;
   }
 
   .step-description {
@@ -152,16 +127,19 @@ function startNewProposal() {
   }
 }
 
-.info-note {
-  background: theme.$gray_1;
-  border-left: 3px solid theme.$yellow_1;
-  padding: 12px 16px;
-  font-size: 13px;
-  color: theme.$gray_5;
-  line-height: 1.5;
-  margin: 0;
+@container (min-width: 760px) {
+  .workflow-steps {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 32px;
+  }
 }
 
+
+/* In the intro's sentence: no gap before it (the intro spaces a link that
+   ends it). */
+.page-header .info-link {
+  margin-left: 0;
+}
 .info-link {
   color: theme.$purple_2;
   text-decoration: none;
@@ -203,10 +181,5 @@ function startNewProposal() {
   }
 }
 
-@container (max-width: 640px) {
-  .page-header .header-row {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-}
+
 </style>

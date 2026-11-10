@@ -72,18 +72,21 @@ export default {
 <style scoped lang="scss">
 @use '@/styles/theme';
 
+/* As the other pages' content: 20px under the header, 32px in. */
 .resources-dashboard {
-  padding: 32px;
+  padding: 20px 32px 32px;
   max-width: 1200px;
 }
 
+/* As every page's intro (ContentIntro, the Collections page's). */
 .info-section {
   margin-bottom: 24px;
 
   p {
+    font-size: 16px;
+    line-height: 1.6;
     color: theme.$gray_5;
     max-width: 800px;
-    line-height: 1.5;
     margin: 0;
   }
 }
