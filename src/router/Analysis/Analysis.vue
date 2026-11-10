@@ -2,7 +2,7 @@
   <bf-page>
     <bf-rafter slot="heading" class="primary analysis-header" :org-id="orgId">
       <template #breadcrumb>
-        <org-breadcrumb page-name="Analysis" :crumbs="breadcrumbCrumbs" :page-route="{ name: 'workflows' }" actions trail-title />
+        <org-breadcrumb page-name="Analysis" :crumbs="breadcrumbCrumbs" :page-route="{ name: 'workflows' }" actions />
       </template>
     </bf-rafter>
     <!-- The section's views as the page's tabs (AnalysisViewBar); the
@@ -177,8 +177,15 @@ export default {
 
 /* The title and the tabs read as one header: one rule, under the tabs.
    (The class thrice: over the rafter's own .bf-rafter.compact.primary.) */
+/* 21px under the title, as the secondary nav's heading (21px padding),
+   so the rule under the header lines up with the rule under "Analysis". */
 .bf-rafter.analysis-header.analysis-header.analysis-header {
   border-bottom: none;
+  padding-bottom: 21px;
+}
+/* With tabs under the title (a detail page's, as a compute node's), they
+   sit close to it. */
+.bf-page:has(.tab-views:not(:empty)) .bf-rafter.analysis-header.analysis-header.analysis-header {
   padding-bottom: 4px;
 }
 /* The views row: the page's tabs (a detail page's, as a compute node's),
