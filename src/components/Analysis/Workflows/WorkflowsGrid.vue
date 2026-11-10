@@ -20,7 +20,7 @@ import IconPDF from "../../icons/IconPDF.vue";
 import WorkflowThumbnail from "../WorkflowGraph/WorkflowThumbnail.vue";
 import RunWizardDialog from "../RunMonitor/RunWizardDialog.vue";
 import { ioSummary, usageLine, cardText } from "./workflowSummary";
-import { activeFilters, applyFilters, domainOptions, FACET_DEFAULTS, INPUT_OPTIONS, VISIBILITY_OPTIONS, fieldOptions, inheritedTags, libraryWorkflows, mergeWorkflows, outputOptions, sortWorkflows, SORTS } from "./galleryFilter";
+import { activeFilters, applyFilters, domainOptions, FACET_DEFAULTS, INPUT_OPTIONS, VISIBILITY_OPTIONS, fieldOptions, inheritedTags, tagOptions, libraryWorkflows, mergeWorkflows, outputOptions, sortWorkflows, SORTS } from "./galleryFilter";
 import { useGetToken } from "@/composables/useGetToken";
 import { isNotebookWorkflow } from "../RunMonitor/notebookHelpers";
 import { exampleLabel, exampleVersion, PDF_URL_FRESH_MS } from "./runExamples";
@@ -61,6 +61,7 @@ const inputFilter = ref("any"); // "any" | "dataset" | "none"
 const outputFilter = ref("any"); // "any" | a target type
 const domainFilter = ref([]); // domains' keys (any of them); none: all
 const fieldFilter = ref([]); // research fields' keys (any of them); none: all
+const tagFilter = ref([]); // other tags' keys (any of them); none: all
 
 // The sort is the viewer's, kept in this browser.
 const SORT_KEY = "pennsieve.gallery.workflowSort";
@@ -106,13 +107,15 @@ const outputChoices = computed(() => outputOptions(workflows.value, targetTypes.
 // Apps tab: the panel's Domain and Field.
 const domainChips = computed(() => domainOptions(libraryWorkflows(workflows.value), applications.value));
 const fieldChips = computed(() => fieldOptions(libraryWorkflows(workflows.value), applications.value));
+// Their other tags, each on two or more workflows: the panel's Tags.
+const tagFacets = computed(() => tagOptions(libraryWorkflows(workflows.value), applications.value));
 
 // The facets set, as removable chips over the cards; Clear all resets them.
-const facetRefs = { visibility: visibilityFilter, official: officialFilter, domain: domainFilter, field: fieldFilter, input: inputFilter, output: outputFilter, status: statusFilter };
+const facetRefs = { visibility: visibilityFilter, official: officialFilter, domain: domainFilter, field: fieldFilter, tag: tagFilter, input: inputFilter, output: outputFilter, status: statusFilter };
 const activeChips = computed(() =>
   activeFilters(
-    { visibility: visibilityFilter.value, official: officialFilter.value, domain: domainFilter.value, field: fieldFilter.value, input: inputFilter.value, output: outputFilter.value, status: statusFilter.value },
-    { domains: domainChips.value, fields: fieldChips.value, outputs: outputChoices.value }
+    { visibility: visibilityFilter.value, official: officialFilter.value, domain: domainFilter.value, field: fieldFilter.value, tag: tagFilter.value, input: inputFilter.value, output: outputFilter.value, status: statusFilter.value },
+    { domains: domainChips.value, fields: fieldChips.value, tags: tagFacets.value, outputs: outputChoices.value }
   )
 );
 // Clear a facet, or (a chip of a multi-select one) one of its keys.
@@ -127,6 +130,7 @@ const domainFacets = computed(() => domainFacetOptions(domainChips.value));
 const fieldFacets = computed(() => fieldFacetOptions(fieldChips.value));
 const toggleDomain = (key) => (domainFilter.value = toggleKey(domainFilter.value, key));
 const toggleField = (key) => (fieldFilter.value = toggleKey(fieldFilter.value, key));
+const toggleTag = (key) => (tagFilter.value = toggleKey(tagFilter.value, key));
 const showArchived = computed({
   get: () => statusFilter.value !== FACET_DEFAULTS.status,
   set: (on) => (statusFilter.value = on ? "all" : FACET_DEFAULTS.status),
@@ -140,7 +144,8 @@ const filtersSet = computed(
     inputFilter.value !== "any" ||
     outputFilter.value !== "any" ||
     domainFilter.value.length > 0 ||
-    fieldFilter.value.length > 0
+    fieldFilter.value.length > 0 ||
+    tagFilter.value.length > 0
 );
 function clearFilters() {
   searchQuery.value = "";
@@ -150,6 +155,7 @@ function clearFilters() {
   outputFilter.value = "any";
   domainFilter.value = [];
   fieldFilter.value = [];
+  tagFilter.value = [];
 }
 
 const filteredWorkflows = computed(() =>
@@ -160,6 +166,7 @@ const filteredWorkflows = computed(() =>
       output: outputFilter.value,
       domain: domainFilter.value,
       field: fieldFilter.value,
+      tag: tagFilter.value,
       officialOnly: officialFilter.value,
       visibility: visibilityFilter.value,
       applications: applications.value,
@@ -436,6 +443,9 @@ onMounted(async () => {
         </FacetSection>
         <FacetSection v-if="fieldFacets.length" title="Field" :clearable="fieldFilter.length > 0" @clear="clearFacet('field')">
           <FacetOptions :options="fieldFacets" :selected="fieldFilter" @toggle="toggleField" />
+        </FacetSection>
+        <FacetSection v-if="tagFacets.length" title="Tags" :clearable="tagFilter.length > 0" @clear="clearFacet('tag')">
+          <FacetOptions :options="tagFacets" :selected="tagFilter" variant="chips" :limit="8" @toggle="toggleTag" />
         </FacetSection>
         <FacetSection title="Input" :clearable="inputFilter !== FACET_DEFAULTS.input" @clear="clearFacet('input')">
           <el-select v-model="inputFilter" size="small" aria-label="Input">

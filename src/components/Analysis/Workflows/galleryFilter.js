@@ -6,7 +6,7 @@ import { versionManifest } from "../WorkflowBuilder/appManifestInfo";
 import { isNotebookWorkflow } from "../RunMonitor/notebookHelpers";
 import { interfaceDag } from "../RunMonitor/workflowInterface";
 import { fieldsOf, domainOfTag, appDomain } from "../Applications/appDomains";
-import { matchesAny, selectedKeys } from "../Facets/facets";
+import { freeTags, matchesAny, selectedKeys, tagFacetOptions } from "../Facets/facets";
 
 // Whether a workflow matches a search: its name, description, tags, the
 // apps it runs, or what goes in and comes out ("spike" finds the one running
@@ -75,11 +75,18 @@ export function domainOptions(list, applications = []) {
 }
 
 // What an untagged workflow's card shows in place of tags: the tags its apps'
-// domains and fields go by ("imaging", "neuroscience"), so a card says why a
-// chip filter matched it. Empty for a tagged workflow (its own tags show).
+// domains and fields go by ("imaging", "neuroscience"), then their other
+// tags, so a card says why a filter matched it. Empty for a tagged workflow
+// (its own tags show).
 export function inheritedTags(wf, applications = []) {
   if (tagged(wf)) return [];
-  return [...new Set([...workflowDomains(wf, applications).map((d) => d.tag), ...workflowFields(wf, applications).map((f) => f.tag)])];
+  return [
+    ...new Set([
+      ...workflowDomains(wf, applications).map((d) => d.tag),
+      ...workflowFields(wf, applications).map((f) => f.tag),
+      ...workflowFreeTags(wf, applications).map((t) => t.label),
+    ]),
+  ];
 }
 
 // The field chips for a list: each field some workflow serves, with how
@@ -92,16 +99,26 @@ export function fieldOptions(list, applications = []) {
     .sort((a, b) => b.count - a.count || a.field.label.localeCompare(b.field.label));
 }
 
+// A workflow's tags that name no domain or field: the Tags section's. Its
+// own, or (untagged) its steps' apps' tags, as its domains and fields are.
+const workflowTagList = (wf, applications = []) =>
+  tagged(wf) ? wf.tags : stepApps(wf, applications).flatMap((app) => versionManifest(app)?.tags || []);
+export const workflowFreeTags = (wf, applications = []) => freeTags(workflowTagList(wf, applications));
+
+// The Tags section's options for a list: each tag on two or more workflows.
+export const tagOptions = (list, applications = []) =>
+  tagFacetOptions((list || []).map((wf) => workflowFreeTags(wf, applications).map((t) => t.label)));
+
 // A workflow's visibility as the Library filters it (VISIBILITY_OPTIONS):
 // published (public) or not (private).
 const isPublished = (wf) => wf?.visibility === "public";
 export const matchesVisibility = (wf, visibility = "all") =>
   visibility === "all" || (visibility === "public" ? isPublished(wf) : !isPublished(wf));
 
-// officialOnly keeps Pennsieve's; visibility all, public or private; domain
-// and field are lists of keys (any of them: OR within each, AND between
-// them; empty, or "any", for all).
-export function applyFilters(list, { query, input = "any", output = "any", domain = "any", field = "any", officialOnly = false, visibility = "all", ...context } = {}) {
+// officialOnly keeps Pennsieve's; visibility all, public or private;
+// domain, field and tag are lists of keys (any of them: OR within each, AND
+// between them; empty, or "any", for all).
+export function applyFilters(list, { query, input = "any", output = "any", domain = "any", field = "any", tag = "any", officialOnly = false, visibility = "all", ...context } = {}) {
   return list.filter(
     (wf) =>
       (!officialOnly || wf.official) &&
@@ -110,6 +127,7 @@ export function applyFilters(list, { query, input = "any", output = "any", domai
       (output === "any" || outputTypes(wf).includes(output)) &&
       matchesAny(workflowDomains(wf, context.applications).map((d) => d.key), domain) &&
       matchesAny(workflowFields(wf, context.applications).map((f) => f.key), field) &&
+      matchesAny(workflowFreeTags(wf, context.applications).map((t) => t.key), tag) &&
       matchesSearch(wf, query, context)
   );
 }
@@ -129,15 +147,15 @@ export const INPUT_OPTIONS = [
 // The panel's "Show archived" lists all (Active and Archived); archived
 // alone isn't offered there, but a chip names it should it be set.
 const STATUS_CHIPS = { all: "Including archived", archived: "Archived only" };
-export const FACET_DEFAULTS = Object.freeze({ visibility: "all", official: false, domain: [], field: [], input: "any", output: "any", status: "active" });
+export const FACET_DEFAULTS = Object.freeze({ visibility: "all", official: false, domain: [], field: [], tag: [], input: "any", output: "any", status: "active" });
 
 // The facets set away from their defaults, as removable chips: { key, value,
-// label }, one per chosen domain and field (value: its key), in the panel's
-// order (visibility, Pennsieve-reviewed, status, domain, field, input,
-// output). The labels come from the
-// options shown (domainOptions, fieldOptions, outputOptions); a value no
-// longer offered (another scope's) shows by its key.
-export function activeFilters(state = {}, { domains = [], fields = [], outputs = [] } = {}) {
+// label }, one per chosen domain, field and tag (value: its key), in the
+// panel's order (visibility, Pennsieve-reviewed, status, domain, field, tag,
+// input, output). The labels come from the options shown (domainOptions,
+// fieldOptions, tagOptions, outputOptions); a value no longer offered
+// (another scope's) shows by its key.
+export function activeFilters(state = {}, { domains = [], fields = [], tags = [], outputs = [] } = {}) {
   const set = (key) => state[key] !== undefined && state[key] !== FACET_DEFAULTS[key];
   const chips = [];
   if (set("visibility")) {
@@ -152,6 +170,9 @@ export function activeFilters(state = {}, { domains = [], fields = [], outputs =
   }
   for (const key of selectedKeys(state.field)) {
     chips.push({ key: "field", value: key, label: fields.find((o) => o.field.key === key)?.field.label || key });
+  }
+  for (const key of selectedKeys(state.tag)) {
+    chips.push({ key: "tag", value: key, label: tags.find((o) => o.key === key)?.label || key });
   }
   if (set("input")) {
     chips.push({ key: "input", label: INPUT_OPTIONS.find((o) => o.value === state.input)?.label || state.input });

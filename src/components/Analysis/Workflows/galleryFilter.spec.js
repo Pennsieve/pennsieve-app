@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { activeFilters, applyFilters, mergeWorkflows, matchesVisibility, domainOptions, FACET_DEFAULTS, fieldOptions, inheritedTags, libraryWorkflows, workflowDomains, workflowFields, matchesSearch, outputOptions, sortWorkflows } from "./galleryFilter";
+import { activeFilters, applyFilters, mergeWorkflows, matchesVisibility, domainOptions, FACET_DEFAULTS, fieldOptions, inheritedTags, libraryWorkflows, workflowDomains, workflowFields, matchesSearch, outputOptions, sortWorkflows, tagOptions } from "./galleryFilter";
 
 const spikes = {
   name: "EEG spikes",
@@ -267,6 +267,37 @@ describe("visibility", () => {
     expect(activeFilters({ ...FACET_DEFAULTS, visibility: "private", official: true })).toEqual([
       { key: "visibility", label: "Private" },
       { key: "official", label: "Pennsieve-reviewed" },
+    ]);
+  });
+});
+
+describe("the Tags filter", () => {
+  const wfs = [
+    { uuid: "1", name: "one", tags: ["imaging", "Acme Lab"] },
+    { uuid: "2", name: "two", tags: ["acme-lab", "tutorial"] },
+    { uuid: "3", name: "three", tags: [] },
+  ];
+  it("offers the tags on two or more workflows", () => {
+    expect(tagOptions(wfs)).toEqual([{ key: "acmelab", label: "Acme Lab", count: 2 }]);
+  });
+  it("keeps the workflows with any chosen tag", () => {
+    expect(applyFilters(wfs, { tag: ["acmelab"] }).map((w) => w.name)).toEqual(["one", "two"]);
+    expect(applyFilters(wfs, { tag: [] }).map((w) => w.name)).toEqual(["one", "two", "three"]);
+  });
+  it("gives an untagged workflow its apps' tags, which its card shows", () => {
+    const url = "https://github.com/org/sorter";
+    const applications = [{ sourceUrl: url, versions: [{ version: "v1", createdAt: "2026-01-01", manifest: { tags: ["eeg", "kilosort-pipeline"] } }] }];
+    const untagged = { uuid: "4", name: "four", dag: [{ id: "s", type: "processor", sourceUrl: url }] };
+    const again = { ...untagged, uuid: "5", name: "five" };
+    expect(tagOptions([untagged, again], applications)).toEqual([{ key: "kilosortpipeline", label: "kilosort-pipeline", count: 2 }]);
+    expect(applyFilters([untagged, ...wfs], { tag: ["kilosortpipeline"], applications }).map((w) => w.name)).toEqual(["four"]);
+    expect(inheritedTags(untagged, applications)).toContain("kilosort-pipeline");
+    // A tagged one keeps its own.
+    expect(applyFilters([{ ...untagged, tags: ["imaging"] }], { tag: ["kilosortpipeline"], applications })).toEqual([]);
+  });
+  it("chips a chosen tag", () => {
+    expect(activeFilters({ tag: ["acmelab"] }, { tags: [{ key: "acmelab", label: "Acme Lab" }] })).toEqual([
+      { key: "tag", value: "acmelab", label: "Acme Lab" },
     ]);
   });
 });

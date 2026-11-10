@@ -42,6 +42,43 @@ export function displayTags(tags = []) {
   return out;
 }
 
+// A tag as the Tags section groups it: case and punctuation aside, as the
+// domains match ("Spike-sorting", "spike sorting" are one).
+export const tagKey = (tag) => String(tag ?? "").toLowerCase().replace(/[^a-z0-9]/g, "");
+
+// The tags that name no domain or field (those have their own sections),
+// each once, as first written: [{ key, label }].
+export function freeTags(tags = []) {
+  const seen = new Set();
+  const out = [];
+  for (const tag of tags || []) {
+    const key = tagKey(tag);
+    if (!key || seen.has(key) || domainOfTag(tag) || fieldOfTag(tag)) continue;
+    seen.add(key);
+    out.push({ key, label: String(tag).trim() });
+  }
+  return out;
+}
+
+// The Tags section's options, from each item's tags: every free tag on at
+// least `minCount` items (one on a single item is search's to find), with
+// how many, most common first; its label the spelling most of them use.
+export function tagFacetOptions(tagLists = [], minCount = 2) {
+  const byKey = new Map();
+  for (const tags of tagLists) {
+    for (const { key, label } of freeTags(tags)) {
+      const o = byKey.get(key) || { key, count: 0, spellings: new Map() };
+      o.count += 1;
+      o.spellings.set(label, (o.spellings.get(label) || 0) + 1);
+      byKey.set(key, o);
+    }
+  }
+  return [...byKey.values()]
+    .filter((o) => o.count >= minCount)
+    .map(({ key, count, spellings }) => ({ key, label: [...spellings].sort((a, b) => b[1] - a[1])[0][0], count }))
+    .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label));
+}
+
 // A multi-select section's chosen keys, as a list: none for "any", null or
 // nothing; a single key (the old one-at-a-time value) as one.
 export const selectedKeys = (value) => (value == null || value === "any" ? [] : [].concat(value));

@@ -74,3 +74,19 @@ describe("appActiveFilters", () => {
     ]);
   });
 });
+
+describe("the Tags filter", () => {
+  const a = app("a", { tags: ["genomics", "Acme Lab"] });
+  const b = app("b", { tags: ["acme-lab", "tutorial"] });
+  const c = app("c", { tags: ["tutorial"] });
+  it("keeps the apps with any chosen tag, whatever its spelling, with the other filters", () => {
+    expect(keys(filterApps([a, b, c], { tag: ["acmelab"] }))).toEqual(["a", "b"]);
+    expect(keys(filterApps([a, b, c], { tag: ["acmelab", "tutorial"] }))).toEqual(["a", "b", "c"]);
+    expect(keys(filterApps([a, b, c], { tag: ["acmelab"], domain: [domainOfTag("genomics").key] }))).toEqual(["a"]);
+  });
+  it("chips a chosen tag by the label shown", () => {
+    expect(appActiveFilters({ tag: ["acmelab"] }, { tags: [{ key: "acmelab", label: "Acme Lab", count: 2 }] })).toEqual([
+      { key: "tag", value: "acmelab", label: "Acme Lab" },
+    ]);
+  });
+});
