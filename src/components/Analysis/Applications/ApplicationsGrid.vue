@@ -18,6 +18,7 @@ import {
   APP_FILTER_DEFAULTS,
   VISIBILITY_OPTIONS,
   appActiveFilters,
+  appFreeTags,
   appsInStatus,
   filterApps,
   readmeSummary,
@@ -30,7 +31,7 @@ import FacetOptions from "../Facets/FacetOptions.vue";
 import FacetRadios from "../Facets/FacetRadios.vue";
 import FacetCheck from "../Facets/FacetCheck.vue";
 import CardTags from "../Facets/CardTags.vue";
-import { domainFacetOptions, fieldFacetOptions, toggleKey } from "../Facets/facets";
+import { domainFacetOptions, fieldFacetOptions, tagFacetOptions, toggleKey } from "../Facets/facets";
 import { paletteVariants, versionManifest } from "../WorkflowBuilder/appManifestInfo";
 import RuntimeMark from "../WorkflowGraph/RuntimeMark.vue";
 import IconPDF from "../../icons/IconPDF.vue";
@@ -138,6 +139,8 @@ const latestVersion = (app) => {
 const domainFilter = ref([]);
 // Research fields' keys (any of them; with the domains, both must hold).
 const fieldFilter = ref([]);
+// Other tags' keys (any of them; with the domains and fields, all must hold).
+const tagFilter = ref([]);
 
 // The sort is the viewer's, kept in this browser.
 const SORT_KEY = "pennsieve.gallery.appSort";
@@ -171,13 +174,14 @@ const githubUrl = (app) => {
 
 const filtersSet = computed(
   () =>
-    !!searchQuery.value.trim() || visibilityFilter.value !== "all" || domainFilter.value.length > 0 || fieldFilter.value.length > 0
+    !!searchQuery.value.trim() || visibilityFilter.value !== "all" || domainFilter.value.length > 0 || fieldFilter.value.length > 0 || tagFilter.value.length > 0
 );
 function clearFilters() {
   searchQuery.value = "";
   visibilityFilter.value = "all";
   domainFilter.value = [];
   fieldFilter.value = [];
+  tagFilter.value = [];
 }
 
 // The domains among the apps in this status (active, archived…), with
@@ -188,6 +192,10 @@ const domainChips = computed(() => domainCounts(statusApps.value));
 const fieldChips = computed(() => fieldCounts(statusApps.value));
 const domainFacets = computed(() => domainFacetOptions(domainChips.value));
 const fieldFacets = computed(() => fieldFacetOptions(fieldChips.value));
+// The other tags two or more of these apps have (one only one app has is
+// search's to find).
+const tagFacets = computed(() => tagFacetOptions(statusApps.value.map((app) => appFreeTags(app).map((t) => t.label))));
+const toggleTag = (key) => (tagFilter.value = toggleKey(tagFilter.value, key));
 const toggleDomain = (key) => (domainFilter.value = toggleKey(domainFilter.value, key));
 const toggleField = (key) => (fieldFilter.value = toggleKey(fieldFilter.value, key));
 // Show archived: all (Active and Archived) when ticked, Active when not.
@@ -198,11 +206,11 @@ const showArchived = computed({
 
 // The filters set, as removable chips over the cards; Clear all resets them
 // (the search stays: it's in the toolbar).
-const facetRefs = { visibility: visibilityFilter, status: statusFilter, domain: domainFilter, field: fieldFilter };
+const facetRefs = { visibility: visibilityFilter, status: statusFilter, domain: domainFilter, field: fieldFilter, tag: tagFilter };
 const activeChips = computed(() =>
   appActiveFilters(
-    { visibility: visibilityFilter.value, status: statusFilter.value, domain: domainFilter.value, field: fieldFilter.value },
-    { domains: domainChips.value, fields: fieldChips.value }
+    { visibility: visibilityFilter.value, status: statusFilter.value, domain: domainFilter.value, field: fieldFilter.value, tag: tagFilter.value },
+    { domains: domainChips.value, fields: fieldChips.value, tags: tagFacets.value }
   )
 );
 // Clear a facet, or (a chip of a multi-select one) one of its keys.
@@ -219,6 +227,7 @@ const filteredApplications = computed(() =>
       visibility: visibilityFilter.value,
       domain: domainFilter.value,
       field: fieldFilter.value,
+      tag: tagFilter.value,
     }),
     sortBy.value,
     workflows.value
@@ -396,6 +405,9 @@ const goToManifestBuilder = () => {
         </FacetSection>
         <FacetSection v-if="fieldFacets.length" title="Field" :clearable="fieldFilter.length > 0" @clear="clearFacet('field')">
           <FacetOptions :options="fieldFacets" :selected="fieldFilter" @toggle="toggleField" />
+        </FacetSection>
+        <FacetSection v-if="tagFacets.length" title="Tags" :clearable="tagFilter.length > 0" @clear="clearFacet('tag')">
+          <FacetOptions :options="tagFacets" :selected="tagFilter" variant="chips" :limit="8" @toggle="toggleTag" />
         </FacetSection>
       </template>
 

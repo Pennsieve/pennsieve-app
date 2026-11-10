@@ -595,10 +595,10 @@ export default {
   text-align: center;
   line-height: 16px;
 }
-/* The filter layout fills the stage (as Apps' and the Library's). */
+/* The filter layout fills the stage, and grows with a long list (not held
+   to the stage's height) so the filters stay beside it as the page scrolls. */
 .datasets-facets {
-  flex: 1;
-  min-height: 0;
+  flex: 1 0 auto;
 }
 /* The search fills the toolbar's row up to Sort, as on Apps. */
 .toolbar-search {
