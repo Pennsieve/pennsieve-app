@@ -174,7 +174,7 @@ const STATUS_TEXT = { Enabled: 'Running', Paused: 'Paused', Pending: 'Setting up
         <span v-if="computeNode?.platform" class="cn-pill">Pennsieve</span>
         <NodeTierBadge v-if="computeNode" :node="computeNode" />
       </Teleport>
-      <AnalysisViewBar v-model="tab" :views="NODE_TABS">
+      <AnalysisViewBar v-model="tab" :views="NODE_TABS" actions-at="title">
         <!-- Pausing in Pennsieve's warning style (red outline), resuming in
              green. -->
         <bf-button

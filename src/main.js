@@ -288,10 +288,11 @@ router.beforeEach(async (to, from, next) => {
 
 router.afterEach((to) => {
 
-    // Set nav state based on routegit a
+    // A top-level page: the primary nav shown, collapsed or not as the user
+    // last chose with its handle (not always expanded)
     if (topLevelRoutes.indexOf(to.name) >= 0) {
         store.dispatch('togglePrimaryNav', true)
-        store.dispatch('condensePrimaryNav', false)
+        store.dispatch('condensePrimaryNav', store.state.primaryNavPreferCondensed)
         store.dispatch('condenseSecondaryNav', false)
     }
 })

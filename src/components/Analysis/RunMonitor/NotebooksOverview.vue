@@ -37,12 +37,16 @@ import { isNotebookWorkflow, notebookGpu, runOnGpu, runNodeId, gpuMarkTitle, not
 import drAzumi from "@/assets/images/illustrations/illo-dr_azumi_1.svg";
 import EmptyState from "../EmptyState.vue";
 import RunningNote from "../RunningNote.vue";
+import ContentIntro from '@/components/shared/ContentIntro/ContentIntro.vue';
 import { nodeGpu } from "../ComputeNodes/computeNodeHelpers";
 import { useComputeResourcesStore } from "@/stores/computeResourcesStore";
 import RuntimeMark from "../WorkflowGraph/RuntimeMark.vue";
 import RunHistory from "./RunHistory.vue";
 import NotebookUsage from "./NotebookUsage.vue";
 
+const props = defineProps({
+  section: { type: String, default: "notebooks" }, // "notebooks" | "environments"
+});
 const store = useStore();
 const router = useRouter();
 const route = useRoute();
@@ -136,15 +140,22 @@ async function openPublicFromQuery() {
   }
 }
 watch(() => route.query.publicDataset, openPublicFromQuery);
-// The sub-tab, kept in the URL so it can be linked to and survives reloads.
-// Environments only where the site has environments-service.
-const VIEWS = [
-  { key: "live", label: "Live" },
-  ...(hasEnvironments ? [{ key: "environments", label: "Environments" }] : []),
-];
+// Two sections of Analysis: Notebooks (the sessions, running and before)
+// and Environments (section="environments": what they run with, only where
+// the site has environments-service). Both routes render this component, so
+// a switch between them keeps its state (an open New notebook dialog). An
+// older link to the Environments tab (?view=environments) goes there.
+const routeName = (name) => ((route.name || "").startsWith("my-") ? `my-${name}` : name);
+if (props.section === "notebooks" && route.query.view === "environments" && hasEnvironments) {
+  const { view: _view, ...rest } = route.query;
+  router.replace({ name: routeName("environments"), query: rest });
+}
 const view = computed({
-  get: () => (hasEnvironments && route.query.view === "environments" ? "environments" : "live"),
-  set: (v) => router.replace({ query: { ...route.query, view: v === "live" ? undefined : v } }),
+  get: () => (props.section === "environments" && hasEnvironments ? "environments" : "live"),
+  set: (v) => {
+    if (v === view.value) return;
+    router.push({ name: routeName(v === "environments" ? "environments" : "notebooks") });
+  },
 });
 
 const notebookWorkflowIds = computed(
@@ -396,7 +407,7 @@ onBeforeUnmount(() => {
   <div class="notebooks-page">
     <!-- Live: the notebooks running and the ones before; Environments: what
          they run with. The view is in the URL (?view=environments). -->
-    <AnalysisViewBar v-model="view" :views="VIEWS">
+    <AnalysisViewBar v-model="view">
         <el-tooltip v-if="view === 'live'" :content="NO_KERNELS" :disabled="notebookWorkflows.length > 0" placement="bottom">
           <span>
             <bf-button :disabled="notebookWorkflows.length === 0" @click="openNewNotebook()">+ New Notebook</bf-button>
@@ -405,6 +416,12 @@ onBeforeUnmount(() => {
         <bf-button v-else @click="openCreateEnvironment()">+ New Environment</bf-button>
     </AnalysisViewBar>
     <div class="notebooks-container">
+      <!-- What the view shows, and the tab's actions (AnalysisViewBar) -->
+      <ContentIntro actions-id="analysis-content-actions"
+        :text="view === 'live'
+          ? 'Interactive notebook sessions on your compute nodes: open now, and earlier ones.'
+          : 'Python and R package environments for your notebooks: build one from a package list, then switch to it from a notebook\'s sidebar while it runs.'"
+      />
 
       <template v-if="view === 'live'">
       <div v-if="!isLoading && notebookWorkflows.length === 0" class="empty-canvas">
@@ -431,11 +448,8 @@ onBeforeUnmount(() => {
 
       <template v-else>
         <!-- A history, but nothing running: a slim note over it -->
-        <RunningNote v-if="emptyState === 'idle'" :image="drAzumi" text="No notebooks running right now">
-          <button type="button" class="running-note-link" :disabled="notebookWorkflows.length === 0" @click="openNewNotebook()">
-            + New Notebook
-          </button>
-        </RunningNote>
+        <!-- "+ New Notebook" is right above it, so only the status -->
+        <RunningNote v-if="emptyState === 'idle'" :image="drAzumi" text="No notebooks running right now" />
         <div v-if="activeNotebookRuns.length > 0" class="dashboard-section">
           <h3 class="dashboard-section-title">
             <span class="active-pulse" />
@@ -512,10 +526,6 @@ onBeforeUnmount(() => {
       </template>
 
       <template v-else>
-        <p class="nb-view-desc">
-          Python and R package environments for your notebooks. Build one from a package list, then switch to it from a
-          notebook's sidebar while it runs.
-        </p>
         <environments-section
           ref="environmentsRef"
           :show-title="false"
@@ -589,11 +599,6 @@ onBeforeUnmount(() => {
   display: flex;
   justify-content: flex-end;
   gap: 8px;
-}
-.nb-view-desc {
-  margin: 0 0 12px;
-  font-size: 13px;
-  color: theme.$gray_4;
 }
 .dashboard-section {
   margin-bottom: 24px;

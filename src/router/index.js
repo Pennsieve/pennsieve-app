@@ -22,6 +22,7 @@ const ResetPassword = () => import('./ResetPassword/ResetPassword.vue')
 
 const BfNavigation = () => import('../components/bf-navigation/BfNavigation.vue')
 const BfNavigationSecondary = () => import('../components/bf-navigation/BfNavigationSecondary.vue')
+const AnalysisNavigationSecondary = () => import('../components/bf-navigation/AnalysisNavigationSecondary.vue')
 
 const Datasets = () => import('./Datasets/Datasets.vue')
 
@@ -134,7 +135,7 @@ const PublicDatasetFileDetails = () => import('../components/datasets/PublicData
 const PublicDatasetMetadata = () => import('../components/datasets/PublicDataset/PublicDatasetMetadata.vue')
 const PublicDatasetRecords = () => import('../components/datasets/PublicDataset/PublicDatasetRecords.vue')
 const PublicDatasetRecord = () => import('../components/datasets/PublicDataset/PublicDatasetRecord.vue')
-const PublicDatasetNavigation = () => import('../components/datasets/PublicDataset/PublicDatasetNavigation.vue')
+const MyWorkspaceNavigationSecondary = () => import('../components/user-navigation-secondary/MyWorkspaceNavigationSecondary.vue')
 const MyCollections = () => import('../components/user/collections/MyCollections.vue')
 const CollectionDetails = () => import('../components/user/collections/CollectionDetails.vue')
 const UserNavigation = () => import('../components/user-navigation/UserNavigation.vue')
@@ -234,7 +235,9 @@ const router = createRouter({
       components: {
         page: MyWorkSpacePage,
         navigation: UserNavigation,
-        navigationSecondary: PublicDatasetNavigation,
+        // A public dataset's sections, or My Analysis's (as a workspace's
+        // Analysis); hidden on the other pages (meta.hideSecondaryNav).
+        navigationSecondary: MyWorkspaceNavigationSecondary,
       },
       props: {
         page: (route) => ({
@@ -528,11 +531,12 @@ const router = createRouter({
             navigation: true
           },
           meta: {
-            hideSecondaryNav: true,
+            hideSecondaryNav: false,
             title: 'My Analysis',
             description: 'Advanced data analysis and visualization tools for your research datasets.'
           },
-          // Tabs, as in a workspace's Analysis page
+          // Its sections in the secondary nav and their views as tabs, as in
+          // a workspace's Analysis page
           children: [
             {
               name: 'my-notebooks',
@@ -540,17 +544,35 @@ const router = createRouter({
               component: NotebooksOverview,
               props: true,
               meta: {
-                hideSecondaryNav: true,
+                hideSecondaryNav: false,
                 title: 'Notebooks',
                 description: 'Interactive notebooks on your personal compute nodes.'
               }
             },
             {
+              name: 'my-environments',
+              path: 'environments',
+              component: NotebooksOverview,
+              props: { section: 'environments' },
+              meta: {
+                hideSecondaryNav: false,
+                title: 'Environments',
+                description: 'The Python and R packages your notebooks run with.'
+              }
+            },
+            {
               // Runs are on the Workflows tab's Live view (and notebooks on
               // the Notebooks tab); old links land there.
+              // Runs outside any workspace (the Workflows overview's Live)
               name: 'my-runs',
               path: 'runs',
-              redirect: { name: 'my-workflows' }
+              component: WorkflowsOverview,
+              props: { section: 'runs' },
+              meta: {
+                hideSecondaryNav: false,
+                title: 'Runs',
+                description: 'Your workflow runs outside any workspace: going on and before.'
+              }
             },
             {
               // Before 'runs/:runId', which would otherwise match 'configure'
@@ -558,7 +580,7 @@ const router = createRouter({
               path: 'runs/configure',
               component: RunDetail,
               meta: {
-                hideSecondaryNav: true,
+                hideSecondaryNav: false,
                 backLink: { name: 'my-runs' },
                 title: 'New Run',
                 description: 'Run one of your workflows, or a public one, on a personal compute node.'
@@ -570,7 +592,7 @@ const router = createRouter({
               component: RunDetail,
               props: true,
               meta: {
-                hideSecondaryNav: true,
+                hideSecondaryNav: false,
                 backLink: { name: 'my-runs' },
                 title: 'Run',
                 description: 'A run outside any workspace.'
@@ -582,7 +604,7 @@ const router = createRouter({
               path: 'apps',
               component: AppsOverview,
               meta: {
-                hideSecondaryNav: true,
+                hideSecondaryNav: false,
                 title: 'Apps',
                 description: 'The applications workflow steps run: your own, public ones, and ones shared with you.'
               }
@@ -613,7 +635,7 @@ const router = createRouter({
               path: 'apps/manifest-guide',
               component: AppManifestGuide,
               meta: {
-                hideSecondaryNav: true,
+                hideSecondaryNav: false,
                 backLink: { name: 'my-apps' },
                 title: 'Manifest Guide',
                 description: 'The app.yml manifest specification.'
@@ -624,7 +646,7 @@ const router = createRouter({
               path: 'apps/manifest-builder',
               component: AppManifestBuilder,
               meta: {
-                hideSecondaryNav: true,
+                hideSecondaryNav: false,
                 backLink: { name: 'my-apps' },
                 title: 'Manifest Builder',
                 description: 'Generate an app.yml manifest for your application.'
@@ -636,7 +658,7 @@ const router = createRouter({
               component: ApplicationDetail,
               props: true,
               meta: {
-                hideSecondaryNav: true,
+                hideSecondaryNav: false,
                 backLink: { name: 'my-apps' },
                 title: 'Application',
                 description: 'An application from the Pennsieve App Store.'
@@ -647,9 +669,9 @@ const router = createRouter({
               path: 'workflows',
               component: WorkflowsOverview,
               meta: {
-                hideSecondaryNav: true,
+                hideSecondaryNav: false,
                 title: 'Workflows',
-                description: 'Workflows to run (your own and public ones), their runs, and the builder.'
+                description: 'Workflows to run (your own and public ones), and the builder for a new one.'
               }
             },
             {
@@ -657,7 +679,7 @@ const router = createRouter({
               path: 'workflows/new',
               component: WorkflowBuilder,
               meta: {
-                hideSecondaryNav: true,
+                hideSecondaryNav: false,
                 backLink: { name: 'my-workflows' },
                 title: 'New Workflow',
                 description: 'Create a workflow of your own, outside any workspace.'
@@ -670,7 +692,7 @@ const router = createRouter({
               component: WorkflowBuilder,
               props: true,
               meta: {
-                hideSecondaryNav: true,
+                hideSecondaryNav: false,
                 backLink: { name: 'my-workflows' },
                 title: 'Workflow',
                 description: 'A workflow of your own, or a public one.'
@@ -682,7 +704,7 @@ const router = createRouter({
               component: ComputeNodesList,
               props: true,
               meta: {
-                hideSecondaryNav: true,
+                hideSecondaryNav: false,
                 title: 'Compute Nodes',
                 description: 'Your personal compute nodes, on AWS accounts you registered. They are private to you.'
               }
@@ -693,7 +715,7 @@ const router = createRouter({
               component: ComputeNodeManagement,
               props: true,
               meta: {
-                hideSecondaryNav: true,
+                hideSecondaryNav: false,
                 backLink: { name: 'my-compute-nodes' },
                 title: 'Compute Node',
                 description: 'Configure your personal compute node.'
@@ -2025,8 +2047,12 @@ const router = createRouter({
       path: '/:orgId/analysis',
       components: {
         page: Analysis,
-        navigation: BfNavigation
+        navigation: BfNavigation,
+        // The sections (Workflows, Notebooks, Apps, Compute Nodes), as a
+        // dataset's; the page's tabs are each section's views.
+        navigationSecondary: AnalysisNavigationSecondary
       },
+      meta: { hideSecondaryNav: false },
       // Workflows first (its Library): what there is to run
       redirect: {
         name: 'workflows'
@@ -2062,15 +2088,34 @@ const router = createRouter({
         {
           // Runs are on the Workflows tab's Live view (and notebooks on the
           // Notebooks tab); old links land there.
+          // Runs: the workflow runs going on and before (the Workflows
+          // overview's Live); the workflows themselves are under Workflows
           name: 'runs',
           path: 'runs',
-          redirect: (to) => ({ name: 'workflows', params: to.params })
+          components: {
+            stage: WorkflowsOverview,
+          },
+          props: {
+            stage: { section: 'runs' }
+          }
         },
         {
           name: 'notebooks',
           path: 'notebooks',
           components: {
             stage: NotebooksOverview,
+          }
+        },
+        {
+          // Environments: the packages notebooks run with (the Notebooks
+          // overview's environments; a resource, as workflows and apps are)
+          name: 'environments',
+          path: 'environments',
+          components: {
+            stage: NotebooksOverview,
+          },
+          props: {
+            stage: { section: 'environments' }
           }
         },
         {

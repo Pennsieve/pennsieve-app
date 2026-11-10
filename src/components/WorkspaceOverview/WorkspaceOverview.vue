@@ -1,15 +1,14 @@
 <template>
   <div class="workspace-overview">
-    <header class="overview-header" :style="headingStyle">
-      <div class="header-info">
-        <h1 class="org-name">{{ orgName }}</h1>
-        <p v-if="orgDescription" class="org-description">{{ orgDescription }}</p>
-        <p v-if="owners.length" class="org-owners">
-          <span class="org-owners-label">Owner{{ owners.length > 1 ? 's' : '' }}:</span>
-          {{ owners.join(', ') }}
-        </p>
-      </div>
-    </header>
+    <!-- The workspace's description and owners, as every page's intro row
+         (the workspace's name is in the header's breadcrumb) -->
+    <div class="overview-intro">
+      <ContentIntro :text="orgDescription || 'This workspace\'s activity: its datasets, members, storage and analysis at a glance.'" />
+      <p v-if="owners.length" class="org-owners">
+        <span class="org-owners-label">Owner{{ owners.length > 1 ? 's' : '' }}:</span>
+        {{ owners.join(', ') }}
+      </p>
+    </div>
 
     <StaticDashboard
       v-if="orgId"
@@ -27,6 +26,7 @@ import { pathOr } from 'ramda'
 import { StaticDashboard } from 'pennsieve-dashboard'
 import 'pennsieve-dashboard/style.css'
 import ChatWidget from '@/components/Chat/ChatWidget.vue'
+import ContentIntro from '@/components/shared/ContentIntro/ContentIntro.vue'
 import LinksWidget from './widgets/LinksWidget.vue'
 import MetricsWidget from './widgets/MetricsWidget.vue'
 import { useGetToken } from '@/composables/useGetToken'
@@ -44,7 +44,6 @@ const orgMembers = computed(() => store.state.orgMembers || [])
 const teams = computed(() => store.state.teams || [])
 const datasetTotalCount = computed(() => store.state.datasetModule?.datasetTotalCount || 0)
 
-const orgName = computed(() => pathOr('Workspace', ['organization', 'name'], activeOrganization.value))
 const orgDescription = computed(() => pathOr('', ['organization', 'description'], activeOrganization.value))
 
 // Dataset count comes from the paginated endpoint's `totalCount`, not
@@ -61,62 +60,6 @@ const owners = computed(() => {
     const full = `${first} ${last}`.trim()
     return full || m?.email || 'Unknown'
   })
-})
-
-// Workspace brand color (same source as the dataset overview heading).
-// `activeOrganization.organization.colorTheme` is an object shaped like
-// `{ secondary: primary }`; we pick the primary value and tint it.
-const workspacePrimaryColor = computed(() => {
-  const ct = activeOrganization.value?.organization?.colorTheme
-  if (ct && typeof ct === 'object' && !Array.isArray(ct)) {
-    const entries = Object.entries(ct)
-    if (entries.length > 0) return entries[0][1]
-  }
-  return null
-})
-
-// Shade Blend Convert — mixes a color toward white (positive p) or black
-// (negative p). Matches the pSBC helper used by `mixins/custom-theme`,
-// so workspace and dataset overview headings tint identically. Returns
-// `null` when input is invalid.
-function pSBC(p, c0) {
-  const i = parseInt, m = Math.round
-  if (typeof p !== 'number' || p < -1 || p > 1 || typeof c0 !== 'string' || (c0[0] !== 'r' && c0[0] !== '#')) return null
-  const parse = (d) => {
-    const n = d.length
-    if (n > 9) {
-      const parts = d.split(',')
-      if (parts.length < 3 || parts.length > 4) return null
-      return {
-        r: i(parts[0][3] === 'a' ? parts[0].slice(5) : parts[0].slice(4)),
-        g: i(parts[1]),
-        b: i(parts[2]),
-        a: parts[3] ? parseFloat(parts[3]) : -1,
-      }
-    }
-    if (n === 8 || n === 6 || n < 4) return null
-    let h = d
-    if (n < 6) h = '#' + d[1] + d[1] + d[2] + d[2] + d[3] + d[3] + (n > 4 ? d[4] + d[4] : '')
-    const v = i(h.slice(1), 16)
-    if (h.length === 9 || h.length === 5) return { r: v >> 24 & 255, g: v >> 16 & 255, b: v >> 8 & 255, a: m((v & 255) / 0.255) / 1000 }
-    return { r: v >> 16, g: v >> 8 & 255, b: v & 255, a: -1 }
-  }
-  const f = parse(c0)
-  if (!f) return null
-  const P = p < 0 ? p * -1 : p
-  const Pinv = 1 - P
-  const target = p < 0 ? { r: 0, g: 0, b: 0 } : { r: 255, g: 255, b: 255 }
-  const r = m((Pinv * f.r ** 2 + P * target.r ** 2) ** 0.5)
-  const g = m((Pinv * f.g ** 2 + P * target.g ** 2) ** 0.5)
-  const b = m((Pinv * f.b ** 2 + P * target.b ** 2) ** 0.5)
-  return '#' + (16777216 + r * 65536 + g * 256 + b).toString(16).slice(1)
-}
-
-const headingStyle = computed(() => {
-  const primary = workspacePrimaryColor.value
-  if (!primary) return {}
-  const tint = pSBC(0.85, primary)
-  return tint ? { background: tint } : {}
 })
 
 // When the user lands directly on /:orgId/overview (e.g., bookmark or
@@ -282,31 +225,15 @@ const dashboardOptions = computed(() => ({
   --dash-secondary: #{theme.$purple_3};
 }
 
-.overview-header {
-  padding: 32px;
-  background: theme.$purple_tint;
-}
-
-.header-info { min-width: 0; }
-
-.org-name {
-  margin: 0;
-  font-size: 24px;
-  font-weight: 600;
-  color: theme.$gray_6;
-}
-
-.org-description {
-  margin: 8px 0 0;
-  font-size: 14px;
-  color: #555;
-  max-width: 720px;
+/* As the other pages' content: 20px under the header, 32px in. */
+.overview-intro {
+  padding: 20px 32px 0;
 }
 
 .org-owners {
-  margin: 12px 0 0;
+  margin: -8px 0 0;
   font-size: 13px;
-  color: #555;
+  color: theme.$gray_5;
 }
 
 .org-owners-label {
@@ -315,9 +242,10 @@ const dashboardOptions = computed(() => ({
   color: theme.$gray_6;
 }
 
+/* 32px in, as the intro over it and the other pages' content. */
 .overview-dashboard {
   flex: 1;
   min-height: 0;
-  padding: 24px;
+  padding: 16px 32px 24px;
 }
 </style>

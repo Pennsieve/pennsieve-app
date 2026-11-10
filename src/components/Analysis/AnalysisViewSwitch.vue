@@ -5,12 +5,15 @@
 defineProps({
   views: { type: Array, default: () => [] }, // [{ key, label }]
   modelValue: { type: String, default: "" },
+  // "pill" (a toolbar, My Analysis's tab row) or "tabs" (a workspace's
+  // Analysis, whose views are the page's tabs: underlined).
+  variant: { type: String, default: "pill" },
 });
 const emit = defineEmits(["update:modelValue"]);
 </script>
 
 <template>
-  <div class="view-switch" role="tablist">
+  <div class="view-switch" :class="variant" role="tablist">
     <button
       v-for="v in views"
       :key="v.key"
@@ -65,6 +68,40 @@ const emit = defineEmits(["update:modelValue"]);
     background: theme.$white;
     color: theme.$purple_3;
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+  }
+}
+
+/* Tabs: the row's full height, the chosen view underlined on the row's
+   rule. */
+.view-switch.tabs {
+  align-items: stretch;
+  gap: 24px;
+  height: 100%;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: none;
+
+  .view-option {
+    height: 100%;
+    padding: 0;
+    border-bottom: 2px solid transparent;
+    border-radius: 0;
+    font-size: 15px;
+    font-weight: 400;
+    line-height: normal;
+    color: theme.$gray_5;
+
+    &:hover {
+      color: theme.$purple_3;
+    }
+    &.active {
+      border-bottom-color: theme.$purple_3;
+      background: none;
+      box-shadow: none;
+      color: theme.$purple_3;
+      font-weight: 500;
+    }
   }
 }
 </style>

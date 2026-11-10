@@ -1541,7 +1541,7 @@ watch(
 @use "../../../styles/theme";
 
 .applications-page {
-  height: calc(100vh - 112px);
+  height: calc(100vh - var(--analysis-stage-top, 112px));
   display: flex;
   flex-direction: column;
   overflow: hidden;

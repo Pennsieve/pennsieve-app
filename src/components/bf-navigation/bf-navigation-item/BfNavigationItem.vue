@@ -7,7 +7,12 @@
     :show-after="200"
   >
 
-    <router-link :class="itemClass" :to="link" :style="styleObject">
+    <router-link
+      :class="[itemClass, { 'router-link-active': active === true }]"
+      :to="link"
+      :active-class="active === null ? 'router-link-active' : ''"
+      :style="styleObject"
+    >
       <div class="svg-icon svg-fill icon-main">
         <slot name="icon" ></slot>
       </div>
@@ -78,6 +83,12 @@ export default {
         type: String,
         default: ''
       },
+      // Overrides the route match: for an item whose pages sit outside its
+      // route (Analysis: a run's page belongs to Workflows or Notebooks).
+      active: {
+        type: Boolean,
+        default: null
+      },
     },
     computed: {
       getThemeColors: function() {
@@ -88,7 +99,10 @@ export default {
         // matches --> link is active
         let cl = ''
         const darkenedColor = this.styleColor ? (this.pSBC(-0.25, this.styleColor) || this.styleColor) : ''
-        if (this.$route.matched.map(a => a.name).includes(this.link.name)) {
+        const isActive = this.active === null
+          ? this.$route.matched.map(a => a.name).includes(this.link.name)
+          : this.active
+        if (isActive) {
           cl = darkenedColor
         }
 

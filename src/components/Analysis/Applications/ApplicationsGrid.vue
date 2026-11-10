@@ -24,6 +24,7 @@ import {
   visibilityLabel,
 } from "./appFilters";
 import FacetLayout from "../Facets/FacetLayout.vue";
+import ContentIntro from '@/components/shared/ContentIntro/ContentIntro.vue';
 import FacetSection from "../Facets/FacetSection.vue";
 import FacetOptions from "../Facets/FacetOptions.vue";
 import FacetRadios from "../Facets/FacetRadios.vue";
@@ -380,6 +381,7 @@ const goToManifestBuilder = () => {
     <FacetLayout
       class="applications-section"
       storage-key="pennsieve.apps.filtersPanel"
+      default-folded
       :chips="activeChips"
       @remove="removeChip"
       @clear-all="clearFacets"
@@ -397,6 +399,11 @@ const goToManifestBuilder = () => {
         </FacetSection>
       </template>
 
+      <!-- In its tab: what's listed, and the tab's actions (AnalysisViewBar) -->
+      <template v-if="embedded" #intro>
+        <ContentIntro actions-id="analysis-content-actions" text="Apps are the steps workflows run, each built from a code repository into a container." />
+      </template>
+
       <template #toolbar>
         <el-input
           v-model="searchQuery"
@@ -406,7 +413,7 @@ const goToManifestBuilder = () => {
         />
         <label class="sort-control toolbar-sort">
           Sort
-          <el-select v-model="sortBy" size="small" class="sort-select">
+          <el-select v-model="sortBy" class="sort-select">
             <el-option v-for="o in APP_SORTS" :key="o.value" :label="o.label" :value="o.value" />
           </el-select>
         </label>

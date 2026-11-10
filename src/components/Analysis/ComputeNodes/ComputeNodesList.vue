@@ -13,6 +13,7 @@ import ComputeNodeCard from './ComputeNodeCard.vue'
 import { groupMyNodes } from './computeNodeHelpers'
 import { remainingResourcesNote, serverMessage } from '@/components/user/integrations/awsConnect'
 import AnalysisViewBar from '../AnalysisViewBar.vue'
+import ContentIntro from '@/components/shared/ContentIntro/ContentIntro.vue'
 import { useComputeResourcesStore } from '@/stores/computeResourcesStore'
 
 const props = defineProps({
@@ -358,21 +359,20 @@ async function confirmDeleteNode() {
     <bf-button :disabled="!canCreate" @click="openCreateDialog">+ New Compute Node</bf-button>
   </AnalysisViewBar>
   <div class="compute-nodes-container">
-    <div class="nodes-toolbar">
-      <p class="nodes-intro">
-        <template v-if="isMyWorkspace && hasPublicNode">
-          Your personal compute nodes, on AWS accounts you registered, and the Pennsieve Public Compute Node, available to everyone.
-        </template>
-        <template v-else-if="isMyWorkspace">
-          Your personal compute nodes, on AWS accounts you registered. They're private to you.
-        </template>
-        <template v-else>
-          Compute nodes run this workspace's workflows and notebooks, on cloud accounts members registered.
-        </template>
-        <router-link v-if="isMyWorkspace" :to="{ name: 'user-compute-resource' }" class="doc-link">Your compute resources</router-link>
-        <a v-else href="https://docs.pennsieve.io/docs/compute-nodes" target="_blank" rel="noopener" class="doc-link">Documentation</a>
-      </p>
-    </div>
+    <!-- What's listed (with its link), and the tab's action (AnalysisViewBar) -->
+    <ContentIntro actions-id="analysis-content-actions">
+      <template v-if="isMyWorkspace && hasPublicNode">
+        Your personal compute nodes, on AWS accounts you registered, and the Pennsieve Public Compute Node, available to everyone.
+      </template>
+      <template v-else-if="isMyWorkspace">
+        Your personal compute nodes, on AWS accounts you registered. They're private to you.
+      </template>
+      <template v-else>
+        Compute nodes run this workspace's workflows and notebooks, on cloud accounts members registered.
+      </template>
+      <router-link v-if="isMyWorkspace" :to="{ name: 'user-compute-resource' }">Your compute resources</router-link>
+      <a v-else href="https://docs.pennsieve.io/docs/compute-nodes" target="_blank" rel="noopener">Documentation</a>
+    </ContentIntro>
 
       <div class="nodes-content">
         <div v-if="hasNoResources && !isLoading" class="info-section">
@@ -521,25 +521,6 @@ h2 {
   margin-bottom: 8px;
 }
 
-// Intro line and the page's main action, where "+ New Notebook" sits on the
-// Notebooks tab.
-.nodes-toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 20px;
-}
-.nodes-intro {
-  margin: 0;
-  font-size: 13px;
-  color: theme.$gray_5;
-
-  .doc-link {
-    margin-left: 6px;
-    color: theme.$purple_3;
-  }
-}
 
 .nodes-content {
   padding: 0;
