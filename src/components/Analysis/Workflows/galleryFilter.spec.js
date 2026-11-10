@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { activeFilters, applyFilters, mergeWorkflows, matchesVisibility, domainOptions, FACET_DEFAULTS, fieldOptions, inheritedTags, libraryWorkflows, workflowDomains, workflowFields, matchesSearch, outputOptions, sortWorkflows, workflowsView } from "./galleryFilter";
+import { activeFilters, applyFilters, mergeWorkflows, matchesVisibility, domainOptions, FACET_DEFAULTS, fieldOptions, inheritedTags, libraryWorkflows, workflowDomains, workflowFields, matchesSearch, outputOptions, sortWorkflows } from "./galleryFilter";
 
 const spikes = {
   name: "EEG spikes",
@@ -198,19 +198,6 @@ describe("recommended order", () => {
     ]);
   });
 });
-
-describe("workflowsView", () => {
-  it("is the URL's view, else the one last used here, else Library", () => {
-    expect(workflowsView("live", "builder")).toBe("live");
-    expect(workflowsView(undefined, "builder")).toBe("builder");
-    expect(workflowsView(undefined, null)).toBe("library");
-    // A first visit: Live when there are runs to see, the Library when none.
-    expect(workflowsView(undefined, null, true)).toBe("live");
-    expect(workflowsView(undefined, "library", true)).toBe("library");
-    expect(workflowsView("apps", "nonsense")).toBe("library");
-  });
-});
-
 
 describe("activeFilters", () => {
   const domains = [{ domain: { key: "genomics", label: "Genomics" }, count: 8 }];

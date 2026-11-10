@@ -2,18 +2,28 @@
   <!-- As the Apps tab and My Code: the filters on the left, the search and
        Sort in one row, the chips and cards -->
   <div class="public-datasets">
-    <!-- The page's action, on the right of its title row as My Code's and
-         a dataset's: propose a dataset of your own for publication -->
-    <Teleport defer to="#page-title-actions">
-      <bf-button class="compact flex" @click="submitDataset">Submit a dataset</bf-button>
-    </Teleport>
-
     <FacetLayout
       storage-key="pennsieve.publicDatasets.filtersPanel"
+      default-folded
       :chips="chips"
       @remove="removeChip"
       @clear-all="clearFacets"
     >
+      <!-- As Analysis's views and My Code: what's listed on the left, the
+           page's action on the right (propose a dataset of your own for
+           publication), over the search and Sort -->
+      <template #intro>
+        <AnalysisContentIntro
+          :text="canOpenNotebook
+            ? 'Read-only datasets published to Pennsieve Discover: browse one, or open it in a notebook to work with its files on your own compute node.'
+            : 'Read-only datasets published to Pennsieve Discover: open one to browse its files.'"
+        >
+          <template #actions>
+            <bf-button @click="submitDataset">+ Submit a Dataset</bf-button>
+          </template>
+        </AnalysisContentIntro>
+      </template>
+
       <template #filters>
         <FacetSection
           v-for="s in sections"
@@ -46,11 +56,6 @@
           </el-select>
         </label>
       </template>
-
-      <p class="scope-hint">
-        Read-only datasets published to Pennsieve Discover.
-        <template v-if="canOpenNotebook">Open one in a notebook to work with its files on your own compute node.</template>
-      </p>
 
       <div v-if="filtered.length > 0" class="dataset-grid">
         <!-- A card: the dataset's banner on the left; what it is, who made
@@ -137,6 +142,7 @@ const cache = { key: "", datasets: [] };
 import { ref, computed, watch, onMounted } from "vue";
 import { useRouter } from "vue-router";
 import FacetLayout from "@/components/Analysis/Facets/FacetLayout.vue";
+import AnalysisContentIntro from "@/components/Analysis/AnalysisContentIntro.vue";
 import FacetSection from "@/components/Analysis/Facets/FacetSection.vue";
 import FacetOptions from "@/components/Analysis/Facets/FacetOptions.vue";
 import CardTags from "@/components/Analysis/Facets/CardTags.vue";
@@ -308,13 +314,6 @@ const openDataset = (dataset) => {
   .sort-select {
     width: 130px;
   }
-}
-
-.scope-hint {
-  margin: -8px 0 16px;
-  font-size: 12px;
-  color: theme.$gray_5;
-  line-height: 1.4;
 }
 
 /* Cards two or more to a row where 340px each fit, each as tall as its

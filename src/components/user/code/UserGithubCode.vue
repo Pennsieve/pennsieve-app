@@ -1,11 +1,22 @@
 <template>
   <div class="user-github">
-    <!-- As the Analysis tabs: the page's actions on the title row's right -->
-    <AnalysisViewBar>
-      <div class="code-actions">
-        <router-link class="code-settings-link" to="/my-workspace/settings/integrations/github">GitHub settings</router-link>
-        <bf-button v-if="hasGithubProfile && !isLoading" @click="openAddRepository()">Add Repository</bf-button>
-      </div>
+    <!-- As the Analysis views: the page's actions at the top right of its
+         content (the intro row over the search), one primary action and a
+         menu button beside it -->
+    <AnalysisViewBar v-if="hasGithubProfile && !isLoading" actions-at="content">
+      <bf-button @click="openAddRepository()">+ Add Repository</bf-button>
+      <el-dropdown trigger="click" placement="bottom-end" @command="onMenu">
+        <bf-button class="secondary code-menu" aria-label="More code actions">
+          <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
+            <path d="M2 4h12M2 8h12M2 12h12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+          </svg>
+        </bf-button>
+        <template #dropdown>
+          <el-dropdown-menu>
+            <el-dropdown-item command="github-settings">GitHub settings</el-dropdown-item>
+          </el-dropdown-menu>
+        </template>
+      </el-dropdown>
     </AnalysisViewBar>
 
     <div v-if="isLoading" class="code-state">
@@ -33,10 +44,15 @@
     <FacetLayout
       v-else
       storage-key="pennsieve.code.filtersPanel"
+      default-folded
       :chips="activeChips"
       @remove="removeChip"
       @clear-all="clearFacets"
     >
+      <template #intro>
+        <AnalysisContentIntro text="Your GitHub repositories: publish one to the App Store as an app, or release it with a DOI." />
+      </template>
+
       <template #filters>
         <FacetSection
           v-if="destinationOptions.length"
@@ -177,6 +193,7 @@ import AddRepositoryDialog from '@/components/Analysis/Applications/AddRepositor
 import { parseRepoInput } from '@/components/Analysis/Applications/addRepository'
 import { Refresh } from '@element-plus/icons-vue'
 import AnalysisViewBar from '@/components/Analysis/AnalysisViewBar.vue'
+import AnalysisContentIntro from '@/components/Analysis/AnalysisContentIntro.vue'
 import FacetLayout from '@/components/Analysis/Facets/FacetLayout.vue'
 import FacetSection from '@/components/Analysis/Facets/FacetSection.vue'
 import FacetOptions from '@/components/Analysis/Facets/FacetOptions.vue'
@@ -206,6 +223,7 @@ export default {
     AddRepositoryDialog,
     Refresh,
     AnalysisViewBar,
+    AnalysisContentIntro,
     FacetLayout,
     FacetSection,
     FacetOptions,
@@ -326,6 +344,9 @@ export default {
   },
 
   methods: {
+    onMenu(command) {
+      if (command === 'github-settings') this.$router.push('/my-workspace/settings/integrations/github')
+    },
     async fetchGithubProfile() {
       this.isLoading = true
       this.error = ''
@@ -529,20 +550,16 @@ export default {
   background: theme.$white;
 }
 
-/* The title row's actions: GitHub's settings as a link, then the button. */
-.code-actions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.code-settings-link {
-  margin-right: 8px;
-  font-size: 14px;
-  color: theme.$purple_2;
-  text-decoration: none;
+/* The menu button: a square, as tall as the primary action beside it.
+   More specific than the view bar's button sizing. */
+.bf-button.bf-button.secondary.code-menu {
+  aspect-ratio: 1;
+  width: auto;
+  padding: 0;
+  justify-content: center;
 
-  &:hover {
-    text-decoration: underline;
+  svg {
+    display: block;
   }
 }
 

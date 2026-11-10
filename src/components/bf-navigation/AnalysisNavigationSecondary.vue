@@ -78,7 +78,7 @@
         <router-link
           v-if="running.length > maxRunning"
           class="running-more"
-          :to="{ name: routeName('workflows'), query: { view: 'live' } }"
+          :to="{ name: routeName('runs') }"
         >
           {{ running.length - maxRunning }} more running
         </router-link>
@@ -118,6 +118,9 @@ import BfNavigationTertiary from "../bf-navigation-tertiary/BfNavigationTertiary
 import IconArrowLeft from "../icons/IconArrowLeft.vue";
 import IconAnalysis from "../icons/IconAnalysis.vue";
 import IconProcedure from "../icons/IconProcedure.vue";
+import IconActivity from "../icons/IconActivity.vue";
+import IconStorage from "../icons/IconStorage.vue";
+import { environmentsServiceUrl } from "@/utils/environmentsService";
 import IconNotebook from "../icons/IconNotebook.vue";
 import IconApp from "../icons/IconApp.vue";
 import IconComputeNode from "../icons/IconComputeNode.vue";
@@ -144,6 +147,7 @@ export default {
   },
   data() {
     return {
+      hasEnvironments: !!environmentsServiceUrl(),
       // The workspace's runs still going; polled while Analysis is open.
       running: [],
       maxRunning: 5,
@@ -190,10 +194,11 @@ export default {
       }
       return null;
     },
-    // Two groups: the work (runs, notebooks) and what it runs on (apps,
-    // compute). A run's page sits under no section's path: it belongs to
-    // Notebooks for a notebook's run, else Workflows (as do configuring a
-    // run, a new workflow and a workflow's page).
+    // Two groups: what's happening (runs, notebook sessions) and what it's
+    // done with (workflows, apps, compute). A run's page sits under no
+    // section's path: it belongs to Notebooks for a notebook's run, else Runs
+    // (as does configuring a run); a workflow's page and a new one, to
+    // Workflows.
     groups() {
       // The route's name without My Analysis's "my-", so one set of rules.
       const name = this.mine ? (this.$route.name || "").replace(/^my-/, "") : this.$route.name;
@@ -204,13 +209,10 @@ export default {
           label: "Run",
           sections: [
             {
-              name: "Workflows",
-              to: "workflows",
-              icon: markRaw(IconProcedure),
-              active:
-                under("workflows") ||
-                (runPage && !this.runIsNotebook) ||
-                ["run-configure", "workflow-create", "workflow-detail"].includes(name),
+              name: "Runs",
+              to: "runs",
+              icon: markRaw(IconActivity),
+              active: under("runs") || (runPage && !this.runIsNotebook) || name === "run-configure",
               badge: this.runningWorkflows
                 ? { text: this.runningWorkflows, tone: "live", title: `${this.runningWorkflows} running` }
                 : null,
@@ -230,12 +232,31 @@ export default {
           label: "Build & resources",
           sections: [
             {
+              name: "Workflows",
+              to: "workflows",
+              icon: markRaw(IconProcedure),
+              active: under("workflows") || ["workflow-create", "workflow-detail"].includes(name),
+              badge: null,
+            },
+            {
               name: "Apps",
               to: "apps",
               icon: markRaw(IconApp),
               active: under("apps") || (name || "").startsWith("application-"),
               badge: null,
             },
+            // Only where the site has environments-service
+            ...(this.hasEnvironments
+              ? [
+                  {
+                    name: "Environments",
+                    to: "environments",
+                    icon: markRaw(IconStorage),
+                    active: under("environments"),
+                    badge: null,
+                  },
+                ]
+              : []),
             {
               name: "Compute Nodes",
               to: "compute-nodes",
