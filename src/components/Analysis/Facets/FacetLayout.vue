@@ -59,14 +59,16 @@ const drawerOpen = ref(false);
       <span v-if="chips.length" class="facet-count-badge">{{ chips.length }}</span>
     </button>
     <aside v-else class="facet-panel" aria-label="Filters">
-      <div class="facets-top">
-        <span class="facets-title">Filters</span>
-        <button v-if="chips.length" type="button" class="facet-link" @click="emit('clear-all')">Clear filters</button>
-        <button type="button" class="panel-fold" title="Fold the filters" aria-label="Fold the filters" @click="togglePanel">
-          <el-icon><ArrowLeft /></el-icon>
-        </button>
+      <div class="facet-panel-inner">
+        <div class="facets-top">
+          <span class="facets-title">Filters</span>
+          <button v-if="chips.length" type="button" class="facet-link" @click="emit('clear-all')">Clear filters</button>
+          <button type="button" class="panel-fold" title="Fold the filters" aria-label="Fold the filters" @click="togglePanel">
+            <el-icon><ArrowLeft /></el-icon>
+          </button>
+        </div>
+        <div class="facets"><slot name="filters" /></div>
       </div>
-      <div class="facets"><slot name="filters" /></div>
     </aside>
 
     <el-drawer v-model="drawerOpen" direction="ltr" size="280px" :with-header="false">
@@ -123,8 +125,17 @@ const drawerOpen = ref(false);
   width: 232px;
   min-width: 0;
   box-sizing: border-box;
-  padding: 20px 16px 24px;
   border-right: 1px solid theme.$gray_2;
+}
+/* The filters stay in view while the list scrolls; the panel's rule runs on
+   down beside the list. A panel taller than the window scrolls on its own. */
+.facet-panel-inner {
+  position: sticky;
+  top: 0;
+  max-height: 100vh;
+  overflow-y: auto;
+  box-sizing: border-box;
+  padding: 20px 16px 24px;
 }
 /* Its arrow on the toolbar's middle. */
 .facet-rail {
