@@ -1,16 +1,20 @@
 <template>
   <bf-page>
-    <bf-rafter slot="heading" class="primary" :org-id="orgId">
+    <bf-rafter slot="heading" class="primary analysis-header" :org-id="orgId">
       <template #breadcrumb>
-        <org-breadcrumb page-name="Analysis" :crumbs="breadcrumbCrumbs" :page-route="{ name: 'workflows' }" actions />
+        <org-breadcrumb page-name="Analysis" :crumbs="breadcrumbCrumbs" :page-route="{ name: 'workflows' }" actions trail-title />
       </template>
     </bf-rafter>
-    <div class="content-tabs">
-      <router-tabs class="content-tabs-list" :tabs="tabs" />
-      <!-- The current tab's views (AnalysisViewBar); its actions are on the
-           title row -->
-      <div id="analysis-tab-views" class="tab-views" />
+    <!-- The section's views as the page's tabs (AnalysisViewBar); the
+         sections themselves are in the secondary nav
+         (AnalysisNavigationSecondary), the section's actions on the title
+         row. The row is there without views too: one header height. -->
+    <div ref="tabsRow" class="tab-header">
+      <div class="views-row">
+        <div id="analysis-tab-views" class="tab-views" />
+      </div>
     </div>
+    <div ref="stageMarker" class="stage-marker" />
     <router-view name="stage" :integrations="integrations" />
   </bf-page>
 </template>
@@ -20,22 +24,30 @@ import { mapActions, mapState } from "vuex";
 import BfPage from "../../components/layout/BfPage/BfPage.vue";
 import BfStage from "../../components/layout/BfStage/BfStage.vue";
 import BfRafter from "../../components/shared/bf-rafter/BfRafter.vue";
-import RouterTabs from "../../components/shared/routerTabs/routerTabs.vue";
 import OrgBreadcrumb from "../../components/shared/OrgBreadcrumb/OrgBreadcrumb.vue";
 import { applicationPageTitle } from "../../components/Analysis/Applications/appCards";
 import { useComputeResourcesStore } from "@/stores/computeResourcesStore";
 import { useGetToken } from "@/composables/useGetToken";
 import EventBus from "@/utils/event-bus";
 import { runPageIsNotebook } from "@/components/Analysis/RunMonitor/notebookHelpers";
+import { provide, ref } from "vue";
+import { useAnalysisStageTop } from "@/composables/useAnalysisStageTop";
 
 export default {
   name: "IntegrationView",
   components: {
-    RouterTabs,
     BfPage,
     BfStage,
     BfRafter,
     OrgBreadcrumb,
+  },
+  setup() {
+    const stageMarker = ref(null);
+    const tabsRow = ref(null);
+    useAnalysisStageTop(stageMarker, [tabsRow]);
+    // Its views are the page's tabs (AnalysisViewBar).
+    provide("analysisLayout", "sections");
+    return { stageMarker, tabsRow };
   },
   computed: {
     ...mapState("integrationsModule", ["integrations"]),
@@ -59,36 +71,18 @@ export default {
     runIsNotebook() {
       return runPageIsNotebook(this.$route, this.$store.getters["analysisModule/workflowInstances"]);
     },
-    // A run's page sits under no tab's path: it lights up Notebooks for a
-    // notebook's run, else Workflows (as do configuring a run, a new workflow
-    // and a workflow's page). An app's pages are under the Apps tab's path.
-    tabs() {
-      const runPage = (route) => route.name === "run-detail";
-      return [
-        {
-          name: "Workflows",
-          to: "workflows",
-          activeWhen: (route) =>
-            (runPage(route) && !this.runIsNotebook) ||
-            ["run-configure", "workflow-create", "workflow-detail"].includes(route.name),
-        },
-        { name: "Notebooks", to: "notebooks", activeWhen: (route) => runPage(route) && this.runIsNotebook },
-        { name: "Apps", to: "apps" },
-        { name: "Compute Nodes", to: "compute-nodes" },
-      ];
-    },
     breadcrumbCrumbs() {
       const routeName = this.$route.name;
 
-      // Top-level tabs: just one crumb (the tab name, as current)
-      const topLevelTabs = {
+      // A section: the trail ends at it (the secondary nav says it too).
+      const sections = {
         'notebooks': 'Notebooks',
         'workflows': 'Workflows',
         'apps': 'Apps',
         'compute-nodes': 'Compute Nodes',
       };
-      if (topLevelTabs[routeName]) {
-        return [{ name: topLevelTabs[routeName] }];
+      if (sections[routeName]) {
+        return [{ name: sections[routeName] }];
       }
 
       // Sub-pages: parent tab as link + detail name as current
@@ -174,48 +168,41 @@ export default {
 <style scoped lang="scss">
 @use "../../styles/theme";
 
-.content-tabs {
-  display: flex;
-  align-items: flex-end;
-  gap: 32px;
+/* The title and the tabs read as one header: one rule, under the tabs.
+   (The class thrice: over the rafter's own .bf-rafter.compact.primary.) */
+.bf-rafter.analysis-header.analysis-header.analysis-header {
+  border-bottom: none;
+  padding-bottom: 4px;
+}
+/* The views row: the page's tabs, their underline on the one rule under
+   the header. There on every section, empty without views, so the header
+   is one height and the content starts in one place. */
+.tab-header {
   box-sizing: border-box;
-  height: 44px;
+  padding: 0 32px;
   background: white;
   border-bottom: 1px solid theme.$gray_2;
-  padding: 0 32px;
 }
-/* The tabs at the row's bottom (their underline on its rule). */
-.content-tabs-list {
-  flex-shrink: 0;
-  max-width: 100%;
-}
-/* The current tab's views (AnalysisViewBar), on the right. */
-.tab-views {
+.views-row {
   display: flex;
-  flex: 1;
-  align-self: center;
-  justify-content: flex-end;
+  height: 40px;
   min-width: 0;
 }
-/* A phone: the views on a line below the tabs. */
+.tab-views {
+  display: flex;
+  align-items: stretch;
+  min-width: 0;
+}
+.stage-marker {
+  height: 0;
+}
+/* A phone: the views scroll rather than the page. */
 @media (max-width: 767px) {
-  .content-tabs {
-    flex-wrap: wrap;
-    row-gap: 0;
-    height: auto;
+  .tab-header {
     padding: 0 16px;
   }
-  /* A long row of tabs scrolls rather than the page. */
-  .content-tabs-list {
+  .views-row {
     overflow-x: auto;
-  }
-  .tab-views {
-    flex-basis: 100%;
-    justify-content: flex-start;
-    padding: 4px 0 8px;
-  }
-  .tab-views:empty {
-    display: none;
   }
 }
 </style>

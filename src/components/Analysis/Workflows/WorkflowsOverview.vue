@@ -127,7 +127,7 @@ watch(() => route.query.run, openRunFromQuery);
 @use "../../../styles/theme";
 
 .wf-page {
-  height: calc(100vh - 112px);
+  height: calc(100vh - var(--analysis-stage-top, 112px));
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -142,6 +142,11 @@ watch(() => route.query.run, openRunFromQuery);
   padding: 0 32px;
   border-bottom: 1px solid theme.$gray_2;
   background: theme.$white;
+}
+/* Empty on the Builder's start screen: no band until it has a workflow's
+   name and Save. */
+.wf-builder-bar:empty {
+  display: none;
 }
 .wf-builder-save {
   display: inline-flex;
