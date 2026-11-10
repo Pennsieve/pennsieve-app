@@ -86,10 +86,12 @@ export default {
       type: Boolean,
       default: false
     },
-    // One row: the trail's parents, then its last crumb as the heading.
+    // One row: the trail's parents, then its last crumb as the heading (every
+    // page's header); false, the older two rows (a small trail over a large
+    // title).
     trailTitle: {
       type: Boolean,
-      default: false
+      default: true
     }
   },
 
@@ -233,13 +235,14 @@ export default {
       text-decoration: underline;
     }
   }
-  /* Only the workspace name gives way; Analysis and a tab stay whole. */
+  /* The workspace name gives way first; then the crumbs between (a long
+  dataset name), down to a few letters each, cut with an ellipsis. */
   .breadcrumb-link {
-    flex-shrink: 0;
-  }
-  .breadcrumb-link:first-child {
     flex-shrink: 1;
     min-width: 48px;
+  }
+  .breadcrumb-link:first-child {
+    flex-shrink: 100;
   }
   .breadcrumb-separator {
     flex-shrink: 0;
