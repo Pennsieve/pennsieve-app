@@ -3,7 +3,8 @@
 // rules are easy to test; moved out of ApplicationsGrid unchanged.
 import { appDomain, appFields } from "./appDomains";
 import { matchesAppSearch } from "./appCards";
-import { matchesAny, selectedKeys } from "../Facets/facets";
+import { freeTags, matchesAny, selectedKeys } from "../Facets/facets";
+import { versionManifest } from "../WorkflowBuilder/appManifestInfo";
 
 export const VISIBILITY_OPTIONS = [
   { label: "All", value: "all" },
@@ -13,8 +14,12 @@ export const VISIBILITY_OPTIONS = [
 // The panel's "Show archived" lists all (Active and Archived), as on the
 // Workflows Library; archived alone isn't offered, but a chip names it.
 const STATUS_CHIPS = { all: "Including archived", archived: "Archived only" };
-// Nothing chosen: every visibility, active apps, any domain or field.
-export const APP_FILTER_DEFAULTS = Object.freeze({ visibility: "all", status: "active", domain: [], field: [] });
+// Nothing chosen: every visibility, active apps, any domain, field or tag.
+export const APP_FILTER_DEFAULTS = Object.freeze({ visibility: "all", status: "active", domain: [], field: [], tag: [] });
+
+// An app's tags that name no domain or field, from its app.yml (all of
+// them, not only the few its card shows): the Tags section's.
+export const appFreeTags = (app) => freeTags(versionManifest(app)?.tags);
 
 // "Public" or "Private" (null for anything else).
 export function visibilityLabel(app) {
@@ -36,23 +41,25 @@ export function appsInStatus(apps = [], status = "active") {
 }
 
 // The apps a choice keeps: in its status, matching the search, of its
-// visibility, for any of its domains and serving any of its fields (lists
-// of keys: OR within each, AND between them; empty for all).
-export function filterApps(apps = [], { status = "active", query = "", visibility = "all", domain = [], field = [] } = {}) {
+// visibility, for any of its domains, serving any of its fields and with
+// any of its tags (lists of keys: OR within each, AND between them; empty
+// for all).
+export function filterApps(apps = [], { status = "active", query = "", visibility = "all", domain = [], field = [], tag = [] } = {}) {
   let list = appsInStatus(apps, status);
   list = list.filter((app) => matchesAppSearch(app, query, readmeSummary(app)));
   if (visibility !== "all") list = list.filter((app) => (visibilityLabel(app) || "").toLowerCase() === visibility);
   list = list.filter((app) => matchesAny([appDomain(app)?.key].filter(Boolean), domain));
   list = list.filter((app) => matchesAny(appFields(app).map((f) => f.key), field));
+  list = list.filter((app) => matchesAny(appFreeTags(app).map((t) => t.key), tag));
   return list;
 }
 
 // The filters set away from their defaults, as removable chips ({ key,
-// value, label }; one per chosen domain and field, value its key) in the
-// panel's order: visibility, status, domain, field. Labels come from the
-// options shown (domainCounts, fieldCounts); one no longer offered shows by
-// its key.
-export function appActiveFilters(state = {}, { domains = [], fields = [] } = {}) {
+// value, label }; one per chosen domain, field and tag, value its key) in
+// the panel's order: visibility, status, domain, field, tag. Labels come
+// from the options shown (domainCounts, fieldCounts, tagFacetOptions); one
+// no longer offered shows by its key.
+export function appActiveFilters(state = {}, { domains = [], fields = [], tags = [] } = {}) {
   const set = (key) => state[key] !== undefined && state[key] !== APP_FILTER_DEFAULTS[key];
   const chips = [];
   if (set("visibility")) {
@@ -64,6 +71,9 @@ export function appActiveFilters(state = {}, { domains = [], fields = [] } = {})
   }
   for (const key of selectedKeys(state.field)) {
     chips.push({ key: "field", value: key, label: fields.find((o) => o.field.key === key)?.field.label || key });
+  }
+  for (const key of selectedKeys(state.tag)) {
+    chips.push({ key: "tag", value: key, label: tags.find((o) => o.key === key)?.label || key });
   }
   return chips;
 }
