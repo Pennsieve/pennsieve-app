@@ -25,7 +25,7 @@ import { getView, viewsServiceUrl, createRunView, viewDataSource } from "@/utils
 import CompactFlowNode from "../WorkflowGraph/CompactFlowNode.vue";
 import GraphDensityToggle from "../WorkflowGraph/GraphDensityToggle.vue";
 import { layoutBox, useGraphDensity } from "../WorkflowGraph/graphDensity";
-import { formatResources, formatRunTime, nodeDurationSec } from "../WorkflowGraph/nodeFacts";
+import { formatResources, formatRunTime, nodeDurationSec, stepExecutionTarget } from "../WorkflowGraph/nodeFacts";
 import { useSendXhr } from "@/mixins/request/request_composable";
 import toQueryParams from "@/utils/toQueryParams";
 import TargetDatasetField from "./TargetDatasetField.vue";
@@ -839,7 +839,7 @@ const runToNodesAndEdges = (run) => {
       extra.datasetId = targetWritesToDataset(d.targetType) ? targetDatasetId(runDataTargets[d.id], run.datasetId) : "";
     } else {
       const cfg = runProcessorConfigs.find((c) => c.nodeId === d.id);
-      extra.executionTarget = cfg?.executionTarget || null;
+      extra.executionTarget = stepExecutionTarget(d, runProcessorConfigs);
       extra.lambdaOverride = cfg?.lambdaOverride === true;
       Object.assign(extra, stepManifest(dag, d.id));
       // What its app.yml declares (or the run's runtime config), for the
@@ -2194,6 +2194,11 @@ function failureSummary(data) {
   }
 }
 
+// Where a step ran, on the card: what the compute node measured once the run
+// is finished (nodeMetrics), else where the run placed it (executionTarget).
+const ranOn = (id, data) =>
+  runMetrics.value?.nodeMetrics?.find((nm) => nm.nodeId === id)?.computeType || data.executionTarget;
+
 const selectedNodeMetrics = computed(() => {
   if (!selectedNode.value || !runMetrics.value?.nodeMetrics) return null;
   return (
@@ -2710,7 +2715,7 @@ onUnmounted(() => {
                   kind="processor"
                   :label="titleOf(id, data)"
                   :status="mode === 'browse' ? data.status : ''"
-                  :runtime="mode === 'browse' ? data.executionTarget : nodeConfigs[id]?.executionTarget"
+                  :runtime="mode === 'browse' ? ranOn(id, data) : nodeConfigs[id]?.executionTarget"
                   :unmet="nodeUnmetCount(id, 'processor')"
                   :actions-on-hover="false"
                 >
@@ -2761,7 +2766,7 @@ onUnmounted(() => {
                   <PortChips v-if="hasPortChips(id, data, 'in')" :points="pointsOf(id, data, 'in')" side="in" />
                   <div class="node-header">
                     <span class="node-title" :title="titleOf(id, data)">{{ titleOf(id, data) }}</span>
-                    <RuntimeMark :runtime="mode === 'browse' ? data.executionTarget : nodeConfigs[id]?.executionTarget" />
+                    <RuntimeMark :runtime="mode === 'browse' ? ranOn(id, data) : nodeConfigs[id]?.executionTarget" />
                     <LlmMark v-if="data.llm" />
                     <span
                       v-if="statusMark(data)"
