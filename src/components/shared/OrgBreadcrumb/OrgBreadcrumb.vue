@@ -1,5 +1,27 @@
 <template>
-  <div class="org-breadcrumb">
+  <!-- trailTitle: the trail is the title, one row; its last crumb is the
+       heading (Analysis: the tabs name the rest). -->
+  <div v-if="trailTitle" class="org-breadcrumb trail-title">
+    <div class="page-title-row">
+      <nav class="title-trail" aria-label="Breadcrumb">
+        <router-link :to="rootRoute" class="breadcrumb-link">
+          {{ rootLabel }}
+        </router-link>
+        <template v-for="(crumb, index) in parentCrumbs" :key="index">
+          <span class="breadcrumb-separator">/</span>
+          <router-link v-if="crumb.route" :to="crumb.route" class="breadcrumb-link">
+            {{ crumb.name }}
+          </router-link>
+          <span v-else class="breadcrumb-link">{{ crumb.name }}</span>
+        </template>
+        <span class="breadcrumb-separator">/</span>
+      </nav>
+      <h1 class="page-title" :title="currentTitle">{{ currentTitle }}</h1>
+      <span id="page-title-extra" class="page-title-extra" />
+      <span v-if="actions" id="page-title-actions" class="page-title-actions" />
+    </div>
+  </div>
+  <div v-else class="org-breadcrumb">
     <div class="breadcrumb-trail">
       <router-link :to="rootRoute" class="breadcrumb-link">
         {{ rootLabel }}
@@ -61,6 +83,11 @@ export default {
     // Has a place for the page's actions on the title row's right
     // (#page-title-actions), as tall as them, so the row doesn't move.
     actions: {
+      type: Boolean,
+      default: false
+    },
+    // One row: the trail's parents, then its last crumb as the heading.
+    trailTitle: {
       type: Boolean,
       default: false
     }
@@ -180,6 +207,67 @@ export default {
   }
   .page-title-actions:empty {
     display: none;
+  }
+}
+/* The trail as the title: muted parents on the heading's baseline; the
+   workspace name gives way first on a narrow screen. */
+.trail-title .page-title-row {
+  align-items: baseline;
+  gap: 0;
+}
+/* Shrinks before the title, down to its crumbs' minimum widths. */
+.title-trail {
+  display: flex;
+  flex-shrink: 100;
+  align-items: baseline;
+  font-size: 16px;
+  white-space: nowrap;
+
+  .breadcrumb-link {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: theme.$gray_4;
+    text-decoration: none;
+
+    &:hover {
+      text-decoration: underline;
+    }
+  }
+  /* Only the workspace name gives way; Analysis and a tab stay whole. */
+  .breadcrumb-link {
+    flex-shrink: 0;
+  }
+  .breadcrumb-link:first-child {
+    flex-shrink: 1;
+    min-width: 48px;
+  }
+  .breadcrumb-separator {
+    flex-shrink: 0;
+    margin: 0 8px;
+    color: theme.$gray_3;
+  }
+}
+/* Then a long title (an app's repository) is cut, never the actions. */
+.trail-title .page-title {
+  flex-shrink: 1;
+  min-width: 80px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.trail-title .page-title-extra {
+  flex-shrink: 0;
+  margin-left: 12px;
+  align-self: center;
+  white-space: nowrap;
+}
+.trail-title .page-title-actions {
+  flex-shrink: 0;
+  align-self: center;
+  padding-left: 16px;
+
+  :deep(.bf-button) {
+    white-space: nowrap;
   }
 }
 .page-title {
