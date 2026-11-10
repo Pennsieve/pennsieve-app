@@ -2,12 +2,13 @@
 // A tab's views and primary actions (Workflows: Live/Library/Builder and
 // + Run Workflow; Notebooks: Live/Environments and + New…; Apps: its
 // actions; a compute node: its tabs and Pause). Each overview owns its bar;
-// the layout shows it in two places, so the tab's content starts right
-// below the tabs:
-// - the views on the right of the Analysis tab row (Analysis.vue,
-//   MyAnalysis.vue: #analysis-tab-views), navigation with the tabs;
+// the layout shows it in two places:
+// - the views (#analysis-tab-views): in a workspace's Analysis, whose
+//   sections are in the secondary nav, the page's tabs under the title; in
+//   My Analysis, a switch on the right of its tab row;
 // - the actions on the right of the page's title row (OrgBreadcrumb:
 //   #page-title-actions), in one place on every tab and view.
+import { inject } from "vue";
 import AnalysisViewSwitch from "./AnalysisViewSwitch.vue";
 
 defineProps({
@@ -15,12 +16,15 @@ defineProps({
   modelValue: { type: String, default: "" },
 });
 const emit = defineEmits(["update:modelValue"]);
+// Analysis.vue provides "sections": its views are the page's tabs.
+const sections = inject("analysisLayout", "") === "sections";
 </script>
 
 <template>
   <!-- Deferred: both targets are the layout's, rendered in the same pass. -->
   <Teleport v-if="views.length" defer to="#analysis-tab-views">
     <AnalysisViewSwitch
+      :variant="sections ? 'tabs' : 'pill'"
       :views="views"
       :model-value="modelValue"
       @update:model-value="(v) => emit('update:modelValue', v)"

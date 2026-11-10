@@ -1,6 +1,6 @@
 <template>
   <bf-page>
-    <bf-rafter slot="heading" class="primary">
+    <bf-rafter slot="heading" class="primary" :class="{ 'analysis-header': isAnalysisSection }">
       <template #breadcrumb>
         <org-breadcrumb
           :page-name="currentSectionName"
@@ -9,6 +9,7 @@
           workspace-label="My Workspace"
           :workspace-route="{ name: 'my-workspace' }"
           :actions="$route.matched.some((r) => ['my-analysis', 'my-code', 'public-datasets', 'public-dataset'].includes(r.name))"
+          :trail-title="isAnalysisSection"
         />
       </template>
     </bf-rafter>
@@ -268,6 +269,13 @@ export default {
 
 <style scoped lang="scss">
 @use '../../styles/theme';
+/* My Analysis, as a workspace's Analysis: the title and its tabs read as
+   one header, one rule under the tabs. (The class thrice: over the
+   rafter's own .bf-rafter.compact.primary.) */
+.bf-rafter.analysis-header.analysis-header.analysis-header {
+  border-bottom: none;
+  padding-bottom: 4px;
+}
 
 .content-tabs {
   background: white;
