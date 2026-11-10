@@ -27,3 +27,13 @@ export function formatResources(cpu, memory) {
   if (mib > 0) parts.push(mib >= 1024 ? `${+(mib / 1024).toFixed(1)} GB` : `${mib} MB`);
   return parts.join(" · ");
 }
+
+// Where a run's step runs: its run config's execution target, else the first
+// compute type stamped on the step, as the compute node decides it
+// (workflow-service executionTargetOf). A run started without processor
+// configs has only the stamp, e.g. a GPU variant's ["gpu"]. null when neither
+// says, which the compute node runs as standard.
+export function stepExecutionTarget(step, configs = []) {
+  const cfg = (configs || []).find((c) => c.nodeId === step?.id);
+  return cfg?.executionTarget || step?.runtimeConfig?.computeTypes?.[0] || null;
+}
