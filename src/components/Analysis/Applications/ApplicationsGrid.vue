@@ -24,6 +24,7 @@ import {
   visibilityLabel,
 } from "./appFilters";
 import FacetLayout from "../Facets/FacetLayout.vue";
+import AnalysisContentIntro from "../AnalysisContentIntro.vue";
 import FacetSection from "../Facets/FacetSection.vue";
 import FacetOptions from "../Facets/FacetOptions.vue";
 import FacetRadios from "../Facets/FacetRadios.vue";
@@ -380,6 +381,7 @@ const goToManifestBuilder = () => {
     <FacetLayout
       class="applications-section"
       storage-key="pennsieve.apps.filtersPanel"
+      default-folded
       :chips="activeChips"
       @remove="removeChip"
       @clear-all="clearFacets"
@@ -395,6 +397,11 @@ const goToManifestBuilder = () => {
         <FacetSection v-if="fieldFacets.length" title="Field" :clearable="fieldFilter.length > 0" @clear="clearFacet('field')">
           <FacetOptions :options="fieldFacets" :selected="fieldFilter" @toggle="toggleField" />
         </FacetSection>
+      </template>
+
+      <!-- In its tab: what's listed, and the tab's actions (AnalysisViewBar) -->
+      <template v-if="embedded" #intro>
+        <AnalysisContentIntro text="Apps are the steps workflows run, each built from a code repository into a container." />
       </template>
 
       <template #toolbar>

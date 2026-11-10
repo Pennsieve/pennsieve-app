@@ -14,8 +14,8 @@ provide('analysisLayout', 'sections')
 
 <template>
   <div class="my-analysis">
-    <!-- The section's views as the page's tabs (AnalysisViewBar). The row
-         is there without views too: one header height. -->
+    <!-- The section's views as the page's tabs (AnalysisViewBar); without
+         views (most sections), no row. -->
     <div ref="tabsRow" class="tab-header">
       <div class="views-row">
         <div id="analysis-tab-views" class="tab-views" />
@@ -41,6 +41,10 @@ provide('analysisLayout', 'sections')
   display: flex;
   height: 40px;
   min-width: 0;
+}
+/* No views (most sections): no row, only the rule under the title. */
+.views-row:has(> .tab-views:empty) {
+  display: none;
 }
 .tab-views {
   display: flex;

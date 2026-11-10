@@ -8,7 +8,7 @@
           :page-route="sectionRoute"
           workspace-label="My Workspace"
           :workspace-route="{ name: 'my-workspace' }"
-          :actions="$route.matched.some((r) => ['my-analysis', 'my-code', 'public-datasets', 'public-dataset'].includes(r.name))"
+          :actions="$route.matched.some((r) => ['my-analysis', 'public-dataset'].includes(r.name))"
           :trail-title="isAnalysisSection"
         />
       </template>
@@ -162,15 +162,35 @@ export default {
             { name: 'Notebook' }
           ];
         }
+        // The Builder (?view=builder): a new workflow under Workflows
+        if (routeName === 'my-workflows' && this.$route.query.view === 'builder') {
+          return [{ name: 'Workflows', route: { name: 'my-workflows' } }, { name: 'New Workflow' }];
+        }
         if (routeName === 'my-workflows') {
           return [{ name: 'Workflows' }];
+        }
+        if (routeName === 'my-runs') {
+          return [{ name: 'Runs' }];
+        }
+        if (routeName === 'my-environments') {
+          return [{ name: 'Environments' }];
+        }
+        // A run's page: a notebook's under Notebooks, any other under Runs
+        if (routeName === 'my-run-detail' || routeName === 'my-run-configure') {
+          const notebook = this.$route.query.from === 'notebooks';
+          return [
+            notebook
+              ? { name: 'Notebooks', route: { name: 'my-notebooks' } }
+              : { name: 'Runs', route: { name: 'my-runs' } },
+            { name: routeName === 'my-run-configure' ? 'Configure Run' : 'Run Details' }
+          ];
         }
         if (routeName === 'my-workflow-create') {
           return [{ name: 'Workflows', route: { name: 'my-workflows' } }, { name: 'New Workflow' }];
         }
-        // A workflow's page leads back to the Workflows tab's Library
+        // A workflow's page leads back to Workflows (the Library)
         if (routeName === 'my-workflow-detail') {
-          return [{ name: 'Workflows', route: { name: 'my-workflows', query: { view: 'library' } } }, { name: 'Workflow' }];
+          return [{ name: 'Workflows', route: { name: 'my-workflows' } }, { name: 'Workflow' }];
         }
         if (routeName === 'my-apps') {
           return [{ name: 'Apps' }];

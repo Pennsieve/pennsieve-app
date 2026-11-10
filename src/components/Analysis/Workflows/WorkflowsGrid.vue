@@ -26,6 +26,7 @@ import { isNotebookWorkflow } from "../RunMonitor/notebookHelpers";
 import { exampleLabel, exampleVersion, PDF_URL_FRESH_MS } from "./runExamples";
 import SampleOutputViewer from "./SampleOutputViewer.vue";
 import FacetLayout from "../Facets/FacetLayout.vue";
+import AnalysisContentIntro from "../AnalysisContentIntro.vue";
 import FacetSection from "../Facets/FacetSection.vue";
 import FacetOptions from "../Facets/FacetOptions.vue";
 import FacetRadios from "../Facets/FacetRadios.vue";
@@ -418,6 +419,7 @@ onMounted(async () => {
     <FacetLayout
       class="workflows-section"
       storage-key="pennsieve.library.filtersPanel"
+      default-folded
       :chips="activeChips"
       @remove="removeChip"
       @clear-all="clearFacets"
@@ -447,6 +449,11 @@ onMounted(async () => {
             <el-option v-for="o in outputChoices" :key="o.value" :label="o.label" :value="o.value" />
           </el-select>
         </FacetSection>
+      </template>
+
+      <!-- In its tab: what's listed, and the tab's actions (AnalysisViewBar) -->
+      <template v-if="embedded" #intro>
+        <AnalysisContentIntro text="Workflows chain apps into a pipeline you run on a dataset: Pennsieve's, your own and the community's." />
       </template>
 
       <template #toolbar>

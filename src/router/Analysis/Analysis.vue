@@ -7,8 +7,8 @@
     </bf-rafter>
     <!-- The section's views as the page's tabs (AnalysisViewBar); the
          sections themselves are in the secondary nav
-         (AnalysisNavigationSecondary), the section's actions on the title
-         row. The row is there without views too: one header height. -->
+         (AnalysisNavigationSecondary), its actions in its content. Without
+         views (most sections), no row: only the rule under the title. -->
     <div ref="tabsRow" class="tab-header">
       <div class="views-row">
         <div id="analysis-tab-views" class="tab-views" />
@@ -74,9 +74,16 @@ export default {
     breadcrumbCrumbs() {
       const routeName = this.$route.name;
 
+      // The Builder (Workflows, ?view=builder): a new workflow under Workflows.
+      if (routeName === 'workflows' && this.$route.query.view === 'builder') {
+        return [{ name: 'Workflows', route: { name: 'workflows' } }, { name: 'New Workflow' }];
+      }
+
       // A section: the trail ends at it (the secondary nav says it too).
       const sections = {
+        'runs': 'Runs',
         'notebooks': 'Notebooks',
+        'environments': 'Environments',
         'workflows': 'Workflows',
         'apps': 'Apps',
         'compute-nodes': 'Compute Nodes',
@@ -87,13 +94,13 @@ export default {
 
       // Sub-pages: parent tab as link + detail name as current
       const subPages = {
-        // A notebook's run belongs to Notebooks, any other to Workflows' Live.
+        // A notebook's run belongs to Notebooks, any other to Runs.
         'run-detail': this.runIsNotebook
           ? { parent: 'Notebooks', parentRoute: { name: 'notebooks' } }
-          : { parent: 'Workflows', parentRoute: { name: 'workflows' } },
-        'run-configure': { parent: 'Workflows', parentRoute: { name: 'workflows' } },
-        'workflow-detail': { parent: 'Workflows', parentRoute: { name: 'workflows', query: { view: 'library' } } },
-        'workflow-create': { parent: 'Workflows', parentRoute: { name: 'workflows', query: { view: 'builder' } } },
+          : { parent: 'Runs', parentRoute: { name: 'runs' } },
+        'run-configure': { parent: 'Runs', parentRoute: { name: 'runs' } },
+        'workflow-detail': { parent: 'Workflows', parentRoute: { name: 'workflows' } },
+        'workflow-create': { parent: 'Workflows', parentRoute: { name: 'workflows' } },
         'application-detail': { parent: 'Apps', parentRoute: { name: 'apps' } },
         'application-manifest-guide': { parent: 'Apps', parentRoute: { name: 'apps' } },
         'application-manifest-builder': { parent: 'Apps', parentRoute: { name: 'apps' } },
@@ -174,9 +181,8 @@ export default {
   border-bottom: none;
   padding-bottom: 4px;
 }
-/* The views row: the page's tabs, their underline on the one rule under
-   the header. There on every section, empty without views, so the header
-   is one height and the content starts in one place. */
+/* The views row: the page's tabs (a detail page's, as a compute node's),
+   their underline on the one rule under the header. */
 .tab-header {
   box-sizing: border-box;
   padding: 0 32px;
@@ -187,6 +193,10 @@ export default {
   display: flex;
   height: 40px;
   min-width: 0;
+}
+/* No views (most sections): no row, only the rule under the title. */
+.views-row:has(> .tab-views:empty) {
+  display: none;
 }
 .tab-views {
   display: flex;

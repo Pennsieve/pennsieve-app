@@ -550,11 +550,29 @@ const router = createRouter({
               }
             },
             {
+              name: 'my-environments',
+              path: 'environments',
+              component: NotebooksOverview,
+              props: { section: 'environments' },
+              meta: {
+                hideSecondaryNav: false,
+                title: 'Environments',
+                description: 'The Python and R packages your notebooks run with.'
+              }
+            },
+            {
               // Runs are on the Workflows tab's Live view (and notebooks on
               // the Notebooks tab); old links land there.
+              // Runs outside any workspace (the Workflows overview's Live)
               name: 'my-runs',
               path: 'runs',
-              redirect: { name: 'my-workflows' }
+              component: WorkflowsOverview,
+              props: { section: 'runs' },
+              meta: {
+                hideSecondaryNav: false,
+                title: 'Runs',
+                description: 'Your workflow runs outside any workspace: going on and before.'
+              }
             },
             {
               // Before 'runs/:runId', which would otherwise match 'configure'
@@ -653,7 +671,7 @@ const router = createRouter({
               meta: {
                 hideSecondaryNav: false,
                 title: 'Workflows',
-                description: 'Workflows to run (your own and public ones), their runs, and the builder.'
+                description: 'Workflows to run (your own and public ones), and the builder for a new one.'
               }
             },
             {
@@ -2070,15 +2088,34 @@ const router = createRouter({
         {
           // Runs are on the Workflows tab's Live view (and notebooks on the
           // Notebooks tab); old links land there.
+          // Runs: the workflow runs going on and before (the Workflows
+          // overview's Live); the workflows themselves are under Workflows
           name: 'runs',
           path: 'runs',
-          redirect: (to) => ({ name: 'workflows', params: to.params })
+          components: {
+            stage: WorkflowsOverview,
+          },
+          props: {
+            stage: { section: 'runs' }
+          }
         },
         {
           name: 'notebooks',
           path: 'notebooks',
           components: {
             stage: NotebooksOverview,
+          }
+        },
+        {
+          // Environments: the packages notebooks run with (the Notebooks
+          // overview's environments; a resource, as workflows and apps are)
+          name: 'environments',
+          path: 'environments',
+          components: {
+            stage: NotebooksOverview,
+          },
+          props: {
+            stage: { section: 'environments' }
           }
         },
         {

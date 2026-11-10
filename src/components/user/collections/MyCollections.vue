@@ -1,12 +1,14 @@
 <template>
   <div class="my-collections">
-    <div class="collections-header">
-      <p class="page-description">
-        Browse and manage your collections. Collections help organize and share related datasets.
+    <!-- As Analysis's views: what's listed on the left, the action on the
+         right; the search under them -->
+    <AnalysisContentIntro text="Browse and manage your collections: they organize and share related datasets. A collection holds only datasets published on Pennsieve.">
+      <template #actions>
+        <bf-button class="primary" @click="showCreateDialog">+ New Collection</bf-button>
+      </template>
+    </AnalysisContentIntro>
 
-        Collections can only datasets that have been published using the Pennsieve platform.
-      </p>
-      
+    <div class="collections-header">
       <div class="header-actions">
         <div class="search-bar">
           <IconSearch :width="20" :height="20" class="search-icon" />
@@ -18,10 +20,6 @@
             @input="onSearch"
           />
         </div>
-        
-        <bf-button class="primary" @click="showCreateDialog">
-          Create Collection
-        </bf-button>
       </div>
     </div>
 
@@ -42,6 +40,7 @@ import IconSearch from '../../icons/IconSearch.vue'
 import CollectionsList from './CollectionsList.vue'
 import CreateCollectionDialog from './CreateCollectionDialog.vue'
 import BfButton from "@/components/shared/bf-button/BfButton.vue"
+import AnalysisContentIntro from "@/components/Analysis/AnalysisContentIntro.vue"
 
 export default {
   name: 'MyCollections',
@@ -50,7 +49,8 @@ export default {
     IconSearch,
     CollectionsList,
     CreateCollectionDialog,
-    BfButton
+    BfButton,
+    AnalysisContentIntro
   },
 
   data() {
@@ -92,20 +92,13 @@ export default {
 <style scoped lang="scss">
 @use '../../../styles/_theme.scss';
 
+/* As Analysis's views' content: 20px under the header, 32px in. */
 .my-collections {
-  margin: 32px;
+  margin: 20px 32px 32px;
 }
 
 .collections-header {
-  margin-bottom: 32px;
-
-  .page-description {
-    font-size: 16px;
-    color: theme.$gray_5;
-    line-height: 1.6;
-    margin: 0 0 24px 0;
-    max-width: 800px;
-  }
+  margin-bottom: 24px;
 
   .header-actions {
     display: flex;

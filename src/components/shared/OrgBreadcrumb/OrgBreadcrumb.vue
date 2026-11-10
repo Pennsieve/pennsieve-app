@@ -261,6 +261,11 @@ export default {
   align-self: center;
   white-space: nowrap;
 }
+/* Nothing in it (a section's actions are in its content), no height: the
+   title row is the title's, and the tabs sit closer. */
+.trail-title .page-title-actions:empty {
+  min-height: 0;
+}
 .trail-title .page-title-actions {
   flex-shrink: 0;
   align-self: center;

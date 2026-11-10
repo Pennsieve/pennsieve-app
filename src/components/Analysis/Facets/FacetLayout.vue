@@ -17,14 +17,19 @@ const props = defineProps({
   // The filters set: [{ key, value?, label }], each removable (remove: the
 // chip); none, no chip row.
   chips: { type: Array, default: () => [] },
+  // Folded until opened once (then remembered): the cards get the width,
+  // the rail shows the filters set (My Code, Apps, the Workflows Library,
+  // Public Datasets).
+  defaultFolded: { type: Boolean, default: false },
 });
 const emit = defineEmits(["remove", "clear-all"]);
 
 const storedOpen = () => {
   try {
-    return localStorage.getItem(props.storageKey) !== "folded";
+    const stored = localStorage.getItem(props.storageKey);
+    return stored ? stored !== "folded" : !props.defaultFolded;
   } catch {
-    return true;
+    return !props.defaultFolded;
   }
 };
 const panelOpen = ref(storedOpen());
@@ -76,6 +81,8 @@ const drawerOpen = ref(false);
     </el-drawer>
 
     <div class="facet-main">
+      <!-- A first row over the search and Sort (a view's intro and actions) -->
+      <slot name="intro" />
       <div class="facet-toolbar">
         <div v-if="$slots.lead" class="facet-lead"><slot name="lead" /></div>
         <button type="button" class="filters-button" @click="drawerOpen = true">
