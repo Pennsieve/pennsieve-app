@@ -43,6 +43,18 @@ const initialFilterState = {
   sortDirection: "asc",
 };
 
+// The primary nav's collapsed state the user chose with its handle, kept in
+// this browser: navigating, a reload or a page that collapses it for a while
+// (a notebook session, search) comes back to it.
+const PRIMARY_NAV_KEY = "pennsieve.primaryNav.condensed";
+const storedPrimaryNavCondensed = () => {
+  try {
+    return localStorage.getItem(PRIMARY_NAV_KEY) === "1";
+  } catch {
+    return false;
+  }
+};
+
 const initialState = () => ({
   config: site,
   uploadRemaining: 0,
@@ -85,7 +97,8 @@ const initialState = () => ({
   publishersLoading: true,
   datasetRole: "viewer",
   primaryNavOpen: true,
-  primaryNavCondensed: false,
+  primaryNavCondensed: storedPrimaryNavCondensed(),
+  primaryNavPreferCondensed: storedPrimaryNavCondensed(),
   secondaryNavOpen: false,
   secondaryNavCondensed: false,
   editingInstance: false,
@@ -257,6 +270,15 @@ export const mutations = {
       },
       CONDENSE_PRIMARY_NAV(state, condensed) {
         state.primaryNavCondensed = condensed;
+      },
+      SET_PRIMARY_NAV_PREFERENCE(state, condensed) {
+        state.primaryNavPreferCondensed = condensed;
+        state.primaryNavCondensed = condensed;
+        try {
+          localStorage.setItem(PRIMARY_NAV_KEY, condensed ? "1" : "0");
+        } catch {
+          // not remembered past this session
+        }
       },
       CONDENSE_SECONDARY_NAV(state, condensed) {
         state.secondaryNavCondensed = condensed;
@@ -698,6 +720,9 @@ export const actions = {
   togglePrimaryNav: ({ commit }, evt) => commit("TOGGLE_PRIMARY_NAV", evt),
   condensePrimaryNav: ({ commit }, evt) =>
       commit("CONDENSE_PRIMARY_NAV", evt),
+  // The user's own choice (the nav's handle): remembered, and come back to.
+  setPrimaryNavPreference: ({ commit }, condensed) =>
+      commit("SET_PRIMARY_NAV_PREFERENCE", condensed),
   toggleSecondaryNav: ({ commit }, evt) =>
       commit("TOGGLE_SECONDARY_NAV", evt),
   condenseSecondaryNav: ({ commit }, evt) =>

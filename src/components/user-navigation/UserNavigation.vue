@@ -188,15 +188,12 @@ export default {
   methods: {
     ...mapActions([
       'togglePrimaryNav',
-      'condensePrimaryNav'
+      'setPrimaryNavPreference'
     ]),
 
+    // The user's choice: remembered, and come back to after navigating
     toggleMenu() {
-      if (!this.primaryNavCondensed) {
-        this.condensePrimaryNav(true)
-      } else {
-        this.condensePrimaryNav(false)
-      }
+      this.setPrimaryNavPreference(!this.primaryNavCondensed)
     }
   }
 }
