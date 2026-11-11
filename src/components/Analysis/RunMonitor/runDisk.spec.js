@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { RUN_DISK_OPTIONS, diskHourCost, diskStepIds, keptDiskSteps, runDiskHint, runDiskOf, takesRunDisk } from "./runDisk";
+import { RUN_DISK_OPTIONS, diskHourCost, diskStepIds, keptDiskNote, keptDiskSteps, lambdaDiskNote, runDiskHint, runDiskOf, takesRunDisk } from "./runDisk";
 
 const batch = { id: "b", type: "processor" };
 const notebook = { id: "nb", type: "processor", runtimeConfig: { interactive: true } };
@@ -60,21 +60,29 @@ describe("runDiskHint", () => {
     expect(runDiskHint("", 3)).not.toContain("an hour");
     expect(runDiskHint(300, 3)).toMatch(/about 3¢ an hour per step while it runs\.$/);
   });
-  it("says which steps keep their own disk, only when the run has them", () => {
-    expect(runDiskHint("", 2)).not.toMatch(/Lambda|GPU|notebook/);
-    const one = runDiskHint("", 2, { lambda: 1, gpu: 1, notebook: 1 });
-    expect(one).toContain("1 step on Lambda keeps Lambda's 10 GB whatever is chosen here: to give it more, run it on Fargate in its step settings.");
-    expect(one).toContain("1 GPU step uses its instance's disk.");
-    expect(one).toContain("1 notebook has the disk chosen when it starts.");
-    const more = runDiskHint(300, 2, { lambda: 2, gpu: 2, notebook: 2 });
-    expect(more).toContain("2 steps on Lambda keep Lambda's 10 GB whatever is chosen here: to give one more,");
-    expect(more).toContain("2 GPU steps use their instance's disk.");
-    expect(more).toContain("2 notebooks have the disk chosen when it starts.");
-    expect(more).toMatch(/about 3¢ an hour per step while it runs\.$/);
+  it("keeps to the Fargate steps; the others get their own notes", () => {
+    expect(runDiskHint(300, 2)).not.toMatch(/Lambda|GPU|notebook/);
   });
   it("offers sizes from 50 GB to 2 TB", () => {
     expect(RUN_DISK_OPTIONS[0]).toBe(50);
     expect(RUN_DISK_OPTIONS[RUN_DISK_OPTIONS.length - 1]).toBe(2000);
+  });
+});
+
+describe("lambdaDiskNote", () => {
+  it("says a Lambda step keeps its 10 GB and how to give it more", () => {
+    expect(lambdaDiskNote(0)).toBe("");
+    expect(lambdaDiskNote(1)).toBe("1 step on Lambda keeps Lambda's 10 GB whatever is chosen here: to give it more, run it on Fargate in its step settings.");
+    expect(lambdaDiskNote(2)).toMatch(/^2 steps on Lambda keep Lambda's 10 GB whatever is chosen here: to give one more,/);
+  });
+});
+
+describe("keptDiskNote", () => {
+  it("names the GPU steps and notebooks, only those the run has", () => {
+    expect(keptDiskNote({})).toBe("");
+    expect(keptDiskNote({ gpu: 1 })).toBe("1 GPU step uses its instance's disk.");
+    expect(keptDiskNote({ notebook: 2 })).toBe("2 notebooks have the disk chosen when it starts.");
+    expect(keptDiskNote({ gpu: 2, notebook: 1 })).toBe("2 GPU steps use their instance's disk. 1 notebook has the disk chosen when it starts.");
   });
 });
 

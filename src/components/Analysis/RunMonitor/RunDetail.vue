@@ -103,7 +103,7 @@ import { fetchVariantGate, runsNonDefaultVariant } from "./variantGate";
 import { appLambdaEligibility, lambdaUnavailableHint, lambdaOverrideWarning, withLambdaChoice } from "../Applications/lambdaEligibility";
 import { stepLambdaFeedback } from "./lambdaFeedback";
 import { gpuReasonNote } from "./notebookHelpers";
-import { RUN_DISK_OPTIONS, diskStepIds, keptDiskSteps, runDiskHint, runDiskOf } from "./runDisk";
+import { RUN_DISK_OPTIONS, diskStepIds, keptDiskNote, keptDiskSteps, lambdaDiskNote, runDiskHint, runDiskOf } from "./runDisk";
 import { nodeGpu, gpuOffer, gpuName, gpuTaskResources } from "../ComputeNodes/computeNodeHelpers";
 import NodeTierBadge from "../ComputeNodes/NodeTierBadge.vue";
 import { useComputeResourcesStore } from "@/stores/computeResourcesStore";
@@ -3517,7 +3517,19 @@ onUnmounted(() => {
                   >
                     <el-option v-for="gib in RUN_DISK_OPTIONS" :key="gib" :label="`${gib} GB`" :value="gib" />
                   </el-select>
-                  <span class="run-name-hint">{{ runDiskHint(initiateForm.diskGiB, diskSteps.length, keptDisk) }}</span>
+                  <span class="run-name-hint">{{ runDiskHint(initiateForm.diskGiB, diskSteps.length) }}</span>
+                  <!-- A Lambda step is out of the disk's reach: a note, and a
+                       warning once a disk is chosen -->
+                  <el-alert
+                    v-if="initiateForm.diskGiB && keptDisk.lambda"
+                    :title="lambdaDiskNote(keptDisk.lambda)"
+                    type="warning"
+                    :closable="false"
+                    show-icon
+                    class="setup-disk-note"
+                  />
+                  <span v-else-if="keptDisk.lambda" class="run-name-hint setup-disk-note">{{ lambdaDiskNote(keptDisk.lambda) }}</span>
+                  <span v-if="keptDiskNote(keptDisk)" class="run-name-hint setup-disk-note">{{ keptDiskNote(keptDisk) }}</span>
                 </div>
               </div>
               <p class="configure-hint">
@@ -5464,6 +5476,21 @@ onUnmounted(() => {
   font-size: 11px;
   color: theme.$gray_4;
   line-height: 1.4;
+}
+
+// The notes under the Disk field's hint, each on its own line.
+.setup-disk-note {
+  display: block;
+  margin-top: 8px;
+}
+
+.el-alert.setup-disk-note {
+  padding: 6px 8px;
+
+  :deep(.el-alert__title) {
+    font-size: 11px;
+    line-height: 1.4;
+  }
 }
 
 .run-name-error {
