@@ -345,6 +345,9 @@ export function processorConfigEntry(nodeId, cfg = {}, lambda = null) {
   if (cfg.version) entry.version = cfg.version;
   if (cfg.cpu) entry.cpu = cfg.cpu;
   if (cfg.memory) entry.memory = onLambda ? lambdaMemory(cfg.memory) : cfg.memory;
+  // The disk the step asks for (GB), a floor on the planned disk: a batch
+  // step on Fargate only (runDisk.js); the others keep their disk.
+  if (cfg.diskGiB && !onLambda && cfg.executionTarget !== "gpu" && !cfg.interactive) entry.diskGiB = Number(cfg.diskGiB);
   // Interactive (Jupyter) override: workflow-service applies it to the run
   // DAG node's runtimeConfig (interactive waitForTaskToken step).
   if (cfg.interactive) {
