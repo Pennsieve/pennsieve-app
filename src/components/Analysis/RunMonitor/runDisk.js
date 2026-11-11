@@ -54,7 +54,10 @@ const plural = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
 // size costs.
 export function runDiskHint(gib, stepCount) {
   const steps = stepCount === 1 ? "the step that runs on Fargate" : `each of the ${stepCount} steps that run on Fargate`;
-  const base = `At least this much disk for ${steps}: the compute node plans a step's disk from its inputs and raises it to this. Over 200 GB a step gets a volume of its own.`;
+  const base =
+    `A floor for ${steps}. The compute node plans a step's disk from its inputs, about three times their size, ` +
+    "and raises it to this when the plan is smaller; a step with large inputs already gets more than a small size here. " +
+    "Over 200 GB a step gets a volume of its own.";
   return gib ? `${base} ${diskHourCost(gib)} an hour per step while it runs.` : base;
 }
 

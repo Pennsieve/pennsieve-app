@@ -3014,12 +3014,12 @@ onUnmounted(() => {
                       v-model="nodeConfigs[selectedNode.id].diskGiB"
                       size="small"
                       style="width: 100%"
-                      :placeholder="initiateForm.diskGiB ? `${initiateForm.diskGiB} GB (the run's)` : 'Planned from the inputs'"
+                      :placeholder="initiateForm.diskGiB ? `${initiateForm.diskGiB} GB (the run's)` : 'Planned from the inputs (about three times their size)'"
                       clearable
                     >
                       <el-option v-for="gib in RUN_DISK_OPTIONS" :key="gib" :label="`${gib} GB`" :value="gib" />
                     </el-select>
-                    <span class="version-hint">At least this much disk for this step alone; the run's disk, from the run setup, applies to every step on Fargate.</span>
+                    <span class="version-hint">A floor for this step alone, raised to when the disk planned from its inputs is smaller; the run's disk, from the run setup, applies to every step on Fargate.</span>
                   </div>
                 </template>
 
@@ -3513,7 +3513,7 @@ onUnmounted(() => {
                     class="setup-select"
                     fit-input-width
                     clearable
-                    placeholder="Planned from the inputs"
+                    placeholder="Planned from the inputs (about three times their size)"
                   >
                     <el-option v-for="gib in RUN_DISK_OPTIONS" :key="gib" :label="`${gib} GB`" :value="gib" />
                   </el-select>

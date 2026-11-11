@@ -55,7 +55,7 @@ describe("keptDiskSteps", () => {
 
 describe("runDiskHint", () => {
   it("says what the disk applies to, and the cost once chosen", () => {
-    expect(runDiskHint("", 1)).toMatch(/^At least this much disk for the step that runs on Fargate:/);
+    expect(runDiskHint("", 1)).toMatch(/^A floor for the step that runs on Fargate\. The compute node plans a step's disk from its inputs, about three times their size, and raises it to this when the plan is smaller; a step with large inputs already gets more than a small size here\./);
     expect(runDiskHint("", 3)).toContain("each of the 3 steps that run on Fargate");
     expect(runDiskHint("", 3)).not.toContain("an hour");
     expect(runDiskHint(300, 3)).toMatch(/about 3¢ an hour per step while it runs\.$/);
