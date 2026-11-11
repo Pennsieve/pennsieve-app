@@ -50,21 +50,27 @@ export function diskHourCost(gib) {
 
 const plural = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
 
-// The Disk field's hint: what the disk applies to, which steps keep their
-// own and why (only those the run has), and what the chosen size costs.
-export function runDiskHint(gib, stepCount, kept = {}) {
+// The Disk field's hint: what the disk applies to, and what the chosen
+// size costs.
+export function runDiskHint(gib, stepCount) {
   const steps = stepCount === 1 ? "the step that runs on Fargate" : `each of the ${stepCount} steps that run on Fargate`;
-  const parts = [
-    `At least this much disk for ${steps}: the compute node plans a step's disk from its inputs and raises it to this. Over 200 GB a step gets a volume of its own.`,
-  ];
-  if (kept.lambda) {
-    parts.push(
-      `${plural(kept.lambda, "step")} on Lambda ${kept.lambda === 1 ? "keeps" : "keep"} Lambda's 10 GB whatever is chosen here: to give ${kept.lambda === 1 ? "it" : "one"} more, run it on Fargate in its step settings.`
-    );
-  }
+  const base = `At least this much disk for ${steps}: the compute node plans a step's disk from its inputs and raises it to this. Over 200 GB a step gets a volume of its own.`;
+  return gib ? `${base} ${diskHourCost(gib)} an hour per step while it runs.` : base;
+}
+
+// The note under the hint on the run's Lambda steps, which the disk can't
+// reach; "" without any. Shown as a warning once a disk is chosen.
+export function lambdaDiskNote(count) {
+  if (!count) return "";
+  return `${plural(count, "step")} on Lambda ${count === 1 ? "keeps" : "keep"} Lambda's 10 GB whatever is chosen here: to give ${count === 1 ? "it" : "one"} more, run it on Fargate in its step settings.`;
+}
+
+// The note on the run's GPU steps and notebooks, which have their own
+// disk; "" without any.
+export function keptDiskNote(kept = {}) {
+  const parts = [];
   if (kept.gpu) parts.push(`${plural(kept.gpu, "GPU step")} ${kept.gpu === 1 ? "uses its" : "use their"} instance's disk.`);
   if (kept.notebook) parts.push(`${plural(kept.notebook, "notebook")} ${kept.notebook === 1 ? "has" : "have"} the disk chosen when it starts.`);
-  if (gib) parts.push(`${diskHourCost(gib)} an hour per step while it runs.`);
   return parts.join(" ");
 }
 
