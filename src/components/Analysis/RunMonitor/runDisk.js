@@ -50,15 +50,12 @@ export function diskHourCost(gib) {
 
 const plural = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
 
-// The Disk field's hint: what the disk applies to, and what the chosen
-// size costs.
+// The Disk field's hint: what a step gets anyway, when to choose more,
+// and what the chosen size costs.
 export function runDiskHint(gib, stepCount) {
-  const steps = stepCount === 1 ? "the step that runs on Fargate" : `each of the ${stepCount} steps that run on Fargate`;
-  const base =
-    `A floor for ${steps}. The compute node plans a step's disk from its inputs, about three times their size, ` +
-    "and raises it to this when the plan is smaller; a step with large inputs already gets more than a small size here. " +
-    "Over 200 GB a step gets a volume of its own.";
-  return gib ? `${base} ${diskHourCost(gib)} an hour per step while it runs.` : base;
+  const steps = stepCount === 1 ? "the step on Fargate writes or unpacks" : `the ${stepCount} steps on Fargate write or unpack`;
+  const base = `Each step gets about three times its inputs in disk. Choose more when ${steps} more than that.`;
+  return gib ? `${base} ${diskHourCost(gib)} an hour per step.` : base;
 }
 
 // The note under the hint on the run's Lambda steps, which the disk can't
