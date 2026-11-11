@@ -82,6 +82,14 @@ describe("nodeMetricRows", () => {
 });
 
 describe("processorConfigEntry", () => {
+  it("sends the disk a batch step on Fargate asks for, and not another step's", () => {
+    expect(processorConfigEntry("a", { executionTarget: "standard", diskGiB: 300 })).toEqual({ nodeId: "a", executionTarget: "standard", diskGiB: 300 });
+    expect(processorConfigEntry("a", { diskGiB: "500" })).toEqual({ nodeId: "a", diskGiB: 500 });
+    expect(processorConfigEntry("a", { executionTarget: "standard", diskGiB: "" })).toEqual({ nodeId: "a", executionTarget: "standard" });
+    expect(processorConfigEntry("a", { executionTarget: "lambda", diskGiB: 300 })).toEqual({ nodeId: "a", executionTarget: "lambda" });
+    expect(processorConfigEntry("a", { executionTarget: "gpu", diskGiB: 300 })).toEqual({ nodeId: "a", executionTarget: "gpu" });
+    expect(processorConfigEntry("a", { executionTarget: "standard", interactive: true, diskGiB: 300 })).toEqual({ nodeId: "a", executionTarget: "standard", interactive: true, sessionType: "jupyter" });
+  });
   const fits = { available: true, reasons: [], known: true, overridable: false };
   const over = { available: false, reasons: ["memory 16384 MB"], known: true, overridable: true };
   const hard = { available: false, reasons: ["image is 12 GB"], known: true, overridable: false };

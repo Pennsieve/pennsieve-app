@@ -103,6 +103,7 @@ import { fetchVariantGate, runsNonDefaultVariant } from "./variantGate";
 import { appLambdaEligibility, lambdaUnavailableHint, lambdaOverrideWarning, withLambdaChoice } from "../Applications/lambdaEligibility";
 import { stepLambdaFeedback } from "./lambdaFeedback";
 import { gpuReasonNote } from "./notebookHelpers";
+import { RUN_DISK_OPTIONS, diskStepIds, keptDiskNote, keptDiskSteps, lambdaDiskNote, runDiskHint, runDiskOf } from "./runDisk";
 import { nodeGpu, gpuOffer, gpuName, gpuTaskResources } from "../ComputeNodes/computeNodeHelpers";
 import NodeTierBadge from "../ComputeNodes/NodeTierBadge.vue";
 import { useComputeResourcesStore } from "@/stores/computeResourcesStore";
@@ -136,7 +137,7 @@ const isLoading = ref(false);
 let analyticsChannel = null;
 
 // Configure mode state
-const initiateForm = ref({ workflowId: "", computeNodeId: "", datasetId: "", name: "" });
+const initiateForm = ref({ workflowId: "", computeNodeId: "", datasetId: "", name: "", diskGiB: "" });
 const runNameError = ref("");
 const configDefinition = ref(null);
 const dataSourceFiles = reactive({});
@@ -197,6 +198,11 @@ const sourceDatasets = reactive({});
 const leftOutInputs = reactive({});
 const sourceDatasetOf = (nodeId) => sourceDatasets[nodeId] || initiateForm.value.datasetId;
 const nodeConfigs = reactive({});
+// The steps the run's disk (the Disk field of the run setup) applies to:
+// batch steps on Fargate, as configured (runDisk.js).
+const diskSteps = computed(() => diskStepIds(configDefinition.value?.dag || [], nodeConfigs));
+// The steps that keep their own disk (on Lambda, a GPU, a notebook), for the hint.
+const keptDisk = computed(() => keptDiskSteps(configDefinition.value?.dag || [], nodeConfigs));
 const isExecuting = ref(false);
 const errorBanner = ref("");
 const errorBannerNodeId = ref("");
@@ -841,6 +847,8 @@ const runToNodesAndEdges = (run) => {
       const cfg = runProcessorConfigs.find((c) => c.nodeId === d.id);
       extra.executionTarget = cfg?.executionTarget || null;
       extra.lambdaOverride = cfg?.lambdaOverride === true;
+      // The disk the run asked for the step (GB), a floor on the planned one.
+      extra.diskGiB = cfg?.diskGiB || null;
       Object.assign(extra, stepManifest(dag, d.id));
       // What its app.yml declares (or the run's runtime config), for the
       // Lambda notice (lambdaFeedback.js).
@@ -1095,7 +1103,7 @@ const configApp = ref(null);
 const initiateWorkflowFromConfig = async (pendingConfig) => {
   const { workflowId, computeNodeId, datasetId, rerunSource: source } = pendingConfig;
   configApp.value = appOf(pendingConfig) || appOf(source);
-  initiateForm.value = { workflowId: workflowId || "", computeNodeId, datasetId, name: "" };
+  initiateForm.value = { workflowId: workflowId || "", computeNodeId, datasetId, name: "", diskGiB: "" };
   runNameError.value = "";
 
   try {
@@ -1211,11 +1219,23 @@ const initiateWorkflowFromConfig = async (pendingConfig) => {
             d.runtimeConfig?.sessionType ||
             matchedApp?.runtimeConfig?.sessionType ||
             "jupyter",
+          // The disk this step asks for (GB), a floor on the planned one;
+          // "" leaves it to the run's disk, else the plan (runDisk.js).
+          diskGiB: srcCfg?.diskGiB || "",
           schemaParams,
           extraParams,
         };
       }
     });
+
+    // A run being run again that asked for one disk on all its batch steps
+    // asked for the run's disk, not each step's own.
+    const diskIds = diskStepIds(dag, nodeConfigs);
+    const runDisk = runDiskOf(sourceConfigs, diskIds);
+    if (runDisk) {
+      initiateForm.value.diskGiB = runDisk;
+      diskIds.forEach((id) => { nodeConfigs[id].diskGiB = ""; });
+    }
 
     rerunSource.value = null;
 
@@ -1423,6 +1443,8 @@ const executeWorkflow = async () => {
         workflowId: initiateForm.value.workflowId,
         computeNodeId: initiateForm.value.computeNodeId,
         ...(processorConfigs.length > 0 && { processorConfigs }),
+        // The run's disk, for its batch steps on Fargate (runDisk.js).
+        ...(initiateForm.value.diskGiB && { diskGiB: Number(initiateForm.value.diskGiB) }),
       },
       ...(runDatasetId.value && { datasetId: runDatasetId.value }),
       dataSources,
@@ -2985,6 +3007,20 @@ onUnmounted(() => {
                       />
                     </el-select>
                   </div>
+                  <!-- Disk: this step's own floor; the run's disk otherwise (runDisk.js) -->
+                  <div v-if="!nodeConfigs[selectedNode.id].interactive" class="config-field">
+                    <label>Disk</label>
+                    <el-select
+                      v-model="nodeConfigs[selectedNode.id].diskGiB"
+                      size="small"
+                      style="width: 100%"
+                      :placeholder="initiateForm.diskGiB ? `${initiateForm.diskGiB} GB (the run's)` : 'Planned from the inputs'"
+                      clearable
+                    >
+                      <el-option v-for="gib in RUN_DISK_OPTIONS" :key="gib" :label="`${gib} GB`" :value="gib" />
+                    </el-select>
+                    <span class="version-hint">For this step alone. The run setup's Disk applies to every step on Fargate.</span>
+                  </div>
                 </template>
 
                 <!-- GPU: the node's GPU instance's CPU and memory (its tier) -->
@@ -3468,6 +3504,33 @@ onUnmounted(() => {
                   </el-select>
                   <span v-if="setupNodeUnfit.length" class="run-name-error">Can't run this workflow: {{ setupNodeUnfit.join(", ") }}<template v-if="gpuReasonNote(setupNodeUnfit)">. {{ gpuReasonNote(setupNodeUnfit) }}</template></span>
                 </div>
+                <!-- The disk the run asks for its batch steps (runDisk.js) -->
+                <div v-if="diskSteps.length" class="info-row info-row-stacked">
+                  <label class="info-label" for="setup-disk">Disk <span class="info-label-hint">(optional)</span></label>
+                  <el-select
+                    id="setup-disk"
+                    v-model="initiateForm.diskGiB"
+                    class="setup-select"
+                    fit-input-width
+                    clearable
+                    placeholder="Planned from the inputs"
+                  >
+                    <el-option v-for="gib in RUN_DISK_OPTIONS" :key="gib" :label="`${gib} GB`" :value="gib" />
+                  </el-select>
+                  <span class="run-name-hint">{{ runDiskHint(initiateForm.diskGiB, diskSteps.length) }}</span>
+                  <!-- A Lambda step is out of the disk's reach: a note, and a
+                       warning once a disk is chosen -->
+                  <el-alert
+                    v-if="initiateForm.diskGiB && keptDisk.lambda"
+                    :title="lambdaDiskNote(keptDisk.lambda)"
+                    type="warning"
+                    :closable="false"
+                    show-icon
+                    class="setup-disk-note"
+                  />
+                  <span v-else-if="keptDisk.lambda" class="run-name-hint setup-disk-note">{{ lambdaDiskNote(keptDisk.lambda) }}</span>
+                  <span v-if="keptDiskNote(keptDisk)" class="run-name-hint setup-disk-note">{{ keptDiskNote(keptDisk) }}</span>
+                </div>
               </div>
               <p class="configure-hint">
                 Choose where it runs, then click each <strong>input</strong> to choose its dataset and files,
@@ -3612,6 +3675,10 @@ onUnmounted(() => {
                 <div v-if="selectedNode.data?.cpuUnits && selectedNode.data?.memoryMiB" class="info-row">
                   <span class="info-label">Ran with</span>
                   <span class="info-value">{{ (selectedNode.data.cpuUnits / 1024).toFixed(1) }} vCPU, {{ selectedNode.data.memoryMiB }} MiB</span>
+                </div>
+                <div v-if="selectedNode.data?.diskGiB" class="info-row">
+                  <span class="info-label">Disk</span>
+                  <span class="info-value">At least {{ selectedNode.data.diskGiB }} GB</span>
                 </div>
                 <div v-if="selectedNode.data?.processorType" class="info-row">
                   <span class="info-label">Type</span>
@@ -5409,6 +5476,42 @@ onUnmounted(() => {
   font-size: 11px;
   color: theme.$gray_4;
   line-height: 1.4;
+}
+
+// The notes under the Disk field's hint, each on its own line.
+span.setup-disk-note {
+  display: block;
+  margin-top: 8px;
+}
+
+// The Lambda note as a warning once a disk is chosen, in the theme's
+// yellows: the icon beside the first line of the text.
+.el-alert.setup-disk-note {
+  display: flex;
+  align-items: flex-start;
+  margin-top: 8px;
+  padding: 6px 8px;
+  background: theme.$yellow_tint;
+  border: 1px solid theme.$yellow_1;
+
+  :deep(.el-alert__icon) {
+    flex: 0 0 auto;
+    width: 14px;
+    height: 14px;
+    font-size: 14px;
+    margin-top: 1px;
+    color: theme.$yellow_2;
+  }
+
+  :deep(.el-alert__content) {
+    padding: 0 0 0 6px;
+  }
+
+  :deep(.el-alert__title) {
+    font-size: 11px;
+    line-height: 1.4;
+    color: theme.$gray_5;
+  }
 }
 
 .run-name-error {
