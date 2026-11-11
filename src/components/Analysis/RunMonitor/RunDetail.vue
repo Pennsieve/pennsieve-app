@@ -5479,17 +5479,38 @@ onUnmounted(() => {
 }
 
 // The notes under the Disk field's hint, each on its own line.
-.setup-disk-note {
+span.setup-disk-note {
   display: block;
   margin-top: 8px;
 }
 
+// The Lambda note as a warning once a disk is chosen, in the theme's
+// yellows: the icon beside the first line of the text.
 .el-alert.setup-disk-note {
+  display: flex;
+  align-items: flex-start;
+  margin-top: 8px;
   padding: 6px 8px;
+  background: theme.$yellow_tint;
+  border: 1px solid theme.$yellow_1;
+
+  :deep(.el-alert__icon) {
+    flex: 0 0 auto;
+    width: 14px;
+    height: 14px;
+    font-size: 14px;
+    margin-top: 1px;
+    color: theme.$yellow_2;
+  }
+
+  :deep(.el-alert__content) {
+    padding: 0 0 0 6px;
+  }
 
   :deep(.el-alert__title) {
     font-size: 11px;
     line-height: 1.4;
+    color: theme.$gray_5;
   }
 }
 
