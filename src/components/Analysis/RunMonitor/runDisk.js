@@ -25,6 +25,21 @@ export function takesRunDisk(node, cfg = {}) {
 export const diskStepIds = (dag, nodeConfigs = {}) =>
   (dag || []).filter((d) => takesRunDisk(d, nodeConfigs[d.id])).map((d) => d.id);
 
+// How many of a run's steps keep their own disk, by why: on Lambda, on a
+// GPU, or a notebook (as configured).
+export function keptDiskSteps(dag, nodeConfigs = {}) {
+  const kept = { lambda: 0, gpu: 0, notebook: 0 };
+  (dag || []).forEach((d) => {
+    if (d.type !== "processor" || takesRunDisk(d, nodeConfigs[d.id])) return;
+    const cfg = nodeConfigs[d.id] || {};
+    const target = cfg.executionTarget || d.computeType || "standard";
+    if (cfg.interactive || d.runtimeConfig?.interactive) kept.notebook += 1;
+    else if (target === "lambda") kept.lambda += 1;
+    else if (target === "gpu") kept.gpu += 1;
+  });
+  return kept;
+}
+
 // What a disk costs an hour, for one step: "under 1¢", "about 3¢", "about $0.22".
 export function diskHourCost(gib) {
   const cents = gib * DISK_GB_HOUR_USD * 100;
@@ -33,14 +48,24 @@ export function diskHourCost(gib) {
   return `about $${(cents / 100).toFixed(2)}`;
 }
 
-// The Disk field's hint: what the disk applies to, and what the chosen
-// size costs.
-export function runDiskHint(gib, stepCount) {
+const plural = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
+
+// The Disk field's hint: what the disk applies to, which steps keep their
+// own and why (only those the run has), and what the chosen size costs.
+export function runDiskHint(gib, stepCount, kept = {}) {
   const steps = stepCount === 1 ? "the step that runs on Fargate" : `each of the ${stepCount} steps that run on Fargate`;
-  const base =
-    `At least this much disk for ${steps}: the compute node plans a step's disk from its inputs and raises it to this. ` +
-    "Over 200 GB a step gets a volume of its own. Steps on Lambda or a GPU and notebooks keep their own disk.";
-  return gib ? `${base} ${diskHourCost(gib)} an hour per step while it runs.` : base;
+  const parts = [
+    `At least this much disk for ${steps}: the compute node plans a step's disk from its inputs and raises it to this. Over 200 GB a step gets a volume of its own.`,
+  ];
+  if (kept.lambda) {
+    parts.push(
+      `${plural(kept.lambda, "step")} on Lambda ${kept.lambda === 1 ? "keeps" : "keep"} Lambda's 10 GB whatever is chosen here: to give ${kept.lambda === 1 ? "it" : "one"} more, run it on Fargate in its step settings.`
+    );
+  }
+  if (kept.gpu) parts.push(`${plural(kept.gpu, "GPU step")} ${kept.gpu === 1 ? "uses its" : "use their"} instance's disk.`);
+  if (kept.notebook) parts.push(`${plural(kept.notebook, "notebook")} ${kept.notebook === 1 ? "has" : "have"} the disk chosen when it starts.`);
+  if (gib) parts.push(`${diskHourCost(gib)} an hour per step while it runs.`);
+  return parts.join(" ");
 }
 
 // The run's disk of a run being run again: the disk all of its batch steps

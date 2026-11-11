@@ -103,7 +103,7 @@ import { fetchVariantGate, runsNonDefaultVariant } from "./variantGate";
 import { appLambdaEligibility, lambdaUnavailableHint, lambdaOverrideWarning, withLambdaChoice } from "../Applications/lambdaEligibility";
 import { stepLambdaFeedback } from "./lambdaFeedback";
 import { gpuReasonNote } from "./notebookHelpers";
-import { RUN_DISK_OPTIONS, diskStepIds, runDiskHint, runDiskOf } from "./runDisk";
+import { RUN_DISK_OPTIONS, diskStepIds, keptDiskSteps, runDiskHint, runDiskOf } from "./runDisk";
 import { nodeGpu, gpuOffer, gpuName, gpuTaskResources } from "../ComputeNodes/computeNodeHelpers";
 import NodeTierBadge from "../ComputeNodes/NodeTierBadge.vue";
 import { useComputeResourcesStore } from "@/stores/computeResourcesStore";
@@ -201,6 +201,8 @@ const nodeConfigs = reactive({});
 // The steps the run's disk (the Disk field of the run setup) applies to:
 // batch steps on Fargate, as configured (runDisk.js).
 const diskSteps = computed(() => diskStepIds(configDefinition.value?.dag || [], nodeConfigs));
+// The steps that keep their own disk (on Lambda, a GPU, a notebook), for the hint.
+const keptDisk = computed(() => keptDiskSteps(configDefinition.value?.dag || [], nodeConfigs));
 const isExecuting = ref(false);
 const errorBanner = ref("");
 const errorBannerNodeId = ref("");
@@ -3515,7 +3517,7 @@ onUnmounted(() => {
                   >
                     <el-option v-for="gib in RUN_DISK_OPTIONS" :key="gib" :label="`${gib} GB`" :value="gib" />
                   </el-select>
-                  <span class="run-name-hint">{{ runDiskHint(initiateForm.diskGiB, diskSteps.length) }}</span>
+                  <span class="run-name-hint">{{ runDiskHint(initiateForm.diskGiB, diskSteps.length, keptDisk) }}</span>
                 </div>
               </div>
               <p class="configure-hint">

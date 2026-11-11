@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { RUN_DISK_OPTIONS, diskHourCost, diskStepIds, runDiskHint, runDiskOf, takesRunDisk } from "./runDisk";
+import { RUN_DISK_OPTIONS, diskHourCost, diskStepIds, keptDiskSteps, runDiskHint, runDiskOf, takesRunDisk } from "./runDisk";
 
 const batch = { id: "b", type: "processor" };
 const notebook = { id: "nb", type: "processor", runtimeConfig: { interactive: true } };
@@ -45,12 +45,32 @@ describe("diskHourCost", () => {
   });
 });
 
+describe("keptDiskSteps", () => {
+  it("counts the steps that keep their own disk, by why", () => {
+    expect(keptDiskSteps(dag)).toEqual({ lambda: 1, gpu: 1, notebook: 1 });
+    expect(keptDiskSteps(dag, { l: { executionTarget: "standard" }, b: { interactive: true } })).toEqual({ lambda: 0, gpu: 1, notebook: 2 });
+    expect(keptDiskSteps([batch])).toEqual({ lambda: 0, gpu: 0, notebook: 0 });
+  });
+});
+
 describe("runDiskHint", () => {
   it("says what the disk applies to, and the cost once chosen", () => {
     expect(runDiskHint("", 1)).toMatch(/^At least this much disk for the step that runs on Fargate:/);
     expect(runDiskHint("", 3)).toContain("each of the 3 steps that run on Fargate");
     expect(runDiskHint("", 3)).not.toContain("an hour");
     expect(runDiskHint(300, 3)).toMatch(/about 3¢ an hour per step while it runs\.$/);
+  });
+  it("says which steps keep their own disk, only when the run has them", () => {
+    expect(runDiskHint("", 2)).not.toMatch(/Lambda|GPU|notebook/);
+    const one = runDiskHint("", 2, { lambda: 1, gpu: 1, notebook: 1 });
+    expect(one).toContain("1 step on Lambda keeps Lambda's 10 GB whatever is chosen here: to give it more, run it on Fargate in its step settings.");
+    expect(one).toContain("1 GPU step uses its instance's disk.");
+    expect(one).toContain("1 notebook has the disk chosen when it starts.");
+    const more = runDiskHint(300, 2, { lambda: 2, gpu: 2, notebook: 2 });
+    expect(more).toContain("2 steps on Lambda keep Lambda's 10 GB whatever is chosen here: to give one more,");
+    expect(more).toContain("2 GPU steps use their instance's disk.");
+    expect(more).toContain("2 notebooks have the disk chosen when it starts.");
+    expect(more).toMatch(/about 3¢ an hour per step while it runs\.$/);
   });
   it("offers sizes from 50 GB to 2 TB", () => {
     expect(RUN_DISK_OPTIONS[0]).toBe(50);
