@@ -683,7 +683,9 @@ const reportOfferLabel = computed(() =>
 const reportOfferTitle = computed(() =>
   reportOffer.value?.kind === "running"
     ? `A sample run of ${reportVersion.value?.version} is on a compute node of yours; open to follow it`
-    : `The platform could not run ${reportVersion.value?.version} on its test inputs. Run it once on a compute node of yours; the release report is made from that run`
+    : reportOffer.value?.kind === "patch_release"
+      ? `${reportVersion.value?.version} is a patch release, so the report of the earlier release in its line stands. Run it once on a compute node of yours to make a report of its own`
+      : `The platform could not run ${reportVersion.value?.version} on its test inputs. Run it once on a compute node of yours; the release report is made from that run`
 );
 const openReportDialog = () => {
   reportDialog.value = { open: true, version: reportVersion.value };

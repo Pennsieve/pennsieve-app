@@ -35,6 +35,7 @@ const REASONS = {
   manifest_missing: "no app.yml",
   build_failed: "the build failed",
   needs_hardware: "needs a GPU, or more memory than the sample runner has",
+  patch_release: "a patch release; the report of the earlier release in its line stands",
   no_bundle: "no test inputs to run on",
   bundle_unavailable: "the test inputs could not be fetched",
   bundle_too_large: "the test inputs are too large",
