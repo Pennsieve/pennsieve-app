@@ -126,7 +126,7 @@ async function handleUpdateProfileSubmit() {
 
 <template>
   <div class="user-profile-container">
-    <h2 class="page-title">Update your user profile</h2>
+    <h2 class="page-title">Update your profile</h2>
 
     <div class="settings-sections">
       <section class="settings-card">
@@ -239,7 +239,6 @@ async function handleUpdateProfileSubmit() {
   color: theme.$purple_3;
 }
 
-// Flex column so the footer sits at the bottom when the grid stretches cards to equal height
 .settings-card {
   display: flex;
   flex-direction: column;
