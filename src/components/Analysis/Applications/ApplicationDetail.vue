@@ -796,6 +796,16 @@ watch(
             <bf-button :class="['compact', 'flex', { secondary: canRelease }]" @click="tryApp">Try this app</bf-button>
           </span>
         </el-tooltip>
+        <el-tooltip
+          v-if="canRelease"
+          :disabled="!nothingToRelease"
+          :content="`Nothing new since ${releaseStatus?.latestTag}: the ${releaseStatus?.target} branch is at that release.`"
+          placement="bottom"
+        >
+          <span>
+            <bf-button class="compact flex" :disabled="nothingToRelease" @click="releaseOpen = true">Release a version</bf-button>
+          </span>
+        </el-tooltip>
         <!-- The owner's less frequent actions, in a menu: the header keeps
              to Try this app and Release a version -->
         <el-dropdown v-if="isAppOwner" trigger="click" placement="bottom-end" @command="onHeaderMenu">
@@ -811,16 +821,6 @@ watch(
             </el-dropdown-menu>
           </template>
         </el-dropdown>
-        <el-tooltip
-          v-if="canRelease"
-          :disabled="!nothingToRelease"
-          :content="`Nothing new since ${releaseStatus?.latestTag}: the ${releaseStatus?.target} branch is at that release.`"
-          placement="bottom"
-        >
-          <span>
-            <bf-button class="compact flex" :disabled="nothingToRelease" @click="releaseOpen = true">Release a version</bf-button>
-          </span>
-        </el-tooltip>
       </div>
     </Teleport>
 
