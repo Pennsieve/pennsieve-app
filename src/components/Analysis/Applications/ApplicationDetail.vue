@@ -660,10 +660,20 @@ const versionStages = (version) => releaseStages(version, assetsUrl.value);
 // "Generate release report": the owner runs the sample on a compute node of
 // theirs when the platform's runner could not (releaseReportRun.js).
 const reportDialog = ref({ open: false, version: null });
-const reportOffer = (version) => (isAppOwner.value ? nodeRunOffer(version) : null);
-const reportOfferLabel = (offer) => (offer?.kind === "running" ? "Sample run on your node…" : offer?.kind === "retry" ? "Run the sample again" : "Generate release report");
-const openReportDialog = (version) => {
-  reportDialog.value = { open: true, version };
+// Offered for the newest version only, in the header: the page shows that
+// version's report, and the pipeline makes one per version.
+const reportVersion = computed(() => sortedVersions.value?.[0] || null);
+const reportOffer = computed(() => (isAppOwner.value ? nodeRunOffer(reportVersion.value) : null));
+const reportOfferLabel = computed(() =>
+  reportOffer.value?.kind === "running" ? "Sample run on your node…" : reportOffer.value?.kind === "retry" ? "Run the sample again" : "Generate release report"
+);
+const reportOfferTitle = computed(() =>
+  reportOffer.value?.kind === "running"
+    ? `A sample run of ${reportVersion.value?.version} is on a compute node of yours; open to follow it`
+    : `The platform could not run ${reportVersion.value?.version} on its test inputs. Run it once on a compute node of yours; the release report is made from that run`
+);
+const openReportDialog = () => {
+  reportDialog.value = { open: true, version: reportVersion.value };
 };
 const onReportRunChanged = () => loadDetail(props.uuid, { quiet: true });
 
@@ -759,7 +769,7 @@ watch(
     <!-- The page's actions, on the right of its title row like every
          Analysis page's (the title is the app's repository: Analysis.vue,
          MyWorkSpacePage.vue). Publishing a release is the main one. -->
-    <Teleport v-if="detail && (canRelease || isAppOwner || tryVersion || appSample)" defer to="#page-title-actions">
+    <Teleport v-if="detail && (canRelease || isAppOwner || tryVersion || appSample || reportOffer)" defer to="#page-title-actions">
       <div class="header-actions">
         <!-- "3 new commits since v1.3.6": a release is due. -->
         <span v-if="canRelease && nudge" class="release-nudge">{{ nudge }}</span>
@@ -779,6 +789,11 @@ watch(
         >
           <span>
             <bf-button :class="['compact', 'flex', { secondary: canRelease }]" @click="tryApp">Try this app</bf-button>
+          </span>
+        </el-tooltip>
+        <el-tooltip v-if="reportOffer" :content="reportOfferTitle" placement="bottom">
+          <span>
+            <bf-button class="compact flex secondary" @click="openReportDialog">{{ reportOfferLabel }}</bf-button>
           </span>
         </el-tooltip>
         <bf-button v-if="isAppOwner" class="compact flex secondary" @click="shareOpen = true">Share</bf-button>
@@ -1487,17 +1502,6 @@ watch(
                   <a v-if="s.href" :href="s.href" target="_blank" rel="noopener" class="status-badge status-badge-sm" :class="`badge-${s.tone}`">{{ s.text }} ↗</a>
                   <span v-else class="status-badge status-badge-sm" :class="`badge-${s.tone}`">{{ s.text }}</span>
                 </span>
-                <!-- The owner's way round a sample run the platform could
-                     not do: run it on a compute node of theirs -->
-                <button
-                  v-if="reportOffer(version)"
-                  type="button"
-                  class="version-stage-action"
-                  :title="reportOffer(version).kind === 'running' ? 'A sample run of this version is on a compute node of yours; open to follow it' : 'Run this version once on a compute node of yours; the release report is made from that run'"
-                  @click="openReportDialog(version)"
-                >
-                  {{ reportOfferLabel(reportOffer(version)) }}
-                </button>
               </div>
               <!-- Each variant's build; the version's status is the default's -->
               <div v-if="versionVariants(liveDetail, version.version).length" class="version-variants">
@@ -2611,22 +2615,6 @@ p.access-ask {
   flex-wrap: wrap;
   gap: 4px 12px;
   margin: -2px 0 8px;
-}
-.version-stage-action {
-  display: inline-flex;
-  align-items: center;
-  padding: 1px 8px;
-  border: 1px solid theme.$purple_1;
-  border-radius: 3px;
-  background: theme.$white;
-  font: inherit;
-  font-size: 11px;
-  font-weight: 600;
-  color: theme.$purple_2;
-  cursor: pointer;
-  &:hover {
-    background: theme.$gray_0;
-  }
 }
 .version-stage {
   display: inline-flex;
