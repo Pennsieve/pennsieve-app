@@ -2625,7 +2625,7 @@ p.access-ask {
   color: theme.$purple_2;
   cursor: pointer;
   &:hover {
-    background: theme.$purple_0;
+    background: theme.$gray_0;
   }
 }
 .version-stage {
