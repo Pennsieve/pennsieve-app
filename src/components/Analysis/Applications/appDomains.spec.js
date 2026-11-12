@@ -19,8 +19,12 @@ describe("banner types", () => {
 describe("app domains", () => {
   it("matches a tag however it's spelled", () => {
     expect(domainOfTag("EEG").key).toBe("ephys");
-    expect(domainOfTag("Spike Sorting").key).toBe("spikes");
-    expect(domainOfTag("spike_sorting").key).toBe("spikes");
+    expect(domainOfTag("Spike Sorting").key).toBe("ephys");
+    expect(domainOfTag("spike_sorting").key).toBe("ephys");
+    expect(domainOfTag("HRV").key).toBe("ephys");
+    expect(domainOfTag("Pose Estimation").key).toBe("behavior");
+    expect(domainOfTag("OMOP").key).toBe("clinical-data");
+    expect(domainOfTag("clinical")).toBeNull();
     expect(domainOfTag("Machine-Learning").key).toBe("ml");
     expect(domainOfTag("my-lab")).toBeNull();
     expect(domainOfTag("Pre-processing").key).toBe("preprocessing");
@@ -37,6 +41,8 @@ describe("app domains", () => {
     expect(domainOf({ tags: ["statistics", "eeg"] }).key).toBe("ephys");
     expect(domainOf({ tags: ["statistics", "visualization"] }).key).toBe("stats");
     expect(domainOf({ tags: ["Format Conversion"] }).key).toBe("convert");
+    // A behaviour app is Behavior, not the machine learning it uses.
+    expect(domainOf({ tags: ["neuroscience", "behavior", "deep-learning"] }).key).toBe("behavior");
     expect(domainOf({ tags: [], runtime: { interactive: true } }).key).toBe("notebook");
     expect(domainOf({ tags: [], runtime: { interactive: true, sessionType: "jupyter", kernel: "r" } }).key).toBe("notebook");
     // Another kind of live session isn't a notebook.
@@ -113,7 +119,14 @@ describe("research fields", () => {
 
   it("matches a tag however it's spelled, apart from domains", () => {
     expect(fieldOfTag("Neuroscience").key).toBe("neuroscience");
-    expect(fieldOfTag("epilepsy").key).toBe("neuroscience");
+    expect(fieldOfTag("epilepsy").key).toBe("neurology");
+    expect(fieldOfTag("Neurology").key).toBe("neurology");
+    expect(fieldOfTag("stroke").key).toBe("neurology");
+    expect(fieldOfTag("HRV").key).toBe("physiology");
+    expect(fieldOfTag("vagus-nerve-stimulation").key).toBe("physiology");
+    expect(fieldOfTag("electrophysiology")).toBeNull();
+    expect(fieldOfTag("OMOP").key).toBe("public-health");
+    expect(canonicalTag("Public Health")).toBe("public-health");
     expect(fieldOfTag("Immuno-Oncology").key).toBe("immunology");
     expect(fieldOfTag("tumour").key).toBe("oncology");
     expect(fieldOfTag("cardiac").key).toBe("cardiology");
@@ -154,25 +167,28 @@ describe("research fields", () => {
     const chips = fieldCounts([
       cytometryApp,
       mriApp,
-      withManifest({ tags: ["epilepsy", "eeg", "cardiac"] }, "c"),
+      withManifest({ tags: ["epilepsy", "neuroimaging", "cardiac"] }, "c"),
       withManifest({ tags: ["penn"] }, "d"),
     ]);
-    expect(chips.map((c) => [c.field.key, c.count])).toEqual([["neuroscience", 2], ["cardiology", 1], ["immunology", 1]]);
+    expect(chips.map((c) => [c.field.key, c.count])).toEqual([["neuroscience", 2], ["cardiology", 1], ["immunology", 1], ["neurology", 1]]);
   });
 
   it("suggests field tags as their own group, found by alias", () => {
     const { fields } = preferredTagGroups();
     expect(fields.map((o) => o.tag)).toEqual(FIELDS.map((f) => f.tag));
     const neuro = fields.find((o) => o.tag === "neuroscience");
-    expect(tagOptionMatches(neuro, "epilep", { preferred: true })).toBe(true);
+    const neurology = fields.find((o) => o.tag === "neurology");
+    expect(tagOptionMatches(neurology, "epilep", { preferred: true })).toBe(true);
+    expect(tagOptionMatches(neuro, "epilep", { preferred: true })).toBe(false);
     expect(tagOptionMatches(neuro, "cancer", { preferred: true })).toBe(false);
     expect(canonicalTag("Clinical Research")).toBe("clinical-research");
     expect(canonicalTag("Immunology")).toBe("immunology");
   });
 
   it("nudges a domain's tag before a field's", () => {
-    expect(tagDomainNudge(["epilepsy", "eeg"])).toMatchObject({ tag: "electrophysiology", label: "Electrophysiology" });
-    expect(tagDomainNudge(["epilepsy", "eeg", "electrophysiology"])).toMatchObject({ tag: "neuroscience", label: "Neuroscience" });
+    expect(tagDomainNudge(["epilepsy", "eeg"])).toMatchObject({ tag: "electrophysiology", label: "Electrophysiology & biosignals" });
+    expect(tagDomainNudge(["epilepsy", "eeg", "electrophysiology"])).toMatchObject({ tag: "neurology", label: "Neurology" });
+    expect(tagDomainNudge(["cognitive-neuroscience", "eeg", "electrophysiology"])).toMatchObject({ tag: "neuroscience", label: "Neuroscience" });
     expect(tagDomainNudge(["imaging", "neuroimaging", "neuroscience"])).toBeNull();
   });
 });
@@ -188,11 +204,12 @@ describe("preferred tags", () => {
   });
   it("matches a preferred tag by its aliases and label", () => {
     const { preferred } = preferredTagGroups();
-    const spikes = preferred.find((o) => o.tag === "spike-sorting");
-    expect(tagOptionMatches(spikes, "spike", { preferred: true })).toBe(true);
-    expect(tagOptionMatches(spikes, "kilosort", { preferred: true })).toBe(true);
-    expect(tagOptionMatches(spikes, "kilosort")).toBe(false);
-    expect(tagOptionMatches(spikes, "")).toBe(true);
+    const ephys = preferred.find((o) => o.tag === "electrophysiology");
+    expect(tagOptionMatches(ephys, "spike", { preferred: true })).toBe(true);
+    expect(tagOptionMatches(ephys, "kilosort", { preferred: true })).toBe(true);
+    expect(tagOptionMatches(ephys, "kilosort")).toBe(false);
+    expect(tagOptionMatches(ephys, "biosig")).toBe(true);
+    expect(tagOptionMatches(ephys, "")).toBe(true);
   });
   it("suggests the preferred tag for an alias's domain, once", () => {
     expect(tagDomainNudge(["eeg"])).toMatchObject({ tag: "electrophysiology" });

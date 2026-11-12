@@ -71,7 +71,7 @@
     {
       "key": "ephys",
       "subject": true,
-      "label": "Electrophysiology",
+      "label": "Electrophysiology & biosignals",
       "tag": "electrophysiology",
       "hue": 245,
       "aliases": [
@@ -89,24 +89,23 @@
         "edf",
         "signal-processing",
         "time-series",
-        "timeseries"
-      ],
-      "icon": "M2 12h4l2-6 4 12 3-9 2 3h5"
-    },
-    {
-      "key": "spikes",
-      "subject": true,
-      "label": "Spike sorting",
-      "tag": "spike-sorting",
-      "hue": 340,
-      "aliases": [
+        "timeseries",
+        "spike-sorting",
         "spikes",
         "spike",
         "spike-detection",
         "single-unit",
-        "kilosort"
+        "kilosort",
+        "biosignals",
+        "biosignal",
+        "physiological-signals",
+        "hrv",
+        "heart-rate-variability",
+        "respiration",
+        "blood-pressure",
+        "ppg"
       ],
-      "icon": "M3 18h18M6 18V8M10 18v-6M14 18V4M18 18v-8"
+      "icon": "M2 12h4l2-6 4 12 3-9 2 3h5"
     },
     {
       "key": "imaging",
@@ -173,6 +172,51 @@
         "immunophenotyping"
       ],
       "icon": "M4 9a4 4 0 1 0 8 0a4 4 0 1 0-8 0M8 9h.01M13 16a3 3 0 1 0 6 0a3 3 0 1 0-6 0M16 16h.01M4 18a2 2 0 1 0 4 0a2 2 0 1 0-4 0M18 5h.01"
+    },
+    {
+      "key": "behavior",
+      "subject": true,
+      "label": "Behavior",
+      "tag": "behavior",
+      "hue": 30,
+      "aliases": [
+        "behaviour",
+        "behavioral",
+        "behavioural",
+        "pose-estimation",
+        "pose",
+        "video",
+        "kinematics",
+        "deeplabcut",
+        "sleap",
+        "motion-capture",
+        "gait",
+        "actigraphy",
+        "ethology",
+        "behavioral-syllables"
+      ],
+      "icon": "M12 2.5a1.5 1.5 0 1 0 0 3a1.5 1.5 0 1 0 0-3M12 7l-1 6M11 13l-3 8M11 13l4 3v5M8 10l3-3 3 2 3 1"
+    },
+    {
+      "key": "clinical-data",
+      "subject": true,
+      "label": "Clinical data",
+      "tag": "clinical-data",
+      "hue": 0,
+      "aliases": [
+        "ehr",
+        "electronic-health-records",
+        "omop",
+        "fhir",
+        "redcap",
+        "phenotypes",
+        "phenotyping",
+        "questionnaires",
+        "case-report-forms",
+        "patient-records",
+        "tabular-clinical"
+      ],
+      "icon": "M9 3h6v3H9zM7 4.5H5V21h14V4.5h-2M8.5 11h7M8.5 14.5h7M8.5 18h4"
     },
     {
       "key": "ml",
@@ -313,11 +357,56 @@
       "aliases": [
         "neuro",
         "neuroimaging",
-        "neurology",
         "brain",
-        "epilepsy",
         "neurophysiology",
         "cognitive-neuroscience"
+      ]
+    },
+    {
+      "key": "neurology",
+      "label": "Neurology",
+      "tag": "neurology",
+      "aliases": [
+        "clinical-neurology",
+        "epilepsy",
+        "seizure",
+        "seizures",
+        "stroke",
+        "dementia",
+        "alzheimer",
+        "alzheimers",
+        "parkinson",
+        "parkinsons",
+        "multiple-sclerosis",
+        "neurodegeneration",
+        "neurocritical-care",
+        "headache",
+        "migraine",
+        "sleep-medicine"
+      ]
+    },
+    {
+      "key": "physiology",
+      "label": "Physiology",
+      "tag": "physiology",
+      "aliases": [
+        "systems-physiology",
+        "organ-physiology",
+        "autonomic",
+        "autonomic-function",
+        "hrv",
+        "heart-rate-variability",
+        "respiration",
+        "respiratory",
+        "blood-pressure",
+        "baroreflex",
+        "gi-motility",
+        "gastrointestinal",
+        "neuromodulation",
+        "vagus",
+        "vagus-nerve-stimulation",
+        "peripheral-nervous-system",
+        "sparc"
       ]
     },
     {
@@ -360,6 +449,21 @@
         "clinical",
         "clinical-trial",
         "clinical-trials"
+      ]
+    },
+    {
+      "key": "public-health",
+      "label": "Public health",
+      "tag": "public-health",
+      "aliases": [
+        "epidemiology",
+        "population-health",
+        "ehr",
+        "electronic-health-records",
+        "omop",
+        "real-world-data",
+        "real-world-evidence",
+        "health-services-research"
       ]
     }
   ]
