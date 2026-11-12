@@ -313,11 +313,32 @@
       "aliases": [
         "neuro",
         "neuroimaging",
-        "neurology",
         "brain",
-        "epilepsy",
         "neurophysiology",
         "cognitive-neuroscience"
+      ]
+    },
+    {
+      "key": "neurology",
+      "label": "Neurology",
+      "tag": "neurology",
+      "aliases": [
+        "clinical-neurology",
+        "epilepsy",
+        "seizure",
+        "seizures",
+        "stroke",
+        "dementia",
+        "alzheimer",
+        "alzheimers",
+        "parkinson",
+        "parkinsons",
+        "multiple-sclerosis",
+        "neurodegeneration",
+        "neurocritical-care",
+        "headache",
+        "migraine",
+        "sleep-medicine"
       ]
     },
     {
