@@ -98,6 +98,22 @@ export function appNeedsGpu(app) {
   return types.includes("gpu") || variantsOf(app).some((v) => v.gpu);
 }
 
+// Two workflow lists as one, each workflow once (by uuid): the workspace's
+// own and the public catalog overlap when the workspace published some.
+export function mergeWorkflows(...lists) {
+  const seen = new Set();
+  const out = [];
+  for (const wf of lists.flatMap((l) => l || [])) {
+    if (!wf) continue;
+    if (wf.uuid) {
+      if (seen.has(wf.uuid)) continue;
+      seen.add(wf.uuid);
+    }
+    out.push(wf);
+  }
+  return out;
+}
+
 // How many of the given workflows run the app.
 export function workflowUses(app, workflows = []) {
   const url = normalizeUrl(app?.sourceUrl);
