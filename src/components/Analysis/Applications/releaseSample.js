@@ -61,7 +61,8 @@ export function releaseStages(version, assetsUrl = "") {
     const rec = version[s.key];
     const status = String(rec.status).toLowerCase();
     const why = stageReason(rec);
-    const title = [s.what, why && `${text(status)}: ${why}`].filter(Boolean).join(". ");
+    const where = s.key === "sampleRun" && rec.source === "node" ? "on a compute node of the owner's" : "";
+    const title = [s.what, where, why && `${text(status)}: ${why}`].filter(Boolean).join(". ");
     const href = s.key === "sample" && status === "ready" ? publicUrl(assetsUrl, rec.public?.document) : "";
     return { key: s.key, label: s.label, status, text: text(status), tone: TONES[status] || "gray", title, ...(href && { href }) };
   });
@@ -113,4 +114,31 @@ export function pipelineBusy(version, now = Date.now(), window = 2 * 60 * 60 * 1
   if (st("fixtures") === "ready" && !st("sampleRun")) return true;
   if (st("sampleRun") === "ready" && !st("sample")) return true;
   return false;
+}
+
+/*
+  The version's release report in one quiet line: { text, tone, href? }, or
+  null for a version from before the pipeline. The outcome, not the stages:
+  a link when the report is ready; what is under way; why there is none.
+*/
+export function releaseReportLine(version, assetsUrl = "") {
+  if (!version) return null;
+  const rec = (key) => version[key] || null;
+  const status = (key) => String(rec(key)?.status || "").toLowerCase();
+  if (!status("fixtures") && !status("sampleRun") && !status("sample")) return null;
+  const href = status("sample") === "ready" ? publicUrl(assetsUrl, rec("sample").public?.document) : "";
+  if (status("sample") === "ready") return { text: "Release report", tone: "link", href };
+  const failed = ["fixtures", "sampleRun", "sample"].find((k) => status(k) === "failed");
+  if (failed) return { text: `Release report: failed — ${stageReason(rec(failed)) || "see the log"}`, tone: "warn" };
+  const skipped = ["fixtures", "sampleRun"].find((k) => status(k) === "skipped");
+  if (skipped) return { text: `Release report: not made — ${stageReason(rec(skipped)) || "skipped"}`, tone: "muted" };
+  if (["queued", "running"].includes(status("sample"))) return { text: "Release report: writing…", tone: "muted" };
+  if (status("sampleRun") === "running") {
+    const where = rec("sampleRun").source === "node" ? " on a compute node of the owner's" : "";
+    return { text: `Release report: running the sample${where}…`, tone: "muted" };
+  }
+  if (status("sampleRun") === "ready") return { text: "Release report: writing…", tone: "muted" };
+  if (status("fixtures") === "building") return { text: "Release report: building the test inputs…", tone: "muted" };
+  if (status("fixtures") === "ready") return { text: "Release report: running the sample…", tone: "muted" };
+  return { text: "Release report: in progress…", tone: "muted" };
 }

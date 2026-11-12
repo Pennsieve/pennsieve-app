@@ -12,11 +12,14 @@ import { parseManifest, MANIFEST_SHAPES, PARAM_TYPE_OPTIONS, conformsToList } fr
 import BfButton from "../../shared/bf-button/BfButton.vue";
 import { fetchRepository, canUpdateManifest } from "./githubRepository";
 import ReleaseDialog from "./ReleaseDialog.vue";
+import ReleaseReportDialog from "./ReleaseReportDialog.vue";
+import SampleOutputViewer from "../Workflows/SampleOutputViewer.vue";
+import { nodeRunOffer } from "./releaseReportRun";
 import AppReferences from "./AppReferences.vue";
 import AppSampleOutputs from "./AppSampleOutputs.vue";
 import AppSampleCard from "./AppSampleCard.vue";
 import { useAppSample } from "./useAppSample";
-import { releaseSample, releaseStages } from "./releaseSample";
+import { releaseReportLine, releaseSample } from "./releaseSample";
 import IconPDF from "../../icons/IconPDF.vue";
 import { useAppSampleOutputs } from "./useAppSampleOutputs";
 import { tryableVersion } from "../RunMonitor/appRuns";
@@ -653,7 +656,43 @@ watch(
     if (ids && !detailLoading.value) loadDetail(props.uuid, { quiet: true });
   }
 );
-const versionStages = (version) => releaseStages(version, assetsUrl.value);
+const versionReport = (version) => releaseReportLine(version, assetsUrl.value);
+// A version's report opens in the page's viewer, as the newest one does.
+const versionViewer = ref({ open: false, source: null, subtitle: "" });
+const openVersionReport = (version) => {
+  const url = versionReport(version)?.href;
+  if (!url) return;
+  const pages = version.sample?.pages;
+  versionViewer.value = {
+    open: true,
+    source: async () => url,
+    subtitle: [version.version && `${version.version} run on its test inputs`, pages && `${pages} pages`].filter(Boolean).join(" · "),
+  };
+};
+
+// "Generate release report": the owner runs the sample on a compute node of
+// theirs when the platform's runner could not (releaseReportRun.js).
+const reportDialog = ref({ open: false, version: null });
+// Offered for the newest version only, in the header: the page shows that
+// version's report, and the pipeline makes one per version.
+const reportVersion = computed(() => sortedVersions.value?.[0] || null);
+const reportOffer = computed(() => (isAppOwner.value ? nodeRunOffer(reportVersion.value) : null));
+const reportOfferLabel = computed(() =>
+  reportOffer.value?.kind === "running" ? "Sample run on your node…" : reportOffer.value?.kind === "retry" ? "Run the sample again" : "Generate release report"
+);
+const reportOfferTitle = computed(() =>
+  reportOffer.value?.kind === "running"
+    ? `A sample run of ${reportVersion.value?.version} is on a compute node of yours; open to follow it`
+    : `The platform could not run ${reportVersion.value?.version} on its test inputs. Run it once on a compute node of yours; the release report is made from that run`
+);
+const openReportDialog = () => {
+  reportDialog.value = { open: true, version: reportVersion.value };
+};
+const onHeaderMenu = (command) => {
+  if (command === "share") shareOpen.value = true;
+  else if (command === "report") openReportDialog();
+};
+const onReportRunChanged = () => loadDetail(props.uuid, { quiet: true });
 
 // The Workflow samples tab: only when a workflow the app is in has a sample
 // output (loaded in the background).
@@ -747,7 +786,7 @@ watch(
     <!-- The page's actions, on the right of its title row like every
          Analysis page's (the title is the app's repository: Analysis.vue,
          MyWorkSpacePage.vue). Publishing a release is the main one. -->
-    <Teleport v-if="detail && (canRelease || isAppOwner || tryVersion || appSample)" defer to="#page-title-actions">
+    <Teleport v-if="detail && (canRelease || isAppOwner || tryVersion || appSample || reportOffer)" defer to="#page-title-actions">
       <div class="header-actions">
         <!-- "3 new commits since v1.3.6": a release is due. -->
         <span v-if="canRelease && nudge" class="release-nudge">{{ nudge }}</span>
@@ -769,7 +808,6 @@ watch(
             <bf-button :class="['compact', 'flex', { secondary: canRelease }]" @click="tryApp">Try this app</bf-button>
           </span>
         </el-tooltip>
-        <bf-button v-if="isAppOwner" class="compact flex secondary" @click="shareOpen = true">Share</bf-button>
         <el-tooltip
           v-if="canRelease"
           :disabled="!nothingToRelease"
@@ -780,6 +818,23 @@ watch(
             <bf-button class="compact flex" :disabled="nothingToRelease" @click="releaseOpen = true">Release a version</bf-button>
           </span>
         </el-tooltip>
+        <!-- The owner's less frequent actions, in a menu: the header keeps
+             to Try this app and Release a version -->
+        <el-dropdown v-if="isAppOwner" trigger="click" placement="bottom-end" @command="onHeaderMenu">
+          <bf-button class="compact flex secondary header-menu" aria-label="More app actions">
+            <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
+              <path d="M2 4h12M2 8h12M2 12h12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+            </svg>
+          </bf-button>
+          <template #dropdown>
+            <el-dropdown-menu>
+              <el-dropdown-item command="share">Share…</el-dropdown-item>
+              <el-dropdown-item v-if="reportOffer" command="report">
+                <span :title="reportOfferTitle">{{ reportOfferLabel }}</span>
+              </el-dropdown-item>
+            </el-dropdown-menu>
+          </template>
+        </el-dropdown>
       </div>
     </Teleport>
 
@@ -1467,14 +1522,14 @@ watch(
               <div class="version-meta">
                 <span>Released {{ formatDate(version.createdAt) }}</span>
               </div>
-              <!-- The release pipeline after the build: test inputs, a
-                   sample run, the sample document (releaseSample.js) -->
-              <div v-if="versionStages(version).length" class="version-stages">
-                <span v-for="s in versionStages(version)" :key="s.key" class="version-stage" :title="s.title">
-                  <span class="version-stage-name">{{ s.label }}</span>
-                  <a v-if="s.href" :href="s.href" target="_blank" rel="noopener" class="status-badge status-badge-sm" :class="`badge-${s.tone}`">{{ s.text }} ↗</a>
-                  <span v-else class="status-badge status-badge-sm" :class="`badge-${s.tone}`">{{ s.text }}</span>
-                </span>
+              <!-- The release report, in a line: a link when it exists,
+                   else what is under way or why there is none
+                   (releaseSample.js) -->
+              <div v-if="versionReport(version)" class="version-report" :class="`is-${versionReport(version).tone}`">
+                <button v-if="versionReport(version).href" type="button" class="version-report-link" @click="openVersionReport(version)">
+                  <IconPDF :width="12" :height="12" color="currentColor" /> {{ versionReport(version).text }}
+                </button>
+                <span v-else>{{ versionReport(version).text }}</span>
               </div>
               <!-- Each variant's build; the version's status is the default's -->
               <div v-if="versionVariants(liveDetail, version.version).length" class="version-variants">
@@ -1552,6 +1607,20 @@ watch(
       :entries="accessList"
       @saved="reloadAfterPermissions"
     />
+    <SampleOutputViewer
+      v-model="versionViewer.open"
+      :source="versionViewer.source"
+      :workflow-name="detail?.name || ''"
+      :subtitle="versionViewer.subtitle"
+      kind="release report"
+    />
+    <ReleaseReportDialog
+      v-model="reportDialog.open"
+      :app="detail ? { uuid: detail.uuid, name: detail.name } : null"
+      :version="reportDialog.version"
+      @started="onReportRunChanged"
+      @registered="onReportRunChanged"
+    />
     <ReleaseDialog
       v-if="canRelease"
       v-model="releaseOpen"
@@ -1581,10 +1650,24 @@ watch(
 // component's scoped styles.
 .header-actions {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
+  justify-content: flex-end;
   gap: 10px;
 }
 
+/* The menu button: a square, as tall as the buttons beside it (the Apps
+   page's menu button, AppsOverview). */
+.bf-button.bf-button.secondary.header-menu {
+  aspect-ratio: 1;
+  width: auto;
+  padding: 0;
+  justify-content: center;
+
+  svg {
+    display: block;
+  }
+}
 .header-sample-btn {
   display: inline-flex;
   align-items: center;
@@ -2576,22 +2659,28 @@ p.access-ask {
   gap: 4px;
   margin-bottom: 4px;
 }
-.version-stages {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px 12px;
+.version-report {
   margin: -2px 0 8px;
-}
-.version-stage {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  font-size: 11px;
+  font-size: 12px;
   color: theme.$gray_5;
 
-  a.status-badge {
-    text-decoration: none;
+  .version-report-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 0;
+    border: none;
+    background: none;
+    font: inherit;
+    font-weight: 600;
+    color: theme.$purple_2;
     cursor: pointer;
+    &:hover {
+      text-decoration: underline;
+    }
+  }
+  &.is-warn {
+    color: theme.$red_2;
   }
 }
 .version-variant {
