@@ -20,6 +20,7 @@ import AppSampleCard from "./AppSampleCard.vue";
 import { useAppSample } from "./useAppSample";
 import { releaseSample, releaseStages } from "./releaseSample";
 import IconPDF from "../../icons/IconPDF.vue";
+import { MoreFilled } from "@element-plus/icons-vue";
 import { useAppSampleOutputs } from "./useAppSampleOutputs";
 import { tryableVersion } from "../RunMonitor/appRuns";
 import ShareAppDialog from "./ShareAppDialog.vue";
@@ -675,6 +676,10 @@ const reportOfferTitle = computed(() =>
 const openReportDialog = () => {
   reportDialog.value = { open: true, version: reportVersion.value };
 };
+const onHeaderMenu = (command) => {
+  if (command === "share") shareOpen.value = true;
+  else if (command === "report") openReportDialog();
+};
 const onReportRunChanged = () => loadDetail(props.uuid, { quiet: true });
 
 // The Workflow samples tab: only when a workflow the app is in has a sample
@@ -791,12 +796,21 @@ watch(
             <bf-button :class="['compact', 'flex', { secondary: canRelease }]" @click="tryApp">Try this app</bf-button>
           </span>
         </el-tooltip>
-        <el-tooltip v-if="reportOffer" :content="reportOfferTitle" placement="bottom">
-          <span>
-            <bf-button class="compact flex secondary" @click="openReportDialog">{{ reportOfferLabel }}</bf-button>
-          </span>
-        </el-tooltip>
-        <bf-button v-if="isAppOwner" class="compact flex secondary" @click="shareOpen = true">Share</bf-button>
+        <!-- The owner's less frequent actions, in a menu: the header keeps
+             to Try this app and Release a version -->
+        <el-dropdown v-if="isAppOwner" trigger="click" placement="bottom-end" @command="onHeaderMenu">
+          <button type="button" class="header-more-btn" aria-label="More: share, release report" title="More">
+            <el-icon><MoreFilled /></el-icon>
+          </button>
+          <template #dropdown>
+            <el-dropdown-menu>
+              <el-dropdown-item command="share">Share…</el-dropdown-item>
+              <el-dropdown-item v-if="reportOffer" command="report">
+                <span :title="reportOfferTitle">{{ reportOfferLabel }}</span>
+              </el-dropdown-item>
+            </el-dropdown-menu>
+          </template>
+        </el-dropdown>
         <el-tooltip
           v-if="canRelease"
           :disabled="!nothingToRelease"
@@ -1619,6 +1633,22 @@ watch(
   gap: 10px;
 }
 
+.header-more-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 32px;
+  padding: 0 8px;
+  border: 1px solid theme.$gray_3;
+  border-radius: 4px;
+  background: theme.$white;
+  color: theme.$gray_6;
+  cursor: pointer;
+  &:hover {
+    border-color: theme.$purple_1;
+    color: theme.$purple_2;
+  }
+}
 .header-sample-btn {
   display: inline-flex;
   align-items: center;
