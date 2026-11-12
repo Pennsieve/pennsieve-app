@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { nodeDurationSec, formatRunTime, formatResources } from "./nodeFacts";
+import { nodeDurationSec, formatRunTime, formatResources, stepExecutionTarget } from "./nodeFacts";
 
 describe("nodeDurationSec", () => {
   const startedAt = "2026-10-23T19:35:05Z";
@@ -30,5 +30,20 @@ describe("formatResources", () => {
     expect(formatResources("1024", "2048")).toBe("1 vCPU · 2 GB");
     expect(formatResources(512, 512)).toBe("0.5 vCPU · 512 MB");
     expect(formatResources("", "")).toBe("");
+  });
+});
+
+describe("stepExecutionTarget", () => {
+  const gpuStep = { id: "sort", runtimeConfig: { computeTypes: ["gpu"] } };
+  it("takes the run config's target first", () => {
+    expect(stepExecutionTarget(gpuStep, [{ nodeId: "sort", executionTarget: "standard" }])).toBe("standard");
+  });
+  it("falls back to the step's first stamped compute type", () => {
+    expect(stepExecutionTarget(gpuStep, [])).toBe("gpu");
+    expect(stepExecutionTarget(gpuStep, [{ nodeId: "other", executionTarget: "lambda" }])).toBe("gpu");
+    expect(stepExecutionTarget(gpuStep, undefined)).toBe("gpu");
+  });
+  it("is null when nothing says", () => {
+    expect(stepExecutionTarget({ id: "prep" }, [])).toBeNull();
   });
 });
