@@ -20,7 +20,6 @@ import AppSampleCard from "./AppSampleCard.vue";
 import { useAppSample } from "./useAppSample";
 import { releaseSample, releaseStages } from "./releaseSample";
 import IconPDF from "../../icons/IconPDF.vue";
-import { MoreFilled } from "@element-plus/icons-vue";
 import { useAppSampleOutputs } from "./useAppSampleOutputs";
 import { tryableVersion } from "../RunMonitor/appRuns";
 import ShareAppDialog from "./ShareAppDialog.vue";
@@ -809,9 +808,11 @@ watch(
         <!-- The owner's less frequent actions, in a menu: the header keeps
              to Try this app and Release a version -->
         <el-dropdown v-if="isAppOwner" trigger="click" placement="bottom-end" @command="onHeaderMenu">
-          <button type="button" class="header-more-btn" aria-label="More: share, release report" title="More">
-            <el-icon><MoreFilled /></el-icon>
-          </button>
+          <bf-button class="compact flex secondary header-menu" aria-label="More app actions">
+            <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
+              <path d="M2 4h12M2 8h12M2 12h12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+            </svg>
+          </bf-button>
           <template #dropdown>
             <el-dropdown-menu>
               <el-dropdown-item command="share">Share…</el-dropdown-item>
@@ -1629,24 +1630,22 @@ watch(
 // component's scoped styles.
 .header-actions {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
+  justify-content: flex-end;
   gap: 10px;
 }
 
-.header-more-btn {
-  display: inline-flex;
-  align-items: center;
+/* The menu button: a square, as tall as the buttons beside it (the Apps
+   page's menu button, AppsOverview). */
+.bf-button.bf-button.secondary.header-menu {
+  aspect-ratio: 1;
+  width: auto;
+  padding: 0;
   justify-content: center;
-  height: 32px;
-  padding: 0 8px;
-  border: 1px solid theme.$gray_3;
-  border-radius: 4px;
-  background: theme.$white;
-  color: theme.$gray_6;
-  cursor: pointer;
-  &:hover {
-    border-color: theme.$purple_1;
-    color: theme.$purple_2;
+
+  svg {
+    display: block;
   }
 }
 .header-sample-btn {
