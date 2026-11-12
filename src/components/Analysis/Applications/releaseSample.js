@@ -61,7 +61,8 @@ export function releaseStages(version, assetsUrl = "") {
     const rec = version[s.key];
     const status = String(rec.status).toLowerCase();
     const why = stageReason(rec);
-    const title = [s.what, why && `${text(status)}: ${why}`].filter(Boolean).join(". ");
+    const where = s.key === "sampleRun" && rec.source === "node" ? "on a compute node of the owner's" : "";
+    const title = [s.what, where, why && `${text(status)}: ${why}`].filter(Boolean).join(". ");
     const href = s.key === "sample" && status === "ready" ? publicUrl(assetsUrl, rec.public?.document) : "";
     return { key: s.key, label: s.label, status, text: text(status), tone: TONES[status] || "gray", title, ...(href && { href }) };
   });
