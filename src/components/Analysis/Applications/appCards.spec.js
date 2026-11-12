@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { appTitle, appInitials, appColor, appDescription, versionLabel, runsOn, workflowUses, versionState, matchesAppSearch, sortApps, appNeedsGpu, appPageTitle, applicationPageTitle } from "./appCards";
+import { appTitle, appInitials, appColor, appDescription, versionLabel, runsOn, workflowUses, mergeWorkflows, versionState, matchesAppSearch, sortApps, appNeedsGpu, appPageTitle, applicationPageTitle } from "./appCards";
 
 const spike = {
   name: "spike-detect",
@@ -48,6 +48,12 @@ describe("app cards", () => {
   it("counts the workflows that use it, and its latest version's state", () => {
     expect(workflowUses(spike, workflows)).toBe(2);
     expect(workflowUses(zip, workflows)).toBe(1);
+    // The Library's list and the public catalog together, a workflow once: in
+    // My Workspace the Library has none of the public workflows that use it.
+    expect(workflowUses(spike, mergeWorkflows([], workflows))).toBe(2);
+    const own = { uuid: "wf-1", dag: [{ sourceUrl: "https://github.com/acme/zipper" }] };
+    expect(mergeWorkflows([own], [own, { uuid: "wf-2", dag: [] }], null)).toHaveLength(2);
+    expect(workflowUses(zip, mergeWorkflows([own], [own]))).toBe(1);
     expect(versionState(spike)).toBe("pending");
     expect(versionState(zip)).toBe("none");
   });

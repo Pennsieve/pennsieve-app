@@ -51,6 +51,7 @@ import {
   sortApps,
   versionState,
   workflowUses,
+  mergeWorkflows,
 } from "./appCards";
 
 defineProps({
@@ -162,8 +163,23 @@ watch(sortBy, (v) => {
   }
 });
 
-// "Used in 3 workflows" counts the workflows loaded for the Library.
-const workflows = computed(() => store.state.analysisModule.workflows || []);
+// "Used in 3 workflows" counts the workflows loaded for the Library and the
+// public catalog together: the Library holds the workspace's own workflows
+// (in My Workspace, only the user's), and the public workflows that run an
+// app belong to other workspaces.
+const publicWorkflows = ref([]);
+const workflows = computed(() => mergeWorkflows(store.state.analysisModule.workflows, publicWorkflows.value));
+const loadPublicWorkflows = async () => {
+  const out = [];
+  let cursor;
+  for (let i = 0; i < 10; i++) {
+    const page = await store.dispatch("analysisModule/listWorkflowDefinitions", { visibility: "public", cursor });
+    out.push(...(page?.workflows || []));
+    cursor = page?.nextCursor;
+    if (!cursor) break;
+  }
+  publicWorkflows.value = out;
+};
 const usageText = (app) => {
   const n = workflowUses(app, workflows.value);
   return n ? `Used in ${n} workflow${n === 1 ? "" : "s"}` : "Not in a workflow yet";
@@ -312,10 +328,12 @@ onMounted(() => {
   store
     .dispatch("analysisModule/fetchApplications", { includeArchived: statusFilter.value !== "active" })
     .catch(() => {});
-  // The workflows "Used in" counts, when Apps opened before the Library.
-  if (!workflows.value.length) {
+  // The workflows "Used in" counts, when Apps opened before the Library, and
+  // the public catalog.
+  if (!store.state.analysisModule.workflows?.length) {
     store.dispatch("analysisModule/fetchWorkflows", { limit: 100 }).catch(() => {});
   }
+  loadPublicWorkflows().catch(() => {});
 });
 
 // Archived applications are excluded from the default list response, so any
