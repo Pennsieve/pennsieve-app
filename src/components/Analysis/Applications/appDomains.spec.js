@@ -113,7 +113,9 @@ describe("research fields", () => {
 
   it("matches a tag however it's spelled, apart from domains", () => {
     expect(fieldOfTag("Neuroscience").key).toBe("neuroscience");
-    expect(fieldOfTag("epilepsy").key).toBe("neuroscience");
+    expect(fieldOfTag("epilepsy").key).toBe("neurology");
+    expect(fieldOfTag("Neurology").key).toBe("neurology");
+    expect(fieldOfTag("stroke").key).toBe("neurology");
     expect(fieldOfTag("Immuno-Oncology").key).toBe("immunology");
     expect(fieldOfTag("tumour").key).toBe("oncology");
     expect(fieldOfTag("cardiac").key).toBe("cardiology");
@@ -154,17 +156,19 @@ describe("research fields", () => {
     const chips = fieldCounts([
       cytometryApp,
       mriApp,
-      withManifest({ tags: ["epilepsy", "eeg", "cardiac"] }, "c"),
+      withManifest({ tags: ["epilepsy", "neuroimaging", "cardiac"] }, "c"),
       withManifest({ tags: ["penn"] }, "d"),
     ]);
-    expect(chips.map((c) => [c.field.key, c.count])).toEqual([["neuroscience", 2], ["cardiology", 1], ["immunology", 1]]);
+    expect(chips.map((c) => [c.field.key, c.count])).toEqual([["neuroscience", 2], ["cardiology", 1], ["immunology", 1], ["neurology", 1]]);
   });
 
   it("suggests field tags as their own group, found by alias", () => {
     const { fields } = preferredTagGroups();
     expect(fields.map((o) => o.tag)).toEqual(FIELDS.map((f) => f.tag));
     const neuro = fields.find((o) => o.tag === "neuroscience");
-    expect(tagOptionMatches(neuro, "epilep", { preferred: true })).toBe(true);
+    const neurology = fields.find((o) => o.tag === "neurology");
+    expect(tagOptionMatches(neurology, "epilep", { preferred: true })).toBe(true);
+    expect(tagOptionMatches(neuro, "epilep", { preferred: true })).toBe(false);
     expect(tagOptionMatches(neuro, "cancer", { preferred: true })).toBe(false);
     expect(canonicalTag("Clinical Research")).toBe("clinical-research");
     expect(canonicalTag("Immunology")).toBe("immunology");
@@ -172,7 +176,8 @@ describe("research fields", () => {
 
   it("nudges a domain's tag before a field's", () => {
     expect(tagDomainNudge(["epilepsy", "eeg"])).toMatchObject({ tag: "electrophysiology", label: "Electrophysiology" });
-    expect(tagDomainNudge(["epilepsy", "eeg", "electrophysiology"])).toMatchObject({ tag: "neuroscience", label: "Neuroscience" });
+    expect(tagDomainNudge(["epilepsy", "eeg", "electrophysiology"])).toMatchObject({ tag: "neurology", label: "Neurology" });
+    expect(tagDomainNudge(["cognitive-neuroscience", "eeg", "electrophysiology"])).toMatchObject({ tag: "neuroscience", label: "Neuroscience" });
     expect(tagDomainNudge(["imaging", "neuroimaging", "neuroscience"])).toBeNull();
   });
 });
