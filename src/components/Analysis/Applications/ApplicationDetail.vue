@@ -12,6 +12,8 @@ import { parseManifest, MANIFEST_SHAPES, PARAM_TYPE_OPTIONS, conformsToList } fr
 import BfButton from "../../shared/bf-button/BfButton.vue";
 import { fetchRepository, canUpdateManifest } from "./githubRepository";
 import ReleaseDialog from "./ReleaseDialog.vue";
+import ReleaseReportDialog from "./ReleaseReportDialog.vue";
+import { nodeRunOffer } from "./releaseReportRun";
 import AppReferences from "./AppReferences.vue";
 import AppSampleOutputs from "./AppSampleOutputs.vue";
 import AppSampleCard from "./AppSampleCard.vue";
@@ -654,6 +656,16 @@ watch(
   }
 );
 const versionStages = (version) => releaseStages(version, assetsUrl.value);
+
+// "Generate release report": the owner runs the sample on a compute node of
+// theirs when the platform's runner could not (releaseReportRun.js).
+const reportDialog = ref({ open: false, version: null });
+const reportOffer = (version) => (isAppOwner.value ? nodeRunOffer(version) : null);
+const reportOfferLabel = (offer) => (offer?.kind === "running" ? "Sample run on your node…" : offer?.kind === "retry" ? "Run the sample again" : "Generate release report");
+const openReportDialog = (version) => {
+  reportDialog.value = { open: true, version };
+};
+const onReportRunChanged = () => loadDetail(props.uuid, { quiet: true });
 
 // The Workflow samples tab: only when a workflow the app is in has a sample
 // output (loaded in the background).
@@ -1475,6 +1487,17 @@ watch(
                   <a v-if="s.href" :href="s.href" target="_blank" rel="noopener" class="status-badge status-badge-sm" :class="`badge-${s.tone}`">{{ s.text }} ↗</a>
                   <span v-else class="status-badge status-badge-sm" :class="`badge-${s.tone}`">{{ s.text }}</span>
                 </span>
+                <!-- The owner's way round a sample run the platform could
+                     not do: run it on a compute node of theirs -->
+                <button
+                  v-if="reportOffer(version)"
+                  type="button"
+                  class="version-stage-action"
+                  :title="reportOffer(version).kind === 'running' ? 'A sample run of this version is on a compute node of yours; open to follow it' : 'Run this version once on a compute node of yours; the release report is made from that run'"
+                  @click="openReportDialog(version)"
+                >
+                  {{ reportOfferLabel(reportOffer(version)) }}
+                </button>
               </div>
               <!-- Each variant's build; the version's status is the default's -->
               <div v-if="versionVariants(liveDetail, version.version).length" class="version-variants">
@@ -1551,6 +1574,13 @@ watch(
       :organization-id="viewingOrgId"
       :entries="accessList"
       @saved="reloadAfterPermissions"
+    />
+    <ReleaseReportDialog
+      v-model="reportDialog.open"
+      :app="detail ? { uuid: detail.uuid, name: detail.name } : null"
+      :version="reportDialog.version"
+      @started="onReportRunChanged"
+      @registered="onReportRunChanged"
     />
     <ReleaseDialog
       v-if="canRelease"
@@ -2581,6 +2611,22 @@ p.access-ask {
   flex-wrap: wrap;
   gap: 4px 12px;
   margin: -2px 0 8px;
+}
+.version-stage-action {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 8px;
+  border: 1px solid theme.$purple_1;
+  border-radius: 3px;
+  background: theme.$white;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  color: theme.$purple_2;
+  cursor: pointer;
+  &:hover {
+    background: theme.$purple_0;
+  }
 }
 .version-stage {
   display: inline-flex;
