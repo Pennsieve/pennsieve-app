@@ -1,5 +1,8 @@
 import { describe, it, expect } from "vitest";
 import {
+  FIXTURES_STATUS_EVENT,
+  SAMPLE_RUN_STATUS_EVENT,
+  SAMPLE_STATUS_EVENT,
   STATUS_EVENT,
   VARIANT_STATUS_EVENT,
   parseStatus,
@@ -105,6 +108,40 @@ describe("live build status", () => {
     expect(versionsToWatch(withLiveStatus(a, live))).toEqual([]);
     // No status recorded isn't a build under way.
     expect(versionBuilding({ status: "deployed", variants: [{ id: "x", status: "" }] })).toBe(false);
+  });
+});
+
+describe("the release pipeline's live events", () => {
+  const stage = (status, extra = {}) => ({ application_id: "ver-022", status, source: "status", time: "2026-11-11T23:00:00Z", ...extra });
+
+  it("lays a stage's event over the version's record, keeping what the record had", () => {
+    const a = app();
+    a.versions[0].fixtures = { status: "building", startedAt: "2026-11-11T22:43:00Z" };
+    let live = recordStatusEvent({}, FIXTURES_STATUS_EVENT, stage("ready", { bytes: 2258842, files: 7 }));
+    let v = withLiveStatus(a, live).versions[0];
+    expect(v.fixtures).toMatchObject({ status: "ready", startedAt: "2026-11-11T22:43:00Z", updatedAt: "2026-11-11T23:00:00Z" });
+    expect(v.status).toBe("deployed");
+    live = recordStatusEvent(live, SAMPLE_RUN_STATUS_EVENT, stage("skipped", { error_code: "needs_hardware", error_message: "gpu" }));
+    live = recordStatusEvent(live, SAMPLE_STATUS_EVENT, stage("ready", { document_key: "examples/x.pdf", preview_key: "examples/x.png", pages: 9 }));
+    v = withLiveStatus(a, live).versions[0];
+    expect(v.sampleRun).toEqual({ status: "skipped", updatedAt: "2026-11-11T23:00:00Z", error: { code: "needs_hardware", message: "gpu" } });
+    expect(v.sample).toMatchObject({ status: "ready", documentKey: "examples/x.pdf", previewKey: "examples/x.png", pages: 9 });
+    // The other version is untouched, and a stage event without a status is nothing.
+    expect(withLiveStatus(a, live).versions[1].fixtures).toBeUndefined();
+    expect(recordStatusEvent(live, FIXTURES_STATUS_EVENT, { application_id: "ver-022" })).toBe(live);
+  });
+
+  it("keeps listening to a deployed version while its pipeline runs", () => {
+    const a = app();
+    a.versions[0].createdAt = new Date(Date.now() - 60_000).toISOString();
+    a.versions[0].fixtures = { status: "building" };
+    // (ver-022 is now the newer of the two.)
+    expect(versionsToWatch(a)).toEqual(["ver-022", "ver-030"]);
+    let live = recordStatusEvent({}, FIXTURES_STATUS_EVENT, stage("ready"));
+    // Between stages of a fresh release: still at work.
+    expect(versionsToWatch(withLiveStatus(a, live))).toEqual(["ver-022", "ver-030"]);
+    live = recordStatusEvent(live, SAMPLE_RUN_STATUS_EVENT, stage("skipped", { error_code: "needs_hardware" }));
+    expect(versionsToWatch(withLiveStatus(a, live))).toEqual(["ver-030"]);
   });
 });
 

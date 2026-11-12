@@ -7,6 +7,7 @@
   "discoverUrl": "https://api.pennsieve.io/discover",
   "discoverDownloadsUrl": "https://downloads.pennsieve.io",
   "discoverAppUrl": "https://discover.pennsieve.io",
+  "assetsUrl": "https://assets.pennsieve.ai",
   "docsUrl": "https://docs.pennsieve.org",
   "maxDownloadSize": 20000000000,
   "environment": "prod",

@@ -39,6 +39,7 @@ import { MoreFilled } from "@element-plus/icons-vue";
 import SampleOutputViewer from "../Workflows/SampleOutputViewer.vue";
 import { PDF_URL_FRESH_MS } from "../Workflows/runExamples";
 import { versionsToWatch, withLiveStatus } from "./liveStatus";
+import { releaseSample } from "./releaseSample";
 import { useAppStatusEvents } from "@/composables/useAppStatusEvents";
 import {
   APP_SORTS,
@@ -257,13 +258,32 @@ watch(
   },
   { immediate: true }
 );
-const sampleViewer = ref({ open: false, source: null, name: "", subtitle: "" });
+const sampleViewer = ref({ open: false, kind: "sample output", source: null, name: "", subtitle: "" });
+
+// The release report the pipeline made for the app's newest version
+// (releaseSample.js): on the card, and first in its menu. Its PDF is a
+// public copy on the assets host, so it opens without a signed link.
+const assetsUrl = computed(() => store.state.config?.assetsUrl || "");
+const releaseReport = (app) => releaseSample(app?.versions, assetsUrl.value);
+const openReleaseReport = (app) => {
+  const report = releaseReport(app);
+  if (!report) return;
+  sampleViewer.value = {
+    open: true,
+    kind: "release report",
+    source: async () => report.pdfUrl,
+    name: appTitle(app),
+    subtitle: [report.app.tag && `${report.app.tag} run on its test inputs`, report.pages && `${report.pages} pages`].filter(Boolean).join(" · "),
+  };
+};
+
 const openAppSample = (app) => {
   const url = app.sourceUrl;
   const cached = appSamples.value[url];
   let first = true;
   sampleViewer.value = {
     open: true,
+    kind: "sample output",
     source: async () => {
       if (first && cached?.pdfUrl && Date.now() - cached.fetchedAt < PDF_URL_FRESH_MS) {
         first = false;
@@ -325,9 +345,10 @@ const goToDetail = (app) => {
   router.push(scopedRoute("application-detail", { uuid: app.uuid }));
 };
 
-// The card's menu: its repository, or its sample output.
+// The card's menu: its repository, its release report, or its sample output.
 const onAppMenu = (command, app) => {
   if (command === "github") window.open(githubUrl(app), "_blank", "noopener");
+  else if (command === "report") openReleaseReport(app);
   else if (command === "sample") openAppSample(app);
 };
 
@@ -458,8 +479,15 @@ const goToManifestBuilder = () => {
             <p class="app-description">
               {{ appDescription(app) || readmeSummary(app) || "No description." }}
             </p>
-            <!-- Its variants (a CPU and a GPU build), then its tags -->
-            <div v-if="appTags(app).length || paletteVariants(app).length || appNeedsGpu(app)" class="app-tags">
+            <!-- Its release report, its variants (a CPU and a GPU build), then its tags -->
+            <div v-if="releaseReport(app) || appTags(app).length || paletteVariants(app).length || appNeedsGpu(app)" class="app-tags">
+              <button
+                v-if="releaseReport(app)"
+                type="button"
+                class="app-tag app-report"
+                :title="`Release report: ${releaseReport(app).app.tag} run on its test inputs, as a PDF`"
+                @click.stop="openReleaseReport(app)"
+              ><IconPDF :width="12" :height="12" color="currentColor" /> Release report</button>
               <span
                 v-for="v in paletteVariants(app)"
                 :key="`v:${v.id}`"
@@ -484,17 +512,22 @@ const goToManifestBuilder = () => {
               <span class="app-actions" @click.stop>
                 <button type="button" class="app-action app-action--open" @click="goToDetail(app)">Open</button>
                 <el-dropdown
-                  v-if="githubUrl(app) || appSamples[app.sourceUrl]"
+                  v-if="githubUrl(app) || releaseReport(app) || appSamples[app.sourceUrl]"
                   trigger="click"
                   placement="bottom-end"
                   @command="(c) => onAppMenu(c, app)"
                 >
-                  <button type="button" class="app-action app-action--icon" aria-label="More: GitHub, sample output" title="More">
+                  <button type="button" class="app-action app-action--icon" aria-label="More: GitHub, release report, sample output" title="More">
                     <el-icon><MoreFilled /></el-icon>
                   </button>
                   <template #dropdown>
                     <el-dropdown-menu>
                       <el-dropdown-item v-if="githubUrl(app)" command="github">View on GitHub</el-dropdown-item>
+                      <el-dropdown-item v-if="releaseReport(app)" command="report">
+                        <span class="app-menu-item" :title="`The ${releaseReport(app).app.tag} release run on its test inputs, as a PDF`">
+                          <IconPDF :width="14" :height="14" color="currentColor" /> Release report (PDF)
+                        </span>
+                      </el-dropdown-item>
                       <el-dropdown-item v-if="appSamples[app.sourceUrl]" command="sample">
                         <span class="app-menu-item" title="A PDF summary of a run of this app">
                           <IconPDF :width="14" :height="14" color="currentColor" /> Sample output (PDF)
@@ -531,6 +564,7 @@ const goToManifestBuilder = () => {
     </FacetLayout>
     <SampleOutputViewer
       v-model="sampleViewer.open"
+      :kind="sampleViewer.kind"
       :source="sampleViewer.source"
       :workflow-name="sampleViewer.name"
       :subtitle="sampleViewer.subtitle"
@@ -736,6 +770,22 @@ $card-height: 172px;
   border-color: theme.$red_2;
   color: theme.$red_2;
   text-decoration: line-through;
+}
+/* The release report: a chip that opens it, drawn as the variants are */
+.app-report {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid theme.$gray_2;
+  background: theme.$white;
+  cursor: pointer;
+  font: inherit;
+  font-size: 11px;
+  line-height: 18px;
+  &:hover {
+    border-color: theme.$purple_1;
+    color: theme.$purple_2;
+  }
 }
 /* The text fits the banner's height: it doesn't size the card (contain),
    and what doesn't fit is cut, never the card stretched. */
