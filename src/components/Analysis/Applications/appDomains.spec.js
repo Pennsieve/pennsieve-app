@@ -116,6 +116,11 @@ describe("research fields", () => {
     expect(fieldOfTag("epilepsy").key).toBe("neurology");
     expect(fieldOfTag("Neurology").key).toBe("neurology");
     expect(fieldOfTag("stroke").key).toBe("neurology");
+    expect(fieldOfTag("HRV").key).toBe("physiology");
+    expect(fieldOfTag("vagus-nerve-stimulation").key).toBe("physiology");
+    expect(fieldOfTag("electrophysiology")).toBeNull();
+    expect(fieldOfTag("OMOP").key).toBe("public-health");
+    expect(canonicalTag("Public Health")).toBe("public-health");
     expect(fieldOfTag("Immuno-Oncology").key).toBe("immunology");
     expect(fieldOfTag("tumour").key).toBe("oncology");
     expect(fieldOfTag("cardiac").key).toBe("cardiology");

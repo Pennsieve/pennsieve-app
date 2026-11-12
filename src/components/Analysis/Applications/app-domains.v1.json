@@ -342,6 +342,30 @@
       ]
     },
     {
+      "key": "physiology",
+      "label": "Physiology",
+      "tag": "physiology",
+      "aliases": [
+        "systems-physiology",
+        "organ-physiology",
+        "autonomic",
+        "autonomic-function",
+        "hrv",
+        "heart-rate-variability",
+        "respiration",
+        "respiratory",
+        "blood-pressure",
+        "baroreflex",
+        "gi-motility",
+        "gastrointestinal",
+        "neuromodulation",
+        "vagus",
+        "vagus-nerve-stimulation",
+        "peripheral-nervous-system",
+        "sparc"
+      ]
+    },
+    {
       "key": "immunology",
       "label": "Immunology",
       "tag": "immunology",
@@ -381,6 +405,21 @@
         "clinical",
         "clinical-trial",
         "clinical-trials"
+      ]
+    },
+    {
+      "key": "public-health",
+      "label": "Public health",
+      "tag": "public-health",
+      "aliases": [
+        "epidemiology",
+        "population-health",
+        "ehr",
+        "electronic-health-records",
+        "omop",
+        "real-world-data",
+        "real-world-evidence",
+        "health-services-research"
       ]
     }
   ]
