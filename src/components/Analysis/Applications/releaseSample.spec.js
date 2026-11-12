@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { pipelineBusy, publicUrl, releaseSample, releaseStages, stageReason } from "./releaseSample";
+import { pipelineBusy, publicUrl, releaseReportLine, releaseSample, releaseStages, stageReason } from "./releaseSample";
 
 const ASSETS = "https://assets.pennsieve.net/";
 const ready = {
@@ -100,5 +100,32 @@ describe("whether the pipeline is still at work", () => {
     expect(pipelineBusy({ createdAt: "2026-11-11T22:40:00Z", fixtures: { status: "ready" }, sampleRun: { status: "failed" } }, now)).toBe(false);
     expect(pipelineBusy({ createdAt: "2026-11-01T00:00:00Z", fixtures: { status: "ready" } }, now)).toBe(false);
     expect(pipelineBusy({ createdAt: "2026-11-01T00:00:00Z", status: "deployed" }, now)).toBe(false);
+  });
+});
+
+describe("releaseReportLine", () => {
+  const assets = "https://assets.pennsieve.net";
+  it("is a link once the report is ready", () => {
+    const v = { fixtures: { status: "ready" }, sampleRun: { status: "ready" }, sample: { status: "ready", public: { document: "public/apps/a/v1/x.pdf" } } };
+    expect(releaseReportLine(v, assets)).toEqual({ text: "Release report", tone: "link", href: "https://assets.pennsieve.net/public/apps/a/v1/x.pdf" });
+  });
+  it("says why there is none, and what is under way", () => {
+    expect(releaseReportLine({ fixtures: { status: "ready" }, sampleRun: { status: "skipped", error: { code: "needs_hardware" } } }).text).toBe(
+      "Release report: not made — needs a GPU, or more memory than the sample runner has"
+    );
+    expect(releaseReportLine({ fixtures: { status: "failed", error: { code: "generator_failed", message: "generator exited 1" } } })).toEqual({
+      text: "Release report: failed — generator exited 1",
+      tone: "warn",
+    });
+    expect(releaseReportLine({ fixtures: { status: "building" } }).text).toBe("Release report: building the test inputs…");
+    expect(releaseReportLine({ fixtures: { status: "ready" }, sampleRun: { status: "running", source: "node" } }).text).toBe(
+      "Release report: running the sample on a compute node of the owner's…"
+    );
+    expect(releaseReportLine({ fixtures: { status: "ready" }, sampleRun: { status: "ready" } }).text).toBe("Release report: writing…");
+    expect(releaseReportLine({ fixtures: { status: "ready" }, sampleRun: { status: "ready" }, sample: { status: "running" } }).text).toBe("Release report: writing…");
+  });
+  it("is nothing for a version from before the pipeline", () => {
+    expect(releaseReportLine({ version: "v0.1.0" })).toBeNull();
+    expect(releaseReportLine(null)).toBeNull();
   });
 });
