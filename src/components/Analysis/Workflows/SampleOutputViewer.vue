@@ -20,6 +20,9 @@ const props = defineProps({
   version: { type: Number, default: null },
   // A line under the title, e.g. "Version 3 · run brave-otter · 18 pages".
   subtitle: { type: String, default: "" },
+  // What the PDF is called in the title: "sample output" (a run's), or
+  // "sample document" (the release pipeline's, AppSampleCard).
+  kind: { type: String, default: "sample output" },
 });
 const emit = defineEmits(["update:modelValue"]);
 
@@ -44,7 +47,7 @@ const open = computed({
 });
 
 const title = computed(() =>
-  props.workflowName ? `${props.workflowName}: sample output` : "Workflow sample output"
+  props.workflowName ? `${props.workflowName}: ${props.kind}` : `Workflow ${props.kind}`
 );
 const filename = computed(() => samplePdfFilename(props.workflowName, props.version));
 

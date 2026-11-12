@@ -39,6 +39,7 @@ import { MoreFilled } from "@element-plus/icons-vue";
 import SampleOutputViewer from "../Workflows/SampleOutputViewer.vue";
 import { PDF_URL_FRESH_MS } from "../Workflows/runExamples";
 import { versionsToWatch, withLiveStatus } from "./liveStatus";
+import { releaseSample } from "./releaseSample";
 import { useAppStatusEvents } from "@/composables/useAppStatusEvents";
 import {
   APP_SORTS,
@@ -257,13 +258,32 @@ watch(
   },
   { immediate: true }
 );
-const sampleViewer = ref({ open: false, source: null, name: "", subtitle: "" });
+const sampleViewer = ref({ open: false, kind: "sample output", source: null, name: "", subtitle: "" });
+
+// The release report the pipeline made for the app's newest version
+// (releaseSample.js): on the card, and first in its menu. Its PDF is a
+// public copy on the assets host, so it opens without a signed link.
+const assetsUrl = computed(() => store.state.config?.assetsUrl || "");
+const releaseReport = (app) => releaseSample(app?.versions, assetsUrl.value);
+const openReleaseReport = (app) => {
+  const report = releaseReport(app);
+  if (!report) return;
+  sampleViewer.value = {
+    open: true,
+    kind: "release report",
+    source: async () => report.pdfUrl,
+    name: appTitle(app),
+    subtitle: [report.app.tag && `${report.app.tag} run on its test inputs`, report.pages && `${report.pages} pages`].filter(Boolean).join(" · "),
+  };
+};
+
 const openAppSample = (app) => {
   const url = app.sourceUrl;
   const cached = appSamples.value[url];
   let first = true;
   sampleViewer.value = {
     open: true,
+    kind: "sample output",
     source: async () => {
       if (first && cached?.pdfUrl && Date.now() - cached.fetchedAt < PDF_URL_FRESH_MS) {
         first = false;
@@ -325,9 +345,10 @@ const goToDetail = (app) => {
   router.push(scopedRoute("application-detail", { uuid: app.uuid }));
 };
 
-// The card's menu: its repository, or its sample output.
+// The card's menu: its repository, its release report, or its sample output.
 const onAppMenu = (command, app) => {
   if (command === "github") window.open(githubUrl(app), "_blank", "noopener");
+  else if (command === "report") openReleaseReport(app);
   else if (command === "sample") openAppSample(app);
 };
 
@@ -479,22 +500,38 @@ const goToManifestBuilder = () => {
                 <span class="app-dot" :class="versionState(app)" :title="statusLabel(latestVersion(app)?.status)" />
                 <span class="app-usage-text">{{ usageText(app) }}</span>
               </span>
-              <!-- Open, then the rest (GitHub, the sample PDF) in a menu, so
-                   the usage keeps its room on a narrow card -->
+              <!-- Open and the release report, then the rest (GitHub, the
+                   sample PDF) in a menu, so the usage keeps its room on a
+                   narrow card -->
               <span class="app-actions" @click.stop>
                 <button type="button" class="app-action app-action--open" @click="goToDetail(app)">Open</button>
+                <button
+                  v-if="releaseReport(app)"
+                  type="button"
+                  class="app-action app-action--icon app-action--report"
+                  aria-label="View the release report"
+                  :title="`Release report: ${releaseReport(app).app.tag} run on its test inputs, as a PDF`"
+                  @click="openReleaseReport(app)"
+                >
+                  <IconPDF :width="14" :height="14" color="currentColor" />
+                </button>
                 <el-dropdown
-                  v-if="githubUrl(app) || appSamples[app.sourceUrl]"
+                  v-if="githubUrl(app) || releaseReport(app) || appSamples[app.sourceUrl]"
                   trigger="click"
                   placement="bottom-end"
                   @command="(c) => onAppMenu(c, app)"
                 >
-                  <button type="button" class="app-action app-action--icon" aria-label="More: GitHub, sample output" title="More">
+                  <button type="button" class="app-action app-action--icon" aria-label="More: GitHub, release report, sample output" title="More">
                     <el-icon><MoreFilled /></el-icon>
                   </button>
                   <template #dropdown>
                     <el-dropdown-menu>
                       <el-dropdown-item v-if="githubUrl(app)" command="github">View on GitHub</el-dropdown-item>
+                      <el-dropdown-item v-if="releaseReport(app)" command="report">
+                        <span class="app-menu-item" :title="`The ${releaseReport(app).app.tag} release run on its test inputs, as a PDF`">
+                          <IconPDF :width="14" :height="14" color="currentColor" /> Release report (PDF)
+                        </span>
+                      </el-dropdown-item>
                       <el-dropdown-item v-if="appSamples[app.sourceUrl]" command="sample">
                         <span class="app-menu-item" title="A PDF summary of a run of this app">
                           <IconPDF :width="14" :height="14" color="currentColor" /> Sample output (PDF)
@@ -531,6 +568,7 @@ const goToManifestBuilder = () => {
     </FacetLayout>
     <SampleOutputViewer
       v-model="sampleViewer.open"
+      :kind="sampleViewer.kind"
       :source="sampleViewer.source"
       :workflow-name="sampleViewer.name"
       :subtitle="sampleViewer.subtitle"
@@ -853,6 +891,10 @@ $card-height: 172px;
   align-items: center;
   justify-content: center;
   padding: 3px 6px;
+}
+/* The release report: the PDF in the app's colour, next to Open */
+.app-action--report {
+  color: theme.$purple_2;
 }
 .app-action {
   padding: 3px 10px;

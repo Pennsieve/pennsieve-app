@@ -1,11 +1,12 @@
 import { getCurrentInstance, onBeforeUnmount, ref, watch } from 'vue'
 import { applicationChannel } from '@/realtime/channels'
-import { STATUS_EVENT, VARIANT_STATUS_EVENT, recordStatusEvent } from '@/components/Analysis/Applications/liveStatus'
+import { LIVE_EVENTS, recordStatusEvent } from '@/components/Analysis/Applications/liveStatus'
 
 /**
  * Live build status of App Store versions (liveStatus.js): listens on the
- * channel of each version uuid that `uuidsOf` gives (those still building),
- * for the version's status and its variants'. Returns `live`, the statuses
+ * channel of each version uuid that `uuidsOf` gives (those still building,
+ * or whose release pipeline is still at work), for the version's status,
+ * its variants' and its pipeline stages'. Returns `live`, the statuses
  * by version uuid, to lay over the apps (withLiveStatus). Without live
  * updates on the site, `live` stays empty and the page's polling applies.
  *
@@ -33,8 +34,7 @@ export function useAppStatusEvents(uuidsOf) {
     for (const id of want) {
       if (channels.has(id)) continue
       const channel = realtime.subscribe(applicationChannel(id))
-      channel.bind(STATUS_EVENT, onEvent(STATUS_EVENT))
-      channel.bind(VARIANT_STATUS_EVENT, onEvent(VARIANT_STATUS_EVENT))
+      for (const name of LIVE_EVENTS) channel.bind(name, onEvent(name))
       channels.set(id, channel)
     }
   }
