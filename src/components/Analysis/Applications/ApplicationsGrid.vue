@@ -479,15 +479,8 @@ const goToManifestBuilder = () => {
             <p class="app-description">
               {{ appDescription(app) || readmeSummary(app) || "No description." }}
             </p>
-            <!-- Its release report, its variants (a CPU and a GPU build), then its tags -->
-            <div v-if="releaseReport(app) || appTags(app).length || paletteVariants(app).length || appNeedsGpu(app)" class="app-tags">
-              <button
-                v-if="releaseReport(app)"
-                type="button"
-                class="app-tag app-report"
-                :title="`Release report: ${releaseReport(app).app.tag} run on its test inputs, as a PDF`"
-                @click.stop="openReleaseReport(app)"
-              ><IconPDF :width="12" :height="12" color="currentColor" /> Release report</button>
+            <!-- Its variants (a CPU and a GPU build), then its tags -->
+            <div v-if="appTags(app).length || paletteVariants(app).length || appNeedsGpu(app)" class="app-tags">
               <span
                 v-for="v in paletteVariants(app)"
                 :key="`v:${v.id}`"
@@ -507,10 +500,21 @@ const goToManifestBuilder = () => {
                 <span class="app-dot" :class="versionState(app)" :title="statusLabel(latestVersion(app)?.status)" />
                 <span class="app-usage-text">{{ usageText(app) }}</span>
               </span>
-              <!-- Open, then the rest (GitHub, the sample PDF) in a menu, so
-                   the usage keeps its room on a narrow card -->
+              <!-- Open and the release report, then the rest (GitHub, the
+                   sample PDF) in a menu, so the usage keeps its room on a
+                   narrow card -->
               <span class="app-actions" @click.stop>
                 <button type="button" class="app-action app-action--open" @click="goToDetail(app)">Open</button>
+                <button
+                  v-if="releaseReport(app)"
+                  type="button"
+                  class="app-action app-action--icon app-action--report"
+                  aria-label="View the release report"
+                  :title="`Release report: ${releaseReport(app).app.tag} run on its test inputs, as a PDF`"
+                  @click="openReleaseReport(app)"
+                >
+                  <IconPDF :width="14" :height="14" color="currentColor" />
+                </button>
                 <el-dropdown
                   v-if="githubUrl(app) || releaseReport(app) || appSamples[app.sourceUrl]"
                   trigger="click"
@@ -771,22 +775,6 @@ $card-height: 172px;
   color: theme.$red_2;
   text-decoration: line-through;
 }
-/* The release report: a chip that opens it, drawn as the variants are */
-.app-report {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  border: 1px solid theme.$gray_2;
-  background: theme.$white;
-  cursor: pointer;
-  font: inherit;
-  font-size: 11px;
-  line-height: 18px;
-  &:hover {
-    border-color: theme.$purple_1;
-    color: theme.$purple_2;
-  }
-}
 /* The text fits the banner's height: it doesn't size the card (contain),
    and what doesn't fit is cut, never the card stretched. */
 .app-body {
@@ -903,6 +891,10 @@ $card-height: 172px;
   align-items: center;
   justify-content: center;
   padding: 3px 6px;
+}
+/* The release report: the PDF in the app's colour, next to Open */
+.app-action--report {
+  color: theme.$purple_2;
 }
 .app-action {
   padding: 3px 10px;
