@@ -18,7 +18,7 @@ import AppReferences from "./AppReferences.vue";
 import AppSampleOutputs from "./AppSampleOutputs.vue";
 import AppSampleCard from "./AppSampleCard.vue";
 import { useAppSample } from "./useAppSample";
-import { releaseSample, releaseStages } from "./releaseSample";
+import { releaseReportLine, releaseSample } from "./releaseSample";
 import IconPDF from "../../icons/IconPDF.vue";
 import { useAppSampleOutputs } from "./useAppSampleOutputs";
 import { tryableVersion } from "../RunMonitor/appRuns";
@@ -655,7 +655,7 @@ watch(
     if (ids && !detailLoading.value) loadDetail(props.uuid, { quiet: true });
   }
 );
-const versionStages = (version) => releaseStages(version, assetsUrl.value);
+const versionReport = (version) => releaseReportLine(version, assetsUrl.value);
 
 // "Generate release report": the owner runs the sample on a compute node of
 // theirs when the platform's runner could not (releaseReportRun.js).
@@ -1509,14 +1509,12 @@ watch(
               <div class="version-meta">
                 <span>Released {{ formatDate(version.createdAt) }}</span>
               </div>
-              <!-- The release pipeline after the build: test inputs, a
-                   sample run, the sample document (releaseSample.js) -->
-              <div v-if="versionStages(version).length" class="version-stages">
-                <span v-for="s in versionStages(version)" :key="s.key" class="version-stage" :title="s.title">
-                  <span class="version-stage-name">{{ s.label }}</span>
-                  <a v-if="s.href" :href="s.href" target="_blank" rel="noopener" class="status-badge status-badge-sm" :class="`badge-${s.tone}`">{{ s.text }} ↗</a>
-                  <span v-else class="status-badge status-badge-sm" :class="`badge-${s.tone}`">{{ s.text }}</span>
-                </span>
+              <!-- The release report, in a line: a link when it exists,
+                   else what is under way or why there is none
+                   (releaseSample.js) -->
+              <div v-if="versionReport(version)" class="version-report" :class="`is-${versionReport(version).tone}`">
+                <a v-if="versionReport(version).href" :href="versionReport(version).href" target="_blank" rel="noopener">{{ versionReport(version).text }} ↗</a>
+                <span v-else>{{ versionReport(version).text }}</span>
               </div>
               <!-- Each variant's build; the version's status is the default's -->
               <div v-if="versionVariants(liveDetail, version.version).length" class="version-variants">
@@ -2639,22 +2637,21 @@ p.access-ask {
   gap: 4px;
   margin-bottom: 4px;
 }
-.version-stages {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px 12px;
+.version-report {
   margin: -2px 0 8px;
-}
-.version-stage {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  font-size: 11px;
+  font-size: 12px;
   color: theme.$gray_5;
 
-  a.status-badge {
+  a {
+    color: theme.$purple_2;
+    font-weight: 600;
     text-decoration: none;
-    cursor: pointer;
+    &:hover {
+      text-decoration: underline;
+    }
+  }
+  &.is-warn {
+    color: theme.$red_2;
   }
 }
 .version-variant {
