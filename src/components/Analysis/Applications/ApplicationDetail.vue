@@ -13,6 +13,7 @@ import BfButton from "../../shared/bf-button/BfButton.vue";
 import { fetchRepository, canUpdateManifest } from "./githubRepository";
 import ReleaseDialog from "./ReleaseDialog.vue";
 import ReleaseReportDialog from "./ReleaseReportDialog.vue";
+import SampleOutputViewer from "../Workflows/SampleOutputViewer.vue";
 import { nodeRunOffer } from "./releaseReportRun";
 import AppReferences from "./AppReferences.vue";
 import AppSampleOutputs from "./AppSampleOutputs.vue";
@@ -656,6 +657,18 @@ watch(
   }
 );
 const versionReport = (version) => releaseReportLine(version, assetsUrl.value);
+// A version's report opens in the page's viewer, as the newest one does.
+const versionViewer = ref({ open: false, source: null, subtitle: "" });
+const openVersionReport = (version) => {
+  const url = versionReport(version)?.href;
+  if (!url) return;
+  const pages = version.sample?.pages;
+  versionViewer.value = {
+    open: true,
+    source: async () => url,
+    subtitle: [version.version && `${version.version} run on its test inputs`, pages && `${pages} pages`].filter(Boolean).join(" · "),
+  };
+};
 
 // "Generate release report": the owner runs the sample on a compute node of
 // theirs when the platform's runner could not (releaseReportRun.js).
@@ -1513,7 +1526,9 @@ watch(
                    else what is under way or why there is none
                    (releaseSample.js) -->
               <div v-if="versionReport(version)" class="version-report" :class="`is-${versionReport(version).tone}`">
-                <a v-if="versionReport(version).href" :href="versionReport(version).href" target="_blank" rel="noopener">{{ versionReport(version).text }} ↗</a>
+                <button v-if="versionReport(version).href" type="button" class="version-report-link" @click="openVersionReport(version)">
+                  <IconPDF :width="12" :height="12" color="currentColor" /> {{ versionReport(version).text }}
+                </button>
                 <span v-else>{{ versionReport(version).text }}</span>
               </div>
               <!-- Each variant's build; the version's status is the default's -->
@@ -1591,6 +1606,13 @@ watch(
       :organization-id="viewingOrgId"
       :entries="accessList"
       @saved="reloadAfterPermissions"
+    />
+    <SampleOutputViewer
+      v-model="versionViewer.open"
+      :source="versionViewer.source"
+      :workflow-name="detail?.name || ''"
+      :subtitle="versionViewer.subtitle"
+      kind="release report"
     />
     <ReleaseReportDialog
       v-model="reportDialog.open"
@@ -2642,10 +2664,17 @@ p.access-ask {
   font-size: 12px;
   color: theme.$gray_5;
 
-  a {
-    color: theme.$purple_2;
+  .version-report-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 0;
+    border: none;
+    background: none;
+    font: inherit;
     font-weight: 600;
-    text-decoration: none;
+    color: theme.$purple_2;
+    cursor: pointer;
     &:hover {
       text-decoration: underline;
     }
