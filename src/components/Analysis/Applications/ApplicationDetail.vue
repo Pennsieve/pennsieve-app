@@ -16,6 +16,7 @@ import AppReferences from "./AppReferences.vue";
 import AppSampleOutputs from "./AppSampleOutputs.vue";
 import AppSampleCard from "./AppSampleCard.vue";
 import { useAppSample } from "./useAppSample";
+import { releaseSample, releaseStages } from "./releaseSample";
 import IconPDF from "../../icons/IconPDF.vue";
 import { useAppSampleOutputs } from "./useAppSampleOutputs";
 import { tryableVersion } from "../RunMonitor/appRuns";
@@ -634,9 +635,25 @@ const tryApp = () => {
 
 // The app's own sample output (a PDF of one of its app runs): first on the
 // page, and the header's PDF button.
-const { sample: appSample, pdfSource: appSamplePdf } = useAppSample(computed(() => detail.value?.sourceUrl || ""));
+const { sample: ownerSample, pdfSource: ownerSamplePdf } = useAppSample(computed(() => detail.value?.sourceUrl || ""));
+// The sample document the release pipeline made for the newest version
+// (releaseSample.js) comes first; the owner-set sample output of a run
+// stands in when there is none (a private app, or one from before).
+const assetsUrl = computed(() => store.state.config?.assetsUrl || "");
+const pipelineSample = computed(() => releaseSample(sortedVersions.value, assetsUrl.value));
+const appSample = computed(() => pipelineSample.value || ownerSample.value);
+const appSamplePdf = (...args) => (pipelineSample.value ? pipelineSample.value.pdfUrl : ownerSamplePdf(...args));
 const sampleCard = ref(null);
 const openAppSample = () => sampleCard.value?.open();
+// A sample document that just got ready (its live event carries no public
+// links): read the app again, quietly, for them.
+watch(
+  () => (liveDetail.value?.versions || []).filter((v) => v.sample?.status === "ready" && !v.sample?.public).map((v) => v.uuid).join(","),
+  (ids) => {
+    if (ids && !detailLoading.value) loadDetail(props.uuid, { quiet: true });
+  }
+);
+const versionStages = (version) => releaseStages(version, assetsUrl.value);
 
 // The Workflow samples tab: only when a workflow the app is in has a sample
 // output (loaded in the background).
@@ -734,8 +751,12 @@ watch(
       <div class="header-actions">
         <!-- "3 new commits since v1.3.6": a release is due. -->
         <span v-if="canRelease && nudge" class="release-nudge">{{ nudge }}</span>
-        <el-tooltip v-if="appSample" content="Sample output: a PDF summary of a run of this app" placement="bottom">
-          <button type="button" class="header-sample-btn" aria-label="View the app's sample output" @click="openAppSample">
+        <el-tooltip
+          v-if="appSample"
+          :content="pipelineSample ? `Release report: ${pipelineSample.app.tag} run on its test inputs, as a PDF` : 'Sample output: a PDF summary of a run of this app'"
+          placement="bottom"
+        >
+          <button type="button" class="header-sample-btn" :aria-label="pipelineSample ? 'View the release report' : 'View the app\'s sample output'" @click="openAppSample">
             <IconPDF :width="20" :height="20" color="currentColor" />
           </button>
         </el-tooltip>
@@ -1445,6 +1466,15 @@ watch(
               </div>
               <div class="version-meta">
                 <span>Released {{ formatDate(version.createdAt) }}</span>
+              </div>
+              <!-- The release pipeline after the build: test inputs, a
+                   sample run, the sample document (releaseSample.js) -->
+              <div v-if="versionStages(version).length" class="version-stages">
+                <span v-for="s in versionStages(version)" :key="s.key" class="version-stage" :title="s.title">
+                  <span class="version-stage-name">{{ s.label }}</span>
+                  <a v-if="s.href" :href="s.href" target="_blank" rel="noopener" class="status-badge status-badge-sm" :class="`badge-${s.tone}`">{{ s.text }} ↗</a>
+                  <span v-else class="status-badge status-badge-sm" :class="`badge-${s.tone}`">{{ s.text }}</span>
+                </span>
               </div>
               <!-- Each variant's build; the version's status is the default's -->
               <div v-if="versionVariants(liveDetail, version.version).length" class="version-variants">
@@ -2545,6 +2575,24 @@ p.access-ask {
   flex-direction: column;
   gap: 4px;
   margin-bottom: 4px;
+}
+.version-stages {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  margin: -2px 0 8px;
+}
+.version-stage {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  color: theme.$gray_5;
+
+  a.status-badge {
+    text-decoration: none;
+    cursor: pointer;
+  }
 }
 .version-variant {
   display: flex;

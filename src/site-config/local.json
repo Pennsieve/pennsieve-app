@@ -8,6 +8,7 @@
   "cdeCatalogUrl": "https://cde-catalog.pennsieve.net",
   "discoverUrl": "https://api.pennsieve.net/discover",
   "discoverAppUrl": "https://discover.pennsieve.net",
+  "assetsUrl": "https://assets.pennsieve.net",
   "docsUrl": "https://docs.pennsieve.io",
   "maxDownloadSize": 20000000000,
   "environment": "local",

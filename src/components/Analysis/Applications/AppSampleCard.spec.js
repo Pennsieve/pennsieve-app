@@ -7,7 +7,7 @@ import { useAppSample } from "./useAppSample";
 
 const viewerStub = {
   name: "SampleOutputViewer",
-  props: ["modelValue", "source", "workflowName", "subtitle"],
+  props: ["modelValue", "source", "workflowName", "subtitle", "kind"],
   template: '<div v-if="modelValue" class="viewer-stub" />',
 };
 const sample = {
@@ -35,6 +35,31 @@ describe("AppSampleCard", () => {
     expect(viewer.props("modelValue")).toBe(true);
     expect(viewer.props("workflowName")).toBe("processor-fcs-prep");
     expect(viewer.props("source")).toBe(source);
+  });
+
+  it("shows the pipeline's sample document with its first page as a thumbnail", async () => {
+    const pipeline = {
+      pipeline: true,
+      app: { tag: "v0.1.5" },
+      pages: 9,
+      createdAt: "2026-11-11T23:10:24Z",
+      pdfUrl: "https://assets/public/apps/a/v0.1.5/x.pdf",
+      previewUrl: "https://assets/public/apps/a/v0.1.5/x.preview.png",
+    };
+    const wrapper = mount(AppSampleCard, {
+      props: { sample: pipeline, appName: "nwb-inspect", source: () => pipeline.pdfUrl },
+      global: { stubs: { SampleOutputViewer: viewerStub, "bf-button": { template: "<button><slot /></button>" } } },
+    });
+    const text = wrapper.text().replace(/\s+/g, " ");
+    expect(text).toContain("Release report");
+    expect(wrapper.findAll("button").some((b) => b.text() === "View report")).toBe(true);
+    expect(text).toContain("Pennsieve ran nwb-inspect v0.1.5 on its test inputs at release");
+    expect(text).toContain("v0.1.5 · 9 pages");
+    expect(text).not.toContain("run ");
+    expect(wrapper.find("img.app-sample-card__preview").attributes("src")).toBe(pipeline.previewUrl);
+    await wrapper.find("button.app-sample-card__icon").trigger("click");
+    expect(wrapper.findComponent(viewerStub).props("modelValue")).toBe(true);
+    expect(wrapper.findComponent(viewerStub).props("kind")).toBe("release report");
   });
 
   it("opens from outside (the header's PDF button)", async () => {
