@@ -113,6 +113,10 @@ describe("releaseReportLine", () => {
     expect(releaseReportLine({ fixtures: { status: "ready" }, sampleRun: { status: "skipped", error: { code: "needs_hardware" } } }).text).toBe(
       "Release report: not made — needs a GPU, or more memory than the sample runner has"
     );
+    expect(releaseReportLine({ fixtures: { status: "ready" }, sampleRun: { status: "skipped", error: { code: "patch_release", message: "a patch release: v1.0.3 keeps the release report of v1.0.2" } } })).toEqual({
+      text: "Release report: not made — a patch release; the report of the earlier release in its line stands",
+      tone: "muted",
+    });
     expect(releaseReportLine({ fixtures: { status: "failed", error: { code: "generator_failed", message: "generator exited 1" } } })).toEqual({
       text: "Release report: failed — generator exited 1",
       tone: "warn",
