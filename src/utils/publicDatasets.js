@@ -34,13 +34,24 @@ export const toPublicDataset = (d) => ({
 
 // Up to 25 datasets matching query, or the latest research datasets without
 // one.
-export async function searchPublicDatasets(query = '', { sendXhr = useSendXhr, config = siteConfig } = {}) {
+// A page of published datasets: Discover's search for a query, else its
+// newest research datasets. { datasets, totalCount }: how many the query
+// matches in all, for paging through them (offset).
+export async function pagePublicDatasets({ query = '', offset = 0, limit = 25 } = {}, { sendXhr = useSendXhr, config = siteConfig } = {}) {
   const base = config.discoverUrl
   const url = query
-    ? `${base}/search/datasets?limit=25&offset=0&query=${encodeURIComponent(query)}`
-    : `${base}/datasets?limit=25&offset=0&datasetType=research&embargo=false`
+    ? `${base}/search/datasets?limit=${limit}&offset=${offset}&query=${encodeURIComponent(query)}`
+    : `${base}/datasets?limit=${limit}&offset=${offset}&datasetType=research&embargo=false`
   const response = await sendXhr(url, { method: 'GET' })
-  return (response?.datasets || []).map(toPublicDataset).filter((d) => !d.embargo)
+  return {
+    datasets: (response?.datasets || []).map(toPublicDataset).filter((d) => !d.embargo),
+    totalCount: response?.totalCount ?? 0,
+  }
+}
+
+// The first page of published datasets for a query, embargoed ones left out.
+export async function searchPublicDatasets(query = '', options = {}) {
+  return (await pagePublicDatasets({ query }, options)).datasets
 }
 
 // One published dataset version (the latest without one), as the pickers
