@@ -12,7 +12,7 @@ describe("public datasets", () => {
       ],
     });
     const found = await searchPublicDatasets("eeg & sleep", { sendXhr, config });
-    expect(sendXhr.mock.calls[0][0]).toBe("https://api.pennsieve.net/discover/search/datasets?limit=25&offset=0&query=eeg%20%26%20sleep");
+    expect(sendXhr.mock.calls[0][0]).toBe("https://api.pennsieve.net/discover/search/datasets?limit=25&offset=0&embargo=false&query=eeg%20%26%20sleep");
     expect(found.map((d) => d.name)).toEqual(["Open"]);
     expect(found[0].authors).toBe("A B");
   });
@@ -20,8 +20,9 @@ describe("public datasets", () => {
   it("pages through a query's matches, or the newest research datasets", async () => {
     const sendXhr = vi.fn().mockResolvedValue({ totalCount: 192, datasets: [{ id: 1, name: "A" }] });
     const page = await pagePublicDatasets({ query: "eeg", offset: 50 }, { sendXhr, config });
-    expect(sendXhr.mock.calls[0][0]).toBe("https://api.pennsieve.net/discover/search/datasets?limit=25&offset=50&query=eeg");
+    expect(sendXhr.mock.calls[0][0]).toBe("https://api.pennsieve.net/discover/search/datasets?limit=25&offset=50&embargo=false&query=eeg");
     expect(page.totalCount).toBe(192);
+    expect(page.fetched).toBe(1);
     expect(page.datasets.map((d) => d.name)).toEqual(["A"]);
     await pagePublicDatasets({ offset: 25, limit: 100 }, { sendXhr, config });
     expect(sendXhr.mock.calls[1][0]).toBe("https://api.pennsieve.net/discover/datasets?limit=100&offset=25&datasetType=research&embargo=false");
