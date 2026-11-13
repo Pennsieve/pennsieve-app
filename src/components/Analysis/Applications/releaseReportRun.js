@@ -12,10 +12,15 @@
 import { useGetToken } from "@/composables/useGetToken";
 
 const SKIPPED_FOR_HARDWARE = "needs_hardware";
+// A patch release whose line already has a report is not run automatically
+// (app-deploy-service docs/builds.md, "Patch releases"); the owner may make
+// one of its own the same way.
+const SKIPPED_PATCH_RELEASE = "patch_release";
 
 /*
   Whether the version's row offers "Generate release report": the fixtures
-  are ready and the platform's runner skipped for hardware or failed, or a
+  are ready and the platform's runner skipped for hardware or a patch
+  release, or failed, or a
   run on a node is on record (then the offer is to follow it / register it).
 */
 export function nodeRunOffer(version) {
@@ -25,6 +30,7 @@ export function nodeRunOffer(version) {
   const status = String(run?.status || "").toLowerCase();
   if (status === "running" && run?.runId) return { kind: "running", runId: run.runId, computeNodeId: run.computeNodeId || "" };
   if (status === "skipped" && run?.error?.code === SKIPPED_FOR_HARDWARE) return { kind: "needs_hardware" };
+  if (status === "skipped" && run?.error?.code === SKIPPED_PATCH_RELEASE) return { kind: "patch_release" };
   if (status === "failed" && run?.source === "node") return { kind: "retry" };
   if (status === "failed") return { kind: "failed" };
   return null;

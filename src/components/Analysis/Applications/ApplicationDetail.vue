@@ -20,6 +20,8 @@ import AppSampleOutputs from "./AppSampleOutputs.vue";
 import AppSampleCard from "./AppSampleCard.vue";
 import { useAppSample } from "./useAppSample";
 import { releaseReportLine, releaseSample } from "./releaseSample";
+import { reviewHelp } from "./reviewGuide";
+import ReviewBlockGuide from "./ReviewBlockGuide.vue";
 import IconPDF from "../../icons/IconPDF.vue";
 import { useAppSampleOutputs } from "./useAppSampleOutputs";
 import { tryableVersion } from "../RunMonitor/appRuns";
@@ -676,6 +678,10 @@ const reportDialog = ref({ open: false, version: null });
 // Offered for the newest version only, in the header: the page shows that
 // version's report, and the pipeline makes one per version.
 const reportVersion = computed(() => sortedVersions.value?.[0] || null);
+// The owner's help to declare test inputs, on the newest version when it has
+// none (reviewGuide.js).
+const showReviewGuide = (version) =>
+  !!version && version.version === reportVersion.value?.version && reviewHelp(version, { owner: isAppOwner.value });
 const reportOffer = computed(() => (isAppOwner.value ? nodeRunOffer(reportVersion.value) : null));
 const reportOfferLabel = computed(() =>
   reportOffer.value?.kind === "running" ? "Sample run on your node…" : reportOffer.value?.kind === "retry" ? "Run the sample again" : "Generate release report"
@@ -683,7 +689,9 @@ const reportOfferLabel = computed(() =>
 const reportOfferTitle = computed(() =>
   reportOffer.value?.kind === "running"
     ? `A sample run of ${reportVersion.value?.version} is on a compute node of yours; open to follow it`
-    : `The platform could not run ${reportVersion.value?.version} on its test inputs. Run it once on a compute node of yours; the release report is made from that run`
+    : reportOffer.value?.kind === "patch_release"
+      ? `${reportVersion.value?.version} is a patch release, so the report of the earlier release in its line stands. Run it once on a compute node of yours to make a report of its own`
+      : `The platform could not run ${reportVersion.value?.version} on its test inputs. Run it once on a compute node of yours; the release report is made from that run`
 );
 const openReportDialog = () => {
   reportDialog.value = { open: true, version: reportVersion.value };
@@ -1531,6 +1539,12 @@ watch(
                 </button>
                 <span v-else>{{ versionReport(version).text }}</span>
               </div>
+              <ReviewBlockGuide
+                v-if="showReviewGuide(version)"
+                :inputs="manifestSchema?.inputs || []"
+                :parameters="manifestSchema?.parameters || []"
+                :tag="version.version"
+              />
               <!-- Each variant's build; the version's status is the default's -->
               <div v-if="versionVariants(liveDetail, version.version).length" class="version-variants">
                 <div

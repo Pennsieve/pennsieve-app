@@ -192,7 +192,11 @@ const runLink = computed(() => (run.value?.uuid ? { name: store.state.activeOrga
 
     <!-- Pick a node -->
     <template v-else-if="phase === 'pick' || phase === 'starting'">
-      <p class="rr-lead">
+      <p v-if="plan?.reason?.code === 'patch_release'" class="rr-lead">
+        This patch release was not run automatically: the report of the earlier release in its line stands.
+        Run it once on a compute node of yours to make a report of its own.
+      </p>
+      <p v-else class="rr-lead">
         The platform could not run this version on its test inputs
         <template v-if="plan?.reason"> ({{ plan.reason.message || plan.reason.code }})</template>.
         Run it once on a compute node of yours; the report is made from that run.
