@@ -25,7 +25,7 @@ const workflowRoute = (uuid) => ({
   params: { ...(route.params.orgId ? { orgId: route.params.orgId } : {}), uuid },
 });
 
-const viewer = ref({ open: false, source: null, name: "", version: null, subtitle: "" });
+const viewer = ref({ open: false, source: null, name: "", version: null, subtitle: "", note: "" });
 const runLabel = (example) => example.runName || example.runId || "";
 const meta = (example) => {
   const parts = [`Version ${exampleVersion(example)}`, `run ${runLabel(example)}`];
@@ -52,6 +52,7 @@ const open = (entry) => {
     name: entry.workflow.name,
     version: exampleVersion(ex),
     subtitle: meta(ex),
+    note: entry.note || "",
   };
 };
 </script>
@@ -66,6 +67,7 @@ const open = (entry) => {
         <div class="app-sample__text">
           <router-link :to="workflowRoute(entry.workflow.uuid)" class="app-sample__name">{{ entry.workflow.name }}</router-link>
           <span class="app-sample__meta">{{ meta(entry.example) }}</span>
+          <span v-if="entry.note" class="app-sample__note">{{ entry.note }}</span>
         </div>
         <button type="button" class="app-sample__open" @click="open(entry)">
           <IconPDF :width="14" :height="14" color="currentColor" />
@@ -83,6 +85,7 @@ const open = (entry) => {
       :workflow-name="viewer.name"
       :version="viewer.version"
       :subtitle="viewer.subtitle"
+      :note="viewer.note"
     />
   </div>
 </template>
@@ -134,6 +137,11 @@ const open = (entry) => {
 }
 .app-sample__meta {
   font-size: 12px;
+  color: theme.$gray_5;
+}
+.app-sample__note {
+  font-size: 12px;
+  font-style: italic;
   color: theme.$gray_5;
 }
 .app-sample__open {

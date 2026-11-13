@@ -20,8 +20,10 @@ export const workflowsUsingApp = (workflows, sourceUrl) => {
   });
 };
 
-// One workflow's sample output as the app's page lists it, or null.
-export const appSampleEntry = (wf, example) =>
-  wf && example ? { workflow: { uuid: wf.uuid, name: wf.name || "Workflow" }, example } : null;
+// One workflow's sample output as the app's page lists it, or null. note:
+// how the report relates to the workflow's current version (Workflows/
+// runExamples.js reportNote), kept only when there's one.
+export const appSampleEntry = (wf, example, note = "") =>
+  wf && example ? { workflow: { uuid: wf.uuid, name: wf.name || "Workflow" }, example, ...(note && { note }) } : null;
 
 export const sortEntries = (entries) => [...entries].sort((a, b) => a.workflow.name.localeCompare(b.workflow.name));

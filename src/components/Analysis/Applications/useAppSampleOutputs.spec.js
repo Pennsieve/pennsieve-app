@@ -11,7 +11,7 @@ const wf = (uuid, name, url) => ({
   dag: [{ id: "in", type: "data-source" }, { id: "s", type: "processor", sourceUrl: url, dependsOn: ["in"] }],
 });
 
-const run = async ({ workspace, publicList, examples, maxWorkflows, own = null }) => {
+const run = async ({ workspace, publicList, examples, maxWorkflows, own = null, versions = {} }) => {
   const list = vi.fn(async (_, { visibility, cursor }) => {
     const pages = visibility === "public" ? publicList : workspace;
     const i = cursor ? Number(cursor) : 0;
@@ -25,7 +25,12 @@ const run = async ({ workspace, publicList, examples, maxWorkflows, own = null }
     modules: {
       analysisModule: {
         namespaced: true,
-        actions: { listWorkflowDefinitions: list, fetchWorkflowExample: fetchExample, fetchAppExample: async () => own },
+        actions: {
+          listWorkflowDefinitions: list,
+          fetchWorkflowExample: fetchExample,
+          fetchAppExample: async () => own,
+          fetchWorkflowVersion: async (_, { uuid, version }) => versions[`${uuid}@${version}`] || null,
+        },
       },
     },
   });
@@ -64,5 +69,17 @@ describe("useAppSampleOutputs", () => {
     });
     expect(fetchExample).toHaveBeenCalledTimes(2);
     expect(result.more.value).toBe(1);
+  });
+
+  it("keeps an older version's report, with a note naming the apps changed since", async () => {
+    const current = { ...wf("n", "N", URL), dag: [{ id: "s", type: "processor", sourceUrl: URL, tag: "v0.2.0", dependsOn: [] }] };
+    const { result } = await run({
+      workspace: [[current]],
+      publicList: [],
+      examples: { n: { version: 1, fromVersion: 1 } },
+      versions: { "n@1": { dag: [{ id: "s", type: "processor", sourceUrl: URL, tag: "v0.1.0", dependsOn: [] }] } },
+    });
+    expect(result.entries.value).toHaveLength(1);
+    expect(result.entries.value[0].note).toBe("Report from version 1; apps have changed since (st-niches v0.1.0 → v0.2.0)");
   });
 });
