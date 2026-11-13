@@ -91,3 +91,18 @@ export async function browsePublicFiles({ id, version, path = '', limit = 500, o
   )
   return { files: response?.files || [], totalCount: response?.totalCount || 0 }
 }
+
+// The metadata models a published version carries records of: the folder
+// names under metadata/models, sorted; none for a version without a
+// metadata export (its folder doesn't exist).
+export async function listPublicModels({ id, version }, options = {}) {
+  try {
+    const { files } = await browsePublicFiles({ id, version, path: 'metadata/models', limit: 1000 }, options)
+    return files
+      .filter((f) => f.type === 'Directory')
+      .map((f) => f.name)
+      .sort()
+  } catch (err) {
+    return []
+  }
+}

@@ -144,8 +144,8 @@ function onRow() {
            from and how much is in the session; a file: not downloaded, its
            size, progress or failure), then its actions on hover. -->
       <span class="fn__end">
-      <span v-if="viewProgress" class="fn__from" :title="`${view.source.name}\n${viewProgress.done} of ${viewProgress.total} files in the session`">
-        {{ view.source.subtitle }} · {{ viewProgress.done }}/{{ viewProgress.total }}
+      <span v-if="viewProgress" class="fn__from" :title="`${view.source.name}\n${viewProgress.done} of ${viewProgress.total} files in the session${view.source.models?.length ? `\nMetadata records of ${view.source.models.map((m) => m.name).join(', ')} under metadata/` : ''}`">
+        {{ view.source.subtitle }} · {{ viewProgress.done }}/{{ viewProgress.total }}<template v-if="view.source.models?.length"> · {{ view.source.models.length }} {{ view.source.models.length === 1 ? "model" : "models" }}</template>
       </span>
       <svg v-if="remote && !under" class="fn__cloud" width="12" height="12" viewBox="0 0 16 16" aria-label="Not downloaded">
         <path d="M4.5 12.5h7.2a2.8 2.8 0 0 0 .4-5.6 4 4 0 0 0-7.7-1A3.3 3.3 0 0 0 4.5 12.5z" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" />

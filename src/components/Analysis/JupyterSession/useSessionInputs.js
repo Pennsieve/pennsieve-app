@@ -133,9 +133,12 @@ export function useSessionInputs({
               inputFolder: s.root ? "" : s.name,
               viewId: s.viewId,
               version: s.version,
+              // The models whose records are in the session already
+              // (staged before it started), with their files' paths.
+              models: s.models || [],
             }))
             .filter((s) => s.nodeId)
-        : runViews.map(([nodeId, ds]) => ({ nodeId, inputFolder: "", viewId: ds.viewId, version: ds.viewVersion }));
+        : runViews.map(([nodeId, ds]) => ({ nodeId, inputFolder: "", viewId: ds.viewId, version: ds.viewVersion, models: [] }));
       sources.value = await Promise.all(
         list.map(async (s) => {
           const [view, entries] = await Promise.all([
