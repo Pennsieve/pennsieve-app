@@ -11,9 +11,9 @@
     file types. Folders can always be chosen.
 */
 import { computed, onBeforeUnmount, ref } from "vue";
-import { searchPublicDatasets, browsePublicFiles } from "@/utils/publicDatasets";
+import { searchPublicDatasets, browsePublicFiles, listPublicModels } from "@/utils/publicDatasets";
 import { formatBytes } from "./dataTargets";
-import { inChosenFolder as inFolder, isPicked as picked, togglePick, groupPicks } from "./publicPicks";
+import { inChosenFolder as inFolder, isPicked as picked, togglePick, groupPicks, recordsPick, recordsPickOf, isRecordsPick } from "./publicPicks";
 
 const props = defineProps({
   modelValue: { type: Array, default: () => [] },
@@ -93,6 +93,36 @@ const openDataset = (id) => {
   path.value = "";
   files.value = [];
   load();
+  loadModels();
+};
+
+/* --------------------------------------------------------------- records -- */
+// The metadata models the open dataset's version publishes records of; the
+// input can take their records (one records pick per version) beside files.
+const availableModels = ref([]);
+let modelsSeq = 0;
+async function loadModels() {
+  const seq = ++modelsSeq;
+  availableModels.value = [];
+  if (!dataset.value) return;
+  const found = await listPublicModels({ id: dataset.value.id, version: dataset.value.version });
+  if (seq === modelsSeq) availableModels.value = found;
+}
+const records = computed(() => (dataset.value ? recordsPickOf(props.modelValue, dataset.value.id, dataset.value.version) : null));
+const setRecords = (models) => {
+  const base = { datasetId: dataset.value.id, version: dataset.value.version, datasetName: dataset.value.name };
+  emit("update:modelValue", togglePick(props.modelValue, recordsPick(base, models.length ? models : availableModels.value), models.length > 0 || !records.value));
+};
+const includeRecords = computed({
+  get: () => !!records.value,
+  set: (on) => {
+    const base = { datasetId: dataset.value.id, version: dataset.value.version, datasetName: dataset.value.name };
+    emit("update:modelValue", togglePick(props.modelValue, recordsPick(base, availableModels.value), on));
+  },
+});
+const toggleModel = (name, on) => {
+  const current = records.value?.models || [];
+  setRecords(on ? [...current, name] : current.filter((m) => m !== name));
 };
 // Another folder: the one before's rows go at once, so they can't be taken
 // for this one's.
@@ -161,6 +191,19 @@ const groups = computed(() => groupPicks(props.modelValue));
         <div class="pfp__meta">
           Version {{ dataset.version }} · {{ dataset.fileCount.toLocaleString("en-US") }} files · {{ formatBytes(dataset.size) }}
         </div>
+        <div v-if="availableModels.length" class="pfp__records">
+          <el-checkbox v-model="includeRecords">Include metadata records</el-checkbox>
+          <div v-if="includeRecords" class="pfp__records-models">
+            <el-checkbox
+              v-for="m in availableModels"
+              :key="m"
+              :model-value="records.models.includes(m)"
+              :disabled="records.models.length === 1 && records.models.includes(m)"
+              @update:model-value="(on) => toggleModel(m, on)"
+              >{{ m }}</el-checkbox
+            >
+          </div>
+        </div>
       </div>
     </div>
 
@@ -204,8 +247,8 @@ const groups = computed(() => groupPicks(props.modelValue));
     <div v-if="groups.length" class="pfp__chosen">
       <div v-for="g in groups" :key="g.key" class="pfp__group">
         <span class="pfp__group-name">{{ g.name }} <span>v{{ g.version }}</span></span>
-        <span v-for="p in g.picks" :key="p.path" class="pfp__chip" :title="p.path">
-          {{ p.isFolder ? `${p.name}/` : p.name }}
+        <span v-for="p in g.picks" :key="isRecordsPick(p) ? 'records' : p.path" class="pfp__chip" :title="isRecordsPick(p) ? `Records of ${p.models.join(', ')}` : p.path">
+          {{ isRecordsPick(p) ? `${p.name} (${p.models.length})` : p.isFolder ? `${p.name}/` : p.name }}
           <button type="button" :aria-label="`Remove ${p.name}`" @click="remove(p)"><span aria-hidden="true">×</span></button>
         </span>
       </div>
@@ -220,6 +263,18 @@ const groups = computed(() => groupPicks(props.modelValue));
   display: flex;
   flex-direction: column;
   gap: 12px;
+}
+.pfp__records {
+  margin-top: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.pfp__records-models {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 14px;
+  padding-left: 22px;
 }
 .pfp__search {
   display: flex;

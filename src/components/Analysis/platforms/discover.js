@@ -15,13 +15,15 @@ export default {
   title: "Choose a Pennsieve Discover dataset",
   intro: ["A published dataset and its version. The notebook gets its file list; you pick which files to download."],
   picker: defineAsyncComponent(() => import("../DiscoverPicker.vue")),
-  selection: () => ({ dataset: null, version: null }),
+  // models are the version's metadata models to take the records of
+  // (names; none for no records), chosen in the picker.
+  selection: () => ({ dataset: null, version: null, models: [] }),
   ready: (p) => !!p.dataset && p.version != null,
-  label: (p) => p.dataset?.name || "",
+  label: (p) => (p.dataset ? `${p.dataset.name}${p.models?.length ? " with metadata records" : ""}` : ""),
   sameLabel: (p) => `Version ${p.version} of ${p.dataset?.name}`,
   // A Discover source is the same files by its dataset id and version.
   sameAs: (p, source) => source.sourceDatasetId === p.dataset.id && source.sourceVersion === p.version,
-  createView: (p) => viewForDataset({ datasetId: p.dataset.id, version: p.version, name: p.dataset.name }),
+  createView: (p) => viewForDataset({ datasetId: p.dataset.id, version: p.version, name: p.dataset.name, models: p.models?.length ? p.models : undefined }),
   folderName: (p, n) => `dataset-${p.dataset.id}-v${p.version}${n > 1 ? `-${n}` : ""}`,
   count: () => countPublicDatasets(),
   regions: () => [],

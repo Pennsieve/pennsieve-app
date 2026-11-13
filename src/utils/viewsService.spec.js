@@ -60,6 +60,16 @@ describe("viewForDataset", () => {
     expect(JSON.parse(init.body)).toEqual({ name: "Study (version 2)", datasetId: 7, version: 2 });
   });
 
+  it("tells a view with records from one without, and asks for the models", async () => {
+    const withRecords = { id: "v2", version: 1, sources: [{ datasetId: 7, version: 2, models: ["participant"] }] };
+    const listed = [200, { views: [view, withRecords] }];
+    expect(await viewForDataset({ datasetId: 7, version: 2, name: "Study" }, { config, getToken, fetchFn: respond(listed) })).toBe(view);
+    expect(await viewForDataset({ datasetId: 7, version: 2, name: "Study", models: ["participant"] }, { config, getToken, fetchFn: respond(listed) })).toBe(withRecords);
+    const fetchFn = respond(listed, [201, withRecords]);
+    await viewForDataset({ datasetId: 7, version: 2, name: "Study", models: ["participant", "sample"] }, { config, getToken, fetchFn });
+    expect(JSON.parse(fetchFn.mock.calls[1][1].body)).toEqual({ name: "Study (version 2)", datasetId: 7, version: 2, models: ["participant", "sample"] });
+  });
+
   it("rejects with the service's message", async () => {
     const fetchFn = respond([200, { views: [] }], [400, { message: "only openly published dataset versions" }]);
     const err = await viewForDataset({ datasetId: 7, version: 2, name: "S" }, { config, getToken, fetchFn }).catch((e) => e);
@@ -113,6 +123,17 @@ describe("run views", () => {
       { datasetId: 9, version: 1, paths: ["files/sub"] },
     ]);
     expect(runViewSources([])).toEqual([]);
+  });
+
+  it("takes a version's records as its source's models, with or without files", async () => {
+    const { runViewSources } = await import("./viewsService");
+    const records = { datasetId: 9, version: 1, path: "", models: ["participant"] };
+    expect(runViewSources([...picks, records])).toEqual([
+      { datasetId: 7, version: 2, paths: ["files/a.csv", "files/b.csv"] },
+      { datasetId: 9, version: 1, paths: ["files/sub"], models: ["participant"] },
+    ]);
+    // Records only: no paths at all (an empty list would be the whole version).
+    expect(runViewSources([{ datasetId: 9, version: 1, path: "", models: ["*"] }])).toEqual([{ datasetId: 9, version: 1, models: ["*"] }]);
   });
 
   it("creates a view kept only for the run", async () => {
