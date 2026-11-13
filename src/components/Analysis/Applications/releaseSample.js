@@ -35,7 +35,7 @@ const REASONS = {
   manifest_missing: "no app.yml",
   build_failed: "the build failed",
   needs_hardware: "needs a GPU, or more memory than the sample runner has",
-  patch_release: "a patch release; the report of the earlier release in its line stands",
+  patch_release: "patch release; previous report kept",
   no_bundle: "no test inputs to run on",
   bundle_unavailable: "the test inputs could not be fetched",
   bundle_too_large: "the test inputs are too large",
@@ -131,6 +131,11 @@ export function releaseReportLine(version, assetsUrl = "") {
   if (status("sample") === "ready") return { text: "Release report", tone: "link", href };
   const failed = ["fixtures", "sampleRun", "sample"].find((k) => status(k) === "failed");
   if (failed) return { text: `Release report: failed — ${stageReason(rec(failed)) || "see the log"}`, tone: "warn" };
+  // A patch release keeps the report of the release before it (app-deploy-service
+  // docs/builds.md, "Patch releases"); the page shows that one.
+  if (status("sampleRun") === "skipped" && rec("sampleRun")?.error?.code === "patch_release") {
+    return { text: "Release report: unchanged (patch release)", tone: "muted" };
+  }
   const skipped = ["fixtures", "sampleRun"].find((k) => status(k) === "skipped");
   if (skipped) return { text: `Release report: not made — ${stageReason(rec(skipped)) || "skipped"}`, tone: "muted" };
   if (["queued", "running"].includes(status("sample"))) return { text: "Release report: writing…", tone: "muted" };
