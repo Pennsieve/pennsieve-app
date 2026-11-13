@@ -20,6 +20,8 @@ import AppSampleOutputs from "./AppSampleOutputs.vue";
 import AppSampleCard from "./AppSampleCard.vue";
 import { useAppSample } from "./useAppSample";
 import { releaseReportLine, releaseSample } from "./releaseSample";
+import { reviewHelp } from "./reviewGuide";
+import ReviewBlockGuide from "./ReviewBlockGuide.vue";
 import IconPDF from "../../icons/IconPDF.vue";
 import { useAppSampleOutputs } from "./useAppSampleOutputs";
 import { tryableVersion } from "../RunMonitor/appRuns";
@@ -676,6 +678,10 @@ const reportDialog = ref({ open: false, version: null });
 // Offered for the newest version only, in the header: the page shows that
 // version's report, and the pipeline makes one per version.
 const reportVersion = computed(() => sortedVersions.value?.[0] || null);
+// The owner's help to declare test inputs, on the newest version when it has
+// none (reviewGuide.js).
+const showReviewGuide = (version) =>
+  !!version && version.version === reportVersion.value?.version && reviewHelp(version, { owner: isAppOwner.value });
 const reportOffer = computed(() => (isAppOwner.value ? nodeRunOffer(reportVersion.value) : null));
 const reportOfferLabel = computed(() =>
   reportOffer.value?.kind === "running" ? "Sample run on your node…" : reportOffer.value?.kind === "retry" ? "Run the sample again" : "Generate release report"
@@ -1533,6 +1539,12 @@ watch(
                 </button>
                 <span v-else>{{ versionReport(version).text }}</span>
               </div>
+              <ReviewBlockGuide
+                v-if="showReviewGuide(version)"
+                :inputs="manifestSchema?.inputs || []"
+                :parameters="manifestSchema?.parameters || []"
+                :tag="version.version"
+              />
               <!-- Each variant's build; the version's status is the default's -->
               <div v-if="versionVariants(liveDetail, version.version).length" class="version-variants">
                 <div
