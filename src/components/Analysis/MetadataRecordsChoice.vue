@@ -14,14 +14,18 @@ const toggle = (name, on) => (chosen.value = on ? [...chosen.value, name] : chos
 
 <template>
   <div v-if="available.length" class="mrc">
-    <el-checkbox :model-value="chosen.length > 0" @update:model-value="include">Include metadata records</el-checkbox>
-    <span class="mrc__hint">The dataset's records and their links to its files, as files the run starts with.</span>
+    <el-checkbox :model-value="chosen.length > 0" class="mrc__include" @update:model-value="include">Include metadata records</el-checkbox>
+    <p class="mrc__hint">
+      Its records and the links between them and its files, downloaded with the data before it starts.
+      <template v-if="chosen.length && available.length > 1"> {{ chosen.length }} of {{ available.length }} models.</template>
+    </p>
     <div v-if="chosen.length && available.length > 1" class="mrc__models">
       <el-checkbox
         v-for="m in available"
         :key="m"
         :model-value="chosen.includes(m)"
         :disabled="chosen.length === 1 && chosen.includes(m)"
+        class="mrc__model"
         @update:model-value="(on) => toggle(m, on)"
         >{{ m }}</el-checkbox
       >
@@ -33,18 +37,33 @@ const toggle = (name, on) => (chosen.value = on ? [...chosen.value, name] : chos
 @use "../../styles/theme";
 
 .mrc {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
+  border-top: 1px solid theme.$gray_2;
+  padding-top: 10px;
+}
+.mrc__include :deep(.el-checkbox__label) {
+  font-size: 14px;
+  font-weight: 500;
+  color: theme.$gray_6;
 }
 .mrc__hint {
+  margin: 0 0 6px 24px;
   font-size: 12px;
+  line-height: 1.4;
   color: theme.$gray_5;
 }
 .mrc__models {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 2px 14px;
-  padding-left: 22px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 0 12px;
+  margin-left: 24px;
+}
+.mrc__model {
+  height: 26px;
+}
+.mrc__model :deep(.el-checkbox__label) {
+  font-size: 13px;
+  font-weight: 400;
+  color: theme.$gray_6;
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
 }
 </style>
