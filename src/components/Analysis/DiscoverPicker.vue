@@ -329,7 +329,7 @@ const formatSize = (bytes) => {
   margin-top: 4px;
 }
 .public-records {
-  margin-top: 10px;
+  margin: 12px 0 0;
 }
 .public-more {
   padding: 8px 4px;
