@@ -34,7 +34,7 @@ const viewButtons = (wrapper) => wrapper.findAll("button").filter((b) => b.text(
 describe("AppSampleOutputs", () => {
   it("lists the sample output of each workflow the app is in", () => {
     const text = mountIt().text().replace(/\s+/g, " ");
-    expect(text).toContain("Sample outputs of workflows that use st-niches");
+    expect(text).toContain("Example reports of workflows that use st-niches");
     expect(text).toContain("Spatial Profiling");
     expect(text).toContain("Version 3 · run Xenium demo · 17 pages");
     expect(text).toContain("Domain Mapping");

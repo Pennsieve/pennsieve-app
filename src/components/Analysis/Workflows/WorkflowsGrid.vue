@@ -351,7 +351,7 @@ watch(
   },
   { immediate: true }
 );
-const cardExampleLabel = (example) => (example?.fromVersion ? `Sample output (v${example.fromVersion})` : "Sample output");
+const cardExampleLabel = (example) => (example?.fromVersion ? `Example report (v${example.fromVersion})` : "Example report");
 const viewer = ref({ open: false, source: null, name: "", version: null, subtitle: "", note: "", noteDetail: "" });
 const exampleSubtitle = (example) => {
   if (!example) return "";

@@ -146,15 +146,15 @@ const remove = async () => {
   </el-tooltip>
 
   <div v-else-if="example && variant === 'row'" class="info-row wf-example-row">
-    <span class="info-label">Sample output</span>
+    <span class="info-label">Example report</span>
     <span class="info-value">
       <button type="button" class="wf-example-row__open" @click="open">
         <IconPDF :width="14" :height="14" color="currentColor" />
-        <span>Sample workflow report{{ pagesLabel ? ` (${pagesLabel})` : "" }}</span>
+        <span>View PDF{{ pagesLabel ? ` (${pagesLabel})` : "" }}</span>
       </button>
       <span v-if="note" class="wf-example-row__note" :title="noteDetail || undefined">{{ note }}</span>
       <button v-if="canEdit" type="button" class="wf-example__remove" :disabled="removing" @click="remove">
-        Remove sample output
+        Remove example
       </button>
     </span>
   </div>
@@ -190,11 +190,31 @@ const remove = async () => {
     color: theme.$purple_3;
   }
 }
+/* The panel's rows (WorkflowBuilder .info-row): its scoped styles don't reach
+   this component, so the row's are repeated here. */
+.wf-example-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 6px 0;
+  border-bottom: 1px solid theme.$gray_2;
+}
+.wf-example-row .info-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: theme.$gray_5;
+  flex-shrink: 0;
+  min-width: 80px;
+}
 .wf-example-row .info-value {
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
+  align-items: flex-end;
   gap: 2px;
+  font-size: 12px;
+  color: theme.$black;
+  text-align: right;
 }
 .wf-example-row__open {
   display: inline-flex;

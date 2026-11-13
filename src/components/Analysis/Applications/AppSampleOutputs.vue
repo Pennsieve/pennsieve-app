@@ -61,7 +61,7 @@ const open = (entry) => {
 <template>
   <div class="app-samples">
     <p class="app-samples__intro">
-      Sample outputs of workflows that use {{ appName || "this app" }}: a PDF summary of one run of each.
+      Example reports of workflows that use {{ appName || "this app" }}: a PDF of one run of each.
     </p>
     <ul class="app-samples__list">
       <li v-for="entry in entries" :key="entry.workflow.uuid" class="app-sample">

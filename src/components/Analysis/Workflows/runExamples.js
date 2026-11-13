@@ -47,7 +47,7 @@ export const exampleVersion = (example) => example?.fromVersion || example?.vers
 // "Sample output", or "Sample output from version N" when it's of an older version than
 // the one shown.
 export const exampleLabel = (example) =>
-  example?.fromVersion ? `Sample output from version ${example.fromVersion}` : "Sample output";
+  example?.fromVersion ? `Example report from version ${example.fromVersion}` : "Example report";
 
 export const jobStatusText = (job) => {
   switch (job?.status) {
