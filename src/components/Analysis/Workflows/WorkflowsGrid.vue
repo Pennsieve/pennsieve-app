@@ -25,6 +25,7 @@ import { useGetToken } from "@/composables/useGetToken";
 import { isNotebookWorkflow } from "../RunMonitor/notebookHelpers";
 import { exampleLabel, exampleVersion, PDF_URL_FRESH_MS } from "./runExamples";
 import SampleOutputViewer from "./SampleOutputViewer.vue";
+import { workflowReportNote } from "./reportNote";
 import FacetLayout from "../Facets/FacetLayout.vue";
 import ContentIntro from '@/components/shared/ContentIntro/ContentIntro.vue';
 import FacetSection from "../Facets/FacetSection.vue";
@@ -351,7 +352,7 @@ watch(
   { immediate: true }
 );
 const cardExampleLabel = (example) => (example?.fromVersion ? `Sample output (v${example.fromVersion})` : "Sample output");
-const viewer = ref({ open: false, source: null, name: "", version: null, subtitle: "" });
+const viewer = ref({ open: false, source: null, name: "", version: null, subtitle: "", note: "" });
 const exampleSubtitle = (example) => {
   if (!example) return "";
   const parts = [];
@@ -387,7 +388,14 @@ const openExample = (wf) => {
     name: wf.name || "",
     version: exampleVersion(cached),
     subtitle: exampleSubtitle(cached),
+    note: "",
   };
+  // How the report relates to the workflow's current version (an older
+  // version's, or other apps'), once known.
+  const shown = viewer.value;
+  workflowReportNote(store, wf.uuid, cached, wf).then((note) => {
+    if (viewer.value === shown) shown.note = note;
+  });
 };
 
 // Re-fetch all when the status filter changes (visibility filters what's
@@ -597,6 +605,7 @@ onMounted(async () => {
       :workflow-name="viewer.name"
       :version="viewer.version"
       :subtitle="viewer.subtitle"
+      :note="viewer.note"
     />
   </div>
 </template>

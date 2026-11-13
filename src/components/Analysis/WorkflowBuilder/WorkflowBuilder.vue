@@ -2887,6 +2887,7 @@ const openNodeSettings = (id) => {
           :uuid="selectedWorkflow.uuid"
           :version="viewingVersion"
           :workflow-name="selectedWorkflow.name || ''"
+          :workflow="selectedWorkflow"
           variant="icon"
         />
         <bf-button v-if="!viewingVersion && selectedWorkflow?.isActive !== false" class="secondary" @click="runThis">
@@ -4090,6 +4091,7 @@ const openNodeSettings = (id) => {
                     :version="viewingVersion"
                     :can-edit="canEditExample"
                     :workflow-name="selectedWorkflow.name || ''"
+                    :workflow="selectedWorkflow"
                     variant="row"
                   />
                   <div class="info-row">

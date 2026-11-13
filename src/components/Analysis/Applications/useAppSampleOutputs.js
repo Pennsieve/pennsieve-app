@@ -7,6 +7,7 @@
 import { ref, watch } from "vue";
 import { useStore } from "vuex";
 import { appSampleEntry, sortEntries, workflowsUsingApp } from "./appSamples";
+import { workflowReportNote } from "../Workflows/reportNote";
 
 export function useAppSampleOutputs(sourceUrl, { maxPages = 5, maxWorkflows = 12 } = {}) {
   const store = useStore();
@@ -45,7 +46,13 @@ export function useAppSampleOutputs(sourceUrl, { maxPages = 5, maxWorkflows = 12
         asked.map((wf) =>
           store
             .dispatch("analysisModule/fetchWorkflowExample", wf.uuid)
-            .then((example) => appSampleEntry(wf, example && { ...example, fetchedAt: Date.now() }))
+            .then(async (example) => {
+              if (!example) return null;
+              // The newest report any version has, with a note when it's
+              // older than the workflow's current version.
+              const note = await workflowReportNote(store, wf.uuid, example, wf).catch(() => "");
+              return appSampleEntry(wf, { ...example, fetchedAt: Date.now() }, note);
+            })
             .catch(() => null)
         )
       );
