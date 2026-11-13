@@ -33,8 +33,8 @@ describe("canEditWorkflow", () => {
 
 describe("example labels", () => {
   it("names an older version's example", () => {
-    expect(exampleLabel({ version: 3 })).toBe("Sample output");
-    expect(exampleLabel({ version: 3, fromVersion: 3 })).toBe("Sample output from version 3");
+    expect(exampleLabel({ version: 3 })).toBe("Example report");
+    expect(exampleLabel({ version: 3, fromVersion: 3 })).toBe("Example report from version 3");
     expect(exampleVersion({ version: 4 })).toBe(4);
     expect(exampleVersion({ version: 4, fromVersion: 2 })).toBe(2);
     expect(exampleVersion(null)).toBe(null);
