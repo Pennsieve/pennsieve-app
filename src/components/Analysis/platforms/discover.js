@@ -13,7 +13,7 @@ export default {
   // The mark is 100 x 114: a little taller than wide.
   mark: { icon: IconPennsieveMark, iconProps: (s) => ({ width: Math.round(s * 0.42), height: Math.round(s * 0.48), color: "currentColor" }), tone: "brand" },
   title: "Choose a Pennsieve Discover dataset",
-  intro: ["A published dataset and its version. The notebook gets its file list; you pick which files to download."],
+  intro: ["A published dataset and its version. The notebook gets its file list, and its metadata records if you include them; you pick which files to download."],
   picker: defineAsyncComponent(() => import("../DiscoverPicker.vue")),
   // models are the version's metadata models to take the records of
   // (names; none for no records), chosen in the picker.
