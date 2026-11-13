@@ -4,23 +4,10 @@
 // version's metadata records of those models (recordsPick), which the view
 // takes beside the files.
 
-const keyOf = (p) => `${p.datasetId}:${p.version}:${p.models ? `records:${[...p.models].sort().join(",")}` : p.path}`;
+import { isRecordsPick } from "@/utils/recordsPicks";
+export { recordsPick, isRecordsPick, recordsPickOf } from "@/utils/recordsPicks";
 
-// The pick that takes a dataset version's metadata records of models (its
-// model names, or ["*"] for all).
-export const recordsPick = ({ datasetId, version, datasetName }, models) => ({
-  datasetId,
-  version,
-  datasetName,
-  path: "",
-  name: "Metadata records",
-  isFolder: false,
-  models: [...models],
-});
-export const isRecordsPick = (p) => Array.isArray(p?.models);
-// The records pick of a dataset version, if any.
-export const recordsPickOf = (picks, datasetId, version) =>
-  picks.find((p) => isRecordsPick(p) && p.datasetId === datasetId && p.version === version) || null;
+const keyOf = (p) => `${p.datasetId}:${p.version}:${isRecordsPick(p) ? `records:${[...p.models].sort().join(",")}` : p.path}`;
 const sameVersion = (a, b) => a.datasetId === b.datasetId && a.version === b.version;
 
 // Whether path in a dataset version is inside a chosen folder (not the

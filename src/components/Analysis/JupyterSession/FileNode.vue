@@ -52,6 +52,14 @@ const progress = computed(() => {
 // A view's folder: how much of it is in the session, and what's left.
 const isViewFolder = computed(() => props.inputs && view.value && props.node.type === "directory");
 const viewProgress = computed(() => (isViewFolder.value && view.value.root ? props.inputs.folderProgress(view.value.source, "") : null));
+// A view folder's row says where it's from, how much of it is in the
+// session, and which models' records it holds (under metadata/).
+const viewTitle = computed(() => {
+  if (!viewProgress.value) return undefined;
+  const models = view.value.source.models || [];
+  const records = models.length ? `\nMetadata records of ${models.map((m) => m.name).join(", ")} under metadata/` : "";
+  return `${view.value.source.name}\n${viewProgress.value.done} of ${viewProgress.value.total} files in the session${records}`;
+});
 const left = computed(() => (isViewFolder.value ? props.inputs.remainingIn(view.value.source, view.value.rel) : []));
 const leftSize = computed(() => left.value.reduce((n, e) => n + (e.size || 0), 0));
 const selected = computed(() => remote.value && props.inputs.isSelected(view.value.source, view.value.entry.cratePath));
@@ -144,7 +152,7 @@ function onRow() {
            from and how much is in the session; a file: not downloaded, its
            size, progress or failure), then its actions on hover. -->
       <span class="fn__end">
-      <span v-if="viewProgress" class="fn__from" :title="`${view.source.name}\n${viewProgress.done} of ${viewProgress.total} files in the session${view.source.models?.length ? `\nMetadata records of ${view.source.models.map((m) => m.name).join(', ')} under metadata/` : ''}`">
+      <span v-if="viewProgress" class="fn__from" :title="viewTitle">
         {{ view.source.subtitle }} · {{ viewProgress.done }}/{{ viewProgress.total }}<template v-if="view.source.models?.length"> · {{ view.source.models.length }} {{ view.source.models.length === 1 ? "model" : "models" }}</template>
       </span>
       <svg v-if="remote && !under" class="fn__cloud" width="12" height="12" viewBox="0 0 16 16" aria-label="Not downloaded">

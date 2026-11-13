@@ -4,11 +4,12 @@
 // versions are offered (views take no embargoed ones). A view of it is made
 // from these (viewsService viewForDataset). Used by the new notebook dialog
 // and the running session's Inputs panel.
-import { computed, onMounted, ref, watch } from "vue";
+import { onMounted, ref, watch } from "vue";
 import * as siteConfig from "@/site-config/site.json";
 import { useSendXhr } from "@/mixins/request/request_composable";
 import { searchPublicDatasets as findPublicDatasets, listPublicModels } from "@/utils/publicDatasets";
 import IconCompass from "@/components/icons/IconCompass.vue";
+import MetadataRecordsChoice from "./MetadataRecordsChoice.vue";
 
 // The chosen dataset ({ id, name, version, doi, fileCount, size, ... }) and
 // version, and the metadata models whose records the notebook gets with
@@ -28,16 +29,9 @@ async function loadModels() {
   const found = await listPublicModels({ id: dataset.value.id, version: version.value });
   if (seq === modelsSeq) availableModels.value = found;
 }
-const includeRecords = computed({
-  get: () => models.value.length > 0,
-  set: (on) => {
-    models.value = on ? [...availableModels.value] : [];
-  },
-});
-const toggleModel = (name, on) => {
-  models.value = on ? [...models.value, name] : models.value.filter((m) => m !== name);
-};
-watch(version, () => loadModels());
+// A preset selection (a notebook opened from a dataset) loads its models
+// too.
+watch([dataset, version], () => loadModels(), { immediate: true });
 
 const publicQuery = ref("");
 const publicResults = ref([]);
@@ -83,7 +77,6 @@ function clearPublicDataset() {
   dataset.value = null;
   version.value = null;
   publicVersions.value = [];
-  loadModels();
 }
 
 onMounted(() => searchPublicDatasets());
@@ -137,20 +130,7 @@ const formatSize = (bytes) => {
         />
       </el-select>
     </div>
-    <div v-if="availableModels.length" class="public-records">
-      <el-checkbox v-model="includeRecords">Include metadata records</el-checkbox>
-      <span class="public-records-hint">The dataset's records and their links to its files, as files the notebook starts with.</span>
-      <div v-if="includeRecords" class="public-records-models">
-        <el-checkbox
-          v-for="m in availableModels"
-          :key="m"
-          :model-value="models.includes(m)"
-          :disabled="models.length === 1 && models.includes(m)"
-          @update:model-value="(on) => toggleModel(m, on)"
-          >{{ m }}</el-checkbox
-        >
-      </div>
-    </div>
+    <MetadataRecordsChoice v-model="models" :available="availableModels" class="public-records" />
   </div>
   <template v-else>
     <el-input
@@ -326,19 +306,6 @@ const formatSize = (bytes) => {
 }
 .public-records {
   margin-top: 10px;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-.public-records-hint {
-  font-size: 12px;
-  color: theme.$gray_5;
-}
-.public-records-models {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 2px 14px;
-  margin-top: 2px;
 }
 .public-selection .public-version {
   padding-left: 68px;
