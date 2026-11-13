@@ -14,11 +14,10 @@ const toggle = (name, on) => (chosen.value = on ? [...chosen.value, name] : chos
 
 <template>
   <div v-if="available.length" class="mrc">
-    <el-checkbox :model-value="chosen.length > 0" class="mrc__include" @update:model-value="include">Include metadata records</el-checkbox>
-    <p class="mrc__hint">
-      Its records and the links between them and its files, downloaded with the data before it starts.
-      <template v-if="chosen.length && available.length > 1"> {{ chosen.length }} of {{ available.length }} models.</template>
-    </p>
+    <el-checkbox :model-value="chosen.length > 0" class="mrc__include" @update:model-value="include">
+      Include metadata records<template v-if="chosen.length && available.length > 1"> ({{ chosen.length }} of {{ available.length }})</template>
+    </el-checkbox>
+    <p class="mrc__hint">Its records and the links between them and its files, downloaded with the data before it starts.</p>
     <div v-if="chosen.length && available.length > 1" class="mrc__models">
       <el-checkbox
         v-for="m in available"
