@@ -1,10 +1,10 @@
 <script setup>
 /*
   For the owner of an app whose release declares no test inputs (app.yml has
-  no review block): why that leaves the release report without figures or
-  results, and a review block to paste, built from the app's own inputs and
-  parameters, for the way of declaring test inputs the owner picks
-  (reviewGuide.js).
+  no review block): a warning line on the version, and a dialog with why
+  that leaves the release report without figures or results and a review
+  block to paste, built from the app's own inputs and parameters, for the
+  way of declaring test inputs the owner picks (reviewGuide.js).
 */
 import { computed, ref } from "vue";
 import EventBus from "../../../utils/event-bus";
@@ -35,111 +35,157 @@ const copy = async () => {
 </script>
 
 <template>
-  <div class="review-guide" :class="{ 'is-open': open }">
-    <button type="button" class="review-guide__toggle" :aria-expanded="open" @click="open = !open">
-      <span class="review-guide__title">Add test inputs for a full release report</span>
-      <span class="review-guide__chevron" aria-hidden="true">{{ open ? "▾" : "▸" }}</span>
-    </button>
-    <div v-if="open" class="review-guide__body">
-      <p class="review-guide__why">
-        {{ tag ? `Release ${tag}` : "This release" }} declares no test inputs: app.yml has no <code>review</code> block.
-        Its release report can describe the app, but shows no figures or results. Declare small test inputs and
-        Pennsieve runs each release on them and puts what the app produced in its report. Only you see this.
-      </p>
-      <p v-if="noPorts" class="review-guide__warn">
-        app.yml declares no input ports either. Add them under <code>inputs:</code> first (a name and
-        <code>mediaTypes</code> for each), so the test inputs can be checked against them.
-      </p>
-      <div class="review-guide__sources" role="radiogroup" aria-label="How to declare test inputs">
-        <button
-          v-for="s in REVIEW_SOURCES"
-          :key="s.id"
-          type="button"
-          role="radio"
-          :aria-checked="kind === s.id"
-          class="review-guide__source"
-          :class="{ 'is-active': kind === s.id }"
-          @click="kind = s.id"
-        >
-          {{ s.label }}
-        </button>
+  <button type="button" class="review-warning" title="Without test inputs the release report has no figures or results" @click="open = true">
+    <span class="review-warning__icon" aria-hidden="true">!</span>
+    <span class="review-warning__text">No test inputs declared</span>
+    <span class="review-warning__sep" aria-hidden="true">·</span>
+    <span class="review-warning__open">Add test inputs ›</span>
+  </button>
+
+  <el-dialog
+    v-model="open"
+    :title="`Add test inputs${tag ? ` for releases after ${tag}` : ''}`"
+    width="min(920px, 96vw)"
+    append-to-body
+    class="review-guide-dialog"
+  >
+    <div class="review-guide">
+      <div class="review-guide__text">
+        <p class="review-guide__why">
+          {{ tag ? `Release ${tag}` : "This release" }} declares no test inputs: app.yml has no
+          <code>review</code> block. Its release report describes the app but shows no figures or results.
+          Declare a few small test inputs, and Pennsieve runs each release on them and puts what the app
+          produced in its report.
+        </p>
+        <p v-if="noPorts" class="review-guide__warn">
+          app.yml declares no input ports either. Add them under <code>inputs:</code> first (a name and
+          <code>mediaTypes</code> for each), so the test inputs can be checked against them.
+        </p>
+        <div class="review-guide__label">Where the test inputs come from</div>
+        <div class="review-guide__sources" role="radiogroup" aria-label="Where the test inputs come from">
+          <button
+            v-for="s in REVIEW_SOURCES"
+            :key="s.id"
+            type="button"
+            role="radio"
+            :aria-checked="kind === s.id"
+            class="review-guide__source"
+            :class="{ 'is-active': kind === s.id }"
+            @click="kind = s.id"
+          >
+            {{ s.label }}
+          </button>
+        </div>
+        <p class="review-guide__when">{{ source.when }}</p>
+        <ol class="review-guide__steps">
+          <li v-for="(step, i) in steps" :key="i">{{ step }}</li>
+        </ol>
       </div>
-      <p class="review-guide__when">{{ source.when }}</p>
-      <ol class="review-guide__steps">
-        <li v-for="(step, i) in steps" :key="i">{{ step }}</li>
-      </ol>
       <div class="review-guide__code">
+        <div class="review-guide__code-head">
+          <span class="review-guide__label">Add to the end of app.yml</span>
+          <button type="button" class="review-guide__copy" @click="copy">Copy</button>
+        </div>
         <pre>{{ snippet }}</pre>
-        <button type="button" class="review-guide__copy" @click="copy">Copy</button>
+        <p class="review-guide__more">
+          Fill in the &lt;placeholders&gt;. Every field, and how the platform checks the block:
+          <a :href="REVIEW_GUIDE_URL" target="_blank" rel="noopener">Review inputs in app.yml</a>.
+        </p>
       </div>
-      <p class="review-guide__more">
-        Placeholders are in &lt;angle brackets&gt;. Every field, and how the platform checks the block:
-        <a :href="REVIEW_GUIDE_URL" target="_blank" rel="noopener">Review inputs in app.yml</a>.
-      </p>
     </div>
-  </div>
+    <template #footer>
+      <bf-button @click="open = false">Close</bf-button>
+    </template>
+  </el-dialog>
 </template>
 
 <style scoped lang="scss">
 @use "../../../styles/theme";
 
-.review-guide {
-  margin-top: 8px;
-  border: 1px solid theme.$yellow_2;
-  border-left-width: 4px;
-  background: theme.$yellow_tint;
-  border-radius: 4px;
-}
-.review-guide__toggle {
-  display: flex;
+.review-warning {
+  display: inline-flex;
   align-items: center;
-  justify-content: space-between;
-  width: 100%;
-  padding: 8px 12px;
+  gap: 6px;
+  margin-top: 4px;
+  padding: 0;
   border: 0;
-  background: transparent;
-  color: theme.$gray_6;
+  background: none;
   font: inherit;
+  font-size: 13px;
+  line-height: 1.4;
+  color: theme.$gray_5;
   text-align: left;
   cursor: pointer;
+
+  &:hover .review-warning__open {
+    text-decoration: underline;
+  }
 }
-.review-guide__title {
-  font-size: 13px;
+.review-warning__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: theme.$yellow_2;
+  color: theme.$white;
+  font-size: 10px;
+  font-weight: 700;
+}
+.review-warning__sep {
+  color: theme.$gray_4;
+}
+.review-warning__open {
+  color: theme.$purple_2;
   font-weight: 600;
+  white-space: nowrap;
 }
-.review-guide__chevron {
-  color: theme.$gray_5;
-}
-.review-guide__body {
-  padding: 0 12px 12px;
-  font-size: 13px;
+
+.review-guide {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
+  gap: 24px;
+  font-size: 14px;
   line-height: 1.5;
   color: theme.$gray_6;
 
+  @media (max-width: 760px) {
+    grid-template-columns: minmax(0, 1fr);
+  }
   p {
-    margin: 0 0 8px;
+    margin: 0 0 12px;
   }
   code {
-    font-size: 12px;
+    font-size: 13px;
   }
 }
 .review-guide__warn {
   color: theme.$red_2;
 }
+.review-guide__label {
+  margin-bottom: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: theme.$gray_5;
+}
 .review-guide__sources {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-  margin: 4px 0 6px;
+  margin-bottom: 8px;
 }
 .review-guide__source {
-  padding: 4px 10px;
+  padding: 4px 12px;
   border: 1px solid theme.$gray_3;
-  border-radius: 14px;
+  border-radius: 3px;
   background: theme.$white;
   color: theme.$gray_6;
   font: inherit;
-  font-size: 12px;
+  font-size: 13px;
   cursor: pointer;
 
   &.is-active {
@@ -152,35 +198,41 @@ const copy = async () => {
   color: theme.$gray_5;
 }
 .review-guide__steps {
-  margin: 0 0 8px;
-  padding-left: 18px;
+  margin: 0;
+  padding-left: 20px;
 
   li {
-    margin-bottom: 2px;
+    margin-bottom: 6px;
   }
 }
 .review-guide__code {
-  position: relative;
-  margin-bottom: 8px;
+  min-width: 0;
 
   pre {
-    margin: 0;
-    padding: 10px 12px;
+    margin: 0 0 10px;
+    padding: 12px 14px;
     overflow-x: auto;
     border: 1px solid theme.$gray_2;
-    border-radius: 4px;
-    background: theme.$white;
-    font-size: 12px;
-    line-height: 1.45;
+    border-radius: 3px;
+    background: theme.$gray_1;
+    font-size: 12.5px;
+    line-height: 1.5;
+  }
+}
+.review-guide__code-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+
+  .review-guide__label {
+    margin-bottom: 0;
   }
 }
 .review-guide__copy {
-  position: absolute;
-  top: 6px;
-  right: 6px;
-  padding: 2px 10px;
+  padding: 2px 12px;
   border: 1px solid theme.$gray_3;
-  border-radius: 4px;
+  border-radius: 3px;
   background: theme.$white;
   font-size: 12px;
   cursor: pointer;

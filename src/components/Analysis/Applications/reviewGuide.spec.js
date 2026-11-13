@@ -32,10 +32,12 @@ describe("review guide", () => {
 
     const files = load(reviewSnippet("files", app)).review;
     expect(files.inputs).toEqual({ spatial: { files: ["tests/data/*.h5ad"] }, metadata: { files: ["tests/data/*.csv"] } });
+    expect(reviewSnippet("files", app)).toContain("      # filePaths: source  # keep the files' folders");
 
     const text = reviewSnippet("dataset", app);
-    expect(text).toContain("spatial:\n      dataset: { doi: <10.5281/zenodo.NNNNNNN>, files: [\"*.h5ad\"] }");
-    expect(load(text.replace(/<[^>]+>/g, "10.5281/zenodo.1")).review.inputs.metadata.dataset.files).toEqual(["*.csv"]);
+    expect(text).toContain("spatial:\n      dataset: { doi: <10.26275/xxxx-xxxx>, files: [\"*.h5ad\"] }");
+    expect(text).toContain("a Pennsieve Discover DOI (10.26275/...)");
+    expect(load(text.replace(/<[^>]+>/g, "10.26275/abcd-efgh")).review.inputs.metadata.dataset.files).toEqual(["*.csv"]);
   });
 
   it("lists the parameters, commented out, with their defaults", () => {

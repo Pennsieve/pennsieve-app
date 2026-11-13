@@ -26,7 +26,7 @@ export const REVIEW_SOURCES = [
   {
     id: "dataset",
     label: "A public dataset",
-    when: "Realistic input is public on Zenodo, Figshare, OSF or OpenNeuro, and small enough (or a few files of it).",
+    when: "Realistic input is public on Pennsieve Discover, Zenodo, Figshare, OSF or OpenNeuro, and small enough (or a few files of it).",
   },
 ];
 
@@ -101,14 +101,21 @@ export function reviewSnippet(kind, { inputs = [], parameters = [] } = {}) {
       '    command: python tests/make_fixture.py "$REVIEW_INPUT_DIR"'
     );
   } else {
+    if (kind === "dataset") {
+      lines.push(
+        "  # doi: a Pennsieve Discover DOI (10.26275/...), or one on Zenodo, Figshare,",
+        "  # OSF or OpenNeuro; files: patterns, or plain paths to a file or folder."
+      );
+    }
     lines.push("  inputs:");
     for (const p of ports) {
       lines.push(`    ${key(p.name)}:`);
       if (kind === "files") {
         lines.push(`      files: ["tests/data/${portPattern(p)}"]`);
       } else {
-        lines.push(`      dataset: { doi: <10.5281/zenodo.NNNNNNN>, files: ["${portPattern(p)}"] }`);
+        lines.push(`      dataset: { doi: <10.26275/xxxx-xxxx>, files: ["${portPattern(p)}"] }`);
       }
+      lines.push("      # filePaths: source  # keep the files' folders; by default each lands at the root");
     }
   }
   lines.push(...parameterLines(parameters));
@@ -123,7 +130,8 @@ export function reviewSteps(kind) {
     generate:
       "Add a small script to the repository (tests/make_fixture.py here) that writes a few tiny inputs, in the folders the app reads: synthetic data is fine.",
     files: "Commit a few small input files to the repository (tests/data/ here), at most a few MB in all.",
-    dataset: "Pick a public dataset and, with files, a few of its files; replace the DOI placeholder.",
+    dataset:
+      "Pick a public dataset, on Pennsieve Discover or another allowed host, and with files a few of its files; replace the DOI placeholder.",
   }[kind];
   return [
     first,
