@@ -103,6 +103,9 @@ export async function listPublicModels({ id, version }, options = {}) {
       .map((f) => f.name)
       .sort()
   } catch (err) {
+    // A version without a metadata export has no such folder (404); anything
+    // else is worth seeing.
+    if (err?.status !== 404 && err?.response?.status !== 404) console.warn('[public datasets] models:', err?.message || err)
     return []
   }
 }

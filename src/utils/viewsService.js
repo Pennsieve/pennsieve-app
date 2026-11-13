@@ -1,5 +1,6 @@
 import * as siteConfig from '@/site-config/site.json'
 import { useGetToken } from '@/composables/useGetToken'
+import { isRecordsPick } from '@/utils/recordsPicks'
 
 // views-service (api2.<domain>/views) keeps a user's dataset views: an
 // RO-Crate of a published dataset version's files. A notebook run takes a
@@ -121,7 +122,7 @@ export function runViewSources(picks) {
     const key = `${p.datasetId}:${p.version}`
     if (!byVersion.has(key)) byVersion.set(key, { datasetId: p.datasetId, version: p.version, paths: [] })
     const source = byVersion.get(key)
-    if (Array.isArray(p.models)) {
+    if (isRecordsPick(p)) {
       source.models = [...p.models]
       continue
     }

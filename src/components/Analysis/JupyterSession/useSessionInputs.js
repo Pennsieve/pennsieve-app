@@ -134,7 +134,9 @@ export function useSessionInputs({
               viewId: s.viewId,
               version: s.version,
               // The models whose records are in the session already
-              // (staged before it started), with their files' paths.
+              // (staged before it started): the sidecar's objects
+              // { name, version, schema, records } (paths in the folder),
+              // not the plain names a picker holds.
               models: s.models || [],
             }))
             .filter((s) => s.nodeId)

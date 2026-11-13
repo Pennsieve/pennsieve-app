@@ -79,6 +79,16 @@ describe("viewForDataset", () => {
   });
 });
 
+describe("sameModels", () => {
+  it("compares models selections whatever their order, none as none", async () => {
+    const { sameModels } = await import("./viewsService");
+    expect(sameModels(["a", "b"], ["b", "a"])).toBe(true);
+    expect(sameModels(undefined, [])).toBe(true);
+    expect(sameModels(["a"], [])).toBe(false);
+    expect(sameModels(["*"], ["a"])).toBe(false);
+  });
+});
+
 describe("viewDataSource", () => {
   it("is a viewVersion data source", () => {
     expect(viewDataSource({ id: "v1", version: 3 })).toEqual({ kind: "viewVersion", viewId: "v1", viewVersion: 3 });

@@ -2,7 +2,7 @@
 // (viewsService viewForDataset).
 import { defineAsyncComponent } from "vue";
 import IconPennsieveMark from "@/components/icons/IconPennsieveMark.vue";
-import { viewForDataset } from "@/utils/viewsService";
+import { viewForDataset, sameModels } from "@/utils/viewsService";
 import { countPublicDatasets } from "@/utils/publicDatasets";
 
 export default {
@@ -21,8 +21,12 @@ export default {
   ready: (p) => !!p.dataset && p.version != null,
   label: (p) => (p.dataset ? `${p.dataset.name}${p.models?.length ? " with metadata records" : ""}` : ""),
   sameLabel: (p) => `Version ${p.version} of ${p.dataset?.name}`,
-  // A Discover source is the same files by its dataset id and version.
-  sameAs: (p, source) => source.sourceDatasetId === p.dataset.id && source.sourceVersion === p.version,
+  // A Discover source is the same files by its dataset id and version, and
+  // the same records (a session's source lists its models as objects).
+  sameAs: (p, source) =>
+    source.sourceDatasetId === p.dataset.id &&
+    source.sourceVersion === p.version &&
+    sameModels((source.models || []).map((m) => m?.name ?? m), p.models || []),
   createView: (p) => viewForDataset({ datasetId: p.dataset.id, version: p.version, name: p.dataset.name, models: p.models?.length ? p.models : undefined }),
   folderName: (p, n) => `dataset-${p.dataset.id}-v${p.version}${n > 1 ? `-${n}` : ""}`,
   count: () => countPublicDatasets(),
