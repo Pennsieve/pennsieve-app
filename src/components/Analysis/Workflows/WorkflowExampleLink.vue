@@ -150,7 +150,7 @@ const remove = async () => {
     <span class="info-value">
       <button type="button" class="wf-example-row__open" @click="open">
         <IconPDF :width="14" :height="14" color="currentColor" />
-        <span>PDF summary{{ pagesLabel ? ` (${pagesLabel})` : "" }}</span>
+        <span>Sample workflow report{{ pagesLabel ? ` (${pagesLabel})` : "" }}</span>
       </button>
       <span v-if="note" class="wf-example-row__note" :title="noteDetail || undefined">{{ note }}</span>
       <button v-if="canEdit" type="button" class="wf-example__remove" :disabled="removing" @click="remove">
