@@ -3476,7 +3476,7 @@ const openNodeSettings = (id) => {
                   </div>
                 </template>
                 <template v-if="selectedNode.data?.application?.description">
-                  <div class="info-row">
+                  <div class="info-row info-row--stacked">
                     <span class="info-label">Description</span>
                     <span class="info-value">{{
                       selectedNode.data.application.description
@@ -4082,7 +4082,7 @@ const openNodeSettings = (id) => {
                     <span class="info-label">Name</span>
                     <span class="info-value">{{ selectedWorkflow.name }}</span>
                   </div>
-                  <div class="info-row">
+                  <div class="info-row info-row--stacked">
                     <span class="info-label">Description</span>
                     <span class="info-value">{{
                       selectedWorkflow.description || "No description"
@@ -5921,6 +5921,17 @@ kbd {
   color: theme.$black;
   text-align: right;
   word-break: break-word;
+}
+/* Long text (descriptions): the label above, the text under it, left-aligned. */
+.info-row--stacked {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+
+  .info-value {
+    text-align: left;
+    line-height: 1.5;
+  }
 }
 /* The workflow's tags, as on its card. */
 .info-tags {
