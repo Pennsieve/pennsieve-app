@@ -21,13 +21,19 @@ const models = defineModel("models", { default: () => [] });
 // The models the chosen version publishes records of, when it does.
 const availableModels = ref([]);
 let modelsSeq = 0;
+// A choice already made (the picker remounts between the dialog's steps)
+// is kept as far as the version has those models.
 async function loadModels() {
   const seq = ++modelsSeq;
   availableModels.value = [];
-  models.value = [];
-  if (!dataset.value || version.value == null) return;
+  if (!dataset.value || version.value == null) {
+    models.value = [];
+    return;
+  }
   const found = await listPublicModels({ id: dataset.value.id, version: version.value });
-  if (seq === modelsSeq) availableModels.value = found;
+  if (seq !== modelsSeq) return;
+  availableModels.value = found;
+  models.value = models.value.filter((m) => found.includes(m));
 }
 // A preset selection (a notebook opened from a dataset) loads its models
 // too.
