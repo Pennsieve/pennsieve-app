@@ -7,7 +7,7 @@
 import { onMounted, ref, watch } from "vue";
 import * as siteConfig from "@/site-config/site.json";
 import { useSendXhr } from "@/mixins/request/request_composable";
-import { searchPublicDatasets as findPublicDatasets, listPublicModels } from "@/utils/publicDatasets";
+import { pagePublicDatasets, listPublicModels } from "@/utils/publicDatasets";
 import IconCompass from "@/components/icons/IconCompass.vue";
 import MetadataRecordsChoice from "./MetadataRecordsChoice.vue";
 
@@ -41,21 +41,33 @@ watch([dataset, version], () => loadModels(), { immediate: true });
 
 const publicQuery = ref("");
 const publicResults = ref([]);
+// How many datasets the query matches in all: the list pages through them.
+const publicTotal = ref(0);
 const publicLoading = ref(false);
 const publicVersions = ref([]);
 let publicSearchTimer = null;
+let publicSearchSeq = 0;
 
-async function searchPublicDatasets(query = "") {
+// The results of a query, or (more) its next page added to the ones
+// shown. A later search's answer is never taken for an earlier one's.
+async function searchPublicDatasets(query = "", more = false) {
+  const seq = ++publicSearchSeq;
   publicLoading.value = true;
   try {
-    publicResults.value = await findPublicDatasets(query);
+    const page = await pagePublicDatasets({ query, offset: more ? publicResults.value.length : 0 });
+    if (seq !== publicSearchSeq) return;
+    publicResults.value = more ? [...publicResults.value, ...page.datasets] : page.datasets;
+    publicTotal.value = page.totalCount;
   } catch (err) {
     console.error("Failed to search public datasets:", err);
-    publicResults.value = [];
+    if (seq !== publicSearchSeq) return;
+    if (!more) publicResults.value = [];
+    publicTotal.value = publicResults.value.length;
   } finally {
-    publicLoading.value = false;
+    if (seq === publicSearchSeq) publicLoading.value = false;
   }
 }
+const publicMore = () => searchPublicDatasets(publicQuery.value, true);
 
 const onPublicSearch = () => {
   clearTimeout(publicSearchTimer);
@@ -172,6 +184,12 @@ const formatSize = (bytes) => {
             <span>{{ formatSize(ds.size) }}</span>
           </div>
         </div>
+      </div>
+      <div v-if="!publicLoading && !publicResults.length" class="wizard-cards-loading">No published datasets match.</div>
+      <div v-if="publicResults.length < publicTotal" class="public-more">
+        <button type="button" class="text-link-btn" :disabled="publicLoading" @click="publicMore">
+          {{ publicLoading ? "Loading…" : `Show more (${(publicTotal - publicResults.length).toLocaleString("en-US")} left)` }}
+        </button>
       </div>
       <div
         v-if="!publicLoading && publicResults.length === 0"
@@ -312,6 +330,10 @@ const formatSize = (bytes) => {
 }
 .public-records {
   margin-top: 10px;
+}
+.public-more {
+  padding: 8px 4px;
+  text-align: center;
 }
 .public-selection .public-version {
   padding-left: 68px;

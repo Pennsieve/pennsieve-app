@@ -11,7 +11,7 @@
     file types. Folders can always be chosen.
 */
 import { computed, onBeforeUnmount, ref } from "vue";
-import { searchPublicDatasets, browsePublicFiles, listPublicModels } from "@/utils/publicDatasets";
+import { pagePublicDatasets, browsePublicFiles, listPublicModels } from "@/utils/publicDatasets";
 import { formatBytes } from "./dataTargets";
 import { inChosenFolder as inFolder, isPicked as picked, togglePick, groupPicks, recordsPick, recordsPickOf, isRecordsPick } from "./publicPicks";
 import MetadataRecordsChoice from "../MetadataRecordsChoice.vue";
@@ -27,18 +27,28 @@ const PAGE = 500;
 /* ---------------------------------------------------------------- search -- */
 const dataset = ref(null);
 const results = ref([]);
+// How many datasets the search matches in all; past the page shown, a
+// narrower search finds the rest.
+const resultsTotal = ref(0);
 const searching = ref(false);
 let searchTimer = null;
 let searchSeq = 0;
+const SEARCH_PAGE = 100;
 async function search(query = "") {
   const seq = ++searchSeq;
   searching.value = true;
   try {
-    const found = await searchPublicDatasets(query);
-    if (seq === searchSeq) results.value = found;
+    const page = await pagePublicDatasets({ query, limit: SEARCH_PAGE });
+    if (seq === searchSeq) {
+      results.value = page.datasets;
+      resultsTotal.value = page.totalCount;
+    }
   } catch (err) {
     console.error("Failed to search public datasets:", err);
-    if (seq === searchSeq) results.value = [];
+    if (seq === searchSeq) {
+      results.value = [];
+      resultsTotal.value = 0;
+    }
   } finally {
     if (seq === searchSeq) searching.value = false;
   }
@@ -174,6 +184,9 @@ const groups = computed(() => groupPicks(props.modelValue));
             </div>
           </div>
         </el-option>
+        <template v-if="resultsTotal > results.length" #footer>
+          <span class="pfp__more">Showing {{ results.length }} of {{ resultsTotal.toLocaleString("en-US") }}; type to narrow the search.</span>
+        </template>
       </el-select>
     </div>
 
@@ -247,6 +260,10 @@ const groups = computed(() => groupPicks(props.modelValue));
 }
 .pfp__records {
   margin-top: 6px;
+}
+.pfp__more {
+  font-size: 12px;
+  color: theme.$gray_5;
 }
 .pfp__search {
   display: flex;
