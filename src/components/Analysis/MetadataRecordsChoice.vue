@@ -59,6 +59,9 @@ const toggle = (name, on) => (chosen.value = on ? [...chosen.value, name] : chos
 }
 .mrc__model {
   height: 26px;
+  // A ticked model stays as quiet as an unticked one.
+  --el-checkbox-checked-text-color: #{theme.$gray_6};
+  --el-checkbox-font-size: 13px;
 }
 .mrc__model :deep(.el-checkbox__label) {
   font-size: 13px;
