@@ -352,7 +352,7 @@ watch(
   { immediate: true }
 );
 const cardExampleLabel = (example) => (example?.fromVersion ? `Sample output (v${example.fromVersion})` : "Sample output");
-const viewer = ref({ open: false, source: null, name: "", version: null, subtitle: "", note: "" });
+const viewer = ref({ open: false, source: null, name: "", version: null, subtitle: "", note: "", noteDetail: "" });
 const exampleSubtitle = (example) => {
   if (!example) return "";
   const parts = [];
@@ -389,12 +389,15 @@ const openExample = (wf) => {
     version: exampleVersion(cached),
     subtitle: exampleSubtitle(cached),
     note: "",
+    noteDetail: "",
   };
-  // How the report relates to the workflow's current version (an older
-  // version's, or other apps'), once known.
+  // "Apps updated since this report" when its apps differ from the
+  // workflow's current ones, once known.
   const shown = viewer.value;
   workflowReportNote(store, wf.uuid, cached, wf).then((note) => {
-    if (viewer.value === shown) shown.note = note;
+    if (viewer.value !== shown) return;
+    shown.note = note.text;
+    shown.noteDetail = note.detail;
   });
 };
 
@@ -606,6 +609,7 @@ onMounted(async () => {
       :version="viewer.version"
       :subtitle="viewer.subtitle"
       :note="viewer.note"
+      :note-detail="viewer.noteDetail"
     />
   </div>
 </template>

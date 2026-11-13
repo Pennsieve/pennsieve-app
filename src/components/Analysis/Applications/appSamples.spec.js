@@ -36,10 +36,17 @@ describe("entries", () => {
       example: { version: 3 },
     });
     expect(appSampleEntry(wf("a", "Spatial", [URL]), null)).toBe(null);
-    expect(appSampleEntry(wf("a", "Spatial", [URL]), { version: 2 }, "Report from version 2")).toEqual({
+    expect(
+      appSampleEntry(wf("a", "Spatial", [URL]), { version: 2 }, { text: "Apps updated since this report", detail: "st-niches v1 → v2" })
+    ).toEqual({
       workflow: { uuid: "a", name: "Spatial" },
       example: { version: 2 },
-      note: "Report from version 2",
+      note: "Apps updated since this report",
+      noteDetail: "st-niches v1 → v2",
+    });
+    expect(appSampleEntry(wf("a", "Spatial", [URL]), { version: 2 }, { text: "", detail: "" })).toEqual({
+      workflow: { uuid: "a", name: "Spatial" },
+      example: { version: 2 },
     });
     const e = (name) => ({ workflow: { name } });
     expect(sortEntries([e("Z"), e("A")]).map((x) => x.workflow.name)).toEqual(["A", "Z"]);

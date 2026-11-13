@@ -71,7 +71,7 @@ describe("useAppSampleOutputs", () => {
     expect(result.more.value).toBe(1);
   });
 
-  it("keeps an older version's report, with a note naming the apps changed since", async () => {
+  it("keeps an older version's report, noting that its apps were updated since", async () => {
     const current = { ...wf("n", "N", URL), dag: [{ id: "s", type: "processor", sourceUrl: URL, tag: "v0.2.0", dependsOn: [] }] };
     const { result } = await run({
       workspace: [[current]],
@@ -80,6 +80,7 @@ describe("useAppSampleOutputs", () => {
       versions: { "n@1": { dag: [{ id: "s", type: "processor", sourceUrl: URL, tag: "v0.1.0", dependsOn: [] }] } },
     });
     expect(result.entries.value).toHaveLength(1);
-    expect(result.entries.value[0].note).toBe("Report from version 1; apps have changed since (st-niches v0.1.0 → v0.2.0)");
+    expect(result.entries.value[0].note).toBe("Apps updated since this report");
+    expect(result.entries.value[0].noteDetail).toBe("st-niches v0.1.0 → v0.2.0");
   });
 });
