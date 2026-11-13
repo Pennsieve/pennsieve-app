@@ -62,6 +62,33 @@ describe("AppSampleCard", () => {
     expect(wrapper.findComponent(viewerStub).props("kind")).toBe("release report");
   });
 
+  it("shows a workflow's example report with its note and actions", async () => {
+    const wrapper = mount(AppSampleCard, {
+      props: {
+        sample: { pages: 4, createdAt: "2026-11-13T19:00:00Z" },
+        appName: "Scalp EEG",
+        source: async () => "",
+        title: "Example report from version 2",
+        ledeText: "A PDF of one run of Scalp EEG: its inputs, results and figures.",
+        metaText: "4 pages · Nov 13, 2026",
+        note: "Apps updated since this report",
+        noteDetail: "eeg-spikes v0.1.0 → v0.1.1",
+        compact: true,
+      },
+      slots: { actions: '<button class="remove">Remove example</button>' },
+      global: { stubs: { SampleOutputViewer: viewerStub, "bf-button": { template: "<button><slot /></button>" } } },
+    });
+    const text = wrapper.text().replace(/\s+/g, " ");
+    expect(text).toContain("Example report from version 2");
+    expect(text).not.toContain("A PDF of one run of Scalp EEG");
+    expect(text).toContain("4 pages · Nov 13, 2026");
+    expect(wrapper.find(".app-sample-card__note").attributes("title")).toBe("eeg-spikes v0.1.0 → v0.1.1");
+    expect(wrapper.find(".app-sample-card--compact").exists()).toBe(true);
+    expect(wrapper.find("button.remove").exists()).toBe(true);
+    await wrapper.findAll("button").find((b) => b.text() === "View report").trigger("click");
+    expect(wrapper.findComponent(viewerStub).props("kind")).toBe("example report from version 2");
+  });
+
   it("opens from outside (the header's PDF button)", async () => {
     const wrapper = mount(AppSampleCard, {
       props: { sample, source: async () => "" },
