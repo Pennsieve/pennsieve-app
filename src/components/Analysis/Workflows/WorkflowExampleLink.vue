@@ -4,10 +4,11 @@
   (a summary of one successful run) in the sample output viewer, over the page. On the latest version it's
   the newest version's example that has one ("Example from version N" when
   that's an older version); on an older version shown, that version's own.
-  Two forms: `variant="icon"` (the page header: a PDF icon button, the version
-  and run in its tooltip) and `variant="row"` (the Details panel: an info row
-  with the PDF link, the apps-updated note when it applies and, for
-  editors, Remove). Nothing shows
+  Three forms: `variant="icon"` (the page header: a PDF icon button, the version
+  and run in its tooltip), `variant="card"` (the side panel, above Workflow
+  Details: the app page's report card, AppSampleCard, with the apps-updated
+  note when it applies and, for editors, Remove) and `variant="row"` (an info
+  row with the PDF link). Nothing shows
   where there's no example or the feature isn't served. The newest report is
   never hidden by a newer version: when its apps differ from the version
   shown's, a muted "Apps updated since this report" says so, the apps changed
@@ -18,6 +19,7 @@ import { useStore } from "vuex";
 import { ElMessageBox } from "element-plus";
 import EventBus from "../../../utils/event-bus";
 import IconPDF from "../../icons/IconPDF.vue";
+import AppSampleCard from "../Applications/AppSampleCard.vue";
 import { exampleLabel, exampleVersion, PDF_URL_FRESH_MS } from "./runExamples";
 import SampleOutputViewer from "./SampleOutputViewer.vue";
 import { workflowReportNote } from "./reportNote";
@@ -27,7 +29,8 @@ const props = defineProps({
   // The version shown, or null for the latest.
   version: { type: Number, default: null },
   canEdit: { type: Boolean, default: false },
-  // "icon": the header's PDF button; "row": the Details panel's info row.
+  // "icon": the header's PDF button; "card": the side panel's report card;
+  // "row": an info row.
   variant: { type: String, default: "icon" },
   // The workflow's name, for the viewer's title and the downloaded file's name.
   workflowName: { type: String, default: "" },
@@ -92,6 +95,17 @@ const title = computed(() => {
   }`;
 });
 
+// The card's sample (AppSampleCard reads pages, createdAt and previewUrl).
+const cardSample = computed(() => (example.value ? { ...example.value, pipeline: false } : null));
+const cardMeta = computed(() => {
+  const d = new Date(example.value?.createdAt);
+  const made = Number.isNaN(d.getTime()) ? "" : d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+  return [pagesLabel.value, made].filter(Boolean).join(" · ");
+});
+const cardLede = computed(
+  () => `A PDF of one run of ${props.workflowName || "this workflow"}: its inputs, results and figures.`
+);
+
 const viewerOpen = ref(false);
 const subtitle = computed(() => {
   if (!example.value) return "";
@@ -145,6 +159,23 @@ const remove = async () => {
     </button>
   </el-tooltip>
 
+  <AppSampleCard
+    v-else-if="example && variant === 'card'"
+    :sample="cardSample"
+    :app-name="workflowName"
+    :source="pdfSource"
+    :title="label"
+    :lede-text="cardLede"
+    :meta-text="cardMeta"
+    :note="note"
+    :note-detail="noteDetail"
+    compact
+  >
+    <template v-if="canEdit" #actions>
+      <button type="button" class="wf-example__remove" :disabled="removing" @click="remove">Remove example</button>
+    </template>
+  </AppSampleCard>
+
   <div v-else-if="example && variant === 'row'" class="info-row wf-example-row">
     <span class="info-label">Example report</span>
     <span class="info-value">
@@ -159,7 +190,7 @@ const remove = async () => {
     </span>
   </div>
   <SampleOutputViewer
-    v-if="example"
+    v-if="example && variant !== 'card'"
     v-model="viewerOpen"
     :source="pdfSource"
     :workflow-name="workflowName"

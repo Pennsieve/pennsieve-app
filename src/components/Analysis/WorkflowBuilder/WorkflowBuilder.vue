@@ -4039,6 +4039,16 @@ const openNodeSettings = (id) => {
 
             <!-- Workflow Details -->
             <template v-if="selectedWorkflow && !selectedNode">
+              <!-- The example report (a run's PDF), as on an app's page; editors can remove it -->
+              <WorkflowExampleLink
+                v-if="selectedWorkflow?.uuid"
+                :uuid="selectedWorkflow.uuid"
+                :version="viewingVersion"
+                :can-edit="canEditExample"
+                :workflow-name="selectedWorkflow.name || ''"
+                :workflow="selectedWorkflow"
+                variant="card"
+              />
               <h4 class="sidebar-section-title">Workflow Details</h4>
               <template v-if="isEditingDetails">
                 <div class="info-edit-form">
@@ -4084,16 +4094,6 @@ const openNodeSettings = (id) => {
                       <span v-for="t in selectedWorkflow.tags" :key="t" class="info-tag">{{ t }}</span>
                     </span>
                   </div>
-                  <!-- The example PDF (a run's summary); editors can remove it here -->
-                  <WorkflowExampleLink
-                    v-if="selectedWorkflow?.uuid"
-                    :uuid="selectedWorkflow.uuid"
-                    :version="viewingVersion"
-                    :can-edit="canEditExample"
-                    :workflow-name="selectedWorkflow.name || ''"
-                    :workflow="selectedWorkflow"
-                    variant="row"
-                  />
                   <div class="info-row">
                     <span class="info-label">Status</span>
                     <span class="info-value">
