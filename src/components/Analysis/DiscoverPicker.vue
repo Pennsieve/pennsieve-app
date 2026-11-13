@@ -22,18 +22,20 @@ const models = defineModel("models", { default: () => [] });
 const availableModels = ref([]);
 let modelsSeq = 0;
 // A choice already made (the picker remounts between the dialog's steps)
-// is kept as far as the version has those models.
+// is kept as far as the version has those models. The choice is written
+// only when it changes.
 async function loadModels() {
   const seq = ++modelsSeq;
   availableModels.value = [];
   if (!dataset.value || version.value == null) {
-    models.value = [];
+    if (models.value.length) models.value = [];
     return;
   }
   const found = await listPublicModels({ id: dataset.value.id, version: version.value });
   if (seq !== modelsSeq) return;
   availableModels.value = found;
-  models.value = models.value.filter((m) => found.includes(m));
+  const kept = models.value.filter((m) => found.includes(m));
+  if (kept.length !== models.value.length) models.value = kept;
 }
 // A preset selection (a notebook opened from a dataset) loads its models
 // too.
@@ -41,22 +43,26 @@ watch([dataset, version], () => loadModels(), { immediate: true });
 
 const publicQuery = ref("");
 const publicResults = ref([]);
-// How many datasets the query matches in all: the list pages through them.
+// How many datasets the query matches in all, and how many rows were
+// fetched so far (the next page's offset): the list pages through them.
 const publicTotal = ref(0);
+let publicFetched = 0;
 const publicLoading = ref(false);
 const publicVersions = ref([]);
 let publicSearchTimer = null;
 let publicSearchSeq = 0;
 
 // The results of a query, or (more) its next page added to the ones
-// shown. A later search's answer is never taken for an earlier one's.
+// shown. A later search's answer is never taken for an earlier one's, and
+// more of a query typed over isn't added to the list.
 async function searchPublicDatasets(query = "", more = false) {
   const seq = ++publicSearchSeq;
   publicLoading.value = true;
   try {
-    const page = await pagePublicDatasets({ query, offset: more ? publicResults.value.length : 0 });
+    const page = await pagePublicDatasets({ query, offset: more ? publicFetched : 0 });
     if (seq !== publicSearchSeq) return;
     publicResults.value = more ? [...publicResults.value, ...page.datasets] : page.datasets;
+    publicFetched = (more ? publicFetched : 0) + page.fetched;
     publicTotal.value = page.totalCount;
   } catch (err) {
     console.error("Failed to search public datasets:", err);
@@ -67,7 +73,10 @@ async function searchPublicDatasets(query = "", more = false) {
     if (seq === publicSearchSeq) publicLoading.value = false;
   }
 }
-const publicMore = () => searchPublicDatasets(publicQuery.value, true);
+const publicMore = () => {
+  clearTimeout(publicSearchTimer);
+  searchPublicDatasets(publicQuery.value, publicFetched > 0);
+};
 
 const onPublicSearch = () => {
   clearTimeout(publicSearchTimer);
@@ -185,9 +194,8 @@ const formatSize = (bytes) => {
           </div>
         </div>
       </div>
-      <div v-if="!publicLoading && !publicResults.length" class="wizard-cards-loading">No published datasets match.</div>
       <div v-if="publicResults.length < publicTotal" class="public-more">
-        <button type="button" class="text-link-btn" :disabled="publicLoading" @click="publicMore">
+        <button type="button" class="public-more-btn" :disabled="publicLoading" @click="publicMore">
           {{ publicLoading ? "Loading…" : `Show more (${(publicTotal - publicResults.length).toLocaleString("en-US")} left)` }}
         </button>
       </div>
@@ -334,6 +342,23 @@ const formatSize = (bytes) => {
 .public-more {
   padding: 8px 4px;
   text-align: center;
+}
+.public-more-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  font-size: 13px;
+  color: theme.$purple_2;
+  cursor: pointer;
+
+  &:hover:not(:disabled) {
+    text-decoration: underline;
+  }
+  &:disabled {
+    color: theme.$gray_4;
+    cursor: default;
+  }
 }
 .public-selection .public-version {
   padding-left: 68px;

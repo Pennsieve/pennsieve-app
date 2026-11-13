@@ -32,20 +32,21 @@ export const toPublicDataset = (d) => ({
   publishedAt: d.versionPublishedAt || d.updatedAt || '',
 })
 
-// Up to 25 datasets matching query, or the latest research datasets without
-// one.
 // A page of published datasets: Discover's search for a query, else its
-// newest research datasets. { datasets, totalCount }: how many the query
-// matches in all, for paging through them (offset).
+// newest research datasets, embargoed ones left out by the server so the
+// count and the offset agree. { datasets, totalCount, fetched }: how many
+// match in all, and how many rows this page held, for the next offset.
 export async function pagePublicDatasets({ query = '', offset = 0, limit = 25 } = {}, { sendXhr = useSendXhr, config = siteConfig } = {}) {
   const base = config.discoverUrl
   const url = query
-    ? `${base}/search/datasets?limit=${limit}&offset=${offset}&query=${encodeURIComponent(query)}`
+    ? `${base}/search/datasets?limit=${limit}&offset=${offset}&embargo=false&query=${encodeURIComponent(query)}`
     : `${base}/datasets?limit=${limit}&offset=${offset}&datasetType=research&embargo=false`
   const response = await sendXhr(url, { method: 'GET' })
+  const rows = response?.datasets || []
   return {
-    datasets: (response?.datasets || []).map(toPublicDataset).filter((d) => !d.embargo),
+    datasets: rows.map(toPublicDataset).filter((d) => !d.embargo),
     totalCount: response?.totalCount ?? 0,
+    fetched: rows.length,
   }
 }
 
