@@ -48,9 +48,9 @@ export function useAppSampleOutputs(sourceUrl, { maxPages = 5, maxWorkflows = 12
             .dispatch("analysisModule/fetchWorkflowExample", wf.uuid)
             .then(async (example) => {
               if (!example) return null;
-              // The newest report any version has, with a note when it's
-              // older than the workflow's current version.
-              const note = await workflowReportNote(store, wf.uuid, example, wf).catch(() => "");
+              // The newest report any version has, with a note when its
+              // apps differ from the workflow's current ones.
+              const note = await workflowReportNote(store, wf.uuid, example, wf).catch(() => null);
               return appSampleEntry(wf, { ...example, fetchedAt: Date.now() }, note);
             })
             .catch(() => null)

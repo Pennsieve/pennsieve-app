@@ -15,8 +15,8 @@
   - samplePdfFilename, downloadPdf: the viewer's Download.
   - createExampleCache: the examples the library's cards show, fetched once
     per workflow for a while, and not at all where the feature isn't served.
-  - appSteps / appChanges / reportNote / loadReportNote: the muted note
-    under a report older than the version shown, naming the apps changed.
+  - appSteps / appChanges / reportNote / loadReportNote: the muted
+    "Apps updated since this report" note, the apps changed in its tooltip.
 */
 
 // A job still being made: polled until it's READY or FAILED.
@@ -252,9 +252,9 @@ export const downloadPdf = async (url, filename, env = typeof window !== "undefi
 /*
   The report's version note. A workflow shows the newest sample output any
   of its versions has (workflow-service sets fromVersion when that isn't the
-  latest version). Where the report is older than the version shown, a muted
-  line says so and names the apps that changed since:
-  "Report from version 2; apps have changed since (eeg-spikes v0.1.0 → v0.1.1)".
+  latest version). Where the report's apps differ from the version shown's,
+  a muted line says "Apps updated since this report", with the apps changed
+  ("eeg-spikes v0.1.0 → v0.1.1") in its tooltip.
   An example may carry apps (the app steps its run used, e.g. a report copied
   to another environment and attached to that environment's version): then
   those are compared, even when the version is the same.
@@ -319,28 +319,29 @@ export const changesText = (changes, max = 3) => {
   return rest > 0 ? `${shown.join(", ")} and ${rest} more` : shown.join(", ");
 };
 
-// The note under a report, or "" when it's of the version shown and made
-// with its apps. reportSteps: the app steps of the report's version (used
-// when the example has no apps of its own); currentSteps: the version
-// shown's. Without steps to compare, an older report still says its version.
+export const REPORT_NOTE_TEXT = "Apps updated since this report";
+const NO_NOTE = Object.freeze({ text: "", detail: "" });
+
+// The note under a report: { text, detail }. text is the short line, shown
+// only when the report's apps differ from the version shown's; detail is the
+// apps changed ("bulk-report v0.1.0 → v0.1.1"), for its tooltip. The
+// version is in the subtitle already, so the note never repeats it, and
+// there's no note when only the version differs or the steps aren't known.
+// reportSteps: the app steps of the report's version (used when the example
+// has no apps of its own); currentSteps: the version shown's.
 export const reportNote = (example, { reportSteps = null, currentSteps = null } = {}) => {
-  if (!example) return "";
+  if (!example) return NO_NOTE;
   const before = example.apps?.length ? example.apps : reportSteps;
   const changes = before && currentSteps?.length ? appChanges(before, currentSteps) : [];
-  const list = changesText(changes);
-  if (example.fromVersion) {
-    return list
-      ? `Report from version ${example.fromVersion}; apps have changed since (${list})`
-      : `Report from version ${example.fromVersion}`;
-  }
-  return list ? `Apps have changed since this report (${list})` : "";
+  if (!changes.length) return NO_NOTE;
+  return { text: REPORT_NOTE_TEXT, detail: changesText(changes) };
 };
 
 // reportNote for a workflow's example, loading the report's version's steps
 // when it needs them. loadVersion: version -> that version shaped as a
-// workflow ({ dag }); a failure leaves the note without the app list.
+// workflow ({ dag }); where that fails, there's no note.
 export const loadReportNote = async (example, currentWorkflow, loadVersion) => {
-  if (!example) return "";
+  if (!example) return NO_NOTE;
   const currentSteps = appSteps(currentWorkflow);
   let reportSteps = null;
   if (!example.apps?.length && example.fromVersion && currentSteps.length && loadVersion) {

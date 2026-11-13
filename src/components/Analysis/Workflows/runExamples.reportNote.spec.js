@@ -76,57 +76,60 @@ describe("changesText", () => {
 describe("reportNote", () => {
   const v2 = appSteps(wf(step("eeg-spikes", "v0.1.0"), step("eeg-qc", "v1.0.0")));
   const v3 = appSteps(wf(step("eeg-spikes", "v0.1.1"), step("eeg-qc", "v1.0.0")));
+  const none = { text: "", detail: "" };
 
   it("says nothing for the version shown's own report", () => {
-    expect(reportNote({ version: 3 }, { currentSteps: v3 })).toBe("");
-    expect(reportNote(null)).toBe("");
+    expect(reportNote({ version: 3 }, { currentSteps: v3 })).toEqual(none);
+    expect(reportNote(null)).toEqual(none);
   });
-  it("names the apps changed since an older version's report", () => {
-    expect(reportNote({ version: 2, fromVersion: 2 }, { reportSteps: v2, currentSteps: v3 })).toBe(
-      "Report from version 2; apps have changed since (eeg-spikes v0.1.0 → v0.1.1)"
-    );
+  it("is a short line, the apps changed in its detail", () => {
+    expect(reportNote({ version: 2, fromVersion: 2 }, { reportSteps: v2, currentSteps: v3 })).toEqual({
+      text: "Apps updated since this report",
+      detail: "eeg-spikes v0.1.0 → v0.1.1",
+    });
   });
-  it("says only the version when no app changed, or the steps aren't known", () => {
-    expect(reportNote({ version: 2, fromVersion: 2 }, { reportSteps: v3, currentSteps: v3 })).toBe("Report from version 2");
-    expect(reportNote({ version: 2, fromVersion: 2 }, { currentSteps: v3 })).toBe("Report from version 2");
-    expect(reportNote({ version: 2, fromVersion: 2 }, { reportSteps: v2, currentSteps: [] })).toBe("Report from version 2");
+  it("says nothing when only the version differs, or the steps aren't known", () => {
+    expect(reportNote({ version: 2, fromVersion: 2 }, { reportSteps: v3, currentSteps: v3 })).toEqual(none);
+    expect(reportNote({ version: 2, fromVersion: 2 }, { currentSteps: v3 })).toEqual(none);
+    expect(reportNote({ version: 2, fromVersion: 2 }, { reportSteps: v2, currentSteps: [] })).toEqual(none);
   });
   it("compares the example's own apps first, even on the same version", () => {
-    const apps = [{ name: "eeg-spikes", sourceUrl: "https://github.com/pennsieve-apps/eeg-spikes", tag: "v0.0.9" }, { name: "eeg-qc", sourceUrl: "https://github.com/pennsieve-apps/eeg-qc", tag: "v1.0.0" }];
-    expect(reportNote({ version: 3, apps }, { reportSteps: v3, currentSteps: v3 })).toBe(
-      "Apps have changed since this report (eeg-spikes v0.0.9 → v0.1.1)"
-    );
-    expect(reportNote({ version: 2, fromVersion: 2, apps }, { reportSteps: v3, currentSteps: v3 })).toBe(
-      "Report from version 2; apps have changed since (eeg-spikes v0.0.9 → v0.1.1)"
-    );
-    expect(reportNote({ version: 3, apps: [] }, { currentSteps: v3 })).toBe("");
+    const apps = [
+      { name: "eeg-spikes", sourceUrl: "https://github.com/pennsieve-apps/eeg-spikes", tag: "v0.0.9" },
+      { name: "eeg-qc", sourceUrl: "https://github.com/pennsieve-apps/eeg-qc", tag: "v1.0.0" },
+    ];
+    const want = { text: "Apps updated since this report", detail: "eeg-spikes v0.0.9 → v0.1.1" };
+    expect(reportNote({ version: 3, apps }, { reportSteps: v3, currentSteps: v3 })).toEqual(want);
+    expect(reportNote({ version: 2, fromVersion: 2, apps }, { reportSteps: v3, currentSteps: v3 })).toEqual(want);
+    expect(reportNote({ version: 3, apps: [] }, { currentSteps: v3 })).toEqual(none);
   });
 });
 
 describe("loadReportNote", () => {
   const current = wf(step("eeg-spikes", "v0.1.1"));
+  const none = { text: "", detail: "" };
   it("loads the report's version only when it needs it", async () => {
     const load = vi.fn(async () => wf(step("eeg-spikes", "v0.1.0")));
-    expect(await loadReportNote({ version: 2, fromVersion: 2 }, current, load)).toBe(
-      "Report from version 2; apps have changed since (eeg-spikes v0.1.0 → v0.1.1)"
-    );
+    expect(await loadReportNote({ version: 2, fromVersion: 2 }, current, load)).toEqual({
+      text: "Apps updated since this report",
+      detail: "eeg-spikes v0.1.0 → v0.1.1",
+    });
     expect(load).toHaveBeenCalledWith(2);
 
     load.mockClear();
-    expect(await loadReportNote({ version: 3 }, current, load)).toBe("");
+    expect(await loadReportNote({ version: 3 }, current, load)).toEqual(none);
     const apps = [{ sourceUrl: "https://github.com/pennsieve-apps/eeg-spikes", tag: "v0.1.0", name: "eeg-spikes" }];
-    expect(await loadReportNote({ version: 2, fromVersion: 2, apps }, current, load)).toContain("eeg-spikes v0.1.0 → v0.1.1");
+    expect((await loadReportNote({ version: 2, fromVersion: 2, apps }, current, load)).detail).toBe("eeg-spikes v0.1.0 → v0.1.1");
     expect(load).not.toHaveBeenCalled();
   });
-  it("still says the version when the load fails", async () => {
+  it("has no note when the load fails", async () => {
     const load = vi.fn(async () => {
       throw new Error("nope");
     });
-    expect(await loadReportNote({ version: 2, fromVersion: 2 }, current, load)).toBe("Report from version 2");
-    expect(await loadReportNote(null, current, load)).toBe("");
+    expect(await loadReportNote({ version: 2, fromVersion: 2 }, current, load)).toEqual(none);
+    expect(await loadReportNote(null, current, load)).toEqual(none);
   });
 });
-
 describe("createVersionCache", () => {
   it("fetches a version once, and again after a failure", async () => {
     const fetch = vi.fn().mockRejectedValueOnce(new Error("x")).mockResolvedValue({ dag: [] });

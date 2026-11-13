@@ -1,7 +1,7 @@
 /*
-  The note under a workflow's sample output when it's older than the version
-  shown (runExamples.js reportNote), with the report's version fetched through
-  the store once per session.
+  The note under a workflow's sample output when its apps differ from the
+  version shown's (runExamples.js reportNote), with the report's version
+  fetched through the store once per session.
 */
 import { createVersionCache, loadReportNote } from "./runExamples";
 
@@ -16,6 +16,6 @@ const versionLoader = (store) => {
 };
 
 // store, the workflow's uuid, its example, and the workflow (version) shown
-// -> the note ("" for none).
+// -> the note: { text, detail } (text "" for none).
 export const workflowReportNote = (store, uuid, example, currentWorkflow) =>
   loadReportNote(example, currentWorkflow, (version) => versionLoader(store)(uuid, version));

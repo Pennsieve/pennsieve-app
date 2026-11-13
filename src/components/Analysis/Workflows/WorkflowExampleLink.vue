@@ -6,11 +6,12 @@
   that's an older version); on an older version shown, that version's own.
   Two forms: `variant="icon"` (the page header: a PDF icon button, the version
   and run in its tooltip) and `variant="row"` (the Details panel: an info row
-  with the version, the run, Open and, for editors, Remove). Nothing shows
+  with the PDF link, the apps-updated note when it applies and, for
+  editors, Remove). Nothing shows
   where there's no example or the feature isn't served. The newest report is
-  never hidden by a newer version: when it's older than the version shown (or
-  made with other app versions), a muted note says so and names the apps that
-  changed since (reportNote.js).
+  never hidden by a newer version: when its apps differ from the version
+  shown's, a muted "Apps updated since this report" says so, the apps changed
+  in its tooltip (reportNote.js).
 */
 import { computed, ref, watch } from "vue";
 import { useStore } from "vuex";
@@ -62,13 +63,16 @@ const load = async () => {
 watch(() => [props.uuid, props.version], load, { immediate: true });
 
 const note = ref("");
+const noteDetail = ref("");
 let noteSeq = 0;
 watch(
   () => [example.value?.jobId, example.value?.version, example.value?.fromVersion, props.workflow?.dag],
   async () => {
     const mine = ++noteSeq;
     const found = await workflowReportNote(store, props.uuid, example.value, props.workflow);
-    if (mine === noteSeq) note.value = found;
+    if (mine !== noteSeq) return;
+    note.value = found.text;
+    noteDetail.value = found.detail;
   },
   { immediate: true }
 );
@@ -83,7 +87,9 @@ const title = computed(() => {
   if (!example.value) return "";
   const parts = [`${label.value}: a PDF summary of run ${runLabel.value}`];
   if (pagesLabel.value) parts.push(pagesLabel.value);
-  return `${parts.join(", ")}. Captions and overview are AI-written.${note.value ? ` ${note.value}.` : ""}`;
+  return `${parts.join(", ")}. Captions and overview are AI-written.${
+    note.value ? ` ${note.value}: ${noteDetail.value}.` : ""
+  }`;
 });
 
 const viewerOpen = ref(false);
@@ -146,10 +152,7 @@ const remove = async () => {
         <IconPDF :width="14" :height="14" color="currentColor" />
         <span>Sample workflow report{{ pagesLabel ? ` (${pagesLabel})` : "" }}</span>
       </button>
-      <span class="wf-example-row__meta">
-        Version {{ exampleVersion(example) }} · run {{ runLabel }}
-      </span>
-      <span v-if="note" class="wf-example-row__note">{{ note }}</span>
+      <span v-if="note" class="wf-example-row__note" :title="noteDetail || undefined">{{ note }}</span>
       <button v-if="canEdit" type="button" class="wf-example__remove" :disabled="removing" @click="remove">
         Remove sample output
       </button>
@@ -163,6 +166,7 @@ const remove = async () => {
     :version="exampleVersion(example)"
     :subtitle="subtitle"
     :note="note"
+    :note-detail="noteDetail"
   />
 </template>
 
@@ -206,10 +210,6 @@ const remove = async () => {
   &:hover {
     text-decoration: underline;
   }
-}
-.wf-example-row__meta {
-  font-size: 12px;
-  color: theme.$gray_5;
 }
 .wf-example-row__note {
   font-size: 12px;
