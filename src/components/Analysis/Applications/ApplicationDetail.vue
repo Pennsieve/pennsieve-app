@@ -939,7 +939,7 @@ watch(
                 :aria-selected="activeTab === 'samples'"
                 @click="activeTab = 'samples'"
               >
-                Workflow samples
+                Example reports
               </button>
             </div>
             <div class="readme-header-actions">

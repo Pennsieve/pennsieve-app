@@ -2887,6 +2887,7 @@ const openNodeSettings = (id) => {
           :uuid="selectedWorkflow.uuid"
           :version="viewingVersion"
           :workflow-name="selectedWorkflow.name || ''"
+          :workflow="selectedWorkflow"
           variant="icon"
         />
         <bf-button v-if="!viewingVersion && selectedWorkflow?.isActive !== false" class="secondary" @click="runThis">
@@ -3475,7 +3476,7 @@ const openNodeSettings = (id) => {
                   </div>
                 </template>
                 <template v-if="selectedNode.data?.application?.description">
-                  <div class="info-row">
+                  <div class="info-row info-row--stacked">
                     <span class="info-label">Description</span>
                     <span class="info-value">{{
                       selectedNode.data.application.description
@@ -4038,6 +4039,16 @@ const openNodeSettings = (id) => {
 
             <!-- Workflow Details -->
             <template v-if="selectedWorkflow && !selectedNode">
+              <!-- The example report (a run's PDF), as on an app's page; editors can remove it -->
+              <WorkflowExampleLink
+                v-if="selectedWorkflow?.uuid"
+                :uuid="selectedWorkflow.uuid"
+                :version="viewingVersion"
+                :can-edit="canEditExample"
+                :workflow-name="selectedWorkflow.name || ''"
+                :workflow="selectedWorkflow"
+                variant="card"
+              />
               <h4 class="sidebar-section-title">Workflow Details</h4>
               <template v-if="isEditingDetails">
                 <div class="info-edit-form">
@@ -4071,7 +4082,7 @@ const openNodeSettings = (id) => {
                     <span class="info-label">Name</span>
                     <span class="info-value">{{ selectedWorkflow.name }}</span>
                   </div>
-                  <div class="info-row">
+                  <div class="info-row info-row--stacked">
                     <span class="info-label">Description</span>
                     <span class="info-value">{{
                       selectedWorkflow.description || "No description"
@@ -4083,15 +4094,6 @@ const openNodeSettings = (id) => {
                       <span v-for="t in selectedWorkflow.tags" :key="t" class="info-tag">{{ t }}</span>
                     </span>
                   </div>
-                  <!-- The example PDF (a run's summary); editors can remove it here -->
-                  <WorkflowExampleLink
-                    v-if="selectedWorkflow?.uuid"
-                    :uuid="selectedWorkflow.uuid"
-                    :version="viewingVersion"
-                    :can-edit="canEditExample"
-                    :workflow-name="selectedWorkflow.name || ''"
-                    variant="row"
-                  />
                   <div class="info-row">
                     <span class="info-label">Status</span>
                     <span class="info-value">
@@ -5919,6 +5921,17 @@ kbd {
   color: theme.$black;
   text-align: right;
   word-break: break-word;
+}
+/* Long text (descriptions): the label above, the text under it, left-aligned. */
+.info-row--stacked {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+
+  .info-value {
+    text-align: left;
+    line-height: 1.5;
+  }
 }
 /* The workflow's tags, as on its card. */
 .info-tags {
