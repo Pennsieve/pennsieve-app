@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { inChosenFolder, isPicked, togglePick, groupPicks, picksKey } from "./publicPicks";
+import { inChosenFolder, isPicked, togglePick, groupPicks, picksKey, recordsPick, recordsPickOf, isRecordsPick } from "./publicPicks";
 
 const pick = (path, o = {}) => ({ datasetId: 7, version: 2, datasetName: "Study", path, name: path.split("/").pop(), isFolder: false, size: 1, ...o });
 
@@ -26,6 +26,25 @@ describe("public picks", () => {
     expect(picks.map((p) => p.path)).toEqual(["files/sub/a.csv", "files/sub"]);
     // Adding again doesn't duplicate.
     expect(togglePick(picks, pick("files/sub", { isFolder: true }), true)).toHaveLength(2);
+  });
+
+  it("takes a version's records once, beside its files, and keys them by their models", () => {
+    const base = { datasetId: 7, version: 2, datasetName: "Study" };
+    let picks = togglePick([pick("a.csv")], recordsPick(base, ["participant", "sample"]), true);
+    expect(picks).toHaveLength(2);
+    const r = recordsPickOf(picks, 7, 2);
+    expect(isRecordsPick(r) && r.models).toEqual(["participant", "sample"]);
+    expect(recordsPickOf(picks, 7, 3)).toBeNull();
+    // A records pick isn't a path, and doesn't make the root look picked.
+    expect(isPicked(picks, 7, 2, "")).toBe(false);
+    expect(isPicked(picks, 7, 2, "a.csv")).toBe(true);
+    // Another choice of models replaces it; off removes it.
+    picks = togglePick(picks, recordsPick(base, ["sample"]), true);
+    expect(picks.filter(isRecordsPick).map((p) => p.models)).toEqual([["sample"]]);
+    expect(picksKey(picks)).not.toBe(picksKey(togglePick(picks, recordsPick(base, ["participant"]), true)));
+    picks = togglePick(picks, recordsPick(base, []), false);
+    expect(picks.some(isRecordsPick)).toBe(false);
+    expect(groupPicks([pick("a.csv"), recordsPick(base, ["sample"])])[0].picks).toHaveLength(2);
   });
 
   it("groups by dataset version and keys a set whatever its order", () => {

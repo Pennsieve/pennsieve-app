@@ -1,5 +1,6 @@
 import * as siteConfig from '@/site-config/site.json'
 import { useGetToken } from '@/composables/useGetToken'
+import { isRecordsPick } from '@/utils/recordsPicks'
 
 // views-service (api2.<domain>/views) keeps a user's dataset views: an
 // RO-Crate of a published dataset version's files. A notebook run takes a
@@ -53,21 +54,28 @@ export async function listMyViews(options = {}) {
   return views || []
 }
 
-// The user's view of exactly one published dataset version, or a new one.
-// Matching on the source alone is right while the app only makes views of
-// whole versions; once views can select folders it no longer is.
-export async function viewForDataset({ datasetId, version, name }, options = {}) {
+// Whether two models selections (model names, or ["*"]; none for no
+// records) take the same records.
+export const sameModels = (a, b) => [...(a || [])].sort().join('\n') === [...(b || [])].sort().join('\n')
+
+// The user's view of exactly one published dataset version, with the
+// metadata records of models when asked (names, or ["*"] for all), or a new
+// one. Matching on the source and its models is right while the app only
+// makes views of whole versions; once views can select folders it no longer
+// is.
+export async function viewForDataset({ datasetId, version, name, models }, options = {}) {
   const existing = (await listMyViews(options)).find(
     (v) =>
       v.sources?.length === 1 &&
       v.sources[0].datasetId === datasetId &&
-      v.sources[0].version === version
+      v.sources[0].version === version &&
+      sameModels(v.sources[0].models, models)
   )
   if (existing) return existing
   return viewsRequest('/me', {
     ...options,
     method: 'POST',
-    body: { name: `${name} (version ${version})`, datasetId, version },
+    body: { name: `${name} (version ${version})`, datasetId, version, ...(models?.length && { models }) },
   })
 }
 
@@ -106,15 +114,22 @@ export async function listEntries(viewId, version, { includeStacks = false, ...o
 // (lifecycle "run": kept apart from the user's views; the run keeps its
 // crate with its provenance). Each pick is
 // { datasetId, version, path }; picks of one version become one source.
+// A pick with models takes the version's metadata records of those models
+// (the source's models) rather than a path.
 export function runViewSources(picks) {
   const byVersion = new Map()
   for (const p of picks || []) {
     const key = `${p.datasetId}:${p.version}`
     if (!byVersion.has(key)) byVersion.set(key, { datasetId: p.datasetId, version: p.version, paths: [] })
-    const paths = byVersion.get(key).paths
-    if (!paths.includes(p.path)) paths.push(p.path)
+    const source = byVersion.get(key)
+    if (isRecordsPick(p)) {
+      source.models = [...p.models]
+      continue
+    }
+    if (!source.paths.includes(p.path)) source.paths.push(p.path)
   }
-  return [...byVersion.values()]
+  // Records only: no paths at all, not an empty list (the whole version).
+  return [...byVersion.values()].map((s) => (s.models && !s.paths.length ? { datasetId: s.datasetId, version: s.version, models: s.models } : s))
 }
 
 export async function createRunView({ name, picks }, options = {}) {

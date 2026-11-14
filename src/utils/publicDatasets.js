@@ -32,15 +32,27 @@ export const toPublicDataset = (d) => ({
   publishedAt: d.versionPublishedAt || d.updatedAt || '',
 })
 
-// Up to 25 datasets matching query, or the latest research datasets without
-// one.
-export async function searchPublicDatasets(query = '', { sendXhr = useSendXhr, config = siteConfig } = {}) {
+// A page of published datasets: Discover's search for a query, else its
+// newest research datasets, embargoed ones left out by the server so the
+// count and the offset agree. { datasets, totalCount, fetched }: how many
+// match in all, and how many rows this page held, for the next offset.
+export async function pagePublicDatasets({ query = '', offset = 0, limit = 25 } = {}, { sendXhr = useSendXhr, config = siteConfig } = {}) {
   const base = config.discoverUrl
   const url = query
-    ? `${base}/search/datasets?limit=25&offset=0&query=${encodeURIComponent(query)}`
-    : `${base}/datasets?limit=25&offset=0&datasetType=research&embargo=false`
+    ? `${base}/search/datasets?limit=${limit}&offset=${offset}&embargo=false&query=${encodeURIComponent(query)}`
+    : `${base}/datasets?limit=${limit}&offset=${offset}&datasetType=research&embargo=false`
   const response = await sendXhr(url, { method: 'GET' })
-  return (response?.datasets || []).map(toPublicDataset).filter((d) => !d.embargo)
+  const rows = response?.datasets || []
+  return {
+    datasets: rows.map(toPublicDataset).filter((d) => !d.embargo),
+    totalCount: response?.totalCount ?? 0,
+    fetched: rows.length,
+  }
+}
+
+// The first page of published datasets for a query, embargoed ones left out.
+export async function searchPublicDatasets(query = '', options = {}) {
+  return (await pagePublicDatasets({ query }, options)).datasets
 }
 
 // One published dataset version (the latest without one), as the pickers
@@ -90,4 +102,22 @@ export async function browsePublicFiles({ id, version, path = '', limit = 500, o
     { method: 'GET' }
   )
   return { files: response?.files || [], totalCount: response?.totalCount || 0 }
+}
+
+// The metadata models a published version carries records of: the folder
+// names under metadata/models, sorted; none for a version without a
+// metadata export (its folder doesn't exist).
+export async function listPublicModels({ id, version }, options = {}) {
+  try {
+    const { files } = await browsePublicFiles({ id, version, path: 'metadata/models', limit: 1000 }, options)
+    return files
+      .filter((f) => f.type === 'Directory')
+      .map((f) => f.name)
+      .sort()
+  } catch (err) {
+    // A version without a metadata export has no such folder (404); anything
+    // else is worth seeing.
+    if (err?.status !== 404 && err?.response?.status !== 404) console.warn('[public datasets] models:', err?.message || err)
+    return []
+  }
 }
