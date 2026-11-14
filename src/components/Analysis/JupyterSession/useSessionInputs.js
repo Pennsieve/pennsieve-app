@@ -251,8 +251,12 @@ export function useSessionInputs({
     filesIn(source, rel).filter((e) => !["done", "queued", "downloading"].includes(stateOf(source, e.cratePath)?.state));
 
   /* -------------------------------------------------------- downloading --- */
-  const inputBytes = computed(() =>
-    Object.values(states.value).reduce((n, st) => n + (st?.state === "done" ? st.size || st.bytes || 0 : 0), 0)
+  // Bytes of the inputs in the session: the downloads done, and the record
+  // files staged before it started.
+  const inputBytes = computed(
+    () =>
+      Object.values(states.value).reduce((n, st) => n + (st?.state === "done" ? st.size || st.bytes || 0 : 0), 0) +
+      sources.value.reduce((n, s) => n + [...(s.staged || [])].reduce((m, p) => m + (stateOf(s, p) && !states.value[inputKey(s.nodeId, p)] ? entrySize(s, p) : 0), 0), 0)
   );
   // What's still to come of downloads under way.
   const active = computed(() => Object.values(states.value).filter((st) => st.state === "queued" || st.state === "downloading"));
