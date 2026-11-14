@@ -136,11 +136,13 @@ export function useSessionInputs({
               // The models whose records are in the session already
               // (staged before it started): the sidecar's objects
               // { name, version, schema, records } (paths in the folder),
-              // not the plain names a picker holds.
+              // not the plain names a picker holds; and the record files
+              // it found on disk, which count as downloaded.
               models: s.models || [],
+              staged: new Set(s.staged || []),
             }))
             .filter((s) => s.nodeId)
-        : runViews.map(([nodeId, ds]) => ({ nodeId, inputFolder: "", viewId: ds.viewId, version: ds.viewVersion, models: [] }));
+        : runViews.map(([nodeId, ds]) => ({ nodeId, inputFolder: "", viewId: ds.viewId, version: ds.viewVersion, models: [], staged: new Set() }));
       sources.value = await Promise.all(
         list.map(async (s) => {
           const [view, entries] = await Promise.all([
@@ -230,7 +232,11 @@ export function useSessionInputs({
     return rows;
   }
 
-  const stateOf = (source, path) => states.value[inputKey(source.nodeId, path)];
+  // A file's download state: the sidecar's, or done for a record file it
+  // found staged before the session started.
+  const stateOf = (source, path) =>
+    states.value[inputKey(source.nodeId, path)] || (source.staged?.has(path) ? { state: "done", size: entrySize(source, path) } : undefined);
+  const entrySize = (source, path) => source.entries.find((e) => e.cratePath === path)?.size || 0;
   // The files of a view under a folder of it ("" for all).
   const filesIn = (source, rel) => source.entries.filter((e) => e.cratePath.startsWith(rel));
   // How much of a view's folder is in the session: { done, total }.
