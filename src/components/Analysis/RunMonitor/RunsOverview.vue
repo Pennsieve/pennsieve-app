@@ -84,13 +84,23 @@ const runRoute = (name, runId) => ({
 const publicWorkflows = ref([]);
 const fetchPublicWorkflows = async () => {
   try {
+    // Every page: the service returns 20 at a time, newest first.
     const token = await useGetToken();
-    const resp = await fetch(`${config.value.api2Url}/compute/workflows/definitions?visibility=public`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-    const result = await resp.json();
-    publicWorkflows.value = Array.isArray(result) ? result : result.workflows || [];
+    const list = [];
+    let cursor = "";
+    let pages = 50;
+    do {
+      const params = new URLSearchParams({ visibility: "public", limit: "100" });
+      if (cursor) params.set("cursor", cursor);
+      const resp = await fetch(`${config.value.api2Url}/compute/workflows/definitions?${params}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const result = await resp.json();
+      list.push(...(Array.isArray(result) ? result : result.workflows || []));
+      cursor = Array.isArray(result) ? "" : result.nextCursor || "";
+    } while (cursor && pages-- > 0);
+    publicWorkflows.value = list;
   } catch (err) {
     console.error("Failed to fetch public workflows:", err);
     publicWorkflows.value = [];
