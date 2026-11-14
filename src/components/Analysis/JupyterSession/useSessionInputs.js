@@ -133,9 +133,16 @@ export function useSessionInputs({
               inputFolder: s.root ? "" : s.name,
               viewId: s.viewId,
               version: s.version,
+              // The models whose records are in the session already
+              // (staged before it started): the sidecar's objects
+              // { name, version, schema, records } (paths in the folder),
+              // not the plain names a picker holds; and the record files
+              // it found on disk, which count as downloaded.
+              models: s.models || [],
+              staged: new Set(s.staged || []),
             }))
             .filter((s) => s.nodeId)
-        : runViews.map(([nodeId, ds]) => ({ nodeId, inputFolder: "", viewId: ds.viewId, version: ds.viewVersion }));
+        : runViews.map(([nodeId, ds]) => ({ nodeId, inputFolder: "", viewId: ds.viewId, version: ds.viewVersion, models: [], staged: new Set() }));
       sources.value = await Promise.all(
         list.map(async (s) => {
           const [view, entries] = await Promise.all([
@@ -225,7 +232,11 @@ export function useSessionInputs({
     return rows;
   }
 
-  const stateOf = (source, path) => states.value[inputKey(source.nodeId, path)];
+  // A file's download state: the sidecar's, or done for a record file it
+  // found staged before the session started.
+  const stateOf = (source, path) =>
+    states.value[inputKey(source.nodeId, path)] || (source.staged?.has(path) ? { state: "done", size: entrySize(source, path) } : undefined);
+  const entrySize = (source, path) => source.entries.find((e) => e.cratePath === path)?.size || 0;
   // The files of a view under a folder of it ("" for all).
   const filesIn = (source, rel) => source.entries.filter((e) => e.cratePath.startsWith(rel));
   // How much of a view's folder is in the session: { done, total }.
@@ -240,8 +251,12 @@ export function useSessionInputs({
     filesIn(source, rel).filter((e) => !["done", "queued", "downloading"].includes(stateOf(source, e.cratePath)?.state));
 
   /* -------------------------------------------------------- downloading --- */
-  const inputBytes = computed(() =>
-    Object.values(states.value).reduce((n, st) => n + (st?.state === "done" ? st.size || st.bytes || 0 : 0), 0)
+  // Bytes of the inputs in the session: the downloads done, and the record
+  // files staged before it started.
+  const inputBytes = computed(
+    () =>
+      Object.values(states.value).reduce((n, st) => n + (st?.state === "done" ? st.size || st.bytes || 0 : 0), 0) +
+      sources.value.reduce((n, s) => n + [...(s.staged || [])].reduce((m, p) => m + (stateOf(s, p) && !states.value[inputKey(s.nodeId, p)] ? entrySize(s, p) : 0), 0), 0)
   );
   // What's still to come of downloads under way.
   const active = computed(() => Object.values(states.value).filter((st) => st.state === "queued" || st.state === "downloading"));
