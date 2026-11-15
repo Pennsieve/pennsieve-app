@@ -1,10 +1,11 @@
-// Starter code for a session file, by its type: a few small cells (load it,
-// summarize it, plot it) the file browser offers on a file's Code action.
+// Starter code for a session file, by its type, or for a stack, by its
+// format: a few small cells (load it, summarize it, plot it) the file
+// browser offers on a file's Code action.
 // They're templates, not generated: the same file always gets the same code,
 // and a cell is only added, never run. The session image is slim, so the
 // libraries a snippet needs come from the user's environment; its first line
 // says which they are.
-import { sessionPathCode } from "./pathCode";
+import { httpsOf, sessionPathCode, stackCode } from "./pathCode";
 
 const isR = (kernelName = "") => {
   const k = kernelName.toLowerCase();
@@ -114,6 +115,61 @@ const R = {
     { id: "plot", label: "Plot", title: "A histogram of each numeric column", code: (p, sep) => lines(`df <- read.csv(${p}${sep})`, "num <- df[sapply(df, is.numeric)]", "par(mfrow = c(ceiling(ncol(num) / 3), 3), mar = c(4, 4, 2, 1))", "for (col in names(num)) hist(num[[col]], main = col, xlab = \"\")") },
   ],
 };
+
+/* ------------------------------------------------------------ stacks --- */
+// A stack (a Zarr, a precomputed volume, a whole-slide image) is read in
+// place from S3, so a plot reads its lowest resolution only: a few chunks,
+// not the whole stack. Load is stackCode's, as the Code action always gave.
+
+const zarrOpen = (e) => {
+  const options = e.region ? `{"anon": True, "client_kwargs": {"region_name": ${JSON.stringify(e.region)}}}` : `{"anon": True}`;
+  return `z = zarr.open(${JSON.stringify(e.location)}, mode="r", storage_options=${options})`;
+};
+const fsOpen = (e) => {
+  const region = e.region ? `, client_kwargs={"region_name": ${JSON.stringify(e.region)}}` : "";
+  return `fs = s3fs.S3FileSystem(anon=True, default_block_size=500_000${region})`;
+};
+const volumeOpen = (e) =>
+  `vol = CloudVolume(${JSON.stringify(`precomputed://${httpsOf(e.location, e.region)}`)}, mip=0, progress=False)`;
+
+// The levels to try for a picture at most `across` voxels wide: the finest
+// that fits first, then coarser ones, then finer ones. Some volumes list a
+// level they hold no data for (CloudVolume raises EmptyVolumeException).
+const mipOrder = (across) => [
+  `small = [m for m in vol.available_mips if max(vol.mip_volume_size(m)[:2]) <= ${across}]`,
+  "mips = small + [m for m in reversed(vol.available_mips) if m not in small]",
+];
+
+const STACKS = {
+  zarr: [
+    { id: "summary", label: "Summarize", title: "Its arrays: shapes, types and chunks", code: (e) => lines(needs("zarr", "s3fs"), "import zarr", "", zarrOpen(e), "", "def show(node, prefix=\"\"):", "    if isinstance(node, zarr.Array):", "        print(f\"{prefix or '/'}  {node.shape} {node.dtype} chunks {node.chunks}\")", "        return", "    for name, arr in node.arrays():", "        show(arr, f\"{prefix}/{name}\")", "    for name, group in node.groups():", "        show(group, f\"{prefix}/{name}\")", "", "show(z)") },
+    { id: "plot", label: "Plot", title: "An array at most 1024 across (a 2-D plane, or a line for 1-D)", code: (e) => lines(needs("zarr", "s3fs", "matplotlib"), "import numpy as np", "import zarr", "import matplotlib.pyplot as plt", "", zarrOpen(e), "", "def arrays(node):", "    if isinstance(node, zarr.Array):", "        yield node", "        return", "    for _, arr in node.arrays():", "        yield arr", "    for _, group in node.groups():", "        yield from arrays(group)", "", "found = list(arrays(z))", "fits = [x for x in found if max(x.shape[-2:]) <= 1024]", "# The largest that's at most 1024 across (a resolution level of a pyramid), else the smallest", "a = max(fits, key=lambda x: x.size) if fits else min(found, key=lambda x: x.size)", "plt.figure(figsize=(8, 6))", "if a.ndim == 1:", "    plt.plot(a[:100_000])", "else:", "    step = [max(1, s // 1024) for s in a.shape[-2:]]", "    plane = a[(0,) * (a.ndim - 2) + (slice(None, None, step[0]), slice(None, None, step[1]))]", "    plt.imshow(np.asarray(plane), cmap=\"gray\")", "    plt.colorbar()", "plt.title(f\"{a.name} {a.shape}\")", "plt.show()") },
+  ],
+  "ome-zarr": [
+    { id: "summary", label: "Summarize", title: "Its axes, resolution levels and channels", code: (e) => lines(needs("zarr", "s3fs"), "import zarr", "", zarrOpen(e), "attrs = z.attrs.asdict()", "attrs = attrs.get(\"ome\", attrs)  # OME-Zarr 0.5 keeps them under \"ome\"", "ms = attrs[\"multiscales\"][0]", "axes = [a if isinstance(a, str) else a[\"name\"] for a in ms.get(\"axes\", \"tczyx\")]", "print(\"axes:\", axes)", "for d in ms[\"datasets\"]:", "    arr = z[d[\"path\"]]", "    print(f\"level {d['path']}: {arr.shape} {arr.dtype}\")", "for c in attrs.get(\"omero\", {}).get(\"channels\", []):", "    print(\"channel:\", c.get(\"label\"))") },
+    { id: "plot", label: "Plot", title: "The middle plane of up to 3 channels, at a level at most 1024 across", code: (e) => lines(needs("zarr", "s3fs", "matplotlib"), "import numpy as np", "import zarr", "import matplotlib.pyplot as plt", "", zarrOpen(e), "attrs = z.attrs.asdict()", "attrs = attrs.get(\"ome\", attrs)", "ms = attrs[\"multiscales\"][0]", "axes = [a if isinstance(a, str) else a[\"name\"] for a in ms.get(\"axes\", \"tczyx\")]", "levels = [z[d[\"path\"]] for d in ms[\"datasets\"]]  # finest first", "# The finest level that's at most 1024 across, else the coarsest", "arr = next((a for a in levels if max(a.shape[-2:]) <= 1024), levels[-1])", "", "def plane(channel):", "    at = {\"t\": 0, \"c\": channel, \"z\": arr.shape[axes.index(\"z\")] // 2 if \"z\" in axes else 0}", "    return np.asarray(arr[tuple(at.get(a, slice(None)) for a in axes)])", "", "channels = min(3, arr.shape[axes.index(\"c\")]) if \"c\" in axes else 1", "fig, ax = plt.subplots(1, channels, figsize=(5 * channels, 5), squeeze=False)", "for c in range(channels):", "    ax[0, c].imshow(plane(c), cmap=\"gray\")", "    ax[0, c].set_title(f\"channel {c}, level {arr.shape}\")", "    ax[0, c].axis(\"off\")", "plt.show()") },
+  ],
+  "neuroglancer-precomputed": [
+    { id: "summary", label: "Summarize", title: "Its type, channels and resolution levels", code: (e) => lines(needs("cloud-volume"), "from cloudvolume import CloudVolume", "", volumeOpen(e), "print(vol.layer_type, vol.dtype, vol.num_channels, \"channel(s)\")", "for mip, scale in enumerate(vol.info[\"scales\"]):", "    print(f\"mip {mip}: {scale['size']} voxels at {scale['resolution']} nm\")") },
+    { id: "plot", label: "Plot", title: "Its middle z plane, at a level at most 1024 voxels across", code: (e) => lines(needs("cloud-volume", "matplotlib"), "import numpy as np", "import matplotlib.pyplot as plt", "from cloudvolume import CloudVolume", "from cloudvolume.exceptions import EmptyVolumeException", "", volumeOpen(e), ...mipOrder(1024), "for mip in mips:", "    vol.mip = mip", "    b = vol.bounds", "    z = int((b.minpt[2] + b.maxpt[2]) // 2)", "    try:", "        img = np.asarray(vol[b.minpt[0]:b.maxpt[0], b.minpt[1]:b.maxpt[1], z])[:, :, 0, 0].T", "        break", "    except EmptyVolumeException:  # a level without data: try the next", "        continue", "plt.figure(figsize=(8, 8))", "plt.imshow(img, cmap=\"tab20\" if vol.layer_type == \"segmentation\" else \"gray\", interpolation=\"nearest\")", "plt.title(f\"z = {z}, mip {vol.mip}\")", "plt.axis(\"off\")", "plt.show()") },
+    { id: "slices", label: "Slices", title: "Its middle plane along z, y and x, at a level at most 512 voxels across", code: (e) => lines(needs("cloud-volume", "matplotlib"), "import numpy as np", "import matplotlib.pyplot as plt", "from cloudvolume import CloudVolume", "from cloudvolume.exceptions import EmptyVolumeException", "", volumeOpen(e), ...mipOrder(512), "for mip in mips:", "    vol.mip = mip", "    b = vol.bounds", "    x, y, z = (int((lo + hi) // 2) for lo, hi in zip(b.minpt, b.maxpt))", "    rx, ry, rz = vol.resolution", "    try:", "        planes = [", "            (\"z\", np.asarray(vol[b.minpt[0]:b.maxpt[0], b.minpt[1]:b.maxpt[1], z])[:, :, 0, 0].T, ry / rx),", "            (\"y\", np.asarray(vol[b.minpt[0]:b.maxpt[0], y, b.minpt[2]:b.maxpt[2]])[:, 0, :, 0].T, rz / rx),", "            (\"x\", np.asarray(vol[x, b.minpt[1]:b.maxpt[1], b.minpt[2]:b.maxpt[2]])[0, :, :, 0].T, rz / ry),", "        ]", "        break", "    except EmptyVolumeException:  # a level without data: try the next", "        continue", "cmap = \"tab20\" if vol.layer_type == \"segmentation\" else \"gray\"", "fig, axes = plt.subplots(1, 3, figsize=(15, 5))", "for ax, (axis, img, aspect) in zip(axes, planes):", "    ax.imshow(img, cmap=cmap, aspect=aspect, interpolation=\"nearest\")", "    ax.set_title(f\"middle {axis} plane, mip {vol.mip}\")", "    ax.axis(\"off\")", "plt.show()") },
+    { id: "crop", label: "Crop", title: "A 512 x 512 patch from its centre, at full resolution", code: (e) => lines(needs("cloud-volume", "matplotlib"), "import numpy as np", "import matplotlib.pyplot as plt", "from cloudvolume import CloudVolume", "", volumeOpen(e), "b = vol.bounds", "x, y, z = (int((lo + hi) // 2) for lo, hi in zip(b.minpt, b.maxpt))", "x0, y0 = max(b.minpt[0], x - 256), max(b.minpt[1], y - 256)", "x1, y1 = min(b.maxpt[0], x0 + 512), min(b.maxpt[1], y0 + 512)", "crop = np.asarray(vol[x0:x1, y0:y1, z])[:, :, 0, 0].T  # rows are y", "print(f\"{crop.shape} {crop.dtype} at x {x0}:{x1}, y {y0}:{y1}, z {z}; voxels {vol.resolution.tolist()} nm\")", "plt.figure(figsize=(8, 8))", "plt.imshow(crop, cmap=\"tab20\" if vol.layer_type == \"segmentation\" else \"gray\", interpolation=\"nearest\")", "plt.axis(\"off\")", "plt.show()") },
+    { id: "save", label: "Save", title: "Save a 512 x 512 x 16 block from its centre to output/ (NumPy)", code: (e) => lines(needs("cloud-volume"), "import json", "import numpy as np", "from cloudvolume import CloudVolume", "", volumeOpen(e), "b = vol.bounds", "size = np.array([512, 512, 16])", "lo = np.maximum(b.minpt, (b.minpt + b.maxpt) // 2 - size // 2)", "hi = np.minimum(b.maxpt, lo + size)", "block = np.asarray(vol[lo[0]:hi[0], lo[1]:hi[1], lo[2]:hi[2]])[..., 0]  # x, y, z", `name = ${JSON.stringify(String(e.cratePath || "volume").replace(/\/$/, "").replace(/\//g, "-"))}`, "np.save(OUTPUT_DIR / f\"{name}-block.npy\", block)", "(OUTPUT_DIR / f\"{name}-block.json\").write_text(json.dumps({", "    \"source\": vol.cloudpath, \"mip\": vol.mip, \"offset_xyz\": lo.tolist(),", "    \"shape_xyz\": list(block.shape), \"resolution_nm\": list(map(float, vol.resolution)),", "}, indent=2))", "print(f\"Saved {block.shape} {block.dtype} to output/{name}-block.npy\")") },
+  ],
+  "dicom-wsi": [
+    { id: "summary", label: "Summarize", title: "Its levels: size and kind (headers only)", code: (e) => lines(needs("s3fs", "pydicom"), "import s3fs, pydicom", "", fsOpen(e), `for path in sorted(fs.ls(${JSON.stringify(e.location)}), key=fs.size):`, "    ds = pydicom.dcmread(fs.open(path, \"rb\"), stop_before_pixels=True)", "    kind = ds.ImageType[2] if len(ds.ImageType) > 2 else \"\"", "    print(f\"{ds.TotalPixelMatrixColumns} x {ds.TotalPixelMatrixRows}  {kind:8} {fs.size(path) / 1e6:.0f} MB  {path.rsplit('/', 1)[-1]}\")") },
+    { id: "plot", label: "Show", title: "A thumbnail: its smallest pyramid level", code: (e) => lines(needs("s3fs", "pydicom", "highdicom", "matplotlib"), "import s3fs, pydicom, highdicom as hd", "import matplotlib.pyplot as plt", "", fsOpen(e), "", "def is_level(path):  # a pyramid level, not the label or overview", "    ds = pydicom.dcmread(fs.open(path, \"rb\"), stop_before_pixels=True)", "    return len(ds.ImageType) < 3 or ds.ImageType[2] == \"VOLUME\"", "", `smallest = next(p for p in sorted(fs.ls(${JSON.stringify(e.location)}), key=fs.size) if is_level(p))`, "slide = hd.imread(fs.open(smallest, \"rb\"), lazy_frame_retrieval=True)", "plt.figure(figsize=(10, 8))", "pixels = slide.get_total_pixel_matrix()", "plt.imshow(pixels / pixels.max() if pixels.dtype.kind == \"f\" else pixels)  # matplotlib wants floats in 0..1", "plt.axis(\"off\")", "plt.show()") },
+  ],
+};
+
+// The snippets for a stack (a view entry: { format, location, region,
+// cratePath }): Load, then its format's own. R has Load only: the URL.
+export function stackSnippets(entry, kernelName = "") {
+  const load = { id: "load", label: "Load", title: "Open it in place: only what you index is read", code: stackCode(entry, kernelName) };
+  if (isR(kernelName)) return [load];
+  const more = STACKS[entry?.format] || STACKS.zarr;
+  return [load, ...more.map(({ id, label, title, code }) => ({ id, label, title, code: code(entry) }))];
+}
 
 // Tab-separated tables need their separator said.
 function separator(name, r) {

@@ -13,7 +13,7 @@ import FileBrowser from "./FileBrowser.vue";
 import AddDataDialog from "./AddDataDialog.vue";
 import { useSessionInputs } from "./useSessionInputs";
 import EnvironmentPanel from "./EnvironmentPanel.vue";
-import { sessionPathCode, stackCode } from "./pathCode";
+import { sessionPathCode } from "./pathCode";
 import RuntimeMark from "../WorkflowGraph/RuntimeMark.vue";
 import { fetchRun } from "../RunMonitor/runDetails";
 import { runOnGpu, runNodeId, gpuShortLabel, gpuMarkTitle, sessionRestrictions } from "../RunMonitor/notebookHelpers";
@@ -504,10 +504,6 @@ async function focusCell(id) {
 function insertPath(path) {
   insertCode(sessionPathCode(path, kernelName.value));
 }
-// The code that opens a stack (a Zarr in an input) in place.
-function insertStack(entry) {
-  insertCode(stackCode(entry, kernelName.value));
-}
 // A file's starter code (the file browser's Code action) as a cell of its
 // own: the selected cell when it's an empty code cell, else a new one below
 // it. It isn't run.
@@ -896,7 +892,6 @@ const kernelPill = computed(() => {
             :inputs="inputs"
             @insert-path="insertPath"
             @open-notebook="requestOpen"
-            @insert-stack="insertStack"
             @insert-snippet="insertSnippet"
             @add-data="addingData = true"
           />

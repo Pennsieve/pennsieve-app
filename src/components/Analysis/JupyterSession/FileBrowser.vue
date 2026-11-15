@@ -27,7 +27,7 @@ const props = defineProps({
   inputs: { type: Object, default: null },
 });
 
-const emit = defineEmits(["insert-path", "open-notebook", "insert-stack", "insert-snippet", "add-data"]);
+const emit = defineEmits(["insert-path", "open-notebook", "insert-snippet", "add-data"]);
 
 // Tree node: { name, path, type, size, last_modified, children, open, loading }
 const roots = ref([]);
@@ -299,7 +299,6 @@ function copyPath(node) {
         @copy="copyPath"
         @insert="emit('insert-path', $event)"
         @open="emit('open-notebook', $event)"
-        @insert-stack="emit('insert-stack', $event)"
         @insert-snippet="emit('insert-snippet', $event)"
         @add-data="emit('add-data')"
       />
