@@ -62,11 +62,11 @@ describe("stackSnippets", () => {
     expect(plot.code).toContain("arr = next((a for a in levels if max(a.shape[-2:]) <= 1024), levels[-1])");
   });
 
-  it("plots a precomputed volume over https, trying levels until one has data", () => {
+  it("plots a precomputed volume over https, trying levels until one has data, missing chunks as zeros", () => {
     const em = { cratePath: "em/", location: "s3://bossdb-open-data/w/em/", region: "us-east-1", format: "neuroglancer-precomputed" };
     const plot = stackSnippets(em).find((s) => s.id === "plot");
     expect(plot.code).toContain('CloudVolume("precomputed://https://s3.us-east-1.amazonaws.com/bossdb-open-data/w/em"');
-    expect(plot.code).toContain("except EmptyVolumeException:");
+    expect(plot.code).toContain("fill_missing=True");
   });
 
   it("summarizes a whole-slide image from headers only", () => {
