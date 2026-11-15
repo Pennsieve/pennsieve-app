@@ -595,7 +595,7 @@ function onAgentEvent(a, ev) {
 
 // Asks: the agent (allowRun continues a fix's conversation: Fix and run),
 // or the single-shot assistant.
-async function submitAssist(cell, prompt, { allowRun = false } = {}) {
+async function submitAssist(cell, prompt, { allowRun = false, codeOnly = false } = {}) {
   const a = cell._assist;
   if (!a) return;
   // Each request (a continuation too) counts its own tokens.
@@ -619,8 +619,17 @@ async function submitAssist(cell, prompt, { allowRun = false } = {}) {
               files: sessionFiles(inputs.sources, kernelName.value),
               packages: await assistPackages(),
             });
+      if (codeOnly) body.codeOnly = true;
       const proposal = await askAgent(body, { signal: controller.signal, onEvent: (ev) => onAgentEvent(a, ev) });
-      Object.assign(a, { text: proposal.code, summary: proposal.summary || "", outputs: proposal.outputs || null, conversationId: proposal.conversationId });
+      // A question's answer is words, not code.
+      if (proposal.kind === "answer") a.lastAnswer = proposal.answer;
+      Object.assign(a, {
+        text: proposal.kind === "answer" ? "" : proposal.code,
+        answer: proposal.kind === "answer" ? proposal.answer : "",
+        summary: proposal.summary || "",
+        outputs: proposal.outputs || null,
+        conversationId: proposal.conversationId,
+      });
     } else {
       const body = assistRequest({
         mode: a.mode,
@@ -691,6 +700,19 @@ function onAssist(cell, { action, prompt }) {
   else if (action === "clear-file") a.file = "";
   else if (action === "discard") closeAssist(cell);
   else if (action === "accept-run") fixAndRun(cell);
+  else if (action === "insert-answer") {
+    // An answer, kept in the notebook as a Markdown cell below.
+    const id = addCell(cell.id, "markdown");
+    setSource(id, `${a.answer}\n\n_Answered by the AI assistant._`);
+    const md = cells.value[idx(id)];
+    if (md) md._editing = false;
+    closeAssist(cell);
+  } else if (action === "answer-to-code") {
+    // Code for what was asked, with what the answer found.
+    const asked = a.prompt;
+    a.answer = "";
+    submitAssist(cell, `${asked}\n\nWrite code for this. What you found before: ${a.lastAnswer || ""}`.slice(0, 3900), { codeOnly: true });
+  }
   else if (action === "accept" || action === "insert-below") {
     const code = acceptedCode(a.text);
     if (!cellCode(a.text)) return;

@@ -7,6 +7,8 @@
 // unless they choose Fix and run. The state is the cell's _assist
 // (JupyterSession owns it).
 import { computed, nextTick, onMounted, ref } from "vue";
+import { marked } from "marked";
+import DOMPurify from "dompurify";
 import { cellCode, stepLabel, usageLine } from "./assistHelpers";
 import AssistIcon from "./AssistIcon.vue";
 
@@ -15,7 +17,7 @@ const props = defineProps({
   // The cell has code: taking the reply replaces it.
   cellHasCode: { type: Boolean, default: false },
 });
-const emit = defineEmits(["submit", "stop", "accept", "accept-run", "insert-below", "discard", "clear-file"]);
+const emit = defineEmits(["submit", "stop", "accept", "accept-run", "insert-below", "insert-answer", "answer-to-code", "discard", "clear-file"]);
 
 const prompt = ref(props.assist.prompt || "");
 const input = ref(null);
@@ -23,6 +25,8 @@ const asking = computed(() => props.assist.state === "asking");
 const fix = computed(() => props.assist.mode === "fix");
 const code = computed(() => cellCode(props.assist.text));
 const fileName = computed(() => String(props.assist.file || "").split("/").pop());
+// A question's answer, in Markdown, shown as the page's own HTML: sanitized.
+const answerHtml = computed(() => (props.assist.answer ? DOMPurify.sanitize(marked.parse(props.assist.answer, { gfm: true, breaks: true })) : ""));
 const usage = computed(() => usageLine(props.assist.usage, props.assist.budget));
 const title = computed(() => {
   const a = props.assist;
@@ -85,6 +89,14 @@ function submit() {
     <p v-if="assist.error" class="nb-assist__error">{{ assist.error }}</p>
     <!-- No AI budget left: a notice, not an error. -->
     <p v-if="assist.state === 'budget'" class="nb-assist__budget">{{ assist.notice }}</p>
+
+    <!-- A question's answer: words, to keep as a Markdown cell or turn into code. -->
+    <div v-if="assist.state === 'done' && assist.answer" class="nb-assist__answer markdown-body" v-html="answerHtml" />
+    <div v-if="assist.state === 'done' && assist.answer" class="nb-assist__actions">
+      <button class="nb-assist__btn nb-assist__btn--go" @click="emit('insert-answer')">Insert as Markdown cell</button>
+      <button class="nb-assist__btn" @click="emit('answer-to-code')">Write code for this</button>
+      <button class="nb-assist__btn" @click="emit('discard')">Close</button>
+    </div>
 
     <div v-if="assist.state === 'done' && code && fix" class="nb-assist__actions">
       <button
@@ -258,6 +270,26 @@ $assist_tint: #f0ebfb;
   margin: 6px 0 0;
   font-size: 10px;
   color: theme.$gray_4;
+}
+.nb-assist__answer {
+  margin: 6px 0 0;
+  padding: 6px 10px;
+  max-height: 360px;
+  overflow: auto;
+  border-radius: 3px;
+  background: theme.$gray_1;
+  font-size: 13px;
+  line-height: 1.5;
+  color: theme.$gray_6;
+
+  :deep(p) {
+    margin: 0 0 6px;
+  }
+  :deep(ul),
+  :deep(ol) {
+    margin: 0 0 6px;
+    padding-left: 20px;
+  }
 }
 .nb-assist__budget {
   margin: 6px 0 0;
