@@ -53,6 +53,12 @@ describe("assistRequest", () => {
     expect(body.error).toBeUndefined();
   });
 
+  it("puts the file asked about first", () => {
+    const files = [{ path: "input/a.csv" }, { path: "input/em", note: "read in place" }];
+    const body = assistRequest({ prompt: "x", cell: cells[2], cells, file: "input/em", files });
+    expect(body.files.map((f) => f.path)).toEqual(["input/em", "input/a.csv"]);
+  });
+
   it("sends a fix with the cell's error, without colours", () => {
     expect(cellError(cells[0])).toBe("");
     const body = assistRequest({ mode: "fix", cell: cells[3], cells });
@@ -71,7 +77,7 @@ describe("sessionFiles", () => {
     ];
     const files = sessionFiles(sources, "Python 3.12.3");
     expect(files[0].path).toBe("input/bossdb-Kasthuri/ac4/em");
-    expect(files[0].note).toContain("Precomputed volume, read in place");
+    expect(files[0].note).toContain("Precomputed volume, read in place from cloud storage (not on the session's disk). Open it with:\nfrom cloudvolume import CloudVolume");
     expect(files[0].note).toContain('CloudVolume("precomputed://https://s3.us-east-1.amazonaws.com/bossdb-open-data/Kasthuri/ac4/em"');
     expect(files[1]).toEqual({ path: "input/bossdb-Kasthuri/notes/readme.txt", size: 120 });
   });
