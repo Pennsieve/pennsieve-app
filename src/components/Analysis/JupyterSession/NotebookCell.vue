@@ -202,8 +202,10 @@ function latexOf(data) {
         <button class="nb-tbtn nb-tbtn--del" title="Delete cell" @click="emit('delete')">🗑</button>
       </div>
 
+      <!-- The assistant writing code: above the editor. A fix shows under
+           the error it's for (below), where it was asked. -->
       <AssistBar
-        v-if="cell._assist && isCode"
+        v-if="cell._assist && isCode && cell._assist.mode !== 'fix'"
         :assist="cell._assist"
         :cell-has-code="!!cell.source.trim()"
         @submit="assist('submit', $event)"
@@ -279,6 +281,17 @@ function latexOf(data) {
           </template>
         </div>
       </div>
+
+      <AssistBar
+        v-if="cell._assist && isCode && cell._assist.mode === 'fix'"
+        :assist="cell._assist"
+        :cell-has-code="!!cell.source.trim()"
+        @submit="assist('submit', $event)"
+        @stop="assist('stop')"
+        @accept="assist('accept')"
+        @accept-run="assist('accept-run')"
+        @discard="assist('discard')"
+      />
     </div>
   </div>
 </template>

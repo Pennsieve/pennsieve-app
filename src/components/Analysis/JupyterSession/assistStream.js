@@ -93,3 +93,68 @@ export async function postAssist(kernelBaseUrl, token, body, { onText, signal, f
   }
   return reply;
 }
+
+// The notebook's agent (the session image's /pennsieve-agent): it looks at
+// the session's files and the kernel before it writes, and can run its fix.
+// Newer images have it; without it the sidecar's single-shot assistant
+// (getAssist, postAssist) is used.
+//   GET  {session}/pennsieve-agent -> { available, model, budget }
+//   POST {session}/pennsieve-agent {kernelId, mode, prompt, …} -> events
+//        (step, run, note, usage, budget, proposal, error)
+const AGENT_PATH = "/pennsieve-agent";
+
+export async function getAgent(kernelBaseUrl, token, { fetchFn = globalThis.fetch } = {}) {
+  try {
+    const resp = await fetchFn(`${kernelBaseUrl}${AGENT_PATH}`, {
+      credentials: "include",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!resp.ok) return { available: false };
+    const body = await resp.json();
+    return { available: !!body.available, model: body.model || "", budget: body.budget || null };
+  } catch {
+    return { available: false };
+  }
+}
+
+// Asks the agent, calling onEvent with each event as it arrives; resolves to
+// its proposal ({ code, summary, outputs, conversationId }).
+export async function postAgent(kernelBaseUrl, token, body, { onEvent, signal, fetchFn = globalThis.fetch } = {}) {
+  const resp = await fetchFn(`${kernelBaseUrl}${AGENT_PATH}`, {
+    method: "POST",
+    credentials: "include",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+    signal,
+  });
+  if (!resp.ok) {
+    const text = await resp.text().catch(() => "");
+    let message = "";
+    try {
+      message = JSON.parse(text).message || "";
+    } catch {
+      // not the server's JSON
+    }
+    throw new Error(message || `The assistant couldn't answer (${resp.status}).`);
+  }
+  const reader = resp.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let proposal = null;
+  let failure = "";
+  for (;;) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const { events, rest } = sseEvents(buffer);
+    buffer = rest;
+    for (const ev of events) {
+      if (ev.type === "proposal") proposal = ev;
+      if (ev.type === "error") failure = ev.message || "The assistant stopped with an error.";
+      onEvent?.(ev);
+    }
+  }
+  if (failure) throw new Error(failure);
+  if (!proposal) throw new Error("The assistant stopped without proposing code.");
+  return proposal;
+}

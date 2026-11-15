@@ -90,3 +90,27 @@ export function assistRequest({ mode = "write", prompt = "", cell, cells, kernel
   if (mode === "fix") body.error = cellError(cell);
   return body;
 }
+
+// An agent's step, in words: what it looked at or ran.
+const STEP_VERBS = { read_file: "Read", list_files: "Listed", inspect: "Looked at", run_code: "Ran" };
+export function stepLabel(step) {
+  const verb = STEP_VERBS[step?.tool] || "Used";
+  return step?.tool === "run_code" ? `${verb} the fix` : `${verb} ${step?.summary || step?.tool || ""}`.trim();
+}
+
+const tokens = (n) => (n >= 1000 ? `${(n / 1000).toFixed(n >= 10000 ? 0 : 1)}k` : String(n));
+const dollars = (n) => (n < 0.01 ? `$${n.toFixed(3)}` : `$${n.toFixed(2)}`);
+
+// What a request used, for the line under its result: its tokens (as the
+// governor counted them), its cost (the run's spend before and after it, so
+// an estimate) and the run's spend of its budget.
+export function usageLine(usage, budget) {
+  const parts = [];
+  if (usage) {
+    const read = (usage.input_tokens || 0) + (usage.cache_read_input_tokens || 0) + (usage.cache_creation_input_tokens || 0);
+    parts.push(`${tokens(read)} tokens in, ${tokens(usage.output_tokens || 0)} out`);
+  }
+  if (budget?.requestUsd != null) parts.push(`about ${dollars(budget.requestUsd)}`);
+  if (budget?.runUsedUsd != null && budget?.runBudgetUsd) parts.push(`${dollars(budget.runUsedUsd)} of this run's ${dollars(budget.runBudgetUsd)}`);
+  return parts.join(" · ");
+}

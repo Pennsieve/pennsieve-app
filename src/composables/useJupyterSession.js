@@ -24,7 +24,7 @@ import {
   ServerConnection,
 } from "@jupyterlab/services";
 import { PYTHON_PACKAGES_CODE, R_PACKAGES_CODE, parsePackages } from "@/components/Analysis/JupyterSession/environmentHelpers";
-import { getAssist, postAssist } from "@/components/Analysis/JupyterSession/assistStream";
+import { getAgent, getAssist, postAgent, postAssist } from "@/components/Analysis/JupyterSession/assistStream";
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const toWs = (u) => u.replace(/^http/i, "ws");
@@ -1009,9 +1009,19 @@ export function useJupyterSession() {
   }
 
   // The notebook's code assistant (see getAssist, postAssist).
-  function assistStatus() {
-    if (!kernelBaseUrl) return Promise.resolve({ available: false });
-    return getAssist(kernelBaseUrl, sessionToken);
+  // The notebook's agent when the session's image has one, else the
+  // sidecar's single-shot assistant: { available, agent, model, budget }.
+  async function assistStatus() {
+    if (!kernelBaseUrl) return { available: false };
+    const agent = await getAgent(kernelBaseUrl, sessionToken);
+    if (agent.available) return { ...agent, agent: true };
+    return { ...(await getAssist(kernelBaseUrl, sessionToken)), agent: false };
+  }
+
+  // Asks the agent about this notebook's kernel.
+  function askAgent(body, opts) {
+    if (!kernelBaseUrl || !kernel) throw new Error("The session isn't connected.");
+    return postAgent(kernelBaseUrl, sessionToken, { ...body, kernelId: kernel.id }, opts);
   }
 
   function askAssist(body, opts) {
@@ -1116,6 +1126,7 @@ export function useJupyterSession() {
     // assistant
     assistStatus,
     askAssist,
+    askAgent,
     // environment
     environmentState,
     switchEnvironment,
