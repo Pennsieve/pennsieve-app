@@ -24,6 +24,7 @@ import {
   ServerConnection,
 } from "@jupyterlab/services";
 import { PYTHON_PACKAGES_CODE, R_PACKAGES_CODE, parsePackages } from "@/components/Analysis/JupyterSession/environmentHelpers";
+import { getAssist, postAssist } from "@/components/Analysis/JupyterSession/assistStream";
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const toWs = (u) => u.replace(/^http/i, "ws");
@@ -1007,6 +1008,17 @@ export function useJupyterSession() {
     return deleteInputsFetch(kernelBaseUrl, sessionToken, files);
   }
 
+  // The notebook's code assistant (see getAssist, postAssist).
+  function assistStatus() {
+    if (!kernelBaseUrl) return Promise.resolve({ available: false });
+    return getAssist(kernelBaseUrl, sessionToken);
+  }
+
+  function askAssist(body, opts) {
+    if (!kernelBaseUrl) throw new Error("The session isn't connected.");
+    return postAssist(kernelBaseUrl, sessionToken, body, opts);
+  }
+
   // The session's view inputs (see sessionSourcesRequest).
   function inputSources() {
     if (!kernelBaseUrl) throw new Error("The session isn't connected.");
@@ -1101,6 +1113,9 @@ export function useJupyterSession() {
     inputSources,
     addInputSource,
     removeInputSource,
+    // assistant
+    assistStatus,
+    askAssist,
     // environment
     environmentState,
     switchEnvironment,

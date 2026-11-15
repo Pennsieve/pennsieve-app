@@ -14,6 +14,7 @@ import AddDataDialog from "./AddDataDialog.vue";
 import { useSessionInputs } from "./useSessionInputs";
 import EnvironmentPanel from "./EnvironmentPanel.vue";
 import { sessionPathCode } from "./pathCode";
+import { acceptedCode, assistRequest, cellCode, sessionFiles } from "./assistHelpers";
 import RuntimeMark from "../WorkflowGraph/RuntimeMark.vue";
 import { fetchRun } from "../RunMonitor/runDetails";
 import { runOnGpu, runNodeId, gpuShortLabel, gpuMarkTitle, sessionRestrictions } from "../RunMonitor/notebookHelpers";
@@ -157,6 +158,8 @@ const {
   environmentState,
   switchEnvironment,
   clearEnvironment,
+  assistStatus,
+  askAssist,
   setSource,
   addCell,
   addCellAbove,
@@ -497,6 +500,108 @@ async function focusCell(id) {
   await nextTick();
   const ref = cellRefs.get(id);
   ref?.focus?.();
+}
+
+/* ---- code assistant -------------------------------------------------------
+   On a node with LLM access the session's sidecar has a code assistant: ✦ or
+   Cmd/Ctrl-K on a cell, Ask… on a file, Fix on an error. Its state is the
+   cell's _assist (AssistBar); one cell has it at a time. What it writes goes
+   into a cell only when the user takes it, and runs only when they run it. */
+const assistAvailable = ref(false);
+watch(status, async (s) => {
+  if (s === "ready") assistAvailable.value = (await assistStatus()).available;
+});
+// Requests in flight, by cell: Stop and closing end them.
+const assistAborts = new Map();
+
+// The kernel's packages, for the assistant to write code that imports: asked
+// once per environment (silently, behind a running cell; not waited for long).
+let packagesFor = null; // { key, list }
+async function assistPackages() {
+  const key = JSON.stringify([kernelName.value, environmentState.value?.active || null]);
+  if (packagesFor?.key === key) return packagesFor.list;
+  const timeout = new Promise((resolve) => setTimeout(() => resolve(null), 5000));
+  const found = await Promise.race([kernelPackages().catch(() => null), timeout]);
+  const list = (found || []).map((p) => p.name);
+  if (found) packagesFor = { key, list };
+  return list;
+}
+
+function closeAssist(cell) {
+  assistAborts.get(cell.id)?.abort();
+  assistAborts.delete(cell.id);
+  delete cell._assist;
+}
+
+function openAssist(cell, { mode = "write", file = "" } = {}) {
+  if (!assistAvailable.value || cell.cell_type !== "code") return;
+  for (const c of cells.value) if (c._assist && c.id !== cell.id) closeAssist(c);
+  if (cell._assist?.state === "asking") return;
+  cell._assist = { mode, file, prompt: "", state: "idle", text: "", error: "" };
+  select(cell.id);
+  if (mode === "fix") submitAssist(cell, "");
+}
+
+async function submitAssist(cell, prompt) {
+  const a = cell._assist;
+  if (!a) return;
+  Object.assign(a, { prompt, state: "asking", text: "", error: "" });
+  const controller = new AbortController();
+  assistAborts.set(cell.id, controller);
+  try {
+    const body = assistRequest({
+      mode: a.mode,
+      prompt,
+      cell,
+      cells: cells.value,
+      kernelName: kernelName.value,
+      file: a.file,
+      files: sessionFiles(inputs.sources.value, kernelName.value),
+      packages: await assistPackages(),
+    });
+    await askAssist(body, { onText: (t) => (a.text = t), signal: controller.signal });
+    a.state = "done";
+  } catch (e) {
+    if (controller.signal.aborted) a.state = a.text ? "done" : "idle";
+    else Object.assign(a, { state: "error", error: e?.message || String(e) });
+  } finally {
+    if (assistAborts.get(cell.id) === controller) assistAborts.delete(cell.id);
+  }
+}
+
+function onAssist(cell, { action, prompt }) {
+  const a = cell._assist;
+  if (action === "open") return a ? null : openAssist(cell);
+  if (action === "fix") return openAssist(cell, { mode: "fix" });
+  if (!a) return;
+  if (action === "submit") submitAssist(cell, prompt);
+  else if (action === "stop") assistAborts.get(cell.id)?.abort();
+  else if (action === "clear-file") a.file = "";
+  else if (action === "discard") closeAssist(cell);
+  else if (action === "accept" || action === "insert-below") {
+    const code = acceptedCode(a.text);
+    if (!cellCode(a.text)) return;
+    closeAssist(cell);
+    if (action === "accept") {
+      setSource(cell.id, code);
+      focusCell(cell.id);
+    } else {
+      const id = addCell(cell.id, "code");
+      setSource(id, code);
+      focusCell(id);
+    }
+  }
+}
+
+// A file's Ask… (the file browser): the assistant on a cell of its own,
+// about that file.
+function askAboutFile(path) {
+  let cell = selectedCell();
+  if (!cell || cell.cell_type !== "code" || cell.source.trim()) {
+    const id = addCell(cell ? cell.id : null, "code");
+    cell = cells.value[idx(id)];
+  }
+  openAssist(cell, { file: path });
 }
 
 // Insert a filesystem path (from the file browser) into the selected code cell
@@ -893,6 +998,8 @@ const kernelPill = computed(() => {
             @insert-path="insertPath"
             @open-notebook="requestOpen"
             @insert-snippet="insertSnippet"
+            :assist-available="assistAvailable"
+            @ask-file="askAboutFile"
             @add-data="addingData = true"
           />
         </div>
@@ -1085,6 +1192,8 @@ const kernelPill = computed(() => {
             @change-type="onChangeType(cell, $event)"
             @focus-prev="selectRel(-1)"
             @focus-next="selectRel(1)"
+            :assist-available="assistAvailable"
+            @assist="onAssist(cell, $event)"
           />
           <div class="nb-add-row">
             <el-button size="small" :icon="Plus" @click="focusCell(addCell(null, 'code'))">

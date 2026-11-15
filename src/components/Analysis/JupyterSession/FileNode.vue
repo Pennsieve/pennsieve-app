@@ -30,9 +30,11 @@ const props = defineProps({
   inputs: { type: Object, default: null },
   // The kernel's name ("Python 3.12.3", "R 4.4.1"): the language of a file's starter code.
   kernelName: { type: String, default: "" },
+  // The session has a code assistant: Code offers Ask… on any file.
+  assistAvailable: { type: Boolean, default: false },
 });
 
-const emit = defineEmits(["toggle", "copy", "insert", "open", "insert-snippet", "add-data"]);
+const emit = defineEmits(["toggle", "copy", "insert", "open", "insert-snippet", "ask-file", "add-data"]);
 const children = computed(() => visibleEntries(props.node.children, props.showHidden, props.onlyLocal));
 
 const isNotebook = (node) => node.type === "notebook" || /\.ipynb$/i.test(node.name || "");
@@ -95,9 +97,16 @@ const snippets = computed(() => {
   if (isStack.value) return stackSnippets(view.value.entry, props.kernelName);
   return props.node.type === "file" && !remote.value && !isNotebook(props.node) ? fileSnippets(props.node.path, props.kernelName) : [];
 });
+// Ask… is the assistant's, on any downloaded file or stack.
+const canAsk = computed(() => props.assistAvailable && (isStack.value || (props.node.type === "file" && !remote.value && !isNotebook(props.node))));
+const hasCode = computed(() => snippets.value.length > 0 || canAsk.value);
 function onCode() {
-  if (snippets.value.length === 1) pickSnippet(snippets.value[0]);
+  if (snippets.value.length === 1 && !canAsk.value) pickSnippet(snippets.value[0]);
   else showSnippets.value = !showSnippets.value;
+}
+function ask() {
+  showSnippets.value = false;
+  emit("ask-file", props.node.path);
 }
 const showSnippets = ref(false);
 function pickSnippet(s) {
@@ -226,7 +235,7 @@ function onRow() {
             ↪
           </button>
           <button
-            v-if="snippets.length"
+            v-if="hasCode"
             class="fn__act fn__act--text"
             :class="{ 'is-on': showSnippets }"
             title="Starter code for this file: load, summarize, plot"
@@ -243,10 +252,11 @@ function onRow() {
     </div>
 
     <!-- A file's starter code: each adds a cell, which isn't run. -->
-    <div v-if="showSnippets && snippets.length" class="fn__snippets" :style="{ paddingLeft: depth * 14 + 28 + 'px' }">
+    <div v-if="showSnippets && hasCode" class="fn__snippets" :style="{ paddingLeft: depth * 14 + 28 + 'px' }">
       <button v-for="s in snippets" :key="s.id" class="fn__snippet" :title="`${s.title}: adds a cell`" @click.stop="pickSnippet(s)">
         {{ s.label }}
       </button>
+      <button v-if="canAsk" class="fn__snippet fn__snippet--ask" title="Ask the AI assistant for code for this file" @click.stop="ask">✦ Ask…</button>
       <button class="fn__snippet-close" title="Close" aria-label="Close" @click.stop="showSnippets = false">✕</button>
     </div>
 
@@ -285,11 +295,13 @@ function onRow() {
         :fmt-time="fmtTime"
         :inputs="inputs"
         :kernel-name="kernelName"
+        :assist-available="assistAvailable"
         @toggle="emit('toggle', $event)"
         @copy="emit('copy', $event)"
         @insert="emit('insert', $event)"
         @open="emit('open', $event)"
         @insert-snippet="emit('insert-snippet', $event)"
+        @ask-file="emit('ask-file', $event)"
         @add-data="emit('add-data')"
       />
     </ul>
@@ -441,6 +453,9 @@ function onRow() {
   border-color: theme.$purple_2;
   background: theme.$purple_tint;
   outline: none;
+}
+.fn__snippet--ask {
+  border-style: dashed;
 }
 .fn__snippet-close {
   border: none;

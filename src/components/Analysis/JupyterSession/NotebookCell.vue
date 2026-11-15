@@ -8,12 +8,16 @@ import { marked } from "marked";
 import CodeMirrorEditor from "./CodeMirrorEditor.vue";
 import PlotlyOutput from "./PlotlyOutput.vue";
 import MathOutput from "./MathOutput.vue";
+import AssistBar from "./AssistBar.vue";
 
 const props = defineProps({
   cell: { type: Object, required: true },
   selected: { type: Boolean, default: false },
   isFirst: { type: Boolean, default: false },
   isLast: { type: Boolean, default: false },
+  // The session has a code assistant: ✦ and Cmd/Ctrl-K ask it, and an
+  // error offers Fix.
+  assistAvailable: { type: Boolean, default: false },
 });
 
 const emit = defineEmits([
@@ -28,6 +32,9 @@ const emit = defineEmits([
   "change-type",
   "focus-prev",
   "focus-next",
+  // The code assistant: { action: open | fix | submit | stop | accept |
+  // insert-below | discard | clear-file, prompt }. JupyterSession owns it.
+  "assist",
 ]);
 
 const editorRef = ref(null);
@@ -83,6 +90,10 @@ function editMarkdown() {
     emit("select");
     emit("edit");
   }
+}
+
+function assist(action, prompt) {
+  if (props.assistAvailable && isCode.value) emit("assist", { action, prompt });
 }
 
 function focus() {
@@ -165,6 +176,15 @@ function latexOf(data) {
       <!-- hover toolbar -->
       <div class="nb-cell__toolbar" @click.stop>
         <button class="nb-tbtn nb-tbtn--run" title="Run (Shift+Enter)" @click="run({ advance: true })">▶</button>
+        <button
+          v-if="assistAvailable && isCode"
+          class="nb-tbtn nb-tbtn--assist"
+          title="Ask the AI assistant for this cell's code (Cmd/Ctrl+K)"
+          aria-label="Ask the AI assistant"
+          @click="assist('open')"
+        >
+          ✦
+        </button>
         <select
           class="nb-type"
           :value="cell.cell_type"
@@ -181,6 +201,18 @@ function latexOf(data) {
         <button class="nb-tbtn nb-tbtn--del" title="Delete cell" @click="emit('delete')">🗑</button>
       </div>
 
+      <AssistBar
+        v-if="cell._assist && isCode"
+        :assist="cell._assist"
+        :cell-has-code="!!cell.source.trim()"
+        @submit="assist('submit', $event)"
+        @stop="assist('stop')"
+        @accept="assist('accept')"
+        @insert-below="assist('insert-below')"
+        @discard="assist('discard')"
+        @clear-file="assist('clear-file')"
+      />
+
       <!-- editor / rendered markdown -->
       <div v-if="editing" class="nb-cell__editor">
         <CodeMirrorEditor
@@ -195,6 +227,7 @@ function latexOf(data) {
           @focus="emit('select')"
           @arrow-up="emit('focus-prev')"
           @arrow-down="emit('focus-next')"
+          @assist="assist('open')"
         />
       </div>
       <div
@@ -215,6 +248,14 @@ function latexOf(data) {
           <template v-else-if="o.output_type === 'error'">
             <pre class="nb-stderr">{{ o.ename }}: {{ o.evalue }}
 {{ stripAnsi((o.traceback || []).join('\n')) }}</pre>
+            <button
+              v-if="assistAvailable && !cell._assist"
+              class="nb-fix"
+              title="Ask the AI assistant to fix this cell"
+              @click.stop="assist('fix')"
+            >
+              ✦ Fix this error
+            </button>
           </template>
 
           <template v-else>
@@ -336,6 +377,7 @@ function latexOf(data) {
 .nb-tbtn:hover { background: #e6e9ef; } /* purple_tint */
 .nb-tbtn:disabled { opacity: 0.3; cursor: default; }
 .nb-tbtn--run { color: #14a758; } /* green_2 */
+.nb-tbtn--assist { color: #4d628c; } /* purple_2 */
 .nb-tbtn--del:hover { background: #feeeec; color: #c14d49; } /* red_tint / red_2 */
 .nb-tspacer { width: 6px; }
 .nb-type {
@@ -425,6 +467,21 @@ function latexOf(data) {
 .nb-stderr {
   background: #feeeec !important; /* red_tint */
   color: #c14d49; /* red_2 */
+}
+/* Under an error: a quiet link to the assistant. */
+.nb-fix {
+  margin: 2px 0 4px;
+  padding: 1px 8px;
+  border: 1px solid #e5e5e5; /* gray_2 */
+  border-radius: 10px;
+  background: #ffffff;
+  font-size: 11px;
+  color: #4d628c; /* purple_2 */
+  cursor: pointer;
+}
+.nb-fix:hover {
+  border-color: #4d628c;
+  background: #e6e9ef; /* purple_tint */
 }
 .nb-json {
   background: #f7f7f7 !important; /* gray_1 — distinguish JSON from plain text */
