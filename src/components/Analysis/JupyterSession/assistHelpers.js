@@ -51,14 +51,19 @@ export function cellsBefore(cells, id) {
 }
 
 // The session's files, as its views list them: [{ path, size, note }].
-// A stack is read in place, so its note says how.
+// A stack is read in place, not from the disk, so its note says so and
+// gives the code that opens it.
 export function sessionFiles(sources, kernelName = "") {
   const files = [];
   for (const s of sources || []) {
     const base = sourceBase(s);
     for (const e of s.stacks || []) {
       const path = `${base}/${String(e.cratePath).replace(/\/$/, "")}`;
-      files.push({ path, size: e.size || undefined, note: `${stackFormat(e)}, read in place, not on the disk: ${stackCode(e, kernelName).split("\n").pop()}` });
+      files.push({
+        path,
+        size: e.size || undefined,
+        note: `${stackFormat(e)}, read in place from cloud storage (not on the session's disk). Open it with:\n${stackCode(e, kernelName)}`,
+      });
     }
     for (const e of s.entries || []) files.push({ path: `${base}/${e.cratePath}`, size: e.size || undefined });
   }
@@ -68,13 +73,16 @@ export function sessionFiles(sources, kernelName = "") {
 // A request: what the user asked (or the cell's error, to fix), with the
 // notebook's context.
 export function assistRequest({ mode = "write", prompt = "", cell, cells, kernelName, file = "", files = [], packages = [] }) {
+  // The file asked about first: the list may be cut short, and its note
+  // (how to open a stack) must go.
+  const asked = file ? files.filter((f) => f.path === file) : [];
   const body = {
     mode,
     prompt,
     kernel: kernelName || "",
     cell: cell?.source || "",
     before: cellsBefore(cells || [], cell?.id),
-    files,
+    files: [...asked, ...files.filter((f) => !asked.includes(f))],
     packages,
   };
   if (file) body.file = file;
