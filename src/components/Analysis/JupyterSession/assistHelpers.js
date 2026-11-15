@@ -107,8 +107,11 @@ const dollars = (n) => (n < 0.01 ? `$${n.toFixed(3)}` : `$${n.toFixed(2)}`);
 export function usageLine(usage, budget) {
   const parts = [];
   if (usage) {
-    const read = (usage.input_tokens || 0) + (usage.cache_read_input_tokens || 0) + (usage.cache_creation_input_tokens || 0);
-    parts.push(`${tokens(read)} tokens in, ${tokens(usage.output_tokens || 0)} out`);
+    // Cached input is read back at about a tenth of the price of new input,
+    // so the two are told apart.
+    const fresh = (usage.input_tokens || 0) + (usage.cache_creation_input_tokens || 0);
+    const cached = usage.cache_read_input_tokens || 0;
+    parts.push(`${tokens(fresh)} new${cached ? ` + ${tokens(cached)} cached` : ""} tokens in, ${tokens(usage.output_tokens || 0)} out`);
   }
   if (budget?.requestUsd != null) parts.push(`about ${dollars(budget.requestUsd)}`);
   if (budget?.runUsedUsd != null && budget?.runBudgetUsd) parts.push(`${dollars(budget.runUsedUsd)} of this run's ${dollars(budget.runBudgetUsd)}`);

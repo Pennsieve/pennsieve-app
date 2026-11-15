@@ -93,8 +93,8 @@ describe("agent display", () => {
   it("sums a request's tokens and gives its cost and the run's", () => {
     const usage = { input_tokens: 3000, cache_read_input_tokens: 600, output_tokens: 180 };
     const budget = { requestUsd: 0.03, runUsedUsd: 0.58, runBudgetUsd: 2 };
-    expect(usageLine(usage, budget)).toBe("3.6k tokens in, 180 out · about $0.03 · $0.58 of this run's $2.00");
-    expect(usageLine(usage, null)).toBe("3.6k tokens in, 180 out");
+    expect(usageLine(usage, budget)).toBe("3.0k new + 600 cached tokens in, 180 out · about $0.03 · $0.58 of this run's $2.00");
+    expect(usageLine({ input_tokens: 900, output_tokens: 20 }, null)).toBe("900 new tokens in, 20 out");
     expect(usageLine(null, { requestUsd: 0.004 })).toBe("about $0.004");
   });
 });
