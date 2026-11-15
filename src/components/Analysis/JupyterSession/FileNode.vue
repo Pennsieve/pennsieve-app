@@ -14,6 +14,7 @@ import { computed, ref } from "vue";
 import { VIEW_CRATE_DIR } from "@/composables/useJupyterSession";
 import { visibleEntries } from "./fileBrowserHelpers";
 import { stackFormat, stackIcon, costLine } from "./inputsHelpers";
+import { fileSnippets } from "./fileSnippets";
 
 const props = defineProps({
   node: { type: Object, required: true },
@@ -27,9 +28,11 @@ const props = defineProps({
   fmtTime: { type: Function, required: true },
   // The session's view inputs (useSessionInputs), or null.
   inputs: { type: Object, default: null },
+  // The kernel's name ("Python 3.12.3", "R 4.4.1"): the language of a file's starter code.
+  kernelName: { type: String, default: "" },
 });
 
-const emit = defineEmits(["toggle", "copy", "insert", "open", "insert-stack", "add-data"]);
+const emit = defineEmits(["toggle", "copy", "insert", "open", "insert-stack", "insert-snippet", "add-data"]);
 const children = computed(() => visibleEntries(props.node.children, props.showHidden, props.onlyLocal));
 
 const isNotebook = (node) => node.type === "notebook" || /\.ipynb$/i.test(node.name || "");
@@ -82,6 +85,18 @@ function go(noted = false) {
   confirm.value = null;
   if (noted) props.inputs.noteCost();
   c?.go();
+}
+
+/* ------------------------------------------------------ starter code --- */
+// A downloaded file of a known type offers a few cells (load, summarize,
+// plot) on its Code action, in a strip under its row until one is picked.
+const snippets = computed(() =>
+  props.node.type === "file" && !remote.value && !isNotebook(props.node) ? fileSnippets(props.node.path, props.kernelName) : []
+);
+const showSnippets = ref(false);
+function pickSnippet(s) {
+  showSnippets.value = false;
+  emit("insert-snippet", s.code);
 }
 
 function onRow() {
@@ -196,11 +211,29 @@ function onRow() {
           >
             ↪
           </button>
+          <button
+            v-if="snippets.length"
+            class="fn__act fn__act--text"
+            :class="{ 'is-on': showSnippets }"
+            title="Starter code for this file: load, summarize, plot"
+            :aria-expanded="showSnippets"
+            @click="showSnippets = !showSnippets"
+          >
+            Code
+          </button>
           <button class="fn__act" title="Insert the path into a cell, as code (INPUT_DIR / …)" @click="emit('insert', node.path)">↩</button>
           <button class="fn__act" title="Copy the path, as code (INPUT_DIR / …)" @click="emit('copy', node)">⧉</button>
         </template>
       </span>
       </span>
+    </div>
+
+    <!-- A file's starter code: each adds a cell, which isn't run. -->
+    <div v-if="showSnippets && snippets.length" class="fn__snippets" :style="{ paddingLeft: depth * 14 + 28 + 'px' }">
+      <button v-for="s in snippets" :key="s.id" class="fn__snippet" :title="`${s.title}: adds a cell`" @click.stop="pickSnippet(s)">
+        {{ s.label }}
+      </button>
+      <button class="fn__snippet-close" title="Close" aria-label="Close" @click.stop="showSnippets = false">✕</button>
     </div>
 
     <!-- A big download asks first; one that doesn't fit says so. -->
@@ -237,11 +270,13 @@ function onRow() {
         :fmt-size="fmtSize"
         :fmt-time="fmtTime"
         :inputs="inputs"
+        :kernel-name="kernelName"
         @toggle="emit('toggle', $event)"
         @copy="emit('copy', $event)"
         @insert="emit('insert', $event)"
         @open="emit('open', $event)"
         @insert-stack="emit('insert-stack', $event)"
+        @insert-snippet="emit('insert-snippet', $event)"
         @add-data="emit('add-data')"
       />
     </ul>
@@ -370,6 +405,38 @@ function onRow() {
   outline: none;
 }
 .fn__act:active { background: theme.$gray_0; }
+.fn__act--text.is-on { background: theme.$white; box-shadow: inset 0 0 0 1px theme.$gray_3; }
+/* Starter code: small, quiet chips under the row. */
+.fn__snippets {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  margin: 1px 8px 4px 0;
+}
+.fn__snippet {
+  border: 1px solid theme.$gray_2;
+  border-radius: 10px;
+  background: theme.$white;
+  padding: 1px 9px;
+  font-size: 11px;
+  color: theme.$purple_2;
+  cursor: pointer;
+}
+.fn__snippet:hover,
+.fn__snippet:focus-visible {
+  border-color: theme.$purple_2;
+  background: theme.$purple_tint;
+  outline: none;
+}
+.fn__snippet-close {
+  border: none;
+  background: none;
+  padding: 1px 4px;
+  font-size: 10px;
+  color: theme.$gray_4;
+  cursor: pointer;
+}
 .fn__act--open { color: theme.$purple_3; font-weight: 700; } /* purple_3 — primary file action */
 .fn__confirm {
   display: flex;
