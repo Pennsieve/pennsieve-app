@@ -508,6 +508,19 @@ function insertPath(path) {
 function insertStack(entry) {
   insertCode(stackCode(entry, kernelName.value));
 }
+// A file's starter code (the file browser's Code action) as a cell of its
+// own: the selected cell when it's an empty code cell, else a new one below
+// it. It isn't run.
+function insertSnippet(code) {
+  let cell = selectedCell();
+  if (!cell || cell.cell_type !== "code" || cell.source.trim()) {
+    const id = addCell(cell ? cell.id : null, "code");
+    select(id);
+    cell = cells.value[idx(id)];
+  }
+  setSource(cell.id, code);
+  focusCell(cell.id);
+}
 function insertCode(literal) {
   let cell = selectedCell();
   if (!cell || cell.cell_type !== "code") {
@@ -884,6 +897,7 @@ const kernelPill = computed(() => {
             @insert-path="insertPath"
             @open-notebook="requestOpen"
             @insert-stack="insertStack"
+            @insert-snippet="insertSnippet"
             @add-data="addingData = true"
           />
         </div>
