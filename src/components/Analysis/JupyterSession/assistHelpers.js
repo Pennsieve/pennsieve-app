@@ -75,7 +75,8 @@ export function sessionFiles(sources, kernelName = "") {
 export function assistRequest({ mode = "write", prompt = "", cell, cells, kernelName, file = "", files = [], packages = [] }) {
   // The file asked about first: the list may be cut short, and its note
   // (how to open a stack) must go.
-  const asked = file ? files.filter((f) => f.path === file) : [];
+  const trim = (p) => String(p).replace(/^\/+|\/+$/g, "");
+  const asked = file ? files.filter((f) => trim(f.path) === trim(file)) : [];
   const body = {
     mode,
     prompt,
