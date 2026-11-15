@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { fileKind, fileSnippets, stackSnippets } from "./fileSnippets";
+import { STARTER_NOTE, fileKind, fileSnippets, stackSnippets } from "./fileSnippets";
 import { stackCode } from "./pathCode";
 
 describe("fileKind", () => {
@@ -21,7 +21,9 @@ describe("fileSnippets", () => {
     const [load] = fileSnippets("input/a.csv", "Python 3.12.3");
     expect(load.id).toBe("load");
     expect(load.code).toContain('pd.read_csv(INPUT_DIR / "a.csv")');
-    expect(load.code.split("\n")[0]).toMatch(/^# Needs pandas/);
+    const [note, needs] = load.code.split("\n");
+    expect(note).toBe(STARTER_NOTE);
+    expect(needs).toMatch(/^# Needs pandas/);
   });
 
   it("says a tab-separated table's separator", () => {
@@ -35,7 +37,7 @@ describe("fileSnippets", () => {
 
   it("uses base R in an R kernel, and has nothing for types R has none for", () => {
     const [load] = fileSnippets("input/a.csv", "R 4.4.1");
-    expect(load.code).toBe('df <- read.csv(file.path(Sys.getenv("INPUT_DIR"), "a.csv"))\nhead(df)');
+    expect(load.code).toBe(`${STARTER_NOTE}\ndf <- read.csv(file.path(Sys.getenv("INPUT_DIR"), "a.csv"))\nhead(df)`);
     expect(fileSnippets("input/a.nwb", "R 4.4.1")).toEqual([]);
   });
 
@@ -50,7 +52,8 @@ describe("stackSnippets", () => {
   it("starts with the stack's load code, then its format's own", () => {
     const list = stackSnippets(zarr, "Python 3.12.3");
     expect(list.map((s) => s.id)).toEqual(["load", "summary", "plot"]);
-    expect(list[0].code).toBe(stackCode(zarr, "Python 3.12.3"));
+    expect(list[0].code).toBe(`${STARTER_NOTE}\n${stackCode(zarr, "Python 3.12.3")}`);
+    expect(list.every((s) => s.code.startsWith(STARTER_NOTE))).toBe(true);
     expect(list[2].code).toContain('z = zarr.open("s3://dandiarchive/zarr/56/", mode="r", storage_options={"anon": True, "client_kwargs": {"region_name": "us-east-2"}})');
   });
 
