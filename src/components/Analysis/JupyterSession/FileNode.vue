@@ -33,6 +33,8 @@ const props = defineProps({
   kernelName: { type: String, default: "" },
   // The session has a code assistant: Code offers Ask… on any file.
   assistAvailable: { type: Boolean, default: false },
+  // Why the assistant is paused (no AI budget left), or "".
+  assistPaused: { type: String, default: "" },
 });
 
 const emit = defineEmits(["toggle", "copy", "insert", "open", "insert-snippet", "ask-file", "add-data"]);
@@ -257,7 +259,7 @@ function onRow() {
       <button v-for="s in snippets" :key="s.id" class="fn__snippet" :title="`${s.title}: adds a cell`" @click.stop="pickSnippet(s)">
         {{ s.label }}
       </button>
-      <button v-if="canAsk" class="fn__snippet fn__snippet--ask" title="Ask the AI assistant for code for this file" @click.stop="ask"><AssistIcon :size="11" /> Ask…</button>
+      <button v-if="canAsk" class="fn__snippet fn__snippet--ask" :title="assistPaused || 'Ask the AI assistant for code for this file'" :disabled="!!assistPaused" @click.stop="ask"><AssistIcon :size="11" /> Ask…</button>
       <button class="fn__snippet-close" title="Close" aria-label="Close" @click.stop="showSnippets = false">✕</button>
     </div>
 
@@ -297,6 +299,7 @@ function onRow() {
         :inputs="inputs"
         :kernel-name="kernelName"
         :assist-available="assistAvailable"
+        :assist-paused="assistPaused"
         @toggle="emit('toggle', $event)"
         @copy="emit('copy', $event)"
         @insert="emit('insert', $event)"
@@ -463,7 +466,11 @@ function onRow() {
   border-color: #d9cff4;
   color: theme.$status_purple;
 }
-.fn__snippet--ask:hover,
+.fn__snippet--ask:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.fn__snippet--ask:hover:not(:disabled),
 .fn__snippet--ask:focus-visible {
   border-color: theme.$status_purple;
   background: #f0ebfb;

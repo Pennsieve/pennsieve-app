@@ -21,6 +21,8 @@ const props = defineProps({
   // The session has a code assistant: ✦ and Cmd/Ctrl-I ask it, and an
   // error offers Fix.
   assistAvailable: { type: Boolean, default: false },
+  // Why the assistant is paused (no AI budget left), or "".
+  assistPaused: { type: String, default: "" },
 });
 
 const emit = defineEmits([
@@ -100,7 +102,10 @@ function editMarkdown() {
 }
 
 function assist(action, prompt) {
-  if (props.assistAvailable && isCode.value) emit("assist", { action, prompt });
+  if (!props.assistAvailable || !isCode.value) return;
+  // Paused: nothing new starts; a bar already open still answers.
+  if (props.assistPaused && (action === "open" || action === "fix")) return;
+  emit("assist", { action, prompt });
 }
 
 function focus() {
@@ -190,7 +195,8 @@ function latexOf(data) {
         <button
           v-if="assistAvailable && isCode"
           class="nb-tbtn nb-tbtn--assist"
-          title="Ask the AI assistant for this cell's code (Cmd/Ctrl+I)"
+          :title="assistPaused || 'Ask the AI assistant for this cell\'s code (Cmd/Ctrl+I)'"
+          :disabled="!!assistPaused"
           aria-label="Ask the AI assistant"
           @click="assist('open')"
         >
@@ -264,7 +270,8 @@ function latexOf(data) {
             <button
               v-if="assistAvailable && !cell._assist"
               class="nb-fix"
-              title="Ask the AI assistant to fix this cell"
+              :title="assistPaused || 'Ask the AI assistant to fix this cell'"
+              :disabled="!!assistPaused"
               @click.stop="assist('fix')"
             >
               <AssistIcon :size="12" /> Fix this error
@@ -520,7 +527,11 @@ function latexOf(data) {
   color: #6d48ce; /* status_purple: the assistant's */
   cursor: pointer;
 }
-.nb-fix:hover {
+.nb-fix:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.nb-fix:hover:not(:disabled) {
   border-color: #6d48ce;
   background: #f0ebfb;
 }

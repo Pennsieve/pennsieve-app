@@ -83,6 +83,8 @@ function submit() {
          While Fix and run works, its earlier proposal is hidden. -->
     <pre v-if="code && !assist.running" class="nb-assist__code">{{ code }}</pre>
     <p v-if="assist.error" class="nb-assist__error">{{ assist.error }}</p>
+    <!-- No AI budget left: a notice, not an error. -->
+    <p v-if="assist.state === 'budget'" class="nb-assist__budget">{{ assist.notice }}</p>
 
     <div v-if="assist.state === 'done' && code && fix" class="nb-assist__actions">
       <button
@@ -256,6 +258,12 @@ $assist_tint: #f0ebfb;
   margin: 6px 0 0;
   font-size: 10px;
   color: theme.$gray_4;
+}
+.nb-assist__budget {
+  margin: 6px 0 0;
+  padding: 6px 8px;
+  background: theme.$gray_1;
+  color: theme.$gray_5;
 }
 .nb-assist__error {
   margin: 6px 0 0;

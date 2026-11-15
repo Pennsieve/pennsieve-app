@@ -19,6 +19,9 @@ const props = defineProps({
 });
 
 const spend = computed(() => runSpend(props.budget));
+const usedUpText = computed(() =>
+  spend.value?.scope === "run" ? "AI budget used up (this run)" : `AI budget used up ${spend.value?.when || ""}`.trim()
+);
 const tokenText = computed(() => (props.tokens >= 1000 ? `${(props.tokens / 1000).toFixed(1)}k tokens` : `${props.tokens} tokens`));
 const title = computed(() => {
   const s = spend.value;
@@ -42,7 +45,7 @@ const title = computed(() => {
 <template>
   <span v-if="spend" class="nb-spend" :class="{ 'is-high': spend.fraction >= 0.8 }" :title="title">
     <AssistIcon :size="12" />
-    <template v-if="!compact">{{ spend.text }}</template>
+    <template v-if="!compact">{{ spend.fraction >= 1 ? usedUpText : spend.text }}</template>
     <span class="nb-spend__bar" aria-hidden="true"><span :style="{ width: `${Math.round(spend.fraction * 100)}%` }" /></span>
   </span>
   <span v-else-if="tokens" class="nb-spend" :title="title">
