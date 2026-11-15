@@ -9,11 +9,13 @@ import { useRoute, useRouter, onBeforeRouteLeave } from "vue-router";
 import { useJupyterSession } from "@/composables/useJupyterSession";
 import { markSessionEnded } from "../RunMonitor/endedSessions";
 import NotebookCell from "./NotebookCell.vue";
+import AssistSpend from "./AssistSpend.vue";
 import FileBrowser from "./FileBrowser.vue";
 import AddDataDialog from "./AddDataDialog.vue";
 import { useSessionInputs } from "./useSessionInputs";
 import EnvironmentPanel from "./EnvironmentPanel.vue";
-import { sessionPathCode, stackCode } from "./pathCode";
+import { sessionPathCode } from "./pathCode";
+import { acceptedCode, addCellSpend, assistRequest, budgetPause, cellCode, requestCost, sessionFiles } from "./assistHelpers";
 import RuntimeMark from "../WorkflowGraph/RuntimeMark.vue";
 import { fetchRun } from "../RunMonitor/runDetails";
 import { runOnGpu, runNodeId, gpuShortLabel, gpuMarkTitle, sessionRestrictions } from "../RunMonitor/notebookHelpers";
@@ -157,6 +159,9 @@ const {
   environmentState,
   switchEnvironment,
   clearEnvironment,
+  assistStatus,
+  askAssist,
+  askAgent,
   setSource,
   addCell,
   addCellAbove,
@@ -499,14 +504,233 @@ async function focusCell(id) {
   ref?.focus?.();
 }
 
+/* ---- code assistant -------------------------------------------------------
+   On a node with LLM access the session's sidecar has a code assistant: ✦ or
+   Cmd/Ctrl-I on a cell, Ask… on a file, Fix on an error. Its state is the
+   cell's _assist (AssistBar); one cell has it at a time. What it writes goes
+   into a cell only when the user takes it, and runs only when they run it. */
+// { available, agent, model, budget }: the agent (it looks, and can run its
+// fix) on a newer session image, else the sidecar's single-shot assistant.
+const assistInfo = ref({ available: false });
+const assistAvailable = computed(() => !!assistInfo.value.available);
+// Why the assistant is paused ("" when it isn't): no AI budget left, as the
+// governor's figures say or as it refused a request. It comes back by
+// itself: while paused, the figures are asked for again every few minutes.
+const assistPaused = computed(() => (assistAvailable.value ? assistInfo.value.usedUp || budgetPause(assistInfo.value.budget) : ""));
+let pauseTimer = null;
+watch(assistPaused, (paused) => {
+  clearInterval(pauseTimer);
+  pauseTimer = null;
+  if (!paused) return;
+  pauseTimer = setInterval(async () => {
+    const info = await assistStatus();
+    if (info.available && !budgetPause(info.budget)) assistInfo.value = { ...info, usedUp: "" };
+  }, 5 * 60 * 1000);
+});
+onBeforeUnmount(() => clearInterval(pauseTimer));
+watch(status, async (s) => {
+  if (s === "ready") assistInfo.value = await assistStatus();
+});
+// Requests in flight, by cell: Stop and closing end them.
+const assistAborts = new Map();
+// The last request's { usage, budget }, and the tokens all this page's
+// requests used, for the toolbar's spend.
+const assistLast = ref(null);
+const assistTokens = ref(0);
+const usageTokens = (u) =>
+  u ? (u.input_tokens || 0) + (u.output_tokens || 0) + (u.cache_read_input_tokens || 0) + (u.cache_creation_input_tokens || 0) : 0;
+
+// The kernel's packages, for the assistant to write code that imports: asked
+// once per environment (silently, behind a running cell; not waited for long).
+let packagesFor = null; // { key, list }
+async function assistPackages() {
+  const key = JSON.stringify([kernelName.value, environmentState.value?.active || null]);
+  if (packagesFor?.key === key) return packagesFor.list;
+  const timeout = new Promise((resolve) => setTimeout(() => resolve(null), 5000));
+  const found = await Promise.race([kernelPackages().catch(() => null), timeout]);
+  const list = (found || []).map((p) => p.name);
+  if (found) packagesFor = { key, list };
+  return list;
+}
+
+function closeAssist(cell) {
+  assistAborts.get(cell.id)?.abort();
+  assistAborts.delete(cell.id);
+  delete cell._assist;
+}
+
+function openAssist(cell, { mode = "write", file = "" } = {}) {
+  if (!assistAvailable.value || assistPaused.value || cell.cell_type !== "code") return;
+  for (const c of cells.value) if (c._assist && c.id !== cell.id) closeAssist(c);
+  if (cell._assist?.state === "asking") return;
+  cell._assist = { mode, file, prompt: "", state: "idle", text: "", error: "", steps: [], note: "", usage: null, budget: null };
+  select(cell.id);
+  if (mode === "fix") submitAssist(cell, "");
+}
+
+// An agent's event, onto the bar's state (step, run, note, usage, budget).
+function onAgentEvent(a, ev) {
+  if (ev.type === "step") {
+    const i = a.steps.findIndex((s) => s.id === ev.id);
+    if (i >= 0) a.steps[i] = { ...a.steps[i], ...ev };
+    else a.steps.push(ev);
+  } else if (ev.type === "run") a.run = ev;
+  else if (ev.type === "note") a.note = ev.text;
+  else if (ev.type === "usage") {
+    a.usage = ev;
+    assistLast.value = { usage: ev, budget: null };
+  } else if (ev.type === "budget") {
+    // The request's cost: the run's, or the change in the node's spend.
+    const cost = requestCost(assistInfo.value.budget, ev);
+    const budget = cost == null ? ev : { ...ev, requestUsd: cost };
+    a.budget = budget;
+    // Figures with budget left lift a pause.
+    assistInfo.value = { ...assistInfo.value, budget: ev, usedUp: budgetPause(ev) ? assistInfo.value.usedUp : "" };
+    assistLast.value = { usage: a.usage, budget };
+  }
+}
+
+// Asks: the agent (allowRun continues a fix's conversation: Fix and run),
+// or the single-shot assistant.
+async function submitAssist(cell, prompt, { allowRun = false } = {}) {
+  const a = cell._assist;
+  if (!a) return;
+  // Each request (a continuation too) counts its own tokens.
+  Object.assign(a, { prompt, state: "asking", error: "", note: "", running: allowRun, usage: null, countedTokens: 0 });
+  if (!allowRun) Object.assign(a, { text: "", steps: [], usage: null, budget: null, outputs: null, conversationId: "" });
+  const controller = new AbortController();
+  assistAborts.set(cell.id, controller);
+  try {
+    if (assistInfo.value.agent) {
+      const body =
+        allowRun && a.conversationId
+          ? { mode: "fix", conversationId: a.conversationId, allowRun: true }
+          : assistRequest({
+              mode: a.mode,
+              prompt,
+              cell,
+              cells: cells.value,
+              kernelName: kernelName.value,
+              file: a.file,
+              // inputs is reactive(): its sources is the list itself.
+              files: sessionFiles(inputs.sources, kernelName.value),
+              packages: await assistPackages(),
+            });
+      const proposal = await askAgent(body, { signal: controller.signal, onEvent: (ev) => onAgentEvent(a, ev) });
+      Object.assign(a, { text: proposal.code, summary: proposal.summary || "", outputs: proposal.outputs || null, conversationId: proposal.conversationId });
+    } else {
+      const body = assistRequest({
+        mode: a.mode,
+        prompt,
+        cell,
+        cells: cells.value,
+        kernelName: kernelName.value,
+        file: a.file,
+        files: sessionFiles(inputs.sources, kernelName.value),
+        packages: await assistPackages(),
+      });
+      await askAssist(body, { onText: (t) => (a.text = t), signal: controller.signal });
+    }
+    a.state = "done";
+  } catch (e) {
+    if (controller.signal.aborted) a.state = a.text ? "done" : "idle";
+    else if (e?.budgetExceeded) {
+      // No budget left: said calmly, and the assistant pauses.
+      Object.assign(a, { state: "budget", notice: e.message, running: false });
+      assistInfo.value = { ...assistInfo.value, usedUp: e.message };
+    } else Object.assign(a, { state: "error", error: e?.message || String(e) });
+  } finally {
+    // What the request cost goes on the cell it was for, saved with the
+    // notebook.
+    if (a.usage && !a.countedTokens) {
+      cell.ai = addCellSpend(cell.ai, a.usage, a.budget?.requestUsd);
+      dirty.value = true;
+    }
+    assistTokens.value += usageTokens(a.usage) - (a.countedTokens || 0);
+    a.countedTokens = usageTokens(a.usage);
+    a.running = false;
+    if (assistAborts.get(cell.id) === controller) assistAborts.delete(cell.id);
+  }
+}
+
+// Fix and run. The agent runs its fix in the kernel and tries again while
+// it fails (a few times, in one conversation); a clean run's code and output
+// go into the cell as they are, without running it again. A fix that never
+// ran cleanly stays on offer. Without the agent: use the fix and run it once.
+async function fixAndRun(cell) {
+  const a = cell._assist;
+  if (!assistInfo.value.agent) {
+    setSource(cell.id, acceptedCode(a.text));
+    closeAssist(cell);
+    await onRun(cell, { advance: false });
+    return;
+  }
+  await submitAssist(cell, "", { allowRun: true });
+  if (cell._assist !== a || a.state !== "done") return;
+  if (a.outputs) {
+    setSource(cell.id, acceptedCode(a.text));
+    cell.outputs = a.outputs;
+    cell.execution_count = null;
+    closeAssist(cell);
+    fileBrowserRef.value?.refresh?.();
+  } else {
+    a.state = "failed";
+  }
+}
+
+function onAssist(cell, { action, prompt }) {
+  const a = cell._assist;
+  if (action === "open") return a ? null : openAssist(cell);
+  if (action === "fix") return openAssist(cell, { mode: "fix" });
+  if (!a) return;
+  if (action === "submit") submitAssist(cell, prompt);
+  else if (action === "stop") assistAborts.get(cell.id)?.abort();
+  else if (action === "clear-file") a.file = "";
+  else if (action === "discard") closeAssist(cell);
+  else if (action === "accept-run") fixAndRun(cell);
+  else if (action === "accept" || action === "insert-below") {
+    const code = acceptedCode(a.text);
+    if (!cellCode(a.text)) return;
+    closeAssist(cell);
+    if (action === "accept") {
+      setSource(cell.id, code);
+      focusCell(cell.id);
+    } else {
+      const id = addCell(cell.id, "code");
+      setSource(id, code);
+      focusCell(id);
+    }
+  }
+}
+
+// A file's Ask… (the file browser): the assistant on a cell of its own,
+// about that file.
+function askAboutFile(path) {
+  let cell = selectedCell();
+  if (!cell || cell.cell_type !== "code" || cell.source.trim()) {
+    const id = addCell(cell ? cell.id : null, "code");
+    cell = cells.value[idx(id)];
+  }
+  openAssist(cell, { file: path });
+}
+
 // Insert a filesystem path (from the file browser) into the selected code cell
 // as a quoted string; if no code cell is selected, create one.
 function insertPath(path) {
   insertCode(sessionPathCode(path, kernelName.value));
 }
-// The code that opens a stack (a Zarr in an input) in place.
-function insertStack(entry) {
-  insertCode(stackCode(entry, kernelName.value));
+// A file's starter code (the file browser's Code action) as a cell of its
+// own: the selected cell when it's an empty code cell, else a new one below
+// it. It isn't run.
+function insertSnippet(code) {
+  let cell = selectedCell();
+  if (!cell || cell.cell_type !== "code" || cell.source.trim()) {
+    const id = addCell(cell ? cell.id : null, "code");
+    select(id);
+    cell = cells.value[idx(id)];
+  }
+  setSource(cell.id, code);
+  focusCell(cell.id);
 }
 function insertCode(literal) {
   let cell = selectedCell();
@@ -883,7 +1107,10 @@ const kernelPill = computed(() => {
             :inputs="inputs"
             @insert-path="insertPath"
             @open-notebook="requestOpen"
-            @insert-stack="insertStack"
+            @insert-snippet="insertSnippet"
+            :assist-available="assistAvailable"
+            :assist-paused="assistPaused"
+            @ask-file="askAboutFile"
             @add-data="addingData = true"
           />
         </div>
@@ -977,6 +1204,8 @@ const kernelPill = computed(() => {
           <span v-if="onGpu" class="nb-gpu" :title="gpuMarkTitle(sessionGpu)">
             <RuntimeMark runtime="gpu" compact :label="gpuMarkTitle(sessionGpu)" /><template v-if="!compactToolbar">{{ gpuShortLabel(sessionGpu) }}</template>
           </span>
+
+          <AssistSpend v-if="assistAvailable" :budget="assistInfo.budget" :last="assistLast" :tokens="assistTokens" :compact="compactToolbar" />
 
           <span
             class="nb-kernel"
@@ -1076,6 +1305,9 @@ const kernelPill = computed(() => {
             @change-type="onChangeType(cell, $event)"
             @focus-prev="selectRel(-1)"
             @focus-next="selectRel(1)"
+            :assist-available="assistAvailable"
+            :assist-paused="assistPaused"
+            @assist="onAssist(cell, $event)"
           />
           <div class="nb-add-row">
             <el-button size="small" :icon="Plus" @click="focusCell(addCell(null, 'code'))">
