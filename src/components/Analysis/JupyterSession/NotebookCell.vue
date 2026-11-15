@@ -9,13 +9,14 @@ import CodeMirrorEditor from "./CodeMirrorEditor.vue";
 import PlotlyOutput from "./PlotlyOutput.vue";
 import MathOutput from "./MathOutput.vue";
 import AssistBar from "./AssistBar.vue";
+import AssistIcon from "./AssistIcon.vue";
 
 const props = defineProps({
   cell: { type: Object, required: true },
   selected: { type: Boolean, default: false },
   isFirst: { type: Boolean, default: false },
   isLast: { type: Boolean, default: false },
-  // The session has a code assistant: ✦ and Cmd/Ctrl-K ask it, and an
+  // The session has a code assistant: ✦ and Cmd/Ctrl-I ask it, and an
   // error offers Fix.
   assistAvailable: { type: Boolean, default: false },
 });
@@ -179,11 +180,11 @@ function latexOf(data) {
         <button
           v-if="assistAvailable && isCode"
           class="nb-tbtn nb-tbtn--assist"
-          title="Ask the AI assistant for this cell's code (Cmd/Ctrl+K)"
+          title="Ask the AI assistant for this cell's code (Cmd/Ctrl+I)"
           aria-label="Ask the AI assistant"
           @click="assist('open')"
         >
-          ✦
+          <AssistIcon :size="15" />
         </button>
         <select
           class="nb-type"
@@ -254,7 +255,7 @@ function latexOf(data) {
               title="Ask the AI assistant to fix this cell"
               @click.stop="assist('fix')"
             >
-              ✦ Fix this error
+              <AssistIcon :size="12" /> Fix this error
             </button>
           </template>
 
@@ -377,7 +378,9 @@ function latexOf(data) {
 .nb-tbtn:hover { background: #e6e9ef; } /* purple_tint */
 .nb-tbtn:disabled { opacity: 0.3; cursor: default; }
 .nb-tbtn--run { color: #14a758; } /* green_2 */
-.nb-tbtn--assist { color: #4d628c; } /* purple_2 */
+/* The assistant's colour, on every AI action: status_purple. */
+.nb-tbtn--assist { color: #6d48ce; padding: 2px 5px; }
+.nb-tbtn--assist:hover { background: #f0ebfb; }
 .nb-tbtn--del:hover { background: #feeeec; color: #c14d49; } /* red_tint / red_2 */
 .nb-tspacer { width: 6px; }
 .nb-type {
@@ -470,18 +473,21 @@ function latexOf(data) {
 }
 /* Under an error: a quiet link to the assistant. */
 .nb-fix {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   margin: 2px 0 4px;
-  padding: 1px 8px;
-  border: 1px solid #e5e5e5; /* gray_2 */
+  padding: 2px 9px;
+  border: 1px solid #d9cff4;
   border-radius: 10px;
   background: #ffffff;
   font-size: 11px;
-  color: #4d628c; /* purple_2 */
+  color: #6d48ce; /* status_purple: the assistant's */
   cursor: pointer;
 }
 .nb-fix:hover {
-  border-color: #4d628c;
-  background: #e6e9ef; /* purple_tint */
+  border-color: #6d48ce;
+  background: #f0ebfb;
 }
 .nb-json {
   background: #f7f7f7 !important; /* gray_1 — distinguish JSON from plain text */

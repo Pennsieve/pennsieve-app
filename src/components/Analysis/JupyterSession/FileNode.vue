@@ -15,6 +15,7 @@ import { VIEW_CRATE_DIR } from "@/composables/useJupyterSession";
 import { visibleEntries } from "./fileBrowserHelpers";
 import { stackFormat, stackIcon, costLine } from "./inputsHelpers";
 import { fileSnippets, stackSnippets } from "./fileSnippets";
+import AssistIcon from "./AssistIcon.vue";
 
 const props = defineProps({
   node: { type: Object, required: true },
@@ -256,7 +257,7 @@ function onRow() {
       <button v-for="s in snippets" :key="s.id" class="fn__snippet" :title="`${s.title}: adds a cell`" @click.stop="pickSnippet(s)">
         {{ s.label }}
       </button>
-      <button v-if="canAsk" class="fn__snippet fn__snippet--ask" title="Ask the AI assistant for code for this file" @click.stop="ask">✦ Ask…</button>
+      <button v-if="canAsk" class="fn__snippet fn__snippet--ask" title="Ask the AI assistant for code for this file" @click.stop="ask"><AssistIcon :size="11" /> Ask…</button>
       <button class="fn__snippet-close" title="Close" aria-label="Close" @click.stop="showSnippets = false">✕</button>
     </div>
 
@@ -454,8 +455,18 @@ function onRow() {
   background: theme.$purple_tint;
   outline: none;
 }
+/* The assistant's colour (status_purple), as on every AI action. */
 .fn__snippet--ask {
-  border-style: dashed;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  border-color: #d9cff4;
+  color: theme.$status_purple;
+}
+.fn__snippet--ask:hover,
+.fn__snippet--ask:focus-visible {
+  border-color: theme.$status_purple;
+  background: #f0ebfb;
 }
 .fn__snippet-close {
   border: none;

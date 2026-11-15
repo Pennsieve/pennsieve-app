@@ -42,7 +42,7 @@ const emit = defineEmits([
   "command", // Escape: leave edit mode
   "arrow-up", // ArrowUp on first line: focus previous cell
   "arrow-down", // ArrowDown on last line: focus next cell
-  "assist", // Mod-K: ask the code assistant
+  "assist", // Mod-I: ask the code assistant (Mod-K is the app's chat)
   "focus",
   "blur",
 ]);
@@ -92,7 +92,7 @@ function notebookKeymap() {
       { key: "Shift-Enter", run: () => (emit("run"), true) },
       { key: "Mod-Enter", run: () => (emit("run-in-place"), true) },
       { key: "Alt-Enter", run: () => (emit("run-insert-below"), true) },
-      { key: "Mod-k", run: () => (emit("assist"), true) },
+      { key: "Mod-i", run: () => (emit("assist"), true) },
       {
         key: "Escape",
         run: (v) => {

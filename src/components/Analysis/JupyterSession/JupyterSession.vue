@@ -504,7 +504,7 @@ async function focusCell(id) {
 
 /* ---- code assistant -------------------------------------------------------
    On a node with LLM access the session's sidecar has a code assistant: ✦ or
-   Cmd/Ctrl-K on a cell, Ask… on a file, Fix on an error. Its state is the
+   Cmd/Ctrl-I on a cell, Ask… on a file, Fix on an error. Its state is the
    cell's _assist (AssistBar); one cell has it at a time. What it writes goes
    into a cell only when the user takes it, and runs only when they run it. */
 const assistAvailable = ref(false);
