@@ -556,7 +556,8 @@ async function submitAssist(cell, prompt) {
       cells: cells.value,
       kernelName: kernelName.value,
       file: a.file,
-      files: sessionFiles(inputs.sources.value, kernelName.value),
+      // inputs is reactive(): its sources is the list itself.
+      files: sessionFiles(inputs.sources, kernelName.value),
       packages: await assistPackages(),
     });
     await askAssist(body, { onText: (t) => (a.text = t), signal: controller.signal });
