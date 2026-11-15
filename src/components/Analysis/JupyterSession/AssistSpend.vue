@@ -59,7 +59,7 @@ const title = computed(() => {
   align-items: center;
   gap: 6px;
   padding: 3px 10px;
-  border: 1px solid theme.$purple_3;
+  border: 1px solid theme.$gray_3;
   border-radius: 0;
   background: theme.$white;
   font-size: 12px;
