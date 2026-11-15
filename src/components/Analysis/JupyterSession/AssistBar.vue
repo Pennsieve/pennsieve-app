@@ -1,11 +1,12 @@
 <script setup>
-// The code assistant's bar above a cell (✦ or Cmd/Ctrl-K, a file's Ask…, or
+// The code assistant's bar above a cell (✦ or Cmd/Ctrl-I, a file's Ask…, or
 // an error's Fix): the user says what the code should do, the reply streams
 // in below, and they take it (into this cell, or a new one below) or leave
 // it. Nothing it writes runs until they run it. The state is the cell's
 // _assist (JupyterSession owns it): { mode, file, state, text, error }.
 import { computed, nextTick, onMounted, ref } from "vue";
 import { cellCode } from "./assistHelpers";
+import AssistIcon from "./AssistIcon.vue";
 
 const props = defineProps({
   assist: { type: Object, required: true },
@@ -35,7 +36,7 @@ function submit() {
 <template>
   <div class="nb-assist" @click.stop @keydown.esc.stop="emit('discard')">
     <div class="nb-assist__ask">
-      <span class="nb-assist__mark" aria-hidden="true">✦</span>
+      <AssistIcon class="nb-assist__mark" :size="15" />
       <span v-if="fix" class="nb-assist__title">Fix this error</span>
       <input
         v-else
@@ -73,11 +74,16 @@ function submit() {
 <style scoped lang="scss">
 @use "../../../styles/theme";
 
+// The assistant's colour, on every AI action.
+$assist: theme.$status_purple;
+$assist_tint: #f0ebfb;
+
 .nb-assist {
-  margin: 0 0 6px;
+  // Below the cell's toolbar, which sits over the cell's top edge.
+  margin: 22px 0 6px;
   padding: 6px 8px;
   border: 1px solid theme.$gray_2;
-  border-left: 2px solid theme.$purple_2;
+  border-left: 2px solid $assist;
   border-radius: 4px;
   background: theme.$white;
   font-size: 12px;
@@ -88,7 +94,7 @@ function submit() {
   gap: 6px;
 }
 .nb-assist__mark {
-  color: theme.$purple_2;
+  color: $assist;
 }
 .nb-assist__title {
   flex: 1;
@@ -111,8 +117,8 @@ function submit() {
   overflow: hidden;
   padding: 0 4px 0 8px;
   border-radius: 10px;
-  background: theme.$purple_tint;
-  color: theme.$purple_2;
+  background: $assist_tint;
+  color: $assist;
   font-size: 11px;
   white-space: nowrap;
   text-overflow: ellipsis;
@@ -127,8 +133,11 @@ function submit() {
   cursor: pointer;
 }
 .nb-assist__btn--go {
-  border-color: theme.$purple_2;
-  color: theme.$purple_2;
+  border-color: $assist;
+  color: $assist;
+}
+.nb-assist__btn--go:hover:not(:disabled) {
+  background: $assist_tint;
 }
 .nb-assist__btn:disabled {
   opacity: 0.5;
