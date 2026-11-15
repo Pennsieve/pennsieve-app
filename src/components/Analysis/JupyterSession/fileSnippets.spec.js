@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { fileKind, fileSnippets } from "./fileSnippets";
+import { fileKind, fileSnippets, stackSnippets } from "./fileSnippets";
+import { stackCode } from "./pathCode";
 
 describe("fileKind", () => {
   it("reads the longest known extension", () => {
@@ -40,5 +41,40 @@ describe("fileSnippets", () => {
 
   it("has nothing for an unknown type", () => {
     expect(fileSnippets("input/README")).toEqual([]);
+  });
+});
+
+describe("stackSnippets", () => {
+  const zarr = { cratePath: "micr/a.zarr/", location: "s3://dandiarchive/zarr/56/", region: "us-east-2" };
+
+  it("starts with the stack's load code, then its format's own", () => {
+    const list = stackSnippets(zarr, "Python 3.12.3");
+    expect(list.map((s) => s.id)).toEqual(["load", "summary", "plot"]);
+    expect(list[0].code).toBe(stackCode(zarr, "Python 3.12.3"));
+    expect(list[2].code).toContain('z = zarr.open("s3://dandiarchive/zarr/56/", mode="r", storage_options={"anon": True, "client_kwargs": {"region_name": "us-east-2"}})');
+  });
+
+  it("plots an OME-Zarr at the finest level that fits 1024 across", () => {
+    const plot = stackSnippets({ ...zarr, format: "ome-zarr" }).find((s) => s.id === "plot");
+    expect(plot.code).toContain("arr = next((a for a in levels if max(a.shape[-2:]) <= 1024), levels[-1])");
+  });
+
+  it("plots a precomputed volume over https, trying levels until one has data", () => {
+    const em = { cratePath: "em/", location: "s3://bossdb-open-data/w/em/", region: "us-east-1", format: "neuroglancer-precomputed" };
+    const plot = stackSnippets(em).find((s) => s.id === "plot");
+    expect(plot.code).toContain('CloudVolume("precomputed://https://s3.us-east-1.amazonaws.com/bossdb-open-data/w/em"');
+    expect(plot.code).toContain("except EmptyVolumeException:");
+  });
+
+  it("summarizes a whole-slide image from headers only", () => {
+    const slide = { cratePath: "s/", location: "s3://idc-open-data/sm-1/", format: "dicom-wsi" };
+    const [, summary, show] = stackSnippets(slide);
+    expect(summary.code).toContain("stop_before_pixels=True");
+    expect(summary.code).toContain('fs.ls("s3://idc-open-data/sm-1/")');
+    expect(show.label).toBe("Show");
+  });
+
+  it("has only the URL in R", () => {
+    expect(stackSnippets(zarr, "R 4.4.1").map((s) => s.id)).toEqual(["load"]);
   });
 });

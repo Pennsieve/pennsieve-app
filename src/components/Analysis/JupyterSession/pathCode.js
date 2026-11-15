@@ -11,7 +11,7 @@ const quote = (s) => JSON.stringify(s);
 
 // A stack's public https URL, without its trailing /, from its s3://
 // location and region: what a precomputed volume is read from.
-const httpsOf = (url, region) => {
+export const httpsOf = (url, region) => {
   const m = String(url).match(/^s3:\/\/([^/]+)\/(.*?)\/?$/);
   return m ? `https://s3.${region || "us-east-1"}.amazonaws.com/${m[1]}/${m[2]}` : url;
 };

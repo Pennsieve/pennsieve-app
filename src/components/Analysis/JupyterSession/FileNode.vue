@@ -14,7 +14,7 @@ import { computed, ref } from "vue";
 import { VIEW_CRATE_DIR } from "@/composables/useJupyterSession";
 import { visibleEntries } from "./fileBrowserHelpers";
 import { stackFormat, stackIcon, costLine } from "./inputsHelpers";
-import { fileSnippets } from "./fileSnippets";
+import { fileSnippets, stackSnippets } from "./fileSnippets";
 
 const props = defineProps({
   node: { type: Object, required: true },
@@ -32,7 +32,7 @@ const props = defineProps({
   kernelName: { type: String, default: "" },
 });
 
-const emit = defineEmits(["toggle", "copy", "insert", "open", "insert-stack", "insert-snippet", "add-data"]);
+const emit = defineEmits(["toggle", "copy", "insert", "open", "insert-snippet", "add-data"]);
 const children = computed(() => visibleEntries(props.node.children, props.showHidden, props.onlyLocal));
 
 const isNotebook = (node) => node.type === "notebook" || /\.ipynb$/i.test(node.name || "");
@@ -88,11 +88,17 @@ function go(noted = false) {
 }
 
 /* ------------------------------------------------------ starter code --- */
-// A downloaded file of a known type offers a few cells (load, summarize,
-// plot) on its Code action, in a strip under its row until one is picked.
-const snippets = computed(() =>
-  props.node.type === "file" && !remote.value && !isNotebook(props.node) ? fileSnippets(props.node.path, props.kernelName) : []
-);
+// A downloaded file of a known type, or a stack, offers a few cells (load,
+// summarize, plot) on its Code action, in a strip under its row until one is
+// picked. A stack in R has only one (its URL): Code adds it.
+const snippets = computed(() => {
+  if (isStack.value) return stackSnippets(view.value.entry, props.kernelName);
+  return props.node.type === "file" && !remote.value && !isNotebook(props.node) ? fileSnippets(props.node.path, props.kernelName) : [];
+});
+function onCode() {
+  if (snippets.value.length === 1) pickSnippet(snippets.value[0]);
+  else showSnippets.value = !showSnippets.value;
+}
 const showSnippets = ref(false);
 function pickSnippet(s) {
   showSnippets.value = false;
@@ -176,7 +182,15 @@ function onRow() {
           <button class="fn__act fn__act--text" title="Add data from a data platform" @click="emit('add-data')">+ Add data</button>
         </template>
         <template v-else-if="isStack">
-          <button class="fn__act fn__act--text" :title="`Add code that opens this ${stackFormat(view.entry)} in place`" @click="emit('insert-stack', view.entry)">Code</button>
+          <button
+            class="fn__act fn__act--text"
+            :class="{ 'is-on': showSnippets }"
+            :title="`Starter code for this ${stackFormat(view.entry)}, read in place: load, summarize, plot`"
+            :aria-expanded="showSnippets"
+            @click="onCode"
+          >
+            Code
+          </button>
         </template>
         <template v-else-if="under">
           <button class="fn__act" title="Cancel the download" aria-label="Cancel the download" @click="inputs.cancel([{ source: view.source, path: view.entry.cratePath }])">✕</button>
@@ -217,7 +231,7 @@ function onRow() {
             :class="{ 'is-on': showSnippets }"
             title="Starter code for this file: load, summarize, plot"
             :aria-expanded="showSnippets"
-            @click="showSnippets = !showSnippets"
+            @click="onCode"
           >
             Code
           </button>
@@ -275,7 +289,6 @@ function onRow() {
         @copy="emit('copy', $event)"
         @insert="emit('insert', $event)"
         @open="emit('open', $event)"
-        @insert-stack="emit('insert-stack', $event)"
         @insert-snippet="emit('insert-snippet', $event)"
         @add-data="emit('add-data')"
       />
