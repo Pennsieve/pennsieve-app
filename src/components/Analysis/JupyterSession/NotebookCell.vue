@@ -5,6 +5,7 @@
 // the cell object; structural/source changes are emitted to the parent.
 import { computed, ref } from "vue";
 import { marked } from "marked";
+import DOMPurify from "dompurify";
 import CodeMirrorEditor from "./CodeMirrorEditor.vue";
 import PlotlyOutput from "./PlotlyOutput.vue";
 import MathOutput from "./MathOutput.vue";
@@ -51,11 +52,15 @@ const promptLabel = computed(() => {
   return props.cell.execution_count != null ? `[${props.cell.execution_count}]` : "[ ]";
 });
 
+// HTML an output or a cell carries (a kernel's, or code the assistant ran)
+// is shown in the app's own page: without scripts or event handlers.
+const clean = (html) => DOMPurify.sanitize(html ?? "");
+
 // Render a markdown string to HTML (used for markdown cells AND text/markdown
 // outputs).
 function renderMd(src) {
   try {
-    return marked.parse(src ?? "", { breaks: true, gfm: true });
+    return clean(marked.parse(src ?? "", { breaks: true, gfm: true }));
   } catch (_) {
     return `<pre>${escapeHtml(src ?? "")}</pre>`;
   }
@@ -112,7 +117,7 @@ function imgSrc(data) {
 }
 function htmlOf(data) {
   const h = data["text/html"];
-  return Array.isArray(h) ? h.join("") : h;
+  return h == null ? h : clean(Array.isArray(h) ? h.join("") : h);
 }
 function textOf(data) {
   const t = data["text/plain"];
@@ -120,7 +125,7 @@ function textOf(data) {
 }
 function svgOf(data) {
   const s = data["image/svg+xml"];
-  return Array.isArray(s) ? s.join("") : s;
+  return s == null ? s : DOMPurify.sanitize(Array.isArray(s) ? s.join("") : s, { USE_PROFILES: { svg: true, svgFilters: true } });
 }
 function markdownOf(data) {
   const m = data["text/markdown"];
