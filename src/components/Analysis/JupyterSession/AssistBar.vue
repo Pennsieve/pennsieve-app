@@ -1,11 +1,13 @@
 <script setup>
-// The code assistant's bar above a cell (✦ or Cmd/Ctrl-I, a file's Ask…, or
-// an error's Fix): the user says what the code should do, the reply streams
-// in below, and they take it (into this cell, or a new one below) or leave
-// it. Nothing it writes runs until they run it. The state is the cell's
-// _assist (JupyterSession owns it): { mode, file, state, text, error }.
+// The code assistant's bar (✦ or Cmd/Ctrl-I above a cell, a file's Ask…, or
+// under an error, Fix): the user says what the code should do, and the
+// proposal comes back with what the assistant did to get there (the files it
+// read, what it looked at in the kernel, its runs) and what it cost. They
+// take it (into this cell, or a new one below) or leave it. Nothing runs
+// unless they choose Fix and run. The state is the cell's _assist
+// (JupyterSession owns it).
 import { computed, nextTick, onMounted, ref } from "vue";
-import { cellCode } from "./assistHelpers";
+import { cellCode, stepLabel, usageLine } from "./assistHelpers";
 import AssistIcon from "./AssistIcon.vue";
 
 const props = defineProps({
@@ -13,7 +15,7 @@ const props = defineProps({
   // The cell has code: taking the reply replaces it.
   cellHasCode: { type: Boolean, default: false },
 });
-const emit = defineEmits(["submit", "stop", "accept", "insert-below", "discard", "clear-file"]);
+const emit = defineEmits(["submit", "stop", "accept", "accept-run", "insert-below", "discard", "clear-file"]);
 
 const prompt = ref(props.assist.prompt || "");
 const input = ref(null);
@@ -21,6 +23,14 @@ const asking = computed(() => props.assist.state === "asking");
 const fix = computed(() => props.assist.mode === "fix");
 const code = computed(() => cellCode(props.assist.text));
 const fileName = computed(() => String(props.assist.file || "").split("/").pop());
+const usage = computed(() => usageLine(props.assist.usage, props.assist.budget));
+const title = computed(() => {
+  const a = props.assist;
+  if (a.running) return a.run ? `Running the fix (try ${a.run.attempt} of ${a.run.of})…` : "Running the fix…";
+  if (a.state === "failed") return "It didn't run cleanly in a few tries: its last attempt is below.";
+  if (asking.value) return "Working out a fix…";
+  return "Fix this error";
+});
 
 onMounted(async () => {
   await nextTick();
@@ -37,7 +47,7 @@ function submit() {
   <div class="nb-assist" @click.stop @keydown.esc.stop="emit('discard')">
     <div class="nb-assist__ask">
       <AssistIcon class="nb-assist__mark" :size="15" />
-      <span v-if="fix" class="nb-assist__title">Fix this error</span>
+      <span v-if="fix" class="nb-assist__title">{{ title }}</span>
       <input
         v-else
         ref="input"
@@ -54,20 +64,51 @@ function submit() {
       </span>
       <button v-if="asking" class="nb-assist__btn" @click="emit('stop')">Stop</button>
       <button v-else-if="!fix" class="nb-assist__btn nb-assist__btn--go" :disabled="!prompt.trim()" @click="submit">Write</button>
-      <button v-else-if="assist.state !== 'done'" class="nb-assist__btn nb-assist__btn--go" @click="submit">Try again</button>
+      <button v-else-if="assist.state === 'error' || assist.state === 'idle'" class="nb-assist__btn nb-assist__btn--go" @click="submit">Try again</button>
       <button class="nb-assist__x" title="Close (Esc)" aria-label="Close" @click="emit('discard')">✕</button>
     </div>
 
-    <p v-if="asking && !code" class="nb-assist__note">Writing…</p>
-    <pre v-if="code" class="nb-assist__code">{{ code }}</pre>
+    <!-- What the assistant did: each look or run as it happens. -->
+    <ul v-if="assist.steps && assist.steps.length" class="nb-assist__steps">
+      <li v-for="s in assist.steps" :key="s.id" :class="`is-${s.state}`" :title="s.detail || ''">
+        <span class="nb-assist__state" aria-hidden="true">{{ s.state === "running" ? "…" : s.state === "failed" ? "✕" : "✓" }}</span>
+        {{ stepLabel(s) }}
+      </li>
+    </ul>
+    <p v-if="asking && assist.note" class="nb-assist__note nb-assist__note--model">{{ assist.note }}</p>
+    <p v-if="asking && !code && !(assist.steps && assist.steps.length) && !fix" class="nb-assist__note">Writing…</p>
+
+    <p v-if="code && !asking && assist.summary" class="nb-assist__summary">{{ assist.summary }}</p>
+    <!-- The single-shot assistant's code streams in; the agent's comes whole.
+         While Fix and run works, its earlier proposal is hidden. -->
+    <pre v-if="code && !assist.running" class="nb-assist__code">{{ code }}</pre>
     <p v-if="assist.error" class="nb-assist__error">{{ assist.error }}</p>
 
-    <div v-if="assist.state === 'done' && code" class="nb-assist__actions">
+    <div v-if="assist.state === 'done' && code && fix" class="nb-assist__actions">
+      <button
+        class="nb-assist__btn nb-assist__btn--go"
+        title="Run the fix; if it still fails, the assistant looks at why and tries again (a few times)"
+        @click="emit('accept-run')"
+      >
+        Fix and run
+      </button>
+      <button class="nb-assist__btn" @click="emit('accept')">Use fix</button>
+      <button class="nb-assist__btn" @click="emit('discard')">Discard</button>
+      <span class="nb-assist__note">Written by AI: check it before you run it.</span>
+    </div>
+    <div v-else-if="assist.state === 'failed' && code" class="nb-assist__actions">
+      <button class="nb-assist__btn nb-assist__btn--go" @click="emit('accept')">Use this attempt</button>
+      <button class="nb-assist__btn" @click="emit('discard')">Discard</button>
+    </div>
+    <div v-else-if="assist.state === 'done' && code" class="nb-assist__actions">
       <button class="nb-assist__btn nb-assist__btn--go" @click="emit('accept')">{{ cellHasCode ? "Replace cell" : "Use" }}</button>
       <button class="nb-assist__btn" @click="emit('insert-below')">Insert below</button>
       <button class="nb-assist__btn" @click="emit('discard')">Discard</button>
       <span class="nb-assist__note">Written by AI: check it before you run it.</span>
     </div>
+
+    <!-- What it used: tokens, and the cost as the run's governor prices it. -->
+    <p v-if="usage" class="nb-assist__usage" title="Tokens as the node's LLM governor counted them; the cost is the run's AI spend before and after this request.">{{ usage }}</p>
   </div>
 </template>
 
@@ -81,6 +122,11 @@ $assist_tint: #f0ebfb;
 .nb-assist {
   // Below the cell's toolbar, which sits over the cell's top edge.
   margin: 22px 0 6px;
+
+  // A fix, under the cell's error: nothing above it to clear.
+  .nb-outputs + & {
+    margin-top: 6px;
+  }
   padding: 6px 8px;
   border: 1px solid theme.$gray_2;
   border-left: 2px solid $assist;
@@ -176,6 +222,40 @@ $assist_tint: #f0ebfb;
 }
 .nb-assist__actions .nb-assist__note {
   margin: 0 0 0 4px;
+}
+.nb-assist__steps {
+  margin: 6px 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 11px;
+  color: theme.$gray_5;
+
+  li {
+    display: flex;
+    gap: 6px;
+    padding: 1px 0;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  li.is-failed {
+    color: theme.$gray_4;
+    text-decoration: line-through;
+  }
+}
+.nb-assist__state {
+  width: 10px;
+  color: $assist;
+}
+.nb-assist__note--model {
+  font-style: italic;
+}
+.nb-assist__summary {
+  margin: 6px 0 0;
+  color: theme.$gray_6;
+}
+.nb-assist__usage {
+  margin: 6px 0 0;
+  font-size: 10px;
+  color: theme.$gray_4;
 }
 .nb-assist__error {
   margin: 6px 0 0;

@@ -160,6 +160,7 @@ const {
   clearEnvironment,
   assistStatus,
   askAssist,
+  askAgent,
   setSource,
   addCell,
   addCellAbove,
@@ -507,9 +508,12 @@ async function focusCell(id) {
    Cmd/Ctrl-I on a cell, Ask… on a file, Fix on an error. Its state is the
    cell's _assist (AssistBar); one cell has it at a time. What it writes goes
    into a cell only when the user takes it, and runs only when they run it. */
-const assistAvailable = ref(false);
+// { available, agent, model, budget }: the agent (it looks, and can run its
+// fix) on a newer session image, else the sidecar's single-shot assistant.
+const assistInfo = ref({ available: false });
+const assistAvailable = computed(() => !!assistInfo.value.available);
 watch(status, async (s) => {
-  if (s === "ready") assistAvailable.value = (await assistStatus()).available;
+  if (s === "ready") assistInfo.value = await assistStatus();
 });
 // Requests in flight, by cell: Stop and closing end them.
 const assistAborts = new Map();
@@ -537,36 +541,98 @@ function openAssist(cell, { mode = "write", file = "" } = {}) {
   if (!assistAvailable.value || cell.cell_type !== "code") return;
   for (const c of cells.value) if (c._assist && c.id !== cell.id) closeAssist(c);
   if (cell._assist?.state === "asking") return;
-  cell._assist = { mode, file, prompt: "", state: "idle", text: "", error: "" };
+  cell._assist = { mode, file, prompt: "", state: "idle", text: "", error: "", steps: [], note: "", usage: null, budget: null };
   select(cell.id);
   if (mode === "fix") submitAssist(cell, "");
 }
 
-async function submitAssist(cell, prompt) {
+// An agent's event, onto the bar's state (step, run, note, usage, budget).
+function onAgentEvent(a, ev) {
+  if (ev.type === "step") {
+    const i = a.steps.findIndex((s) => s.id === ev.id);
+    if (i >= 0) a.steps[i] = { ...a.steps[i], ...ev };
+    else a.steps.push(ev);
+  } else if (ev.type === "run") a.run = ev;
+  else if (ev.type === "note") a.note = ev.text;
+  else if (ev.type === "usage") a.usage = ev;
+  else if (ev.type === "budget") {
+    a.budget = ev;
+    assistInfo.value = { ...assistInfo.value, budget: ev };
+  }
+}
+
+// Asks: the agent (allowRun continues a fix's conversation: Fix and run),
+// or the single-shot assistant.
+async function submitAssist(cell, prompt, { allowRun = false } = {}) {
   const a = cell._assist;
   if (!a) return;
-  Object.assign(a, { prompt, state: "asking", text: "", error: "" });
+  Object.assign(a, { prompt, state: "asking", error: "", note: "", running: allowRun });
+  if (!allowRun) Object.assign(a, { text: "", steps: [], usage: null, budget: null, outputs: null, conversationId: "" });
   const controller = new AbortController();
   assistAborts.set(cell.id, controller);
   try {
-    const body = assistRequest({
-      mode: a.mode,
-      prompt,
-      cell,
-      cells: cells.value,
-      kernelName: kernelName.value,
-      file: a.file,
-      // inputs is reactive(): its sources is the list itself.
-      files: sessionFiles(inputs.sources, kernelName.value),
-      packages: await assistPackages(),
-    });
-    await askAssist(body, { onText: (t) => (a.text = t), signal: controller.signal });
+    if (assistInfo.value.agent) {
+      const body =
+        allowRun && a.conversationId
+          ? { mode: "fix", conversationId: a.conversationId, allowRun: true }
+          : assistRequest({
+              mode: a.mode,
+              prompt,
+              cell,
+              cells: cells.value,
+              kernelName: kernelName.value,
+              file: a.file,
+              // inputs is reactive(): its sources is the list itself.
+              files: sessionFiles(inputs.sources, kernelName.value),
+              packages: await assistPackages(),
+            });
+      const proposal = await askAgent(body, { signal: controller.signal, onEvent: (ev) => onAgentEvent(a, ev) });
+      Object.assign(a, { text: proposal.code, summary: proposal.summary || "", outputs: proposal.outputs || null, conversationId: proposal.conversationId });
+    } else {
+      const body = assistRequest({
+        mode: a.mode,
+        prompt,
+        cell,
+        cells: cells.value,
+        kernelName: kernelName.value,
+        file: a.file,
+        files: sessionFiles(inputs.sources, kernelName.value),
+        packages: await assistPackages(),
+      });
+      await askAssist(body, { onText: (t) => (a.text = t), signal: controller.signal });
+    }
     a.state = "done";
   } catch (e) {
     if (controller.signal.aborted) a.state = a.text ? "done" : "idle";
     else Object.assign(a, { state: "error", error: e?.message || String(e) });
   } finally {
+    a.running = false;
     if (assistAborts.get(cell.id) === controller) assistAborts.delete(cell.id);
+  }
+}
+
+// Fix and run. The agent runs its fix in the kernel and tries again while
+// it fails (a few times, in one conversation); a clean run's code and output
+// go into the cell as they are, without running it again. A fix that never
+// ran cleanly stays on offer. Without the agent: use the fix and run it once.
+async function fixAndRun(cell) {
+  const a = cell._assist;
+  if (!assistInfo.value.agent) {
+    setSource(cell.id, acceptedCode(a.text));
+    closeAssist(cell);
+    await onRun(cell, { advance: false });
+    return;
+  }
+  await submitAssist(cell, "", { allowRun: true });
+  if (cell._assist !== a || a.state !== "done") return;
+  if (a.outputs) {
+    setSource(cell.id, acceptedCode(a.text));
+    cell.outputs = a.outputs;
+    cell.execution_count = null;
+    closeAssist(cell);
+    fileBrowserRef.value?.refresh?.();
+  } else {
+    a.state = "failed";
   }
 }
 
@@ -579,6 +645,7 @@ function onAssist(cell, { action, prompt }) {
   else if (action === "stop") assistAborts.get(cell.id)?.abort();
   else if (action === "clear-file") a.file = "";
   else if (action === "discard") closeAssist(cell);
+  else if (action === "accept-run") fixAndRun(cell);
   else if (action === "accept" || action === "insert-below") {
     const code = acceptedCode(a.text);
     if (!cellCode(a.text)) return;

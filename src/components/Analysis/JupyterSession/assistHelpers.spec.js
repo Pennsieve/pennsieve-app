@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { ASSIST_NOTE, acceptedCode, assistRequest, cellCode, cellError, deltaText, sessionFiles, sseEvents } from "./assistHelpers";
+import { ASSIST_NOTE, acceptedCode, assistRequest, cellCode, cellError, deltaText, sessionFiles, sseEvents, stepLabel, usageLine } from "./assistHelpers";
 
 const delta = (text) => `event: content_block_delta\ndata: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":${JSON.stringify(text)}}}\n\n`;
 
@@ -80,5 +80,21 @@ describe("sessionFiles", () => {
     expect(files[0].note).toContain("Precomputed volume, read in place from cloud storage (not on the session's disk). Open it with:\nfrom cloudvolume import CloudVolume");
     expect(files[0].note).toContain('CloudVolume("precomputed://https://s3.us-east-1.amazonaws.com/bossdb-open-data/Kasthuri/ac4/em"');
     expect(files[1]).toEqual({ path: "input/bossdb-Kasthuri/notes/readme.txt", size: 120 });
+  });
+});
+
+describe("agent display", () => {
+  it("says what each step did", () => {
+    expect(stepLabel({ tool: "read_file", summary: "input/a.csv" })).toBe("Read input/a.csv");
+    expect(stepLabel({ tool: "inspect", summary: "df.columns" })).toBe("Looked at df.columns");
+    expect(stepLabel({ tool: "run_code", summary: "the fix" })).toBe("Ran the fix");
+  });
+
+  it("sums a request's tokens and gives its cost and the run's", () => {
+    const usage = { input_tokens: 3000, cache_read_input_tokens: 600, output_tokens: 180 };
+    const budget = { requestUsd: 0.03, runUsedUsd: 0.58, runBudgetUsd: 2 };
+    expect(usageLine(usage, budget)).toBe("3.6k tokens in, 180 out · about $0.03 · $0.58 of this run's $2.00");
+    expect(usageLine(usage, null)).toBe("3.6k tokens in, 180 out");
+    expect(usageLine(null, { requestUsd: 0.004 })).toBe("about $0.004");
   });
 });
