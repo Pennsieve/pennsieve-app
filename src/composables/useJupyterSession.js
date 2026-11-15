@@ -270,6 +270,8 @@ function nbCellsToCells(nbCells) {
     source: joinSource(c.source),
     outputs: Array.isArray(c.outputs) ? c.outputs : [],
     execution_count: c.execution_count ?? null,
+    // The AI assistant's spend on the cell, kept in its metadata.
+    ai: c.metadata?.pennsieve?.ai || null,
     _running: false,
     _editing: false,
   }));
@@ -640,7 +642,8 @@ export function useJupyterSession() {
       cells: cells.value.map((c) => {
         const base = {
           cell_type: c.cell_type,
-          metadata: {},
+          // The AI assistant's spend on the cell (pennsieve.ai), if any.
+          metadata: c.ai ? { pennsieve: { ai: c.ai } } : {},
           source: c.source,
         };
         if (c.cell_type === "code") {

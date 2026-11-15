@@ -15,7 +15,7 @@ import AddDataDialog from "./AddDataDialog.vue";
 import { useSessionInputs } from "./useSessionInputs";
 import EnvironmentPanel from "./EnvironmentPanel.vue";
 import { sessionPathCode } from "./pathCode";
-import { acceptedCode, assistRequest, cellCode, requestCost, sessionFiles } from "./assistHelpers";
+import { acceptedCode, addCellSpend, assistRequest, cellCode, requestCost, sessionFiles } from "./assistHelpers";
 import RuntimeMark from "../WorkflowGraph/RuntimeMark.vue";
 import { fetchRun } from "../RunMonitor/runDetails";
 import { runOnGpu, runNodeId, gpuShortLabel, gpuMarkTitle, sessionRestrictions } from "../RunMonitor/notebookHelpers";
@@ -620,6 +620,12 @@ async function submitAssist(cell, prompt, { allowRun = false } = {}) {
     if (controller.signal.aborted) a.state = a.text ? "done" : "idle";
     else Object.assign(a, { state: "error", error: e?.message || String(e) });
   } finally {
+    // What the request cost goes on the cell it was for, saved with the
+    // notebook.
+    if (a.usage && !a.countedTokens) {
+      cell.ai = addCellSpend(cell.ai, a.usage, a.budget?.requestUsd);
+      dirty.value = true;
+    }
     assistTokens.value += usageTokens(a.usage) - (a.countedTokens || 0);
     a.countedTokens = usageTokens(a.usage);
     a.running = false;

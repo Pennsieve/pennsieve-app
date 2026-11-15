@@ -142,3 +142,28 @@ export function requestCost(before, after) {
   if (before?.periodUsedUsd != null && after?.periodUsedUsd != null) return Math.max(0, after.periodUsedUsd - before.periodUsedUsd);
   return null;
 }
+
+// A cell's AI spend, kept with the notebook (cell metadata pennsieve.ai):
+// its requests, their tokens, and their cost where the governor gave one.
+export function addCellSpend(spend, usage, usd) {
+  const t = usage ? (usage.input_tokens || 0) + (usage.output_tokens || 0) + (usage.cache_read_input_tokens || 0) + (usage.cache_creation_input_tokens || 0) : 0;
+  const prev = spend || { requests: 0, tokens: 0, usd: 0 };
+  return {
+    requests: (prev.requests || 0) + 1,
+    tokens: (prev.tokens || 0) + t,
+    usd: Math.round(((prev.usd || 0) + (usd || 0)) * 1e6) / 1e6,
+  };
+}
+
+// The cell's spend in its gutter: its cost, or its tokens without one.
+export function cellSpendLabel(spend) {
+  if (!spend?.requests) return "";
+  return spend.usd > 0 ? dollars(spend.usd) : `${tokens(spend.tokens || 0)} tok`;
+}
+
+export function cellSpendTitle(spend) {
+  if (!spend?.requests) return "";
+  const n = spend.requests === 1 ? "1 request" : `${spend.requests} requests`;
+  const cost = spend.usd > 0 ? `, about ${dollars(spend.usd)}` : "";
+  return `AI assistant on this cell: ${n}, ${tokens(spend.tokens || 0)} tokens${cost}`;
+}
