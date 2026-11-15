@@ -132,9 +132,19 @@ export function runSpend(budget) {
   if (budget?.periodUsedUsd != null && budget?.periodBudgetUsd) {
     const { periodUsedUsd: used, periodBudgetUsd: total } = budget;
     const when = PERIODS[budget.period] || "this period";
-    return { used, total, scope: "node", fraction: clamp(used / total), text: `${dollars(used)} of ${dollars(total)} ${when}` };
+    return { used, total, scope: "node", when, fraction: clamp(used / total), text: `${dollars(used)} of ${dollars(total)} ${when}` };
   }
   return null;
+}
+
+// Why the assistant is paused for lack of budget ("" when it isn't), from
+// the governor's figures.
+export function budgetPause(budget) {
+  const s = runSpend(budget);
+  if (!s || s.fraction < 1) return "";
+  return s.scope === "run"
+    ? "This run's AI budget is used up: start a new notebook to use the assistant again."
+    : `This compute node's AI budget for ${s.when} is used up. It resets with the next period; the node's owner can raise it.`;
 }
 
 // A request's cost: the governor's for the run, or, without a run budget,

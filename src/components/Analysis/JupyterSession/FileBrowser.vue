@@ -25,6 +25,8 @@ const props = defineProps({
   kernelName: { type: String, default: "" },
   // The session has a code assistant: a file's Code offers Ask….
   assistAvailable: { type: Boolean, default: false },
+  // Why the assistant is paused (no AI budget left), or "".
+  assistPaused: { type: String, default: "" },
   // The session's view inputs (useSessionInputs), or null.
   inputs: { type: Object, default: null },
 });
@@ -298,6 +300,7 @@ function copyPath(node) {
         :inputs="inputs"
         :kernel-name="kernelName"
         :assist-available="assistAvailable"
+        :assist-paused="assistPaused"
         @toggle="toggle"
         @copy="copyPath"
         @insert="emit('insert-path', $event)"

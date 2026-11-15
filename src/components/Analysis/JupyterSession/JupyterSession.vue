@@ -15,7 +15,7 @@ import AddDataDialog from "./AddDataDialog.vue";
 import { useSessionInputs } from "./useSessionInputs";
 import EnvironmentPanel from "./EnvironmentPanel.vue";
 import { sessionPathCode } from "./pathCode";
-import { acceptedCode, addCellSpend, assistRequest, cellCode, requestCost, sessionFiles } from "./assistHelpers";
+import { acceptedCode, addCellSpend, assistRequest, budgetPause, cellCode, requestCost, sessionFiles } from "./assistHelpers";
 import RuntimeMark from "../WorkflowGraph/RuntimeMark.vue";
 import { fetchRun } from "../RunMonitor/runDetails";
 import { runOnGpu, runNodeId, gpuShortLabel, gpuMarkTitle, sessionRestrictions } from "../RunMonitor/notebookHelpers";
@@ -513,6 +513,21 @@ async function focusCell(id) {
 // fix) on a newer session image, else the sidecar's single-shot assistant.
 const assistInfo = ref({ available: false });
 const assistAvailable = computed(() => !!assistInfo.value.available);
+// Why the assistant is paused ("" when it isn't): no AI budget left, as the
+// governor's figures say or as it refused a request. It comes back by
+// itself: while paused, the figures are asked for again every few minutes.
+const assistPaused = computed(() => (assistAvailable.value ? assistInfo.value.usedUp || budgetPause(assistInfo.value.budget) : ""));
+let pauseTimer = null;
+watch(assistPaused, (paused) => {
+  clearInterval(pauseTimer);
+  pauseTimer = null;
+  if (!paused) return;
+  pauseTimer = setInterval(async () => {
+    const info = await assistStatus();
+    if (info.available && !budgetPause(info.budget)) assistInfo.value = { ...info, usedUp: "" };
+  }, 5 * 60 * 1000);
+});
+onBeforeUnmount(() => clearInterval(pauseTimer));
 watch(status, async (s) => {
   if (s === "ready") assistInfo.value = await assistStatus();
 });
@@ -545,7 +560,7 @@ function closeAssist(cell) {
 }
 
 function openAssist(cell, { mode = "write", file = "" } = {}) {
-  if (!assistAvailable.value || cell.cell_type !== "code") return;
+  if (!assistAvailable.value || assistPaused.value || cell.cell_type !== "code") return;
   for (const c of cells.value) if (c._assist && c.id !== cell.id) closeAssist(c);
   if (cell._assist?.state === "asking") return;
   cell._assist = { mode, file, prompt: "", state: "idle", text: "", error: "", steps: [], note: "", usage: null, budget: null };
@@ -569,7 +584,8 @@ function onAgentEvent(a, ev) {
     const cost = requestCost(assistInfo.value.budget, ev);
     const budget = cost == null ? ev : { ...ev, requestUsd: cost };
     a.budget = budget;
-    assistInfo.value = { ...assistInfo.value, budget: ev };
+    // Figures with budget left lift a pause.
+    assistInfo.value = { ...assistInfo.value, budget: ev, usedUp: budgetPause(ev) ? assistInfo.value.usedUp : "" };
     assistLast.value = { usage: a.usage, budget };
   }
 }
@@ -618,7 +634,11 @@ async function submitAssist(cell, prompt, { allowRun = false } = {}) {
     a.state = "done";
   } catch (e) {
     if (controller.signal.aborted) a.state = a.text ? "done" : "idle";
-    else Object.assign(a, { state: "error", error: e?.message || String(e) });
+    else if (e?.budgetExceeded) {
+      // No budget left: said calmly, and the assistant pauses.
+      Object.assign(a, { state: "budget", notice: e.message, running: false });
+      assistInfo.value = { ...assistInfo.value, usedUp: e.message };
+    } else Object.assign(a, { state: "error", error: e?.message || String(e) });
   } finally {
     // What the request cost goes on the cell it was for, saved with the
     // notebook.
@@ -1089,6 +1109,7 @@ const kernelPill = computed(() => {
             @open-notebook="requestOpen"
             @insert-snippet="insertSnippet"
             :assist-available="assistAvailable"
+            :assist-paused="assistPaused"
             @ask-file="askAboutFile"
             @add-data="addingData = true"
           />
@@ -1285,6 +1306,7 @@ const kernelPill = computed(() => {
             @focus-prev="selectRel(-1)"
             @focus-next="selectRel(1)"
             :assist-available="assistAvailable"
+            :assist-paused="assistPaused"
             @assist="onAssist(cell, $event)"
           />
           <div class="nb-add-row">

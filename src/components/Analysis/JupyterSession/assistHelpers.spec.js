@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { ASSIST_NOTE, acceptedCode, assistRequest, cellCode, cellError, deltaText, addCellSpend, cellSpendLabel, cellSpendTitle, requestCost, runSpend, sessionFiles, sseEvents, stepLabel, usageLine } from "./assistHelpers";
+import { ASSIST_NOTE, acceptedCode, assistRequest, cellCode, cellError, deltaText, addCellSpend, budgetPause, cellSpendLabel, cellSpendTitle, requestCost, runSpend, sessionFiles, sseEvents, stepLabel, usageLine } from "./assistHelpers";
 
 const delta = (text) => `event: content_block_delta\ndata: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":${JSON.stringify(text)}}}\n\n`;
 
@@ -109,7 +109,7 @@ describe("runSpend", () => {
 
   it("falls back to the node's budget for a run without one", () => {
     const s = runSpend({ periodUsedUsd: 1.1, periodBudgetUsd: 5, period: "daily" });
-    expect([s.scope, s.text]).toEqual(["node", "$1.10 of $5.00 today"]);
+    expect([s.scope, s.when, s.text]).toEqual(["node", "today", "$1.10 of $5.00 today"]);
     expect(s.fraction).toBeCloseTo(0.22);
     expect(requestCost({ periodUsedUsd: 1.1 }, { periodUsedUsd: 1.13 })).toBeCloseTo(0.03);
     expect(requestCost(null, { requestUsd: 0.02 })).toBe(0.02);
@@ -129,5 +129,14 @@ describe("a cell's spend", () => {
   it("shows tokens without a cost, and nothing without requests", () => {
     expect(cellSpendLabel(addCellSpend(null, { input_tokens: 1200, output_tokens: 80 }, null))).toBe("1.3k tok");
     expect(cellSpendLabel(null)).toBe("");
+  });
+});
+
+describe("budgetPause", () => {
+  it("pauses the assistant only when a budget is used up", () => {
+    expect(budgetPause({ periodUsedUsd: 4.9, periodBudgetUsd: 5, period: "daily" })).toBe("");
+    expect(budgetPause({ periodUsedUsd: 5, periodBudgetUsd: 5, period: "daily" })).toMatch(/^This compute node's AI budget for today is used up/);
+    expect(budgetPause({ runUsedUsd: 2, runBudgetUsd: 2 })).toMatch(/^This run's AI budget is used up/);
+    expect(budgetPause(null)).toBe("");
   });
 });
