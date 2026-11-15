@@ -55,7 +55,7 @@ describe("assistRequest", () => {
 
   it("puts the file asked about first", () => {
     const files = [{ path: "input/a.csv" }, { path: "input/em", note: "read in place" }];
-    const body = assistRequest({ prompt: "x", cell: cells[2], cells, file: "input/em", files });
+    const body = assistRequest({ prompt: "x", cell: cells[2], cells, file: "input/em/", files });
     expect(body.files.map((f) => f.path)).toEqual(["input/em", "input/a.csv"]);
   });
 
