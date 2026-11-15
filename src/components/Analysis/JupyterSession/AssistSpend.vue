@@ -58,30 +58,30 @@ const title = computed(() => {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 4px 10px;
-  border-radius: 12px;
-  background: #f0ebfb;
+  padding: 3px 10px;
+  border: 1px solid theme.$purple_3;
+  border-radius: 0;
+  background: theme.$white;
   font-size: 12px;
-  color: theme.$status_purple;
+  color: theme.$purple_3;
   white-space: nowrap;
 }
 .nb-spend__bar {
   display: inline-block;
   width: 40px;
   height: 4px;
-  border-radius: 2px;
-  background: #d9cff4;
+  background: theme.$gray_2;
   overflow: hidden;
 
   span {
     display: block;
     height: 100%;
-    background: theme.$status_purple;
+    background: theme.$purple_3;
   }
 }
 .nb-spend.is-high {
+  border-color: theme.$orange_2;
   color: theme.$orange_2;
-  background: theme.$orange_tint;
 
   .nb-spend__bar span {
     background: theme.$orange_2;
