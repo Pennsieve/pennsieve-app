@@ -9,12 +9,13 @@ import { useRoute, useRouter, onBeforeRouteLeave } from "vue-router";
 import { useJupyterSession } from "@/composables/useJupyterSession";
 import { markSessionEnded } from "../RunMonitor/endedSessions";
 import NotebookCell from "./NotebookCell.vue";
+import AssistSpend from "./AssistSpend.vue";
 import FileBrowser from "./FileBrowser.vue";
 import AddDataDialog from "./AddDataDialog.vue";
 import { useSessionInputs } from "./useSessionInputs";
 import EnvironmentPanel from "./EnvironmentPanel.vue";
 import { sessionPathCode } from "./pathCode";
-import { acceptedCode, assistRequest, cellCode, sessionFiles } from "./assistHelpers";
+import { acceptedCode, assistRequest, cellCode, requestCost, sessionFiles } from "./assistHelpers";
 import RuntimeMark from "../WorkflowGraph/RuntimeMark.vue";
 import { fetchRun } from "../RunMonitor/runDetails";
 import { runOnGpu, runNodeId, gpuShortLabel, gpuMarkTitle, sessionRestrictions } from "../RunMonitor/notebookHelpers";
@@ -517,6 +518,12 @@ watch(status, async (s) => {
 });
 // Requests in flight, by cell: Stop and closing end them.
 const assistAborts = new Map();
+// The last request's { usage, budget }, and the tokens all this page's
+// requests used, for the toolbar's spend.
+const assistLast = ref(null);
+const assistTokens = ref(0);
+const usageTokens = (u) =>
+  u ? (u.input_tokens || 0) + (u.output_tokens || 0) + (u.cache_read_input_tokens || 0) + (u.cache_creation_input_tokens || 0) : 0;
 
 // The kernel's packages, for the assistant to write code that imports: asked
 // once per environment (silently, behind a running cell; not waited for long).
@@ -554,10 +561,16 @@ function onAgentEvent(a, ev) {
     else a.steps.push(ev);
   } else if (ev.type === "run") a.run = ev;
   else if (ev.type === "note") a.note = ev.text;
-  else if (ev.type === "usage") a.usage = ev;
-  else if (ev.type === "budget") {
-    a.budget = ev;
+  else if (ev.type === "usage") {
+    a.usage = ev;
+    assistLast.value = { usage: ev, budget: null };
+  } else if (ev.type === "budget") {
+    // The request's cost: the run's, or the change in the node's spend.
+    const cost = requestCost(assistInfo.value.budget, ev);
+    const budget = cost == null ? ev : { ...ev, requestUsd: cost };
+    a.budget = budget;
     assistInfo.value = { ...assistInfo.value, budget: ev };
+    assistLast.value = { usage: a.usage, budget };
   }
 }
 
@@ -566,7 +579,8 @@ function onAgentEvent(a, ev) {
 async function submitAssist(cell, prompt, { allowRun = false } = {}) {
   const a = cell._assist;
   if (!a) return;
-  Object.assign(a, { prompt, state: "asking", error: "", note: "", running: allowRun });
+  // Each request (a continuation too) counts its own tokens.
+  Object.assign(a, { prompt, state: "asking", error: "", note: "", running: allowRun, usage: null, countedTokens: 0 });
   if (!allowRun) Object.assign(a, { text: "", steps: [], usage: null, budget: null, outputs: null, conversationId: "" });
   const controller = new AbortController();
   assistAborts.set(cell.id, controller);
@@ -606,6 +620,8 @@ async function submitAssist(cell, prompt, { allowRun = false } = {}) {
     if (controller.signal.aborted) a.state = a.text ? "done" : "idle";
     else Object.assign(a, { state: "error", error: e?.message || String(e) });
   } finally {
+    assistTokens.value += usageTokens(a.usage) - (a.countedTokens || 0);
+    a.countedTokens = usageTokens(a.usage);
     a.running = false;
     if (assistAborts.get(cell.id) === controller) assistAborts.delete(cell.id);
   }
@@ -1161,6 +1177,8 @@ const kernelPill = computed(() => {
           <span v-if="onGpu" class="nb-gpu" :title="gpuMarkTitle(sessionGpu)">
             <RuntimeMark runtime="gpu" compact :label="gpuMarkTitle(sessionGpu)" /><template v-if="!compactToolbar">{{ gpuShortLabel(sessionGpu) }}</template>
           </span>
+
+          <AssistSpend v-if="assistAvailable" :budget="assistInfo.budget" :last="assistLast" :tokens="assistTokens" :compact="compactToolbar" />
 
           <span
             class="nb-kernel"

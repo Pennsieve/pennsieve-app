@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { ASSIST_NOTE, acceptedCode, assistRequest, cellCode, cellError, deltaText, sessionFiles, sseEvents, stepLabel, usageLine } from "./assistHelpers";
+import { ASSIST_NOTE, acceptedCode, assistRequest, cellCode, cellError, deltaText, requestCost, runSpend, sessionFiles, sseEvents, stepLabel, usageLine } from "./assistHelpers";
 
 const delta = (text) => `event: content_block_delta\ndata: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":${JSON.stringify(text)}}}\n\n`;
 
@@ -96,5 +96,23 @@ describe("agent display", () => {
     expect(usageLine(usage, budget)).toBe("3.6k tokens in, 180 out · about $0.03 · $0.58 of this run's $2.00");
     expect(usageLine(usage, null)).toBe("3.6k tokens in, 180 out");
     expect(usageLine(null, { requestUsd: 0.004 })).toBe("about $0.004");
+  });
+});
+
+describe("runSpend", () => {
+  it("says the run's spend of its budget", () => {
+    expect(runSpend({ runUsedUsd: 0.58, runBudgetUsd: 2 })).toEqual({ used: 0.58, total: 2, scope: "run", fraction: 0.29, text: "$0.58 of $2.00" });
+    expect(runSpend({ runUsedUsd: 3, runBudgetUsd: 2 }).fraction).toBe(1);
+    expect(runSpend({ runUsedUsd: 0.5 })).toBeNull();
+    expect(runSpend(null)).toBeNull();
+  });
+
+  it("falls back to the node's budget for a run without one", () => {
+    const s = runSpend({ periodUsedUsd: 1.1, periodBudgetUsd: 5, period: "daily" });
+    expect([s.scope, s.text]).toEqual(["node", "$1.10 of $5.00 today"]);
+    expect(s.fraction).toBeCloseTo(0.22);
+    expect(requestCost({ periodUsedUsd: 1.1 }, { periodUsedUsd: 1.13 })).toBeCloseTo(0.03);
+    expect(requestCost(null, { requestUsd: 0.02 })).toBe(0.02);
+    expect(requestCost(null, { periodUsedUsd: 1 })).toBeNull();
   });
 });

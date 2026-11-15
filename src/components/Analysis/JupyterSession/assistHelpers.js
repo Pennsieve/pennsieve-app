@@ -114,3 +114,31 @@ export function usageLine(usage, budget) {
   if (budget?.runUsedUsd != null && budget?.runBudgetUsd) parts.push(`${dollars(budget.runUsedUsd)} of this run's ${dollars(budget.runBudgetUsd)}`);
   return parts.join(" · ");
 }
+
+// The AI spend for the notebook's toolbar: the run's of its budget, or, for
+// a run without a budget of its own (the governor then reports only the
+// node's), the node's for the period ("$1.10 of $5.00 today"); how full
+// (0..1); or null when the governor gave no figures.
+const PERIODS = { daily: "today", weekly: "this week", monthly: "this month" };
+export function runSpend(budget) {
+  const clamp = (x) => Math.min(1, Math.max(0, x));
+  if (budget?.runUsedUsd != null && budget?.runBudgetUsd) {
+    const { runUsedUsd: used, runBudgetUsd: total } = budget;
+    return { used, total, scope: "run", fraction: clamp(used / total), text: `${dollars(used)} of ${dollars(total)}` };
+  }
+  if (budget?.periodUsedUsd != null && budget?.periodBudgetUsd) {
+    const { periodUsedUsd: used, periodBudgetUsd: total } = budget;
+    const when = PERIODS[budget.period] || "this period";
+    return { used, total, scope: "node", fraction: clamp(used / total), text: `${dollars(used)} of ${dollars(total)} ${when}` };
+  }
+  return null;
+}
+
+// A request's cost: the governor's for the run, or, without a run budget,
+// the change in the node's spend across it (other runs on the node may add
+// to it: an estimate).
+export function requestCost(before, after) {
+  if (after?.requestUsd != null) return after.requestUsd;
+  if (before?.periodUsedUsd != null && after?.periodUsedUsd != null) return Math.max(0, after.periodUsedUsd - before.periodUsedUsd);
+  return null;
+}
