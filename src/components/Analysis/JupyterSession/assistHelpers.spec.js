@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { ASSIST_NOTE, acceptedCode, assistRequest, cellCode, cellError, deltaText, requestCost, runSpend, sessionFiles, sseEvents, stepLabel, usageLine } from "./assistHelpers";
+import { ASSIST_NOTE, acceptedCode, assistRequest, cellCode, cellError, deltaText, addCellSpend, cellSpendLabel, cellSpendTitle, requestCost, runSpend, sessionFiles, sseEvents, stepLabel, usageLine } from "./assistHelpers";
 
 const delta = (text) => `event: content_block_delta\ndata: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":${JSON.stringify(text)}}}\n\n`;
 
@@ -114,5 +114,20 @@ describe("runSpend", () => {
     expect(requestCost({ periodUsedUsd: 1.1 }, { periodUsedUsd: 1.13 })).toBeCloseTo(0.03);
     expect(requestCost(null, { requestUsd: 0.02 })).toBe(0.02);
     expect(requestCost(null, { periodUsedUsd: 1 })).toBeNull();
+  });
+});
+
+describe("a cell's spend", () => {
+  it("adds each request's tokens and cost", () => {
+    let spend = addCellSpend(null, { input_tokens: 3000, output_tokens: 200 }, 0.03);
+    spend = addCellSpend(spend, { input_tokens: 1000, output_tokens: 100, cache_read_input_tokens: 500 }, null);
+    expect(spend).toEqual({ requests: 2, tokens: 4800, usd: 0.03 });
+    expect(cellSpendLabel(spend)).toBe("$0.03");
+    expect(cellSpendTitle(spend)).toBe("AI assistant on this cell: 2 requests, 4.8k tokens, about $0.03");
+  });
+
+  it("shows tokens without a cost, and nothing without requests", () => {
+    expect(cellSpendLabel(addCellSpend(null, { input_tokens: 1200, output_tokens: 80 }, null))).toBe("1.3k tok");
+    expect(cellSpendLabel(null)).toBe("");
   });
 });

@@ -11,6 +11,7 @@ import PlotlyOutput from "./PlotlyOutput.vue";
 import MathOutput from "./MathOutput.vue";
 import AssistBar from "./AssistBar.vue";
 import AssistIcon from "./AssistIcon.vue";
+import { cellSpendLabel, cellSpendTitle } from "./assistHelpers";
 
 const props = defineProps({
   cell: { type: Object, required: true },
@@ -176,6 +177,10 @@ function latexOf(data) {
     <!-- prompt gutter -->
     <div class="nb-cell__prompt" :class="{ 'nb-cell__prompt--running': cell._running }">
       {{ promptLabel }}
+      <!-- What the AI assistant has spent on this cell (saved with it). -->
+      <div v-if="cell.ai && cell.ai.requests" class="nb-cell__spend" :title="cellSpendTitle(cell.ai)">
+        <AssistIcon :size="9" />{{ cellSpendLabel(cell.ai) }}
+      </div>
     </div>
 
     <div class="nb-cell__body">
@@ -341,6 +346,18 @@ function latexOf(data) {
   padding: 11px 8px 0 0;
   user-select: none;
   white-space: nowrap;
+}
+.nb-cell__spend {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 2px;
+  margin-top: 4px;
+  font-size: 10px;
+  color: #999; /* gray_4 */
+}
+.nb-cell__spend :deep(.assist-icon) {
+  color: #6d48ce; /* status_purple: the assistant's */
 }
 .nb-cell__prompt--running {
   color: #011f5b; /* purple_3 */
