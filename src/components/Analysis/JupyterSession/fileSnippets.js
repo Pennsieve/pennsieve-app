@@ -3,8 +3,8 @@
 // browser offers on a file's Code action.
 // They're templates, not generated: the same file always gets the same code,
 // and a cell is only added, never run. The session image is slim, so the
-// libraries a snippet needs come from the user's environment; its first line
-// says which they are.
+// libraries a snippet needs come from the user's environment; its first
+// lines say it's a template and which libraries it needs.
 import { httpsOf, sessionPathCode, stackCode } from "./pathCode";
 
 const isR = (kernelName = "") => {
@@ -39,6 +39,11 @@ export function fileKind(name) {
   }
   return null;
 }
+
+// Every snippet says first what it is: a template for the file's type, not
+// code checked against this file.
+export const STARTER_NOTE = "# Starter code for this type of file: it may need changes to work on yours";
+const noted = (code) => `${STARTER_NOTE}\n${code}`;
 
 const needs = (...libs) => `# Needs ${libs.join(", ")} (from your environment)`;
 const lines = (...l) => l.join("\n");
@@ -165,10 +170,10 @@ const STACKS = {
 // The snippets for a stack (a view entry: { format, location, region,
 // cratePath }): Load, then its format's own. R has Load only: the URL.
 export function stackSnippets(entry, kernelName = "") {
-  const load = { id: "load", label: "Load", title: "Open it in place: only what you index is read", code: stackCode(entry, kernelName) };
+  const load = { id: "load", label: "Load", title: "Open it in place: only what you index is read", code: noted(stackCode(entry, kernelName)) };
   if (isR(kernelName)) return [load];
   const more = STACKS[entry?.format] || STACKS.zarr;
-  return [load, ...more.map(({ id, label, title, code }) => ({ id, label, title, code: code(entry) }))];
+  return [load, ...more.map(({ id, label, title, code }) => ({ id, label, title, code: noted(code(entry)) }))];
 }
 
 // Tab-separated tables need their separator said.
@@ -186,5 +191,5 @@ export function fileSnippets(path, kernelName = "") {
   if (!list.length) return [];
   const p = sessionPathCode(path, kernelName);
   const sep = separator(path, r);
-  return list.map(({ id, label, title, code }) => ({ id, label, title, code: code(p, sep) }));
+  return list.map(({ id, label, title, code }) => ({ id, label, title, code: noted(code(p, sep)) }));
 }
