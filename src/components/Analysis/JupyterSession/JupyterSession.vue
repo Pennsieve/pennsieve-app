@@ -266,14 +266,17 @@ const showFiles = ref(storedOpen());
 // tooltip), so the toolbar stays on one line beside the sidebar.
 const COMPACT_TOOLBAR_PX = 900;
 const toolbarRef = ref(null);
-const compactToolbar = ref(false);
+// The AI spend meter, when shown, needs about this much more room.
+const SPEND_METER_PX = 200;
+const toolbarWidth = ref(Infinity);
+const compactToolbar = computed(() => toolbarWidth.value < COMPACT_TOOLBAR_PX + (assistAvailable.value ? SPEND_METER_PX : 0));
 let toolbarObserver = null;
 watch(toolbarRef, (el) => {
   toolbarObserver?.disconnect();
   toolbarObserver = null;
   if (!el || typeof ResizeObserver === "undefined") return;
   toolbarObserver = new ResizeObserver(([entry]) => {
-    compactToolbar.value = entry.contentRect.width < COMPACT_TOOLBAR_PX;
+    toolbarWidth.value = entry.contentRect.width;
   });
   toolbarObserver.observe(el);
 });

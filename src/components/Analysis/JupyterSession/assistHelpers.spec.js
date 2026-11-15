@@ -101,7 +101,7 @@ describe("agent display", () => {
 
 describe("runSpend", () => {
   it("says the run's spend of its budget", () => {
-    expect(runSpend({ runUsedUsd: 0.58, runBudgetUsd: 2 })).toEqual({ used: 0.58, total: 2, scope: "run", fraction: 0.29, text: "$0.58 of $2.00" });
+    expect(runSpend({ runUsedUsd: 0.58, runBudgetUsd: 2 })).toEqual({ used: 0.58, total: 2, scope: "run", fraction: 0.29, text: "$0.58 of $2.00", short: "$0.58 / $2.00" });
     expect(runSpend({ runUsedUsd: 3, runBudgetUsd: 2 }).fraction).toBe(1);
     expect(runSpend({ runUsedUsd: 0.5 })).toBeNull();
     expect(runSpend(null)).toBeNull();
