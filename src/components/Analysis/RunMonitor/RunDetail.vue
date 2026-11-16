@@ -33,7 +33,7 @@ import { targetWritesToDataset, targetParamFields, buildDataTargets, targetDatas
 import DatasetOptionRow from "./DatasetOptionRow.vue";
 import RunExampleAction from "./RunExampleAction.vue";
 import PublicFilesPicker from "./PublicFilesPicker.vue";
-import { picksKey } from "./publicPicks";
+import { picksKey, isRecordsPick } from "./publicPicks";
 import FilePlacementChoice from "./FilePlacementChoice.vue";
 import { FILE_PATHS_SELECTION, FILE_PATHS_SOURCE, filePathsOf, filePathsField, sharedNames } from "./inputFilePaths";
 import IoPill from "../WorkflowGraph/IoPill.vue";
@@ -727,6 +727,16 @@ const statusMark = (data) => (mode.value === "browse" && statusMarkOf(data.statu
 // A source with one file shows its name; with more, how many.
 // An input's and output's second line on the graph (IoPill): its files, or
 // where it goes and how that went.
+// The sidebar's count of an input's public picks: its files, and whether
+// a version's records come along.
+const publicFilesLine = (id) => {
+  const picks = publicPicks[id] || [];
+  const records = picks.some(isRecordsPick);
+  const n = fileCountForNode(id) - (records ? 1 : 0);
+  if (records && !n) return "Metadata records only";
+  return `${n} selected${records ? " + metadata records" : ""}`;
+};
+
 const sourceSubOf = (id, data) => {
   if (mode.value === "configure" && referenceChoiceOf(id)) return referenceChoiceOf(id).label;
   if (mode.value === "browse" && usedReferenceOf(id)) return usedReferenceOf(id).label || "Reference data";
@@ -735,8 +745,11 @@ const sourceSubOf = (id, data) => {
     const n = fileCountForNode(id);
     if (!n) return "Choose files";
     const picks = publicPicks[id] || [];
+    const records = picks.some(isRecordsPick);
+    const files = records ? n - 1 : n;
+    if (records && !files) return "Metadata records";
     const noun = picks.some((p) => p.isFolder) ? "item" : "file";
-    return `${n} ${picks.length ? "public " : ""}${noun}${n === 1 ? "" : "s"}`;
+    return `${files} ${picks.length ? "public " : ""}${noun}${files === 1 ? "" : "s"}${records ? " + records" : ""}`;
   }
   if (inputStaging(data)) return data.progress ? inputProgressLine(data.progress) : "Preparing files…";
   if (data.status === "FAILED") return "Couldn't get its files";
@@ -1795,7 +1808,7 @@ const filesOf = (f) =>
 // its picked files are checked.
 const chosenFileNames = (nodeId) => [
   ...(dataSourceFiles[nodeId] || []).flatMap(filesOf),
-  ...(publicPicks[nodeId] || []).filter((p) => !p.isFolder).map((p) => p.name),
+  ...(publicPicks[nodeId] || []).filter((p) => !p.isFolder && !isRecordsPick(p)).map((p) => p.name),
 ];
 const configHints = (nodeId) => {
   const dag = configDefinition.value?.dag || [];
@@ -3374,7 +3387,7 @@ onUnmounted(() => {
                 </div>
                 <div class="info-row">
                   <span class="info-label">Files</span>
-                  <span class="info-value">{{ fileCountForNode(selectedNode.id) }} selected</span>
+                  <span class="info-value">{{ publicFilesLine(selectedNode.id) }}</span>
                 </div>
               </div>
               <p v-if="isMyWorkspace && !publicInputs" class="configure-hint">
@@ -3407,13 +3420,13 @@ onUnmounted(() => {
               <div v-else-if="publicPicks[selectedNode.id]?.length" class="selected-files-list">
                 <div
                   v-for="pick in publicPicks[selectedNode.id]"
-                  :key="`${pick.datasetId}:${pick.version}:${pick.path}`"
+                  :key="`${pick.datasetId}:${pick.version}:${isRecordsPick(pick) ? 'records' : pick.path}`"
                   class="selected-file-item"
-                  :title="`${pick.datasetName}, version ${pick.version}: ${pick.path}`"
+                  :title="`${pick.datasetName}, version ${pick.version}: ${isRecordsPick(pick) ? `records of ${pick.models.join(', ')}` : pick.path}`"
                 >
-                  <IconCollection v-if="pick.isFolder" :width="14" :height="14" class="selected-file-icon collection" />
+                  <IconCollection v-if="pick.isFolder || isRecordsPick(pick)" :width="14" :height="14" class="selected-file-icon collection" />
                   <IconFile v-else :width="14" :height="14" class="selected-file-icon" />
-                  <span class="selected-file-name">{{ pick.name }}</span>
+                  <span class="selected-file-name">{{ isRecordsPick(pick) ? `${pick.name} (${pick.models.length})` : pick.name }}</span>
                   <button class="selected-file-remove" title="Remove" @click="removePublicPick(selectedNode.id, pick)">&times;</button>
                 </div>
               </div>

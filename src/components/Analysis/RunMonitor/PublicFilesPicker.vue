@@ -11,9 +11,10 @@
     file types. Folders can always be chosen.
 */
 import { computed, onBeforeUnmount, ref } from "vue";
-import { searchPublicDatasets, browsePublicFiles } from "@/utils/publicDatasets";
+import { pagePublicDatasets, browsePublicFiles, listPublicModels } from "@/utils/publicDatasets";
 import { formatBytes } from "./dataTargets";
-import { inChosenFolder as inFolder, isPicked as picked, togglePick, groupPicks } from "./publicPicks";
+import { inChosenFolder as inFolder, isPicked as picked, togglePick, groupPicks, recordsPick, recordsPickOf, isRecordsPick } from "./publicPicks";
+import MetadataRecordsChoice from "../MetadataRecordsChoice.vue";
 
 const props = defineProps({
   modelValue: { type: Array, default: () => [] },
@@ -26,18 +27,28 @@ const PAGE = 500;
 /* ---------------------------------------------------------------- search -- */
 const dataset = ref(null);
 const results = ref([]);
+// How many datasets the search matches in all; past the page shown, a
+// narrower search finds the rest.
+const resultsTotal = ref(0);
 const searching = ref(false);
 let searchTimer = null;
 let searchSeq = 0;
+const SEARCH_PAGE = 100;
 async function search(query = "") {
   const seq = ++searchSeq;
   searching.value = true;
   try {
-    const found = await searchPublicDatasets(query);
-    if (seq === searchSeq) results.value = found;
+    const page = await pagePublicDatasets({ query, limit: SEARCH_PAGE });
+    if (seq === searchSeq) {
+      results.value = page.datasets;
+      resultsTotal.value = page.totalCount;
+    }
   } catch (err) {
     console.error("Failed to search public datasets:", err);
-    if (seq === searchSeq) results.value = [];
+    if (seq === searchSeq) {
+      results.value = [];
+      resultsTotal.value = 0;
+    }
   } finally {
     if (seq === searchSeq) searching.value = false;
   }
@@ -93,7 +104,29 @@ const openDataset = (id) => {
   path.value = "";
   files.value = [];
   load();
+  loadModels();
 };
+
+/* --------------------------------------------------------------- records -- */
+// The metadata models the open dataset's version publishes records of; the
+// input can take their records (one records pick per version) beside files.
+const availableModels = ref([]);
+let modelsSeq = 0;
+async function loadModels() {
+  const seq = ++modelsSeq;
+  availableModels.value = [];
+  if (!dataset.value) return;
+  const found = await listPublicModels({ id: dataset.value.id, version: dataset.value.version });
+  if (seq === modelsSeq) availableModels.value = found;
+}
+// The chosen models are the version's records pick; none takes it out.
+const chosenModels = computed({
+  get: () => (dataset.value && recordsPickOf(props.modelValue, dataset.value.id, dataset.value.version)?.models) || [],
+  set: (models) => {
+    const base = { datasetId: dataset.value.id, version: dataset.value.version, datasetName: dataset.value.name };
+    emit("update:modelValue", togglePick(props.modelValue, recordsPick(base, models), models.length > 0));
+  },
+});
 // Another folder: the one before's rows go at once, so they can't be taken
 // for this one's.
 const openFolder = (p) => {
@@ -151,6 +184,9 @@ const groups = computed(() => groupPicks(props.modelValue));
             </div>
           </div>
         </el-option>
+        <template v-if="resultsTotal > results.length" #footer>
+          <span class="pfp__more">Showing {{ results.length }} of {{ resultsTotal.toLocaleString("en-US") }}; type to narrow the search.</span>
+        </template>
       </el-select>
     </div>
 
@@ -161,6 +197,7 @@ const groups = computed(() => groupPicks(props.modelValue));
         <div class="pfp__meta">
           Version {{ dataset.version }} · {{ dataset.fileCount.toLocaleString("en-US") }} files · {{ formatBytes(dataset.size) }}
         </div>
+        <MetadataRecordsChoice v-model="chosenModels" :available="availableModels" class="pfp__records" />
       </div>
     </div>
 
@@ -204,8 +241,8 @@ const groups = computed(() => groupPicks(props.modelValue));
     <div v-if="groups.length" class="pfp__chosen">
       <div v-for="g in groups" :key="g.key" class="pfp__group">
         <span class="pfp__group-name">{{ g.name }} <span>v{{ g.version }}</span></span>
-        <span v-for="p in g.picks" :key="p.path" class="pfp__chip" :title="p.path">
-          {{ p.isFolder ? `${p.name}/` : p.name }}
+        <span v-for="p in g.picks" :key="isRecordsPick(p) ? 'records' : p.path" class="pfp__chip" :title="isRecordsPick(p) ? `Records of ${p.models.join(', ')}` : p.path">
+          {{ isRecordsPick(p) ? `${p.name} (${p.models.length})` : p.isFolder ? `${p.name}/` : p.name }}
           <button type="button" :aria-label="`Remove ${p.name}`" @click="remove(p)"><span aria-hidden="true">×</span></button>
         </span>
       </div>
@@ -220,6 +257,13 @@ const groups = computed(() => groupPicks(props.modelValue));
   display: flex;
   flex-direction: column;
   gap: 12px;
+}
+.pfp__records {
+  margin-top: 6px;
+}
+.pfp__more {
+  font-size: 12px;
+  color: theme.$gray_5;
 }
 .pfp__search {
   display: flex;
