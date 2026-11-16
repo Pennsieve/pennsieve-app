@@ -24,6 +24,7 @@ import {
   ServerConnection,
 } from "@jupyterlab/services";
 import { PYTHON_PACKAGES_CODE, R_PACKAGES_CODE, parsePackages } from "@/components/Analysis/JupyterSession/environmentHelpers";
+import { getAgent, getAssist, postAgent, postAssist } from "@/components/Analysis/JupyterSession/assistStream";
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const toWs = (u) => u.replace(/^http/i, "ws");
@@ -269,6 +270,8 @@ function nbCellsToCells(nbCells) {
     source: joinSource(c.source),
     outputs: Array.isArray(c.outputs) ? c.outputs : [],
     execution_count: c.execution_count ?? null,
+    // The AI assistant's spend on the cell, kept in its metadata.
+    ai: c.metadata?.pennsieve?.ai || null,
     _running: false,
     _editing: false,
   }));
@@ -639,7 +642,8 @@ export function useJupyterSession() {
       cells: cells.value.map((c) => {
         const base = {
           cell_type: c.cell_type,
-          metadata: {},
+          // The AI assistant's spend on the cell (pennsieve.ai), if any.
+          metadata: c.ai ? { pennsieve: { ai: c.ai } } : {},
           source: c.source,
         };
         if (c.cell_type === "code") {
@@ -1007,6 +1011,27 @@ export function useJupyterSession() {
     return deleteInputsFetch(kernelBaseUrl, sessionToken, files);
   }
 
+  // The notebook's code assistant (see getAssist, postAssist).
+  // The notebook's agent when the session's image has one, else the
+  // sidecar's single-shot assistant: { available, agent, model, budget }.
+  async function assistStatus() {
+    if (!kernelBaseUrl) return { available: false };
+    const agent = await getAgent(kernelBaseUrl, sessionToken);
+    if (agent.available) return { ...agent, agent: true };
+    return { ...(await getAssist(kernelBaseUrl, sessionToken)), agent: false };
+  }
+
+  // Asks the agent about this notebook's kernel.
+  function askAgent(body, opts) {
+    if (!kernelBaseUrl || !kernel) throw new Error("The session isn't connected.");
+    return postAgent(kernelBaseUrl, sessionToken, { ...body, kernelId: kernel.id }, opts);
+  }
+
+  function askAssist(body, opts) {
+    if (!kernelBaseUrl) throw new Error("The session isn't connected.");
+    return postAssist(kernelBaseUrl, sessionToken, body, opts);
+  }
+
   // The session's view inputs (see sessionSourcesRequest).
   function inputSources() {
     if (!kernelBaseUrl) throw new Error("The session isn't connected.");
@@ -1101,6 +1126,10 @@ export function useJupyterSession() {
     inputSources,
     addInputSource,
     removeInputSource,
+    // assistant
+    assistStatus,
+    askAssist,
+    askAgent,
     // environment
     environmentState,
     switchEnvironment,
