@@ -12,7 +12,7 @@
 import { isPathPrefixParam, targetParamLabel, defaultsToRunName, targetWritesToDataset, canWriteDataset, searchDatasets } from "./dataTargets";
 import { hasInterface, withInterfaceNodes, destinationChoices, NO_DESTINATION } from "./workflowInterface";
 import { acceptsInput, nodeDataReason, nodeDataNote, dataUnreachable, suggestedDisk } from "./dataHints";
-import { computed, nextTick, reactive, ref, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, reactive, ref, watch } from "vue";
 import { useStore } from "vuex";
 import BfButton from "../../shared/bf-button/BfButton.vue";
 import AnalysisFilesTable from "../../FilesTable/AnalysisFilesTable.vue";
@@ -65,9 +65,11 @@ import RuntimeMark from "../WorkflowGraph/RuntimeMark.vue";
 import { STANDARD_CPU_OPTIONS, getStandardMemoryOptions, getTargetTypeLabel } from "./runHelpers";
 import { sourceLabel } from "../WorkflowGraph/sourceInputs";
 import * as siteConfig from "@/site-config/site.json";
-import { viewsServiceUrl, viewDataSource } from "@/utils/viewsService";
+import { viewsServiceUrl, viewDataSource, prepareWorkspaceRunView } from "@/utils/viewsService";
+import { listWorkspaceModels } from "@/utils/workspaceModels";
 import PlatformList from "../PlatformList.vue";
 import PlatformPane from "../PlatformPane.vue";
+import MetadataRecordsChoice from "../MetadataRecordsChoice.vue";
 import { newSelection, clearSelection, selectionReady } from "../platformSelection";
 import { PLATFORMS, PLATFORM_KEYS, platformData } from "../platforms";
 
@@ -545,7 +547,49 @@ watch(defaultRunName, (val) => {
 });
 
 const dataSourcesComplete = computed(() =>
-  dataSourceNodes.value.every((d) => (dataSourceFiles[d.id] || []).length > 0)
+  dataSourceNodes.value.every((d) => (dataSourceFiles[d.id] || []).length > 0 || recordsNodeId.value === d.id)
+);
+// The chosen dataset's metadata records instead of its files: the models
+// (names), taken as a view made for the session from metadata-service when
+// it starts, on the first input. In this version an input takes the
+// dataset's records or its files, not both. Where views-service is
+// deployed only; the dataset's models load as it's chosen.
+const notebookRecords = ref([]);
+const datasetModels = ref([]);
+const recordsNodeId = computed(() => (notebookRecords.value.length ? dataSourceNodes.value[0]?.id || "" : ""));
+const WORKSPACE_RECORDS_HINT =
+  "Its records and the links between them, as they are when the session starts, instead of its files.";
+// The records are exported into a view before the session starts; closing
+// the dialog stops waiting (the view's build goes on).
+let preparingAbort = null;
+const preparingRecords = ref(false);
+const startLabel = computed(() => (preparingRecords.value ? "Preparing the dataset's records…" : "Start Notebook"));
+watch(visible, (open) => {
+  if (!open) preparingAbort?.abort();
+});
+onBeforeUnmount(() => preparingAbort?.abort());
+// Records replace the first input's files (one or the other, as on the run
+// page).
+watch(notebookRecords, (models) => {
+  if (!models.length || !recordsNodeId.value) return;
+  delete dataSourceFiles[recordsNodeId.value];
+  store.commit("analysisModule/CLEAR_SELECTED_FILES");
+});
+let datasetModelsSeq = 0;
+watch(
+  () => (viewsServiceUrl() && inputChoice.value === "dataset" ? form.value.datasetId : ""),
+  async (datasetId) => {
+    const seq = ++datasetModelsSeq;
+    notebookRecords.value = [];
+    datasetModels.value = [];
+    if (!datasetId) return;
+    try {
+      const found = await listWorkspaceModels(datasetId);
+      if (seq === datasetModelsSeq) datasetModels.value = found;
+    } catch (err) {
+      console.warn("Couldn't list the dataset's models:", err);
+    }
+  }
 );
 const dataTargetsComplete = computed(() =>
   dataTargetNodes.value.every((d) =>
@@ -741,7 +785,7 @@ const filePickerCurrentFile = ref({ content: { name: "" } });
 const clearSelectedValues = ref(false);
 
 function fileCountForNode(nodeId) {
-  return (dataSourceFiles[nodeId] || []).length;
+  return (dataSourceFiles[nodeId] || []).length + (recordsNodeId.value === nodeId ? 1 : 0);
 }
 
 async function selectSourceNode(nodeId) {
@@ -968,7 +1012,12 @@ const soFar = computed(() => {
   }
   if (step.value > S.KERNEL && selectedWorkflow.value) rows.push({ label: "Kernel", value: kernelLabel(notebookKernel(selectedWorkflow.value)) });
   if (step.value > S.FILES && inputChoice.value === "dataset") {
-    rows.push({ label: "Files", value: String(dataSourceNodes.value.reduce((n, d) => n + fileCountForNode(d.id), 0)) });
+    const files = dataSourceNodes.value.reduce((n, d) => n + (dataSourceFiles[d.id] || []).length, 0);
+    const records = notebookRecords.value.length;
+    rows.push({
+      label: records ? "Input" : "Files",
+      value: records ? `Metadata records (${records} model${records === 1 ? "" : "s"})` : String(files),
+    });
   }
   if (step.value > S.NODE && selectedComputeNode.value) rows.push({ label: "Compute node", value: selectedComputeNode.value.name });
   if ((step.value > S.HARDWARE || gpuFirst.value) && step.value > S.KERNEL && reviewHardware.value) rows.push({ label: "Hardware", value: reviewHardware.value });
@@ -1010,7 +1059,28 @@ async function execute() {
     if (inputChoice.value === "dataset") {
       for (const [nodeId, files] of Object.entries(dataSourceFiles)) {
         const ids = files.map((f) => f.content?.id).filter(Boolean);
-        if (ids.length) dataSources[nodeId] = { packageIds: ids };
+        if (ids.length && nodeId !== recordsNodeId.value) dataSources[nodeId] = { packageIds: ids };
+      }
+      // The dataset's records: a view made now for the session's first
+      // input, built before the session starts; closing the dialog stops it
+      // (the view's build goes on).
+      if (recordsNodeId.value) {
+        const name = `${selectedDataset.value?.content?.name || "Dataset"}: metadata records`.slice(0, 255);
+        const controller = new AbortController();
+        preparingAbort = controller;
+        preparingRecords.value = true;
+        let view;
+        try {
+          view = await prepareWorkspaceRunView(
+            { datasetNodeId: form.value.datasetId, name, models: notebookRecords.value },
+            { signal: controller.signal }
+          );
+        } finally {
+          preparingRecords.value = false;
+          if (preparingAbort === controller) preparingAbort = null;
+        }
+        if (controller.signal.aborted) return;
+        dataSources[recordsNodeId.value] = viewDataSource(view);
       }
     }
 
@@ -1082,6 +1152,7 @@ async function execute() {
     visible.value = false;
     emit("created", newRun);
   } catch (err) {
+    if (err?.name === "AbortError") return;
     console.error("Failed to start notebook:", err);
     // The node may have filled up since it was read (a 409): read it again.
     if (selectedComputeNode.value) loadCapacity([selectedComputeNode.value]);
@@ -1460,6 +1531,19 @@ async function execute() {
             This notebook has no input — continue to start a blank session.
           </div>
           <template v-else>
+            <!-- The dataset's metadata records instead of its files, on the
+                 first input -->
+            <MetadataRecordsChoice
+              v-if="datasetModels.length && currentSourceNodeId === dataSourceNodes[0]?.id"
+              v-model="notebookRecords"
+              :available="datasetModels"
+              :hint="WORKSPACE_RECORDS_HINT"
+              class="wizard-records"
+            />
+            <p v-if="recordsNodeId === currentSourceNodeId" class="wizard-cards-loading">
+              This input takes the dataset's metadata records. Untick them to choose its files instead.
+            </p>
+            <template v-else>
             <div class="file-picker-header">
               <strong>{{ fileCountForNode(currentSourceNodeId) }}</strong>
               file{{ fileCountForNode(currentSourceNodeId) !== 1 ? "s" : "" }}
@@ -1482,6 +1566,7 @@ async function execute() {
                 @click-file-label="onClickFileLabel"
               />
             </div>
+            </template>
           </template>
         </template>
       </div>
@@ -1637,7 +1722,7 @@ async function execute() {
             Next
           </bf-button>
           <bf-button v-else :disabled="!canNext" :processing="executing" @click="execute">
-            Start Notebook
+            {{ startLabel }}
           </bf-button>
         </div>
       </div>
@@ -2122,6 +2207,9 @@ async function execute() {
   font-size: 12px;
   color: theme.$gray_5;
   margin-top: 4px;
+}
+.wizard-records {
+  margin-bottom: 12px;
 }
 .wizard-cards-loading {
   color: theme.$gray_4;
