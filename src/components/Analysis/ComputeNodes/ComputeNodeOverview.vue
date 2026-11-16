@@ -7,7 +7,7 @@ import { useStore } from 'vuex'
 import { ElMessage } from 'element-plus'
 import { useComputeResourcesStore } from '@/stores/computeResourcesStore'
 import { getUserName, runDisplayName, statusLabel, statusDotClass } from '../RunMonitor/runHelpers'
-import { nodeCapabilities, recentNodeRuns, relativeTime } from './computeNodeHelpers'
+import { deploymentMode, nodeCapabilities, recentNodeRuns, relativeTime } from './computeNodeHelpers'
 
 const props = defineProps({
   node: { type: Object, required: true },
@@ -76,10 +76,22 @@ function startEditingConfig() {
     gpuTier: props.node.gpuTier || 'small',
     maxGpuInstances: props.node.maxGpuInstances || 2,
     enableInteractive: (props.node.maxInteractiveSessions || 0) > 0,
-    maxInteractiveSessions: props.node.maxInteractiveSessions || 2
+    maxInteractiveSessions: props.node.maxInteractiveSessions || 2,
+    llmBaaAcknowledged: false
   }
   isEditingConfig.value = true
 }
+// Turning AI models on for a secure or compliant node needs the owner to
+// confirm a BAA, unless they already did (at create, or an earlier update).
+const requiresBaaAck = computed(() =>
+  configForm.value.enableLLMAccess &&
+  !props.node.enableLLMAccess &&
+  !props.node.llmBaaAcknowledged &&
+  ['secure', 'compliant'].includes(deploymentMode(props.node).key)
+)
+const canSaveConfig = computed(() =>
+  !isSavingConfig.value && (!requiresBaaAck.value || configForm.value.llmBaaAcknowledged)
+)
 async function saveConfig() {
   isSavingConfig.value = true
   try {
@@ -87,7 +99,8 @@ async function saveConfig() {
       enableLLMAccess: configForm.value.enableLLMAccess,
       maxGpuInstances: configForm.value.enableGpu ? configForm.value.maxGpuInstances : 0,
       gpuTier: configForm.value.enableGpu ? configForm.value.gpuTier : 'small',
-      maxInteractiveSessions: configForm.value.enableInteractive ? configForm.value.maxInteractiveSessions : 0
+      maxInteractiveSessions: configForm.value.enableInteractive ? configForm.value.maxInteractiveSessions : 0,
+      ...(requiresBaaAck.value && { llmBaaAcknowledged: true })
     })
     emit('updated')
     ElMessage.success('Capabilities updated')
@@ -155,7 +168,7 @@ onMounted(async () => {
         <button type="button" v-if="canManage && !isEditingConfig" class="cn-action" @click="startEditingConfig">Change</button>
         <div v-else-if="isEditingConfig" class="edit-actions">
           <button type="button" class="cn-action" @click="isEditingConfig = false">Cancel</button>
-          <button type="button" class="cn-action cn-action--primary" :disabled="isSavingConfig" @click="saveConfig">Save</button>
+          <button type="button" class="cn-action cn-action--primary" :disabled="!canSaveConfig" @click="saveConfig">Save</button>
         </div>
       </div>
 
@@ -211,6 +224,17 @@ onMounted(async () => {
             </dd>
           </div>
         </dl>
+        <div v-if="requiresBaaAck" class="baa-notice">
+          <strong>Business Associate Agreement (BAA) Required</strong>
+          <p>
+            This node runs in a secure or compliant deployment mode.
+            Because AI model calls may involve processing protected health information (PHI),
+            you must confirm that an AWS Business Associate Agreement (BAA) is in place for its account.
+          </p>
+          <el-checkbox v-model="configForm.llmBaaAcknowledged" :disabled="isSavingConfig">
+            I confirm that an AWS Business Associate Agreement (BAA) is in place for the target AWS account.
+          </el-checkbox>
+        </div>
       </div>
     </section>
 
@@ -292,6 +316,39 @@ onMounted(async () => {
 }
 .tier-select {
   width: 280px;
+}
+.baa-notice {
+  margin-top: 16px;
+  background: rgba(#F59E0B, 0.05);
+  border: 1px solid rgba(#F59E0B, 0.15);
+  border-radius: 8px;
+  padding: 16px;
+
+  strong {
+    color: theme.$gray_6;
+    font-size: 14px;
+    display: block;
+    margin-bottom: 8px;
+  }
+
+  p {
+    color: theme.$gray_5;
+    font-size: 13px;
+    margin: 0 0 12px 0;
+    line-height: 1.5;
+  }
+
+  :deep(.el-checkbox) {
+    align-items: flex-start;
+    height: auto;
+
+    .el-checkbox__label {
+      font-size: 13px;
+      color: theme.$gray_5;
+      line-height: 1.4;
+      white-space: normal;
+    }
+  }
 }
 .run-link {
   display: inline-flex;
