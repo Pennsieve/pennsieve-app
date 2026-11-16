@@ -45,7 +45,8 @@ const title = computed(() => {
 <template>
   <span v-if="spend" class="nb-spend" :class="{ 'is-high': spend.fraction >= 0.8 }" :title="title">
     <AssistIcon :size="12" />
-    <template v-if="!compact">{{ spend.fraction >= 1 ? usedUpText : spend.text }}</template>
+    <!-- Short in the toolbar; the hover says whose budget and for when. -->
+    <template v-if="!compact">{{ spend.fraction >= 1 ? usedUpText : spend.short }}</template>
     <span class="nb-spend__bar" aria-hidden="true"><span :style="{ width: `${Math.round(spend.fraction * 100)}%` }" /></span>
   </span>
   <span v-else-if="tokens" class="nb-spend" :title="title">

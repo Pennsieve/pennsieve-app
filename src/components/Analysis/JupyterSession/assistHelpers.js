@@ -127,12 +127,12 @@ export function runSpend(budget) {
   const clamp = (x) => Math.min(1, Math.max(0, x));
   if (budget?.runUsedUsd != null && budget?.runBudgetUsd) {
     const { runUsedUsd: used, runBudgetUsd: total } = budget;
-    return { used, total, scope: "run", fraction: clamp(used / total), text: `${dollars(used)} of ${dollars(total)}` };
+    return { used, total, scope: "run", fraction: clamp(used / total), text: `${dollars(used)} of ${dollars(total)}`, short: `${dollars(used)} / ${dollars(total)}` };
   }
   if (budget?.periodUsedUsd != null && budget?.periodBudgetUsd) {
     const { periodUsedUsd: used, periodBudgetUsd: total } = budget;
     const when = PERIODS[budget.period] || "this period";
-    return { used, total, scope: "node", when, fraction: clamp(used / total), text: `${dollars(used)} of ${dollars(total)} ${when}` };
+    return { used, total, scope: "node", when, fraction: clamp(used / total), text: `${dollars(used)} of ${dollars(total)} ${when}`, short: `${dollars(used)} / ${dollars(total)}` };
   }
   return null;
 }

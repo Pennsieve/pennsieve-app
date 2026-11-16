@@ -228,6 +228,8 @@ function latexOf(data) {
         @stop="assist('stop')"
         @accept="assist('accept')"
         @insert-below="assist('insert-below')"
+        @insert-answer="assist('insert-answer')"
+        @answer-to-code="assist('answer-to-code')"
         @discard="assist('discard')"
         @clear-file="assist('clear-file')"
       />
