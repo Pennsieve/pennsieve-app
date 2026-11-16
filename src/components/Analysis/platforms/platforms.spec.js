@@ -28,6 +28,21 @@ describe("the data platforms", () => {
     }
   });
 
+  it("take a Discover version's records when its models are chosen", async () => {
+    const d = PLATFORMS.discover;
+    const part = { ...d.selection(), dataset: { id: 42, name: "Study" }, version: 3, models: ["participant"] };
+    expect(d.label(part)).toBe("Study with metadata records");
+    expect(d.label({ ...part, models: [] })).toBe("Study");
+    const view = await d.createView(part);
+    expect(view.args).toEqual({ datasetId: 42, version: 3, name: "Study", models: ["participant"] });
+    expect((await d.createView({ ...part, models: [] })).args.models).toBeUndefined();
+    // The same files aren't the same input once records come along.
+    const source = { sourceDatasetId: 42, sourceVersion: 3, models: [] };
+    expect(d.sameAs({ ...part, models: [] }, source)).toBe(true);
+    expect(d.sameAs(part, source)).toBe(false);
+    expect(d.sameAs(part, { ...source, models: [{ name: "participant", version: 1 }] })).toBe(true);
+  });
+
   it("are listed in order", () => {
     expect(PLATFORM_KEYS).toEqual(["discover", "openData", "sparc", "epilepsyScience", "openNeuro", "bossdb", "dandi", "physionet", "allen", "cellxgene", "encode", "hca", "idc", "ibl"]);
   });

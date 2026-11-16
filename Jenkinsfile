@@ -15,6 +15,17 @@ if (env.BRANCH_NAME == "main") {
 safeJobName = env.JOB_NAME.replaceAll(/[^A-Za-z0-9._-]/, '-')
 safeBranchName = env.BRANCH_NAME.replaceAll(/[^A-Za-z0-9._-]/, '-')
 
+// Node for the build. The executor image bakes this version; when an agent
+// lacks it, or a half-finished install left npm unusable (two builds once
+// extracted the same tarball into the same directory at once), reinstall it
+// under a lock so concurrent builds on one agent cannot race the extraction.
+useNode = """. \$HOME/.nvm/nvm.sh
+                    if ! nvm use 22.23.4 >/dev/null 2>&1 || ! npm -v >/dev/null 2>&1; then
+                        nvm deactivate >/dev/null 2>&1 || true; nvm uninstall 22.23.4 || true
+                        flock \$HOME/.nvm/.install.lock bash -c '. \$HOME/.nvm/nvm.sh; nvm install 22.23.4'
+                    fi
+                    nvm use 22.23.4"""
+
 node('executor') {
     ws("/tmp/${safeJobName}/${safeBranchName}") {
         checkout scm
@@ -23,7 +34,7 @@ node('executor') {
         stage("Build") {
             try {
                 sh """#!/bin/bash -ex
-                    . $HOME/.nvm/nvm.sh ; nvm install 22.23.4
+                    ${useNode}
                     node -v
                     npm -v
                     npm install
@@ -39,7 +50,7 @@ node('executor') {
         stage("Test") {
             try {
                 sh """#!/bin/bash
-                    . $HOME/.nvm/nvm.sh ; nvm install 22.23.4
+                    ${useNode}
                     xvfb-run --auto-servernum --server-args='-screen 0, 1024x768x16' npm test"""
             } catch (e) {
                 slackSend(color: '#b20000', message: "FAILED: Tests! '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL}) by ${authorName}")

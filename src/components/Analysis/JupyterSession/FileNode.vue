@@ -14,6 +14,8 @@ import { computed, ref } from "vue";
 import { VIEW_CRATE_DIR } from "@/composables/useJupyterSession";
 import { visibleEntries } from "./fileBrowserHelpers";
 import { stackFormat, stackIcon, costLine } from "./inputsHelpers";
+import { fileSnippets, stackSnippets } from "./fileSnippets";
+import AssistIcon from "./AssistIcon.vue";
 
 const props = defineProps({
   node: { type: Object, required: true },
@@ -27,9 +29,15 @@ const props = defineProps({
   fmtTime: { type: Function, required: true },
   // The session's view inputs (useSessionInputs), or null.
   inputs: { type: Object, default: null },
+  // The kernel's name ("Python 3.12.3", "R 4.4.1"): the language of a file's starter code.
+  kernelName: { type: String, default: "" },
+  // The session has a code assistant: Code offers Ask… on any file.
+  assistAvailable: { type: Boolean, default: false },
+  // Why the assistant is paused (no AI budget left), or "".
+  assistPaused: { type: String, default: "" },
 });
 
-const emit = defineEmits(["toggle", "copy", "insert", "open", "insert-stack", "add-data"]);
+const emit = defineEmits(["toggle", "copy", "insert", "open", "insert-snippet", "ask-file", "add-data"]);
 const children = computed(() => visibleEntries(props.node.children, props.showHidden, props.onlyLocal));
 
 const isNotebook = (node) => node.type === "notebook" || /\.ipynb$/i.test(node.name || "");
@@ -52,6 +60,14 @@ const progress = computed(() => {
 // A view's folder: how much of it is in the session, and what's left.
 const isViewFolder = computed(() => props.inputs && view.value && props.node.type === "directory");
 const viewProgress = computed(() => (isViewFolder.value && view.value.root ? props.inputs.folderProgress(view.value.source, "") : null));
+// A view folder's row says where it's from, how much of it is in the
+// session, and which models' records it holds (under metadata/).
+const viewTitle = computed(() => {
+  if (!viewProgress.value) return undefined;
+  const models = view.value.source.models || [];
+  const records = models.length ? `\nMetadata records of ${models.map((m) => m.name).join(", ")} under metadata/` : "";
+  return `${view.value.source.name}\n${viewProgress.value.done} of ${viewProgress.value.total} files in the session${records}`;
+});
 const left = computed(() => (isViewFolder.value ? props.inputs.remainingIn(view.value.source, view.value.rel) : []));
 const leftSize = computed(() => left.value.reduce((n, e) => n + (e.size || 0), 0));
 const selected = computed(() => remote.value && props.inputs.isSelected(view.value.source, view.value.entry.cratePath));
@@ -82,6 +98,31 @@ function go(noted = false) {
   confirm.value = null;
   if (noted) props.inputs.noteCost();
   c?.go();
+}
+
+/* ------------------------------------------------------ starter code --- */
+// A downloaded file of a known type, or a stack, offers a few cells (load,
+// summarize, plot) on its Code action, in a strip under its row until one is
+// picked. A stack in R has only one (its URL): Code adds it.
+const snippets = computed(() => {
+  if (isStack.value) return stackSnippets(view.value.entry, props.kernelName);
+  return props.node.type === "file" && !remote.value && !isNotebook(props.node) ? fileSnippets(props.node.path, props.kernelName) : [];
+});
+// Ask… is the assistant's, on any downloaded file or stack.
+const canAsk = computed(() => props.assistAvailable && (isStack.value || (props.node.type === "file" && !remote.value && !isNotebook(props.node))));
+const hasCode = computed(() => snippets.value.length > 0 || canAsk.value);
+function onCode() {
+  if (snippets.value.length === 1 && !canAsk.value) pickSnippet(snippets.value[0]);
+  else showSnippets.value = !showSnippets.value;
+}
+function ask() {
+  showSnippets.value = false;
+  emit("ask-file", props.node.path);
+}
+const showSnippets = ref(false);
+function pickSnippet(s) {
+  showSnippets.value = false;
+  emit("insert-snippet", s.code);
 }
 
 function onRow() {
@@ -144,8 +185,8 @@ function onRow() {
            from and how much is in the session; a file: not downloaded, its
            size, progress or failure), then its actions on hover. -->
       <span class="fn__end">
-      <span v-if="viewProgress" class="fn__from" :title="`${view.source.name}\n${viewProgress.done} of ${viewProgress.total} files in the session`">
-        {{ view.source.subtitle }} · {{ viewProgress.done }}/{{ viewProgress.total }}
+      <span v-if="viewProgress" class="fn__from" :title="viewTitle">
+        {{ view.source.subtitle }} · {{ viewProgress.done }}/{{ viewProgress.total }}<template v-if="view.source.models?.length"> · {{ view.source.models.length }} {{ view.source.models.length === 1 ? "model" : "models" }}</template>
       </span>
       <svg v-if="remote && !under" class="fn__cloud" width="12" height="12" viewBox="0 0 16 16" aria-label="Not downloaded">
         <path d="M4.5 12.5h7.2a2.8 2.8 0 0 0 .4-5.6 4 4 0 0 0-7.7-1A3.3 3.3 0 0 0 4.5 12.5z" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" />
@@ -161,7 +202,15 @@ function onRow() {
           <button class="fn__act fn__act--text" title="Add data from a data platform" @click="emit('add-data')">+ Add data</button>
         </template>
         <template v-else-if="isStack">
-          <button class="fn__act fn__act--text" :title="`Add code that opens this ${stackFormat(view.entry)} in place`" @click="emit('insert-stack', view.entry)">Code</button>
+          <button
+            class="fn__act fn__act--text"
+            :class="{ 'is-on': showSnippets }"
+            :title="`Starter code for this ${stackFormat(view.entry)}, read in place: load, summarize, plot`"
+            :aria-expanded="showSnippets"
+            @click="onCode"
+          >
+            Code
+          </button>
         </template>
         <template v-else-if="under">
           <button class="fn__act" title="Cancel the download" aria-label="Cancel the download" @click="inputs.cancel([{ source: view.source, path: view.entry.cratePath }])">✕</button>
@@ -196,11 +245,30 @@ function onRow() {
           >
             ↪
           </button>
+          <button
+            v-if="hasCode"
+            class="fn__act fn__act--text"
+            :class="{ 'is-on': showSnippets }"
+            title="Starter code for this file: load, summarize, plot"
+            :aria-expanded="showSnippets"
+            @click="onCode"
+          >
+            Code
+          </button>
           <button class="fn__act" title="Insert the path into a cell, as code (INPUT_DIR / …)" @click="emit('insert', node.path)">↩</button>
           <button class="fn__act" title="Copy the path, as code (INPUT_DIR / …)" @click="emit('copy', node)">⧉</button>
         </template>
       </span>
       </span>
+    </div>
+
+    <!-- A file's starter code: each adds a cell, which isn't run. -->
+    <div v-if="showSnippets && hasCode" class="fn__snippets" :style="{ paddingLeft: depth * 14 + 28 + 'px' }">
+      <button v-for="s in snippets" :key="s.id" class="fn__snippet" :title="`${s.title}: adds a cell`" @click.stop="pickSnippet(s)">
+        {{ s.label }}
+      </button>
+      <button v-if="canAsk" class="fn__snippet fn__snippet--ask" :title="assistPaused || 'Ask the AI assistant for code for this file'" :disabled="!!assistPaused" @click.stop="ask"><AssistIcon :size="11" /> Ask…</button>
+      <button class="fn__snippet-close" title="Close" aria-label="Close" @click.stop="showSnippets = false">✕</button>
     </div>
 
     <!-- A big download asks first; one that doesn't fit says so. -->
@@ -237,11 +305,15 @@ function onRow() {
         :fmt-size="fmtSize"
         :fmt-time="fmtTime"
         :inputs="inputs"
+        :kernel-name="kernelName"
+        :assist-available="assistAvailable"
+        :assist-paused="assistPaused"
         @toggle="emit('toggle', $event)"
         @copy="emit('copy', $event)"
         @insert="emit('insert', $event)"
         @open="emit('open', $event)"
-        @insert-stack="emit('insert-stack', $event)"
+        @insert-snippet="emit('insert-snippet', $event)"
+        @ask-file="emit('ask-file', $event)"
         @add-data="emit('add-data')"
       />
     </ul>
@@ -370,6 +442,55 @@ function onRow() {
   outline: none;
 }
 .fn__act:active { background: theme.$gray_0; }
+.fn__act--text.is-on { background: theme.$white; box-shadow: inset 0 0 0 1px theme.$gray_3; }
+/* Starter code: small, quiet chips under the row. */
+.fn__snippets {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  margin: 1px 8px 4px 0;
+}
+.fn__snippet {
+  border: 1px solid theme.$gray_2;
+  border-radius: 10px;
+  background: theme.$white;
+  padding: 1px 9px;
+  font-size: 11px;
+  color: theme.$purple_2;
+  cursor: pointer;
+}
+.fn__snippet:hover,
+.fn__snippet:focus-visible {
+  border-color: theme.$purple_2;
+  background: theme.$purple_tint;
+  outline: none;
+}
+/* The assistant's colour (status_purple), as on every AI action. */
+.fn__snippet--ask {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  border-color: #d9cff4;
+  color: theme.$status_purple;
+}
+.fn__snippet--ask:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.fn__snippet--ask:hover:not(:disabled),
+.fn__snippet--ask:focus-visible {
+  border-color: theme.$status_purple;
+  background: #f0ebfb;
+}
+.fn__snippet-close {
+  border: none;
+  background: none;
+  padding: 1px 4px;
+  font-size: 10px;
+  color: theme.$gray_4;
+  cursor: pointer;
+}
 .fn__act--open { color: theme.$purple_3; font-weight: 700; } /* purple_3 — primary file action */
 .fn__confirm {
   display: flex;
