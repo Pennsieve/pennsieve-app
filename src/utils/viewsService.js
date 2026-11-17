@@ -140,6 +140,84 @@ export async function createRunView({ name, picks }, options = {}) {
   })
 }
 
+// A run's input from a workspace dataset's metadata records: the models
+// named (names, or ["*"] for all), read from metadata-service as the user
+// when the view is made and kept for the run (lifecycle "run"). The dataset
+// is named in the call (dataset_id), which the gateway's dataset authorizer
+// checks: the user's role on that dataset, whatever workspace they're in.
+// A workspace view is the run's only source, and it has no files (v0).
+export async function createWorkspaceRunView({ datasetNodeId, name, models }, options = {}) {
+  return viewsRequest(`/workspace?dataset_id=${encodeURIComponent(datasetNodeId)}`, {
+    ...options,
+    method: 'POST',
+    body: { name, models: [...models], lifecycle: 'run' },
+  })
+}
+
+// A workspace view is built asynchronously: POST /workspace answers 202 with
+// the view in state "building", and GET /{id} says when it's ready (no
+// state) or failed (state "failed", with why). waitForView polls, 2 s then
+// backing off to 10 s, until then: it resolves the ready view, or rejects
+// with a ViewBuildError (the build failed, or it took longer than timeoutMs,
+// 10 minutes). An AbortSignal stops the polling (the page was left; the
+// build goes on).
+export class ViewBuildError extends Error {
+  constructor(state, message) {
+    super(message)
+    this.name = 'ViewBuildError'
+    this.state = state
+  }
+}
+
+const sleepFor = (ms, signal) =>
+  new Promise((resolve, reject) => {
+    if (signal?.aborted) return reject(abortError())
+    const t = setTimeout(() => {
+      signal?.removeEventListener('abort', onAbort)
+      resolve()
+    }, ms)
+    const onAbort = () => {
+      clearTimeout(t)
+      reject(abortError())
+    }
+    signal?.addEventListener('abort', onAbort, { once: true })
+  })
+const abortError = () => new DOMException('The view is still being built; polling stopped.', 'AbortError')
+
+export async function waitForView(viewId, { signal, timeoutMs = 10 * 60 * 1000, sleep = sleepFor, now = Date.now, ...options } = {}) {
+  if (signal?.aborted) throw abortError()
+  const start = now()
+  let delay = 2000
+  for (;;) {
+    const view = await getView(viewId, options)
+    if (!view.state) return view
+    if (view.state === 'failed') {
+      throw new ViewBuildError('failed', view.error || "The dataset's records couldn't be prepared.")
+    }
+    if (now() - start + delay > timeoutMs) {
+      throw new ViewBuildError('timeout', "The dataset's records are still being prepared. Try again in a few minutes.")
+    }
+    await sleep(delay, signal)
+    delay = Math.min(delay * 2, 10000)
+  }
+}
+
+// A run's input from a workspace dataset's records, ready: started with
+// createWorkspaceRunView and, when the service builds it asynchronously,
+// waited for. An AbortSignal stops it before the view is started as well
+// as while it's waited for (the build goes on). A view already started
+// (a retry after a timeout) is waited for again rather than started twice.
+export async function prepareWorkspaceRunView({ datasetNodeId, name, models, started = null }, { signal, onStarted, ...options } = {}) {
+  if (signal?.aborted) throw abortError()
+  let view = started
+  if (!view) {
+    view = await createWorkspaceRunView({ datasetNodeId, name, models }, options)
+    onStarted?.(view)
+  }
+  if (signal?.aborted) throw abortError()
+  return view.state ? waitForView(view.id, { signal, ...options }) : view
+}
+
 // The AWS Open Data Registry datasets a view can take, from views-service's
 // catalog (GET /open-data, a schema.org DataCatalog), as
 // { name, title, summary, keywords, publisher, regions, anonymous, url }.
