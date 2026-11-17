@@ -116,6 +116,7 @@ describe("registerSessionSource", () => {
     const fetchFn = respond(404, { message: "view v1 version 2 was not found or isn't yours" });
     await expect(registerSessionSource("run-1", { name: "more", viewId: "v1", version: 2 }, { config, getToken, fetchFn })).rejects.toMatchObject({
       status: 404,
+      source: "run",
       message: "view v1 version 2 was not found or isn't yours",
     });
   });
