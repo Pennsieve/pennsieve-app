@@ -146,11 +146,27 @@ export async function createRunView({ name, picks }, options = {}) {
 // is named in the call (dataset_id), which the gateway's dataset authorizer
 // checks: the user's role on that dataset, whatever workspace they're in.
 // A workspace view is the run's only source, and it has no files (v0).
-export async function createWorkspaceRunView({ datasetNodeId, name, models }, options = {}) {
+// Whether a workspace input's files go through a view too (they always do
+// with records): on where views of workspace files are deployed, until
+// every input is a view (phase 3).
+export function workspaceFilesAsViews(config = siteConfig) {
+  return !!viewsServiceUrl(config) && config.workspaceFilesAsViews === true
+}
+
+// A workspace input as a view: the packages picked (packageIds, placed as
+// picked or at their dataset paths: filePaths selection|source) and the
+// models' records (models), either or both.
+export async function createWorkspaceRunView({ datasetNodeId, name, models = [], packageIds = [], filePaths = '' }, options = {}) {
   return viewsRequest(`/workspace?dataset_id=${encodeURIComponent(datasetNodeId)}`, {
     ...options,
     method: 'POST',
-    body: { name, models: [...models], lifecycle: 'run' },
+    body: {
+      name,
+      lifecycle: 'run',
+      ...(models.length && { models: [...models] }),
+      ...(packageIds.length && { packageIds: [...packageIds] }),
+      ...(packageIds.length && filePaths && { filePaths }),
+    },
   })
 }
 
@@ -207,11 +223,11 @@ export async function waitForView(viewId, { signal, timeoutMs = 10 * 60 * 1000, 
 // waited for. An AbortSignal stops it before the view is started as well
 // as while it's waited for (the build goes on). A view already started
 // (a retry after a timeout) is waited for again rather than started twice.
-export async function prepareWorkspaceRunView({ datasetNodeId, name, models, started = null }, { signal, onStarted, ...options } = {}) {
+export async function prepareWorkspaceRunView({ datasetNodeId, name, models = [], packageIds = [], filePaths = '', started = null }, { signal, onStarted, ...options } = {}) {
   if (signal?.aborted) throw abortError()
   let view = started
   if (!view) {
-    view = await createWorkspaceRunView({ datasetNodeId, name, models }, options)
+    view = await createWorkspaceRunView({ datasetNodeId, name, models, packageIds, filePaths }, options)
     onStarted?.(view)
   }
   if (signal?.aborted) throw abortError()
