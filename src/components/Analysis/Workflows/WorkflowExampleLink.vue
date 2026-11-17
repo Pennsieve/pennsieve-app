@@ -4,28 +4,39 @@
   (a summary of one successful run) in the sample output viewer, over the page. On the latest version it's
   the newest version's example that has one ("Example from version N" when
   that's an older version); on an older version shown, that version's own.
-  Two forms: `variant="icon"` (the page header: a PDF icon button, the version
-  and run in its tooltip) and `variant="row"` (the Details panel: an info row
-  with the version, the run, Open and, for editors, Remove). Nothing shows
-  where there's no example or the feature isn't served.
+  Three forms: `variant="icon"` (the page header: a PDF icon button, the version
+  and run in its tooltip), `variant="card"` (the side panel, above Workflow
+  Details: the app page's report card, AppSampleCard, with the apps-updated
+  note when it applies and, for editors, Remove) and `variant="row"` (an info
+  row with the PDF link). Nothing shows
+  where there's no example or the feature isn't served. The newest report is
+  never hidden by a newer version: when its apps differ from the version
+  shown's, a muted "Apps updated since this report" says so, the apps changed
+  in its tooltip (reportNote.js).
 */
 import { computed, ref, watch } from "vue";
 import { useStore } from "vuex";
 import { ElMessageBox } from "element-plus";
 import EventBus from "../../../utils/event-bus";
 import IconPDF from "../../icons/IconPDF.vue";
+import AppSampleCard from "../Applications/AppSampleCard.vue";
 import { exampleLabel, exampleVersion, PDF_URL_FRESH_MS } from "./runExamples";
 import SampleOutputViewer from "./SampleOutputViewer.vue";
+import { workflowReportNote } from "./reportNote";
 
 const props = defineProps({
   uuid: { type: String, default: "" },
   // The version shown, or null for the latest.
   version: { type: Number, default: null },
   canEdit: { type: Boolean, default: false },
-  // "icon": the header's PDF button; "row": the Details panel's info row.
+  // "icon": the header's PDF button; "card": the side panel's report card;
+  // "row": an info row.
   variant: { type: String, default: "icon" },
   // The workflow's name, for the viewer's title and the downloaded file's name.
   workflowName: { type: String, default: "" },
+  // The workflow (or version) shown, with its dag: what the report's apps
+  // are compared with.
+  workflow: { type: Object, default: null },
 });
 
 const store = useStore();
@@ -54,6 +65,21 @@ const load = async () => {
 };
 watch(() => [props.uuid, props.version], load, { immediate: true });
 
+const note = ref("");
+const noteDetail = ref("");
+let noteSeq = 0;
+watch(
+  () => [example.value?.jobId, example.value?.version, example.value?.fromVersion, props.workflow?.dag],
+  async () => {
+    const mine = ++noteSeq;
+    const found = await workflowReportNote(store, props.uuid, example.value, props.workflow);
+    if (mine !== noteSeq) return;
+    note.value = found.text;
+    noteDetail.value = found.detail;
+  },
+  { immediate: true }
+);
+
 const label = computed(() => exampleLabel(example.value));
 const runLabel = computed(() => example.value?.runName || example.value?.runId || "");
 const pagesLabel = computed(() => {
@@ -64,8 +90,21 @@ const title = computed(() => {
   if (!example.value) return "";
   const parts = [`${label.value}: a PDF summary of run ${runLabel.value}`];
   if (pagesLabel.value) parts.push(pagesLabel.value);
-  return `${parts.join(", ")}. Captions and overview are AI-written.`;
+  return `${parts.join(", ")}. Captions and overview are AI-written.${
+    note.value ? ` ${note.value}: ${noteDetail.value}.` : ""
+  }`;
 });
+
+// The card's sample (AppSampleCard reads pages, createdAt and previewUrl).
+const cardSample = computed(() => (example.value ? { ...example.value, pipeline: false } : null));
+const cardMeta = computed(() => {
+  const d = new Date(example.value?.createdAt);
+  const made = Number.isNaN(d.getTime()) ? "" : d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+  return [pagesLabel.value, made].filter(Boolean).join(" · ");
+});
+const cardLede = computed(
+  () => `A PDF of one run of ${props.workflowName || "this workflow"}: its inputs, results and figures.`
+);
 
 const viewerOpen = ref(false);
 const subtitle = computed(() => {
@@ -120,28 +159,45 @@ const remove = async () => {
     </button>
   </el-tooltip>
 
+  <AppSampleCard
+    v-else-if="example && variant === 'card'"
+    :sample="cardSample"
+    :app-name="workflowName"
+    :source="pdfSource"
+    :title="label"
+    :lede-text="cardLede"
+    :meta-text="cardMeta"
+    :note="note"
+    :note-detail="noteDetail"
+    compact
+  >
+    <template v-if="canEdit" #actions>
+      <button type="button" class="wf-example__remove" :disabled="removing" @click="remove">Remove example</button>
+    </template>
+  </AppSampleCard>
+
   <div v-else-if="example && variant === 'row'" class="info-row wf-example-row">
-    <span class="info-label">Sample output</span>
+    <span class="info-label">Example report</span>
     <span class="info-value">
       <button type="button" class="wf-example-row__open" @click="open">
         <IconPDF :width="14" :height="14" color="currentColor" />
-        <span>PDF summary{{ pagesLabel ? ` (${pagesLabel})` : "" }}</span>
+        <span>View PDF{{ pagesLabel ? ` (${pagesLabel})` : "" }}</span>
       </button>
-      <span class="wf-example-row__meta">
-        Version {{ exampleVersion(example) }} · run {{ runLabel }}
-      </span>
+      <span v-if="note" class="wf-example-row__note" :title="noteDetail || undefined">{{ note }}</span>
       <button v-if="canEdit" type="button" class="wf-example__remove" :disabled="removing" @click="remove">
-        Remove sample output
+        Remove example
       </button>
     </span>
   </div>
   <SampleOutputViewer
-    v-if="example"
+    v-if="example && variant !== 'card'"
     v-model="viewerOpen"
     :source="pdfSource"
     :workflow-name="workflowName"
     :version="exampleVersion(example)"
     :subtitle="subtitle"
+    :note="note"
+    :note-detail="noteDetail"
   />
 </template>
 
@@ -165,11 +221,31 @@ const remove = async () => {
     color: theme.$purple_3;
   }
 }
+/* The panel's rows (WorkflowBuilder .info-row): its scoped styles don't reach
+   this component, so the row's are repeated here. */
+.wf-example-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 6px 0;
+  border-bottom: 1px solid theme.$gray_2;
+}
+.wf-example-row .info-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: theme.$gray_5;
+  flex-shrink: 0;
+  min-width: 80px;
+}
 .wf-example-row .info-value {
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
+  align-items: flex-end;
   gap: 2px;
+  font-size: 12px;
+  color: theme.$black;
+  text-align: right;
 }
 .wf-example-row__open {
   display: inline-flex;
@@ -186,8 +262,9 @@ const remove = async () => {
     text-decoration: underline;
   }
 }
-.wf-example-row__meta {
+.wf-example-row__note {
   font-size: 12px;
+  font-style: italic;
   color: theme.$gray_5;
 }
 .wf-example__remove {

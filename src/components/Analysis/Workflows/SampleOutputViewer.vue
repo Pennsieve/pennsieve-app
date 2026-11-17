@@ -20,6 +20,10 @@ const props = defineProps({
   version: { type: Number, default: null },
   // A line under the title, e.g. "Version 3 · run brave-otter · 18 pages".
   subtitle: { type: String, default: "" },
+  // A muted line under it, "Apps updated since this report", and its tooltip:
+  // the apps changed ("bulk-report v0.1.0 → v0.1.1").
+  note: { type: String, default: "" },
+  noteDetail: { type: String, default: "" },
   // What the PDF is called in the title: "sample output" (a run's), or
   // "sample document" (the release pipeline's, AppSampleCard).
   kind: { type: String, default: "sample output" },
@@ -158,6 +162,7 @@ const openInTab = async () => {
         <div class="sample-viewer__titles">
           <h2 class="sample-viewer__title">{{ title }}</h2>
           <p v-if="subtitle" class="sample-viewer__subtitle">{{ subtitle }}</p>
+          <p v-if="note" class="sample-viewer__note" :title="noteDetail || undefined">{{ note }}</p>
         </div>
         <div class="sample-viewer__actions">
           <bf-button class="primary sample-viewer__btn" :disabled="!src || downloading" @click="download">
@@ -245,6 +250,12 @@ const openInTab = async () => {
 .sample-viewer__subtitle {
   margin: 2px 0 0;
   font-size: 12px;
+  color: theme.$gray_5;
+}
+.sample-viewer__note {
+  margin: 2px 0 0;
+  font-size: 12px;
+  font-style: italic;
   color: theme.$gray_5;
 }
 .sample-viewer__actions {

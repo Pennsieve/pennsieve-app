@@ -25,7 +25,7 @@ const workflowRoute = (uuid) => ({
   params: { ...(route.params.orgId ? { orgId: route.params.orgId } : {}), uuid },
 });
 
-const viewer = ref({ open: false, source: null, name: "", version: null, subtitle: "" });
+const viewer = ref({ open: false, source: null, name: "", version: null, subtitle: "", note: "", noteDetail: "" });
 const runLabel = (example) => example.runName || example.runId || "";
 const meta = (example) => {
   const parts = [`Version ${exampleVersion(example)}`, `run ${runLabel(example)}`];
@@ -52,6 +52,8 @@ const open = (entry) => {
     name: entry.workflow.name,
     version: exampleVersion(ex),
     subtitle: meta(ex),
+    note: entry.note || "",
+    noteDetail: entry.noteDetail || "",
   };
 };
 </script>
@@ -59,13 +61,14 @@ const open = (entry) => {
 <template>
   <div class="app-samples">
     <p class="app-samples__intro">
-      Sample outputs of workflows that use {{ appName || "this app" }}: a PDF summary of one run of each.
+      Example reports of workflows that use {{ appName || "this app" }}: a PDF of one run of each.
     </p>
     <ul class="app-samples__list">
       <li v-for="entry in entries" :key="entry.workflow.uuid" class="app-sample">
         <div class="app-sample__text">
           <router-link :to="workflowRoute(entry.workflow.uuid)" class="app-sample__name">{{ entry.workflow.name }}</router-link>
           <span class="app-sample__meta">{{ meta(entry.example) }}</span>
+          <span v-if="entry.note" class="app-sample__note" :title="entry.noteDetail || undefined">{{ entry.note }}</span>
         </div>
         <button type="button" class="app-sample__open" @click="open(entry)">
           <IconPDF :width="14" :height="14" color="currentColor" />
@@ -83,6 +86,8 @@ const open = (entry) => {
       :workflow-name="viewer.name"
       :version="viewer.version"
       :subtitle="viewer.subtitle"
+      :note="viewer.note"
+      :note-detail="viewer.noteDetail"
     />
   </div>
 </template>
@@ -134,6 +139,11 @@ const open = (entry) => {
 }
 .app-sample__meta {
   font-size: 12px;
+  color: theme.$gray_5;
+}
+.app-sample__note {
+  font-size: 12px;
+  font-style: italic;
   color: theme.$gray_5;
 }
 .app-sample__open {

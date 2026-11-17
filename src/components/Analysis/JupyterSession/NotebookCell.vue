@@ -5,15 +5,24 @@
 // the cell object; structural/source changes are emitted to the parent.
 import { computed, ref } from "vue";
 import { marked } from "marked";
+import DOMPurify from "dompurify";
 import CodeMirrorEditor from "./CodeMirrorEditor.vue";
 import PlotlyOutput from "./PlotlyOutput.vue";
 import MathOutput from "./MathOutput.vue";
+import AssistBar from "./AssistBar.vue";
+import AssistIcon from "./AssistIcon.vue";
+import { cellSpendLabel, cellSpendTitle } from "./assistHelpers";
 
 const props = defineProps({
   cell: { type: Object, required: true },
   selected: { type: Boolean, default: false },
   isFirst: { type: Boolean, default: false },
   isLast: { type: Boolean, default: false },
+  // The session has a code assistant: ✦ and Cmd/Ctrl-I ask it, and an
+  // error offers Fix.
+  assistAvailable: { type: Boolean, default: false },
+  // Why the assistant is paused (no AI budget left), or "".
+  assistPaused: { type: String, default: "" },
 });
 
 const emit = defineEmits([
@@ -28,6 +37,9 @@ const emit = defineEmits([
   "change-type",
   "focus-prev",
   "focus-next",
+  // The code assistant: { action: open | fix | submit | stop | accept |
+  // insert-below | discard | clear-file, prompt }. JupyterSession owns it.
+  "assist",
 ]);
 
 const editorRef = ref(null);
@@ -43,11 +55,15 @@ const promptLabel = computed(() => {
   return props.cell.execution_count != null ? `[${props.cell.execution_count}]` : "[ ]";
 });
 
+// HTML an output or a cell carries (a kernel's, or code the assistant ran)
+// is shown in the app's own page: without scripts or event handlers.
+const clean = (html) => DOMPurify.sanitize(html ?? "");
+
 // Render a markdown string to HTML (used for markdown cells AND text/markdown
 // outputs).
 function renderMd(src) {
   try {
-    return marked.parse(src ?? "", { breaks: true, gfm: true });
+    return clean(marked.parse(src ?? "", { breaks: true, gfm: true }));
   } catch (_) {
     return `<pre>${escapeHtml(src ?? "")}</pre>`;
   }
@@ -85,6 +101,13 @@ function editMarkdown() {
   }
 }
 
+function assist(action, prompt) {
+  if (!props.assistAvailable || !isCode.value) return;
+  // Paused: nothing new starts; a bar already open still answers.
+  if (props.assistPaused && (action === "open" || action === "fix")) return;
+  emit("assist", { action, prompt });
+}
+
 function focus() {
   editorRef.value?.focus?.();
 }
@@ -100,7 +123,7 @@ function imgSrc(data) {
 }
 function htmlOf(data) {
   const h = data["text/html"];
-  return Array.isArray(h) ? h.join("") : h;
+  return h == null ? h : clean(Array.isArray(h) ? h.join("") : h);
 }
 function textOf(data) {
   const t = data["text/plain"];
@@ -108,7 +131,7 @@ function textOf(data) {
 }
 function svgOf(data) {
   const s = data["image/svg+xml"];
-  return Array.isArray(s) ? s.join("") : s;
+  return s == null ? s : DOMPurify.sanitize(Array.isArray(s) ? s.join("") : s, { USE_PROFILES: { svg: true, svgFilters: true } });
 }
 function markdownOf(data) {
   const m = data["text/markdown"];
@@ -159,12 +182,26 @@ function latexOf(data) {
     <!-- prompt gutter -->
     <div class="nb-cell__prompt" :class="{ 'nb-cell__prompt--running': cell._running }">
       {{ promptLabel }}
+      <!-- What the AI assistant has spent on this cell (saved with it). -->
+      <div v-if="cell.ai && cell.ai.requests" class="nb-cell__spend" :title="cellSpendTitle(cell.ai)">
+        <AssistIcon :size="9" />{{ cellSpendLabel(cell.ai) }}
+      </div>
     </div>
 
     <div class="nb-cell__body">
       <!-- hover toolbar -->
       <div class="nb-cell__toolbar" @click.stop>
         <button class="nb-tbtn nb-tbtn--run" title="Run (Shift+Enter)" @click="run({ advance: true })">▶</button>
+        <button
+          v-if="assistAvailable && isCode"
+          class="nb-tbtn nb-tbtn--assist"
+          :title="assistPaused || 'Ask the AI assistant for this cell\'s code (Cmd/Ctrl+I)'"
+          :disabled="!!assistPaused"
+          aria-label="Ask the AI assistant"
+          @click="assist('open')"
+        >
+          <AssistIcon :size="15" />
+        </button>
         <select
           class="nb-type"
           :value="cell.cell_type"
@@ -181,6 +218,20 @@ function latexOf(data) {
         <button class="nb-tbtn nb-tbtn--del" title="Delete cell" @click="emit('delete')">🗑</button>
       </div>
 
+      <!-- The assistant writing code: above the editor. A fix shows under
+           the error it's for (below), where it was asked. -->
+      <AssistBar
+        v-if="cell._assist && isCode && cell._assist.mode !== 'fix'"
+        :assist="cell._assist"
+        :cell-has-code="!!cell.source.trim()"
+        @submit="assist('submit', $event)"
+        @stop="assist('stop')"
+        @accept="assist('accept')"
+        @insert-below="assist('insert-below')"
+        @discard="assist('discard')"
+        @clear-file="assist('clear-file')"
+      />
+
       <!-- editor / rendered markdown -->
       <div v-if="editing" class="nb-cell__editor">
         <CodeMirrorEditor
@@ -195,6 +246,7 @@ function latexOf(data) {
           @focus="emit('select')"
           @arrow-up="emit('focus-prev')"
           @arrow-down="emit('focus-next')"
+          @assist="assist('open')"
         />
       </div>
       <div
@@ -215,6 +267,15 @@ function latexOf(data) {
           <template v-else-if="o.output_type === 'error'">
             <pre class="nb-stderr">{{ o.ename }}: {{ o.evalue }}
 {{ stripAnsi((o.traceback || []).join('\n')) }}</pre>
+            <button
+              v-if="assistAvailable && !cell._assist"
+              class="nb-fix"
+              :title="assistPaused || 'Ask the AI assistant to fix this cell'"
+              :disabled="!!assistPaused"
+              @click.stop="assist('fix')"
+            >
+              <AssistIcon :size="12" /> Fix this error
+            </button>
           </template>
 
           <template v-else>
@@ -237,6 +298,17 @@ function latexOf(data) {
           </template>
         </div>
       </div>
+
+      <AssistBar
+        v-if="cell._assist && isCode && cell._assist.mode === 'fix'"
+        :assist="cell._assist"
+        :cell-has-code="!!cell.source.trim()"
+        @submit="assist('submit', $event)"
+        @stop="assist('stop')"
+        @accept="assist('accept')"
+        @accept-run="assist('accept-run')"
+        @discard="assist('discard')"
+      />
     </div>
   </div>
 </template>
@@ -281,6 +353,18 @@ function latexOf(data) {
   padding: 11px 8px 0 0;
   user-select: none;
   white-space: nowrap;
+}
+.nb-cell__spend {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 2px;
+  margin-top: 4px;
+  font-size: 10px;
+  color: #999; /* gray_4 */
+}
+.nb-cell__spend :deep(.assist-icon) {
+  color: #6d48ce; /* status_purple: the assistant's */
 }
 .nb-cell__prompt--running {
   color: #011f5b; /* purple_3 */
@@ -336,6 +420,9 @@ function latexOf(data) {
 .nb-tbtn:hover { background: #e6e9ef; } /* purple_tint */
 .nb-tbtn:disabled { opacity: 0.3; cursor: default; }
 .nb-tbtn--run { color: #14a758; } /* green_2 */
+/* The assistant's colour, on every AI action: status_purple. */
+.nb-tbtn--assist { color: #6d48ce; padding: 2px 5px; }
+.nb-tbtn--assist:hover { background: #f0ebfb; }
 .nb-tbtn--del:hover { background: #feeeec; color: #c14d49; } /* red_tint / red_2 */
 .nb-tspacer { width: 6px; }
 .nb-type {
@@ -425,6 +512,28 @@ function latexOf(data) {
 .nb-stderr {
   background: #feeeec !important; /* red_tint */
   color: #c14d49; /* red_2 */
+}
+/* Under an error: a quiet link to the assistant. */
+.nb-fix {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin: 2px 0 4px;
+  padding: 2px 9px;
+  border: 1px solid #d9cff4;
+  border-radius: 10px;
+  background: #ffffff;
+  font-size: 11px;
+  color: #6d48ce; /* status_purple: the assistant's */
+  cursor: pointer;
+}
+.nb-fix:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.nb-fix:hover:not(:disabled) {
+  border-color: #6d48ce;
+  background: #f0ebfb;
 }
 .nb-json {
   background: #f7f7f7 !important; /* gray_1 — distinguish JSON from plain text */

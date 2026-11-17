@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { postInputsFetch, getInputsFetch, sessionSourcesRequest } from "./useJupyterSession";
+import { postInputsFetch, getInputsFetch, sessionSourcesRequest, registerSessionSource } from "./useJupyterSession";
 
 const respond = (status, body) =>
   vi.fn().mockResolvedValue({
@@ -94,5 +94,30 @@ describe("sessionSourcesRequest", () => {
     const err = await sessionSourcesRequest("https://k", "tok", "POST", { body: {} }, { fetchFn: respond(409, "input/x already exists") }).catch((e) => e);
     expect(err.message).toBe("input/x already exists");
     expect(err.status).toBe(409);
+  });
+});
+
+describe("registerSessionSource", () => {
+  const config = { api2Url: "https://api2.pennsieve.net" };
+  const getToken = () => Promise.resolve("user-tok");
+
+  it("records the view on the run with the user's token", async () => {
+    const fetchFn = respond(201, { name: "more", viewId: "v1", viewVersion: 2, addedAt: "2026-11-16T00:00:00Z" });
+    const out = await registerSessionSource("run-1", { name: "more", viewId: "v1", version: 2 }, { config, getToken, fetchFn });
+    expect(out.addedAt).toBe("2026-11-16T00:00:00Z");
+    const [url, init] = fetchFn.mock.calls[0];
+    expect(url).toBe("https://api2.pennsieve.net/compute/workflows/runs/run-1/sources");
+    expect(init.method).toBe("POST");
+    expect(init.headers.Authorization).toBe("Bearer user-tok");
+    expect(JSON.parse(init.body)).toEqual({ name: "more", viewId: "v1", viewVersion: 2 });
+  });
+
+  it("rejects with the service's reason", async () => {
+    const fetchFn = respond(404, { message: "view v1 version 2 was not found or isn't yours" });
+    await expect(registerSessionSource("run-1", { name: "more", viewId: "v1", version: 2 }, { config, getToken, fetchFn })).rejects.toMatchObject({
+      status: 404,
+      source: "run",
+      message: "view v1 version 2 was not found or isn't yours",
+    });
   });
 });

@@ -15,6 +15,8 @@
   - samplePdfFilename, downloadPdf: the viewer's Download.
   - createExampleCache: the examples the library's cards show, fetched once
     per workflow for a while, and not at all where the feature isn't served.
+  - appSteps / appChanges / reportNote / loadReportNote: the muted
+    "Apps updated since this report" note, the apps changed in its tooltip.
 */
 
 // A job still being made: polled until it's READY or FAILED.
@@ -45,7 +47,7 @@ export const exampleVersion = (example) => example?.fromVersion || example?.vers
 // "Sample output", or "Sample output from version N" when it's of an older version than
 // the one shown.
 export const exampleLabel = (example) =>
-  example?.fromVersion ? `Sample output from version ${example.fromVersion}` : "Sample output";
+  example?.fromVersion ? `Example report from version ${example.fromVersion}` : "Example report";
 
 export const jobStatusText = (job) => {
   switch (job?.status) {
@@ -245,4 +247,128 @@ export const downloadPdf = async (url, filename, env = typeof window !== "undefi
     env.open(url, "_blank", "noopener");
     return "opened";
   }
+};
+
+/*
+  The report's version note. A workflow shows the newest sample output any
+  of its versions has (workflow-service sets fromVersion when that isn't the
+  latest version). Where the report's apps differ from the version shown's,
+  a muted line says "Apps updated since this report", with the apps changed
+  ("eeg-spikes v0.1.0 → v0.1.1") in its tooltip.
+  An example may carry apps (the app steps its run used, e.g. a report copied
+  to another environment and attached to that environment's version): then
+  those are compared, even when the version is the same.
+*/
+
+const STEP_NODE_TYPES_SKIPPED = ["data-source", "data-target"];
+const repoKey = (url) =>
+  String(url || "")
+    .trim()
+    .replace(/\/+$/, "")
+    .replace(/\.git$/, "")
+    .toLowerCase();
+const repoName = (url) => repoKey(url).split("/").pop() || "app";
+
+// The app steps of a workflow (or a version shaped as one: { dag }), named
+// by their repository: [{ name, sourceUrl, tag, variant }].
+export const appSteps = (wf) =>
+  (wf?.dag || [])
+    .filter((n) => n?.sourceUrl && !STEP_NODE_TYPES_SKIPPED.includes(n.type))
+    .map((n) => ({
+      name: repoName(n.sourceUrl),
+      sourceUrl: n.sourceUrl,
+      tag: n.tag || "",
+      variant: n.variant || "",
+    }));
+
+const stepLabel = (s) => `${s.tag || "untagged"}${s.variant ? ` (${s.variant})` : ""}`;
+
+// What changed between two lists of app steps, one entry per app (matched by
+// repository): { name, from, to } with from "" for an app added and to ""
+// for one removed. Unchanged apps are left out.
+export const appChanges = (before = [], after = []) => {
+  const group = (steps) => {
+    const out = new Map();
+    for (const s of steps || []) {
+      const key = repoKey(s.sourceUrl);
+      if (!key) continue;
+      if (!out.has(key)) out.set(key, { name: s.name || repoName(s.sourceUrl), labels: [] });
+      out.get(key).labels.push(stepLabel(s));
+    }
+    return out;
+  };
+  const a = group(before);
+  const b = group(after);
+  const changes = [];
+  for (const key of new Set([...a.keys(), ...b.keys()])) {
+    const from = [...new Set(a.get(key)?.labels || [])].sort().join(", ");
+    const to = [...new Set(b.get(key)?.labels || [])].sort().join(", ");
+    if (from !== to) changes.push({ name: (b.get(key) || a.get(key)).name, from, to });
+  }
+  return changes;
+};
+
+export const changeText = ({ name, from, to }) =>
+  !from ? `${name} added` : !to ? `${name} removed` : `${name} ${from} → ${to}`;
+
+// The changes as a short list: the first few, then "and N more".
+export const changesText = (changes, max = 3) => {
+  if (!changes?.length) return "";
+  const shown = changes.slice(0, max).map(changeText);
+  const rest = changes.length - shown.length;
+  return rest > 0 ? `${shown.join(", ")} and ${rest} more` : shown.join(", ");
+};
+
+export const REPORT_NOTE_TEXT = "Apps updated since this report";
+const NO_NOTE = Object.freeze({ text: "", detail: "" });
+
+// The note under a report: { text, detail }. text is the short line, shown
+// only when the report's apps differ from the version shown's; detail is the
+// apps changed ("bulk-report v0.1.0 → v0.1.1"), for its tooltip. The
+// version is in the subtitle already, so the note never repeats it, and
+// there's no note when only the version differs or the steps aren't known.
+// reportSteps: the app steps of the report's version (used when the example
+// has no apps of its own); currentSteps: the version shown's.
+export const reportNote = (example, { reportSteps = null, currentSteps = null } = {}) => {
+  if (!example) return NO_NOTE;
+  const before = example.apps?.length ? example.apps : reportSteps;
+  const changes = before && currentSteps?.length ? appChanges(before, currentSteps) : [];
+  if (!changes.length) return NO_NOTE;
+  return { text: REPORT_NOTE_TEXT, detail: changesText(changes) };
+};
+
+// reportNote for a workflow's example, loading the report's version's steps
+// when it needs them. loadVersion: version -> that version shaped as a
+// workflow ({ dag }); where that fails, there's no note.
+export const loadReportNote = async (example, currentWorkflow, loadVersion) => {
+  if (!example) return NO_NOTE;
+  const currentSteps = appSteps(currentWorkflow);
+  let reportSteps = null;
+  if (!example.apps?.length && example.fromVersion && currentSteps.length && loadVersion) {
+    try {
+      reportSteps = appSteps(await loadVersion(example.fromVersion));
+    } catch {
+      reportSteps = null;
+    }
+  }
+  return reportNote(example, { reportSteps, currentSteps });
+};
+
+// A workflow version (shaped as a workflow) per uuid and version, fetched
+// once: a version doesn't change. fetch: (uuid, version) -> the version.
+export const createVersionCache = (fetch) => {
+  const entries = new Map();
+  return (uuid, version) => {
+    const key = `${uuid}@${version}`;
+    if (!entries.has(key)) {
+      const p = Promise.resolve()
+        .then(() => fetch(uuid, version))
+        .catch((err) => {
+          entries.delete(key);
+          throw err;
+        });
+      entries.set(key, p);
+    }
+    return entries.get(key);
+  };
 };

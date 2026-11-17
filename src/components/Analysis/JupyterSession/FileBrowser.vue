@@ -23,11 +23,15 @@ const props = defineProps({
   // The kernel's language and version ("Python 3.12.3"): copied paths are
   // code for it (pathCode.js).
   kernelName: { type: String, default: "" },
+  // The session has a code assistant: a file's Code offers Ask….
+  assistAvailable: { type: Boolean, default: false },
+  // Why the assistant is paused (no AI budget left), or "".
+  assistPaused: { type: String, default: "" },
   // The session's view inputs (useSessionInputs), or null.
   inputs: { type: Object, default: null },
 });
 
-const emit = defineEmits(["insert-path", "open-notebook", "insert-stack", "add-data"]);
+const emit = defineEmits(["insert-path", "open-notebook", "insert-snippet", "ask-file", "add-data"]);
 
 // Tree node: { name, path, type, size, last_modified, children, open, loading }
 const roots = ref([]);
@@ -294,11 +298,15 @@ function copyPath(node) {
         :fmt-size="fmtSize"
         :fmt-time="fmtTime"
         :inputs="inputs"
+        :kernel-name="kernelName"
+        :assist-available="assistAvailable"
+        :assist-paused="assistPaused"
         @toggle="toggle"
         @copy="copyPath"
         @insert="emit('insert-path', $event)"
         @open="emit('open-notebook', $event)"
-        @insert-stack="emit('insert-stack', $event)"
+        @insert-snippet="emit('insert-snippet', $event)"
+        @ask-file="emit('ask-file', $event)"
         @add-data="emit('add-data')"
       />
     </ul>
