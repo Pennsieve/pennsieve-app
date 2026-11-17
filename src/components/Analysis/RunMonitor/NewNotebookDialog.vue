@@ -66,6 +66,7 @@ import { STANDARD_CPU_OPTIONS, getStandardMemoryOptions, getTargetTypeLabel } fr
 import { sourceLabel } from "../WorkflowGraph/sourceInputs";
 import * as siteConfig from "@/site-config/site.json";
 import { viewsServiceUrl, viewDataSource, prepareWorkspaceRunView, workspaceFilesAsViews } from "@/utils/viewsService";
+import { routeWorkspaceInputs } from "@/utils/workspaceInputs";
 import { listWorkspaceModels } from "@/utils/workspaceModels";
 import PlatformList from "../PlatformList.vue";
 import PlatformPane from "../PlatformPane.vue";
@@ -549,24 +550,37 @@ watch(defaultRunName, (val) => {
 const dataSourcesComplete = computed(() =>
   dataSourceNodes.value.every((d) => (dataSourceFiles[d.id] || []).length > 0 || recordsNodeId.value === d.id)
 );
-// The chosen dataset's metadata records: the models (names), taken with the
-// first input's files as one view made for the session when it starts.
-// Where views-service is deployed only; the dataset's models load as it's
-// chosen.
+// The chosen dataset's metadata records: the models (names), taken as a
+// view made for the session when it starts, on the first input; with that
+// input's files where views take workspace files (filesWithRecords), else
+// instead of them. Where views-service is deployed only; the dataset's
+// models load as it's chosen.
+const filesWithRecords = workspaceFilesAsViews();
 const notebookRecords = ref([]);
 const datasetModels = ref([]);
 const recordsNodeId = computed(() => (notebookRecords.value.length ? dataSourceNodes.value[0]?.id || "" : ""));
-const WORKSPACE_RECORDS_HINT =
-  "Its records and the links between them, as they are when the session starts, with the files you choose below.";
+const WORKSPACE_RECORDS_HINT = filesWithRecords
+  ? "Its records and the links between them, as they are when the session starts, with the files you choose below."
+  : "Its records and the links between them, as they are when the session starts, instead of its files.";
 // The records are exported into a view before the session starts; closing
 // the dialog stops waiting (the view's build goes on).
 let preparingAbort = null;
 const preparingRecords = ref(false);
-const startLabel = computed(() => (preparingRecords.value ? "Preparing the dataset's input…" : "Start Notebook"));
+const startLabel = computed(() => (preparingRecords.value ? "Preparing the inputs…" : "Start Notebook"));
 watch(visible, (open) => {
   if (!open) preparingAbort?.abort();
 });
 onBeforeUnmount(() => preparingAbort?.abort());
+// Where views don't take workspace files, records replace the first
+// input's files (one or the other, as on the run page).
+watch(notebookRecords, (models) => {
+  if (filesWithRecords || !models.length || !recordsNodeId.value) return;
+  delete dataSourceFiles[recordsNodeId.value];
+  store.commit("analysisModule/CLEAR_SELECTED_FILES");
+});
+// Each input's view, kept by what it was asked for: a view still being
+// built when a try timed out is waited for again, not started again.
+const sessionViews = {};
 let datasetModelsSeq = 0;
 watch(
   () => (viewsServiceUrl() && inputChoice.value === "dataset" ? form.value.datasetId : ""),
@@ -1052,13 +1066,16 @@ async function execute() {
       // An input goes through a view when it has the dataset's records
       // (the first input), or has files and workspace files go through
       // views here; else it sends its packages.
-      const viaView = [];
-      for (const node of dataSourceNodes.value) {
-        const ids = (dataSourceFiles[node.id] || []).map((f) => f.content?.id).filter(Boolean);
-        const models = node.id === recordsNodeId.value ? notebookRecords.value : [];
-        if (models.length || (ids.length && workspaceFilesAsViews())) viaView.push({ nodeId: node.id, packageIds: ids, models });
-        else if (ids.length) dataSources[node.id] = { packageIds: ids };
-      }
+      const { viaView, packages } = routeWorkspaceInputs(
+        dataSourceNodes.value.map((node) => ({
+          id: node.id,
+          datasetId: form.value.datasetId,
+          packageIds: (dataSourceFiles[node.id] || []).map((f) => f.content?.id).filter(Boolean),
+          models: node.id === recordsNodeId.value ? notebookRecords.value : [],
+        })),
+        { filesAsViews: filesWithRecords }
+      );
+      for (const p of packages) dataSources[p.id] = { packageIds: p.packageIds };
       // Made now, built before the session starts; closing the dialog stops
       // the wait (the views' builds go on).
       if (viaView.length) {
@@ -1067,18 +1084,27 @@ async function execute() {
         preparingRecords.value = true;
         let views;
         try {
+          const dag = configDefinition.value?.dag || [];
           views = await Promise.all(
-            viaView.map((v) =>
-              prepareWorkspaceRunView(
-                {
-                  datasetNodeId: form.value.datasetId,
-                  name: `${selectedDataset.value?.content?.name || "Dataset"}: ${v.models.length ? "files and records" : "files"}`.slice(0, 255),
-                  models: v.models,
-                  packageIds: v.packageIds,
-                },
-                { signal: controller.signal }
-              )
-            )
+            viaView.map(async (v) => {
+              const key = [v.datasetId, [...v.models].sort().join(","), [...v.packageIds].sort().join(",")].join("\n");
+              if (sessionViews[v.id]?.key !== key) sessionViews[v.id] = { key, started: null, view: null };
+              const entry = sessionViews[v.id];
+              if (!entry.view) {
+                const label = sourceLabel(v.id, dag, "input");
+                entry.view = await prepareWorkspaceRunView(
+                  {
+                    datasetNodeId: v.datasetId,
+                    name: `${selectedDataset.value?.content?.name || "Dataset"}: ${label}`.slice(0, 255),
+                    models: v.models,
+                    packageIds: v.packageIds,
+                    started: entry.started,
+                  },
+                  { signal: controller.signal, onStarted: (started) => (entry.started = started) }
+                );
+              }
+              return entry.view;
+            })
           );
         } catch (err) {
           controller.abort();
@@ -1088,7 +1114,7 @@ async function execute() {
           if (preparingAbort === controller) preparingAbort = null;
         }
         if (controller.signal.aborted) return;
-        viaView.forEach((v, i) => (dataSources[v.nodeId] = viewDataSource(views[i])));
+        viaView.forEach((v, i) => (dataSources[v.id] = viewDataSource(views[i])));
       }
     }
 
@@ -1547,6 +1573,10 @@ async function execute() {
               :hint="WORKSPACE_RECORDS_HINT"
               class="wizard-records"
             />
+            <p v-if="recordsNodeId === currentSourceNodeId && !filesWithRecords" class="wizard-cards-loading">
+              This input takes the dataset's metadata records. Untick them to choose its files instead.
+            </p>
+            <template v-else>
             <div class="file-picker-header">
               <strong>{{ fileCountForNode(currentSourceNodeId) }}</strong>
               file{{ fileCountForNode(currentSourceNodeId) !== 1 ? "s" : "" }}
@@ -1569,6 +1599,7 @@ async function execute() {
                 @click-file-label="onClickFileLabel"
               />
             </div>
+            </template>
           </template>
         </template>
       </div>

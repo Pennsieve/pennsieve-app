@@ -419,6 +419,18 @@ describe("workspace files through views", () => {
     expect(JSON.parse(fetchFn.mock.calls[1][1].body)).toEqual({ name: "x", lifecycle: "run", models: ["*"] });
   });
 
+  it("passes the packages and placement on when it starts a view", async () => {
+    const fetchFn = respond([201, { id: "v1", version: 1 }]);
+    await prepareWorkspaceRunView({ datasetNodeId: "N:dataset:abc", name: "x", packageIds: ["N:package:a"], filePaths: "source" }, { config, getToken, fetchFn });
+    expect(JSON.parse(fetchFn.mock.calls[0][1].body)).toEqual({ name: "x", lifecycle: "run", packageIds: ["N:package:a"], filePaths: "source" });
+  });
+
+  it("drops the placement without packages", async () => {
+    const fetchFn = respond([201, { id: "v1", version: 1 }]);
+    await createWorkspaceRunView({ datasetNodeId: "N:dataset:abc", name: "x", models: ["*"], filePaths: "source" }, { config, getToken, fetchFn });
+    expect(JSON.parse(fetchFn.mock.calls[0][1].body)).toEqual({ name: "x", lifecycle: "run", models: ["*"] });
+  });
+
   it("is on where the site says so and views-service is deployed", () => {
     expect(workspaceFilesAsViews({ viewsServiceUrl: "https://v", workspaceFilesAsViews: true })).toBe(true);
     expect(workspaceFilesAsViews({ viewsServiceUrl: "https://v" })).toBe(false);
