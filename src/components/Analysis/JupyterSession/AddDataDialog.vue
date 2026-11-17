@@ -45,15 +45,20 @@ async function addData() {
   try {
     const view = await p.value.createView(part.value);
     const folder = (n) => p.value.folderName(part.value, n);
-    // The next free folder name: input/ may hold one already.
+    // The next free folder name: the session's sources are known, so the
+    // view is recorded on the run under a name that's free; input/ may
+    // still hold a folder the list doesn't show, which the sidecar says
+    // with a 409 (the run's own refusals aren't retried).
+    const taken = new Set(props.sources.map((s) => s.inputFolder || s.name).filter(Boolean));
     let added = "";
     for (let n = 1; ; n++) {
+      if (taken.has(folder(n))) continue;
       try {
         await props.addInputSource(folder(n), view.id, view.version);
         added = folder(n);
         break;
       } catch (e) {
-        if (e?.status !== 409 || n >= 20) throw e;
+        if (e?.status !== 409 || e?.source !== "sidecar" || n >= 20) throw e;
       }
     }
     addOpen.value = false;

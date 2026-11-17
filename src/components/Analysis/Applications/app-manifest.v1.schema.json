@@ -510,11 +510,20 @@
     },
     "reviewInput": {
       "type": "object",
-      "description": "One source for an input port's review data: generate (a command that writes it), files (committed in the repository) or dataset (a public dataset).",
-      "minProperties": 1,
-      "maxProperties": 1,
+      "description": "One source for an input port's review data: generate (a command that writes it), files (committed in the repository) or dataset (a public dataset); with files or dataset, filePaths says how they are laid out.",
       "additionalProperties": false,
+      "oneOf": [
+        { "required": ["generate"], "not": { "anyOf": [{ "required": ["files"] }, { "required": ["dataset"] }, { "required": ["filePaths"] }] } },
+        { "required": ["files"], "not": { "anyOf": [{ "required": ["generate"] }, { "required": ["dataset"] }] } },
+        { "required": ["dataset"], "not": { "anyOf": [{ "required": ["generate"] }, { "required": ["files"] }] } }
+      ],
       "properties": {
+        "filePaths": {
+          "type": "string",
+          "enum": ["flat", "source"],
+          "default": "flat",
+          "description": "How the files land in the port: flat puts every file at its root (two files with one name are refused); source keeps each file's path, below the pattern's fixed part for committed files and within the dataset for a dataset. As workflow and notebook data sources."
+        },
         "generate": { "$ref": "#/$defs/reviewGenerate" },
         "files": {
           "type": "array",
@@ -553,7 +562,7 @@
     },
     "reviewDataset": {
       "type": "object",
-      "description": "A public dataset, fetched by the platform from an allowed host (Zenodo, Figshare, OSF, OpenNeuro): its DOI or HTTPS URL, and optionally which of its files.",
+      "description": "A public dataset, fetched by the platform from an allowed host (Pennsieve Discover, Zenodo, Figshare, OSF, OpenNeuro): its DOI or HTTPS URL, and optionally which of its files.",
       "additionalProperties": false,
       "oneOf": [{ "required": ["doi"] }, { "required": ["url"] }],
       "properties": {

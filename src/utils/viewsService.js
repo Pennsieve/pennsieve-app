@@ -1,5 +1,6 @@
 import * as siteConfig from '@/site-config/site.json'
 import { useGetToken } from '@/composables/useGetToken'
+import { isRecordsPick } from '@/utils/recordsPicks'
 
 // views-service (api2.<domain>/views) keeps a user's dataset views: an
 // RO-Crate of a published dataset version's files. A notebook run takes a
@@ -53,21 +54,28 @@ export async function listMyViews(options = {}) {
   return views || []
 }
 
-// The user's view of exactly one published dataset version, or a new one.
-// Matching on the source alone is right while the app only makes views of
-// whole versions; once views can select folders it no longer is.
-export async function viewForDataset({ datasetId, version, name }, options = {}) {
+// Whether two models selections (model names, or ["*"]; none for no
+// records) take the same records.
+export const sameModels = (a, b) => [...(a || [])].sort().join('\n') === [...(b || [])].sort().join('\n')
+
+// The user's view of exactly one published dataset version, with the
+// metadata records of models when asked (names, or ["*"] for all), or a new
+// one. Matching on the source and its models is right while the app only
+// makes views of whole versions; once views can select folders it no longer
+// is.
+export async function viewForDataset({ datasetId, version, name, models }, options = {}) {
   const existing = (await listMyViews(options)).find(
     (v) =>
       v.sources?.length === 1 &&
       v.sources[0].datasetId === datasetId &&
-      v.sources[0].version === version
+      v.sources[0].version === version &&
+      sameModels(v.sources[0].models, models)
   )
   if (existing) return existing
   return viewsRequest('/me', {
     ...options,
     method: 'POST',
-    body: { name: `${name} (version ${version})`, datasetId, version },
+    body: { name: `${name} (version ${version})`, datasetId, version, ...(models?.length && { models }) },
   })
 }
 
@@ -106,15 +114,22 @@ export async function listEntries(viewId, version, { includeStacks = false, ...o
 // (lifecycle "run": kept apart from the user's views; the run keeps its
 // crate with its provenance). Each pick is
 // { datasetId, version, path }; picks of one version become one source.
+// A pick with models takes the version's metadata records of those models
+// (the source's models) rather than a path.
 export function runViewSources(picks) {
   const byVersion = new Map()
   for (const p of picks || []) {
     const key = `${p.datasetId}:${p.version}`
     if (!byVersion.has(key)) byVersion.set(key, { datasetId: p.datasetId, version: p.version, paths: [] })
-    const paths = byVersion.get(key).paths
-    if (!paths.includes(p.path)) paths.push(p.path)
+    const source = byVersion.get(key)
+    if (isRecordsPick(p)) {
+      source.models = [...p.models]
+      continue
+    }
+    if (!source.paths.includes(p.path)) source.paths.push(p.path)
   }
-  return [...byVersion.values()]
+  // Records only: no paths at all, not an empty list (the whole version).
+  return [...byVersion.values()].map((s) => (s.models && !s.paths.length ? { datasetId: s.datasetId, version: s.version, models: s.models } : s))
 }
 
 export async function createRunView({ name, picks }, options = {}) {
@@ -123,6 +138,100 @@ export async function createRunView({ name, picks }, options = {}) {
     method: 'POST',
     body: { name, sources: runViewSources(picks), lifecycle: 'run' },
   })
+}
+
+// A run's input from a workspace dataset's metadata records: the models
+// named (names, or ["*"] for all), read from metadata-service as the user
+// when the view is made and kept for the run (lifecycle "run"). The dataset
+// is named in the call (dataset_id), which the gateway's dataset authorizer
+// checks: the user's role on that dataset, whatever workspace they're in.
+// A workspace view is the run's only source, and it has no files (v0).
+// Whether a workspace input's files go through a view too (they always do
+// with records): on where views of workspace files are deployed, until
+// every input is a view (phase 3).
+export function workspaceFilesAsViews(config = siteConfig) {
+  return !!viewsServiceUrl(config) && config.workspaceFilesAsViews === true
+}
+
+// A workspace input as a view: the packages picked (packageIds, placed as
+// picked or at their dataset paths: filePaths selection|source) and the
+// models' records (models), either or both.
+export async function createWorkspaceRunView({ datasetNodeId, name, models = [], packageIds = [], filePaths = '' }, options = {}) {
+  return viewsRequest(`/workspace?dataset_id=${encodeURIComponent(datasetNodeId)}`, {
+    ...options,
+    method: 'POST',
+    body: {
+      name,
+      lifecycle: 'run',
+      ...(models.length && { models: [...models] }),
+      ...(packageIds.length && { packageIds: [...packageIds] }),
+      ...(packageIds.length && filePaths && { filePaths }),
+    },
+  })
+}
+
+// A workspace view is built asynchronously: POST /workspace answers 202 with
+// the view in state "building", and GET /{id} says when it's ready (no
+// state) or failed (state "failed", with why). waitForView polls, 2 s then
+// backing off to 10 s, until then: it resolves the ready view, or rejects
+// with a ViewBuildError (the build failed, or it took longer than timeoutMs,
+// 10 minutes). An AbortSignal stops the polling (the page was left; the
+// build goes on).
+export class ViewBuildError extends Error {
+  constructor(state, message) {
+    super(message)
+    this.name = 'ViewBuildError'
+    this.state = state
+  }
+}
+
+const sleepFor = (ms, signal) =>
+  new Promise((resolve, reject) => {
+    if (signal?.aborted) return reject(abortError())
+    const t = setTimeout(() => {
+      signal?.removeEventListener('abort', onAbort)
+      resolve()
+    }, ms)
+    const onAbort = () => {
+      clearTimeout(t)
+      reject(abortError())
+    }
+    signal?.addEventListener('abort', onAbort, { once: true })
+  })
+const abortError = () => new DOMException('The view is still being built; polling stopped.', 'AbortError')
+
+export async function waitForView(viewId, { signal, timeoutMs = 10 * 60 * 1000, sleep = sleepFor, now = Date.now, ...options } = {}) {
+  if (signal?.aborted) throw abortError()
+  const start = now()
+  let delay = 2000
+  for (;;) {
+    const view = await getView(viewId, options)
+    if (!view.state) return view
+    if (view.state === 'failed') {
+      throw new ViewBuildError('failed', view.error || "The dataset's records couldn't be prepared.")
+    }
+    if (now() - start + delay > timeoutMs) {
+      throw new ViewBuildError('timeout', "The dataset's records are still being prepared. Try again in a few minutes.")
+    }
+    await sleep(delay, signal)
+    delay = Math.min(delay * 2, 10000)
+  }
+}
+
+// A run's input from a workspace dataset's records, ready: started with
+// createWorkspaceRunView and, when the service builds it asynchronously,
+// waited for. An AbortSignal stops it before the view is started as well
+// as while it's waited for (the build goes on). A view already started
+// (a retry after a timeout) is waited for again rather than started twice.
+export async function prepareWorkspaceRunView({ datasetNodeId, name, models = [], packageIds = [], filePaths = '', started = null }, { signal, onStarted, ...options } = {}) {
+  if (signal?.aborted) throw abortError()
+  let view = started
+  if (!view) {
+    view = await createWorkspaceRunView({ datasetNodeId, name, models, packageIds, filePaths }, options)
+    onStarted?.(view)
+  }
+  if (signal?.aborted) throw abortError()
+  return view.state ? waitForView(view.id, { signal, ...options }) : view
 }
 
 // The AWS Open Data Registry datasets a view can take, from views-service's

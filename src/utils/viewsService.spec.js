@@ -14,6 +14,11 @@ import {
   listOpenDataFolder,
   openDataViewName,
   openDataCatalog,
+  createWorkspaceRunView,
+  waitForView,
+  prepareWorkspaceRunView,
+  workspaceFilesAsViews,
+  ViewBuildError,
 } from "./viewsService";
 import dev from "../site-config/dev.json";
 import prod from "../site-config/prod.json";
@@ -60,12 +65,32 @@ describe("viewForDataset", () => {
     expect(JSON.parse(init.body)).toEqual({ name: "Study (version 2)", datasetId: 7, version: 2 });
   });
 
+  it("tells a view with records from one without, and asks for the models", async () => {
+    const withRecords = { id: "v2", version: 1, sources: [{ datasetId: 7, version: 2, models: ["participant"] }] };
+    const listed = [200, { views: [view, withRecords] }];
+    expect(await viewForDataset({ datasetId: 7, version: 2, name: "Study" }, { config, getToken, fetchFn: respond(listed) })).toBe(view);
+    expect(await viewForDataset({ datasetId: 7, version: 2, name: "Study", models: ["participant"] }, { config, getToken, fetchFn: respond(listed) })).toBe(withRecords);
+    const fetchFn = respond(listed, [201, withRecords]);
+    await viewForDataset({ datasetId: 7, version: 2, name: "Study", models: ["participant", "sample"] }, { config, getToken, fetchFn });
+    expect(JSON.parse(fetchFn.mock.calls[1][1].body)).toEqual({ name: "Study (version 2)", datasetId: 7, version: 2, models: ["participant", "sample"] });
+  });
+
   it("rejects with the service's message", async () => {
     const fetchFn = respond([200, { views: [] }], [400, { message: "only openly published dataset versions" }]);
     const err = await viewForDataset({ datasetId: 7, version: 2, name: "S" }, { config, getToken, fetchFn }).catch((e) => e);
     expect(err).toBeInstanceOf(ViewsServiceError);
     expect(err.status).toBe(400);
     expect(err.message).toMatch(/openly published/);
+  });
+});
+
+describe("sameModels", () => {
+  it("compares models selections whatever their order, none as none", async () => {
+    const { sameModels } = await import("./viewsService");
+    expect(sameModels(["a", "b"], ["b", "a"])).toBe(true);
+    expect(sameModels(undefined, [])).toBe(true);
+    expect(sameModels(["a"], [])).toBe(false);
+    expect(sameModels(["*"], ["a"])).toBe(false);
   });
 });
 
@@ -113,6 +138,17 @@ describe("run views", () => {
       { datasetId: 9, version: 1, paths: ["files/sub"] },
     ]);
     expect(runViewSources([])).toEqual([]);
+  });
+
+  it("takes a version's records as its source's models, with or without files", async () => {
+    const { runViewSources } = await import("./viewsService");
+    const records = { datasetId: 9, version: 1, path: "", models: ["participant"] };
+    expect(runViewSources([...picks, records])).toEqual([
+      { datasetId: 7, version: 2, paths: ["files/a.csv", "files/b.csv"] },
+      { datasetId: 9, version: 1, paths: ["files/sub"], models: ["participant"] },
+    ]);
+    // Records only: no paths at all (an empty list would be the whole version).
+    expect(runViewSources([{ datasetId: 9, version: 1, path: "", models: ["*"] }])).toEqual([{ datasetId: 9, version: 1, models: ["*"] }]);
   });
 
   it("creates a view kept only for the run", async () => {
@@ -240,5 +276,166 @@ describe("openDataCatalog", () => {
     const again = await openDataCatalog({ config, getToken, fetchFn });
     expect(first).toBe(again);
     expect(fetchFn).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("createWorkspaceRunView", () => {
+  it("names the dataset in the call and keeps the view for the run", async () => {
+    const fetchFn = respond([201, { id: "v1", version: 1, sources: [{ sourceType: "workspace" }] }]);
+    const view = await createWorkspaceRunView(
+      { datasetNodeId: "N:dataset:abc", name: "Cohort: metadata records", models: ["case", "drug"] },
+      { config, getToken, fetchFn }
+    );
+    expect(view.id).toBe("v1");
+    const [url, init] = fetchFn.mock.calls[0];
+    expect(url).toBe("https://api2.pennsieve.net/views/workspace?dataset_id=N%3Adataset%3Aabc");
+    expect(init.method).toBe("POST");
+    expect(init.headers.Authorization).toBe("Bearer tok");
+    expect(JSON.parse(init.body)).toEqual({ name: "Cohort: metadata records", models: ["case", "drug"], lifecycle: "run" });
+  });
+
+  it("passes the service's refusal on", async () => {
+    const fetchFn = respond([403, { message: "views of this workspace's datasets aren't available yet" }]);
+    await expect(
+      createWorkspaceRunView({ datasetNodeId: "N:dataset:abc", name: "x", models: ["*"] }, { config, getToken, fetchFn })
+    ).rejects.toMatchObject({ status: 403, message: "views of this workspace's datasets aren't available yet" });
+  });
+});
+
+describe("waitForView", () => {
+  const building = { view: { id: "v1", state: "building" } };
+  const ready = { view: { id: "v1", version: 1, entryCount: 3 } };
+  const sleeps = () => {
+    const delays = [];
+    return { delays, sleep: (ms) => (delays.push(ms), Promise.resolve()) };
+  };
+
+  it("polls with backoff until the view is ready", async () => {
+    const fetchFn = respond([200, building], [200, building], [200, building], [200, ready]);
+    const { delays, sleep } = sleeps();
+    const view = await waitForView("v1", { config, getToken, fetchFn, sleep });
+    expect(view.entryCount).toBe(3);
+    expect(delays).toEqual([2000, 4000, 8000]);
+    expect(fetchFn).toHaveBeenCalledTimes(4);
+  });
+
+  it("caps the delay at 10 s", async () => {
+    const fetchFn = respond([200, building], [200, building], [200, building], [200, building], [200, building], [200, ready]);
+    const { delays, sleep } = sleeps();
+    await waitForView("v1", { config, getToken, fetchFn, sleep });
+    expect(delays).toEqual([2000, 4000, 8000, 10000, 10000]);
+  });
+
+  it("stops when aborted while sleeping", async () => {
+    const fetchFn = respond([200, building], [200, building]);
+    const controller = new AbortController();
+    const sleep = (ms, signal) =>
+      new Promise((_, reject) => {
+        signal.addEventListener("abort", () => reject(new DOMException("stopped", "AbortError")));
+        controller.abort();
+      });
+    await expect(waitForView("v1", { config, getToken, fetchFn, sleep, signal: controller.signal })).rejects.toMatchObject({ name: "AbortError" });
+    expect(fetchFn).toHaveBeenCalledTimes(1);
+  });
+
+  it("rejects with the reason when the build failed", async () => {
+    const fetchFn = respond([200, building], [200, { view: { id: "v1", state: "failed", error: "the dataset has no records" } }]);
+    const { sleep } = sleeps();
+    await expect(waitForView("v1", { config, getToken, fetchFn, sleep })).rejects.toMatchObject({
+      name: "ViewBuildError",
+      state: "failed",
+      message: "the dataset has no records",
+    });
+  });
+
+  it("gives up after the timeout", async () => {
+    const fetchFn = respond([200, building], [200, building], [200, building]);
+    let t = 0;
+    const sleep = (ms) => ((t += ms), Promise.resolve());
+    await expect(waitForView("v1", { config, getToken, fetchFn, sleep, now: () => t, timeoutMs: 5000 })).rejects.toBeInstanceOf(ViewBuildError);
+  });
+
+  it("stops when aborted", async () => {
+    const fetchFn = respond([200, building], [200, building]);
+    const controller = new AbortController();
+    controller.abort();
+    await expect(waitForView("v1", { config, getToken, fetchFn, signal: controller.signal })).rejects.toMatchObject({ name: "AbortError" });
+    expect(fetchFn).not.toHaveBeenCalled();
+  });
+});
+
+describe("prepareWorkspaceRunView", () => {
+  const args = { datasetNodeId: "N:dataset:abc", name: "x", models: ["*"] };
+
+  it("returns a view the service built at once", async () => {
+    const fetchFn = respond([201, { id: "v1", version: 1 }]);
+    const view = await prepareWorkspaceRunView(args, { config, getToken, fetchFn });
+    expect(view.id).toBe("v1");
+    expect(fetchFn).toHaveBeenCalledTimes(1);
+  });
+
+  it("waits for a view being built, and reports it as started", async () => {
+    const fetchFn = respond([202, { id: "v1", version: 1, state: "building" }], [200, { view: { id: "v1", version: 1 } }]);
+    const started = [];
+    const view = await prepareWorkspaceRunView(args, { config, getToken, fetchFn, sleep: () => Promise.resolve(), onStarted: (v) => started.push(v.id) });
+    expect(view.state).toBeUndefined();
+    expect(started).toEqual(["v1"]);
+  });
+
+  it("waits again for a view already started rather than starting another", async () => {
+    const fetchFn = respond([200, { view: { id: "v1", version: 1 } }]);
+    await prepareWorkspaceRunView({ ...args, started: { id: "v1", state: "building" } }, { config, getToken, fetchFn });
+    const [url, init] = fetchFn.mock.calls[0];
+    expect(url).toBe("https://api2.pennsieve.net/views/v1");
+    expect(init.method).toBe("GET");
+  });
+
+  it("does not start a view when already aborted", async () => {
+    const fetchFn = respond([202, { id: "v1", state: "building" }]);
+    const controller = new AbortController();
+    controller.abort();
+    await expect(prepareWorkspaceRunView(args, { config, getToken, fetchFn, signal: controller.signal })).rejects.toMatchObject({ name: "AbortError" });
+    expect(fetchFn).not.toHaveBeenCalled();
+  });
+});
+
+describe("workspace files through views", () => {
+  it("sends the packages picked and their placement with the records", async () => {
+    const fetchFn = respond([202, { id: "v1", state: "building" }]);
+    await createWorkspaceRunView(
+      { datasetNodeId: "N:dataset:abc", name: "x", models: ["case"], packageIds: ["N:package:a", "N:collection:b"], filePaths: "source" },
+      { config, getToken, fetchFn }
+    );
+    expect(JSON.parse(fetchFn.mock.calls[0][1].body)).toEqual({
+      name: "x", lifecycle: "run", models: ["case"], packageIds: ["N:package:a", "N:collection:b"], filePaths: "source",
+    });
+  });
+
+  it("sends files alone, or records alone", async () => {
+    const fetchFn = respond([202, { id: "v1", state: "building" }], [202, { id: "v2", state: "building" }]);
+    await createWorkspaceRunView({ datasetNodeId: "N:dataset:abc", name: "x", packageIds: ["N:package:a"] }, { config, getToken, fetchFn });
+    await createWorkspaceRunView({ datasetNodeId: "N:dataset:abc", name: "x", models: ["*"] }, { config, getToken, fetchFn });
+    expect(JSON.parse(fetchFn.mock.calls[0][1].body)).toEqual({ name: "x", lifecycle: "run", packageIds: ["N:package:a"] });
+    expect(JSON.parse(fetchFn.mock.calls[1][1].body)).toEqual({ name: "x", lifecycle: "run", models: ["*"] });
+  });
+
+  it("passes the packages and placement on when it starts a view", async () => {
+    const fetchFn = respond([201, { id: "v1", version: 1 }]);
+    await prepareWorkspaceRunView({ datasetNodeId: "N:dataset:abc", name: "x", packageIds: ["N:package:a"], filePaths: "source" }, { config, getToken, fetchFn });
+    expect(JSON.parse(fetchFn.mock.calls[0][1].body)).toEqual({ name: "x", lifecycle: "run", packageIds: ["N:package:a"], filePaths: "source" });
+  });
+
+  it("drops the placement without packages", async () => {
+    const fetchFn = respond([201, { id: "v1", version: 1 }]);
+    await createWorkspaceRunView({ datasetNodeId: "N:dataset:abc", name: "x", models: ["*"], filePaths: "source" }, { config, getToken, fetchFn });
+    expect(JSON.parse(fetchFn.mock.calls[0][1].body)).toEqual({ name: "x", lifecycle: "run", models: ["*"] });
+  });
+
+  it("is on where the site says so and views-service is deployed", () => {
+    expect(workspaceFilesAsViews({ viewsServiceUrl: "https://v", workspaceFilesAsViews: true })).toBe(true);
+    expect(workspaceFilesAsViews({ viewsServiceUrl: "https://v" })).toBe(false);
+    expect(workspaceFilesAsViews({ workspaceFilesAsViews: true })).toBe(false);
+    expect(workspaceFilesAsViews(dev)).toBe(true);
+    expect(workspaceFilesAsViews(prod)).toBe(false);
   });
 });

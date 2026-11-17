@@ -21,7 +21,9 @@ import { markSessionEnded, sessionEnded, endingPhase } from "./endedSessions";
 import AnalysisFilesTable from "../../FilesTable/AnalysisFilesTable.vue";
 import BreadcrumbNavigation from "../../datasets/files/BreadcrumbNavigation/BreadcrumbNavigation.vue";
 import { useGetToken } from "@/composables/useGetToken";
-import { getView, viewsServiceUrl, createRunView, viewDataSource } from "@/utils/viewsService";
+import { getView, viewsServiceUrl, createRunView, prepareWorkspaceRunView, viewDataSource, workspaceFilesAsViews } from "@/utils/viewsService";
+import { routeWorkspaceInputs } from "@/utils/workspaceInputs";
+import { listWorkspaceModels } from "@/utils/workspaceModels";
 import CompactFlowNode from "../WorkflowGraph/CompactFlowNode.vue";
 import GraphDensityToggle from "../WorkflowGraph/GraphDensityToggle.vue";
 import { layoutBox, useGraphDensity } from "../WorkflowGraph/graphDensity";
@@ -33,7 +35,8 @@ import { targetWritesToDataset, targetParamFields, buildDataTargets, targetDatas
 import DatasetOptionRow from "./DatasetOptionRow.vue";
 import RunExampleAction from "./RunExampleAction.vue";
 import PublicFilesPicker from "./PublicFilesPicker.vue";
-import { picksKey } from "./publicPicks";
+import MetadataRecordsChoice from "../MetadataRecordsChoice.vue";
+import { picksKey, isRecordsPick } from "./publicPicks";
 import FilePlacementChoice from "./FilePlacementChoice.vue";
 import { FILE_PATHS_SELECTION, FILE_PATHS_SOURCE, filePathsOf, filePathsField, sharedNames } from "./inputFilePaths";
 import IoPill from "../WorkflowGraph/IoPill.vue";
@@ -171,7 +174,8 @@ const pickerSide = ref("workspace");
 const pickerReplaces = computed(() => {
   const id = filePickerNodeId.value;
   if (!id) return "";
-  const n = pickerSide.value === "public" ? (dataSourceFiles[id] || []).length : (publicPicks[id] || []).length;
+  const n =
+    pickerSide.value === "public" ? (dataSourceFiles[id] || []).length + (workspaceRecords[id] ? 1 : 0) : (publicPicks[id] || []).length;
   if (!n) return "";
   const from = pickerSide.value === "public" ? "the workspace dataset" : "public datasets";
   return `Choosing here replaces the ${n} item${n === 1 ? "" : "s"} chosen from ${from}.`;
@@ -182,11 +186,42 @@ const setPublicPicks = (nodeId, picks) => {
   if (picks.length) {
     publicPicks[nodeId] = picks;
     delete dataSourceFiles[nodeId];
+    delete workspaceRecords[nodeId];
     store.commit("analysisModule/CLEAR_SELECTED_FILES");
   } else {
     delete publicPicks[nodeId];
   }
 };
+// An input's metadata records from its workspace dataset, by model
+// ({ datasetId, datasetName, models }): the run takes them as a view made
+// for it (records as they are when the run starts). Where views take
+// workspace files (filesWithRecords), the input's files go in the same view,
+// pinned; elsewhere an input takes the records or its files, not both, so
+// records replace the files. Public picks are replaced.
+const workspaceRecords = reactive({});
+const filesWithRecords = workspaceFilesAsViews();
+const setWorkspaceRecords = (nodeId, models) => {
+  if (!nodeId) return;
+  delete leftOutInputs[nodeId];
+  if (models.length) {
+    const datasetId = sourceDatasetOf(nodeId);
+    workspaceRecords[nodeId] = { datasetId, datasetName: datasetName(datasetId, datasetOptions.value), models: [...models] };
+    delete publicPicks[nodeId];
+    if (!filesWithRecords) {
+      delete dataSourceFiles[nodeId];
+      store.commit("analysisModule/CLEAR_SELECTED_FILES");
+    }
+  } else {
+    delete workspaceRecords[nodeId];
+  }
+};
+const WORKSPACE_RECORDS_HINT = filesWithRecords
+  ? "Its records and the links between them, as they are when the run starts, with the files you choose below."
+  : "Its records and the links between them, as they are when the run starts. In this version an input takes a dataset's records or its files, not both.";
+// The records are exported into the view before the run starts: Execute
+// waits for it (preparingRecords), and stops waiting if the page is left.
+const preparingRecords = ref(false);
+let preparingAbort = null;
 // Each input picks the dataset its files come from. initiateForm.datasetId
 // is only where a new input's picker starts (the dataset used last for this
 // workflow, a rerun's, or the one picked last); sourceDatasets holds an
@@ -223,6 +258,26 @@ const sourcePicker = computed(() => {
   };
 });
 const filePickerNodeId = ref(null);
+// The models of the dataset the open picker shows, for its records choice
+// (none while they load, or for a dataset without models).
+const pickerModels = ref([]);
+const modelsByDataset = {};
+let pickerModelsSeq = 0;
+watch(
+  () => (publicInputs && filePickerVisible.value && pickerSide.value === "workspace" ? sourceDatasetOf(filePickerNodeId.value) : ""),
+  async (datasetId) => {
+    const seq = ++pickerModelsSeq;
+    pickerModels.value = (datasetId && modelsByDataset[datasetId]) || [];
+    if (!datasetId || modelsByDataset[datasetId]) return;
+    try {
+      const found = await listWorkspaceModels(datasetId);
+      modelsByDataset[datasetId] = found;
+      if (seq === pickerModelsSeq) pickerModels.value = found;
+    } catch (err) {
+      console.warn("Couldn't list the dataset's models:", err);
+    }
+  }
+);
 const filePickerFiles = ref([]);
 // The picker's list is being fetched (a dataset's top level or a folder).
 const filePickerLoading = ref(false);
@@ -727,20 +782,43 @@ const statusMark = (data) => (mode.value === "browse" && statusMarkOf(data.statu
 // A source with one file shows its name; with more, how many.
 // An input's and output's second line on the graph (IoPill): its files, or
 // where it goes and how that went.
+// The sidebar's count of an input's public picks: its files, and whether
+// a version's records come along.
+const publicFilesLine = (id) => {
+  if (workspaceRecords[id]) {
+    const n = workspaceRecords[id].models.length;
+    const files = (dataSourceFiles[id] || []).length;
+    return `${files ? `${files} selected + ` : ""}Metadata records (${n} model${n === 1 ? "" : "s"})`;
+  }
+  const picks = publicPicks[id] || [];
+  const records = picks.some(isRecordsPick);
+  const n = fileCountForNode(id) - (records ? 1 : 0);
+  if (records && !n) return "Metadata records only";
+  return `${n} selected${records ? " + metadata records" : ""}`;
+};
+
 const sourceSubOf = (id, data) => {
   if (mode.value === "configure" && referenceChoiceOf(id)) return referenceChoiceOf(id).label;
   if (mode.value === "browse" && usedReferenceOf(id)) return usedReferenceOf(id).label || "Reference data";
   if (mode.value === "configure") {
     if (isLeftOut(id)) return "Left out";
+    if (workspaceRecords[id]) {
+      const files = (dataSourceFiles[id] || []).length;
+      return files ? `${files} file${files === 1 ? "" : "s"} + records` : "Metadata records";
+    }
     const n = fileCountForNode(id);
     if (!n) return "Choose files";
     const picks = publicPicks[id] || [];
+    const records = picks.some(isRecordsPick);
+    const files = records ? n - 1 : n;
+    if (records && !files) return "Metadata records";
     const noun = picks.some((p) => p.isFolder) ? "item" : "file";
-    return `${n} ${picks.length ? "public " : ""}${noun}${n === 1 ? "" : "s"}`;
+    return `${files} ${picks.length ? "public " : ""}${noun}${files === 1 ? "" : "s"}${records ? " + records" : ""}`;
   }
   if (inputStaging(data)) return data.progress ? inputProgressLine(data.progress) : "Preparing files…";
   if (data.status === "FAILED") return "Couldn't get its files";
-  return data.view ? "Public dataset" : data.packageCount != null ? sourceDetail(data) : "";
+  if (data.view) return browseViewInfo.value[data.view.viewId]?.workspace ? "Workspace dataset" : "Public dataset";
+  return data.packageCount != null ? sourceDetail(data) : "";
 };
 // An input whose files are being prepared or downloaded: it says STARTED,
 // and the run is still pending (a run is marked running once its inputs are
@@ -1119,6 +1197,7 @@ const initiateWorkflowFromConfig = async (pendingConfig) => {
 
     Object.keys(dataSourceFiles).forEach((k) => delete dataSourceFiles[k]);
     Object.keys(publicPicks).forEach((k) => delete publicPicks[k]);
+    Object.keys(workspaceRecords).forEach((k) => delete workspaceRecords[k]);
     Object.keys(dataSourceFilePaths).forEach((k) => delete dataSourceFilePaths[k]);
     Object.keys(pickedPaths).forEach((k) => delete pickedPaths[k]);
     Object.keys(sourceDatasets).forEach((k) => delete sourceDatasets[k]);
@@ -1138,6 +1217,17 @@ const initiateWorkflowFromConfig = async (pendingConfig) => {
         // run's did; its files are chosen again.
         const own = source?.dataSources?.[d.id]?.datasetId;
         if (own && own !== datasetId) sourceDatasets[d.id] = own;
+        // An input that went through a workspace view reads from the view's
+        // dataset (its files and records are chosen again).
+        const asView = source?.dataSources?.[d.id];
+        if (asView?.kind === "viewVersion" && asView.viewId) {
+          getView(asView.viewId)
+            .then((v) => {
+              const ws = v?.sources?.find((s) => s.sourceType === "workspace");
+              if (ws?.datasetNodeId && ws.datasetNodeId !== initiateForm.value.datasetId) sourceDatasets[d.id] = ws.datasetNodeId;
+            })
+            .catch(() => {});
+        }
         setFilePaths(d.id, filePathsOf(source?.dataSources?.[d.id]));
         // A reference the run being rerun chose is chosen again, and an input
         // it filled with files (an own index) takes files again.
@@ -1317,6 +1407,66 @@ const publicInputViews = async (dag) => {
   }
 };
 
+// Makes a view of each workspace input that goes through one (it has
+// records; or it has files and workspace files go through views here) and
+// returns them as data sources, or null when one couldn't be made (it says
+// why). Each input's view is kept by its picks: a view still being built
+// when a try timed out is waited for again, not started again.
+const runWorkspaceViews = {};
+const workspaceViewInputs = () =>
+  routeWorkspaceInputs(
+    [...new Set([...Object.keys(workspaceRecords), ...Object.keys(dataSourceFiles)])].map((id) => ({
+      id,
+      datasetId: workspaceRecords[id]?.datasetId || sourceDatasetOf(id),
+      packageIds: (dataSourceFiles[id] || []).map((f) => f.content?.id).filter(Boolean),
+      models: workspaceRecords[id]?.models || [],
+      filePaths: filePathsFor(id) === FILE_PATHS_SOURCE ? "source" : "selection",
+    })),
+    {
+      filesAsViews: filesWithRecords,
+      publicIds: new Set(Object.keys(publicPicks).filter((id) => publicPicks[id]?.length)),
+      leftOut: new Set(Object.keys(leftOutInputs).filter((id) => leftOutInputs[id])),
+    }
+  ).viaView.map((v) => [v.id, v]);
+const workspaceInputViews = async (dag) => {
+  const inputs = workspaceViewInputs();
+  if (!inputs.length) return {};
+  const controller = new AbortController();
+  preparingAbort = controller;
+  preparingRecords.value = true;
+  try {
+    const made = await Promise.all(
+      inputs.map(async ([id, r]) => {
+        const key = [r.datasetId, r.filePaths, [...r.models].sort().join(","), [...r.packageIds].sort().join(",")].join("\n");
+        if (runWorkspaceViews[id]?.key !== key) runWorkspaceViews[id] = { key, started: null, view: null };
+        const entry = runWorkspaceViews[id];
+        if (!entry.view) {
+          const label = sourceLabel(id, dag, "input");
+          const name = `${trimmedRunName() || "Run"}: ${label}`.slice(0, VIEW_NAME_MAX);
+          entry.view = await prepareWorkspaceRunView(
+            { datasetNodeId: r.datasetId, name, models: r.models, packageIds: r.packageIds, filePaths: r.filePaths, started: entry.started },
+            { signal: controller.signal, onStarted: (v) => (entry.started = v) }
+          );
+        }
+        return [id, viewDataSource(entry.view)];
+      })
+    );
+    return Object.fromEntries(made);
+  } catch (err) {
+    // One input failing stops waiting for the others.
+    controller.abort();
+    if (err?.name === "AbortError") return null;
+    console.error("Failed to prepare the workspace inputs:", err);
+    EventBus.$emit("toast", {
+      detail: { type: "error", msg: `Couldn't prepare the dataset's files and records for this run: ${err?.message || "views-service failed"}` },
+    });
+    return null;
+  } finally {
+    preparingRecords.value = false;
+    if (preparingAbort === controller) preparingAbort = null;
+  }
+};
+
 const executeWorkflow = async () => {
   const dag = configDefinition.value?.dag || [];
 
@@ -1403,6 +1553,10 @@ const executeWorkflow = async () => {
     const views = await publicInputViews(dag);
     if (!views) return;
     Object.assign(dataSources, views);
+    // Workspace records: one view per input, kept for the run.
+    const recordViews = await workspaceInputViews(dag);
+    if (!recordViews) return;
+    Object.assign(dataSources, recordViews);
     // A reference chosen for this run; the others take the workflow's
     // default, else the app's.
     for (const [nodeId, entry] of Object.entries(referencePicks)) {
@@ -1521,8 +1675,8 @@ const onPickerDatasetChange = (datasetId) => {
   // that already have files from the one before keep it as their own.
   const before = initiateForm.value.datasetId;
   if (datasetId && datasetId !== before) {
-    for (const k of Object.keys(dataSourceFiles)) {
-      if (k !== nodeId && dataSourceFiles[k]?.length && !sourceDatasets[k]) sourceDatasets[k] = before;
+    for (const k of new Set([...Object.keys(dataSourceFiles), ...Object.keys(workspaceRecords)])) {
+      if (k !== nodeId && (dataSourceFiles[k]?.length || workspaceRecords[k]) && !sourceDatasets[k]) sourceDatasets[k] = before;
     }
     initiateForm.value.datasetId = datasetId;
   }
@@ -1532,6 +1686,7 @@ const onPickerDatasetChange = (datasetId) => {
     if (sourceDatasets[k] === initiateForm.value.datasetId) sourceDatasets[k] = "";
   }
   delete dataSourceFiles[nodeId];
+  delete workspaceRecords[nodeId];
   store.commit("analysisModule/CLEAR_SELECTED_FILES");
   filePickerFiles.value = [];
   filePickerAncestorList.value = [];
@@ -1641,7 +1796,7 @@ const closeFilePicker = () => {
 const fileCountForNode = (nodeId) => {
   // A reference source has no files to choose: it always has its reference.
   if (referenceOf(nodeId)) return 1;
-  return (dataSourceFiles[nodeId] || []).length + (publicPicks[nodeId] || []).length;
+  return (dataSourceFiles[nodeId] || []).length + (publicPicks[nodeId] || []).length + (workspaceRecords[nodeId] ? 1 : 0);
 };
 
 /*
@@ -1795,7 +1950,7 @@ const filesOf = (f) =>
 // its picked files are checked.
 const chosenFileNames = (nodeId) => [
   ...(dataSourceFiles[nodeId] || []).flatMap(filesOf),
-  ...(publicPicks[nodeId] || []).filter((p) => !p.isFolder).map((p) => p.name),
+  ...(publicPicks[nodeId] || []).filter((p) => !p.isFolder && !isRecordsPick(p)).map((p) => p.name),
 ];
 const configHints = (nodeId) => {
   const dag = configDefinition.value?.dag || [];
@@ -1949,11 +2104,16 @@ const fetchViewInfo = async ({ viewId }) => {
   try {
     const view = await getView(viewId);
     const src = view.sources?.[0] || {};
+    // A workspace dataset's records: the view is named for the run's
+    // input; the source is the dataset's node id.
+    const workspace = src.sourceType === "workspace";
     browseViewInfo.value[viewId] = {
-      datasetId: src.datasetId,
-      name: src.name || view.name,
+      workspace,
+      datasetId: workspace ? null : src.datasetId,
+      name: workspace ? view.name : src.name || view.name,
       version: src.version,
       doi: src.doi,
+      models: src.models || [],
       entryCount: view.entryCount,
       totalSize: view.totalSize,
     };
@@ -2116,6 +2276,8 @@ onMounted(() => {
   nowTimer = setInterval(() => (nowTick.value = Date.now()), 15000);
 });
 onBeforeUnmount(() => clearInterval(nowTimer));
+// Leaving the page stops waiting for records (the view's build goes on).
+onBeforeUnmount(() => preparingAbort?.abort());
 
 /*
   Dataset imports: how far each "Pennsieve Dataset" target's copies into its
@@ -2185,6 +2347,7 @@ const targetFacts = (data) => [nodeRunTime(data)].filter(Boolean);
 const viewSourceLabel = (view) => {
   const info = view && browseViewInfo.value[view.viewId];
   if (!info || info.error) return "Public dataset";
+  if (info.workspace) return `Metadata records (${info.models.length} model${info.models.length === 1 ? "" : "s"})`;
   return [info.name, info.version && `v${info.version}`, info.entryCount != null && `${info.entryCount} files`]
     .filter(Boolean)
     .join(" · ");
@@ -2451,6 +2614,7 @@ const toggleLeftOut = (id) => {
   leftOutInputs[id] = true;
   delete dataSourceFiles[id];
   delete publicPicks[id];
+  delete workspaceRecords[id];
 };
 
 // A target's type for this run: an output's destination, else the node's.
@@ -2602,7 +2766,7 @@ onUnmounted(() => {
             :disabled="isExecuting"
             @click="executeWorkflow"
           >
-            {{ isExecuting ? 'Executing...' : configApp ? 'Run app' : 'Execute Workflow' }}
+            {{ preparingRecords ? "Preparing the inputs…" : isExecuting ? 'Executing...' : configApp ? 'Run app' : 'Execute Workflow' }}
           </bf-button>
         </div>
       </template>
@@ -3373,8 +3537,8 @@ onUnmounted(() => {
                   <span class="info-value">{{ sourceDatasetOf(selectedNode.id) ? datasetName(sourceDatasetOf(selectedNode.id), datasetOptions) : "Chosen with its files" }}</span>
                 </div>
                 <div class="info-row">
-                  <span class="info-label">Files</span>
-                  <span class="info-value">{{ fileCountForNode(selectedNode.id) }} selected</span>
+                  <span class="info-label">{{ workspaceRecords[selectedNode.id] ? "Input" : "Files" }}</span>
+                  <span class="info-value">{{ publicFilesLine(selectedNode.id) }}</span>
                 </div>
               </div>
               <p v-if="isMyWorkspace && !publicInputs" class="configure-hint">
@@ -3407,20 +3571,30 @@ onUnmounted(() => {
               <div v-else-if="publicPicks[selectedNode.id]?.length" class="selected-files-list">
                 <div
                   v-for="pick in publicPicks[selectedNode.id]"
-                  :key="`${pick.datasetId}:${pick.version}:${pick.path}`"
+                  :key="`${pick.datasetId}:${pick.version}:${isRecordsPick(pick) ? 'records' : pick.path}`"
                   class="selected-file-item"
-                  :title="`${pick.datasetName}, version ${pick.version}: ${pick.path}`"
+                  :title="`${pick.datasetName}, version ${pick.version}: ${isRecordsPick(pick) ? `records of ${pick.models.join(', ')}` : pick.path}`"
                 >
-                  <IconCollection v-if="pick.isFolder" :width="14" :height="14" class="selected-file-icon collection" />
+                  <IconCollection v-if="pick.isFolder || isRecordsPick(pick)" :width="14" :height="14" class="selected-file-icon collection" />
                   <IconFile v-else :width="14" :height="14" class="selected-file-icon" />
-                  <span class="selected-file-name">{{ pick.name }}</span>
+                  <span class="selected-file-name">{{ isRecordsPick(pick) ? `${pick.name} (${pick.models.length})` : pick.name }}</span>
                   <button class="selected-file-remove" title="Remove" @click="removePublicPick(selectedNode.id, pick)">&times;</button>
                 </div>
               </div>
-              <div v-else class="selected-files-empty">
+              <div v-else-if="!workspaceRecords[selectedNode.id]" class="selected-files-empty">
                 No files selected yet.
               </div>
-              <template v-if="!publicPicks[selectedNode.id]?.length">
+              <div v-if="workspaceRecords[selectedNode.id]" class="selected-files-list">
+                <div
+                  class="selected-file-item"
+                  :title="`${workspaceRecords[selectedNode.id].datasetName}: records of ${workspaceRecords[selectedNode.id].models.join(', ')}`"
+                >
+                  <IconCollection :width="14" :height="14" class="selected-file-icon collection" />
+                  <span class="selected-file-name">Metadata records ({{ workspaceRecords[selectedNode.id].models.length }})</span>
+                  <button class="selected-file-remove" title="Remove" @click="setWorkspaceRecords(selectedNode.id, [])">&times;</button>
+                </div>
+              </div>
+              <template v-if="!publicPicks[selectedNode.id]?.length && dataSourceFiles[selectedNode.id]?.length">
                 <h4 class="sidebar-section-title">Where the files land</h4>
                 <FilePlacementChoice
                   :model-value="filePathsFor(selectedNode.id)"
@@ -3591,6 +3765,12 @@ onUnmounted(() => {
                     <div v-else-if="info.error" class="info-row">
                       <span class="info-value">{{ info.error }}</span>
                     </div>
+                    <template v-else-if="info.workspace">
+                      <div class="info-row">
+                        <span class="info-label">Workspace dataset</span>
+                        <span class="info-value">Metadata records ({{ info.models.join(", ") }})</span>
+                      </div>
+                    </template>
                     <template v-else>
                       <div class="info-row">
                         <span class="info-label">Public dataset</span>
@@ -3985,6 +4165,19 @@ onUnmounted(() => {
             <div class="file-picker-dataset-meta">{{ pickerDataset.meta }}</div>
           </div>
         </div>
+        <!-- The dataset's metadata records, by model, with its files -->
+        <MetadataRecordsChoice
+          v-if="sourceDatasetOf(filePickerNodeId) && pickerModels.length"
+          :model-value="workspaceRecords[filePickerNodeId]?.models || []"
+          :available="pickerModels"
+          :hint="WORKSPACE_RECORDS_HINT"
+          class="file-picker-records"
+          @update:model-value="(models) => setWorkspaceRecords(filePickerNodeId, models)"
+        />
+        <p v-if="workspaceRecords[filePickerNodeId] && !filesWithRecords" class="file-picker-empty">
+          This input takes the dataset's metadata records.
+        </p>
+        <template v-else>
         <div class="file-picker-header">
           <span class="selected-count">
             <strong>{{ fileCountForNode(filePickerNodeId) }}</strong>
@@ -4029,6 +4222,7 @@ onUnmounted(() => {
             />
           </div>
         </div>
+        </template>
         </template>
       </div>
       <template #footer>
@@ -5347,6 +5541,9 @@ onUnmounted(() => {
     font-weight: 500;
     color: theme.$gray_6;
   }
+}
+.file-picker-records {
+  margin-bottom: 12px;
 }
 .file-picker-dataset-head {
   display: flex;

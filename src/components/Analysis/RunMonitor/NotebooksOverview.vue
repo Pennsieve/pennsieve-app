@@ -179,21 +179,33 @@ const runRuntimeTitle = (run) => {
   return gpuMarkTitle(nodeGpu(node, gpuTiers.value));
 };
 
+// Every page of the definitions a query matches: the service returns 20 at a
+// time, newest first, so a kernel published before newer workflows is on a
+// later page.
 async function fetchDefinitions(query) {
   const token = await useGetToken();
-  const url = `${config.value.api2Url}/compute/workflows/definitions?${query}`;
-  const resp = await fetch(url, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
-  if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-  const result = await resp.json();
-  return Array.isArray(result) ? result : result.workflows || [];
+  const list = [];
+  let cursor = "";
+  let pages = 50;
+  do {
+    const params = new URLSearchParams(query);
+    params.set("limit", "100");
+    if (cursor) params.set("cursor", cursor);
+    const resp = await fetch(`${config.value.api2Url}/compute/workflows/definitions?${params}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const result = await resp.json();
+    list.push(...(Array.isArray(result) ? result : result.workflows || []));
+    cursor = Array.isArray(result) ? "" : result.nextCursor || "";
+  } while (cursor && pages-- > 0);
+  return list;
 }
 
 async function fetchNotebookWorkflows() {
   try {
     const orgId = store.state.activeOrganization?.organization?.id;
-    const queries = ["visibility=public"];
+    const queries = ["visibility=public&official=true"];
     if (orgId) queries.push(`organization_id=${encodeURIComponent(orgId)}`);
     const results = await Promise.allSettled(queries.map(fetchDefinitions));
     const byId = new Map();

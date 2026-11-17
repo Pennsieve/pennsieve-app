@@ -10,6 +10,10 @@ describe("nodeRunOffer", () => {
   it("offers a run when the runner skipped for hardware", () => {
     expect(nodeRunOffer({ fixtures: ready, sampleRun: { status: "skipped", error: { code: "needs_hardware" } } })).toEqual({ kind: "needs_hardware" });
   });
+  it("offers a run for a patch release the runner skipped", () => {
+    expect(nodeRunOffer({ fixtures: ready, sampleRun: { status: "skipped", error: { code: "patch_release" } } })).toEqual({ kind: "patch_release" });
+    expect(nodeRunOffer({ fixtures: { status: "building" }, sampleRun: { status: "skipped", error: { code: "patch_release" } } })).toBeNull();
+  });
   it("follows a run on a node that is on record", () => {
     expect(nodeRunOffer({ fixtures: ready, sampleRun: { status: "running", runId: "run-7", computeNodeId: "node-1", source: "node" } })).toEqual({
       kind: "running",
