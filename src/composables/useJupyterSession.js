@@ -159,6 +159,31 @@ export async function getInputsFetch(kernelBaseUrl, token, { fetchFn = globalThi
 // from a sidecar that can't change its inputs (older, or none).
 const SOURCES_PATH = "/pennsieve/inputs/sources";
 
+// Records a view added to a running session on its run (workflow-service
+// POST /runs/{runId}/sources, the user's own token), so the run's callback
+// token may read it: views-service's run routes serve only the run's views.
+// Done before the sidecar is asked to stage the view; a refusal (not the
+// run's creator, not the caller's view, the session over) says why.
+export async function registerSessionSource(
+  runId,
+  { name, viewId, version },
+  { config = siteConfig, getToken = useGetToken, fetchFn = globalThis.fetch } = {}
+) {
+  const token = await getToken();
+  const resp = await fetchFn(`${config.api2Url}/compute/workflows/runs/${encodeURIComponent(runId)}/sources`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ name, viewId, viewVersion: version }),
+  });
+  if (!resp.ok) {
+    const data = await resp.json().catch(() => ({}));
+    const err = new Error(data.message || data.error || `The view couldn't be added to the session (${resp.status}).`);
+    err.status = resp.status;
+    throw err;
+  }
+  return resp.json();
+}
+
 export async function sessionSourcesRequest(kernelBaseUrl, token, method = "GET", { body, name } = {}, { fetchFn = globalThis.fetch } = {}) {
   const query = name ? `?name=${encodeURIComponent(name)}` : "";
   const resp = await fetchFn(`${kernelBaseUrl}${SOURCES_PATH}${query}`, {
@@ -340,6 +365,7 @@ export function useJupyterSession() {
   // to the same Pennsieve file (overwrite-by-name).
   let notebookPath = DEFAULT_NOTEBOOK_PATH;
   let sessionToken = null; // broker-signed session JWT (NOT the Cognito token)
+  let connectedRunId = null; // the run the session belongs to, once connected
   // nbformat kernelspec metadata for saved notebooks — captured from the live
   // kernel so an R notebook is written with the R (ir) kernelspec, not a
   // hard-coded Python one, and reopens with the right kernel.
@@ -478,6 +504,7 @@ export function useJupyterSession() {
       const conn = await fetchConnection(runId); // { kernelUrl, token, ... }
       kernelBaseUrl = trimSlash(conn.kernelUrl);
       sessionToken = conn.token;
+      connectedRunId = runId;
 
       const settings = ServerConnection.makeSettings({
         baseUrl: kernelBaseUrl,
@@ -1038,8 +1065,10 @@ export function useJupyterSession() {
     return sessionSourcesRequest(kernelBaseUrl, sessionToken);
   }
 
-  function addInputSource(name, viewId, version) {
+  async function addInputSource(name, viewId, version) {
     if (!kernelBaseUrl) throw new Error("The session isn't connected.");
+    // On the run first, so the sidecar's fetch of the view is allowed.
+    await registerSessionSource(connectedRunId, { name, viewId, version });
     return sessionSourcesRequest(kernelBaseUrl, sessionToken, "POST", { body: { name, viewId, version } });
   }
 
