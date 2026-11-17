@@ -65,7 +65,8 @@ import RuntimeMark from "../WorkflowGraph/RuntimeMark.vue";
 import { STANDARD_CPU_OPTIONS, getStandardMemoryOptions, getTargetTypeLabel } from "./runHelpers";
 import { sourceLabel } from "../WorkflowGraph/sourceInputs";
 import * as siteConfig from "@/site-config/site.json";
-import { viewsServiceUrl, viewDataSource, prepareWorkspaceRunView } from "@/utils/viewsService";
+import { viewsServiceUrl, viewDataSource, prepareWorkspaceRunView, workspaceFilesAsViews } from "@/utils/viewsService";
+import { routeWorkspaceInputs } from "@/utils/workspaceInputs";
 import { listWorkspaceModels } from "@/utils/workspaceModels";
 import PlatformList from "../PlatformList.vue";
 import PlatformPane from "../PlatformPane.vue";
@@ -549,32 +550,37 @@ watch(defaultRunName, (val) => {
 const dataSourcesComplete = computed(() =>
   dataSourceNodes.value.every((d) => (dataSourceFiles[d.id] || []).length > 0 || recordsNodeId.value === d.id)
 );
-// The chosen dataset's metadata records instead of its files: the models
-// (names), taken as a view made for the session from metadata-service when
-// it starts, on the first input. In this version an input takes the
-// dataset's records or its files, not both. Where views-service is
-// deployed only; the dataset's models load as it's chosen.
+// The chosen dataset's metadata records: the models (names), taken as a
+// view made for the session when it starts, on the first input; with that
+// input's files where views take workspace files (filesWithRecords), else
+// instead of them. Where views-service is deployed only; the dataset's
+// models load as it's chosen.
+const filesWithRecords = workspaceFilesAsViews();
 const notebookRecords = ref([]);
 const datasetModels = ref([]);
 const recordsNodeId = computed(() => (notebookRecords.value.length ? dataSourceNodes.value[0]?.id || "" : ""));
-const WORKSPACE_RECORDS_HINT =
-  "Its records and the links between them, as they are when the session starts, instead of its files.";
+const WORKSPACE_RECORDS_HINT = filesWithRecords
+  ? "Its records and the links between them, as they are when the session starts, with the files you choose below."
+  : "Its records and the links between them, as they are when the session starts, instead of its files.";
 // The records are exported into a view before the session starts; closing
 // the dialog stops waiting (the view's build goes on).
 let preparingAbort = null;
 const preparingRecords = ref(false);
-const startLabel = computed(() => (preparingRecords.value ? "Preparing the dataset's records…" : "Start Notebook"));
+const startLabel = computed(() => (preparingRecords.value ? "Preparing the inputs…" : "Start Notebook"));
 watch(visible, (open) => {
   if (!open) preparingAbort?.abort();
 });
 onBeforeUnmount(() => preparingAbort?.abort());
-// Records replace the first input's files (one or the other, as on the run
-// page).
+// Where views don't take workspace files, records replace the first
+// input's files (one or the other, as on the run page).
 watch(notebookRecords, (models) => {
-  if (!models.length || !recordsNodeId.value) return;
+  if (filesWithRecords || !models.length || !recordsNodeId.value) return;
   delete dataSourceFiles[recordsNodeId.value];
   store.commit("analysisModule/CLEAR_SELECTED_FILES");
 });
+// Each input's view, kept by what it was asked for: a view still being
+// built when a try timed out is waited for again, not started again.
+const sessionViews = {};
 let datasetModelsSeq = 0;
 watch(
   () => (viewsServiceUrl() && inputChoice.value === "dataset" ? form.value.datasetId : ""),
@@ -1016,7 +1022,7 @@ const soFar = computed(() => {
     const records = notebookRecords.value.length;
     rows.push({
       label: records ? "Input" : "Files",
-      value: records ? `Metadata records (${records} model${records === 1 ? "" : "s"})` : String(files),
+      value: records ? `${files ? `${files} files + ` : ""}Metadata records (${records} model${records === 1 ? "" : "s"})` : String(files),
     });
   }
   if (step.value > S.NODE && selectedComputeNode.value) rows.push({ label: "Compute node", value: selectedComputeNode.value.name });
@@ -1057,30 +1063,58 @@ async function execute() {
 
     const dataSources = {};
     if (inputChoice.value === "dataset") {
-      for (const [nodeId, files] of Object.entries(dataSourceFiles)) {
-        const ids = files.map((f) => f.content?.id).filter(Boolean);
-        if (ids.length && nodeId !== recordsNodeId.value) dataSources[nodeId] = { packageIds: ids };
-      }
-      // The dataset's records: a view made now for the session's first
-      // input, built before the session starts; closing the dialog stops it
-      // (the view's build goes on).
-      if (recordsNodeId.value) {
-        const name = `${selectedDataset.value?.content?.name || "Dataset"}: metadata records`.slice(0, 255);
+      // An input goes through a view when it has the dataset's records
+      // (the first input), or has files and workspace files go through
+      // views here; else it sends its packages.
+      const { viaView, packages } = routeWorkspaceInputs(
+        dataSourceNodes.value.map((node) => ({
+          id: node.id,
+          datasetId: form.value.datasetId,
+          packageIds: (dataSourceFiles[node.id] || []).map((f) => f.content?.id).filter(Boolean),
+          models: node.id === recordsNodeId.value ? notebookRecords.value : [],
+        })),
+        { filesAsViews: filesWithRecords }
+      );
+      for (const p of packages) dataSources[p.id] = { packageIds: p.packageIds };
+      // Made now, built before the session starts; closing the dialog stops
+      // the wait (the views' builds go on).
+      if (viaView.length) {
         const controller = new AbortController();
         preparingAbort = controller;
         preparingRecords.value = true;
-        let view;
+        let views;
         try {
-          view = await prepareWorkspaceRunView(
-            { datasetNodeId: form.value.datasetId, name, models: notebookRecords.value },
-            { signal: controller.signal }
+          const dag = configDefinition.value?.dag || [];
+          views = await Promise.all(
+            viaView.map(async (v) => {
+              const key = [v.datasetId, [...v.models].sort().join(","), [...v.packageIds].sort().join(",")].join("\n");
+              if (sessionViews[v.id]?.key !== key) sessionViews[v.id] = { key, started: null, view: null };
+              const entry = sessionViews[v.id];
+              if (!entry.view) {
+                const label = sourceLabel(v.id, dag, "input");
+                entry.view = await prepareWorkspaceRunView(
+                  {
+                    datasetNodeId: v.datasetId,
+                    name: `${selectedDataset.value?.content?.name || "Dataset"}: ${label}`.slice(0, 255),
+                    models: v.models,
+                    packageIds: v.packageIds,
+                    started: entry.started,
+                  },
+                  { signal: controller.signal, onStarted: (started) => (entry.started = started) }
+                );
+              }
+              return entry.view;
+            })
           );
+        } catch (err) {
+          controller.abort();
+          throw err;
         } finally {
           preparingRecords.value = false;
           if (preparingAbort === controller) preparingAbort = null;
         }
         if (controller.signal.aborted) return;
-        dataSources[recordsNodeId.value] = viewDataSource(view);
+        viaView.forEach((v, i) => (dataSources[v.id] = viewDataSource(views[i])));
       }
     }
 
@@ -1531,8 +1565,7 @@ async function execute() {
             This notebook has no input — continue to start a blank session.
           </div>
           <template v-else>
-            <!-- The dataset's metadata records instead of its files, on the
-                 first input -->
+            <!-- The dataset's metadata records, with the first input's files -->
             <MetadataRecordsChoice
               v-if="datasetModels.length && currentSourceNodeId === dataSourceNodes[0]?.id"
               v-model="notebookRecords"
@@ -1540,7 +1573,7 @@ async function execute() {
               :hint="WORKSPACE_RECORDS_HINT"
               class="wizard-records"
             />
-            <p v-if="recordsNodeId === currentSourceNodeId" class="wizard-cards-loading">
+            <p v-if="recordsNodeId === currentSourceNodeId && !filesWithRecords" class="wizard-cards-loading">
               This input takes the dataset's metadata records. Untick them to choose its files instead.
             </p>
             <template v-else>

@@ -3,6 +3,7 @@
   "apiUrl": "https://api.pennsieve.io",
   "api2Url": "https://api2.pennsieve.io",
   "downloadServiceUrl": "https://api2.pennsieve.io/downloads",
+  "workspaceFilesAsViews": false,
   "viewsServiceUrl": "https://api2.pennsieve.io/views",
   "environmentsServiceUrl": "https://api2.pennsieve.io/environments",
   "cdeCatalogUrl": "https://cde-catalog.pennsieve.io",
