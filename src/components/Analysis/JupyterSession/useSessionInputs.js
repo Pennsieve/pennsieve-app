@@ -153,12 +153,15 @@ export function useSessionInputs({
           // volume) are read in place.
           const { files, stacks } = splitStacks(entries);
           const first = view?.sources?.[0] || {};
+          // A workspace dataset's records: the view is named for the
+          // dataset (its source is the dataset's node id).
+          const workspace = first.sourceType === "workspace";
           return {
             ...s,
             // An Open Data view's own name says which folder of the dataset.
-            name: (first.openDataset ? view?.name : first.name) || view?.name || "Dataset",
+            name: (first.openDataset || workspace ? view?.name : first.name) || view?.name || "Dataset",
             subtitle: inputSubtitle({
-              platform: platformReading(first.openDataset, first.publisher)?.name,
+              platform: workspace ? "Workspace dataset" : platformReading(first.openDataset, first.publisher)?.name,
               openDataset: first.openDataset || "",
               sourceVersion: first.version,
             }),

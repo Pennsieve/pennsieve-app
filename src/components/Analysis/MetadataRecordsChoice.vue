@@ -1,11 +1,15 @@
 <script setup>
-// "Include metadata records": a published dataset version's records, by
-// model, taken with its files. v-model is the chosen model names (none:
-// no records); available is what the version publishes. With records on,
-// every model is taken unless unticked; the last one can't be.
+// "Include metadata records": a dataset's records, by model (a published
+// version's, taken with its files; a workspace dataset's, on their own).
+// v-model is the chosen model names (none: no records); available is what
+// the dataset has. With records on, every model is taken unless unticked;
+// the last one can't be.
 const chosen = defineModel({ type: Array, default: () => [] });
 const props = defineProps({
   available: { type: Array, default: () => [] },
+  // What taking the records means here (a workspace dataset's are a
+  // snapshot without file links).
+  hint: { type: String, default: "Its records and the links between them and its files, downloaded with the data before it starts." },
 });
 
 const include = (on) => (chosen.value = on ? [...props.available] : []);
@@ -17,7 +21,7 @@ const toggle = (name, on) => (chosen.value = on ? [...chosen.value, name] : chos
     <el-checkbox :model-value="chosen.length > 0" class="mrc__include" @update:model-value="include">
       Include metadata records<template v-if="chosen.length && available.length > 1"> ({{ chosen.length }} of {{ available.length }})</template>
     </el-checkbox>
-    <p class="mrc__hint">Its records and the links between them and its files, downloaded with the data before it starts.</p>
+    <p class="mrc__hint">{{ hint }}</p>
     <div v-if="chosen.length && available.length > 1" class="mrc__models">
       <el-checkbox
         v-for="m in available"
