@@ -179,6 +179,7 @@ export async function registerSessionSource(
     const data = await resp.json().catch(() => ({}));
     const err = new Error(data.message || data.error || `The view couldn't be added to the session (${resp.status}).`);
     err.status = resp.status;
+    err.source = "run";
     throw err;
   }
   return resp.json();
@@ -197,6 +198,7 @@ export async function sessionSourcesRequest(kernelBaseUrl, token, method = "GET"
     const text = await resp.text().catch(() => "");
     const err = new Error(text.trim() || `The session couldn't change its inputs (${resp.status}).`);
     err.status = resp.status;
+    err.source = "sidecar";
     throw err;
   }
   const out = await resp.json();
