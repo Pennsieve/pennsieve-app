@@ -312,7 +312,7 @@ function copyPath(node) {
     </ul>
 
     <!-- The inputs: what's ticked, what's under way, the disk. -->
-    <div v-if="inputs && ready && (inputs.sources.length || inputs.requestError)" class="fb__foot">
+    <div v-if="inputs && ready && (inputs.sources.length || inputs.requestError || inputs.preparing)" class="fb__foot">
       <div v-if="inputs.selected.size && costAsk" class="fb__bar fb__bar--ask">
         <span class="fb__bar-text">{{ costLine(costAsk) }}</span>
         <button class="fb__bar-btn fb__bar-btn--go" @click="downloadSelected()">Download</button>
@@ -327,6 +327,10 @@ function copyPath(node) {
       <div v-if="inputs.active.length" class="fb__bar">
         <span class="fb__bar-text">Downloading {{ inputs.active.length }} · {{ fmtSize(inputs.activeLeft) }} left</span>
         <button class="fb__bar-btn" @click="inputs.cancelAll()">Cancel all</button>
+      </div>
+      <div v-if="inputs.preparing" class="fb__bar">
+        <span class="fb__bar-text">Preparing the view's records… the download starts when they're ready.</span>
+        <button class="fb__bar-btn" @click="inputs.stopPreparing()">Stop</button>
       </div>
       <p v-if="inputs.requestError" class="fb__msg fb__msg--error">{{ inputs.requestError }}</p>
       <div class="fb__disk" title="Files downloaded from the inputs, against the disk the session was started with. The environment and your own files use it too.">
