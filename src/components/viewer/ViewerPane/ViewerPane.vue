@@ -78,8 +78,10 @@ import {
   TSViewer,
   TIMESERIES_ZARR,
   TIMESERIES_WEBSOCKET,
+  setTokenProvider,
 } from "@pennsieve-viz/tsviewer";
 import "@pennsieve-viz/tsviewer/style.css";
+import { useGetToken } from "@/composables/useGetToken";
 import * as siteConfig from "@/site-config/site.json";
 import {
   VIEWER_INSTANCE_ID,
@@ -92,6 +94,10 @@ import { isPackageReady } from "@/utils/package-state";
 
 import "@pennsieve-viz/micro-ct/style.css";
 import "@pennsieve-viz/core/style.css";
+
+// The timeseries viewer does no auth of its own; it takes the token from the app's
+// Amplify. Set here, where the viewer is loaded, so it stays out of the app's first chunk.
+setTokenProvider(useGetToken);
 
 export default {
   name: "ViewerPane",
