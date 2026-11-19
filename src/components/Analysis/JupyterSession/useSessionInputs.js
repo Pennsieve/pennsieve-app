@@ -11,7 +11,7 @@ import { computed, onBeforeUnmount, reactive, ref, watch } from "vue";
 import { ElMessageBox } from "element-plus";
 import * as siteConfig from "@/site-config/site.json";
 import { useGetToken } from "@/composables/useGetToken";
-import { CancelUnavailable } from "@/composables/useJupyterSession";
+import { CancelUnavailable, InputsPreparing } from "@/composables/useJupyterSession";
 import { getView, listEntries } from "@/utils/viewsService";
 import {
   folderContents,
@@ -93,6 +93,11 @@ export function useSessionInputs({
   const loading = ref(false);
   const error = ref(null);
   const requestError = ref(null);
+  // While views-service prepares a view's records, the files asked for wait
+  // here and are asked for again (up to PREPARE_BUDGET_MS).
+  const preparing = ref(false);
+  let prepareTimer = null;
+  const PREPARE_BUDGET_MS = 30 * 60 * 1000;
   // The sidecar's state of every file asked for: key -> { state, size, bytes, error }.
   const states = ref({});
   // Files ticked to download together: key -> { source, path, size }.
@@ -215,7 +220,10 @@ export function useSessionInputs({
     },
     { immediate: true }
   );
-  onBeforeUnmount(() => clearTimeout(pollTimer));
+  onBeforeUnmount(() => {
+    clearTimeout(pollTimer);
+    clearTimeout(prepareTimer);
+  });
 
   /* ------------------------------------------------------------- the tree --- */
   // What a folder of the tree holds from the views, beside what's on disk:
@@ -301,15 +309,26 @@ export function useSessionInputs({
     return { ...c, ask: c.ask || !!cost, cost };
   };
 
-  // Asks the sidecar for files: [{ source, path }].
-  async function request(files) {
+  // Asks the sidecar for files: [{ source, path }]. While the view's records
+  // are being prepared, asks again when the sidecar says (Retry-After).
+  async function request(files, since = Date.now()) {
     if (!files.length) return;
     requestError.value = null;
+    clearTimeout(prepareTimer);
+    prepareTimer = null;
     try {
       await fetchInputs(files.map(({ source, path }) => ({ source: source.nodeId, path })));
+      preparing.value = false;
       await refreshStatus();
     } catch (e) {
-      requestError.value = e?.message || String(e);
+      if (e instanceof InputsPreparing && Date.now() - since < PREPARE_BUDGET_MS) {
+        preparing.value = true;
+        prepareTimer = setTimeout(() => request(files, since), e.retryAfter * 1000);
+        return;
+      }
+      preparing.value = false;
+      requestError.value =
+        e instanceof InputsPreparing ? "The view's records took too long to prepare. Try again in a few minutes." : e?.message || String(e);
     }
   }
   const requestEntries = (source, entries) => request(entries.map((e) => ({ source, path: e.cratePath })));
@@ -378,6 +397,7 @@ export function useSessionInputs({
     loading,
     error,
     requestError,
+    preparing,
     states,
     diskUse,
     freeBytes,

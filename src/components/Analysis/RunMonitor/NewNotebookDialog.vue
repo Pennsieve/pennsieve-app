@@ -579,7 +579,8 @@ watch(notebookRecords, (models) => {
   store.commit("analysisModule/CLEAR_SELECTED_FILES");
 });
 // Each input's view, kept by what it was asked for: a view still being
-// built when a try timed out is waited for again, not started again.
+// built when a try timed out, or one built for a start that failed, is used
+// again; once a session started, the next one gets new views.
 const sessionViews = {};
 let datasetModelsSeq = 0;
 watch(
@@ -1183,6 +1184,9 @@ async function execute() {
       },
     });
     store.commit("analysisModule/CLEAR_SELECTED_FILES");
+    // A view is reused only to retry a start: the next session gets its own,
+    // with the records as they are then.
+    for (const id of Object.keys(sessionViews)) delete sessionViews[id];
     visible.value = false;
     emit("created", newRun);
   } catch (err) {

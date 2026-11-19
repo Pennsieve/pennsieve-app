@@ -100,10 +100,38 @@ const INPUTS_PATH = "/pennsieve/inputs/fetch";
 // The sidecar takes at most this many files per request.
 const INPUTS_BATCH = 1000;
 
+// The view's records are being prepared (views-service rebuilds their
+// short-lived copy; the sidecar answers 503 with Retry-After): ask again
+// after retryAfter seconds.
+export class InputsPreparing extends Error {
+  constructor(message, retryAfter) {
+    super(message);
+    this.retryAfter = retryAfter;
+  }
+}
+
+// inputsMessage words the sidecar's refusal of a view's files: no longer
+// readable (views-service's 403), gone (410), else as it came.
+export function inputsMessage(text, status) {
+  const t = (text || "").trim();
+  if (/status 410|source records are gone|can't be rebuilt/i.test(t)) {
+    return "This view's records are no longer available: their dataset was deleted.";
+  }
+  if (/status 403|no longer read/i.test(t)) {
+    return "You no longer have access to this view's dataset records.";
+  }
+  return t || `The session couldn't add the files (${status}).`;
+}
+
 async function inputsResponse(resp) {
+  if (resp.status === 503 && resp.headers?.get?.("Retry-After")) {
+    const text = await resp.text().catch(() => "");
+    const retryAfter = Math.min(Math.max(Number(resp.headers.get("Retry-After")) || 30, 5), 60);
+    throw new InputsPreparing(text.trim() || "The view's records are being prepared.", retryAfter);
+  }
   if (!resp.ok) {
     const text = await resp.text().catch(() => "");
-    throw new Error(text.trim() || `The session couldn't add the files (${resp.status}).`);
+    throw new Error(inputsMessage(text, resp.status));
   }
   const body = await resp.json();
   return body.files || [];

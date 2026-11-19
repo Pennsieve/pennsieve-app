@@ -2099,6 +2099,12 @@ watch(
 // its source dataset version: { name, version, doi, entryCount, totalSize }.
 const browseViewInfo = ref({});
 
+// When a workspace view's records were pinned, as the user's local time.
+const recordsAsOf = (iso) => {
+  const d = new Date(iso);
+  return isNaN(d) ? null : d.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
+};
+
 const fetchViewInfo = async ({ viewId }) => {
   if (browseViewInfo.value[viewId]) return;
   try {
@@ -2116,6 +2122,8 @@ const fetchViewInfo = async ({ viewId }) => {
       models: src.models || [],
       entryCount: view.entryCount,
       totalSize: view.totalSize,
+      // The records are pinned when the view is made.
+      recordsAsOf: workspace && view.createdAt ? recordsAsOf(view.createdAt) : null,
     };
   } catch (err) {
     browseViewInfo.value[viewId] = { error: err?.message || "Could not read the dataset." };
@@ -3769,6 +3777,10 @@ onUnmounted(() => {
                       <div class="info-row">
                         <span class="info-label">Workspace dataset</span>
                         <span class="info-value">Metadata records ({{ info.models.join(", ") }})</span>
+                      </div>
+                      <div v-if="info.recordsAsOf" class="info-row">
+                        <span class="info-label">Records as of</span>
+                        <span class="info-value" title="The view keeps the records as they were when it was made; later changes to the dataset aren't in it.">{{ info.recordsAsOf }}</span>
                       </div>
                     </template>
                     <template v-else>
