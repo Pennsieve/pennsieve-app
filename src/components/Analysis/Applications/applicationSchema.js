@@ -342,9 +342,12 @@ export const createPort = (overrides = {}) => ({
  * @returns {ApplicationSchema}
  */
 // What a live (human-in-the-loop) app runs as: app.yml's runtime.sessionType,
-// the kind of session ("jupyter" is a notebook; others may come), and for a
-// Jupyter session its language, runtime.kernel.
-export const SESSION_TYPES = Object.freeze([{ value: "jupyter", label: "Jupyter notebook" }]);
+// the kind of session ("jupyter" is a notebook, "webapp" a web page the app
+// serves itself), and for a Jupyter session its language, runtime.kernel.
+export const SESSION_TYPES = Object.freeze([
+  { value: "jupyter", label: "Jupyter notebook" },
+  { value: "webapp", label: "Web app" },
+]);
 export const KERNELS = Object.freeze([
   { value: "python", label: "Python" },
   { value: "r", label: "R" },
@@ -835,8 +838,8 @@ export const buildManifest = (schema, meta = {}) => {
   if (meta.timeoutSeconds != null && meta.timeoutSeconds !== "") {
     runtime.timeoutSeconds = Number(meta.timeoutSeconds);
   }
-  // A live session (a notebook), not a batch step: the one place an app
-  // declares it. A Jupyter session also says its language.
+  // A live session (a notebook or a web app), not a batch step: the one
+  // place an app declares it. A Jupyter session also says its language.
   if (s.runtime?.interactive) {
     runtime.interactive = true;
     runtime.sessionType = s.runtime.sessionType || "jupyter";

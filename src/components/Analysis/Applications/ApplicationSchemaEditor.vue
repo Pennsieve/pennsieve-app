@@ -576,9 +576,13 @@ const props = defineProps({
   // Which part: "tags" (About), "io" (What it does: inputs, parameters,
   // outputs), "runtime" (How it runs).
   part: { type: String, required: true },
-  // "batch" or "interactive" (manifestBuilder.appKind): an interactive app
-  // has no parameters, and its resources are only defaults.
+  // "batch" or "interactive" (manifestBuilder.appKind): an interactive app's
+  // resources are only defaults, and it has no parameters unless
+  // sessionParameters says so.
   kind: { type: String, default: "batch" },
+  // An interactive app that takes parameters: a web app session
+  // (manifestBuilder.takesParameters). A notebook doesn't.
+  sessionParameters: { type: Boolean, default: false },
   // Problems by the field they point at: { "parameters.0.name": ["…"] }.
   problems: { type: Object, default: () => ({}) },
 });
@@ -856,7 +860,7 @@ const PORT_BLOCKS = {
   },
 };
 const ioBlocks = computed(() =>
-  props.kind === "interactive"
+  props.kind === "interactive" && !props.sessionParameters
     ? [PORT_BLOCKS.inputs, PORT_BLOCKS.outputs]
     : [PORT_BLOCKS.inputs, { key: "parameters" }, PORT_BLOCKS.outputs]
 );

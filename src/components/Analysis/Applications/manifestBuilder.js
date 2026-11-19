@@ -13,8 +13,12 @@ export const APP_KINDS = Object.freeze([
   { value: "interactive", label: "Interactive", hint: "A live session people work in; the workflow waits until it ends." },
 ]);
 
-// The interactive session types the platform runs today (runtime.sessionType).
-export const SESSION_KINDS = Object.freeze([{ value: "jupyter", label: "Jupyter" }]);
+// The interactive session types the platform runs today (runtime.sessionType):
+// a notebook, or a web page the app serves itself.
+export const SESSION_KINDS = Object.freeze([
+  { value: "jupyter", label: "Jupyter" },
+  { value: "webapp", label: "Web app" },
+]);
 
 // An app is interactive when its app.yml says it's a live session.
 export const appKind = (schema) => (schema?.runtime?.interactive ? "interactive" : "batch");
@@ -46,10 +50,16 @@ export function setAppKind(schema, kind) {
   }
 }
 
-// The schema the manifest is written from: an interactive app's has no
-// parameters (they're the batch app's, kept in the form only).
+// Whether the app takes parameters: a batch step does, and so does a web app
+// session, which gets them as environment variables the same way. A notebook
+// has none.
+export const takesParameters = (schema) =>
+  appKind(schema) === "batch" || schema?.runtime?.sessionType === "webapp";
+
+// The schema the manifest is written from: a notebook's has no parameters
+// (they're the batch app's, kept in the form only).
 export const manifestSchemaFor = (schema) =>
-  appKind(schema) === "interactive" ? { ...schema, parameters: [] } : schema;
+  takesParameters(schema) ? schema : { ...schema, parameters: [] };
 
 /* ─────────────── Sections and the fields problems point at ─────────────── */
 
@@ -98,13 +108,13 @@ export function fieldKeyOfPath(path) {
 
 /**
  * The builder's own checks, as { path, message } like the schema's: the name
- * the app needs, and a batch step's parameters (unique, single-token names,
- * choices with values, min below max, defaults that fit).
+ * the app needs, and its parameters when it takes them (unique, single-token
+ * names, choices with values, min below max, defaults that fit).
  */
 export function builderChecks(meta, schema) {
   const out = [];
   if (!String(meta?.name || "").trim()) out.push({ path: "application.name", message: "is required" });
-  if (appKind(schema) === "interactive") return out;
+  if (!takesParameters(schema)) return out;
   const seen = new Set();
   (schema?.parameters || []).forEach((p, i) => {
     const at = `parameters.${i}`;
