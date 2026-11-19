@@ -11,7 +11,8 @@ import { computed, onBeforeUnmount, reactive, ref, watch } from "vue";
 import { ElMessageBox } from "element-plus";
 import * as siteConfig from "@/site-config/site.json";
 import { useGetToken } from "@/composables/useGetToken";
-import { CancelUnavailable, InputsPreparing } from "@/composables/useJupyterSession";
+import { CancelUnavailable } from "@/composables/useJupyterSession";
+import { createPreparingRetry } from "./preparingRetry";
 import { getView, listEntries } from "@/utils/viewsService";
 import {
   folderContents,
@@ -94,10 +95,8 @@ export function useSessionInputs({
   const error = ref(null);
   const requestError = ref(null);
   // While views-service prepares a view's records, the files asked for wait
-  // here and are asked for again (up to PREPARE_BUDGET_MS).
+  // and are asked for again (preparingRetry.js).
   const preparing = ref(false);
-  let prepareTimer = null;
-  const PREPARE_BUDGET_MS = 30 * 60 * 1000;
   // The sidecar's state of every file asked for: key -> { state, size, bytes, error }.
   const states = ref({});
   // Files ticked to download together: key -> { source, path, size }.
@@ -222,7 +221,7 @@ export function useSessionInputs({
   );
   onBeforeUnmount(() => {
     clearTimeout(pollTimer);
-    clearTimeout(prepareTimer);
+    retry.stop();
   });
 
   /* ------------------------------------------------------------- the tree --- */
@@ -310,27 +309,25 @@ export function useSessionInputs({
   };
 
   // Asks the sidecar for files: [{ source, path }]. While the view's records
-  // are being prepared, asks again when the sidecar says (Retry-After).
-  async function request(files, since = Date.now()) {
+  // are being prepared, they wait and are asked for again, with any asked
+  // for meanwhile.
+  const retry = createPreparingRetry({
+    send: async (files) => {
+      await fetchInputs(files.map(({ source, path }) => ({ source: source.nodeId, path })));
+      await refreshStatus();
+    },
+    onState: ({ preparing: p, error: e }) => {
+      preparing.value = p;
+      requestError.value = e;
+    },
+    keyOf: ({ source, path }) => inputKey(source.nodeId, path),
+  });
+  async function request(files) {
     if (!files.length) return;
     requestError.value = null;
-    clearTimeout(prepareTimer);
-    prepareTimer = null;
-    try {
-      await fetchInputs(files.map(({ source, path }) => ({ source: source.nodeId, path })));
-      preparing.value = false;
-      await refreshStatus();
-    } catch (e) {
-      if (e instanceof InputsPreparing && Date.now() - since < PREPARE_BUDGET_MS) {
-        preparing.value = true;
-        prepareTimer = setTimeout(() => request(files, since), e.retryAfter * 1000);
-        return;
-      }
-      preparing.value = false;
-      requestError.value =
-        e instanceof InputsPreparing ? "The view's records took too long to prepare. Try again in a few minutes." : e?.message || String(e);
-    }
+    await retry.request(files);
   }
+  const stopPreparing = () => retry.stop();
   const requestEntries = (source, entries) => request(entries.map((e) => ({ source, path: e.cratePath })));
 
   async function cancel(files) {
@@ -343,8 +340,9 @@ export function useSessionInputs({
         e instanceof CancelUnavailable ? "This session can't cancel downloads yet: its compute node needs an update." : e?.message || String(e);
     }
   }
-  // Every download under way.
+  // Every download under way, and any waiting for records being prepared.
   function cancelAll() {
+    retry.stop();
     const bySource = new Map(sources.value.map((s) => [s.nodeId, s]));
     return cancel(
       active.value.filter((st) => bySource.has(st.source)).map((st) => ({ source: bySource.get(st.source), path: st.path }))
@@ -398,6 +396,7 @@ export function useSessionInputs({
     error,
     requestError,
     preparing,
+    stopPreparing,
     states,
     diskUse,
     freeBytes,

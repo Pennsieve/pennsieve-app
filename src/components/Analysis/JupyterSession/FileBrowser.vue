@@ -328,7 +328,10 @@ function copyPath(node) {
         <span class="fb__bar-text">Downloading {{ inputs.active.length }} · {{ fmtSize(inputs.activeLeft) }} left</span>
         <button class="fb__bar-btn" @click="inputs.cancelAll()">Cancel all</button>
       </div>
-      <p v-if="inputs.preparing" class="fb__msg">Preparing the view's records… the download starts when they're ready.</p>
+      <div v-if="inputs.preparing" class="fb__bar">
+        <span class="fb__bar-text">Preparing the view's records… the download starts when they're ready.</span>
+        <button class="fb__bar-btn" @click="inputs.stopPreparing()">Stop</button>
+      </div>
       <p v-if="inputs.requestError" class="fb__msg fb__msg--error">{{ inputs.requestError }}</p>
       <div class="fb__disk" title="Files downloaded from the inputs, against the disk the session was started with. The environment and your own files use it too.">
         <span class="fb__disk-text">{{ inputs.diskUse.text }}</span>
