@@ -115,7 +115,7 @@ export class InputsPreparing extends Error {
 export function inputsMessage(text, status) {
   const t = (text || "").trim();
   if (/status 410|source records are gone|can't be rebuilt/i.test(t)) {
-    return "This view's records are no longer available: their dataset was deleted.";
+    return "This view's records are no longer available.";
   }
   if (/status 403|no longer read/i.test(t)) {
     return "You no longer have access to this view's dataset records.";
@@ -124,13 +124,14 @@ export function inputsMessage(text, status) {
 }
 
 async function inputsResponse(resp) {
-  if (resp.status === 503 && resp.headers?.get?.("Retry-After")) {
-    const text = await resp.text().catch(() => "");
-    const retryAfter = Math.min(Math.max(Number(resp.headers.get("Retry-After")) || 30, 5), 60);
-    throw new InputsPreparing(text.trim() || "The view's records are being prepared.", retryAfter);
-  }
   if (!resp.ok) {
     const text = await resp.text().catch(() => "");
+    // Told apart by the sidecar's words: a browser sees Retry-After only
+    // when the sidecar exposes it (CORS), which is then the wait.
+    if (resp.status === 503 && /being prepared/i.test(text)) {
+      const retryAfter = Math.min(Math.max(Number(resp.headers?.get?.("Retry-After")) || 30, 5), 60);
+      throw new InputsPreparing(text.trim(), retryAfter);
+    }
     throw new Error(inputsMessage(text, resp.status));
   }
   const body = await resp.json();

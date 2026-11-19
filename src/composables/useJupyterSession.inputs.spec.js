@@ -141,13 +141,21 @@ describe("a view's records being prepared", () => {
 
   it("keeps Retry-After between 5 and 60 seconds", async () => {
     for (const [given, want] of [["1", 5], ["600", 60], ["soon", 30]]) {
-      const err = await postInputsFetch("https://k", "tok", [{ source: "n", path: "a" }], { fetchFn: withHeaders(503, "", { "Retry-After": given }) }).catch((e) => e);
+      const err = await postInputsFetch("https://k", "tok", [{ source: "n", path: "a" }], { fetchFn: withHeaders(503, "being prepared", { "Retry-After": given }) }).catch((e) => e);
       expect(err.retryAfter).toBe(want);
     }
   });
 
-  it("a 503 without Retry-After is an error", async () => {
-    const err = await postInputsFetch("https://k", "tok", [{ source: "n", path: "a" }], { fetchFn: withHeaders(503, "down", {}) }).catch((e) => e);
+  it("is recognised by its words when the browser hides Retry-After (CORS)", async () => {
+    const err = await postInputsFetch("https://k", "tok", [{ source: "n", path: "a" }], {
+      fetchFn: withHeaders(503, "src: the view's records are being prepared; ask again shortly", {}),
+    }).catch((e) => e);
+    expect(err).toBeInstanceOf(InputsPreparing);
+    expect(err.retryAfter).toBe(30);
+  });
+
+  it("another 503 is an error", async () => {
+    const err = await postInputsFetch("https://k", "tok", [{ source: "n", path: "a" }], { fetchFn: withHeaders(503, "down", { "Retry-After": "30" }) }).catch((e) => e);
     expect(err).not.toBeInstanceOf(InputsPreparing);
     expect(err.message).toBe("down");
   });
