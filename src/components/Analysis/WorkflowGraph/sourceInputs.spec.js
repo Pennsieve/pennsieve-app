@@ -113,6 +113,19 @@ describe("inputs of metadata records", () => {
     expect(sourceParts("r3", more, portsOf, (id) => id === "nb2")).toEqual({ files: true, records: true });
   });
 
+  it("offers both while a step's ports aren't known", () => {
+    expect(sourceParts("r2", dag, () => null)).toEqual({ files: true, records: true });
+  });
+
+  it("gives a link to all inputs (no input named) the files", () => {
+    const all = [{ id: "s" }, { id: "f", inputs: [{ from: "s" }] }];
+    expect(sourceParts("s", all, () => ({ inputs: [] }))).toEqual({ files: true, records: false });
+  });
+
+  it("names what is missing", () => {
+    expect(missingFilesMessage(["r2"], dag, "metadata records")).toBe("Select metadata records for records");
+  });
+
   it("leaves records inputs out of the file types a source checks", () => {
     const hints = sourceHints("r1", dag, portsOf);
     expect(acceptedFileTypes(hints)).toEqual(new Set(["EDF"]));

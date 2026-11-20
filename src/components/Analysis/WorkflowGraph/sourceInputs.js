@@ -56,7 +56,10 @@ export function sourceHints(sourceId, steps, portsOf) {
 export function sourceParts(sourceId, steps, portsOf, interactive = () => false) {
   const linked = (s) => (Array.isArray(s?.inputs) ? s.inputs : []).some((l) => l?.from === sourceId);
   const readers = (steps || []).filter((s) => (s?.dependsOn || []).includes(sourceId) || linked(s));
-  if (readers.some((s) => interactive(s.id))) return { files: true, records: true };
+  // A step whose ports aren't known yet (the app list is loading) may take
+  // either, as may a notebook.
+  const unknown = (s) => linked(s) && !portsOf(s.id);
+  if (readers.some((s) => interactive(s.id) || unknown(s))) return { files: true, records: true };
   const fed = inputsFedBy(sourceId, steps);
   const hints = sourceHints(sourceId, steps, portsOf);
   const takesRecords = (f) => hints.some((h) => h.step === f.step && h.input === f.input && h.records);
@@ -96,11 +99,11 @@ const listed = (names) =>
 
 // What to say when sources have no files yet: their inputs by name ("Select
 // files for signals and events"), or how many.
-export function missingFilesMessage(missingIds, dag) {
+export function missingFilesMessage(missingIds, dag, what = "files") {
   const names = (missingIds || []).map((id) => sourceLabel(id, dag, ""));
-  if (names.length && names.every(Boolean)) return `Select files for ${listed([...new Set(names)])}`;
+  if (names.length && names.every(Boolean)) return `Select ${what} for ${listed([...new Set(names)])}`;
   const n = (missingIds || []).length;
-  return `Select files for ${n === 1 ? "data source" : `${n} data sources`}`;
+  return `Select ${what} for ${n === 1 ? "data source" : `${n} data sources`}`;
 }
 
 // EDAM formats (app.yml formats) by the names files' extensions give them,

@@ -388,7 +388,7 @@
                       @change="(v) => onLayoutChange(port, v)"
                     >
                       <el-option
-                        v-for="s in layoutOptions.filter((o) => structureMatches(o, mediaTypeQuery))"
+                        v-for="s in layoutOptionsFor(block.key).filter((o) => structureMatches(o, mediaTypeQuery))"
                         :key="s.id"
                         :label="s.name"
                         :value="s.id"
@@ -410,7 +410,7 @@
                   <div class="field-control">
                     <el-select :model-value="port.conformsTo[1] ? structureId(port.conformsTo[1]) : ''" class="full" @change="(v) => onInnerStructure(port, v)">
                       <el-option label="No particular layout" value="" />
-                      <el-option v-for="s in layoutOptions.filter((o) => o.id !== structureId(port.conformsTo[0]))" :key="s.id" :label="s.name" :value="s.id" />
+                      <el-option v-for="s in layoutOptionsFor(block.key).filter((o) => o.id !== structureId(port.conformsTo[0]))" :key="s.id" :label="s.name" :value="s.id" />
                     </el-select>
                   </div>
                 </div>
@@ -959,8 +959,9 @@ const structureOptions = computed(() =>
     ...(schema.value.outputs || []).map((p) => p.conformsTo),
   ])
 );
-// Metadata records are a kind of input of their own, not a layout to pick.
-const layoutOptions = computed(() => structureOptions.value.filter((o) => o.id !== RECORDS_STRUCTURE));
+// Metadata records are a kind of input of their own, not a layout to pick
+// (an output that names them still shows them).
+const layoutOptionsFor = (blockKey) => (blockKey === "inputs" ? structureOptions.value.filter((o) => o.id !== RECORDS_STRUCTURE) : structureOptions.value);
 /*
   What an input or output is made of at its root, the first thing the card
   asks: files, folders of a folder format (OME-Zarr, as container:
