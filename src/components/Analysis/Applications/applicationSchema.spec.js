@@ -1249,3 +1249,14 @@ describe("isRecordsPort", () => {
     expect(isRecordsPort({})).toBe(false);
   });
 });
+
+describe("an input of metadata records", () => {
+  it("is read and written back as conformsTo pennsieve-records in its own folder", () => {
+    const yaml = "application:\n  name: a\ninputs:\n  - name: records\n    conformsTo: pennsieve-records\n    placement: subfolder\n"
+    const { meta, schema } = parseManifest(yaml)
+    expect(isRecordsPort(schema.inputs[0])).toBe(true)
+    const again = loadYaml(manifestToYaml(buildManifest(schema, meta)))
+    expect(again.inputs[0].placement).toBe("subfolder")
+    expect([].concat(again.inputs[0].conformsTo)).toEqual(["pennsieve-records"])
+  })
+})

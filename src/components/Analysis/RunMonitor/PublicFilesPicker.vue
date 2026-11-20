@@ -115,17 +115,20 @@ const openDataset = (id) => {
 // input can take their records (one records pick per version) beside files.
 const availableModels = ref([]);
 const modelsLoading = ref(false);
+const modelsFailed = ref(false);
 let modelsSeq = 0;
 async function loadModels() {
   const seq = ++modelsSeq;
   availableModels.value = [];
-  if (!dataset.value) return;
+  modelsFailed.value = false;
+  if (!dataset.value || !props.parts.records) return;
   modelsLoading.value = true;
   try {
     const found = await listPublicModels({ id: dataset.value.id, version: dataset.value.version });
     if (seq === modelsSeq) availableModels.value = found;
   } catch (err) {
     console.warn("Couldn't list the dataset's models:", err);
+    if (seq === modelsSeq) modelsFailed.value = true;
   } finally {
     if (seq === modelsSeq) modelsLoading.value = false;
   }
@@ -212,11 +215,11 @@ const groups = computed(() => groupPicks(props.modelValue));
           v-if="parts.records"
           v-model="chosenModels"
           :available="availableModels"
-          v-bind="parts.files ? {} : { hint: 'Its records and the links between them.' }"
+          :hint="parts.files ? undefined : 'Its records and the links between them.'"
           class="pfp__records"
         />
         <p v-if="!parts.files && !availableModels.length" class="pfp__empty">
-          {{ modelsLoading ? "Loading metadata records…" : "This version publishes no metadata records." }}
+          {{ modelsLoading ? "Loading metadata records…" : modelsFailed ? "Couldn't load its metadata records." : "This version publishes no metadata records." }}
         </p>
       </div>
     </div>

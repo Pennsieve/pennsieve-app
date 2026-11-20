@@ -264,24 +264,20 @@ const filePickerNodeId = ref(null);
 // What the open picker's source can take (sourceInputs.js sourceParts): a
 // batch step reads a dataset's records only through an input that takes
 // them, and its files through any other; a notebook reads both.
-const partsOf = (nodeId) => {
+const BOTH_PARTS = Object.freeze({ files: true, records: true });
+const partsBySource = computed(() => {
   const dag = configDefinition.value?.dag || [];
-  return sourceParts(nodeId, dag, portsOfStep(dag, availableApplications.value), (step) => !!nodeConfigs[step]?.interactive);
-};
-const pickerParts = computed(() => (filePickerNodeId.value ? partsOf(filePickerNodeId.value) : { files: true, records: true }));
-// What a source takes of what was picked for it: picks of a part its
-// inputs no longer take (a step switched off being a notebook) are neither
-// counted nor sent.
-const takenFiles = (nodeId) => (partsOf(nodeId).files ? dataSourceFiles[nodeId] || [] : []);
-const takenPublicPicks = (nodeId) => {
-  const parts = partsOf(nodeId);
-  return (publicPicks[nodeId] || []).filter((p) => (isRecordsPick(p) ? parts.records : parts.files));
-};
-const takenRecords = (nodeId) => (partsOf(nodeId).records ? workspaceRecords[nodeId] : null);
+  const portsOf = portsOfStep(dag, availableApplications.value);
+  const interactive = (step) => !!nodeConfigs[step]?.interactive;
+  return Object.fromEntries(dataSourceNodes.value.map((d) => [d.id, sourceParts(d.id, dag, portsOf, interactive)]));
+});
+const partsOf = (nodeId) => partsBySource.value[nodeId] || BOTH_PARTS;
+const pickerParts = computed(() => (filePickerNodeId.value ? partsOf(filePickerNodeId.value) : BOTH_PARTS));
 // The models of the dataset the open picker shows, for its records choice
 // (none while they load, or for a dataset without models).
 const pickerModels = ref([]);
 const pickerModelsLoading = ref(false);
+const pickerModelsFailed = ref(false);
 const modelsByDataset = {};
 let pickerModelsSeq = 0;
 watch(
@@ -290,6 +286,7 @@ watch(
     const seq = ++pickerModelsSeq;
     pickerModels.value = (datasetId && modelsByDataset[datasetId]) || [];
     pickerModelsLoading.value = false;
+    pickerModelsFailed.value = false;
     if (!datasetId || modelsByDataset[datasetId]) return;
     pickerModelsLoading.value = true;
     try {
@@ -298,6 +295,7 @@ watch(
       if (seq === pickerModelsSeq) pickerModels.value = found;
     } catch (err) {
       console.warn("Couldn't list the dataset's models:", err);
+      if (seq === pickerModelsSeq) pickerModelsFailed.value = true;
     } finally {
       if (seq === pickerModelsSeq) pickerModelsLoading.value = false;
     }
@@ -1409,9 +1407,7 @@ const VIEW_NAME_MAX = 255;
 // Makes a view of each input's public files (all at once) and returns them
 // as data sources, or null when one couldn't be made (it says why).
 const publicInputViews = async (dag) => {
-  const inputs = Object.keys(publicPicks)
-    .map((id) => [id, takenPublicPicks(id)])
-    .filter(([id, picks]) => picks.length && !leftOutInputs[id]);
+  const inputs = Object.entries(publicPicks).filter(([id, picks]) => picks?.length && !leftOutInputs[id]);
   try {
     const made = await Promise.all(
       inputs.map(async ([id, picks]) => {
@@ -1444,14 +1440,14 @@ const workspaceViewInputs = () =>
   routeWorkspaceInputs(
     [...new Set([...Object.keys(workspaceRecords), ...Object.keys(dataSourceFiles)])].map((id) => ({
       id,
-      datasetId: takenRecords(id)?.datasetId || sourceDatasetOf(id),
-      packageIds: takenFiles(id).map((f) => f.content?.id).filter(Boolean),
-      models: takenRecords(id)?.models || [],
+      datasetId: workspaceRecords[id]?.datasetId || sourceDatasetOf(id),
+      packageIds: (dataSourceFiles[id] || []).map((f) => f.content?.id).filter(Boolean),
+      models: workspaceRecords[id]?.models || [],
       filePaths: filePathsFor(id) === FILE_PATHS_SOURCE ? "source" : "selection",
     })),
     {
       filesAsViews: filesWithRecords,
-      publicIds: new Set(Object.keys(publicPicks).filter((id) => takenPublicPicks(id).length)),
+      publicIds: new Set(Object.keys(publicPicks).filter((id) => publicPicks[id]?.length)),
       leftOut: new Set(Object.keys(leftOutInputs).filter((id) => leftOutInputs[id])),
     }
   ).viaView.map((v) => [v.id, v]);
@@ -1530,9 +1526,11 @@ const executeWorkflow = async () => {
     EventBus.$emit("toast", {
       detail: {
         type: "error",
-        msg: missingFilesMessage(missingSources.map((d) => d.id), configDefinition.value?.dag || [])
-          // Inputs of metadata records only.
-          .replace(/^Select files/, missingSources.every((d) => !partsOf(d.id).files) ? "Select metadata records" : "Select files"),
+        msg: missingFilesMessage(
+          missingSources.map((d) => d.id),
+          configDefinition.value?.dag || [],
+          missingSources.every((d) => !partsOf(d.id).files) ? "metadata records" : "files"
+        ),
       },
     });
     return;
@@ -1573,7 +1571,9 @@ const executeWorkflow = async () => {
   try {
     const dataSources = {};
     Object.keys(dataSourceFiles).forEach((nodeId) => {
-      const ids = takenFiles(nodeId).map((f) => f.content?.id).filter(Boolean);
+      const ids = (dataSourceFiles[nodeId] || []).map((f) => f.content?.id).filter(Boolean);
+      // Nothing to send for a source without files (one of records only).
+      if (!ids.length) return;
       const own = sourceDatasetOf(nodeId);
       dataSources[nodeId] = {
         packageIds: ids,
@@ -1828,8 +1828,25 @@ const closeFilePicker = () => {
 const fileCountForNode = (nodeId) => {
   // A reference source has no files to choose: it always has its reference.
   if (referenceOf(nodeId)) return 1;
-  return takenFiles(nodeId).length + takenPublicPicks(nodeId).length + (takenRecords(nodeId) ? 1 : 0);
+  return (dataSourceFiles[nodeId] || []).length + (publicPicks[nodeId] || []).length + (workspaceRecords[nodeId] ? 1 : 0);
 };
+// Picks of a part a source's inputs no longer take (a step switched off
+// being a notebook) go, so what's shown, counted and sent agree. Ports not
+// yet known count as taking both (sourceParts), so a late app list never
+// drops real picks.
+watch(partsBySource, (parts) => {
+  for (const [id, p] of Object.entries(parts)) {
+    if (!p.files) delete dataSourceFiles[id];
+    if (!p.records) delete workspaceRecords[id];
+    const picks = publicPicks[id];
+    if (!picks?.length) continue;
+    const kept = picks.filter((x) => (isRecordsPick(x) ? p.records : p.files));
+    if (kept.length !== picks.length) {
+      if (kept.length) publicPicks[id] = kept;
+      else delete publicPicks[id];
+    }
+  }
+});
 
 /*
   Reference sources: inputs filled from Pennsieve's reference catalog (an
@@ -4216,12 +4233,14 @@ onUnmounted(() => {
               ? "Choose a dataset to see its metadata records."
               : pickerModelsLoading
                 ? "Loading metadata records…"
-                : `${datasetName(sourceDatasetOf(filePickerNodeId), datasetOptions)} has no metadata records.` }}
+                : pickerModelsFailed
+                  ? "Couldn't load the dataset's metadata records."
+                  : `${datasetName(sourceDatasetOf(filePickerNodeId), datasetOptions)} has no metadata records.` }}
         </p>
         <p v-else-if="pickerParts.files && pickerParts.records && workspaceRecords[filePickerNodeId] && !filesWithRecords" class="file-picker-empty">
           This input takes the dataset's metadata records.
         </p>
-        <template v-else>
+        <template v-else-if="pickerParts.files">
         <div class="file-picker-header">
           <span class="selected-count">
             <strong>{{ fileCountForNode(filePickerNodeId) }}</strong>
