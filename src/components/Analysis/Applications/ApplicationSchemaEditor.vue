@@ -990,7 +990,8 @@ const formatProblems = (port, key) =>
   portMode(port) === "folder" && !portTypes(port).length && !formatTouched.has(toRaw(port)) ? [] : at(key);
 const portMode = (port) => {
   if (showsReference(port)) return "reference";
-  if (isRecordsPort(port)) return "records";
+  // Records are an input's; an output that names them shows as a layout.
+  if (isRecordsPort(port) && (schema.value.inputs || []).includes(port)) return "records";
   if (conformsToList(port.conformsTo).length) return "layout";
   if (port.container === "directory") return "folder";
   return chosenModes.get(toRaw(port)) || "file";
@@ -1003,6 +1004,8 @@ const dropReference = (port) => {
 };
 const setPortMode = (port, mode) => {
   if (portMode(port) === mode) return;
+  // The name records mode suggested goes with it.
+  if (portMode(port) === "records" && port.name === "records") port.name = "";
   if (mode === "records") {
     // A layout of its own, always in the input's folder; no formats.
     if (portMode(port) === "reference") dropReference(port);

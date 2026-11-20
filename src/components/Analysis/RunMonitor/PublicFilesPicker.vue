@@ -114,13 +114,21 @@ const openDataset = (id) => {
 // The metadata models the open dataset's version publishes records of; the
 // input can take their records (one records pick per version) beside files.
 const availableModels = ref([]);
+const modelsLoading = ref(false);
 let modelsSeq = 0;
 async function loadModels() {
   const seq = ++modelsSeq;
   availableModels.value = [];
   if (!dataset.value) return;
-  const found = await listPublicModels({ id: dataset.value.id, version: dataset.value.version });
-  if (seq === modelsSeq) availableModels.value = found;
+  modelsLoading.value = true;
+  try {
+    const found = await listPublicModels({ id: dataset.value.id, version: dataset.value.version });
+    if (seq === modelsSeq) availableModels.value = found;
+  } catch (err) {
+    console.warn("Couldn't list the dataset's models:", err);
+  } finally {
+    if (seq === modelsSeq) modelsLoading.value = false;
+  }
 }
 // The chosen models are the version's records pick; none takes it out.
 const chosenModels = computed({
@@ -200,8 +208,16 @@ const groups = computed(() => groupPicks(props.modelValue));
         <div class="pfp__meta">
           Version {{ dataset.version }} · {{ dataset.fileCount.toLocaleString("en-US") }} files · {{ formatBytes(dataset.size) }}
         </div>
-        <MetadataRecordsChoice v-if="parts.records" v-model="chosenModels" :available="availableModels" class="pfp__records" />
-        <p v-if="!parts.files && !availableModels.length" class="pfp__empty">This version publishes no metadata records.</p>
+        <MetadataRecordsChoice
+          v-if="parts.records"
+          v-model="chosenModels"
+          :available="availableModels"
+          v-bind="parts.files ? {} : { hint: 'Its records and the links between them.' }"
+          class="pfp__records"
+        />
+        <p v-if="!parts.files && !availableModels.length" class="pfp__empty">
+          {{ modelsLoading ? "Loading metadata records…" : "This version publishes no metadata records." }}
+        </p>
       </div>
     </div>
 

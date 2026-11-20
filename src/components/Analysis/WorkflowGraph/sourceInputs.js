@@ -54,13 +54,15 @@ export function sourceHints(sourceId, steps, portsOf) {
 // pennsieve-records) and its files through any other; a notebook (a step
 // interactive(stepId) says is one) reads whatever it is given.
 export function sourceParts(sourceId, steps, portsOf, interactive = () => false) {
-  const readers = (steps || []).filter((s) => (s?.dependsOn || []).includes(sourceId));
+  const linked = (s) => (Array.isArray(s?.inputs) ? s.inputs : []).some((l) => l?.from === sourceId);
+  const readers = (steps || []).filter((s) => (s?.dependsOn || []).includes(sourceId) || linked(s));
   if (readers.some((s) => interactive(s.id))) return { files: true, records: true };
   const fed = inputsFedBy(sourceId, steps);
   const hints = sourceHints(sourceId, steps, portsOf);
   const takesRecords = (f) => hints.some((h) => h.step === f.step && h.input === f.input && h.records);
   return {
-    files: !fed.length || fed.some((f) => !takesRecords(f)),
+    // A step it isn't linked into takes all of it at the root: its files.
+    files: !fed.length || readers.some((s) => !linked(s)) || fed.some((f) => !takesRecords(f)),
     records: fed.some(takesRecords),
   };
 }
@@ -193,7 +195,8 @@ export function fileTypeMismatches(fileNames, hints, formats = []) {
 // declares no types.
 export function acceptedFileTypes(hints) {
   const accepted = new Set();
-  for (const h of hints || []) {
+  // A records input takes no files: it says nothing about them.
+  for (const h of (hints || []).filter((x) => !x.records)) {
     if (h.layout || !h.types.length) return null;
     for (const t of h.types) {
       if (t === "Any" || t === "File") return null;

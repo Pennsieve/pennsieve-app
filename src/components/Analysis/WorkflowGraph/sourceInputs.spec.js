@@ -102,6 +102,21 @@ describe("inputs of metadata records", () => {
     // A notebook reads both.
     expect(sourceParts("r4", dag, portsOf, (id) => id === "nb")).toEqual({ files: true, records: true });
   });
+
+  it("counts readers it isn't linked into, and notebooks linked without dependsOn", () => {
+    const more = [
+      ...dag,
+      { id: "e", dependsOn: ["r2"] }, // takes all of r2 at its root: files
+      { id: "nb2", inputs: [{ from: "r3", input: "data" }] },
+    ];
+    expect(sourceParts("r2", more, portsOf)).toEqual({ files: true, records: true });
+    expect(sourceParts("r3", more, portsOf, (id) => id === "nb2")).toEqual({ files: true, records: true });
+  });
+
+  it("leaves records inputs out of the file types a source checks", () => {
+    const hints = sourceHints("r1", dag, portsOf);
+    expect(acceptedFileTypes(hints)).toEqual(new Set(["EDF"]));
+  });
 });
 
 describe("file types against an input", () => {
