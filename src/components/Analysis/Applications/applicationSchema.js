@@ -761,6 +761,16 @@ export const structureId = (entry) => {
 };
 
 /**
+ * The registry structure of a dataset's metadata records: an input that
+ * conforms to it takes records (models/<model>/schema.json and
+ * records.jsonl, relationships.csv) in its own folder, not files.
+ */
+export const RECORDS_STRUCTURE = "pennsieve-records";
+
+/** Whether a port takes (or writes) metadata records: its outermost layout. */
+export const isRecordsPort = (port) => structureId(conformsToList(port?.conformsTo)[0]) === RECORDS_STRUCTURE;
+
+/**
  * Can a tree that conforms to `output` (outermost first) feed an input that
  * asks for `input`? When the input's list is the end of the output's:
  * [pennsieve-published-dataset, bids] feeds bids (the app gets files/), but

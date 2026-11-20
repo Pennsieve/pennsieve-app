@@ -1,5 +1,6 @@
 import {
   PARAM_TYPES,
+  isRecordsPort,
   createApplicationSchema,
   createParameter,
   parseApplication,
@@ -1238,3 +1239,13 @@ describe('media type profiles (NWB is application/x-hdf5; profile=nwb)', () => {
     expect(opts.find((o) => o.value === NWB).formats).toEqual(['NeuroData Without Borders'])
   })
 })
+
+describe("isRecordsPort", () => {
+  it("is an input whose outermost layout is pennsieve-records", () => {
+    expect(isRecordsPort({ conformsTo: ["pennsieve-records"] })).toBe(true);
+    expect(isRecordsPort({ conformsTo: "pennsieve-records@1.0" })).toBe(true);
+    expect(isRecordsPort({ conformsTo: ["bids"] })).toBe(false);
+    expect(isRecordsPort({ conformsTo: ["pennsieve-published-dataset", "pennsieve-records"] })).toBe(false);
+    expect(isRecordsPort({})).toBe(false);
+  });
+});
