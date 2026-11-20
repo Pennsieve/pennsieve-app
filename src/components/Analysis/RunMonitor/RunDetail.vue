@@ -90,7 +90,7 @@ import {
   processorConfigEntry,
   lambdaMemory,
 } from "./runHelpers";
-import { sourceLabel, sourceHints, hintLine, portsOfStep, missingFilesMessage, fileTypeMismatches, acceptedFileTypes, linkHints } from "../WorkflowGraph/sourceInputs";
+import { sourceLabel, sourceHints, sourceParts, hintLine, portsOfStep, missingFilesMessage, fileTypeMismatches, acceptedFileTypes, linkHints } from "../WorkflowGraph/sourceInputs";
 import ReferencePickerDialog from "./ReferencePickerDialog.vue";
 import { findReferences, environmentsServiceUrl } from "@/utils/environmentsService";
 import { referenceTargetIn, runReferences, referenceSource, formatSize, choiceLabel, createReferenceCatalog, catalogLacks, defaultIdentity, referenceLabel, referenceKindText } from "./referenceSources";
@@ -251,13 +251,23 @@ const sourcePicker = computed(() => {
   const id = filePickerNodeId.value;
   const dag = configDefinition.value?.dag || [];
   const name = id ? sourceLabel(id, dag, "") : "";
+  const what = pickerParts.value.files ? "files" : "records";
   return {
     name,
-    title: name ? `Select files for ${name}` : "Select Files",
+    title: name ? `Select ${what} for ${name}` : pickerParts.value.files ? "Select Files" : "Select Records",
     hint: id ? hintLine(sourceHints(id, dag, portsOfStep(dag, availableApplications.value))) : "",
   };
 });
 const filePickerNodeId = ref(null);
+// What the open picker's source can take (sourceInputs.js sourceParts): a
+// batch step reads a dataset's records only through an input that takes
+// them, and its files through any other; a notebook reads both.
+const pickerParts = computed(() => {
+  const id = filePickerNodeId.value;
+  const dag = configDefinition.value?.dag || [];
+  if (!id) return { files: true, records: true };
+  return sourceParts(id, dag, portsOfStep(dag, availableApplications.value), (step) => !!nodeConfigs[step]?.interactive);
+});
 // The models of the dataset the open picker shows, for its records choice
 // (none while they load, or for a dataset without models).
 const pickerModels = ref([]);
@@ -4130,6 +4140,7 @@ onUnmounted(() => {
           </div>
           <PublicFilesPicker
             :model-value="publicPicks[filePickerNodeId] || []"
+            :parts="pickerParts"
             :why-not="(name) => pickerWhyNot({ content: { name } })"
             @update:model-value="(picks) => setPublicPicks(filePickerNodeId, picks)"
           />
@@ -4167,14 +4178,17 @@ onUnmounted(() => {
         </div>
         <!-- The dataset's metadata records, by model, with its files -->
         <MetadataRecordsChoice
-          v-if="sourceDatasetOf(filePickerNodeId) && pickerModels.length"
+          v-if="pickerParts.records && sourceDatasetOf(filePickerNodeId) && pickerModels.length"
           :model-value="workspaceRecords[filePickerNodeId]?.models || []"
           :available="pickerModels"
           :hint="WORKSPACE_RECORDS_HINT"
           class="file-picker-records"
           @update:model-value="(models) => setWorkspaceRecords(filePickerNodeId, models)"
         />
-        <p v-if="workspaceRecords[filePickerNodeId] && !filesWithRecords" class="file-picker-empty">
+        <p v-if="!pickerParts.files" class="file-picker-empty">
+          {{ !sourceDatasetOf(filePickerNodeId) ? "Choose a dataset to see its metadata records." : pickerModels.length ? "This input takes the dataset's metadata records." : `${datasetName(sourceDatasetOf(filePickerNodeId), datasetOptions)} has no metadata records.` }}
+        </p>
+        <p v-else-if="workspaceRecords[filePickerNodeId] && !filesWithRecords" class="file-picker-empty">
           This input takes the dataset's metadata records.
         </p>
         <template v-else>

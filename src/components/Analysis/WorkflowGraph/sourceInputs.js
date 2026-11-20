@@ -7,7 +7,7 @@
 // Pure: on DAG steps ({ id, inputs }) and app.yml ports.
 
 import { shortMediaType, versionManifest } from "../WorkflowBuilder/appManifestInfo";
-import { mediaTypesOverlap, normalizeMediaType } from "../Applications/applicationSchema";
+import { isRecordsPort, mediaTypesOverlap, normalizeMediaType } from "../Applications/applicationSchema";
 
 // The inputs a source feeds: { step, input } per link from it.
 export function inputsFedBy(sourceId, steps) {
@@ -40,16 +40,36 @@ export function sourceHints(sourceId, steps, portsOf) {
         types: [...new Set([...(port.mediaTypes || []).map(shortMediaType), ...(port.formats || []).map((f) => EDAM_TYPES[f]).filter(Boolean)])],
         mediaTypes: (port.mediaTypes || []).map(normalizeMediaType).filter(Boolean),
         layout: layout.length ? String(layout[layout.length - 1]).split("@")[0].toUpperCase() : "",
+        // It takes a dataset's metadata records (pennsieve-records), not files.
+        records: isRecordsPort(port),
         description: port.description || "",
       };
     })
     .filter(Boolean);
 }
 
+// What a run can choose for a source: a dataset's files, its metadata
+// records, or both ({ files, records }). A batch step gets a dataset's
+// records only through an input that takes them (app.yml conformsTo:
+// pennsieve-records) and its files through any other; a notebook (a step
+// interactive(stepId) says is one) reads whatever it is given.
+export function sourceParts(sourceId, steps, portsOf, interactive = () => false) {
+  const readers = (steps || []).filter((s) => (s?.dependsOn || []).includes(sourceId));
+  if (readers.some((s) => interactive(s.id))) return { files: true, records: true };
+  const fed = inputsFedBy(sourceId, steps);
+  const hints = sourceHints(sourceId, steps, portsOf);
+  const takesRecords = (f) => hints.some((h) => h.step === f.step && h.input === f.input && h.records);
+  return {
+    files: !fed.length || fed.some((f) => !takesRecords(f)),
+    records: fed.some(takesRecords),
+  };
+}
+
 // One line for a picker: "signals takes CSV files", "study takes a BIDS
 // folder", "a takes CSV; b takes JSON".
 export function hintLine(hints) {
   const lines = (hints || []).map((h) => {
+    if (h.records) return `${h.input} takes a dataset's metadata records`;
     if (h.layout) return `${h.input} takes a ${h.layout} folder`;
     if (h.types.length) return `${h.input} takes ${h.types.join(", ")} files`;
     return "";
