@@ -477,9 +477,9 @@
                 <label class="field-label">Placed at</label>
                 <div class="field-control">
                   <span class="field-static"><code>$INPUT_DIR/{{ port.name || "&lt;name&gt;" }}/</code></span>
-                  <p class="field-hint">{{ portMode(port) === "records" ? "Records go in the input's own folder." : portMode(port) === "kgx" ? "The graph goes in the input's own folder." : "A reference is unpacked into the input's own folder." }}</p>
+                  <p class="field-hint">{{ isViewPartMode(portMode(port)) ? viewPart(portMode(port)).placed : "A reference is unpacked into the input's own folder." }}</p>
                   <p v-if="isViewPartMode(portMode(port)) && port.placement !== 'subfolder'" class="field-error">
-                    The app.yml places it at the root of INPUT_DIR, which Pennsieve refuses for {{ portMode(port) === "kgx" ? "a graph" : "records" }}.
+                    The app.yml places it at the root of INPUT_DIR, which Pennsieve refuses for {{ viewPart(portMode(port)).what }}.
                     <button type="button" class="link-button" @click="port.placement = 'subfolder'">Put it in its own folder</button>
                   </p>
                 </div>
@@ -576,7 +576,7 @@ import { computed, onMounted, reactive, ref, toRaw, watch } from "vue";
 import { useStore } from "vuex";
 import MoreOptions from "./MoreOptions.vue";
 import FieldHint from "./FieldHint.vue";
-import { PARAM_TYPES, PARAM_TYPE_OPTIONS, createParameter, createPort, portDataTypeOptions, normalizeMediaType, keptFormats, STANDARD_CPU_OPTIONS, getStandardMemoryOptions, isNumericType, mediaTypeMatches, structureId, structureOptionsFor, structureMatches, isStructureLink, conformsToList, rootInputCollisions, VIEW_PARTS, viewPartOf } from "./applicationSchema";
+import { PARAM_TYPES, PARAM_TYPE_OPTIONS, createParameter, createPort, portDataTypeOptions, normalizeMediaType, keptFormats, STANDARD_CPU_OPTIONS, getStandardMemoryOptions, isNumericType, mediaTypeMatches, structureId, structureOptionsFor, structureMatches, isStructureLink, conformsToList, rootInputCollisions, VIEW_PARTS, viewPart, viewPartOf } from "./applicationSchema";
 import { environmentsServiceUrl, findReferences } from "@/utils/environmentsService";
 import { useOntologyStore } from "@/stores/ontologyStore";
 import { REFERENCE_KINDS, assetClassName, isAppDefault, organismName, referenceBlock, referenceKindText, referenceLabel, taxonFromTerm, rankOrganisms, COMMON_ORGANISMS } from "../RunMonitor/referenceSources";
@@ -971,7 +971,7 @@ const structureOptions = computed(() =>
 const layoutOptionsFor = (blockKey) =>
   blockKey === "inputs" ? structureOptions.value.filter((o) => !VIEW_PARTS.some((p) => p.structure === o.id)) : structureOptions.value;
 // Whether a port mode is a view part's (records, kgx): the part's name.
-const isViewPartMode = (mode) => VIEW_PARTS.some((p) => p.part === mode);
+const isViewPartMode = (mode) => !!viewPart(mode);
 /*
   What an input or output is made of at its root, the first thing the card
   asks: files, folders of a folder format (OME-Zarr, as container:
@@ -983,8 +983,7 @@ const PORT_MODES = [
   { value: "file", label: "Files", hint: "Each item is one file: an EDF recording, a DICOM slice, a CSV table. A folder of them is fine; paths are kept." },
   { value: "folder", label: "Folders of a format", hint: "Each item is a folder that is one thing, in a folder format: an .ome.zarr image, a .mefd session." },
   { value: "layout", label: "One folder with a set layout", hint: "One folder tree laid out by a standard, such as BIDS or a Pennsieve published dataset." },
-  { value: "records", label: "Metadata records", hint: "A dataset's metadata records: each model's schema and records, and the links between them. A run takes them from the dataset it picks, in this input's own folder." },
-  { value: "kgx", label: "Knowledge graph (KGX)", hint: "A dataset's metadata records as a knowledge graph in KGX tables: nodes and edges, as TSV and Parquet. For graph tools such as NetworkX, GRAPE, PyKEEN or Neo4j. A run takes it from the dataset it picks, in this input's own folder." },
+  ...VIEW_PARTS.map((p) => ({ value: p.part, label: p.label, hint: p.hint })),
   { value: "reference", label: "Reference data", hint: "A folder whose contents are declared as a published reference, such as a genome index or a brain template, by public identifiers rather than by file type. Pennsieve can fill it from its reference data; otherwise a run takes files." },
 ];
 // Reference data and a dataset's records or graph are for inputs.
@@ -1018,9 +1017,9 @@ const dropReference = (port) => {
 const setPortMode = (port, mode) => {
   if (portMode(port) === mode) return;
   // The name a records or graph mode suggested goes with it.
-  const was = VIEW_PARTS.find((p) => p.part === portMode(port));
+  const was = viewPart(portMode(port));
   if (was && port.name === was.name) port.name = "";
-  const part = VIEW_PARTS.find((p) => p.part === mode);
+  const part = viewPart(mode);
   if (part) {
     // A layout of its own, always in the input's folder; no formats.
     if (portMode(port) === "reference") dropReference(port);

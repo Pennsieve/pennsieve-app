@@ -43,8 +43,6 @@ export function sourceHints(sourceId, steps, portsOf) {
         // The part of a dataset it takes other than files (VIEW_PARTS:
         // records for pennsieve-records, kgx for a knowledge graph), or "".
         part: viewPartOf(port)?.part || "",
-        // It takes a dataset's metadata records (pennsieve-records), not files.
-        records: viewPartOf(port)?.part === "records",
         description: port.description || "",
       };
     })
@@ -56,16 +54,12 @@ export function sourceHints(sourceId, steps, portsOf) {
 // batch step gets a dataset's records or graph only through an input that
 // takes that part (app.yml conformsTo: pennsieve-records, kgx; VIEW_PARTS)
 // and its files through any other; a notebook (a step interactive(stepId)
-// says is one) reads whatever it is given: its files and records, and the
-// graph comes with the records.
-export const ALL_PARTS = Object.freeze({ files: true, records: true, kgx: false });
+// says is one) reads whatever it is given: its files and records (its view
+// has the graph too).
+export const NOTEBOOK_PARTS = Object.freeze({ files: true, records: true, kgx: false });
 export function sourceParts(sourceId, steps, portsOf, interactive = () => false) {
   const linked = (s) => (Array.isArray(s?.inputs) ? s.inputs : []).some((l) => l?.from === sourceId);
   const readers = (steps || []).filter((s) => (s?.dependsOn || []).includes(sourceId) || linked(s));
-  // A step whose ports aren't known yet (the app list is loading) may take
-  // either, as may a notebook.
-  const unknown = (s) => linked(s) && !portsOf(s.id);
-  if (readers.some((s) => interactive(s.id) || unknown(s))) return { ...ALL_PARTS };
   const fed = inputsFedBy(sourceId, steps);
   const hints = sourceHints(sourceId, steps, portsOf);
   const partOf = (f) => hints.find((h) => h.step === f.step && h.input === f.input)?.part || "";
@@ -74,12 +68,12 @@ export function sourceParts(sourceId, steps, portsOf, interactive = () => false)
     files: !fed.length || readers.some((s) => !linked(s)) || fed.some((f) => !partOf(f)),
   };
   for (const p of VIEW_PARTS) parts[p.part] = fed.some((f) => partOf(f) === p.part);
+  // A step whose ports aren't known yet (the app list is loading) may take
+  // files or records, as may a notebook; a graph a known batch step takes
+  // is still asked for.
+  if (readers.some((s) => interactive(s.id) || (linked(s) && !portsOf(s.id)))) return { ...parts, files: true, records: true };
   return parts;
 }
-
-// Whether a source takes only parts of a dataset that aren't files (records,
-// a graph): its picker picks a dataset, not files.
-export const takesNoFiles = (parts) => !parts?.files;
 
 // What a source takes, in a few words ("files", "metadata records",
 // "knowledge graph", "metadata records and knowledge graph").

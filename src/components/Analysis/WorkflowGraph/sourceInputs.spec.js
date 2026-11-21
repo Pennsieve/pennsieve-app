@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { inputsFedBy, sourceLabel, sourceHints, sourceParts, partsWhat, takesNoFiles, hintLine, portsOfStep, missingFilesMessage, fileShortType, fileShortTypes, fileTypeMismatches, acceptedFileTypes, linkHints, fileMediaTypes } from "./sourceInputs";
+import { inputsFedBy, sourceLabel, sourceHints, sourceParts, partsWhat, hintLine, portsOfStep, missingFilesMessage, fileShortType, fileShortTypes, fileTypeMismatches, acceptedFileTypes, linkHints, fileMediaTypes } from "./sourceInputs";
 
 // Four sources into test-ports-processor: two linked to its inputs, two to
 // "all inputs".
@@ -89,7 +89,7 @@ describe("inputs of metadata records", () => {
 
   it("says an input takes records", () => {
     const hints = sourceHints("r2", dag, portsOf);
-    expect(hints.map((h) => [h.input, h.records])).toEqual([["records", true]]);
+    expect(hints.map((h) => [h.input, h.part])).toEqual([["records", "records"]]);
     expect(hintLine(hints)).toBe("records takes a dataset's metadata records");
   });
 
@@ -271,7 +271,7 @@ describe("inputs of a knowledge graph", () => {
 
   it("says an input takes a graph, and its files say nothing about types", () => {
     const hints = sourceHints("k", dag, portsOf);
-    expect(hints.map((h) => [h.input, h.part, h.records])).toEqual([["graph", "kgx", false]]);
+    expect(hints.map((h) => [h.input, h.part])).toEqual([["graph", "kgx"]]);
     expect(hintLine(hints)).toBe("graph takes a dataset's knowledge graph");
     expect(acceptedFileTypes(hints)).toBe(null);
   });
@@ -280,8 +280,11 @@ describe("inputs of a knowledge graph", () => {
     expect(sourceParts("k", dag, portsOf)).toEqual({ files: false, records: false, kgx: true });
     expect(sourceParts("m", dag, portsOf)).toEqual({ files: false, records: true, kgx: true });
     expect(sourceParts("f", dag, portsOf)).toEqual({ files: true, records: false, kgx: true });
-    expect(takesNoFiles(sourceParts("k", dag, portsOf))).toBe(true);
-    expect(takesNoFiles(sourceParts("f", dag, portsOf))).toBe(false);
+  });
+
+  it("still asks for a graph a batch step takes when a notebook reads the source too", () => {
+    const withNotebook = [...dag, { id: "nb", dependsOn: ["k"] }];
+    expect(sourceParts("k", withNotebook, portsOf, (id) => id === "nb")).toEqual({ files: true, records: true, kgx: true });
   });
 
   it("names what a source takes", () => {
