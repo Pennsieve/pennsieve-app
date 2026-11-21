@@ -16,9 +16,15 @@ import { sessionPathCode } from "./pathCode";
 import { visibleEntries, readShowHidden, writeShowHidden, readOnlyLocal, writeOnlyLocal } from "./fileBrowserHelpers";
 import { useRememberedFold } from "./sectionFold";
 import { costLine } from "./inputsHelpers";
+import { sourceAt, sourceBase } from "./useSessionInputs";
+import { layoutsOf, layoutAt } from "./structuredLayouts";
+import { VIEW_CRATE_DIR } from "@/composables/useJupyterSession";
 
 const props = defineProps({
   listDir: { type: Function, required: true },
+  // Reads a small text file of the session (path) or gives null: a view's
+  // crate, a structured layout's description.
+  readText: { type: Function, default: null },
   ready: { type: Boolean, default: false },
   // The kernel's language and version ("Python 3.12.3"): copied paths are
   // code for it (pathCode.js).
@@ -78,11 +84,47 @@ function withViews(disk, dirPath) {
   return [...byName.values()].sort((a, b) => dirsFirst(a) - dirsFirst(b) || a.name.localeCompare(b.name));
 }
 
+// A view's structured layouts (structuredLayouts.js), read once per view
+// version from its crate in the session, or by path without one.
+const layoutsCache = new Map();
+function layoutsFor(source) {
+  const base = sourceBase(source);
+  const key = `${base}|${source.viewId}|${source.version}`;
+  if (!layoutsCache.has(key)) {
+    const read = props.readText ? props.readText(`${base}/${VIEW_CRATE_DIR}/view.json`) : Promise.resolve(null);
+    layoutsCache.set(
+      key,
+      read
+        .then((text) => {
+          try {
+            return text ? JSON.parse(text) : null;
+          } catch {
+            return null;
+          }
+        })
+        .then((crate) => layoutsOf(crate, source.entries))
+    );
+  }
+  return layoutsCache.get(key);
+}
+
+// A folder of a view that is one of its structured layouts shows as one
+// row (FileNode), with the layout.
+async function withLayouts(rows, dirPath) {
+  const at = props.inputs ? sourceAt(props.inputs.sources, dirPath) : null;
+  if (!at) return rows;
+  const layouts = await layoutsFor(at.source);
+  for (const n of rows) {
+    if (n.type === "directory" && n.view?.rel) n.layout = layoutAt(layouts, n.view.rel);
+  }
+  return rows;
+}
+
 // A folder's children: on the disk (none for one that's only in a view),
 // with what the views hold there.
 async function childrenOf(node) {
   const disk = node.virtual ? [] : (await props.listDir(node.path)).map(decorate);
-  return withViews(disk, node.path);
+  return withLayouts(withViews(disk, node.path), node.path);
 }
 
 async function loadRoot(preserve = false) {
@@ -166,6 +208,7 @@ function refresh() {
 watch(
   () => props.inputs?.sources,
   () => {
+    layoutsCache.clear();
     if (props.ready && roots.value.length) refresh();
   }
 );
@@ -298,6 +341,7 @@ function copyPath(node) {
         :fmt-size="fmtSize"
         :fmt-time="fmtTime"
         :inputs="inputs"
+        :read-text="readText"
         :kernel-name="kernelName"
         :assist-available="assistAvailable"
         :assist-paused="assistPaused"

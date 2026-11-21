@@ -150,6 +150,7 @@ const {
   openNotebookFrom,
   findInputNotebooks,
   listDir,
+  readText,
   fetchInputs,
   inputsStatus,
   cancelInputs,
@@ -1138,6 +1139,7 @@ const kernelPill = computed(() => {
           <FileBrowser
             ref="fileBrowserRef"
             :list-dir="listDir"
+            :read-text="readText"
             :ready="status === 'ready'"
             :kernel-name="kernelName"
             :inputs="inputs"
