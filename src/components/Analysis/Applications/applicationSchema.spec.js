@@ -1,6 +1,7 @@
 import {
   PARAM_TYPES,
   isRecordsPort,
+  viewPartOf,
   createApplicationSchema,
   createParameter,
   parseApplication,
@@ -1260,3 +1261,23 @@ describe("an input of metadata records", () => {
     expect([].concat(again.inputs[0].conformsTo)).toEqual(["pennsieve-records"])
   })
 })
+
+describe("viewPartOf", () => {
+  it("is the part an input's outermost layout picks", () => {
+    expect(viewPartOf({ conformsTo: ["kgx"] })?.part).toBe("kgx");
+    expect(viewPartOf({ conformsTo: "kgx@1.0" })?.part).toBe("kgx");
+    expect(viewPartOf({ conformsTo: ["pennsieve-records"] })?.part).toBe("records");
+    expect(viewPartOf({ conformsTo: ["ro-crate", "kgx"] })).toBe(null);
+    expect(viewPartOf({ conformsTo: ["bids"] })).toBe(null);
+    expect(viewPartOf({})).toBe(null);
+    expect(isRecordsPort({ conformsTo: ["kgx"] })).toBe(false);
+  });
+  it("reads and writes a graph input as conformsTo kgx in its own folder", () => {
+    const yaml = "application:\n  name: a\ninputs:\n  - name: graph\n    conformsTo: kgx\n    placement: subfolder\n"
+    const { meta, schema } = parseManifest(yaml)
+    expect(viewPartOf(schema.inputs[0])?.part).toBe("kgx")
+    const again = loadYaml(manifestToYaml(buildManifest(schema, meta)))
+    expect(again.inputs[0].placement).toBe("subfolder")
+    expect([].concat(again.inputs[0].conformsTo)).toEqual(["kgx"])
+  })
+});

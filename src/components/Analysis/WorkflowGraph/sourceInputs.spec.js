@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { inputsFedBy, sourceLabel, sourceHints, sourceParts, hintLine, portsOfStep, missingFilesMessage, fileShortType, fileShortTypes, fileTypeMismatches, acceptedFileTypes, linkHints, fileMediaTypes } from "./sourceInputs";
+import { inputsFedBy, sourceLabel, sourceHints, sourceParts, partsWhat, takesNoFiles, hintLine, portsOfStep, missingFilesMessage, fileShortType, fileShortTypes, fileTypeMismatches, acceptedFileTypes, linkHints, fileMediaTypes } from "./sourceInputs";
 
 // Four sources into test-ports-processor: two linked to its inputs, two to
 // "all inputs".
@@ -94,13 +94,13 @@ describe("inputs of metadata records", () => {
   });
 
   it("offers a source's files, records or both, by what it feeds", () => {
-    expect(sourceParts("r1", dag, portsOf)).toEqual({ files: true, records: true });
-    expect(sourceParts("r2", dag, portsOf)).toEqual({ files: false, records: true });
-    expect(sourceParts("r3", dag, portsOf)).toEqual({ files: true, records: false });
+    expect(sourceParts("r1", dag, portsOf)).toEqual({ files: true, records: true, kgx: false });
+    expect(sourceParts("r2", dag, portsOf)).toEqual({ files: false, records: true, kgx: false });
+    expect(sourceParts("r3", dag, portsOf)).toEqual({ files: true, records: false, kgx: false });
     // Unlinked into a batch step: files.
-    expect(sourceParts("r4", dag, portsOf)).toEqual({ files: true, records: false });
+    expect(sourceParts("r4", dag, portsOf)).toEqual({ files: true, records: false, kgx: false });
     // A notebook reads both.
-    expect(sourceParts("r4", dag, portsOf, (id) => id === "nb")).toEqual({ files: true, records: true });
+    expect(sourceParts("r4", dag, portsOf, (id) => id === "nb")).toEqual({ files: true, records: true, kgx: false });
   });
 
   it("counts readers it isn't linked into, and notebooks linked without dependsOn", () => {
@@ -109,17 +109,17 @@ describe("inputs of metadata records", () => {
       { id: "e", dependsOn: ["r2"] }, // takes all of r2 at its root: files
       { id: "nb2", inputs: [{ from: "r3", input: "data" }] },
     ];
-    expect(sourceParts("r2", more, portsOf)).toEqual({ files: true, records: true });
-    expect(sourceParts("r3", more, portsOf, (id) => id === "nb2")).toEqual({ files: true, records: true });
+    expect(sourceParts("r2", more, portsOf)).toEqual({ files: true, records: true, kgx: false });
+    expect(sourceParts("r3", more, portsOf, (id) => id === "nb2")).toEqual({ files: true, records: true, kgx: false });
   });
 
   it("offers both while a step's ports aren't known", () => {
-    expect(sourceParts("r2", dag, () => null)).toEqual({ files: true, records: true });
+    expect(sourceParts("r2", dag, () => null)).toEqual({ files: true, records: true, kgx: false });
   });
 
   it("gives a link to all inputs (no input named) the files", () => {
     const all = [{ id: "s" }, { id: "f", inputs: [{ from: "s" }] }];
-    expect(sourceParts("s", all, () => ({ inputs: [] }))).toEqual({ files: true, records: false });
+    expect(sourceParts("s", all, () => ({ inputs: [] }))).toEqual({ files: true, records: false, kgx: false });
   });
 
   it("names what is missing", () => {
@@ -242,5 +242,51 @@ describe("formats sharing a media type (profiles)", () => {
     const hints = hintsFor(["image/tiff; profile=ome-tiff"]);
     expect(hints[0].types).toEqual(["OME-TIFF"]);
     expect(fileTypeMismatches(["x.ome.tiff", "y.tif"], hints)).toEqual({ names: ["y.tif"], expected: "OME-TIFF" });
+  });
+});
+
+describe("inputs of a knowledge graph", () => {
+  // k feeds only a graph input; m feeds a graph and a records input; f feeds files and the graph.
+  const dag = [
+    { id: "k" }, { id: "m" }, { id: "f" },
+    {
+      id: "g",
+      dependsOn: ["k", "m", "f"],
+      inputs: [
+        { from: "k", input: "graph" },
+        { from: "m", input: "graph" },
+        { from: "m", input: "records" },
+        { from: "f", input: "recordings" },
+        { from: "f", input: "graph" },
+      ],
+    },
+  ];
+  const portsOf = () => ({
+    inputs: [
+      { name: "recordings", mediaTypes: ["application/x-edf"] },
+      { name: "records", conformsTo: ["pennsieve-records"], placement: "subfolder" },
+      { name: "graph", conformsTo: ["kgx@1.0"], placement: "subfolder" },
+    ],
+  });
+
+  it("says an input takes a graph, and its files say nothing about types", () => {
+    const hints = sourceHints("k", dag, portsOf);
+    expect(hints.map((h) => [h.input, h.part, h.records])).toEqual([["graph", "kgx", false]]);
+    expect(hintLine(hints)).toBe("graph takes a dataset's knowledge graph");
+    expect(acceptedFileTypes(hints)).toBe(null);
+  });
+
+  it("offers the graph, alone or beside the other parts, one part per link", () => {
+    expect(sourceParts("k", dag, portsOf)).toEqual({ files: false, records: false, kgx: true });
+    expect(sourceParts("m", dag, portsOf)).toEqual({ files: false, records: true, kgx: true });
+    expect(sourceParts("f", dag, portsOf)).toEqual({ files: true, records: false, kgx: true });
+    expect(takesNoFiles(sourceParts("k", dag, portsOf))).toBe(true);
+    expect(takesNoFiles(sourceParts("f", dag, portsOf))).toBe(false);
+  });
+
+  it("names what a source takes", () => {
+    expect(partsWhat({ files: false, records: false, kgx: true })).toBe("knowledge graph");
+    expect(partsWhat({ files: false, records: true, kgx: true })).toBe("metadata records and knowledge graph");
+    expect(partsWhat({ files: true, records: false, kgx: false })).toBe("files");
   });
 });

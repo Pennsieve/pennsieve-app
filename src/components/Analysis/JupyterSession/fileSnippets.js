@@ -405,10 +405,91 @@ const schemaSummary = (m) =>
     "fields",
   );
 
+/* ------------------------------------------------- knowledge graph --- */
+// A view's records as a knowledge graph: metadata/kgx/, KGX tables (the kgx
+// structure, schemas.pennsieve.io/structures/kgx). Nodes: id, category
+// (a list), name, provided_by, properties (JSON); edges: id, subject,
+// predicate, object and provenance columns. Records are pennsieve:<uuid>
+// nodes; coded values are biolink:has_attribute edges to term nodes. The
+// cells read the Parquet files, which have the same rows as the TSV.
+const kgxNote = (lib) => `# Written for this view's knowledge graph (KGX tables): plain ${lib}, no Pennsieve library needed`;
+
+// nodes and edges as DuckDB views over the Parquet files.
+const kgxSetup = (k) =>
+  lines(
+    needs("duckdb", "pandas"),
+    "import duckdb",
+    "from pathlib import Path",
+    "",
+    `kgx = Path(${k})`,
+    "con = duckdb.connect()",
+    "text = lambda s: \"'\" + str(s).replace(\"'\", \"''\") + \"'\"",
+    "con.sql(f\"CREATE OR REPLACE VIEW nodes AS SELECT * FROM read_parquet({text(kgx / 'nodes.parquet')})\")",
+    "con.sql(f\"CREATE OR REPLACE VIEW edges AS SELECT * FROM read_parquet({text(kgx / 'edges.parquet')})\")",
+    "# In later cells: con.sql('SELECT * FROM nodes').df(); category is a list, properties a JSON object",
+  );
+
+// The graph's nodes by category and edges by predicate.
+const kgxLoad = (k) =>
+  lines(
+    kgxSetup(k),
+    "",
+    shown(["SELECT category, count(*) AS nodes FROM (SELECT unnest(category) AS category FROM nodes) GROUP BY ALL ORDER BY nodes DESC"]),
+    sqlCell(["SELECT predicate, count(*) AS edges FROM edges GROUP BY ALL ORDER BY edges DESC"]),
+  );
+
+// One hop through a term: records that share a term (a coded value), and
+// what a record links to.
+const kgxQuery = (k) =>
+  lines(
+    kgxSetup(k),
+    "",
+    "# Examples: change them, or write your own SQL over nodes and edges",
+    "# The terms most records share (coded values: record -> term edges)",
+    shown([
+      "SELECT t.id AS term, t.name AS label, e.pennsieve_property AS property, count(*) AS records",
+      "FROM edges AS e JOIN nodes AS t ON t.id = e.object",
+      "WHERE e.predicate = 'biolink:has_attribute'",
+      "GROUP BY ALL ORDER BY records DESC LIMIT 20",
+    ]),
+    "# One hop through a term: pairs of records with the same term",
+    sqlCell([
+      "SELECT a.subject AS record, ra.name AS record_name, t.id AS term, t.name AS label,",
+      "       b.subject AS other, rb.name AS other_name",
+      "FROM edges AS a",
+      "JOIN edges AS b ON b.object = a.object AND b.subject <> a.subject AND b.predicate = a.predicate",
+      "JOIN nodes AS t ON t.id = a.object",
+      "JOIN nodes AS ra ON ra.id = a.subject",
+      "JOIN nodes AS rb ON rb.id = b.subject",
+      "WHERE a.predicate = 'biolink:has_attribute'",
+      "LIMIT 100",
+    ]),
+  );
+
+// The graph in NetworkX: a directed multigraph, nodes with their category
+// and name, edges with their predicate.
+const kgxNetworkx = (k) =>
+  lines(
+    needs("pandas", "pyarrow", "networkx"),
+    "import networkx as nx",
+    "import pandas as pd",
+    "from pathlib import Path",
+    "",
+    `kgx = Path(${k})`,
+    "nodes = pd.read_parquet(kgx / \"nodes.parquet\")",
+    "edges = pd.read_parquet(kgx / \"edges.parquet\")",
+    "g = nx.from_pandas_edgelist(edges, \"subject\", \"object\", edge_attr=[\"predicate\"], create_using=nx.MultiDiGraph)",
+    "g.add_nodes_from((r.id, {\"category\": list(r.category), \"name\": r.name}) for r in nodes.itertuples())",
+    "print(g)",
+    "# The best-connected nodes",
+    "pd.DataFrame(sorted(g.degree, key=lambda d: -d[1])[:10], columns=[\"id\", \"degree\"]).merge(nodes[[\"id\", \"name\", \"category\"]], on=\"id\")",
+  );
+
 // Which of a view's metadata folders a folder is, from its path in the
-// view (its crate path: "metadata/" or "metadata/models/<model>/"), or
-// null for any other.
+// view (its crate path: "metadata/", "metadata/models/<model>/" or
+// "metadata/kgx/"), or null for any other.
 export function metadataFolder(rel) {
+  if (/^metadata\/kgx\/?$/.test(String(rel || ""))) return { level: "kgx", model: null };
   // Model names are metadata-service's (lower-case letters, digits, _), so
   // a name can go into the generated code as is; any other folder gets none.
   const m = String(rel || "").match(/^metadata(?:\/models\/([a-z0-9_]+))?\/?$/);
@@ -421,6 +502,14 @@ export function metadataFolder(rel) {
 export function folderSnippets(path, rel, kernelName = "") {
   const f = metadataFolder(rel);
   if (!f || isR(kernelName)) return [];
+  if (f.level === "kgx") {
+    const k = sessionPathCode(String(path).replace(/\/+$/, ""), kernelName);
+    return [
+      { id: "load", label: "Load", title: "The graph's nodes and edges as DuckDB views, with counts by category and predicate", code: `${kgxNote("DuckDB")}\n${kgxLoad(k)}` },
+      { id: "query", label: "Query", title: "Load, then example queries: shared terms, and records one hop apart through a term", code: `${kgxNote("DuckDB")}\n${kgxQuery(k)}` },
+      { id: "networkx", label: "NetworkX", title: "The graph in NetworkX, and its best-connected nodes", code: `${kgxNote("NetworkX")}\n${kgxNetworkx(k)}` },
+    ];
+  }
   // The metadata folder in the session: path, less what rel has after metadata.
   const below = String(rel).replace(/\/+$/, "").length - "metadata".length;
   const folder = String(path).replace(/\/+$/, "");

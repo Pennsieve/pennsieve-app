@@ -7,7 +7,7 @@
 // Pure: on DAG steps ({ id, inputs }) and app.yml ports.
 
 import { shortMediaType, versionManifest } from "../WorkflowBuilder/appManifestInfo";
-import { isRecordsPort, mediaTypesOverlap, normalizeMediaType } from "../Applications/applicationSchema";
+import { VIEW_PARTS, viewPartOf, mediaTypesOverlap, normalizeMediaType } from "../Applications/applicationSchema";
 
 // The inputs a source feeds: { step, input } per link from it.
 export function inputsFedBy(sourceId, steps) {
@@ -40,8 +40,11 @@ export function sourceHints(sourceId, steps, portsOf) {
         types: [...new Set([...(port.mediaTypes || []).map(shortMediaType), ...(port.formats || []).map((f) => EDAM_TYPES[f]).filter(Boolean)])],
         mediaTypes: (port.mediaTypes || []).map(normalizeMediaType).filter(Boolean),
         layout: layout.length ? String(layout[layout.length - 1]).split("@")[0].toUpperCase() : "",
+        // The part of a dataset it takes other than files (VIEW_PARTS:
+        // records for pennsieve-records, kgx for a knowledge graph), or "".
+        part: viewPartOf(port)?.part || "",
         // It takes a dataset's metadata records (pennsieve-records), not files.
-        records: isRecordsPort(port),
+        records: viewPartOf(port)?.part === "records",
         description: port.description || "",
       };
     })
@@ -49,32 +52,47 @@ export function sourceHints(sourceId, steps, portsOf) {
 }
 
 // What a run can choose for a source: a dataset's files, its metadata
-// records, or both ({ files, records }). A batch step gets a dataset's
-// records only through an input that takes them (app.yml conformsTo:
-// pennsieve-records) and its files through any other; a notebook (a step
-// interactive(stepId) says is one) reads whatever it is given.
+// records, its knowledge graph, or several ({ files, records, kgx }). A
+// batch step gets a dataset's records or graph only through an input that
+// takes that part (app.yml conformsTo: pennsieve-records, kgx; VIEW_PARTS)
+// and its files through any other; a notebook (a step interactive(stepId)
+// says is one) reads whatever it is given: its files and records, and the
+// graph comes with the records.
+export const ALL_PARTS = Object.freeze({ files: true, records: true, kgx: false });
 export function sourceParts(sourceId, steps, portsOf, interactive = () => false) {
   const linked = (s) => (Array.isArray(s?.inputs) ? s.inputs : []).some((l) => l?.from === sourceId);
   const readers = (steps || []).filter((s) => (s?.dependsOn || []).includes(sourceId) || linked(s));
   // A step whose ports aren't known yet (the app list is loading) may take
   // either, as may a notebook.
   const unknown = (s) => linked(s) && !portsOf(s.id);
-  if (readers.some((s) => interactive(s.id) || unknown(s))) return { files: true, records: true };
+  if (readers.some((s) => interactive(s.id) || unknown(s))) return { ...ALL_PARTS };
   const fed = inputsFedBy(sourceId, steps);
   const hints = sourceHints(sourceId, steps, portsOf);
-  const takesRecords = (f) => hints.some((h) => h.step === f.step && h.input === f.input && h.records);
-  return {
+  const partOf = (f) => hints.find((h) => h.step === f.step && h.input === f.input)?.part || "";
+  const parts = {
     // A step it isn't linked into takes all of it at the root: its files.
-    files: !fed.length || readers.some((s) => !linked(s)) || fed.some((f) => !takesRecords(f)),
-    records: fed.some(takesRecords),
+    files: !fed.length || readers.some((s) => !linked(s)) || fed.some((f) => !partOf(f)),
   };
+  for (const p of VIEW_PARTS) parts[p.part] = fed.some((f) => partOf(f) === p.part);
+  return parts;
+}
+
+// Whether a source takes only parts of a dataset that aren't files (records,
+// a graph): its picker picks a dataset, not files.
+export const takesNoFiles = (parts) => !parts?.files;
+
+// What a source takes, in a few words ("files", "metadata records",
+// "knowledge graph", "metadata records and knowledge graph").
+export function partsWhat(parts) {
+  const names = [...(parts?.files ? ["files"] : []), ...VIEW_PARTS.filter((p) => parts?.[p.part]).map((p) => p.what)];
+  return names.length ? listed(names) : "files";
 }
 
 // One line for a picker: "signals takes CSV files", "study takes a BIDS
 // folder", "a takes CSV; b takes JSON".
 export function hintLine(hints) {
   const lines = (hints || []).map((h) => {
-    if (h.records) return `${h.input} takes a dataset's metadata records`;
+    if (h.part) return `${h.input} takes a dataset's ${VIEW_PARTS.find((p) => p.part === h.part)?.what || h.part}`;
     if (h.layout) return `${h.input} takes a ${h.layout} folder`;
     if (h.types.length) return `${h.input} takes ${h.types.join(", ")} files`;
     return "";
@@ -198,8 +216,8 @@ export function fileTypeMismatches(fileNames, hints, formats = []) {
 // declares no types.
 export function acceptedFileTypes(hints) {
   const accepted = new Set();
-  // A records input takes no files: it says nothing about them.
-  for (const h of (hints || []).filter((x) => !x.records)) {
+  // A records or graph input takes no files: it says nothing about them.
+  for (const h of (hints || []).filter((x) => !x.part)) {
     if (h.layout || !h.types.length) return null;
     for (const t of h.types) {
       if (t === "Any" || t === "File") return null;

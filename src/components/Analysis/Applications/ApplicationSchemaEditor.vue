@@ -327,6 +327,13 @@
                 <code>models/&lt;model&gt;/versions/&lt;n&gt;/schema.json</code> and <code>records.jsonl</code> for each version of each model's schema, and <code>relationships.csv</code> for the links between records.
                 Pennsieve fills it from the dataset; elsewhere, lay the folder out the same way.
               </p>
+              <!-- A dataset's records as a knowledge graph: KGX tables in its own folder -->
+              <p v-if="portMode(port) === 'kgx'" class="field-hint reference-summary">
+                The folder <code>$INPUT_DIR/{{ port.name || "&lt;name&gt;" }}/</code> holds the dataset's records as a knowledge graph, as they are when the run starts:
+                <code>nodes.tsv.gz</code>, <code>edges.tsv.gz</code>, <code>nodes.parquet</code>, <code>edges.parquet</code>, <code>graph.json</code> and <code>graph_stats.yaml</code>
+                (<a href="https://schemas.pennsieve.io/structures/kgx/v1.0" target="_blank" rel="noopener">KGX tables</a>; read the Parquet files with DuckDB or pandas, the TSV with kgx or GRAPE).
+                Records are nodes; their links and coded values are edges. Pennsieve fills it from a workspace dataset with metadata records.
+              </p>
               <!-- A file or a folder: its format -->
               <div v-if="portMode(port) === 'file' || portMode(port) === 'folder'" class="field-row full-width" :data-field="`${block.key}.${index}.mediaTypes`" :class="{ 'has-problem': formatProblems(port, `${block.key}.${index}.mediaTypes`).length > 0 }">
                 <label class="field-label">{{ portMode(port) === "folder" ? "Folder formats" : "Media types" }}</label>
@@ -466,13 +473,13 @@
                   </p>
                 </div>
               </div>
-              <div v-if="block.key === 'inputs' && (portMode(port) === 'reference' || portMode(port) === 'records')" class="field-row full-width">
+              <div v-if="block.key === 'inputs' && (portMode(port) === 'reference' || isViewPartMode(portMode(port)))" class="field-row full-width">
                 <label class="field-label">Placed at</label>
                 <div class="field-control">
                   <span class="field-static"><code>$INPUT_DIR/{{ port.name || "&lt;name&gt;" }}/</code></span>
-                  <p class="field-hint">{{ portMode(port) === "records" ? "Records go in the input's own folder." : "A reference is unpacked into the input's own folder." }}</p>
-                  <p v-if="portMode(port) === 'records' && port.placement !== 'subfolder'" class="field-error">
-                    The app.yml places it at the root of INPUT_DIR, which Pennsieve refuses for records.
+                  <p class="field-hint">{{ portMode(port) === "records" ? "Records go in the input's own folder." : portMode(port) === "kgx" ? "The graph goes in the input's own folder." : "A reference is unpacked into the input's own folder." }}</p>
+                  <p v-if="isViewPartMode(portMode(port)) && port.placement !== 'subfolder'" class="field-error">
+                    The app.yml places it at the root of INPUT_DIR, which Pennsieve refuses for {{ portMode(port) === "kgx" ? "a graph" : "records" }}.
                     <button type="button" class="link-button" @click="port.placement = 'subfolder'">Put it in its own folder</button>
                   </p>
                 </div>
@@ -569,7 +576,7 @@ import { computed, onMounted, reactive, ref, toRaw, watch } from "vue";
 import { useStore } from "vuex";
 import MoreOptions from "./MoreOptions.vue";
 import FieldHint from "./FieldHint.vue";
-import { PARAM_TYPES, PARAM_TYPE_OPTIONS, createParameter, createPort, portDataTypeOptions, normalizeMediaType, keptFormats, STANDARD_CPU_OPTIONS, getStandardMemoryOptions, isNumericType, mediaTypeMatches, structureId, structureOptionsFor, structureMatches, isStructureLink, conformsToList, rootInputCollisions, RECORDS_STRUCTURE, isRecordsPort } from "./applicationSchema";
+import { PARAM_TYPES, PARAM_TYPE_OPTIONS, createParameter, createPort, portDataTypeOptions, normalizeMediaType, keptFormats, STANDARD_CPU_OPTIONS, getStandardMemoryOptions, isNumericType, mediaTypeMatches, structureId, structureOptionsFor, structureMatches, isStructureLink, conformsToList, rootInputCollisions, VIEW_PARTS, viewPartOf } from "./applicationSchema";
 import { environmentsServiceUrl, findReferences } from "@/utils/environmentsService";
 import { useOntologyStore } from "@/stores/ontologyStore";
 import { REFERENCE_KINDS, assetClassName, isAppDefault, organismName, referenceBlock, referenceKindText, referenceLabel, taxonFromTerm, rankOrganisms, COMMON_ORGANISMS } from "../RunMonitor/referenceSources";
@@ -959,9 +966,12 @@ const structureOptions = computed(() =>
     ...(schema.value.outputs || []).map((p) => p.conformsTo),
   ])
 );
-// Metadata records are a kind of input of their own, not a layout to pick
-// (an output that names them still shows them).
-const layoutOptionsFor = (blockKey) => (blockKey === "inputs" ? structureOptions.value.filter((o) => o.id !== RECORDS_STRUCTURE) : structureOptions.value);
+// Metadata records and a knowledge graph (VIEW_PARTS) are kinds of input of
+// their own, not layouts to pick (an output that names one still shows it).
+const layoutOptionsFor = (blockKey) =>
+  blockKey === "inputs" ? structureOptions.value.filter((o) => !VIEW_PARTS.some((p) => p.structure === o.id)) : structureOptions.value;
+// Whether a port mode is a view part's (records, kgx): the part's name.
+const isViewPartMode = (mode) => VIEW_PARTS.some((p) => p.part === mode);
 /*
   What an input or output is made of at its root, the first thing the card
   asks: files, folders of a folder format (OME-Zarr, as container:
@@ -974,10 +984,11 @@ const PORT_MODES = [
   { value: "folder", label: "Folders of a format", hint: "Each item is a folder that is one thing, in a folder format: an .ome.zarr image, a .mefd session." },
   { value: "layout", label: "One folder with a set layout", hint: "One folder tree laid out by a standard, such as BIDS or a Pennsieve published dataset." },
   { value: "records", label: "Metadata records", hint: "A dataset's metadata records: each model's schema and records, and the links between them. A run takes them from the dataset it picks, in this input's own folder." },
+  { value: "kgx", label: "Knowledge graph (KGX)", hint: "A dataset's metadata records as a knowledge graph in KGX tables: nodes and edges, as TSV and Parquet. For graph tools such as NetworkX, GRAPE, PyKEEN or Neo4j. A run takes it from the dataset it picks, in this input's own folder." },
   { value: "reference", label: "Reference data", hint: "A folder whose contents are declared as a published reference, such as a genome index or a brain template, by public identifiers rather than by file type. Pennsieve can fill it from its reference data; otherwise a run takes files." },
 ];
-// Reference data and metadata records are for inputs.
-const portModes = (blockKey) => PORT_MODES.filter((m) => (m.value !== "reference" && m.value !== "records") || blockKey === "inputs");
+// Reference data and a dataset's records or graph are for inputs.
+const portModes = (blockKey) => PORT_MODES.filter((m) => (m.value !== "reference" && !isViewPartMode(m.value)) || blockKey === "inputs");
 // Where an input's data goes in INPUT_DIR (app.yml placement).
 const PLACEMENTS = [
   { value: "root", label: "Root of INPUT_DIR" },
@@ -991,8 +1002,9 @@ const formatProblems = (port, key) =>
   portMode(port) === "folder" && !portTypes(port).length && !formatTouched.has(toRaw(port)) ? [] : at(key);
 const portMode = (port) => {
   if (showsReference(port)) return "reference";
-  // Records are an input's; an output that names them shows as a layout.
-  if (isRecordsPort(port) && (schema.value.inputs || []).includes(port)) return "records";
+  // Records and a graph are an input's; an output that names one shows as a layout.
+  const part = viewPartOf(port);
+  if (part && (schema.value.inputs || []).includes(port)) return part.part;
   if (conformsToList(port.conformsTo).length) return "layout";
   if (port.container === "directory") return "folder";
   return chosenModes.get(toRaw(port)) || "file";
@@ -1005,19 +1017,21 @@ const dropReference = (port) => {
 };
 const setPortMode = (port, mode) => {
   if (portMode(port) === mode) return;
-  // The name records mode suggested goes with it.
-  if (portMode(port) === "records" && port.name === "records") port.name = "";
-  if (mode === "records") {
+  // The name a records or graph mode suggested goes with it.
+  const was = VIEW_PARTS.find((p) => p.part === portMode(port));
+  if (was && port.name === was.name) port.name = "";
+  const part = VIEW_PARTS.find((p) => p.part === mode);
+  if (part) {
     // A layout of its own, always in the input's folder; no formats.
     if (portMode(port) === "reference") dropReference(port);
     chosenModes.delete(toRaw(port));
-    port.conformsTo = [RECORDS_STRUCTURE];
+    port.conformsTo = [part.structure];
     port.container = "";
     port.dataType = "any";
     port.mediaTypes = [];
     port.formats = [];
     port.placement = "subfolder";
-    if (!port.name) port.name = "records";
+    if (!port.name) port.name = part.name;
     return;
   }
   if (mode === "reference") {
