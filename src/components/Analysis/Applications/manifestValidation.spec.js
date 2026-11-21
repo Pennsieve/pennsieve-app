@@ -32,7 +32,7 @@ describe("validateManifestDoc", () => {
       expect.arrayContaining([
         "application.tag: isn't a field app.yml knows: tag",
         "application: is missing name",
-        "runtime.sessionType: must be one of jupyter",
+        "runtime.sessionType: must be one of jupyter, webapp",
       ])
     );
     expect(messages(validateManifestDoc({ application: { name: "a" }, extra: 1 }))).toEqual(["extra: isn't a field app.yml knows: extra"]);

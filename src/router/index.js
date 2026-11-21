@@ -159,6 +159,7 @@ const RunMonitor = () => import ('../components/Analysis/RunMonitor/RunMonitor.v
 const RunDetail = () => import ('../components/Analysis/RunMonitor/RunDetail.vue')
 const NotebooksOverview = () => import ('../components/Analysis/RunMonitor/NotebooksOverview.vue')
 const NotebookSession = () => import ('../components/Analysis/JupyterSession/NotebookSession.vue')
+const WebAppSession = () => import ('../components/Analysis/WebAppSession/WebAppSession.vue')
 const WorkflowBuilder = () => import ('../components/Analysis/WorkflowBuilder/WorkflowBuilder.vue')
 const WorkflowsOverview = () => import ('../components/Analysis/Workflows/WorkflowsOverview.vue')
 const AppsOverview = () => import ('../components/Analysis/Applications/AppsOverview.vue')
@@ -227,6 +228,18 @@ const router = createRouter({
       // navigation: true passes :orgId to BfNavigation (it builds links from the
       // orgId prop); without it the left-nav router-links throw "Missing
       // required param orgId".
+      props: { page: true, navigation: true },
+    },
+    {
+      // A run's web app session (an interactive step whose app serves its
+      // own page). The run page opens it in a new tab; it waits for the
+      // session, then sends the tab to the app. Laid out like 'run-notebook'.
+      name: 'run-session',
+      path: '/:orgId/analysis/runs/:runId/session',
+      components: {
+        page: WebAppSession,
+        navigation: BfNavigation,
+      },
       props: { page: true, navigation: true },
     },
     {
@@ -741,6 +754,25 @@ const router = createRouter({
             backLink: { name: 'my-notebooks' },
             title: 'Notebook',
             description: 'An interactive notebook on your personal compute node.'
+          }
+        },
+        {
+          // A web app session outside any workspace; see 'run-session'.
+          name: 'my-run-session',
+          path: 'analysis/sessions/:runId',
+          components: {
+            stage: WebAppSession,
+            navigation: UserNavigation,
+          },
+          props: {
+            stage: true,
+            navigation: true
+          },
+          meta: {
+            hideSecondaryNav: true,
+            backLink: { name: 'my-runs' },
+            title: 'App',
+            description: 'A workflow step that is waiting for you, on your personal compute node.'
           }
         },
         {

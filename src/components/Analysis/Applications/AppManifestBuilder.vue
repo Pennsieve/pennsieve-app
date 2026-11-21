@@ -22,6 +22,7 @@ import {
   appKind,
   setAppKind,
   manifestSchemaFor,
+  takesParameters,
   builderChecks,
   problemsBySection,
   problemsByField,
@@ -453,7 +454,7 @@ const goToGuide = () =>
         <!-- What it does: in, its settings, out -->
         <section :ref="(el) => (sectionEls.does = el)" class="builder-section">
           <h3 class="section-title">What it does</h3>
-          <application-schema-editor v-model="schema" part="io" :kind="kind" :problems="byField" />
+          <application-schema-editor v-model="schema" part="io" :kind="kind" :session-parameters="takesParameters(schema)" :problems="byField" />
         </section>
 
         <!-- How it runs -->

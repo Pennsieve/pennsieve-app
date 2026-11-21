@@ -34,6 +34,7 @@ import {
   getUserName as getUserNameFn,
 } from "./runHelpers";
 import { isNotebookWorkflow, notebookGpu, runOnGpu, runNodeId, gpuMarkTitle, notebooksEmptyState, NOTEBOOK_RUNNING_STATUSES } from "./notebookHelpers";
+import { isNotebookSession } from "./sessionKinds";
 import drAzumi from "@/assets/images/illustrations/illo-dr_azumi_1.svg";
 import EmptyState from "../EmptyState.vue";
 import RunningNote from "../RunningNote.vue";
@@ -236,12 +237,13 @@ async function fetchNotebookWorkflows() {
 }
 
 /* ------------------------------------------------------ notebook runs ------- */
-// Sessions of the official kernels, and any other interactive run here: the
+// Sessions of the official kernels, and any other notebook run here (a run
+// that pauses on a web app is a workflow's, on the Workflows tab): the
 // Official rule guards which kernels are offered, not which running sessions
 // you see (a hidden session keeps billing, e.g. on a GPU).
 const notebookRuns = computed(() => {
   const ids = notebookWorkflowIds.value;
-  return workflowInstances.value.filter((r) => ids.has(r.workflowUuid) || r.interactive === true);
+  return workflowInstances.value.filter((r) => ids.has(r.workflowUuid) || (r.interactive === true && isNotebookSession(r)));
 });
 const activeNotebookRuns = computed(() =>
   notebookRuns.value

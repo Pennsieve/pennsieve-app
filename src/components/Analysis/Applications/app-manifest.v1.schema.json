@@ -170,8 +170,8 @@
         },
         "sessionType": {
           "type": "string",
-          "enum": ["jupyter"],
-          "description": "The kind of live session. \"jupyter\" is a Jupyter notebook. Needs interactive: true."
+          "enum": ["jupyter", "webapp"],
+          "description": "The kind of live session. \"jupyter\" is a Jupyter notebook. \"webapp\" is a web page the app serves itself on port 8888, opened from the run in a new browser tab; the workflow goes on when the app exits 0. Needs interactive: true."
         },
         "kernel": {
           "type": "string",

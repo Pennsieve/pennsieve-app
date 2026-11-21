@@ -104,6 +104,15 @@ describe('the app.yml schema', () => {
     expect(m.runtime).toMatchObject({ interactive: true, sessionType: 'jupyter', kernel: 'r' })
   })
 
+  it('accepts a web app session the builder writes, which has no kernel', () => {
+    const m = buildManifest(createApplicationSchema({ runtime: { computeTypes: ['standard'], interactive: true, sessionType: 'webapp' } }), { name: 'Review files' })
+    expect(validate(m), problems()).toBe(true)
+    expect(m.runtime).toMatchObject({ interactive: true, sessionType: 'webapp' })
+    expect(m.runtime).not.toHaveProperty('kernel')
+    // A kernel is a notebook's: the schema refuses it on a web app.
+    expect(validate({ ...m, runtime: { ...m.runtime, kernel: 'python' } })).toBe(false)
+  })
+
   it('round-trips through YAML, with the editor directive on the first line', () => {
     const text = serializeManifestYaml(createApplicationSchema(), { name: 'X' })
     expect(text.split('\n')[0]).toBe(`# yaml-language-server: $schema=${MANIFEST_SCHEMA_URL}`)

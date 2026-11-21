@@ -79,7 +79,10 @@ outputs:
 #   interactive: true      # a session a person works in; the workflow waits
 #   sessionType: jupyter   # a Jupyter notebook
 #   kernel: python         # its language: python or r
-#   computeTypes: [standard]`;
+#   computeTypes: [standard]
+#
+# A web page the app serves itself (on port 8888), which a person opens from
+# the run while the workflow waits, declares sessionType: webapp and no kernel.`;
 
 const EXAMPLE_URL = "https://app.pennsieve.io/static/schemas/app-manifest.v1.yml";
 // The JSON Schema app.yml follows; registration validates against it.
@@ -126,7 +129,7 @@ const runtimeFields = [
   { name: "optimize", type: "boolean", required: false, desc: "false runs the app only as computeTypes declares it; otherwise Pennsieve may run it on an optimized runtime it fits, such as Lambda (15 minutes, 10 GB)." },
   { name: "timeoutSeconds", type: "number", required: false, desc: "How long a run may take before it is timed out." },
   { name: "interactive", type: "boolean", required: false, desc: "A live session people work in, such as a Jupyter notebook, rather than a batch step. In a workflow it runs as an interactive step, and the workflow waits until the session ends. The only place an app declares this: an app without an app.yml is never interactive." },
-  { name: "sessionType", type: "string", required: false, desc: "The kind of live session. jupyter (the default) is a notebook, and makes workflows using this app notebooks; other kinds may come." },
+  { name: "sessionType", type: "string", required: false, desc: "The kind of live session. jupyter (the default) is a notebook, and makes workflows using this app notebooks. webapp is a web page the app serves itself on port 8888: the run offers Open App while the step waits, and the workflow goes on when the app exits 0." },
   { name: "kernel", type: "string", required: false, desc: "For a jupyter session, the notebook's language: python (the default) or r." },
 ];
 
