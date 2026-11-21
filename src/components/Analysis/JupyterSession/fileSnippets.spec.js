@@ -154,7 +154,9 @@ describe("folderSnippets", () => {
     expect(load.code).toContain("SELECT predicate, count(*) AS edges FROM edges");
     expect(query.code).toContain("WHERE a.predicate = 'biolink:has_attribute'");
     expect(query.code).toContain("JOIN edges AS b ON b.object = a.object AND b.subject <> a.subject");
-    expect(nx.code).toMatch(/^# Needs pandas, pyarrow, networkx/m);
+    expect(nx.code).toMatch(/^# Needs pandas, networkx \(/m);
+    expect(nx.code).toContain('nodes = pd.read_csv(kgx / "nodes.tsv.gz", **tsv)');
+    expect(nx.code).not.toContain("parquet");
     expect(nx.code).toContain('nx.from_pandas_edgelist(edges, "subject", "object", edge_attr=["predicate"], create_using=nx.MultiDiGraph)');
     expect(folderSnippets("input/v/metadata/kgx", "metadata/kgx/", "R 4.4.1")).toEqual([]);
   });
