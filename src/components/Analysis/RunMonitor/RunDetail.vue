@@ -37,6 +37,7 @@ import RunExampleAction from "./RunExampleAction.vue";
 import PublicFilesPicker from "./PublicFilesPicker.vue";
 import MetadataRecordsChoice from "../MetadataRecordsChoice.vue";
 import KnowledgeGraphChoice from "../KnowledgeGraphChoice.vue";
+import { viewPart } from "../Applications/applicationSchema";
 import { picksKey, isRecordsPick } from "./publicPicks";
 import FilePlacementChoice from "./FilePlacementChoice.vue";
 import { FILE_PATHS_SELECTION, FILE_PATHS_SOURCE, filePathsOf, filePathsField, sharedNames } from "./inputFilePaths";
@@ -91,7 +92,7 @@ import {
   processorConfigEntry,
   lambdaMemory,
 } from "./runHelpers";
-import { sourceLabel, sourceHints, sourceParts, hintLine, portsOfStep, missingFilesMessage, fileTypeMismatches, acceptedFileTypes, linkHints, ALL_PARTS, partsWhat } from "../WorkflowGraph/sourceInputs";
+import { sourceLabel, sourceHints, sourceParts, hintLine, portsOfStep, missingFilesMessage, fileTypeMismatches, acceptedFileTypes, linkHints, NOTEBOOK_PARTS, partsWhat } from "../WorkflowGraph/sourceInputs";
 import ReferencePickerDialog from "./ReferencePickerDialog.vue";
 import { findReferences, environmentsServiceUrl } from "@/utils/environmentsService";
 import { referenceTargetIn, runReferences, referenceSource, formatSize, choiceLabel, createReferenceCatalog, catalogLacks, defaultIdentity, referenceLabel, referenceKindText } from "./referenceSources";
@@ -227,7 +228,7 @@ const setWorkspaceGraph = (nodeId, on) => {
   delete leftOutInputs[nodeId];
   if (on) {
     const datasetId = sourceDatasetOf(nodeId);
-    workspaceRecords[nodeId] = { datasetId, datasetName: datasetName(datasetId, datasetOptions.value), models: ["*"], graphOnly: true };
+    workspaceRecords[nodeId] = { datasetId, datasetName: datasetName(datasetId, datasetOptions.value), models: ["*"], part: "kgx" };
     delete publicPicks[nodeId];
     if (!filesWithRecords) {
       delete dataSourceFiles[nodeId];
@@ -238,22 +239,24 @@ const setWorkspaceGraph = (nodeId, on) => {
   }
 };
 // How an input's records or graph shows: "Knowledge graph", "Metadata
-// records (2 models)", "... + graph".
+// records (2 models)", "... + graph". An entry with part (a graph taken
+// without records) is that part's.
 const workspacePartsLabel = (id) => {
   const r = workspaceRecords[id];
   if (!r) return "";
-  if (r.graphOnly) return "Knowledge graph";
+  if (r.part) return viewPart(r.part).title;
   const n = r.models.length;
   return `Metadata records (${n} model${n === 1 ? "" : "s"})${partsOf(id).kgx ? " + graph" : ""}`;
 };
-// A view that holds a knowledge graph (views-service lists the layouts of
-// records a view holds as its structures), or why not.
-const graphMissing = (view) => {
-  const structures = view?.structures || [];
-  if (structures.includes("kgx")) return "";
-  return structures.includes("pennsieve-records")
-    ? "the dataset's view has no knowledge graph (making it may have failed); try again"
-    : "the dataset has no metadata records, so it has no knowledge graph";
+// Why a view lacks a part an input takes ("" when it has it): views-service
+// lists the layouts of records a view holds as its structures.
+const partMissing = (view, part) => {
+  const structures = view?.structures;
+  if (!Array.isArray(structures)) return `views-service didn't say whether the dataset's view has its ${part.what}`;
+  if (structures.includes(part.structure)) return "";
+  return structures.length
+    ? `the dataset's view has no ${part.what} (making it may have failed); try again`
+    : `the dataset has no metadata records, so it has no ${part.what}`;
 };
 const WORKSPACE_RECORDS_HINT = filesWithRecords
   ? "Its records and the links between them, as they are when the run starts, with the files you choose below."
@@ -291,7 +294,7 @@ const sourcePicker = computed(() => {
   const id = filePickerNodeId.value;
   const dag = configDefinition.value?.dag || [];
   const name = id ? sourceLabel(id, dag, "") : "";
-  const what = partsWhat(pickerParts.value);
+  const what = pickerParts.value.files ? "files" : partsWhat(pickerParts.value);
   return {
     name,
     title: name ? `Select ${what} for ${name}` : pickerParts.value.files ? "Select Files" : pickerParts.value.records ? "Select Records" : "Select Graph",
@@ -303,15 +306,14 @@ const filePickerNodeId = ref(null);
 // batch step reads a dataset's records or graph only through an input that
 // takes them, and its files through any other; a notebook reads both files
 // and records (its view has the graph too).
-const BOTH_PARTS = ALL_PARTS;
 const partsBySource = computed(() => {
   const dag = configDefinition.value?.dag || [];
   const portsOf = portsOfStep(dag, availableApplications.value);
   const interactive = (step) => !!nodeConfigs[step]?.interactive;
   return Object.fromEntries(dataSourceNodes.value.map((d) => [d.id, sourceParts(d.id, dag, portsOf, interactive)]));
 });
-const partsOf = (nodeId) => partsBySource.value[nodeId] || BOTH_PARTS;
-const pickerParts = computed(() => (filePickerNodeId.value ? partsOf(filePickerNodeId.value) : BOTH_PARTS));
+const partsOf = (nodeId) => partsBySource.value[nodeId] || NOTEBOOK_PARTS;
+const pickerParts = computed(() => (filePickerNodeId.value ? partsOf(filePickerNodeId.value) : NOTEBOOK_PARTS));
 // The models of the dataset the open picker shows, for its records choice
 // (none while they load, or for a dataset without models).
 const pickerModels = ref([]);
@@ -865,11 +867,11 @@ const sourceSubOf = (id, data) => {
     if (isLeftOut(id)) return "Left out";
     if (workspaceRecords[id]) {
       const files = (dataSourceFiles[id] || []).length;
-      const what = workspaceRecords[id].graphOnly ? "graph" : "records";
-      return files ? `${files} file${files === 1 ? "" : "s"} + ${what}` : workspaceRecords[id].graphOnly ? "Knowledge graph" : "Metadata records";
+      const part = viewPart(workspaceRecords[id].part || "records");
+      return files ? `${files} file${files === 1 ? "" : "s"} + ${part.short}` : part.title;
     }
     const n = fileCountForNode(id);
-    if (!n) return partsOf(id).files ? "Choose files" : partsOf(id).records ? "Choose records" : "Choose graph";
+    if (!n) return partsOf(id).files ? "Choose files" : `Choose ${viewPart(partsOf(id).records ? "records" : "kgx").short}`;
     const picks = publicPicks[id] || [];
     const records = picks.some(isRecordsPick);
     const files = records ? n - 1 : n;
@@ -1511,9 +1513,13 @@ const workspaceInputViews = async (dag) => {
           );
         }
         // A graph input needs the graph in the view (workflow-service
-        // refuses the run too, later and less plainly).
-        const missing = partsOf(id).kgx ? graphMissing(entry.view) : "";
-        if (missing) throw new Error(`${sourceLabel(id, dag, "input")}: ${missing}`);
+        // refuses the run too, later and less plainly). The view is made
+        // again on the next try.
+        const missing = partsOf(id).kgx ? partMissing(entry.view, viewPart("kgx")) : "";
+        if (missing) {
+          entry.view = entry.started = null;
+          throw new Error(`${sourceLabel(id, dag, "input")}: ${missing}`);
+        }
         return [id, viewDataSource(entry.view)];
       })
     );
@@ -1579,8 +1585,9 @@ const executeWorkflow = async () => {
     return;
   }
   // A graph comes from a workspace dataset's view: published datasets have
-  // none yet, and files alone bring none.
-  const graphless = dataSourceNodes.value.filter((d) => !leftOutInputs[d.id] && partsOf(d.id).kgx && !workspaceRecords[d.id]);
+  // none yet, and files alone bring none. (Beside records, it's of the
+  // records chosen: a source without them is missing its records.)
+  const graphless = dataSourceNodes.value.filter((d) => !leftOutInputs[d.id] && partsOf(d.id).kgx && !partsOf(d.id).records && !workspaceRecords[d.id]);
   if (graphless.length) {
     const names = [...new Set(graphless.map((d) => sourceLabel(d.id, dag, "an input")))].join(", ");
     EventBus.$emit("toast", {
@@ -1895,10 +1902,10 @@ const fileCountForNode = (nodeId) => {
 watch(partsBySource, (parts) => {
   for (const [id, p] of Object.entries(parts)) {
     if (!p.files) delete dataSourceFiles[id];
-    // Records chosen go when neither records nor a graph is taken; a graph
-    // taken alone goes when the graph isn't, or records are taken instead.
+    // Records or a graph chosen go when the source takes neither (a graph
+    // alone is a view of every model, which records readers take too).
     const r = workspaceRecords[id];
-    if (r && (r.graphOnly ? !p.kgx || p.records : !p.records)) delete workspaceRecords[id];
+    if (r && !p.records && !(r.part && p[r.part])) delete workspaceRecords[id];
     const picks = publicPicks[id];
     if (!picks?.length) continue;
     const kept = picks.filter((x) => (isRecordsPick(x) ? p.records : p.files));
@@ -3699,7 +3706,7 @@ onUnmounted(() => {
               <div v-if="workspaceRecords[selectedNode.id]" class="selected-files-list">
                 <div
                   class="selected-file-item"
-                  :title="workspaceRecords[selectedNode.id].graphOnly
+                  :title="workspaceRecords[selectedNode.id].part
                     ? `${workspaceRecords[selectedNode.id].datasetName}: its knowledge graph`
                     : `${workspaceRecords[selectedNode.id].datasetName}: records of ${workspaceRecords[selectedNode.id].models.join(', ')}`"
                 >
@@ -4295,7 +4302,7 @@ onUnmounted(() => {
         <!-- Its records as a knowledge graph, for an input that takes one -->
         <KnowledgeGraphChoice
           v-if="pickerParts.kgx && !pickerParts.records && sourceDatasetOf(filePickerNodeId) && pickerModels.length"
-          :model-value="!!workspaceRecords[filePickerNodeId]?.graphOnly"
+          :model-value="workspaceRecords[filePickerNodeId]?.part === 'kgx'"
           class="file-picker-records"
           @update:model-value="(on) => setWorkspaceGraph(filePickerNodeId, on)"
         />
@@ -4311,7 +4318,7 @@ onUnmounted(() => {
                   : `${datasetName(sourceDatasetOf(filePickerNodeId), datasetOptions)} has no metadata records${pickerParts.records ? "" : ", so it has no knowledge graph"}.` }}
         </p>
         <p v-else-if="pickerParts.files && (pickerParts.records || pickerParts.kgx) && workspaceRecords[filePickerNodeId] && !filesWithRecords" class="file-picker-empty">
-          This input takes the dataset's {{ workspaceRecords[filePickerNodeId].graphOnly ? "knowledge graph" : "metadata records" }}.
+          This input takes the dataset's {{ viewPart(workspaceRecords[filePickerNodeId].part || "records").what }}.
         </p>
         <template v-else-if="pickerParts.files">
         <div class="file-picker-header">

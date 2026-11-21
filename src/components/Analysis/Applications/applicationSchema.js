@@ -765,20 +765,30 @@ export const structureId = (entry) => {
  * the registry structure the input conforms to (its outermost layout): a
  * run fills such an input with that part of the dataset it picks, in the
  * input's own folder. One row of the part table workflow-service,
- * app-deploy-service and the compute node keep in step.
+ * app-deploy-service and the compute node keep in step; a new layout of
+ * records is a row here.
  *   part: the run's name for it; structure: the registry id;
- *   label, name: the builder's input kind and the name it suggests;
- *   what: how pickers and hints name it.
+ *   label, hint, name: the builder's input kind, its hint and the name it suggests;
+ *   title, short, what: how pickers name it ("Knowledge graph", "graph", "knowledge graph");
+ *   placed: where the builder says it goes.
  */
 export const VIEW_PARTS = Object.freeze([
-  { part: "records", structure: "pennsieve-records", label: "Metadata records", name: "records", what: "metadata records" },
-  { part: "kgx", structure: "kgx", label: "Knowledge graph (KGX)", name: "graph", what: "knowledge graph" },
+  {
+    part: "records", structure: "pennsieve-records", name: "records",
+    label: "Metadata records",
+    hint: "A dataset's metadata records: each model's schema and records, and the links between them. A run takes them from the dataset it picks, in this input's own folder.",
+    title: "Metadata records", short: "records", what: "metadata records", placed: "Records go in the input's own folder.",
+  },
+  {
+    part: "kgx", structure: "kgx", name: "graph",
+    label: "Knowledge graph (KGX)",
+    hint: "A dataset's metadata records as a knowledge graph in KGX tables: nodes and edges, as TSV and Parquet. For graph tools such as NetworkX, GRAPE, PyKEEN or Neo4j. A run takes it from the dataset it picks, in this input's own folder.",
+    title: "Knowledge graph", short: "graph", what: "knowledge graph", placed: "The graph goes in the input's own folder.",
+  },
 ]);
 
-/** The registry structure of a dataset's metadata records. */
-export const RECORDS_STRUCTURE = "pennsieve-records";
-/** The registry structure of a dataset's records as a knowledge graph (KGX tables). */
-export const KGX_STRUCTURE = "kgx";
+/** A view part by its name ("records", "kgx"), or null. */
+export const viewPart = (name) => VIEW_PARTS.find((p) => p.part === name) || null;
 
 /** The view part a port takes (or writes), by its outermost layout, or null. */
 export const viewPartOf = (port) => {
@@ -786,8 +796,6 @@ export const viewPartOf = (port) => {
   return VIEW_PARTS.find((p) => p.structure === id) || null;
 };
 
-/** Whether a port takes (or writes) metadata records: its outermost layout. */
-export const isRecordsPort = (port) => viewPartOf(port)?.part === "records";
 
 /**
  * Can a tree that conforms to `output` (outermost first) feed an input that
