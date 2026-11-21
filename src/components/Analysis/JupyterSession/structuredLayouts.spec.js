@@ -18,17 +18,24 @@ describe("structured layouts: the registry", () => {
       expect(l.conformsTo).toBe(`https://schemas.pennsieve.io/structures/${l.id}`);
       expect(l.spec).toMatch(new RegExp(`^${l.conformsTo}/v\\d`));
       expect(l.label && l.icon && l.folder).toBeTruthy();
+      expect(["bundle", "folder"]).toContain(l.presentation);
       expect(typeof l.snippets).toBe("function");
     }
   });
 
-  it("gives the records' code metadata/ and the graph's its own folder", () => {
+  it("keeps the records a folder (with a badge) and makes the graph a bundle", () => {
     const [records, kgx] = LAYOUTS;
-    expect(records.codePath("input/faers/metadata/models")).toBe("input/faers/metadata");
+    expect([records.folder, records.presentation]).toEqual(["metadata", "folder"]);
+    expect([kgx.folder, kgx.presentation]).toEqual(["metadata/kgx", "bundle"]);
+  });
+
+  it("gives the code each layout's own folder", () => {
+    const [records, kgx] = LAYOUTS;
+    expect(records.codePath("input/faers/metadata/")).toBe("input/faers/metadata");
     expect(kgx.codePath("input/faers/metadata/kgx/")).toBe("input/faers/metadata/kgx");
     // The existing snippets: the records' Load / Query / Summarize, the graph's Load / Query / NetworkX.
-    expect(records.snippets("input/faers/metadata/models", "Python 3.12").map((s) => s.id)).toEqual(["load", "query", "summary"]);
-    expect(records.snippets("input/faers/metadata/models", "Python 3.12")[0].code).toContain('INPUT_DIR / "faers/metadata"');
+    expect(records.snippets("input/faers/metadata", "Python 3.12").map((s) => s.id)).toEqual(["load", "query", "summary"]);
+    expect(records.snippets("input/faers/metadata", "Python 3.12")[0].code).toContain('INPUT_DIR / "faers/metadata"');
     expect(kgx.snippets("input/faers/metadata/kgx", "Python 3.12").map((s) => s.label)).toEqual(["Load", "Query", "NetworkX"]);
     expect(kgx.snippets("input/faers/metadata/kgx", "R 4.4")).toEqual([]);
   });
@@ -45,7 +52,7 @@ describe("structured layouts: detection", () => {
       [] // the entries aren't read when the crate says
     );
     expect(layouts.map((l) => [l.id, l.folder])).toEqual([
-      ["pennsieve-records", "metadata/models"],
+      ["pennsieve-records", "metadata"],
       ["kgx", "metadata/kgx"],
     ]);
     expect(layouts[0].files).toContain("metadata/relationships.csv");
@@ -63,9 +70,19 @@ describe("structured layouts: detection", () => {
     expect(layouts[1].files).toEqual(kgxFiles);
   });
 
-  it("trusts the crate: a folder named kgx it doesn't declare is a plain folder", () => {
+  it("trusts the crate's views:layouts: a kgx folder it doesn't list is a plain folder", () => {
     const entries = kgxFiles.map((cratePath) => ({ cratePath }));
-    expect(layoutsOf(crate({}), entries)).toEqual([]);
+    expect(layoutsOf(crate({ "views:layouts": [] }), entries)).toEqual([]);
+  });
+
+  it("finds the other layouts by path in a crate from before views:layouts", () => {
+    const entries = kgxFiles.map((cratePath) => ({ cratePath }));
+    const layouts = layoutsOf(crate({ "views:models": models }), entries);
+    expect(layouts.map((l) => [l.id, l.folder])).toEqual([
+      ["pennsieve-records", "metadata"],
+      ["kgx", "metadata/kgx"],
+    ]);
+    expect(layoutsOf(crate({}), [])).toEqual([]);
   });
 
   it("leaves out unknown structures, empty layouts and unsafe paths", () => {
@@ -75,7 +92,7 @@ describe("structured layouts: detection", () => {
           { conformsTo: "https://example.org/other", folder: "metadata/other", files: ["metadata/other/a"] },
           { conformsTo: KGX, folder: "metadata/kgx", files: [] },
           { conformsTo: KGX, folder: "../etc", files: ["../etc/passwd"] },
-          { conformsTo: "kgx", folder: "metadata/kgx/", files: ["metadata/kgx/graph.json", "/abs", "a/../b"] },
+          { conformsTo: "kgx", folder: "metadata/kgx/", files: ["metadata/kgx/graph.json", "/abs", "a/../b", "files/elsewhere.csv"] },
         ],
       })
     );
@@ -105,6 +122,7 @@ describe("structured layouts: detection", () => {
     const layouts = layoutsOf(null, kgxFiles.map((cratePath) => ({ cratePath })));
     expect(layoutAt(layouts, "metadata/kgx/").entry.label).toBe("Knowledge graph (KGX)");
     expect(layoutAt(layouts, "metadata/")).toBeNull();
+    expect(layoutAt(layoutsOf(crate({ "views:models": models })), "metadata/").entry.presentation).toBe("folder");
     expect(layoutAt(layouts, "files/metadata/kgx/")).toBeNull();
   });
 
@@ -140,7 +158,7 @@ describe("structured layouts: summaries", () => {
     expect(s.predicates[0]).toEqual({ name: "pennsieve:has_reaction", count: 23901 });
     expect(s.biolink).toBe("none");
     expect(s.generatedAt).toBe("2026-11-21T14:20:00Z");
-    expect(s.source).toEqual({ datasetNodeId: "N:dataset:1", datasetId: 42, viewId: "5138c7de", viewVersion: "v3" });
+    expect(s.datasetNodeId).toBe("N:dataset:1");
   });
 
   it("keeps only well-typed values, and nothing for what isn't graph.json", () => {
@@ -148,7 +166,7 @@ describe("structured layouts: summaries", () => {
     expect(s.biolink).toBe("");
     expect(s.nodes).toBeNull();
     expect(s.categories).toEqual([{ name: "b", count: 2 }]);
-    expect(s.source.datasetNodeId).toBe("");
+    expect(s.datasetNodeId).toBe("");
     expect(parseKgxGraph(null)).toBeNull();
     expect(parseKgxGraph("not json")).toBeNull();
     expect(parseKgxGraph("[1, 2]")).toBeNull();

@@ -1,10 +1,9 @@
 <script setup>
 // The summary of a view's structured layout (structuredLayouts.js): the
-// metadata records or the knowledge graph, as one object. It's read from
-// the layout's own description (the crate's models, the graph's
-// graph.json) and the view's entries, and offers the layout's starter code,
-// its path, its files as the plain folder, and downloading what isn't in
-// the session. Everything shown is text: nothing from the files is markup.
+// metadata records or the knowledge graph. It's read from the layout's own
+// description (the crate's models, the graph's graph.json) and the view's
+// entries, and offers the layout's starter code, its path, its files
+// (expanded in the tree), and downloading what isn't in the session. Everything shown is text: nothing from the files is markup.
 import { computed, ref, watch } from "vue";
 import IconGraph from "@/components/icons/IconGraph.vue";
 import { parseKgxGraph } from "./structuredLayouts";
@@ -20,6 +19,7 @@ const props = defineProps({
   // The layout's files not in the session and not under way.
   left: { type: Array, default: () => [] },
   fmtSize: { type: Function, required: true },
+  fmtTime: { type: Function, required: true },
 });
 const emit = defineEmits(["insert-snippet", "copy", "show-files", "download", "download-files"]);
 const open = defineModel({ type: Boolean, default: false });
@@ -34,19 +34,21 @@ const files = computed(() => {
   const s = source.value;
   if (!s) return [];
   const byPath = new Map(s.entries.map((e) => [e.cratePath, e]));
-  const parent = props.layout.folder.replace(/[^/]+$/, "");
+  // Names in the layout's folder (its files are all under it).
+  const folder = `${props.layout.folder}/`;
   return props.layout.files
     .map((p) => byPath.get(p))
     .filter(Boolean)
-    .map((e) => ({ entry: e, name: e.cratePath.slice(parent.length), size: e.size || 0, state: props.inputs?.stateOf(s, e.cratePath)?.state || "" }))
+    .map((e) => ({ entry: e, name: e.cratePath.slice(folder.length), size: e.size || 0, state: props.inputs?.stateOf(s, e.cratePath)?.state || "" }))
     .sort((a, b) => a.name.localeCompare(b.name));
 });
-const totalSize = computed(() => files.value.reduce((n, f) => n + f.size, 0));
-const leftSize = computed(() => props.left.reduce((n, e) => n + (e.size || 0), 0));
+const sizeOf = (list) => list.reduce((n, f) => n + (f.size || 0), 0);
+const totalSize = computed(() => sizeOf(files.value));
+const leftSize = computed(() => sizeOf(props.left));
 
 /* ------------------------------------------------------------ the graph --- */
 // graph.json, read from the session's disk when it's there.
-const summaryFile = computed(() => (entry.value.summaryFile ? files.value.find((f) => f.name.endsWith(`/${entry.value.summaryFile}`)) : null));
+const summaryFile = computed(() => (entry.value.summaryFile ? files.value.find((f) => f.name === entry.value.summaryFile) : null));
 const graph = ref(null);
 const loading = ref(false);
 async function loadSummary() {
@@ -68,8 +70,8 @@ watch(
 );
 // The description files to download for the summary: graph.json and the
 // summary in kgx graph-summary's form beside it.
-const describe = computed(() => files.value.filter((f) => /\/(graph\.json|graph_stats\.yaml)$/.test(f.name) && f.state !== "done"));
-const describeSize = computed(() => describe.value.reduce((n, f) => n + f.size, 0));
+const describe = computed(() => files.value.filter((f) => ["graph.json", "graph_stats.yaml"].includes(f.name) && f.state !== "done"));
+const describeSize = computed(() => sizeOf(describe.value));
 const describing = computed(() => describe.value.some((f) => ["queued", "downloading"].includes(f.state)));
 
 const BIOLINK = {
@@ -78,10 +80,6 @@ const BIOLINK = {
   full: "full: every category and predicate is Biolink",
 };
 const num = (n) => (n == null ? "–" : n.toLocaleString());
-function when(t) {
-  const d = new Date(t);
-  return Number.isNaN(d.getTime()) ? t : d.toLocaleString();
-}
 // The longest lists are cut, with how many more there are.
 const TOP = 12;
 const shown = (list) => list.slice(0, TOP);
@@ -89,8 +87,12 @@ const more = (list) => Math.max(0, list.length - TOP);
 
 /* -------------------------------------------------------------- records --- */
 const models = computed(() => props.layout.models || []);
-const recordSize = (path) => source.value?.entries.find((e) => e.cratePath === path)?.size;
-const tables = computed(() => files.value.filter((f) => !f.name.startsWith("models/")));
+// Each model's records files, together.
+const recordsSize = computed(() => {
+  const size = new Map(files.value.map((f) => [f.entry.cratePath, f.size]));
+  return (m) => m.versions.reduce((n, v) => n + (size.get(v.records) || 0), 0);
+});
+const tables = computed(() => files.value.filter((f) => !f.name.includes("/")));
 
 function pick(s) {
   open.value = false;
@@ -123,6 +125,7 @@ function act(name) {
     <!-- The knowledge graph: graph.json's counts and provenance. -->
     <template v-if="isGraph">
       <p v-if="loading && !graph" class="lp__msg">Reading graph.json…</p>
+      <p v-else-if="!graph && summaryFile?.state === 'done'" class="lp__msg">graph.json is in the session but couldn't be read.</p>
       <div v-else-if="!graph" class="lp__msg">
         The summary is in graph.json, which isn't in the session yet.
         <button v-if="describe.length && !describing" class="lp__btn" @click="emit('download-files', describe.map((f) => f.entry))">
@@ -135,10 +138,10 @@ function act(name) {
           <dt>Source dataset</dt>
           <dd>
             {{ source?.name || "–" }}
-            <span v-if="graph.source.datasetNodeId" class="lp__dim">{{ graph.source.datasetNodeId }}</span>
+            <span v-if="graph.datasetNodeId" class="lp__dim">{{ graph.datasetNodeId }}</span>
           </dd>
           <dt>Generated</dt>
-          <dd>{{ graph.generatedAt ? when(graph.generatedAt) : "–" }}</dd>
+          <dd>{{ fmtTime(graph.generatedAt) || "–" }}</dd>
           <dt>Biolink</dt>
           <dd>{{ BIOLINK[graph.biolink] || "–" }}</dd>
           <dt>Size</dt>
@@ -184,7 +187,7 @@ function act(name) {
         <tr v-for="m in models" :key="m.name">
           <td>{{ m.name }}</td>
           <td>{{ m.versions.map((v) => v.version).join(", ") }}</td>
-          <td class="lp__num">{{ fmtSize(m.versions.reduce((n, v) => n + (recordSize(v.records) || 0), 0)) }}</td>
+          <td class="lp__num">{{ fmtSize(recordsSize(m)) }}</td>
         </tr>
       </table>
       <p v-else class="lp__msg">No models listed.</p>
@@ -210,7 +213,7 @@ function act(name) {
         </span>
         <span class="lp__spacer" />
         <el-button size="small" title="Copy its path, as code (INPUT_DIR / …)" @click="act('copy')">Copy path</el-button>
-        <el-button size="small" title="Its files, as a plain folder" @click="act('show-files')">Show files</el-button>
+        <el-button size="small" title="Expand it in the file tree" @click="act('show-files')">Show files</el-button>
         <el-button v-if="left.length" size="small" type="primary" :title="`Download the ${left.length} files not in the session`" @click="act('download')">
           Download ({{ fmtSize(leftSize) }})
         </el-button>

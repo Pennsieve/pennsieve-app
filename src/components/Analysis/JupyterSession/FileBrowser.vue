@@ -16,8 +16,8 @@ import { sessionPathCode } from "./pathCode";
 import { visibleEntries, readShowHidden, writeShowHidden, readOnlyLocal, writeOnlyLocal } from "./fileBrowserHelpers";
 import { useRememberedFold } from "./sectionFold";
 import { costLine } from "./inputsHelpers";
-import { sourceAt, sourceBase } from "./useSessionInputs";
-import { layoutsOf, layoutAt } from "./structuredLayouts";
+import { sourceBase } from "./useSessionInputs";
+import { layoutsOf, layoutAt, crateRoot } from "./structuredLayouts";
 import { VIEW_CRATE_DIR } from "@/composables/useJupyterSession";
 
 const props = defineProps({
@@ -84,38 +84,33 @@ function withViews(disk, dirPath) {
   return [...byName.values()].sort((a, b) => dirsFirst(a) - dirsFirst(b) || a.name.localeCompare(b.name));
 }
 
-// A view's structured layouts (structuredLayouts.js), read once per view
-// version from its crate in the session, or by path without one.
+// A view's crate can list many files: read it up to this size.
+const CRATE_MAX_BYTES = 32 * 2 ** 20;
+// A view's structured layouts (structuredLayouts.js), from its crate in
+// the session, kept per view version once it's read; by path while it
+// can't be (not staged yet, or an error), and tried again next time.
 const layoutsCache = new Map();
-function layoutsFor(source) {
+async function layoutsFor(source) {
   const base = sourceBase(source);
   const key = `${base}|${source.viewId}|${source.version}`;
-  if (!layoutsCache.has(key)) {
-    const read = props.readText ? props.readText(`${base}/${VIEW_CRATE_DIR}/view.json`) : Promise.resolve(null);
-    layoutsCache.set(
-      key,
-      read
-        .then((text) => {
-          try {
-            return text ? JSON.parse(text) : null;
-          } catch {
-            return null;
-          }
-        })
-        .then((crate) => layoutsOf(crate, source.entries))
-    );
+  if (layoutsCache.has(key)) return layoutsCache.get(key);
+  let crate = null;
+  try {
+    const text = props.readText ? await props.readText(`${base}/${VIEW_CRATE_DIR}/view.json`, CRATE_MAX_BYTES) : null;
+    crate = text ? JSON.parse(text) : null;
+  } catch {
+    crate = null;
   }
-  return layoutsCache.get(key);
+  const layouts = layoutsOf(crate, source.entries);
+  if (crateRoot(crate)) layoutsCache.set(key, layouts);
+  return layouts;
 }
 
-// A folder of a view that is one of its structured layouts shows as one
-// row (FileNode), with the layout.
-async function withLayouts(rows, dirPath) {
-  const at = props.inputs ? sourceAt(props.inputs.sources, dirPath) : null;
-  if (!at) return rows;
-  const layouts = await layoutsFor(at.source);
+// A folder of a view that is one of its structured layouts gets it: FileNode
+// shows it as its layout's entry says (a bundle, or a folder with a badge).
+async function withLayouts(rows) {
   for (const n of rows) {
-    if (n.type === "directory" && n.view?.rel) n.layout = layoutAt(layouts, n.view.rel);
+    if (n.type === "directory" && n.view?.rel) n.layout = layoutAt(await layoutsFor(n.view.source), n.view.rel);
   }
   return rows;
 }
@@ -124,7 +119,7 @@ async function withLayouts(rows, dirPath) {
 // with what the views hold there.
 async function childrenOf(node) {
   const disk = node.virtual ? [] : (await props.listDir(node.path)).map(decorate);
-  return withLayouts(withViews(disk, node.path), node.path);
+  return withLayouts(withViews(disk, node.path));
 }
 
 async function loadRoot(preserve = false) {

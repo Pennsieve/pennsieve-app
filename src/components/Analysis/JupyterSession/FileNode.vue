@@ -73,34 +73,28 @@ const viewTitle = computed(() => {
   return `${view.value.source.name}\n${viewProgress.value.done} of ${viewProgress.value.total} files in the session${records}`;
 });
 /* ------------------------------------------------- structured layouts --- */
-// A view's structured layout (the metadata records, the knowledge graph:
-// structuredLayouts.js) is one row, a bundle: a click opens its summary
-// (LayoutPanel), Show files opens it as the plain folder, Summary goes back.
-const plain = ref(false);
-const layout = computed(() => (props.inputs && view.value && props.node.layout && !plain.value ? props.node.layout : null));
+// A view's structured layout (structuredLayouts.js) shows as its entry
+// says: the knowledge graph as a bundle (its name and icon; a click opens
+// its summary, LayoutPanel, and its caret its files, in place), the
+// metadata records as the folder it is, with a badge. Both have Summary
+// among their actions, and the panel's Show files expands them here.
+const layout = computed(() => (props.inputs && view.value && props.node.layout) || null);
+const bundle = computed(() => layout.value?.entry.presentation === "bundle");
 const panelOpen = ref(false);
-const layoutFiles = computed(() => new Set(props.node.layout?.files || []));
+const layoutFiles = computed(() => new Set(layout.value?.files || []));
 const layoutSize = computed(() =>
   layout.value ? view.value.source.entries.reduce((n, e) => n + (layoutFiles.value.has(e.cratePath) ? e.size || 0 : 0), 0) : 0
 );
 function showFiles() {
-  plain.value = true;
   if (!props.node.open) emit("toggle", props.node);
 }
-function showSummary() {
-  plain.value = false;
-  if (props.node.open) emit("toggle", props.node);
-  panelOpen.value = true;
-}
-// The path its code reads (the records' code reads metadata/).
+// The path its code reads.
 const codePath = computed(() => (layout.value ? layout.value.entry.codePath(props.node.path) : props.node.path));
 
-// A view folder's files not in the session; a bundle's are its layout's.
-const left = computed(() => {
-  if (!isViewFolder.value) return [];
-  if (layout.value) return props.inputs.remainingIn(view.value.source, "").filter((e) => layoutFiles.value.has(e.cratePath));
-  return props.inputs.remainingIn(view.value.source, view.value.rel);
-});
+// A view folder's files not in the session and not under way.
+const left = computed(() => (isViewFolder.value ? props.inputs.remainingIn(view.value.source, view.value.rel) : []));
+// The layout's own (the panel's Download).
+const layoutLeft = computed(() => (layout.value ? left.value.filter((e) => layoutFiles.value.has(e.cratePath)) : []));
 const leftSize = computed(() => left.value.reduce((n, e) => n + (e.size || 0), 0));
 const selected = computed(() => remote.value && props.inputs.isSelected(view.value.source, view.value.entry.cratePath));
 // Ticking shows on hover, and on every remote file once any is ticked.
@@ -142,7 +136,8 @@ function go(noted = false) {
 const isFolder = computed(() => props.node.type === "directory");
 const hasRecords = computed(() => (view.value?.source?.models || []).length > 0);
 const snippets = computed(() => {
-  if (layout.value) return layout.value.entry.snippets(props.node.path, props.kernelName);
+  // Not before something of it is downloaded: the code reads the disk.
+  if (layout.value) return props.node.virtual ? [] : layout.value.entry.snippets(props.node.path, props.kernelName);
   if (isStack.value) return stackSnippets(view.value.entry, props.kernelName);
   if (isFolder.value) return props.node.virtual || !hasRecords.value ? [] : folderSnippets(props.node.path, view.value.rel, props.kernelName);
   return props.node.type === "file" && !remote.value && !isNotebook(props.node) ? fileSnippets(props.node.path, props.kernelName) : [];
@@ -164,17 +159,17 @@ function pickSnippet(s) {
   emit("insert-snippet", s.code);
 }
 
-// The panel's Download for the summary's own files (graph.json).
+// The panel's downloads: the layout's files, or its summary's (graph.json).
+// One that asks first asks under the row: the panel makes way.
 function downloadFiles(entries) {
   const size = entries.reduce((n, e) => n + (e.size || 0), 0);
   start(size, entries, () => props.inputs.requestEntries(view.value.source, entries));
-  // One that asks first asks under the row: the panel makes way.
   if (confirm.value) panelOpen.value = false;
 }
 
 function onRow() {
   const n = props.node;
-  if (layout.value) panelOpen.value = true;
+  if (bundle.value) panelOpen.value = true;
   else if (n.type === "directory") emit("toggle", n);
   else if (isStack.value) return;
   else if (remote.value) download();
@@ -189,8 +184,8 @@ function onRow() {
       :class="{ 'is-remote': remote || isStack, 'is-selected': selected }"
       :style="{ paddingLeft: depth * 14 + 8 + 'px' }"
       :title="
-        layout
-          ? `${node.path}\n${layout.entry.title}: click for its summary`
+        bundle
+          ? `${node.path}\n${layout.entry.title}: click for its summary, ▸ for its files`
           : isStack
           ? `${node.path}\n${stackFormat(view.entry)}: read in place from the notebook`
           : remote
@@ -200,7 +195,17 @@ function onRow() {
       @click="onRow"
     >
       <span class="fn__caret">
-        <template v-if="layout" />
+        <!-- A bundle's caret is its files: click it to expand in place. -->
+        <button
+          v-if="bundle"
+          class="fn__expand"
+          :aria-expanded="node.open"
+          :aria-label="node.open ? 'Hide its files' : 'Show its files'"
+          :title="node.open ? 'Hide its files' : 'Show its files'"
+          @click.stop="emit('toggle', node)"
+        >
+          {{ node.open ? "▾" : "▸" }}
+        </button>
         <template v-else-if="node.type === 'directory'">{{ node.open ? "▾" : "▸" }}</template>
         <input
           v-else-if="remote && !under"
@@ -213,15 +218,21 @@ function onRow() {
           @change="inputs.toggleSelect(view.source, view.entry)"
         />
       </span>
-      <IconGraph v-if="layout?.entry.icon === 'graph'" class="fn__icon fn__icon--graph" :width="16" :height="16" />
-      <img v-else-if="layout" class="fn__icon" src="/file-icons/icon-tabular.svg" alt="" />
+      <IconGraph v-if="bundle && layout.entry.icon === 'graph'" class="fn__icon fn__icon--graph" :width="16" :height="16" />
+      <img v-else-if="bundle" class="fn__icon" src="/file-icons/icon-tabular.svg" alt="" />
       <img v-else class="fn__icon" :src="isStack ? stackIcon(view.entry) : iconOf(node)" alt="" />
       <!-- The view's crate folder is shown by what it is; its name is in the row's title. -->
       <span
         class="fn__name"
         :title="node.name === VIEW_CRATE_DIR ? 'This input\'s dataset view (.pennsieve/view.json, an RO-Crate): where its files come from, their sizes and checksums.' : undefined"
-        >{{ layout ? layout.entry.label : node.name === VIEW_CRATE_DIR ? "input manifest" : node.name }}</span
+        >{{ bundle ? layout.entry.label : node.name === VIEW_CRATE_DIR ? "input manifest" : node.name }}</span
       >
+      <!-- A folder that is a layout says which. -->
+      <span v-if="layout && !bundle" class="fn__badge" :title="layout.entry.title">
+        <IconGraph v-if="layout.entry.icon === 'graph'" :width="10" :height="10" />
+        <img v-else src="/file-icons/icon-tabular.svg" alt="" />
+        {{ layout.entry.label }}
+      </span>
       <span
         v-if="depth === 0 && node.type === 'directory' && node.name === 'output'"
         class="fn__tag fn__tag--out"
@@ -247,7 +258,7 @@ function onRow() {
 
       <span v-if="under" class="fn__state fn__state--active">{{ progress }}</span>
       <span v-else-if="failed" class="fn__state fn__state--failed" :title="fileState.error">failed · retry</span>
-      <span v-else-if="layout" class="fn__size">{{ fmtSize(layoutSize) }}</span>
+      <span v-else-if="bundle" class="fn__size">{{ fmtSize(layoutSize) }}</span>
       <span v-else-if="isStack" class="fn__size">{{ view.entry.size ? fmtSize(view.entry.size) : stackFormat(view.entry) }}</span>
       <span v-else-if="node.type !== 'directory' && node.size != null" class="fn__size">{{ fmtSize(node.size) }}</span>
 
@@ -292,10 +303,10 @@ function onRow() {
             🗑
           </button>
           <button
-            v-if="node.layout && plain"
+            v-if="layout"
             class="fn__act fn__act--text"
-            :title="`Show ${node.layout.entry.label} as one object, with its summary`"
-            @click="showSummary"
+            :title="`What the ${layout.entry.label.toLowerCase()} hold, and their files`"
+            @click="panelOpen = true"
           >
             Summary
           </button>
@@ -359,12 +370,13 @@ function onRow() {
       :inputs="inputs"
       :read-text="readText"
       :snippets="snippets"
-      :left="left"
+      :left="layoutLeft"
       :fmt-size="fmtSize"
+      :fmt-time="fmtTime"
       @insert-snippet="pickSnippet"
       @copy="emit('copy', { ...node, path: codePath })"
       @show-files="showFiles"
-      @download="downloadAll"
+      @download="downloadFiles(layoutLeft)"
       @download-files="downloadFiles"
     />
 
@@ -372,7 +384,7 @@ function onRow() {
       loading…
     </span>
 
-    <ul v-if="!layout && node.open && node.children && children.length" class="fn__children">
+    <ul v-if="node.open && node.children && children.length" class="fn__children">
       <FileNode
         v-for="child in children"
         :key="child.path"
@@ -398,7 +410,7 @@ function onRow() {
       />
     </ul>
     <span
-      v-else-if="!layout && node.open && node.children && !children.length"
+      v-else-if="node.open && node.children && !children.length"
       class="fn__empty"
       :style="{ paddingLeft: (depth + 1) * 14 + 22 + 'px' }"
     >
@@ -446,6 +458,32 @@ function onRow() {
 }
 .fn__icon { flex: 0 0 auto; width: 16px; height: 16px; }
 .fn__icon--graph { color: theme.$purple_2; }
+/* A bundle's caret is a button: its files, in place. */
+.fn__expand {
+  border: none;
+  background: none;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+.fn__expand:hover,
+.fn__expand:focus-visible { color: theme.$purple_3; outline: none; }
+/* A layout's badge on its folder: small, quiet. */
+.fn__badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-left: 6px;
+  padding: 0 6px;
+  border: 1px solid theme.$gray_2;
+  border-radius: 8px;
+  font-size: 10px;
+  color: theme.$purple_2;
+  white-space: nowrap;
+
+  img { width: 10px; height: 10px; }
+}
 .fn__name {
   min-width: 0;
   overflow: hidden;
