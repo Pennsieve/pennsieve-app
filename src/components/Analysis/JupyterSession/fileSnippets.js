@@ -411,10 +411,11 @@ const schemaSummary = (m) =>
 // (a list), name, provided_by, properties (JSON); edges: id, subject,
 // predicate, object and provenance columns. Records are pennsieve:<uuid>
 // nodes; coded values are biolink:has_attribute edges to term nodes. The
-// cells read the Parquet files, which have the same rows as the TSV.
+// DuckDB cells read the Parquet files, which have the same rows as the TSV.
 const kgxNote = (lib) => `# Written for this view's knowledge graph (KGX tables): plain ${lib}, no Pennsieve library needed`;
 
-// nodes and edges as DuckDB views over the Parquet files.
+// nodes and edges as DuckDB views over the Parquet files (DuckDB reads
+// Parquet itself; NetworkX reads the TSV with pandas).
 const kgxSetup = (k) =>
   lines(
     needs("duckdb", "pandas"),
@@ -467,19 +468,22 @@ const kgxQuery = (k) =>
   );
 
 // The graph in NetworkX: a directed multigraph, nodes with their category
-// and name, edges with their predicate.
+// and name, edges with their predicate. It reads the TSV files (KGX's
+// canonical form: no quoting, | between a list's values), which pandas
+// reads without a Parquet library.
 const kgxNetworkx = (k) =>
   lines(
-    needs("pandas", "pyarrow", "networkx"),
+    needs("pandas", "networkx"),
     "import networkx as nx",
     "import pandas as pd",
     "from pathlib import Path",
     "",
     `kgx = Path(${k})`,
-    "nodes = pd.read_parquet(kgx / \"nodes.parquet\")",
-    "edges = pd.read_parquet(kgx / \"edges.parquet\")",
+    "tsv = dict(sep=\"\\t\", quoting=3, dtype=str, keep_default_na=False)",
+    "nodes = pd.read_csv(kgx / \"nodes.tsv.gz\", **tsv)",
+    "edges = pd.read_csv(kgx / \"edges.tsv.gz\", **tsv)",
     "g = nx.from_pandas_edgelist(edges, \"subject\", \"object\", edge_attr=[\"predicate\"], create_using=nx.MultiDiGraph)",
-    "g.add_nodes_from((r.id, {\"category\": list(r.category), \"name\": r.name}) for r in nodes.itertuples())",
+    "g.add_nodes_from((r.id, {\"category\": r.category.split(\"|\"), \"name\": r.name}) for r in nodes.itertuples())",
     "print(g)",
     "# The best-connected nodes",
     "pd.DataFrame(sorted(g.degree, key=lambda d: -d[1])[:10], columns=[\"id\", \"degree\"]).merge(nodes[[\"id\", \"name\", \"category\"]], on=\"id\")",
