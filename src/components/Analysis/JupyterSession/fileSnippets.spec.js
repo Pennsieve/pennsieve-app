@@ -93,6 +93,12 @@ describe("metadataFolder", () => {
     expect(metadataFolder("data/metadata/models/case/")).toBeNull();
     expect(metadataFolder("metadata/models/")).toBeNull();
     expect(metadataFolder("metadata/models/case/versions/")).toBeNull();
+    // Only metadata-service model names: anything else could inject code.
+    expect(metadataFolder('metadata/models/x{print(1)}/')).toBeNull();
+    expect(metadataFolder("metadata/models/a\nb/")).toBeNull();
+    expect(metadataFolder('metadata/models/a"b/')).toBeNull();
+    expect(metadataFolder("metadata/models/Case/")).toBeNull();
+    expect(folderSnippets("input/v/metadata/models/x{y}", "metadata/models/x{y}/")).toEqual([]);
     expect(metadataFolder("")).toBeNull();
     expect(metadataFolder(undefined)).toBeNull();
   });
@@ -103,16 +109,16 @@ describe("folderSnippets", () => {
   it("offers Load, Query and Summarize on the metadata folder", () => {
     const [load, query, summary] = folderSnippets("input/v/metadata", "metadata/", py);
     expect([load.id, query.id, summary.id]).toEqual(["load", "query", "summary"]);
-    expect(load.code).toContain("SELECT model, count(*) AS records FROM records");
+    expect(load.code).toContain("SELECT model, count(*) AS records FROM meta.records");
     expect(load.code).toContain(`# In later cells: con.sql('SELECT * FROM "<model>"').df()`);
     expect(summary.code.split("\n")[0]).toBe(metadataNote("pandas"));
     expect(load.code.split("\n")[0]).toBe(metadataNote("DuckDB"));
     expect(load.code.split("\n")[0]).toMatch(/no Pennsieve library needed$/);
-    expect(summary.code).toContain('metadata = INPUT_DIR / "v/metadata"');
+    expect(summary.code).toContain('metadata = Path(INPUT_DIR / "v/metadata")');
     expect(summary.code).toContain("x-pennsieve-key");
     expect(query.code).toMatch(/^# Needs duckdb, pandas/m);
-    expect(query.code).toContain("CREATE OR REPLACE VIEW records");
-    expect(query.code).toContain("JOIN records AS t ON t.record_id = r.target_record_id");
+    expect(query.code).toContain("CREATE OR REPLACE VIEW meta.records");
+    expect(query.code).toContain("JOIN meta.records AS t ON t.record_id = r.target_record_id");
   });
 
   it("offers nothing on the models folder: the metadata folder covers every model", () => {
@@ -126,13 +132,13 @@ describe("folderSnippets", () => {
     expect(load.code).not.toContain("# Examples");
     expect(load.code).toContain(`# In later cells: con.sql('SELECT * FROM "case"').df()`);
     expect(load.code).toContain('CREATE OR REPLACE VIEW \\"case\\" AS');
-    expect(load.code).not.toContain("VIEW records");
-    expect(summary.code).not.toContain("VIEW records");
-    expect(query.code).toContain("VIEW records");
-    expect(query.code).toContain("JOIN relationships AS r ON r.source_record_id = m.record_id");
+    expect(load.code).not.toContain("VIEW meta.records");
+    expect(summary.code).not.toContain("VIEW meta.records");
+    expect(query.code).toContain("VIEW meta.records");
+    expect(query.code).toContain("JOIN meta.relationships AS r ON r.source_record_id = m.record_id");
     expect(summary.code).toContain('SUMMARIZE "case"');
     expect(summary.code).toContain('(metadata / "models" / "case" / "versions")');
-    expect(query.code).toContain('metadata = INPUT_DIR / "v/metadata"');
+    expect(query.code).toContain('metadata = Path(INPUT_DIR / "v/metadata")');
   });
 
   it("has none in R, or for a folder that isn't a view's metadata folder", () => {

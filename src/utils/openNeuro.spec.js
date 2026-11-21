@@ -71,6 +71,13 @@ describe("OpenNeuro readability", () => {
     expect(await checkOpenNeuro("ds900002", { fetchFn: status(403) })).toBe(false);
     expect(await checkOpenNeuro("ds900003", { fetchFn: status(404) })).toBe(null);
     expect(await checkOpenNeuro("ds900004", { fetchFn: vi.fn().mockRejectedValue(new Error("offline")) })).toBe(null);
+    // No answer is asked again; a name that isn't a dataset id never is.
+    const again = vi.fn().mockResolvedValue({ status: 200 });
+    expect(await checkOpenNeuro("ds900004", { fetchFn: again })).toBe(true);
+    const never = vi.fn();
+    expect(await checkOpenNeuro("../README", { fetchFn: never })).toBe(null);
+    expect(await checkOpenNeuro("derivatives", { fetchFn: never })).toBe(null);
+    expect(never).not.toHaveBeenCalled();
     expect(openNeuroUnreadable("ds900002")).toBe(true);
     expect(openNeuroUnreadable("ds900002/sub-01/")).toBe(true);
     expect(openNeuroUnreadable("ds900003")).toBe(false);

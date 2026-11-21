@@ -214,8 +214,9 @@ const duckdbSetup = (m) =>
   lines(
     needs("duckdb", "pandas"),
     "import duckdb",
+    "from pathlib import Path",
     "",
-    `metadata = ${m}`,
+    `metadata = Path(${m})`,
     "con = duckdb.connect()",
     "ident = lambda s: '\"' + s.replace('\"', '\"\"') + '\"'",
     "text = lambda s: \"'\" + str(s).replace(\"'\", \"''\") + \"'\"",
@@ -223,7 +224,7 @@ const duckdbSetup = (m) =>
     "# A view per model: record_id and its fields, from its newest version",
     "models = []",
     "for folder in sorted(p for p in (metadata / \"models\").iterdir() if p.is_dir()):",
-    "    files = sorted((folder / \"versions\").glob(\"*/records.jsonl\"), key=lambda f: int(f.parent.name))",
+    "    files = sorted((f for f in (folder / \"versions\").glob(\"*/records.jsonl\") if f.parent.name.isdigit()), key=lambda f: int(f.parent.name))",
     "    if not files:",
     "        continue  # not downloaded",
     "    source = f\"read_json({text(files[-1])}, format='newline_delimited', sample_size=-1\"",
@@ -233,17 +234,19 @@ const duckdbSetup = (m) =>
     "        con.sql(f\"CREATE OR REPLACE VIEW {ident(folder.name)} AS SELECT id AS record_id, data FROM {source}, columns={{'id': 'VARCHAR', 'data': 'JSON'}})\")",
     "    models.append(folder.name)",
     "",
-    "# records: every record's id and model; relationships: source, target, type",
-    "con.sql(\"CREATE OR REPLACE VIEW records AS \" + (\" UNION ALL \".join(",
-    "    f\"SELECT record_id, {text(m)} AS model FROM {ident(m)}\" for m in models",
+    "# meta.records: every record's id and model; meta.relationships: source, target, type",
+    "# (in their own schema, so a model named records or relationships keeps its name)",
+    "con.sql(\"CREATE SCHEMA IF NOT EXISTS meta\")",
+    "con.sql(\"CREATE OR REPLACE VIEW meta.records AS \" + (\" UNION ALL \".join(",
+    "    f\"SELECT record_id, {text(m)} AS model FROM main.{ident(m)}\" for m in models",
     ") or \"SELECT NULL::VARCHAR AS record_id, NULL::VARCHAR AS model WHERE false\"))",
     "links = metadata / \"relationships.csv\"",
-    "con.sql(\"CREATE OR REPLACE VIEW relationships AS \" + (",
+    "con.sql(\"CREATE OR REPLACE VIEW meta.relationships AS \" + (",
     "    f\"SELECT * FROM read_csv({text(links)}, all_varchar=true)\" if links.exists()",
     "    else \"SELECT NULL::VARCHAR AS source_record_id, NULL::VARCHAR AS target_record_id, NULL::VARCHAR AS relationship_type WHERE false\"",
     "))",
-    "print(\"Views:\", \", \".join(models + [\"records\", \"relationships\"]))",
-    "# In later cells: con.sql('SELECT * FROM \"<model>\"').df(); relationships links records by record_id",
+    "print(\"Views:\", \", \".join(models + [\"meta.records\", \"meta.relationships\"]))",
+    "# In later cells: con.sql('SELECT * FROM \"<model>\"').df(); meta.relationships links records by record_id",
   );
 
 const quoted = (model) => `"${model.replace(/"/g, '""')}"`;
@@ -254,13 +257,14 @@ const modelSetup = (m, model) =>
   lines(
     needs("duckdb", "pandas"),
     "import duckdb",
+    "from pathlib import Path",
     "",
-    `metadata = ${m}`,
+    `metadata = Path(${m})`,
     "con = duckdb.connect()",
     "text = lambda s: \"'\" + str(s).replace(\"'\", \"''\") + \"'\"",
     "",
     `# ${model}: a view of its newest version's records`,
-    `files = sorted((metadata / "models" / ${JSON.stringify(model)} / "versions").glob("*/records.jsonl"), key=lambda f: int(f.parent.name))`,
+    `files = sorted((f for f in (metadata / "models" / ${JSON.stringify(model)} / "versions").glob("*/records.jsonl") if f.parent.name.isdigit()), key=lambda f: int(f.parent.name))`,
     "if not files:",
     `    raise FileNotFoundError(${JSON.stringify(`${model}'s records aren't downloaded yet`)})`,
     "source = f\"read_json({text(files[-1])}, format='newline_delimited', sample_size=-1\"",
@@ -276,7 +280,7 @@ const shown = (sql) => lines("display(con.sql(\"\"\"", ...sql, "\"\"\").df())");
 const EXAMPLES = "# Examples: change them, or write your own SQL over the views";
 
 // The whole view: its models' views, and what they hold.
-const viewLoad = (m) => lines(duckdbSetup(m), "", sqlCell(["SELECT model, count(*) AS records FROM records GROUP BY model ORDER BY model"]));
+const viewLoad = (m) => lines(duckdbSetup(m), "", sqlCell(["SELECT model, count(*) AS records FROM meta.records GROUP BY model ORDER BY model"]));
 
 // The whole view, then example queries: its models and how they link.
 const viewQuery = (m) =>
@@ -285,13 +289,13 @@ const viewQuery = (m) =>
     "",
     EXAMPLES,
     "# Records per model",
-    shown(["SELECT model, count(*) AS records FROM records GROUP BY model ORDER BY model"]),
+    shown(["SELECT model, count(*) AS records FROM meta.records GROUP BY model ORDER BY model"]),
     "# How the models link: each relationship type, between which models",
     sqlCell([
       "SELECT s.model AS source, r.relationship_type, t.model AS target, count(*) AS links",
-      "FROM relationships AS r",
-      "JOIN records AS s ON s.record_id = r.source_record_id",
-      "JOIN records AS t ON t.record_id = r.target_record_id",
+      "FROM meta.relationships AS r",
+      "JOIN meta.records AS s ON s.record_id = r.source_record_id",
+      "JOIN meta.records AS t ON t.record_id = r.target_record_id",
       "GROUP BY ALL ORDER BY links DESC",
     ]),
   );
@@ -305,6 +309,8 @@ const modelQuery = (m, model) => {
   const id = quoted(model);
   return lines(
     duckdbSetup(m),
+    `if ${JSON.stringify(model)} not in models:`,
+    `    raise FileNotFoundError(${JSON.stringify(`${model}'s records aren't downloaded yet`)})`,
     "",
     shown([`SELECT * FROM ${id} LIMIT 10`]),
     "",
@@ -313,14 +319,14 @@ const modelQuery = (m, model) => {
     shown([
       `SELECT 'to' AS direction, r.relationship_type, o.model, count(*) AS links`,
       `FROM ${id} AS m`,
-      "JOIN relationships AS r ON r.source_record_id = m.record_id",
-      "JOIN records AS o ON o.record_id = r.target_record_id",
+      "JOIN meta.relationships AS r ON r.source_record_id = m.record_id",
+      "JOIN meta.records AS o ON o.record_id = r.target_record_id",
       "GROUP BY ALL",
       "UNION ALL",
       `SELECT 'from', r.relationship_type, o.model, count(*)`,
       `FROM ${id} AS m`,
-      "JOIN relationships AS r ON r.target_record_id = m.record_id",
-      "JOIN records AS o ON o.record_id = r.source_record_id",
+      "JOIN meta.relationships AS r ON r.target_record_id = m.record_id",
+      "JOIN meta.records AS o ON o.record_id = r.source_record_id",
       "GROUP BY ALL",
       "ORDER BY links DESC",
     ]),
@@ -330,7 +336,7 @@ const modelQuery = (m, model) => {
     "    display(con.sql(f\"\"\"",
     `    SELECT m.*, o.record_id AS linked_record_id, o.* EXCLUDE (record_id)`,
     `    FROM ${id} AS m`,
-    "    JOIN relationships AS r ON r.source_record_id = m.record_id AND r.relationship_type = {text(kind)}",
+    "    JOIN meta.relationships AS r ON r.source_record_id = m.record_id AND r.relationship_type = {text(kind)}",
     "    JOIN {ident(other)} AS o ON o.record_id = r.target_record_id",
     "    \"\"\").df())",
   );
@@ -345,7 +351,7 @@ const modelSummary = (m, model) =>
     "import pandas as pd",
     "",
     `# ${model}: its fields, from the schema of its newest version`,
-    `schemas = sorted((metadata / "models" / ${JSON.stringify(model)} / "versions").glob("*/schema.json"), key=lambda f: int(f.parent.name))`,
+    `schemas = sorted((f for f in (metadata / "models" / ${JSON.stringify(model)} / "versions").glob("*/schema.json") if f.parent.name.isdigit()), key=lambda f: int(f.parent.name))`,
     "schema = json.loads(schemas[-1].read_text()) if schemas else {}",
     "required = set(schema.get(\"required\", []))",
     "display(pd.DataFrame([{",
@@ -368,14 +374,18 @@ const schemaSummary = (m) =>
     needs("pandas"),
     "import json",
     "import pandas as pd",
+    "from pathlib import Path",
     "",
-    `metadata = ${m}`,
+    `metadata = Path(${m})`,
     "rows = []",
-    "for schema_file in sorted((metadata / \"models\").glob(\"*/versions/*/schema.json\")):",
+    "for schema_file in sorted(f for f in (metadata / \"models\").glob(\"*/versions/*/schema.json\") if f.parent.name.isdigit()):",
     "    model, version = schema_file.parts[-4], int(schema_file.parent.name)",
     "    schema = json.loads(schema_file.read_text())",
     "    records = schema_file.with_name(\"records.jsonl\")",
-    "    count = sum(1 for _ in records.open()) if records.exists() else None",
+    "    count = None",
+    "    if records.exists():",
+    "        with records.open() as lines_:",
+    "            count = sum(1 for line in lines_ if line.strip())",
     "    required = set(schema.get(\"required\", []))",
     "    for field, spec in schema.get(\"properties\", {}).items():",
     "        kind = spec.get(\"type\")",
@@ -399,7 +409,9 @@ const schemaSummary = (m) =>
 // view (its crate path: "metadata/" or "metadata/models/<model>/"), or
 // null for any other.
 export function metadataFolder(rel) {
-  const m = String(rel || "").match(/^metadata(?:\/models\/([^/]+))?\/?$/);
+  // Model names are metadata-service's (lower-case letters, digits, _), so
+  // a name can go into the generated code as is; any other folder gets none.
+  const m = String(rel || "").match(/^metadata(?:\/models\/([a-z0-9_]+))?\/?$/);
   if (!m) return null;
   return { level: m[1] ? "model" : "metadata", model: m[1] || null };
 }

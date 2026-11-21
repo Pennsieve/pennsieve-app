@@ -26,6 +26,7 @@ const props = defineProps({
 const prefix = defineModel("prefix", { type: String, default: "" });
 
 const level = ref(null); // { folders, files, truncated }
+const OPENNEURO_CHECKED = 60;
 const loading = ref(false);
 const error = ref("");
 const filter = ref("");
@@ -42,7 +43,9 @@ async function load() {
     if (mine === seq) level.value = l;
     // OpenNeuro's bucket lists datasets whose files can't be read (private,
     // or not released yet): its dataset folders are checked as they're shown.
-    if (mine === seq && datasetsLevel.value) checkOpenNeuroAll(l.folders, { current: () => mine === seq });
+    // The first OPENNEURO_CHECKED only: the top level lists up to a thousand
+    // datasets, two HEADs each. Others are checked when opened.
+    if (mine === seq && datasetsLevel.value) checkOpenNeuroAll(l.folders.slice(0, OPENNEURO_CHECKED), { current: () => mine === seq });
     else if (isOpenNeuro.value && prefix.value) checkOpenNeuro(prefix.value.split("/")[0]);
   } catch (err) {
     console.error("Failed to list the Open Data folder:", err);

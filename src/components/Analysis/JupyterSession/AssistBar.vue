@@ -129,17 +129,23 @@ function submit() {
     </div>
     <!-- Written code: its main action puts it in and runs it. A suggestion for
          a cell with code is its next step, so it goes below. -->
+    <!-- A reply stopped part-way can be used, never run in one click. -->
+    <div v-else-if="assist.state === 'done' && code && assist.partial" class="nb-assist__actions">
+      <button class="nb-assist__btn nb-assist__btn--go" @click="emit(cellHasCode ? 'insert-below' : 'accept')">{{ cellHasCode ? "Insert below" : "Use" }}</button>
+      <button class="nb-assist__btn" @click="emit('discard')">Discard</button>
+      <span class="nb-assist__note">Stopped part-way: read it before you run it.</span>
+    </div>
     <div v-else-if="assist.state === 'done' && code && assist.mode === 'suggest' && cellHasCode" class="nb-assist__actions">
       <button class="nb-assist__btn nb-assist__btn--go" @click="emit('insert-below-run')">Insert below and run</button>
       <button class="nb-assist__btn" @click="emit('insert-below')">Insert below</button>
       <button class="nb-assist__btn" @click="emit('discard')">Discard</button>
-      <span class="nb-assist__note">Written by AI: check what it does.</span>
+      <span class="nb-assist__note">Written by AI from your session's data: read it before you run it.</span>
     </div>
     <div v-else-if="assist.state === 'done' && code" class="nb-assist__actions">
       <button class="nb-assist__btn nb-assist__btn--go" @click="emit('use-run')">{{ cellHasCode ? "Replace and run" : "Use and run" }}</button>
       <button class="nb-assist__btn" @click="emit('insert-below')">Insert below</button>
       <button class="nb-assist__btn" @click="emit('discard')">Discard</button>
-      <span class="nb-assist__note">Written by AI: check what it does.</span>
+      <span class="nb-assist__note">Written by AI: read it before you run it.</span>
     </div>
 
     <!-- What it used: tokens, and the cost as the run's governor prices it. -->
