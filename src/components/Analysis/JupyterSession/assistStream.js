@@ -111,7 +111,8 @@ export async function getAgent(kernelBaseUrl, token, { fetchFn = globalThis.fetc
     });
     if (!resp.ok) return { available: false };
     const body = await resp.json();
-    return { available: !!body.available, model: body.model || "", budget: body.budget || null };
+    // modes: what the agent takes (write, fix, suggest); an older one says nothing.
+    return { available: !!body.available, model: body.model || "", budget: body.budget || null, modes: Array.isArray(body.modes) ? body.modes : ["write", "fix"] };
   } catch {
     return { available: false };
   }

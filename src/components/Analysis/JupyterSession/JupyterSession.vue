@@ -566,7 +566,10 @@ function openAssist(cell, { mode = "write", file = "" } = {}) {
   if (!assistAvailable.value || assistPaused.value || cell.cell_type !== "code") return;
   for (const c of cells.value) if (c._assist && c.id !== cell.id) closeAssist(c);
   if (cell._assist?.state === "asking") return;
-  cell._assist = { mode, file, prompt: "", state: "idle", text: "", error: "", steps: [], note: "", usage: null, budget: null };
+  // An agent that says it can suggests a next cell when nothing is typed
+  // (not for a file: that asks what to do with it).
+  const canSuggest = !!assistInfo.value.agent && (assistInfo.value.modes || []).includes("suggest") && mode === "write" && !file;
+  cell._assist = { mode, file, canSuggest, prompt: "", state: "idle", text: "", error: "", steps: [], note: "", usage: null, budget: null };
   select(cell.id);
   if (mode === "fix") submitAssist(cell, "");
 }
@@ -695,8 +698,13 @@ function onAssist(cell, { action, prompt }) {
   if (action === "open") return a ? null : openAssist(cell);
   if (action === "fix") return openAssist(cell, { mode: "fix" });
   if (!a) return;
-  if (action === "submit") submitAssist(cell, prompt);
-  else if (action === "stop") assistAborts.get(cell.id)?.abort();
+  if (action === "submit") {
+    if (a.mode === "suggest") a.mode = "write";
+    submitAssist(cell, prompt);
+  } else if (action === "suggest") {
+    a.mode = "suggest";
+    submitAssist(cell, "");
+  } else if (action === "stop") assistAborts.get(cell.id)?.abort();
   else if (action === "clear-file") a.file = "";
   else if (action === "discard") closeAssist(cell);
   else if (action === "accept-run") fixAndRun(cell);
@@ -713,17 +721,18 @@ function onAssist(cell, { action, prompt }) {
     a.answer = "";
     submitAssist(cell, `${asked}\n\nWrite code for this. What you found before: ${a.lastAnswer || ""}`.slice(0, 3900), { codeOnly: true });
   }
-  else if (action === "accept" || action === "insert-below") {
+  else if (["accept", "use-run", "insert-below", "insert-below-run"].includes(action)) {
     const code = acceptedCode(a.text);
     if (!cellCode(a.text)) return;
     closeAssist(cell);
-    if (action === "accept") {
-      setSource(cell.id, code);
-      focusCell(cell.id);
-    } else {
-      const id = addCell(cell.id, "code");
-      setSource(id, code);
-      focusCell(id);
+    let id = cell.id;
+    if (action.startsWith("insert-below")) id = addCell(cell.id, "code");
+    setSource(id, code);
+    focusCell(id);
+    // ...and run, for the actions that say so.
+    if (action.endsWith("-run")) {
+      const target = cells.value[idx(id)];
+      if (target) onRun(target, { advance: false });
     }
   }
 }
