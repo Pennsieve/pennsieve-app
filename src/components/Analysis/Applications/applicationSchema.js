@@ -762,7 +762,7 @@ export const structureId = (entry) => {
 
 /**
  * The registry structure of a dataset's metadata records: an input that
- * conforms to it takes records (models/<model>/schema.json and
+ * conforms to it takes records (models/<model>/versions/<n>/schema.json and
  * records.jsonl, relationships.csv) in its own folder, not files.
  */
 export const RECORDS_STRUCTURE = "pennsieve-records";
