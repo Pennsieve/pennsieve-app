@@ -751,7 +751,7 @@ export function useJupyterSession() {
       const meta = await contents.get(path, { content: false });
       if (meta.type === "directory" || (meta.size != null && meta.size > maxBytes)) return null;
       const model = await contents.get(path, { content: true, type: "file", format: "text" });
-      return typeof model.content === "string" ? model.content : null;
+      return typeof model.content === "string" && model.content.length <= maxBytes ? model.content : null;
     } catch {
       return null;
     }
