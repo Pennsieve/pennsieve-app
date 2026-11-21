@@ -511,7 +511,8 @@ async function focusCell(id) {
    On a node with LLM access the session's sidecar has a code assistant: ✦ or
    Cmd/Ctrl-I on a cell, Ask… on a file, Fix on an error. Its state is the
    cell's _assist (AssistBar); one cell has it at a time. What it writes goes
-   into a cell only when the user takes it, and runs only when they run it. */
+   into a cell only when the user takes it, and runs only on an action that
+   says so (Use and run, Insert below and run), never on a stopped, partial reply. */
 // { available, agent, model, budget }: the agent (it looks, and can run its
 // fix) on a newer session image, else the sidecar's single-shot assistant.
 const assistInfo = ref({ available: false });
@@ -602,7 +603,7 @@ async function submitAssist(cell, prompt, { allowRun = false, codeOnly = false }
   const a = cell._assist;
   if (!a) return;
   // Each request (a continuation too) counts its own tokens.
-  Object.assign(a, { prompt, state: "asking", error: "", note: "", running: allowRun, usage: null, countedTokens: 0 });
+  Object.assign(a, { prompt, state: "asking", error: "", note: "", running: allowRun, usage: null, countedTokens: 0, partial: false });
   if (!allowRun) Object.assign(a, { text: "", steps: [], usage: null, budget: null, outputs: null, conversationId: "" });
   const controller = new AbortController();
   assistAborts.set(cell.id, controller);
@@ -648,7 +649,8 @@ async function submitAssist(cell, prompt, { allowRun = false, codeOnly = false }
     }
     a.state = "done";
   } catch (e) {
-    if (controller.signal.aborted) a.state = a.text ? "done" : "idle";
+    // Stopped: what came so far can be used, but not run in one click (partial).
+    if (controller.signal.aborted) Object.assign(a, { state: a.text ? "done" : "idle", partial: !!a.text });
     else if (e?.budgetExceeded) {
       // No budget left: said calmly, and the assistant pauses.
       Object.assign(a, { state: "budget", notice: e.message, running: false });
@@ -732,7 +734,7 @@ function onAssist(cell, { action, prompt }) {
     // ...and run, for the actions that say so.
     if (action.endsWith("-run")) {
       const target = cells.value[idx(id)];
-      if (target) onRun(target, { advance: false });
+      if (target) Promise.resolve(onRun(target, { advance: false })).catch((e) => console.warn("Running the cell failed:", e));
     }
   }
 }

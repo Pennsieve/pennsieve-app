@@ -92,7 +92,11 @@ const asked = new Map()
 
 const PROBES = ['dataset_description.json', 'README']
 
+// OpenNeuro's dataset ids: ds and six digits. Anything else isn't asked.
+const DATASET_ID = /^ds\d{6}$/
+
 export function checkOpenNeuro(id, { fetchFn = globalThis.fetch } = {}) {
+  if (!DATASET_ID.test(String(id))) return Promise.resolve(null)
   if (!asked.has(id)) {
     const status = (file) =>
       fetchFn(`${OPENNEURO_BUCKET_URL}/${encodeURIComponent(id)}/${file}`, { method: 'HEAD' }).then((r) => r.status, () => 0)
@@ -100,6 +104,8 @@ export function checkOpenNeuro(id, { fetchFn = globalThis.fetch } = {}) {
       .then((codes) => (codes.includes(403) ? false : codes.includes(200) ? true : null))
       .then((readable) => {
         openNeuroReadable.set(id, readable)
+        // No answer (a network error): asked again next time.
+        if (readable === null) asked.delete(id)
         return readable
       })
     asked.set(id, answer)
