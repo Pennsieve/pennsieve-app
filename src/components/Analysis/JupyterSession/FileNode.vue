@@ -14,7 +14,7 @@ import { computed, ref } from "vue";
 import { VIEW_CRATE_DIR } from "@/composables/useJupyterSession";
 import { visibleEntries } from "./fileBrowserHelpers";
 import { stackFormat, stackIcon, costLine } from "./inputsHelpers";
-import { fileSnippets, stackSnippets } from "./fileSnippets";
+import { fileSnippets, folderSnippets, stackSnippets } from "./fileSnippets";
 import AssistIcon from "./AssistIcon.vue";
 
 const props = defineProps({
@@ -103,9 +103,15 @@ function go(noted = false) {
 /* ------------------------------------------------------ starter code --- */
 // A downloaded file of a known type, or a stack, offers a few cells (load,
 // summarize, plot) on its Code action, in a strip under its row until one is
-// picked. A stack in R has only one (its URL): Code adds it.
+// picked. A stack in R has only one (its URL): Code adds it. The metadata
+// folders of a view with metadata records, once something of it is
+// downloaded, offer SQL over the records and a summary of the schemas:
+// known by the folder's path in the view, not by its name.
+const isFolder = computed(() => props.node.type === "directory");
+const hasRecords = computed(() => (view.value?.source?.models || []).length > 0);
 const snippets = computed(() => {
   if (isStack.value) return stackSnippets(view.value.entry, props.kernelName);
+  if (isFolder.value) return props.node.virtual || !hasRecords.value ? [] : folderSnippets(props.node.path, view.value.rel, props.kernelName);
   return props.node.type === "file" && !remote.value && !isNotebook(props.node) ? fileSnippets(props.node.path, props.kernelName) : [];
 });
 // Ask… is the assistant's, on any downloaded file or stack.
@@ -249,7 +255,7 @@ function onRow() {
             v-if="hasCode"
             class="fn__act fn__act--text"
             :class="{ 'is-on': showSnippets }"
-            title="Starter code for this file: load, summarize, plot"
+            :title="isFolder ? 'Starter code for these metadata records: query them with SQL' : 'Starter code for this file: load, summarize, plot'"
             :aria-expanded="showSnippets"
             @click="onCode"
           >
