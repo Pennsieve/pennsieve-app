@@ -3,7 +3,7 @@
 // search (utils/openNeuro).
 import { defineAsyncComponent } from "vue";
 import openNeuroMark from "@/assets/images/logos/openneuro-mark.svg";
-import { OPENNEURO_REGISTRY, countOpenNeuro } from "@/utils/openNeuro";
+import { OPENNEURO_REGISTRY, countOpenNeuro, openNeuroUnreadable } from "@/utils/openNeuro";
 import { imagingTerms, openDataPlatform } from "./openDataPlatform";
 
 export default openDataPlatform({
@@ -21,6 +21,8 @@ export default openDataPlatform({
   ],
   picker: defineAsyncComponent(() => import("../OpenNeuroPicker.vue")),
   registry: () => OPENNEURO_REGISTRY,
+  // A dataset whose files OpenNeuro hasn't made public can't be taken.
+  ready: (p) => !!p.dataset && !openNeuroUnreadable(p.dataset.id),
   viewTitle: (p) => p.dataset.name,
   label: (p) => (p.dataset ? `${p.dataset.name} (${p.prefix || p.dataset.id})` : ""),
   count: () => countOpenNeuro(),

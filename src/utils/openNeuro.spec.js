@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { searchOpenNeuro, countOpenNeuro, toOpenNeuroDataset, openNeuroUrl } from "./openNeuro";
+import { searchOpenNeuro, countOpenNeuro, toOpenNeuroDataset, openNeuroUrl, checkOpenNeuro, checkOpenNeuroAll, openNeuroReadable, openNeuroUnreadable } from "./openNeuro";
 
 const node = {
   id: "ds004100",
@@ -52,5 +52,45 @@ describe("OpenNeuro", () => {
   it("names a dataset by its id when it has no title", () => {
     expect(toOpenNeuroDataset({ id: "ds1" }).name).toBe("ds1");
     expect(openNeuroUrl("ds000001")).toBe("https://openneuro.org/datasets/ds000001");
+  });
+});
+
+describe("OpenNeuro readability", () => {
+  const status = (s) => vi.fn().mockResolvedValue({ status: s });
+  it("asks once per dataset, anonymously, for its dataset_description.json and README", async () => {
+    const fetchFn = status(200);
+    expect(await checkOpenNeuro("ds900001", { fetchFn })).toBe(true);
+    expect(await checkOpenNeuro("ds900001", { fetchFn })).toBe(true);
+    expect(fetchFn).toHaveBeenCalledTimes(2);
+    expect(fetchFn).toHaveBeenCalledWith("https://s3.us-east-1.amazonaws.com/openneuro.org/ds900001/dataset_description.json", { method: "HEAD" });
+    expect(fetchFn).toHaveBeenCalledWith("https://s3.us-east-1.amazonaws.com/openneuro.org/ds900001/README", { method: "HEAD" });
+    expect(openNeuroReadable.get("ds900001")).toBe(true);
+  });
+
+  it("takes a 403 as unreadable, and anything else as unknown", async () => {
+    expect(await checkOpenNeuro("ds900002", { fetchFn: status(403) })).toBe(false);
+    expect(await checkOpenNeuro("ds900003", { fetchFn: status(404) })).toBe(null);
+    expect(await checkOpenNeuro("ds900004", { fetchFn: vi.fn().mockRejectedValue(new Error("offline")) })).toBe(null);
+    expect(openNeuroUnreadable("ds900002")).toBe(true);
+    expect(openNeuroUnreadable("ds900002/sub-01/")).toBe(true);
+    expect(openNeuroUnreadable("ds900003")).toBe(false);
+    expect(openNeuroUnreadable("ds999999")).toBe(false);
+  });
+
+  it("takes a dataset partly released (description readable, README refused) as unreadable", async () => {
+    const fetchFn = vi.fn((url) => Promise.resolve({ status: url.endsWith("README") ? 403 : 200 }));
+    expect(await checkOpenNeuro("ds900005", { fetchFn })).toBe(false);
+  });
+
+  it("takes a missing README as no answer, not a refusal", async () => {
+    const fetchFn = vi.fn((url) => Promise.resolve({ status: url.endsWith("README") ? 404 : 200 }));
+    expect(await checkOpenNeuro("ds900006", { fetchFn })).toBe(true);
+  });
+
+  it("checks a list until it changes", async () => {
+    const fetchFn = status(200);
+    let n = 0;
+    await checkOpenNeuroAll(["ds900010", "ds900011", "ds900012"], { at: 1, fetchFn, current: () => n++ < 2 });
+    expect(fetchFn).toHaveBeenCalledTimes(4);
   });
 });

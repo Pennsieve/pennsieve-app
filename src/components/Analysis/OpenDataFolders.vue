@@ -9,6 +9,7 @@
 // a file it marks zarr is a Zarr folder, which a notebook reads in place.
 import { computed, onMounted, ref, watch } from "vue";
 import { listOpenDataFolder } from "@/utils/viewsService";
+import { checkOpenNeuro, checkOpenNeuroAll, openNeuroUnreadable, OPENNEURO_NOT_PUBLIC, OPENNEURO_REGISTRY } from "@/utils/openNeuro";
 
 const props = defineProps({
   // The dataset's registry name.
@@ -39,6 +40,10 @@ async function load() {
     const args = { dataset: props.dataset, prefix: prefix.value, startsWith: filter.value.trim() };
     const l = await (props.list ? props.list(args) : listOpenDataFolder(args));
     if (mine === seq) level.value = l;
+    // OpenNeuro's bucket lists datasets whose files can't be read (private,
+    // or not released yet): its dataset folders are checked as they're shown.
+    if (mine === seq && datasetsLevel.value) checkOpenNeuroAll(l.folders, { current: () => mine === seq });
+    else if (isOpenNeuro.value && prefix.value) checkOpenNeuro(prefix.value.split("/")[0]);
   } catch (err) {
     console.error("Failed to list the Open Data folder:", err);
     if (mine === seq) {
@@ -60,6 +65,13 @@ const onFilter = () => {
   clearTimeout(filterTimer);
   filterTimer = setTimeout(load, 300);
 };
+
+// The level of OpenNeuro's bucket that holds its dataset folders, and
+// whether the folder shown is in a dataset whose files can't be read.
+const isOpenNeuro = computed(() => props.dataset === OPENNEURO_REGISTRY);
+const datasetsLevel = computed(() => isOpenNeuro.value && prefix.value === "");
+const unreadable = computed(() => isOpenNeuro.value && prefix.value !== "" && openNeuroUnreadable(prefix.value));
+const folderUnreadable = (f) => datasetsLevel.value && openNeuroUnreadable(f);
 
 // The path below root to the folder shown, for going back up.
 const crumbs = computed(() => {
@@ -110,7 +122,8 @@ const formatSize = (bytes) => {
         @input="onFilter"
       />
     </div>
-    <p v-if="levelStack" class="odf__note">
+    <p v-if="unreadable" class="odf__note odf__note--warn">{{ OPENNEURO_NOT_PUBLIC }}.</p>
+    <p v-else-if="levelStack" class="odf__note">
       This folder is {{ levelStack }}: the notebook reads it whole, in place, without downloading it.
     </p>
     <p v-else class="odf__note">
@@ -127,10 +140,12 @@ const formatSize = (bytes) => {
           :key="f"
           type="button"
           class="odf-row"
-          :title="`Open ${f}/`"
+          :class="{ 'is-unavailable': folderUnreadable(f) }"
+          :disabled="folderUnreadable(f)"
+          :title="folderUnreadable(f) ? OPENNEURO_NOT_PUBLIC : `Open ${f}/`"
           @click="prefix = `${prefix}${f}/`"
         >
-          <span>{{ f }}/</span>
+          <span>{{ f }}/<span v-if="folderUnreadable(f)" class="odf-row__unavailable">files not public yet</span></span>
           <svg class="odf-row__chevron" width="12" height="12" viewBox="0 0 12 12" aria-hidden="true">
             <path d="M4.5 2.5 8 6l-3.5 3.5" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" />
           </svg>
@@ -199,6 +214,9 @@ const formatSize = (bytes) => {
   font-size: 12px;
   color: theme.$gray_4;
 }
+.odf__note--warn {
+  color: theme.$red_2;
+}
 .odf__level {
   max-height: 280px;
   overflow-y: auto;
@@ -227,6 +245,16 @@ const formatSize = (bytes) => {
   &:hover .odf-row__chevron {
     color: theme.$gray_5;
   }
+  &.is-unavailable {
+    cursor: not-allowed;
+    color: theme.$gray_4;
+    background: none;
+  }
+}
+.odf-row__unavailable {
+  margin-left: 8px;
+  font-size: 12px;
+  color: theme.$red_2;
 }
 .odf-row__chevron {
   flex-shrink: 0;
