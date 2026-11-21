@@ -7,7 +7,7 @@
 // Pure: on DAG steps ({ id, inputs }) and app.yml ports.
 
 import { shortMediaType, versionManifest } from "../WorkflowBuilder/appManifestInfo";
-import { mediaTypesOverlap, normalizeMediaType } from "../Applications/applicationSchema";
+import { isRecordsPort, mediaTypesOverlap, normalizeMediaType } from "../Applications/applicationSchema";
 
 // The inputs a source feeds: { step, input } per link from it.
 export function inputsFedBy(sourceId, steps) {
@@ -40,16 +40,41 @@ export function sourceHints(sourceId, steps, portsOf) {
         types: [...new Set([...(port.mediaTypes || []).map(shortMediaType), ...(port.formats || []).map((f) => EDAM_TYPES[f]).filter(Boolean)])],
         mediaTypes: (port.mediaTypes || []).map(normalizeMediaType).filter(Boolean),
         layout: layout.length ? String(layout[layout.length - 1]).split("@")[0].toUpperCase() : "",
+        // It takes a dataset's metadata records (pennsieve-records), not files.
+        records: isRecordsPort(port),
         description: port.description || "",
       };
     })
     .filter(Boolean);
 }
 
+// What a run can choose for a source: a dataset's files, its metadata
+// records, or both ({ files, records }). A batch step gets a dataset's
+// records only through an input that takes them (app.yml conformsTo:
+// pennsieve-records) and its files through any other; a notebook (a step
+// interactive(stepId) says is one) reads whatever it is given.
+export function sourceParts(sourceId, steps, portsOf, interactive = () => false) {
+  const linked = (s) => (Array.isArray(s?.inputs) ? s.inputs : []).some((l) => l?.from === sourceId);
+  const readers = (steps || []).filter((s) => (s?.dependsOn || []).includes(sourceId) || linked(s));
+  // A step whose ports aren't known yet (the app list is loading) may take
+  // either, as may a notebook.
+  const unknown = (s) => linked(s) && !portsOf(s.id);
+  if (readers.some((s) => interactive(s.id) || unknown(s))) return { files: true, records: true };
+  const fed = inputsFedBy(sourceId, steps);
+  const hints = sourceHints(sourceId, steps, portsOf);
+  const takesRecords = (f) => hints.some((h) => h.step === f.step && h.input === f.input && h.records);
+  return {
+    // A step it isn't linked into takes all of it at the root: its files.
+    files: !fed.length || readers.some((s) => !linked(s)) || fed.some((f) => !takesRecords(f)),
+    records: fed.some(takesRecords),
+  };
+}
+
 // One line for a picker: "signals takes CSV files", "study takes a BIDS
 // folder", "a takes CSV; b takes JSON".
 export function hintLine(hints) {
   const lines = (hints || []).map((h) => {
+    if (h.records) return `${h.input} takes a dataset's metadata records`;
     if (h.layout) return `${h.input} takes a ${h.layout} folder`;
     if (h.types.length) return `${h.input} takes ${h.types.join(", ")} files`;
     return "";
@@ -74,11 +99,11 @@ const listed = (names) =>
 
 // What to say when sources have no files yet: their inputs by name ("Select
 // files for signals and events"), or how many.
-export function missingFilesMessage(missingIds, dag) {
+export function missingFilesMessage(missingIds, dag, what = "files") {
   const names = (missingIds || []).map((id) => sourceLabel(id, dag, ""));
-  if (names.length && names.every(Boolean)) return `Select files for ${listed([...new Set(names)])}`;
+  if (names.length && names.every(Boolean)) return `Select ${what} for ${listed([...new Set(names)])}`;
   const n = (missingIds || []).length;
-  return `Select files for ${n === 1 ? "data source" : `${n} data sources`}`;
+  return `Select ${what} for ${n === 1 ? "data source" : `${n} data sources`}`;
 }
 
 // EDAM formats (app.yml formats) by the names files' extensions give them,
@@ -173,7 +198,8 @@ export function fileTypeMismatches(fileNames, hints, formats = []) {
 // declares no types.
 export function acceptedFileTypes(hints) {
   const accepted = new Set();
-  for (const h of hints || []) {
+  // A records input takes no files: it says nothing about them.
+  for (const h of (hints || []).filter((x) => !x.records)) {
     if (h.layout || !h.types.length) return null;
     for (const t of h.types) {
       if (t === "Any" || t === "File") return null;

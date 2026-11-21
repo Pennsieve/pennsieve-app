@@ -37,8 +37,9 @@ const emit = defineEmits([
   "change-type",
   "focus-prev",
   "focus-next",
-  // The code assistant: { action: open | fix | submit | stop | accept |
-  // insert-below | discard | clear-file, prompt }. JupyterSession owns it.
+  // The code assistant: { action: open | fix | submit | suggest | stop | accept |
+  // use-run | insert-below | insert-below-run | discard | clear-file, prompt }.
+  // JupyterSession owns it.
   "assist",
 ]);
 
@@ -225,9 +226,12 @@ function latexOf(data) {
         :assist="cell._assist"
         :cell-has-code="!!cell.source.trim()"
         @submit="assist('submit', $event)"
+        @suggest="assist('suggest')"
         @stop="assist('stop')"
         @accept="assist('accept')"
+        @use-run="assist('use-run')"
         @insert-below="assist('insert-below')"
+        @insert-below-run="assist('insert-below-run')"
         @insert-answer="assist('insert-answer')"
         @answer-to-code="assist('answer-to-code')"
         @discard="assist('discard')"

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { inputsFedBy, sourceLabel, sourceHints, hintLine, portsOfStep, missingFilesMessage, fileShortType, fileShortTypes, fileTypeMismatches, acceptedFileTypes, linkHints, fileMediaTypes } from "./sourceInputs";
+import { inputsFedBy, sourceLabel, sourceHints, sourceParts, hintLine, portsOfStep, missingFilesMessage, fileShortType, fileShortTypes, fileTypeMismatches, acceptedFileTypes, linkHints, fileMediaTypes } from "./sourceInputs";
 
 // Four sources into test-ports-processor: two linked to its inputs, two to
 // "all inputs".
@@ -65,6 +65,72 @@ describe("data sources named after their inputs", () => {
   });
 });
 
+
+describe("inputs of metadata records", () => {
+  // d takes files and records; r1 feeds both, r2 only records, r3 only files.
+  const dag = [
+    { id: "r1" }, { id: "r2" }, { id: "r3" }, { id: "r4" },
+    {
+      id: "d",
+      dependsOn: ["r1", "r2", "r3"],
+      inputs: [
+        { from: "r1", input: "recordings" },
+        { from: "r1", input: "records" },
+        { from: "r2", input: "records" },
+        { from: "r3", input: "recordings" },
+      ],
+    },
+    { id: "nb", dependsOn: ["r4"] },
+  ];
+  const appPorts = {
+    d: { inputs: [{ name: "recordings", mediaTypes: ["application/x-edf"] }, { name: "records", conformsTo: "pennsieve-records@1.0", placement: "subfolder" }] },
+  };
+  const portsOf = (id) => appPorts[id];
+
+  it("says an input takes records", () => {
+    const hints = sourceHints("r2", dag, portsOf);
+    expect(hints.map((h) => [h.input, h.records])).toEqual([["records", true]]);
+    expect(hintLine(hints)).toBe("records takes a dataset's metadata records");
+  });
+
+  it("offers a source's files, records or both, by what it feeds", () => {
+    expect(sourceParts("r1", dag, portsOf)).toEqual({ files: true, records: true });
+    expect(sourceParts("r2", dag, portsOf)).toEqual({ files: false, records: true });
+    expect(sourceParts("r3", dag, portsOf)).toEqual({ files: true, records: false });
+    // Unlinked into a batch step: files.
+    expect(sourceParts("r4", dag, portsOf)).toEqual({ files: true, records: false });
+    // A notebook reads both.
+    expect(sourceParts("r4", dag, portsOf, (id) => id === "nb")).toEqual({ files: true, records: true });
+  });
+
+  it("counts readers it isn't linked into, and notebooks linked without dependsOn", () => {
+    const more = [
+      ...dag,
+      { id: "e", dependsOn: ["r2"] }, // takes all of r2 at its root: files
+      { id: "nb2", inputs: [{ from: "r3", input: "data" }] },
+    ];
+    expect(sourceParts("r2", more, portsOf)).toEqual({ files: true, records: true });
+    expect(sourceParts("r3", more, portsOf, (id) => id === "nb2")).toEqual({ files: true, records: true });
+  });
+
+  it("offers both while a step's ports aren't known", () => {
+    expect(sourceParts("r2", dag, () => null)).toEqual({ files: true, records: true });
+  });
+
+  it("gives a link to all inputs (no input named) the files", () => {
+    const all = [{ id: "s" }, { id: "f", inputs: [{ from: "s" }] }];
+    expect(sourceParts("s", all, () => ({ inputs: [] }))).toEqual({ files: true, records: false });
+  });
+
+  it("names what is missing", () => {
+    expect(missingFilesMessage(["r2"], dag, "metadata records")).toBe("Select metadata records for records");
+  });
+
+  it("leaves records inputs out of the file types a source checks", () => {
+    const hints = sourceHints("r1", dag, portsOf);
+    expect(acceptedFileTypes(hints)).toEqual(new Set(["EDF"]));
+  });
+});
 
 describe("file types against an input", () => {
   it("names a file's type by its extension", () => {

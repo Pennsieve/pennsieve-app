@@ -195,3 +195,245 @@ export function fileSnippets(path, kernelName = "") {
   const sep = separator(path, r);
   return list.map(({ id, label, title, code }) => ({ id, label, title, code: noted(code(p, sep)) }));
 }
+
+/* ------------------------------------------------- metadata records --- */
+// A view's metadata records are files: metadata/models/<model>/versions/<v>/
+// records.jsonl (rows {"id", "data"}) and schema.json, and
+// metadata/relationships.csv. The metadata folder and each model's folder
+// offer cells that query them with DuckDB, as SQL views
+// over the files: no copy, no Pennsieve library. The setup reads what's on
+// the disk when it runs, so a model not downloaded yet is left out.
+// Their first line says so: written for these files, and portable.
+export const metadataNote = (lib) => `# Written for this view's metadata records (the Pennsieve export layout): plain ${lib}, no Pennsieve library needed`;
+
+// A view per model (its newest version on the disk), "records" (record_id,
+// model) of them all, and "relationships". A model's view expands its
+// records' fields; one whose records have none (or that has no records)
+// keeps them as a JSON column, data.
+const duckdbSetup = (m) =>
+  lines(
+    needs("duckdb", "pandas"),
+    "import duckdb",
+    "from pathlib import Path",
+    "",
+    `metadata = Path(${m})`,
+    "con = duckdb.connect()",
+    "ident = lambda s: '\"' + s.replace('\"', '\"\"') + '\"'",
+    "text = lambda s: \"'\" + str(s).replace(\"'\", \"''\") + \"'\"",
+    "",
+    "# A view per model: record_id and its fields, from its newest version",
+    "models = []",
+    "for folder in sorted(p for p in (metadata / \"models\").iterdir() if p.is_dir()):",
+    "    files = sorted((f for f in (folder / \"versions\").glob(\"*/records.jsonl\") if f.parent.name.isdigit()), key=lambda f: int(f.parent.name))",
+    "    if not files:",
+    "        continue  # not downloaded",
+    "    source = f\"read_json({text(files[-1])}, format='newline_delimited', sample_size=-1\"",
+    "    try:",
+    "        con.sql(f\"CREATE OR REPLACE VIEW {ident(folder.name)} AS SELECT id AS record_id, data.* FROM {source})\")",
+    "    except duckdb.Error:  # no records, or none with fields",
+    "        con.sql(f\"CREATE OR REPLACE VIEW {ident(folder.name)} AS SELECT id AS record_id, data FROM {source}, columns={{'id': 'VARCHAR', 'data': 'JSON'}})\")",
+    "    models.append(folder.name)",
+    "",
+    "# meta.records: every record's id and model; meta.relationships: source, target, type",
+    "# (in their own schema, so a model named records or relationships keeps its name)",
+    "con.sql(\"CREATE SCHEMA IF NOT EXISTS meta\")",
+    "con.sql(\"CREATE OR REPLACE VIEW meta.records AS \" + (\" UNION ALL \".join(",
+    "    f\"SELECT record_id, {text(m)} AS model FROM main.{ident(m)}\" for m in models",
+    ") or \"SELECT NULL::VARCHAR AS record_id, NULL::VARCHAR AS model WHERE false\"))",
+    "links = metadata / \"relationships.csv\"",
+    "con.sql(\"CREATE OR REPLACE VIEW meta.relationships AS \" + (",
+    "    f\"SELECT * FROM read_csv({text(links)}, all_varchar=true)\" if links.exists()",
+    "    else \"SELECT NULL::VARCHAR AS source_record_id, NULL::VARCHAR AS target_record_id, NULL::VARCHAR AS relationship_type WHERE false\"",
+    "))",
+    "print(\"Views:\", \", \".join(models + [\"meta.records\", \"meta.relationships\"]))",
+    "# In later cells: con.sql('SELECT * FROM \"<model>\"').df(); meta.relationships links records by record_id",
+  );
+
+const quoted = (model) => `"${model.replace(/"/g, '""')}"`;
+
+// One model's view (its newest version on the disk): record_id and its
+// records' fields, or a JSON column, data, when they have none.
+const modelSetup = (m, model) =>
+  lines(
+    needs("duckdb", "pandas"),
+    "import duckdb",
+    "from pathlib import Path",
+    "",
+    `metadata = Path(${m})`,
+    "con = duckdb.connect()",
+    "text = lambda s: \"'\" + str(s).replace(\"'\", \"''\") + \"'\"",
+    "",
+    `# ${model}: a view of its newest version's records`,
+    `files = sorted((f for f in (metadata / "models" / ${JSON.stringify(model)} / "versions").glob("*/records.jsonl") if f.parent.name.isdigit()), key=lambda f: int(f.parent.name))`,
+    "if not files:",
+    `    raise FileNotFoundError(${JSON.stringify(`${model}'s records aren't downloaded yet`)})`,
+    "source = f\"read_json({text(files[-1])}, format='newline_delimited', sample_size=-1\"",
+    "try:",
+    `    con.sql(f"CREATE OR REPLACE VIEW ${quoted(model).replace(/"/g, '\\"')} AS SELECT id AS record_id, data.* FROM {source})")`,
+    "except duckdb.Error:  # no records, or none with fields",
+    `    con.sql(f"CREATE OR REPLACE VIEW ${quoted(model).replace(/"/g, '\\"')} AS SELECT id AS record_id, data FROM {source}, columns={{'id': 'VARCHAR', 'data': 'JSON'}})")`,
+    `# In later cells: con.sql('SELECT * FROM ${quoted(model)}').df()`,
+  );
+
+const sqlCell = (sql) => lines("con.sql(\"\"\"", ...sql, "\"\"\").df()");
+const shown = (sql) => lines("display(con.sql(\"\"\"", ...sql, "\"\"\").df())");
+const EXAMPLES = "# Examples: change them, or write your own SQL over the views";
+
+// The whole view: its models' views, and what they hold.
+const viewLoad = (m) => lines(duckdbSetup(m), "", sqlCell(["SELECT model, count(*) AS records FROM meta.records GROUP BY model ORDER BY model"]));
+
+// The whole view, then example queries: its models and how they link.
+const viewQuery = (m) =>
+  lines(
+    duckdbSetup(m),
+    "",
+    EXAMPLES,
+    "# Records per model",
+    shown(["SELECT model, count(*) AS records FROM meta.records GROUP BY model ORDER BY model"]),
+    "# How the models link: each relationship type, between which models",
+    sqlCell([
+      "SELECT s.model AS source, r.relationship_type, t.model AS target, count(*) AS links",
+      "FROM meta.relationships AS r",
+      "JOIN meta.records AS s ON s.record_id = r.source_record_id",
+      "JOIN meta.records AS t ON t.record_id = r.target_record_id",
+      "GROUP BY ALL ORDER BY links DESC",
+    ]),
+  );
+
+// One model: its view, then its first records.
+const modelLoad = (m, model) => lines(modelSetup(m, model), "", sqlCell([`SELECT * FROM ${quoted(model)} LIMIT 10`]));
+
+// One model's first records, then example queries: what links to them, and
+// a join to a linked model.
+const modelQuery = (m, model) => {
+  const id = quoted(model);
+  return lines(
+    duckdbSetup(m),
+    `if ${JSON.stringify(model)} not in models:`,
+    `    raise FileNotFoundError(${JSON.stringify(`${model}'s records aren't downloaded yet`)})`,
+    "",
+    shown([`SELECT * FROM ${id} LIMIT 10`]),
+    "",
+    EXAMPLES,
+    "# What its records link to, and what links to them",
+    shown([
+      `SELECT 'to' AS direction, r.relationship_type, o.model, count(*) AS links`,
+      `FROM ${id} AS m`,
+      "JOIN meta.relationships AS r ON r.source_record_id = m.record_id",
+      "JOIN meta.records AS o ON o.record_id = r.target_record_id",
+      "GROUP BY ALL",
+      "UNION ALL",
+      `SELECT 'from', r.relationship_type, o.model, count(*)`,
+      `FROM ${id} AS m`,
+      "JOIN meta.relationships AS r ON r.target_record_id = m.record_id",
+      "JOIN meta.records AS o ON o.record_id = r.source_record_id",
+      "GROUP BY ALL",
+      "ORDER BY links DESC",
+    ]),
+    "# Its records with a linked model's fields: name the model (one above) and the relationship type",
+    "other, kind = \"OTHER_MODEL\", \"RELATIONSHIP_TYPE\"",
+    "if other in models:",
+    "    display(con.sql(f\"\"\"",
+    `    SELECT m.*, o.record_id AS linked_record_id, o.* EXCLUDE (record_id)`,
+    `    FROM ${id} AS m`,
+    "    JOIN meta.relationships AS r ON r.source_record_id = m.record_id AND r.relationship_type = {text(kind)}",
+    "    JOIN {ident(other)} AS o ON o.record_id = r.target_record_id",
+    "    \"\"\").df())",
+  );
+};
+
+// One model: its fields from its schema (type, required, key, unit,
+// sensitive, description), then statistics of each column of its records.
+const modelSummary = (m, model) =>
+  lines(
+    modelSetup(m, model),
+    "import json",
+    "import pandas as pd",
+    "",
+    `# ${model}: its fields, from the schema of its newest version`,
+    `schemas = sorted((f for f in (metadata / "models" / ${JSON.stringify(model)} / "versions").glob("*/schema.json") if f.parent.name.isdigit()), key=lambda f: int(f.parent.name))`,
+    "schema = json.loads(schemas[-1].read_text()) if schemas else {}",
+    "required = set(schema.get(\"required\", []))",
+    "display(pd.DataFrame([{",
+    "    \"field\": field,",
+    "    \"type\": \", \".join(spec[\"type\"]) if isinstance(spec.get(\"type\"), list) else spec.get(\"type\"),",
+    "    \"required\": field in required,",
+    "    \"key\": bool(spec.get(\"x-pennsieve-key\")),",
+    "    \"unit\": spec.get(\"x-pennsieve-unit\"),",
+    "    \"sensitive\": bool(spec.get(\"x-pennsieve-sensitive\")),",
+    "    \"description\": spec.get(\"description\"),",
+    "} for field, spec in schema.get(\"properties\", {}).items()]))",
+    "# Each column of its records: type, count, distinct values, range, nulls",
+    sqlCell([`SUMMARIZE ${quoted(model)}`]),
+  );
+
+// A table of every model's fields, from the schemas: type, required, key,
+// unit, sensitive, description, with its version and record count.
+const schemaSummary = (m) =>
+  lines(
+    needs("pandas"),
+    "import json",
+    "import pandas as pd",
+    "from pathlib import Path",
+    "",
+    `metadata = Path(${m})`,
+    "rows = []",
+    "for schema_file in sorted(f for f in (metadata / \"models\").glob(\"*/versions/*/schema.json\") if f.parent.name.isdigit()):",
+    "    model, version = schema_file.parts[-4], int(schema_file.parent.name)",
+    "    schema = json.loads(schema_file.read_text())",
+    "    records = schema_file.with_name(\"records.jsonl\")",
+    "    count = None",
+    "    if records.exists():",
+    "        with records.open() as lines_:",
+    "            count = sum(1 for line in lines_ if line.strip())",
+    "    required = set(schema.get(\"required\", []))",
+    "    for field, spec in schema.get(\"properties\", {}).items():",
+    "        kind = spec.get(\"type\")",
+    "        rows.append({",
+    "            \"model\": model, \"version\": version, \"records\": count, \"field\": field,",
+    "            \"type\": \", \".join(kind) if isinstance(kind, list) else kind,",
+    "            \"required\": field in required,",
+    "            \"key\": bool(spec.get(\"x-pennsieve-key\")),",
+    "            \"unit\": spec.get(\"x-pennsieve-unit\"),",
+    "            \"sensitive\": bool(spec.get(\"x-pennsieve-sensitive\")),",
+    "            \"description\": spec.get(\"description\"),",
+    "        })",
+    "fields = pd.DataFrame(rows)",
+    "links = metadata / \"relationships.csv\"",
+    "if links.exists():",
+    "    print(pd.read_csv(links, dtype=str)[\"relationship_type\"].value_counts().rename(\"relationships\").to_string(), end=\"\\n\\n\")",
+    "fields",
+  );
+
+// Which of a view's metadata folders a folder is, from its path in the
+// view (its crate path: "metadata/" or "metadata/models/<model>/"), or
+// null for any other.
+export function metadataFolder(rel) {
+  // Model names are metadata-service's (lower-case letters, digits, _), so
+  // a name can go into the generated code as is; any other folder gets none.
+  const m = String(rel || "").match(/^metadata(?:\/models\/([a-z0-9_]+))?\/?$/);
+  if (!m) return null;
+  return { level: m[1] ? "model" : "metadata", model: m[1] || null };
+}
+
+// The snippets for a view's metadata folder or a model's folder, at path in the session and rel in the view: [{ id, label, title,
+// code }], or [] for other folders and in R.
+export function folderSnippets(path, rel, kernelName = "") {
+  const f = metadataFolder(rel);
+  if (!f || isR(kernelName)) return [];
+  // The metadata folder in the session: path, less what rel has after metadata.
+  const below = String(rel).replace(/\/+$/, "").length - "metadata".length;
+  const folder = String(path).replace(/\/+$/, "");
+  const m = sessionPathCode(below ? folder.slice(0, -below) : folder, kernelName);
+  const note = (code, lib = "DuckDB") => `${metadataNote(lib)}\n${code}`;
+  if (f.level === "model") {
+    return [
+      { id: "load", label: "Load", title: `${f.model}'s records as a DuckDB view, for SQL`, code: note(modelLoad(m, f.model)) },
+      { id: "query", label: "Query", title: `Load, then example queries: what ${f.model}'s records link to, and a join`, code: note(modelQuery(m, f.model)) },
+      { id: "summary", label: "Summarize", title: `${f.model}'s fields from its schema, and statistics of each column`, code: note(modelSummary(m, f.model)) },
+    ];
+  }
+  const load = { id: "load", label: "Load", title: "Every model's records as DuckDB views, for SQL", code: note(viewLoad(m)) };
+  const query = { id: "query", label: "Query", title: "Load, then example queries: records per model, and how the models link", code: note(viewQuery(m)) };
+  return [load, query, { id: "summary", label: "Summarize", title: "Every model's fields from its schema, with record counts", code: note(schemaSummary(m), "pandas") }];
+}
