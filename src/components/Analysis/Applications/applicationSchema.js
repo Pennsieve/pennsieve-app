@@ -761,14 +761,33 @@ export const structureId = (entry) => {
 };
 
 /**
- * The registry structure of a dataset's metadata records: an input that
- * conforms to it takes records (models/<model>/versions/<n>/schema.json and
- * records.jsonl, relationships.csv) in its own folder, not files.
+ * The parts of a dataset view an input can take other than its files, by
+ * the registry structure the input conforms to (its outermost layout): a
+ * run fills such an input with that part of the dataset it picks, in the
+ * input's own folder. One row of the part table workflow-service,
+ * app-deploy-service and the compute node keep in step.
+ *   part: the run's name for it; structure: the registry id;
+ *   label, name: the builder's input kind and the name it suggests;
+ *   what: how pickers and hints name it.
  */
+export const VIEW_PARTS = Object.freeze([
+  { part: "records", structure: "pennsieve-records", label: "Metadata records", name: "records", what: "metadata records" },
+  { part: "kgx", structure: "kgx", label: "Knowledge graph (KGX)", name: "graph", what: "knowledge graph" },
+]);
+
+/** The registry structure of a dataset's metadata records. */
 export const RECORDS_STRUCTURE = "pennsieve-records";
+/** The registry structure of a dataset's records as a knowledge graph (KGX tables). */
+export const KGX_STRUCTURE = "kgx";
+
+/** The view part a port takes (or writes), by its outermost layout, or null. */
+export const viewPartOf = (port) => {
+  const id = structureId(conformsToList(port?.conformsTo)[0]);
+  return VIEW_PARTS.find((p) => p.structure === id) || null;
+};
 
 /** Whether a port takes (or writes) metadata records: its outermost layout. */
-export const isRecordsPort = (port) => structureId(conformsToList(port?.conformsTo)[0]) === RECORDS_STRUCTURE;
+export const isRecordsPort = (port) => viewPartOf(port)?.part === "records";
 
 /**
  * Can a tree that conforms to `output` (outermost first) feed an input that
