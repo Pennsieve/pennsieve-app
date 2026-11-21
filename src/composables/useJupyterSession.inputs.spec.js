@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { postInputsFetch, getInputsFetch, sessionSourcesRequest, registerSessionSource } from "./useJupyterSession";
+import { postInputsFetch, getInputsFetch, sessionSourcesRequest, registerSessionSource, InputsPreparing, inputsMessage } from "./useJupyterSession";
 
 const respond = (status, body) =>
   vi.fn().mockResolvedValue({
@@ -119,5 +119,53 @@ describe("registerSessionSource", () => {
       source: "run",
       message: "view v1 version 2 was not found or isn't yours",
     });
+  });
+});
+
+describe("a view's records being prepared", () => {
+  const withHeaders = (status, body, headers) =>
+    vi.fn().mockResolvedValue({
+      ok: false,
+      status,
+      headers: { get: (h) => headers[h] ?? null },
+      json: () => Promise.resolve({}),
+      text: () => Promise.resolve(body),
+    });
+
+  it("is told apart from an error, with when to ask again", async () => {
+    const fetchFn = withHeaders(503, "src: the view's records are being prepared; ask again shortly", { "Retry-After": "30" });
+    const err = await postInputsFetch("https://k", "tok", [{ source: "n", path: "a" }], { fetchFn }).catch((e) => e);
+    expect(err).toBeInstanceOf(InputsPreparing);
+    expect(err.retryAfter).toBe(30);
+  });
+
+  it("keeps Retry-After between 5 and 60 seconds", async () => {
+    for (const [given, want] of [["1", 5], ["600", 60], ["soon", 30]]) {
+      const err = await postInputsFetch("https://k", "tok", [{ source: "n", path: "a" }], { fetchFn: withHeaders(503, "being prepared", { "Retry-After": given }) }).catch((e) => e);
+      expect(err.retryAfter).toBe(want);
+    }
+  });
+
+  it("is recognised by its words when the browser hides Retry-After (CORS)", async () => {
+    const err = await postInputsFetch("https://k", "tok", [{ source: "n", path: "a" }], {
+      fetchFn: withHeaders(503, "src: the view's records are being prepared; ask again shortly", {}),
+    }).catch((e) => e);
+    expect(err).toBeInstanceOf(InputsPreparing);
+    expect(err.retryAfter).toBe(30);
+  });
+
+  it("another 503 is an error", async () => {
+    const err = await postInputsFetch("https://k", "tok", [{ source: "n", path: "a" }], { fetchFn: withHeaders(503, "down", { "Retry-After": "30" }) }).catch((e) => e);
+    expect(err).not.toBeInstanceOf(InputsPreparing);
+    expect(err.message).toBe("down");
+  });
+});
+
+describe("inputsMessage", () => {
+  it("words a view's refusals plainly", () => {
+    expect(inputsMessage("src: views-service: status 410: the source records are gone", 502)).toMatch(/no longer available/);
+    expect(inputsMessage("src: views-service: status 403: you can no longer read this view's dataset records", 502)).toMatch(/no longer have access/);
+    expect(inputsMessage("n: dataset not open\n", 502)).toBe("n: dataset not open");
+    expect(inputsMessage("", 500)).toBe("The session couldn't add the files (500).");
   });
 });
