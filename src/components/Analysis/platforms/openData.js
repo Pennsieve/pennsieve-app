@@ -4,6 +4,7 @@ import { defineAsyncComponent } from "vue";
 import IconOpenData from "@/components/icons/IconOpenData.vue";
 import { openDataCatalog } from "@/utils/viewsService";
 import { openDataPlatform } from "./openDataPlatform";
+import { OPENNEURO_REGISTRY, openNeuroUnreadable } from "@/utils/openNeuro";
 
 export default openDataPlatform({
   key: "openData",
@@ -22,6 +23,8 @@ export default openDataPlatform({
   // A dataset's note: why none of the user's nodes can reach it.
   pickerProps: ({ datasetNote }) => ({ cardNote: datasetNote }),
   registry: (p) => p.dataset.name,
+  // Not an OpenNeuro dataset whose files OpenNeuro hasn't made public.
+  ready: (p) => !!p.dataset && !(p.dataset.name === OPENNEURO_REGISTRY && openNeuroUnreadable(p.prefix)),
   viewTitle: (p) => p.dataset.title,
   count: () => openDataCatalog().then((list) => list.filter((d) => d.anonymous).length),
 });

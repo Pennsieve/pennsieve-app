@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { ASSIST_NOTE, acceptedCode, assistRequest, cellCode, cellError, deltaText, addCellSpend, budgetPause, cellSpendLabel, cellSpendTitle, requestCost, runSpend, sessionFiles, sseEvents, stepLabel, usageLine } from "./assistHelpers";
+import { getAgent } from "./assistStream";
 
 const delta = (text) => `event: content_block_delta\ndata: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":${JSON.stringify(text)}}}\n\n`;
 
@@ -138,5 +139,18 @@ describe("budgetPause", () => {
     expect(budgetPause({ periodUsedUsd: 5, periodBudgetUsd: 5, period: "daily" })).toMatch(/^This compute node's AI budget for today is used up/);
     expect(budgetPause({ runUsedUsd: 2, runBudgetUsd: 2 })).toMatch(/^This run's AI budget is used up/);
     expect(budgetPause(null)).toBe("");
+  });
+});
+
+describe("getAgent", () => {
+  const answering = (body) => async () => ({ ok: true, json: async () => body });
+  it("keeps the modes the agent takes", async () => {
+    const agent = await getAgent("https://k", "t", { fetchFn: answering({ available: true, model: "m", modes: ["write", "fix", "suggest"] }) });
+    expect(agent.modes).toEqual(["write", "fix", "suggest"]);
+  });
+
+  it("takes an older agent, which lists none, as write and fix only", async () => {
+    const agent = await getAgent("https://k", "t", { fetchFn: answering({ available: true, model: "m" }) });
+    expect(agent.modes).toEqual(["write", "fix"]);
   });
 });

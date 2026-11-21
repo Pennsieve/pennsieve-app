@@ -321,6 +321,12 @@
                   The folder <code>$INPUT_DIR/{{ port.name || "&lt;name&gt;" }}/</code> holds this reference. On Pennsieve it's filled from reference data when there's a match, and runs may pick another of the same kind; otherwise a run takes the files, as it does anywhere else.
                 </p>
               </template>
+              <!-- A dataset's metadata records: a set layout in its own folder -->
+              <p v-if="portMode(port) === 'records'" class="field-hint reference-summary">
+                The folder <code>$INPUT_DIR/{{ port.name || "&lt;name&gt;" }}/</code> holds the records of the dataset a run picks, as they are when the run starts:
+                <code>models/&lt;model&gt;/versions/&lt;n&gt;/schema.json</code> and <code>records.jsonl</code> for each version of each model's schema, and <code>relationships.csv</code> for the links between records.
+                Pennsieve fills it from the dataset; elsewhere, lay the folder out the same way.
+              </p>
               <!-- A file or a folder: its format -->
               <div v-if="portMode(port) === 'file' || portMode(port) === 'folder'" class="field-row full-width" :data-field="`${block.key}.${index}.mediaTypes`" :class="{ 'has-problem': formatProblems(port, `${block.key}.${index}.mediaTypes`).length > 0 }">
                 <label class="field-label">{{ portMode(port) === "folder" ? "Folder formats" : "Media types" }}</label>
@@ -382,7 +388,7 @@
                       @change="(v) => onLayoutChange(port, v)"
                     >
                       <el-option
-                        v-for="s in structureOptions.filter((o) => structureMatches(o, mediaTypeQuery))"
+                        v-for="s in layoutOptionsFor(block.key).filter((o) => structureMatches(o, mediaTypeQuery))"
                         :key="s.id"
                         :label="s.name"
                         :value="s.id"
@@ -404,7 +410,7 @@
                   <div class="field-control">
                     <el-select :model-value="port.conformsTo[1] ? structureId(port.conformsTo[1]) : ''" class="full" @change="(v) => onInnerStructure(port, v)">
                       <el-option label="No particular layout" value="" />
-                      <el-option v-for="s in structureOptions.filter((o) => o.id !== structureId(port.conformsTo[0]))" :key="s.id" :label="s.name" :value="s.id" />
+                      <el-option v-for="s in layoutOptionsFor(block.key).filter((o) => o.id !== structureId(port.conformsTo[0]))" :key="s.id" :label="s.name" :value="s.id" />
                     </el-select>
                   </div>
                 </div>
@@ -460,11 +466,15 @@
                   </p>
                 </div>
               </div>
-              <div v-if="block.key === 'inputs' && portMode(port) === 'reference'" class="field-row full-width">
+              <div v-if="block.key === 'inputs' && (portMode(port) === 'reference' || portMode(port) === 'records')" class="field-row full-width">
                 <label class="field-label">Placed at</label>
                 <div class="field-control">
                   <span class="field-static"><code>$INPUT_DIR/{{ port.name || "&lt;name&gt;" }}/</code></span>
-                  <p class="field-hint">A reference is unpacked into the input's own folder.</p>
+                  <p class="field-hint">{{ portMode(port) === "records" ? "Records go in the input's own folder." : "A reference is unpacked into the input's own folder." }}</p>
+                  <p v-if="portMode(port) === 'records' && port.placement !== 'subfolder'" class="field-error">
+                    The app.yml places it at the root of INPUT_DIR, which Pennsieve refuses for records.
+                    <button type="button" class="link-button" @click="port.placement = 'subfolder'">Put it in its own folder</button>
+                  </p>
                 </div>
               </div>
               <div v-else-if="block.key === 'inputs'" class="field-row full-width">
@@ -559,7 +569,7 @@ import { computed, onMounted, reactive, ref, toRaw, watch } from "vue";
 import { useStore } from "vuex";
 import MoreOptions from "./MoreOptions.vue";
 import FieldHint from "./FieldHint.vue";
-import { PARAM_TYPES, PARAM_TYPE_OPTIONS, createParameter, createPort, portDataTypeOptions, normalizeMediaType, keptFormats, STANDARD_CPU_OPTIONS, getStandardMemoryOptions, isNumericType, mediaTypeMatches, structureId, structureOptionsFor, structureMatches, isStructureLink, conformsToList, rootInputCollisions } from "./applicationSchema";
+import { PARAM_TYPES, PARAM_TYPE_OPTIONS, createParameter, createPort, portDataTypeOptions, normalizeMediaType, keptFormats, STANDARD_CPU_OPTIONS, getStandardMemoryOptions, isNumericType, mediaTypeMatches, structureId, structureOptionsFor, structureMatches, isStructureLink, conformsToList, rootInputCollisions, RECORDS_STRUCTURE, isRecordsPort } from "./applicationSchema";
 import { environmentsServiceUrl, findReferences } from "@/utils/environmentsService";
 import { useOntologyStore } from "@/stores/ontologyStore";
 import { REFERENCE_KINDS, assetClassName, isAppDefault, organismName, referenceBlock, referenceKindText, referenceLabel, taxonFromTerm, rankOrganisms, COMMON_ORGANISMS } from "../RunMonitor/referenceSources";
@@ -949,6 +959,9 @@ const structureOptions = computed(() =>
     ...(schema.value.outputs || []).map((p) => p.conformsTo),
   ])
 );
+// Metadata records are a kind of input of their own, not a layout to pick
+// (an output that names them still shows them).
+const layoutOptionsFor = (blockKey) => (blockKey === "inputs" ? structureOptions.value.filter((o) => o.id !== RECORDS_STRUCTURE) : structureOptions.value);
 /*
   What an input or output is made of at its root, the first thing the card
   asks: files, folders of a folder format (OME-Zarr, as container:
@@ -960,10 +973,11 @@ const PORT_MODES = [
   { value: "file", label: "Files", hint: "Each item is one file: an EDF recording, a DICOM slice, a CSV table. A folder of them is fine; paths are kept." },
   { value: "folder", label: "Folders of a format", hint: "Each item is a folder that is one thing, in a folder format: an .ome.zarr image, a .mefd session." },
   { value: "layout", label: "One folder with a set layout", hint: "One folder tree laid out by a standard, such as BIDS or a Pennsieve published dataset." },
+  { value: "records", label: "Metadata records", hint: "A dataset's metadata records: each model's schema and records, and the links between them. A run takes them from the dataset it picks, in this input's own folder." },
   { value: "reference", label: "Reference data", hint: "A folder whose contents are declared as a published reference, such as a genome index or a brain template, by public identifiers rather than by file type. Pennsieve can fill it from its reference data; otherwise a run takes files." },
 ];
-// Reference data is for inputs.
-const portModes = (blockKey) => PORT_MODES.filter((m) => m.value !== "reference" || blockKey === "inputs");
+// Reference data and metadata records are for inputs.
+const portModes = (blockKey) => PORT_MODES.filter((m) => (m.value !== "reference" && m.value !== "records") || blockKey === "inputs");
 // Where an input's data goes in INPUT_DIR (app.yml placement).
 const PLACEMENTS = [
   { value: "root", label: "Root of INPUT_DIR" },
@@ -977,12 +991,35 @@ const formatProblems = (port, key) =>
   portMode(port) === "folder" && !portTypes(port).length && !formatTouched.has(toRaw(port)) ? [] : at(key);
 const portMode = (port) => {
   if (showsReference(port)) return "reference";
+  // Records are an input's; an output that names them shows as a layout.
+  if (isRecordsPort(port) && (schema.value.inputs || []).includes(port)) return "records";
   if (conformsToList(port.conformsTo).length) return "layout";
   if (port.container === "directory") return "folder";
   return chosenModes.get(toRaw(port)) || "file";
 };
+const dropReference = (port) => {
+  wantsReference.delete(toRaw(port));
+  describing.delete(toRaw(port));
+  propertyDrafts.delete(toRaw(port));
+  delete port.reference;
+};
 const setPortMode = (port, mode) => {
   if (portMode(port) === mode) return;
+  // The name records mode suggested goes with it.
+  if (portMode(port) === "records" && port.name === "records") port.name = "";
+  if (mode === "records") {
+    // A layout of its own, always in the input's folder; no formats.
+    if (portMode(port) === "reference") dropReference(port);
+    chosenModes.delete(toRaw(port));
+    port.conformsTo = [RECORDS_STRUCTURE];
+    port.container = "";
+    port.dataType = "any";
+    port.mediaTypes = [];
+    port.formats = [];
+    port.placement = "subfolder";
+    if (!port.name) port.name = "records";
+    return;
+  }
   if (mode === "reference") {
     // No files: the block (once an entry is picked) is all there is.
     wantsReference.add(toRaw(port));
@@ -996,12 +1033,7 @@ const setPortMode = (port, mode) => {
     port.placement = "subfolder";
     return;
   }
-  if (portMode(port) === "reference") {
-    wantsReference.delete(toRaw(port));
-    describing.delete(toRaw(port));
-    propertyDrafts.delete(toRaw(port));
-    delete port.reference;
-  }
+  if (portMode(port) === "reference") dropReference(port);
   const before = optionFor(portTypes(port)[0]);
   chosenModes.set(toRaw(port), mode);
   port.conformsTo = [];
