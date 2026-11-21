@@ -324,7 +324,7 @@
               <!-- A dataset's metadata records: a set layout in its own folder -->
               <p v-if="portMode(port) === 'records'" class="field-hint reference-summary">
                 The folder <code>$INPUT_DIR/{{ port.name || "&lt;name&gt;" }}/</code> holds the records of the dataset a run picks, as they are when the run starts:
-                <code>models/&lt;model&gt;/schema.json</code> and <code>records.jsonl</code> for each model, and <code>relationships.csv</code> for the links between records.
+                <code>models/&lt;model&gt;/versions/&lt;n&gt;/schema.json</code> and <code>records.jsonl</code> for each version of each model's schema, and <code>relationships.csv</code> for the links between records.
                 Pennsieve fills it from the dataset; elsewhere, lay the folder out the same way.
               </p>
               <!-- A file or a folder: its format -->
