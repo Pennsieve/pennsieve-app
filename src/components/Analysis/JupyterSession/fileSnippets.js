@@ -48,6 +48,16 @@ const noted = (code) => `${STARTER_NOTE}\n${code}`;
 const needs = (...libs) => `# Needs ${libs.join(", ")} (from your environment)`;
 const lines = (...l) => l.join("\n");
 
+// DuckDB within half the session's memory: by default it takes most of the
+// machine's, which a notebook shares with Jupyter (a CPU session's machine is
+// its own Fargate task, a GPU session's its whole instance).
+const duckdbConnect = lines(
+  "import duckdb, os",
+  "",
+  "# DuckDB within half the session's memory (Jupyter and your other cells need the rest)",
+  "con = duckdb.connect(config={\"memory_limit\": f\"{os.sysconf('SC_PAGE_SIZE') * os.sysconf('SC_PHYS_PAGES') // 2**21}MB\"})",
+);
+
 // Python snippets per kind: [{ id, label, title, code(p) }], p the file's
 // path as code.
 const PYTHON = {
@@ -213,11 +223,10 @@ export const metadataNote = (lib) => `# Written for this view's metadata records
 const duckdbSetup = (m) =>
   lines(
     needs("duckdb", "pandas"),
-    "import duckdb",
     "from pathlib import Path",
+    duckdbConnect,
     "",
     `metadata = Path(${m})`,
-    "con = duckdb.connect()",
     "ident = lambda s: '\"' + s.replace('\"', '\"\"') + '\"'",
     "text = lambda s: \"'\" + str(s).replace(\"'\", \"''\") + \"'\"",
     "",
@@ -256,11 +265,10 @@ const quoted = (model) => `"${model.replace(/"/g, '""')}"`;
 const modelSetup = (m, model) =>
   lines(
     needs("duckdb", "pandas"),
-    "import duckdb",
     "from pathlib import Path",
+    duckdbConnect,
     "",
     `metadata = Path(${m})`,
-    "con = duckdb.connect()",
     "text = lambda s: \"'\" + str(s).replace(\"'\", \"''\") + \"'\"",
     "",
     `# ${model}: a view of its newest version's records`,
@@ -419,11 +427,10 @@ const kgxNote = (lib) => `# Written for this view's knowledge graph (KGX tables)
 const kgxSetup = (k) =>
   lines(
     needs("duckdb", "pandas"),
-    "import duckdb",
     "from pathlib import Path",
+    duckdbConnect,
     "",
     `kgx = Path(${k})`,
-    "con = duckdb.connect()",
     "text = lambda s: \"'\" + str(s).replace(\"'\", \"''\") + \"'\"",
     "con.sql(f\"CREATE OR REPLACE VIEW nodes AS SELECT * FROM read_parquet({text(kgx / 'nodes.parquet')})\")",
     "con.sql(f\"CREATE OR REPLACE VIEW edges AS SELECT * FROM read_parquet({text(kgx / 'edges.parquet')})\")",
@@ -470,7 +477,11 @@ const kgxQuery = (k) =>
 // The graph in NetworkX: a directed multigraph, nodes with their category
 // and name, edges with their predicate. It reads the TSV files (KGX's
 // canonical form: no quoting, | between a list's values), which pandas
-// reads without a Parquet library.
+// reads without a Parquet library, only the columns it uses. NetworkX holds
+// each edge as Python objects (roughly a GB per million edges), so a large
+// graph (Hetionet: 2.3 million) is summarised in pandas and only the edges
+// around a few nodes become the NetworkX graph.
+const KGX_NETWORKX_EDGES = 500000;
 const kgxNetworkx = (k) =>
   lines(
     needs("pandas", "networkx"),
@@ -480,13 +491,23 @@ const kgxNetworkx = (k) =>
     "",
     `kgx = Path(${k})`,
     "tsv = dict(sep=\"\\t\", quoting=3, dtype=str, keep_default_na=False)",
-    "nodes = pd.read_csv(kgx / \"nodes.tsv.gz\", **tsv)",
-    "edges = pd.read_csv(kgx / \"edges.tsv.gz\", **tsv)",
+    "nodes = pd.read_csv(kgx / \"nodes.tsv.gz\", usecols=[\"id\", \"category\", \"name\"], **tsv)",
+    "edges = pd.read_csv(kgx / \"edges.tsv.gz\", usecols=[\"subject\", \"predicate\", \"object\"], **tsv)",
+    "print(len(nodes), \"nodes,\", len(edges), \"edges\")",
+    "",
+    "# The best-connected nodes (edges in and out)",
+    "degree = pd.concat([edges.subject, edges.object]).value_counts().rename_axis(\"id\").reset_index(name=\"degree\")",
+    "display(degree.head(10).merge(nodes, on=\"id\"))",
+    "",
+    "# NetworkX holds every edge as Python objects (roughly a GB per million):",
+    "# a large graph becomes the edges around the nodes you pick, here the top hub.",
+    `whole = len(edges) <= ${KGX_NETWORKX_EDGES}`,
+    "if not whole:",
+    "    seed = set(degree.id.head(1))  # e.g. set(nodes[nodes.name.str.contains(\"epilepsy\", case=False)].id)",
+    "    edges = edges[edges.subject.isin(seed) | edges.object.isin(seed)]",
     "g = nx.from_pandas_edgelist(edges, \"subject\", \"object\", edge_attr=[\"predicate\"], create_using=nx.MultiDiGraph)",
-    "g.add_nodes_from((r.id, {\"category\": r.category.split(\"|\"), \"name\": r.name}) for r in nodes.itertuples())",
+    "g.add_nodes_from((r.id, {\"category\": r.category.split(\"|\"), \"name\": r.name}) for r in (nodes if whole else nodes[nodes.id.isin(g.nodes)]).itertuples())",
     "print(g)",
-    "# The best-connected nodes",
-    "pd.DataFrame(sorted(g.degree, key=lambda d: -d[1])[:10], columns=[\"id\", \"degree\"]).merge(nodes[[\"id\", \"name\", \"category\"]], on=\"id\")",
   );
 
 // Which of a view's metadata folders a folder is, from its path in the
