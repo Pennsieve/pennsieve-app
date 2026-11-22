@@ -101,6 +101,7 @@ describe("a pending input's folder", () => {
   it("is the input's node id when the notebook has several", () => {
     expect(pendingFolderName({ viewName: "D: Input", nodeId: "node-1", only: true })).toBe("D-Input");
     expect(pendingFolderName({ viewName: "D: Input", nodeId: "node-1", only: false })).toBe("node-1");
+    expect(pendingFolderName({ viewName: "D: Input", nodeId: "node 1/x", only: false })).toBe("node-1-x");
   });
 });
 

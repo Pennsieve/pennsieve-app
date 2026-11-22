@@ -8,7 +8,7 @@
 // what's staged (inputSources), which can differ from the run's data
 // sources. A new notebook's dataset records can join the session once it
 // runs (pendingSessionInputs): they're added here when their view is built.
-import { computed, onBeforeUnmount, reactive, ref, watch } from "vue";
+import { computed, onBeforeUnmount, reactive, ref, toValue, watch } from "vue";
 import { ElMessageBox } from "element-plus";
 import * as siteConfig from "@/site-config/site.json";
 import { useGetToken } from "@/composables/useGetToken";
@@ -106,7 +106,13 @@ export function useSessionInputs({
   let sourcesRead = false;
   const currentRun = () => (typeof runId === "function" ? runId() : runId);
 
-  async function loadSources() {
+  // One read at a time: a second caller waits for the one under way.
+  let loadingSources = null;
+  function loadSources() {
+    loadingSources ||= readSources().finally(() => (loadingSources = null));
+    return loadingSources;
+  }
+  async function readSources() {
     error.value = null;
     loading.value = true;
     try {
@@ -249,16 +255,24 @@ export function useSessionInputs({
       attachAbort = null;
       pending.value = [];
       sourcesRead = false;
+      // The new run's own, once its session is connected.
+      if (toValue(ready)) loadSources().then(attachPending);
     }
   );
 
   // Adds those not under way, once the session's views are read: each when
-  // its view is built, one by one as they're ready. Not while the sources
-  // couldn't be read (the session isn't reachable yet: the next connect
-  // tries again).
+  // its view is built, one by one as they're ready. While the sources
+  // couldn't be read (the session isn't reachable yet), each says so with
+  // Retry; the next connect tries again too.
   function attachPending() {
     readPending();
-    if (!pending.value.length || error.value || !sourcesRead) return;
+    if (!pending.value.length) return;
+    if (error.value || !sourcesRead) {
+      for (const p of pending.value) {
+        if (!underWay(p)) setPending(p.viewId, "failed", `${p.label || "The dataset's records"} couldn't join the session yet: ${error.value || "its inputs couldn't be read"}`);
+      }
+      return;
+    }
     if (!canAdd.value) {
       for (const p of pending.value) {
         if (p.state !== "unavailable") {
@@ -272,8 +286,9 @@ export function useSessionInputs({
       return;
     }
     if (!attachAbort) attachAbort = new AbortController();
-    for (const p of pending.value) if (!p.state || p.state === "unavailable") attachOne(p.viewId, attachAbort.signal);
+    for (const p of pending.value) if (!underWay(p)) attachOne(p.viewId, attachAbort.signal);
   }
+  const underWay = (p) => p.state === "preparing" || p.state === "adding";
 
   async function attachOne(viewId, signal) {
     const run = currentRun();
@@ -296,7 +311,14 @@ export function useSessionInputs({
             setPending(viewId, "adding");
             return view;
           },
-          addInputSource,
+          // Not when another tab of this session (or this page before a
+          // reload) has added it meanwhile: the sidecar lists it then.
+          addInputSource: async (name, id, version) => {
+            const now = inputSources ? await inputSources().catch(() => null) : null;
+            const there = now?.find?.((s) => s.viewId === id);
+            if (there) throw Object.assign(new Error("added already"), { status: 409, added: there.root ? "" : there.name });
+            return addInputSource(name, id, version);
+          },
           taken,
           signal,
         }
@@ -313,6 +335,13 @@ export function useSessionInputs({
       if (records.length) await requestEntries(source, records);
     } catch (e) {
       if (e?.name === "AbortError") return;
+      if (e?.added !== undefined) {
+        dropPendingInput(run, viewId);
+        if (run !== currentRun()) return;
+        await loadSources();
+        pending.value = pending.value.filter((x) => x.viewId !== viewId);
+        return;
+      }
       console.warn("[inputs] adding", p.label || viewId, e?.message || e);
       setPending(viewId, "failed", `${p.label || "The dataset's records"} couldn't join the session: ${e?.message || e}`);
     }
@@ -497,7 +526,7 @@ export function useSessionInputs({
     ready,
     async (r) => {
       if (!r) return;
-      if (!sources.value.length && !loading.value) await loadSources();
+      if (!sources.value.length || !sourcesRead) await loadSources();
       attachPending();
     },
     { immediate: true }
