@@ -53,9 +53,10 @@ const lines = (...l) => l.join("\n");
 // its own Fargate task, a GPU session's its whole instance).
 const duckdbConnect = lines(
   "import duckdb, os",
+  "from pathlib import Path",
   "",
   "# DuckDB within half the session's memory (Jupyter and your other cells need the rest)",
-  "con = duckdb.connect(config={\"memory_limit\": f\"{os.sysconf('SC_PAGE_SIZE') * os.sysconf('SC_PHYS_PAGES') // 2**21}MB\"})",
+  "con = duckdb.connect(config={\"memory_limit\": f\"{os.sysconf('SC_PAGE_SIZE') * os.sysconf('SC_PHYS_PAGES') // 2**21}MiB\"})",
 );
 
 // Python snippets per kind: [{ id, label, title, code(p) }], p the file's
@@ -223,7 +224,6 @@ export const metadataNote = (lib) => `# Written for this view's metadata records
 const duckdbSetup = (m) =>
   lines(
     needs("duckdb", "pandas"),
-    "from pathlib import Path",
     duckdbConnect,
     "",
     `metadata = Path(${m})`,
@@ -265,7 +265,6 @@ const quoted = (model) => `"${model.replace(/"/g, '""')}"`;
 const modelSetup = (m, model) =>
   lines(
     needs("duckdb", "pandas"),
-    "from pathlib import Path",
     duckdbConnect,
     "",
     `metadata = Path(${m})`,
@@ -427,7 +426,6 @@ const kgxNote = (lib) => `# Written for this view's knowledge graph (KGX tables)
 const kgxSetup = (k) =>
   lines(
     needs("duckdb", "pandas"),
-    "from pathlib import Path",
     duckdbConnect,
     "",
     `kgx = Path(${k})`,
@@ -504,7 +502,7 @@ const kgxNetworkx = (k) =>
     `whole = len(edges) <= ${KGX_NETWORKX_EDGES}`,
     "if not whole:",
     "    seed = set(degree.id.head(1))  # e.g. set(nodes[nodes.name.str.contains(\"epilepsy\", case=False)].id)",
-    "    edges = edges[edges.subject.isin(seed) | edges.object.isin(seed)]",
+    `    edges = edges[edges.subject.isin(seed) | edges.object.isin(seed)].head(${KGX_NETWORKX_EDGES})  # a hub may touch most of the graph`,
     "g = nx.from_pandas_edgelist(edges, \"subject\", \"object\", edge_attr=[\"predicate\"], create_using=nx.MultiDiGraph)",
     "g.add_nodes_from((r.id, {\"category\": r.category.split(\"|\"), \"name\": r.name}) for r in (nodes if whole else nodes[nodes.id.isin(g.nodes)]).itertuples())",
     "print(g)",
