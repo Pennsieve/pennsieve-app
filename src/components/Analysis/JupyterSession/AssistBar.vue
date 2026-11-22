@@ -17,7 +17,7 @@ const props = defineProps({
   // The cell has code: taking the reply replaces it.
   cellHasCode: { type: Boolean, default: false },
 });
-const emit = defineEmits(["submit", "stop", "accept", "accept-run", "insert-below", "insert-answer", "answer-to-code", "discard", "clear-file"]);
+const emit = defineEmits(["submit", "suggest", "stop", "accept", "accept-run", "use-run", "insert-below", "insert-below-run", "insert-answer", "answer-to-code", "discard", "clear-file"]);
 
 const prompt = ref(props.assist.prompt || "");
 const input = ref(null);
@@ -41,8 +41,13 @@ onMounted(async () => {
   input.value?.focus();
 });
 
+// Nothing typed: the agent may suggest the next cell instead.
+const suggests = computed(() => !fix.value && !!props.assist.canSuggest && !prompt.value.trim());
+
 function submit() {
-  if (asking.value || (!fix.value && !prompt.value.trim())) return;
+  if (asking.value) return;
+  if (suggests.value) return emit("suggest");
+  if (!fix.value && !prompt.value.trim()) return;
   emit("submit", prompt.value.trim());
 }
 </script>
@@ -57,7 +62,7 @@ function submit() {
         ref="input"
         v-model="prompt"
         class="nb-assist__input"
-        :placeholder="assist.file ? `What should the code do with ${fileName}?` : 'Describe the code this cell should have'"
+        :placeholder="assist.file ? `What should the code do with ${fileName}?` : assist.canSuggest ? 'Describe the code this cell should have, or ask for a suggestion' : 'Describe the code this cell should have'"
         :disabled="asking"
         aria-label="What the code should do"
         @keydown.enter.prevent="submit"
@@ -67,6 +72,14 @@ function submit() {
         <button v-if="!asking" class="nb-assist__x" aria-label="Leave the file out" @click="emit('clear-file')">✕</button>
       </span>
       <button v-if="asking" class="nb-assist__btn" @click="emit('stop')">Stop</button>
+      <button
+        v-else-if="suggests"
+        class="nb-assist__btn nb-assist__btn--go"
+        title="The assistant proposes a next step from the cells above and the session's data"
+        @click="submit"
+      >
+        Suggest
+      </button>
       <button v-else-if="!fix" class="nb-assist__btn nb-assist__btn--go" :disabled="!prompt.trim()" @click="submit">Write</button>
       <button v-else-if="assist.state === 'error' || assist.state === 'idle'" class="nb-assist__btn nb-assist__btn--go" @click="submit">Try again</button>
       <button class="nb-assist__x" title="Close (Esc)" aria-label="Close" @click="emit('discard')">✕</button>
@@ -114,11 +127,25 @@ function submit() {
       <button class="nb-assist__btn nb-assist__btn--go" @click="emit('accept')">Use this attempt</button>
       <button class="nb-assist__btn" @click="emit('discard')">Discard</button>
     </div>
-    <div v-else-if="assist.state === 'done' && code" class="nb-assist__actions">
-      <button class="nb-assist__btn nb-assist__btn--go" @click="emit('accept')">{{ cellHasCode ? "Replace cell" : "Use" }}</button>
+    <!-- Written code: its main action puts it in and runs it. A suggestion for
+         a cell with code is its next step, so it goes below. -->
+    <!-- A reply stopped part-way can be used, never run in one click. -->
+    <div v-else-if="assist.state === 'done' && code && assist.partial" class="nb-assist__actions">
+      <button class="nb-assist__btn nb-assist__btn--go" @click="emit(cellHasCode ? 'insert-below' : 'accept')">{{ cellHasCode ? "Insert below" : "Use" }}</button>
+      <button class="nb-assist__btn" @click="emit('discard')">Discard</button>
+      <span class="nb-assist__note">Stopped part-way: read it before you run it.</span>
+    </div>
+    <div v-else-if="assist.state === 'done' && code && assist.mode === 'suggest' && cellHasCode" class="nb-assist__actions">
+      <button class="nb-assist__btn nb-assist__btn--go" @click="emit('insert-below-run')">Insert below and run</button>
       <button class="nb-assist__btn" @click="emit('insert-below')">Insert below</button>
       <button class="nb-assist__btn" @click="emit('discard')">Discard</button>
-      <span class="nb-assist__note">Written by AI: check it before you run it.</span>
+      <span class="nb-assist__note">Written by AI from your session's data: read it before you run it.</span>
+    </div>
+    <div v-else-if="assist.state === 'done' && code" class="nb-assist__actions">
+      <button class="nb-assist__btn nb-assist__btn--go" @click="emit('use-run')">{{ cellHasCode ? "Replace and run" : "Use and run" }}</button>
+      <button class="nb-assist__btn" @click="emit('insert-below')">Insert below</button>
+      <button class="nb-assist__btn" @click="emit('discard')">Discard</button>
+      <span class="nb-assist__note">Written by AI: read it before you run it.</span>
     </div>
 
     <!-- What it used: tokens, and the cost as the run's governor prices it. -->

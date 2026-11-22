@@ -1,5 +1,6 @@
 import {
   PARAM_TYPES,
+  viewPartOf,
   createApplicationSchema,
   createParameter,
   parseApplication,
@@ -1238,3 +1239,44 @@ describe('media type profiles (NWB is application/x-hdf5; profile=nwb)', () => {
     expect(opts.find((o) => o.value === NWB).formats).toEqual(['NeuroData Without Borders'])
   })
 })
+
+describe("a records port", () => {
+  it("is an input whose outermost layout is pennsieve-records", () => {
+    expect(viewPartOf({ conformsTo: ["pennsieve-records"] })?.part === "records").toBe(true);
+    expect(viewPartOf({ conformsTo: "pennsieve-records@1.0" })?.part === "records").toBe(true);
+    expect(viewPartOf({ conformsTo: ["bids"] })?.part === "records").toBe(false);
+    expect(viewPartOf({ conformsTo: ["pennsieve-published-dataset", "pennsieve-records"] })?.part === "records").toBe(false);
+    expect(viewPartOf({})?.part === "records").toBe(false);
+  });
+});
+
+describe("an input of metadata records", () => {
+  it("is read and written back as conformsTo pennsieve-records in its own folder", () => {
+    const yaml = "application:\n  name: a\ninputs:\n  - name: records\n    conformsTo: pennsieve-records\n    placement: subfolder\n"
+    const { meta, schema } = parseManifest(yaml)
+    expect(viewPartOf(schema.inputs[0])?.part === "records").toBe(true)
+    const again = loadYaml(manifestToYaml(buildManifest(schema, meta)))
+    expect(again.inputs[0].placement).toBe("subfolder")
+    expect([].concat(again.inputs[0].conformsTo)).toEqual(["pennsieve-records"])
+  })
+})
+
+describe("viewPartOf", () => {
+  it("is the part an input's outermost layout picks", () => {
+    expect(viewPartOf({ conformsTo: ["kgx"] })?.part).toBe("kgx");
+    expect(viewPartOf({ conformsTo: "kgx@1.0" })?.part).toBe("kgx");
+    expect(viewPartOf({ conformsTo: ["pennsieve-records"] })?.part).toBe("records");
+    expect(viewPartOf({ conformsTo: ["ro-crate", "kgx"] })).toBe(null);
+    expect(viewPartOf({ conformsTo: ["bids"] })).toBe(null);
+    expect(viewPartOf({})).toBe(null);
+    expect(viewPartOf({ conformsTo: ["kgx"] })?.part === "records").toBe(false);
+  });
+  it("reads and writes a graph input as conformsTo kgx in its own folder", () => {
+    const yaml = "application:\n  name: a\ninputs:\n  - name: graph\n    conformsTo: kgx\n    placement: subfolder\n"
+    const { meta, schema } = parseManifest(yaml)
+    expect(viewPartOf(schema.inputs[0])?.part).toBe("kgx")
+    const again = loadYaml(manifestToYaml(buildManifest(schema, meta)))
+    expect(again.inputs[0].placement).toBe("subfolder")
+    expect([].concat(again.inputs[0].conformsTo)).toEqual(["kgx"])
+  })
+});

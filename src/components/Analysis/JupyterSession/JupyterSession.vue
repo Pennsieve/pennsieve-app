@@ -150,6 +150,7 @@ const {
   openNotebookFrom,
   findInputNotebooks,
   listDir,
+  readText,
   fetchInputs,
   inputsStatus,
   cancelInputs,
@@ -511,7 +512,8 @@ async function focusCell(id) {
    On a node with LLM access the session's sidecar has a code assistant: ✦ or
    Cmd/Ctrl-I on a cell, Ask… on a file, Fix on an error. Its state is the
    cell's _assist (AssistBar); one cell has it at a time. What it writes goes
-   into a cell only when the user takes it, and runs only when they run it. */
+   into a cell only when the user takes it, and runs only on an action that
+   says so (Use and run, Insert below and run), never on a stopped, partial reply. */
 // { available, agent, model, budget }: the agent (it looks, and can run its
 // fix) on a newer session image, else the sidecar's single-shot assistant.
 const assistInfo = ref({ available: false });
@@ -566,7 +568,10 @@ function openAssist(cell, { mode = "write", file = "" } = {}) {
   if (!assistAvailable.value || assistPaused.value || cell.cell_type !== "code") return;
   for (const c of cells.value) if (c._assist && c.id !== cell.id) closeAssist(c);
   if (cell._assist?.state === "asking") return;
-  cell._assist = { mode, file, prompt: "", state: "idle", text: "", error: "", steps: [], note: "", usage: null, budget: null };
+  // An agent that says it can suggests a next cell when nothing is typed
+  // (not for a file: that asks what to do with it).
+  const canSuggest = !!assistInfo.value.agent && (assistInfo.value.modes || []).includes("suggest") && mode === "write" && !file;
+  cell._assist = { mode, file, canSuggest, prompt: "", state: "idle", text: "", error: "", steps: [], note: "", usage: null, budget: null };
   select(cell.id);
   if (mode === "fix") submitAssist(cell, "");
 }
@@ -599,7 +604,7 @@ async function submitAssist(cell, prompt, { allowRun = false, codeOnly = false }
   const a = cell._assist;
   if (!a) return;
   // Each request (a continuation too) counts its own tokens.
-  Object.assign(a, { prompt, state: "asking", error: "", note: "", running: allowRun, usage: null, countedTokens: 0 });
+  Object.assign(a, { prompt, state: "asking", error: "", note: "", running: allowRun, usage: null, countedTokens: 0, partial: false });
   if (!allowRun) Object.assign(a, { text: "", steps: [], usage: null, budget: null, outputs: null, conversationId: "" });
   const controller = new AbortController();
   assistAborts.set(cell.id, controller);
@@ -645,7 +650,8 @@ async function submitAssist(cell, prompt, { allowRun = false, codeOnly = false }
     }
     a.state = "done";
   } catch (e) {
-    if (controller.signal.aborted) a.state = a.text ? "done" : "idle";
+    // Stopped: what came so far can be used, but not run in one click (partial).
+    if (controller.signal.aborted) Object.assign(a, { state: a.text ? "done" : "idle", partial: !!a.text });
     else if (e?.budgetExceeded) {
       // No budget left: said calmly, and the assistant pauses.
       Object.assign(a, { state: "budget", notice: e.message, running: false });
@@ -695,8 +701,13 @@ function onAssist(cell, { action, prompt }) {
   if (action === "open") return a ? null : openAssist(cell);
   if (action === "fix") return openAssist(cell, { mode: "fix" });
   if (!a) return;
-  if (action === "submit") submitAssist(cell, prompt);
-  else if (action === "stop") assistAborts.get(cell.id)?.abort();
+  if (action === "submit") {
+    if (a.mode === "suggest") a.mode = "write";
+    submitAssist(cell, prompt);
+  } else if (action === "suggest") {
+    a.mode = "suggest";
+    submitAssist(cell, "");
+  } else if (action === "stop") assistAborts.get(cell.id)?.abort();
   else if (action === "clear-file") a.file = "";
   else if (action === "discard") closeAssist(cell);
   else if (action === "accept-run") fixAndRun(cell);
@@ -713,17 +724,18 @@ function onAssist(cell, { action, prompt }) {
     a.answer = "";
     submitAssist(cell, `${asked}\n\nWrite code for this. What you found before: ${a.lastAnswer || ""}`.slice(0, 3900), { codeOnly: true });
   }
-  else if (action === "accept" || action === "insert-below") {
+  else if (["accept", "use-run", "insert-below", "insert-below-run"].includes(action)) {
     const code = acceptedCode(a.text);
     if (!cellCode(a.text)) return;
     closeAssist(cell);
-    if (action === "accept") {
-      setSource(cell.id, code);
-      focusCell(cell.id);
-    } else {
-      const id = addCell(cell.id, "code");
-      setSource(id, code);
-      focusCell(id);
+    let id = cell.id;
+    if (action.startsWith("insert-below")) id = addCell(cell.id, "code");
+    setSource(id, code);
+    focusCell(id);
+    // ...and run, for the actions that say so.
+    if (action.endsWith("-run")) {
+      const target = cells.value[idx(id)];
+      if (target) Promise.resolve(onRun(target, { advance: false })).catch((e) => console.warn("Running the cell failed:", e));
     }
   }
 }
@@ -1127,6 +1139,7 @@ const kernelPill = computed(() => {
           <FileBrowser
             ref="fileBrowserRef"
             :list-dir="listDir"
+            :read-text="readText"
             :ready="status === 'ready'"
             :kernel-name="kernelName"
             :inputs="inputs"

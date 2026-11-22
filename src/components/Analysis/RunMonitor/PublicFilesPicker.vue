@@ -9,6 +9,10 @@
     { datasetId, version, datasetName, path, name, isFolder, size }.
   whyNot(name): why a file can't be chosen ("" when it can): the input's
     file types. Folders can always be chosen.
+  parts: what the input can take, { files, records, kgx }: its files, its
+    metadata records, its knowledge graph (sourceInputs.js sourceParts).
+    Published datasets have no knowledge graph yet: an input that takes only
+    a graph says so and offers nothing.
 */
 import { computed, onBeforeUnmount, ref } from "vue";
 import { pagePublicDatasets, browsePublicFiles, listPublicModels } from "@/utils/publicDatasets";
@@ -19,8 +23,11 @@ import MetadataRecordsChoice from "../MetadataRecordsChoice.vue";
 const props = defineProps({
   modelValue: { type: Array, default: () => [] },
   whyNot: { type: Function, default: () => "" },
+  parts: { type: Object, default: () => ({ files: true, records: true }) },
 });
 const emit = defineEmits(["update:modelValue"]);
+// An input that takes only a knowledge graph, which no published dataset has.
+const graphOnly = computed(() => props.parts.kgx && !props.parts.files && !props.parts.records);
 
 const PAGE = 500;
 
@@ -111,13 +118,24 @@ const openDataset = (id) => {
 // The metadata models the open dataset's version publishes records of; the
 // input can take their records (one records pick per version) beside files.
 const availableModels = ref([]);
+const modelsLoading = ref(false);
+const modelsFailed = ref(false);
 let modelsSeq = 0;
 async function loadModels() {
   const seq = ++modelsSeq;
   availableModels.value = [];
-  if (!dataset.value) return;
-  const found = await listPublicModels({ id: dataset.value.id, version: dataset.value.version });
-  if (seq === modelsSeq) availableModels.value = found;
+  modelsFailed.value = false;
+  if (!dataset.value || !props.parts.records) return;
+  modelsLoading.value = true;
+  try {
+    const found = await listPublicModels({ id: dataset.value.id, version: dataset.value.version });
+    if (seq === modelsSeq) availableModels.value = found;
+  } catch (err) {
+    console.warn("Couldn't list the dataset's models:", err);
+    if (seq === modelsSeq) modelsFailed.value = true;
+  } finally {
+    if (seq === modelsSeq) modelsLoading.value = false;
+  }
 }
 // The chosen models are the version's records pick; none takes it out.
 const chosenModels = computed({
@@ -160,7 +178,11 @@ const groups = computed(() => groupPicks(props.modelValue));
 </script>
 
 <template>
-  <div class="pfp">
+  <p v-if="graphOnly" class="pfp__empty pfp__no-graph">
+    Published datasets have no knowledge graph yet. Choose a workspace dataset's graph instead.
+  </p>
+  <div v-else class="pfp">
+    <p v-if="parts.kgx" class="pfp__empty pfp__no-graph">Published datasets have no knowledge graph yet: its graph input needs a workspace dataset.</p>
     <div class="pfp__search">
       <label for="pfp-dataset">Public dataset</label>
       <el-select
@@ -197,11 +219,20 @@ const groups = computed(() => groupPicks(props.modelValue));
         <div class="pfp__meta">
           Version {{ dataset.version }} · {{ dataset.fileCount.toLocaleString("en-US") }} files · {{ formatBytes(dataset.size) }}
         </div>
-        <MetadataRecordsChoice v-model="chosenModels" :available="availableModels" class="pfp__records" />
+        <MetadataRecordsChoice
+          v-if="parts.records"
+          v-model="chosenModels"
+          :available="availableModels"
+          :hint="parts.files ? undefined : 'Its records and the links between them.'"
+          class="pfp__records"
+        />
+        <p v-if="!parts.files && !availableModels.length" class="pfp__empty">
+          {{ modelsLoading ? "Loading metadata records…" : modelsFailed ? "Couldn't load its metadata records." : "This version publishes no metadata records." }}
+        </p>
       </div>
     </div>
 
-    <div v-if="dataset" class="pfp__browser">
+    <div v-if="dataset && parts.files" class="pfp__browser">
       <nav class="pfp__crumbs" aria-label="Folder">
         <button type="button" :disabled="!path" @click="openFolder('')">{{ dataset.name }}</button>
         <template v-for="c in crumbs" :key="c.path">
@@ -236,7 +267,9 @@ const groups = computed(() => groupPicks(props.modelValue));
         </li>
       </ul>
     </div>
-    <p v-else class="pfp__empty">Find a published dataset to choose its files. You can choose files from several datasets.</p>
+    <p v-else-if="!dataset" class="pfp__empty">
+      {{ parts.files ? "Find a published dataset to choose its files. You can choose files from several datasets." : "Find a published dataset to choose its metadata records." }}
+    </p>
 
     <div v-if="groups.length" class="pfp__chosen">
       <div v-for="g in groups" :key="g.key" class="pfp__group">

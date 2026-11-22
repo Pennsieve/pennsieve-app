@@ -743,6 +743,20 @@ export function useJupyterSession() {
       });
   }
 
+  // A small text file of the session (a view's crate, a layout's
+  // description), or null when it isn't there or is bigger than maxBytes.
+  async function readText(path, maxBytes = 4 * 2 ** 20) {
+    if (!contents) return null;
+    try {
+      const meta = await contents.get(path, { content: false });
+      if (meta.type === "directory" || (meta.size != null && meta.size > maxBytes)) return null;
+      const model = await contents.get(path, { content: true, type: "file", format: "text" });
+      return typeof model.content === "string" && model.content.length <= maxBytes ? model.content : null;
+    } catch {
+      return null;
+    }
+  }
+
 
   // ---- cell mutations -------------------------------------------------------
 
@@ -1151,6 +1165,7 @@ export function useJupyterSession() {
     findInputNotebooks,
     // files
     listDir,
+    readText,
     fetchInputs,
     inputsStatus,
     cancelInputs,

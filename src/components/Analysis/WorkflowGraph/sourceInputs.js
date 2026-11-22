@@ -7,7 +7,7 @@
 // Pure: on DAG steps ({ id, inputs }) and app.yml ports.
 
 import { shortMediaType, versionManifest } from "../WorkflowBuilder/appManifestInfo";
-import { mediaTypesOverlap, normalizeMediaType } from "../Applications/applicationSchema";
+import { VIEW_PARTS, viewPartOf, mediaTypesOverlap, normalizeMediaType } from "../Applications/applicationSchema";
 
 // The inputs a source feeds: { step, input } per link from it.
 export function inputsFedBy(sourceId, steps) {
@@ -40,16 +40,53 @@ export function sourceHints(sourceId, steps, portsOf) {
         types: [...new Set([...(port.mediaTypes || []).map(shortMediaType), ...(port.formats || []).map((f) => EDAM_TYPES[f]).filter(Boolean)])],
         mediaTypes: (port.mediaTypes || []).map(normalizeMediaType).filter(Boolean),
         layout: layout.length ? String(layout[layout.length - 1]).split("@")[0].toUpperCase() : "",
+        // The part of a dataset it takes other than files (VIEW_PARTS:
+        // records for pennsieve-records, kgx for a knowledge graph), or "".
+        part: viewPartOf(port)?.part || "",
         description: port.description || "",
       };
     })
     .filter(Boolean);
 }
 
+// What a run can choose for a source: a dataset's files, its metadata
+// records, its knowledge graph, or several ({ files, records, kgx }). A
+// batch step gets a dataset's records or graph only through an input that
+// takes that part (app.yml conformsTo: pennsieve-records, kgx; VIEW_PARTS)
+// and its files through any other; a notebook (a step interactive(stepId)
+// says is one) reads whatever it is given: its files and records (its view
+// has the graph too).
+export const NOTEBOOK_PARTS = Object.freeze({ files: true, records: true, kgx: false });
+export function sourceParts(sourceId, steps, portsOf, interactive = () => false) {
+  const linked = (s) => (Array.isArray(s?.inputs) ? s.inputs : []).some((l) => l?.from === sourceId);
+  const readers = (steps || []).filter((s) => (s?.dependsOn || []).includes(sourceId) || linked(s));
+  const fed = inputsFedBy(sourceId, steps);
+  const hints = sourceHints(sourceId, steps, portsOf);
+  const partOf = (f) => hints.find((h) => h.step === f.step && h.input === f.input)?.part || "";
+  const parts = {
+    // A step it isn't linked into takes all of it at the root: its files.
+    files: !fed.length || readers.some((s) => !linked(s)) || fed.some((f) => !partOf(f)),
+  };
+  for (const p of VIEW_PARTS) parts[p.part] = fed.some((f) => partOf(f) === p.part);
+  // A step whose ports aren't known yet (the app list is loading) may take
+  // files or records, as may a notebook; a graph a known batch step takes
+  // is still asked for.
+  if (readers.some((s) => interactive(s.id) || (linked(s) && !portsOf(s.id)))) return { ...parts, files: true, records: true };
+  return parts;
+}
+
+// What a source takes, in a few words ("files", "metadata records",
+// "knowledge graph", "metadata records and knowledge graph").
+export function partsWhat(parts) {
+  const names = [...(parts?.files ? ["files"] : []), ...VIEW_PARTS.filter((p) => parts?.[p.part]).map((p) => p.what)];
+  return names.length ? listed(names) : "files";
+}
+
 // One line for a picker: "signals takes CSV files", "study takes a BIDS
 // folder", "a takes CSV; b takes JSON".
 export function hintLine(hints) {
   const lines = (hints || []).map((h) => {
+    if (h.part) return `${h.input} takes a dataset's ${VIEW_PARTS.find((p) => p.part === h.part)?.what || h.part}`;
     if (h.layout) return `${h.input} takes a ${h.layout} folder`;
     if (h.types.length) return `${h.input} takes ${h.types.join(", ")} files`;
     return "";
@@ -74,11 +111,11 @@ const listed = (names) =>
 
 // What to say when sources have no files yet: their inputs by name ("Select
 // files for signals and events"), or how many.
-export function missingFilesMessage(missingIds, dag) {
+export function missingFilesMessage(missingIds, dag, what = "files") {
   const names = (missingIds || []).map((id) => sourceLabel(id, dag, ""));
-  if (names.length && names.every(Boolean)) return `Select files for ${listed([...new Set(names)])}`;
+  if (names.length && names.every(Boolean)) return `Select ${what} for ${listed([...new Set(names)])}`;
   const n = (missingIds || []).length;
-  return `Select files for ${n === 1 ? "data source" : `${n} data sources`}`;
+  return `Select ${what} for ${n === 1 ? "data source" : `${n} data sources`}`;
 }
 
 // EDAM formats (app.yml formats) by the names files' extensions give them,
@@ -173,7 +210,8 @@ export function fileTypeMismatches(fileNames, hints, formats = []) {
 // declares no types.
 export function acceptedFileTypes(hints) {
   const accepted = new Set();
-  for (const h of hints || []) {
+  // A records or graph input takes no files: it says nothing about them.
+  for (const h of (hints || []).filter((x) => !x.part)) {
     if (h.layout || !h.types.length) return null;
     for (const t of h.types) {
       if (t === "Any" || t === "File") return null;

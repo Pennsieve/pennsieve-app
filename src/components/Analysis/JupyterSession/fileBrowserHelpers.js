@@ -6,8 +6,9 @@
 export const isHidden = (entry) => (entry?.name || "").startsWith(".");
 
 // Not on the disk: a file or folder a view holds that isn't downloaded. A
-// stack (read in place, never downloaded) isn't one.
-export const isRemote = (entry) => !!entry?.virtual && entry.type !== "stack";
+// stack (read in place, never downloaded) isn't one, nor an input still
+// joining the session (its row says so).
+export const isRemote = (entry) => !!entry?.virtual && entry.type !== "stack" && entry.type !== "pending";
 
 // The entries to show, in the order given: without hidden ones unless
 // showHidden, and without remote ones when onlyLocal.

@@ -65,7 +65,8 @@ import RuntimeMark from "../WorkflowGraph/RuntimeMark.vue";
 import { STANDARD_CPU_OPTIONS, getStandardMemoryOptions, getTargetTypeLabel } from "./runHelpers";
 import { sourceLabel } from "../WorkflowGraph/sourceInputs";
 import * as siteConfig from "@/site-config/site.json";
-import { viewsServiceUrl, viewDataSource, prepareWorkspaceRunView, workspaceFilesAsViews } from "@/utils/viewsService";
+import { viewsServiceUrl, viewDataSource, prepareWorkspaceRunView, createWorkspaceRunView, workspaceFilesAsViews } from "@/utils/viewsService";
+import { holdPendingInputs, pendingFolderName, splitSessionViews } from "../JupyterSession/pendingSessionInputs";
 import { routeWorkspaceInputs } from "@/utils/workspaceInputs";
 import { listWorkspaceModels } from "@/utils/workspaceModels";
 import PlatformList from "../PlatformList.vue";
@@ -562,8 +563,10 @@ const recordsNodeId = computed(() => (notebookRecords.value.length ? dataSourceN
 const WORKSPACE_RECORDS_HINT = filesWithRecords
   ? "Its records and the links between them, as they are when the session starts, with the files you choose below."
   : "Its records and the links between them, as they are when the session starts, instead of its files.";
-// The records are exported into a view before the session starts; closing
-// the dialog stops waiting (the view's build goes on).
+// The records are exported into a view while the session starts, and join
+// it once it runs (execute); only where the session couldn't add them are
+// they waited for before it starts: closing the dialog stops that wait (the
+// view's build goes on).
 let preparingAbort = null;
 const preparingRecords = ref(false);
 const startLabel = computed(() => (preparingRecords.value ? "Preparing the inputs…" : "Start Notebook"));
@@ -578,8 +581,9 @@ watch(notebookRecords, (models) => {
   delete dataSourceFiles[recordsNodeId.value];
   store.commit("analysisModule/CLEAR_SELECTED_FILES");
 });
-// Each input's view, kept by what it was asked for: a view still being
-// built when a try timed out is waited for again, not started again.
+// Each input's view, kept by what it was asked for: a view started by a try
+// that failed (the run refused, the wait timed out) is taken again, not
+// started again.
 const sessionViews = {};
 let datasetModelsSeq = 0;
 watch(
@@ -1062,6 +1066,8 @@ async function execute() {
     const dag = configDefinition.value?.dag || [];
 
     const dataSources = {};
+    // The views the session adds once it runs (pendingSessionInputs).
+    let pendingViews = [];
     if (inputChoice.value === "dataset") {
       // An input goes through a view when it has the dataset's records
       // (the first input), or has files and workspace files go through
@@ -1076,30 +1082,55 @@ async function execute() {
         { filesAsViews: filesWithRecords }
       );
       for (const p of packages) dataSources[p.id] = { packageIds: p.packageIds };
-      // Made now, built before the session starts; closing the dialog stops
-      // the wait (the views' builds go on).
-      if (viaView.length) {
+      // Each view is started now and built while the session starts: the
+      // run goes without it, and the session page adds it to the running
+      // session once it's built (pendingSessionInputs), in the folder the
+      // session would have given it. Where the session couldn't add it (an
+      // input the workflow requires, or a node whose sessions can't add
+      // views), it's built before the run is sent, as before; closing the
+      // dialog stops that wait (the views' builds go on).
+      const viewName = (v) => `${selectedDataset.value?.content?.name || "Dataset"}: ${sourceLabel(v.id, dag, "input")}`.slice(0, 255);
+      const entryFor = (v) => {
+        const key = [v.datasetId, [...v.models].sort().join(","), [...v.packageIds].sort().join(",")].join("\n");
+        if (sessionViews[v.id]?.key !== key) sessionViews[v.id] = { key, started: null, view: null };
+        return sessionViews[v.id];
+      };
+      const request = (v) => ({ datasetNodeId: v.datasetId, name: viewName(v), models: v.models, packageIds: v.packageIds });
+      const { later, now } = splitSessionViews(viaView, { nodes: dataSourceNodes.value, computeNode: selectedComputeNode.value });
+      if (later.length) {
+        // Started once: a retry after the run was refused takes the same
+        // views.
+        const started = await Promise.all(
+          later.map(async (v) => {
+            const entry = entryFor(v);
+            if (!entry.started) entry.started = await createWorkspaceRunView(request(v));
+            return entry.started;
+          })
+        );
+        const only = dataSourceNodes.value.length === 1;
+        pendingViews = later.map((v, i) => ({
+          nodeId: v.id,
+          name: pendingFolderName({ viewName: started[i].name || viewName(v), nodeId: v.id, only }),
+          viewId: started[i].id,
+          version: started[i].version || 1,
+          datasetId: v.datasetId,
+          label: viewName(v),
+        }));
+        // Records replace the input's files here: the view is its input.
+        for (const v of later) delete dataSources[v.id];
+      }
+      if (now.length) {
         const controller = new AbortController();
         preparingAbort = controller;
         preparingRecords.value = true;
         let views;
         try {
-          const dag = configDefinition.value?.dag || [];
           views = await Promise.all(
-            viaView.map(async (v) => {
-              const key = [v.datasetId, [...v.models].sort().join(","), [...v.packageIds].sort().join(",")].join("\n");
-              if (sessionViews[v.id]?.key !== key) sessionViews[v.id] = { key, started: null, view: null };
-              const entry = sessionViews[v.id];
+            now.map(async (v) => {
+              const entry = entryFor(v);
               if (!entry.view) {
-                const label = sourceLabel(v.id, dag, "input");
                 entry.view = await prepareWorkspaceRunView(
-                  {
-                    datasetNodeId: v.datasetId,
-                    name: `${selectedDataset.value?.content?.name || "Dataset"}: ${label}`.slice(0, 255),
-                    models: v.models,
-                    packageIds: v.packageIds,
-                    started: entry.started,
-                  },
+                  { ...request(v), started: entry.started },
                   { signal: controller.signal, onStarted: (started) => (entry.started = started) }
                 );
               }
@@ -1114,7 +1145,7 @@ async function execute() {
           if (preparingAbort === controller) preparingAbort = null;
         }
         if (controller.signal.aborted) return;
-        viaView.forEach((v, i) => (dataSources[v.id] = viewDataSource(views[i])));
+        now.forEach((v, i) => (dataSources[v.id] = viewDataSource(views[i])));
       }
     }
 
@@ -1176,6 +1207,13 @@ async function execute() {
     console.log("[Notebook] createRun payload:", JSON.stringify(payload, null, 2));
     const newRun = await store.dispatch("analysisModule/createRun", payload);
     console.log("[Notebook] createRun response:", JSON.stringify(newRun, null, 2));
+    // The session page (its run's) adds them once the session runs.
+    if (pendingViews.length && !fromPlatform) {
+      holdPendingInputs(newRun?.executionRunId || newRun?.uuid || newRun?.id || newRun?.runId, pendingViews);
+    }
+    // The run has them: the next notebook builds its own, with the records
+    // as they are then.
+    for (const id of Object.keys(sessionViews)) delete sessionViews[id];
     EventBus.$emit("toast", {
       detail: {
         type: "success",

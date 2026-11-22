@@ -1,3 +1,5 @@
+import { reactive } from 'vue'
+
 // OpenNeuro (openneuro.org), whose public datasets are mirrored in the
 // Registry of Open Data on AWS as the openneuro entry: one folder per
 // dataset (ds000001/) in the openneuro.org bucket. Its own public GraphQL API
@@ -73,3 +75,54 @@ export async function countOpenNeuro(options = {}) {
   const { count } = await searchOpenNeuro({ first: 1 }, options)
   return count
 }
+
+// OpenNeuro keeps private, withdrawn and not-yet-released datasets in the
+// same bucket as public ones: their folders list, but their files can't be
+// read. A dataset released in the last few days can be partly readable:
+// its dataset_description.json is, its README and data aren't (ds009109).
+// Anonymous HEADs of both files say which (the bucket lets browsers ask):
+// false when either is refused, true when one reads and neither is
+// refused, else null (neither there, or no answer), which stops no one.
+// Answers are kept for the page, in a reactive map, so a picker shows them
+// as they come.
+const OPENNEURO_BUCKET_URL = 'https://s3.us-east-1.amazonaws.com/openneuro.org'
+export const OPENNEURO_NOT_PUBLIC = "OpenNeuro hasn't made this dataset's files public (yet), so it can't be downloaded"
+export const openNeuroReadable = reactive(new Map())
+const asked = new Map()
+
+const PROBES = ['dataset_description.json', 'README']
+
+// OpenNeuro's dataset ids: ds and six digits. Anything else isn't asked.
+const DATASET_ID = /^ds\d{6}$/
+
+export function checkOpenNeuro(id, { fetchFn = globalThis.fetch } = {}) {
+  if (!DATASET_ID.test(String(id))) return Promise.resolve(null)
+  if (!asked.has(id)) {
+    const status = (file) =>
+      fetchFn(`${OPENNEURO_BUCKET_URL}/${encodeURIComponent(id)}/${file}`, { method: 'HEAD' }).then((r) => r.status, () => 0)
+    const answer = Promise.all(PROBES.map(status))
+      .then((codes) => (codes.includes(403) ? false : codes.includes(200) ? true : null))
+      .then((readable) => {
+        openNeuroReadable.set(id, readable)
+        // No answer (a network error): asked again next time.
+        if (readable === null) asked.delete(id)
+        return readable
+      })
+    asked.set(id, answer)
+  }
+  return asked.get(id)
+}
+
+// Checks ids a few at a time (a browser asks a host six at a time anyway),
+// in order, until current() says the list has changed.
+export async function checkOpenNeuroAll(ids, { current = () => true, at = 6, fetchFn } = {}) {
+  const queue = [...ids]
+  const worker = async () => {
+    while (queue.length && current()) await checkOpenNeuro(queue.shift(), { fetchFn })
+  }
+  await Promise.all(Array.from({ length: Math.min(at, queue.length) }, worker))
+}
+
+// Whether a dataset is known to be unreadable: its id, or the ds folder a
+// prefix of OpenNeuro's bucket starts with.
+export const openNeuroUnreadable = (idOrPrefix = '') => openNeuroReadable.get(String(idOrPrefix).split('/')[0]) === false

@@ -5,7 +5,7 @@
 // these like any Open Data dataset's (viewsService createOpenDataView). Used
 // by the new notebook dialog and the running session's Inputs panel.
 import { onMounted, ref, watch } from "vue";
-import { searchOpenNeuro, openNeuroUrl, OPENNEURO_MODALITIES, OPENNEURO_REGISTRY } from "@/utils/openNeuro";
+import { searchOpenNeuro, openNeuroUrl, checkOpenNeuroAll, openNeuroUnreadable, OPENNEURO_MODALITIES, OPENNEURO_NOT_PUBLIC, OPENNEURO_REGISTRY } from "@/utils/openNeuro";
 import OpenDataFolders from "./OpenDataFolders.vue";
 
 // The chosen dataset (a searchOpenNeuro result) and folder: its ds folder
@@ -34,6 +34,8 @@ async function search({ more = false } = {}) {
     results.value = more ? [...results.value, ...res.datasets] : res.datasets;
     count.value = res.count;
     next.value = res.next;
+    // Which of them can be downloaded: some public ones aren't yet.
+    checkOpenNeuroAll(res.datasets.map((d) => d.id), { current: () => mine === seq });
   } catch (err) {
     console.error("Failed to search OpenNeuro:", err);
     if (mine === seq) {
@@ -55,6 +57,7 @@ onMounted(() => {
 });
 
 function choose(d) {
+  if (openNeuroUnreadable(d.id)) return;
   dataset.value = d;
   prefix.value = `${d.id}/`;
 }
@@ -114,10 +117,20 @@ const subjectsLine = (n) => (n ? `${n} subject${n === 1 ? "" : "s"}` : "");
         {{ count.toLocaleString("en-US") }} dataset{{ count === 1 ? "" : "s" }}
       </p>
       <div class="on-cards pp-list">
-        <button v-for="d in results" :key="d.id" type="button" class="on-card" @click="choose(d)">
+        <button
+          v-for="d in results"
+          :key="d.id"
+          type="button"
+          class="on-card"
+          :class="{ 'is-unavailable': openNeuroUnreadable(d.id) }"
+          :disabled="openNeuroUnreadable(d.id)"
+          :title="openNeuroUnreadable(d.id) ? OPENNEURO_NOT_PUBLIC : undefined"
+          @click="choose(d)"
+        >
           <span class="on-card__name">{{ d.name }}</span>
           <span class="on-meta">
             <span>{{ d.id }}</span>
+            <span v-if="openNeuroUnreadable(d.id)" class="on-unavailable">files not public yet</span>
             <span v-if="d.modalities.length">{{ d.modalities.join(", ") }}</span>
             <span v-if="d.subjects">{{ subjectsLine(d.subjects) }}</span>
             <span v-if="d.size">{{ formatSize(d.size) }}</span>
@@ -172,6 +185,16 @@ const subjectsLine = (n) => (n ? `${n} subject${n === 1 ? "" : "s"}` : "");
   &:hover {
     background: theme.$gray_1;
   }
+  &.is-unavailable {
+    cursor: not-allowed;
+    background: theme.$white;
+    .on-card__name {
+      color: theme.$gray_4;
+    }
+  }
+}
+.on-unavailable {
+  color: theme.$red_2;
 }
 .on-card__name {
   font-size: 14px;
