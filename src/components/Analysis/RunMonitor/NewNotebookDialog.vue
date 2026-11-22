@@ -156,7 +156,7 @@ const stepTitles = computed(() => [
 
 /* ------------------------------------------------------ compute resources --- */
 // Fargate CPU/memory for the notebook task. Lowest tier is 1 vCPU (1024). Memory
-// can be set automatically (balanced for the CPU) or pinned to a specific value.
+// can be set automatically (autoMemoryForCpu) or pinned to a specific value.
 const DEFAULT_CPU = "1024"; // 1 vCPU
 // Sentinel for "let the platform pick memory for the chosen CPU". A non-empty
 // value is used deliberately: Element Plus won't render the label of an
@@ -1462,7 +1462,8 @@ async function execute() {
         </div>
         <p class="resource-hint">
           Memory is set automatically (at least 8 GB, more with more CPU) unless you pick a
-          specific value. A smaller one costs a little less; more CPU costs most.
+          specific value. At 1 CPU, 8 GB costs about half as much again per hour as 2 GB:
+          pick less for light work.
         </p>
         <p v-if="diskSuggestion" class="data-hint">
           The data is {{ formatSize(dataBytes) }} in all: {{ diskSuggestion }} GB fits it with room for the
