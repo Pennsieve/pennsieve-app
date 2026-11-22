@@ -167,6 +167,18 @@ function downloadFiles(entries) {
   if (confirm.value) panelOpen.value = false;
 }
 
+/* ------------------------------------------------- joining the session --- */
+// An input still on its way: what it's waiting for.
+const pendingLine = computed(() =>
+  props.node.pending?.state === "adding" ? "adding to the session…" : "preparing the dataset's records…"
+);
+const pendingTitle = computed(() => {
+  const p = props.node.pending;
+  if (!p) return undefined;
+  if (p.error) return p.error;
+  return `${p.label || p.name}\nThe dataset's records are being prepared; they join the session as input/${p.name}/ when they're ready.`;
+});
+
 function onRow() {
   const n = props.node;
   if (bundle.value) panelOpen.value = true;
@@ -179,7 +191,27 @@ function onRow() {
 
 <template>
   <li class="fn">
+    <!-- An input joining the session (pendingSessionInputs): its dataset's
+         records being prepared, then added; not a folder yet. -->
     <div
+      v-if="node.pending"
+      class="fn__row is-remote is-pending"
+      :style="{ paddingLeft: depth * 14 + 8 + 'px' }"
+      :title="pendingTitle"
+    >
+      <span class="fn__caret" />
+      <img class="fn__icon" :src="iconOf({ name: node.name, type: 'directory' })" alt="" />
+      <span class="fn__name">{{ node.name }}</span>
+      <span class="fn__end">
+        <span v-if="node.pending.error" class="fn__state fn__state--failed">couldn't be added</span>
+        <template v-else>
+          <span class="fn__spinner" aria-hidden="true" />
+          <span class="fn__from fn__from--pending">{{ pendingLine }}</span>
+        </template>
+      </span>
+    </div>
+    <div
+      v-else
       class="fn__row"
       :class="{ 'is-remote': remote || isStack, 'is-selected': selected }"
       :style="{ paddingLeft: depth * 14 + 8 + 'px' }"
@@ -475,6 +507,22 @@ function onRow() {
 .fn__row.is-remote .fn__name { color: theme.$gray_4; }
 .fn__row.is-remote .fn__icon { opacity: 0.55; }
 .fn__cloud { flex: 0 0 auto; color: theme.$gray_3; }
+/* An input joining the session: not clickable, a small spinner by its line. */
+.fn__row.is-pending { cursor: default; }
+.fn__row.is-pending:hover { background: none; }
+.fn__from--pending { max-width: 200px; color: theme.$purple_2; }
+.fn__spinner {
+  flex: 0 0 auto;
+  width: 10px;
+  height: 10px;
+  border: 1.5px solid theme.$gray_2;
+  border-top-color: theme.$purple_2;
+  border-radius: 50%;
+  animation: fn-spin 0.9s linear infinite;
+}
+@keyframes fn-spin {
+  to { transform: rotate(360deg); }
+}
 .fn__size { color: theme.$gray_4; font-size: 11px; }
 .fn__state { font-size: 11px; }
 .fn__state--active { color: theme.$purple_2; }
