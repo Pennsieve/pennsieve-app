@@ -171,9 +171,11 @@ const diskOptions = NOTEBOOK_DISK_OPTIONS;
 const diskHint = notebookDiskHint();
 const cpuOptions = STANDARD_CPU_OPTIONS;
 const memoryOptions = computed(() => getStandardMemoryOptions(resourceCpu.value));
-// Balanced default memory for a CPU when memory is left automatic: 2 GB per vCPU
-// (the low end of each CPU's valid range), e.g. 1 vCPU → 2 GB, 4 vCPU → 8 GB.
-const autoMemoryForCpu = (cpu) => String(parseInt(cpu, 10) * 2);
+// Default memory for a CPU when memory is left automatic: 4 GB per vCPU, at
+// least 8 GB (Jupyter and the session's own services take about 1 GB, and a
+// dataset's records or graph in pandas soon take a few more), within each
+// CPU's valid range: 1 or 2 vCPU → 8 GB, 4 → 16 GB, 8 → 32 GB.
+const autoMemoryForCpu = (cpu) => String(Math.max(8192, parseInt(cpu, 10) * 4));
 const isAutoMemory = computed(() => resourceMemory.value === AUTO_MEMORY);
 const resolvedMemory = computed(() =>
   isAutoMemory.value ? autoMemoryForCpu(resourceCpu.value) : resourceMemory.value
@@ -1459,8 +1461,8 @@ async function execute() {
           </div>
         </div>
         <p class="resource-hint">
-          Memory is set automatically based on the CPU unless you pick a specific
-          value. Higher tiers cost more — start small and scale up if needed.
+          Memory is set automatically (at least 8 GB, more with more CPU) unless you pick a
+          specific value. A smaller one costs a little less; more CPU costs most.
         </p>
         <p v-if="diskSuggestion" class="data-hint">
           The data is {{ formatSize(dataBytes) }} in all: {{ diskSuggestion }} GB fits it with room for the
