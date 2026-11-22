@@ -16,9 +16,15 @@ import { sessionPathCode } from "./pathCode";
 import { visibleEntries, readShowHidden, writeShowHidden, readOnlyLocal, writeOnlyLocal } from "./fileBrowserHelpers";
 import { useRememberedFold } from "./sectionFold";
 import { costLine } from "./inputsHelpers";
+import { sourceBase } from "./useSessionInputs";
+import { layoutsOf, layoutAt, crateRoot, groupNames, layoutById, parseKgxGraph, graphRecords } from "./structuredLayouts";
+import { VIEW_CRATE_DIR } from "@/composables/useJupyterSession";
 
 const props = defineProps({
   listDir: { type: Function, required: true },
+  // Reads a small text file of the session (path) or gives null: a view's
+  // crate, a structured layout's description.
+  readText: { type: Function, default: null },
   ready: { type: Boolean, default: false },
   // The kernel's language and version ("Python 3.12.3"): copied paths are
   // code for it (pathCode.js).
@@ -65,6 +71,12 @@ function withViews(disk, dirPath) {
   if (!rows.length) return disk;
   const byName = new Map(disk.map((n) => [n.name, n]));
   for (const r of rows) {
+    // An input still on its way (pendingSessionInputs): a row that says so,
+    // until its folder is there.
+    if (r.type === "pending") {
+      if (!byName.has(r.name)) byName.set(r.name, { ...decorate({ name: r.name, path: `${dirPath}/${r.name}`, type: "pending" }), virtual: true, pending: r.pending });
+      continue;
+    }
     const view = { source: r.source, rel: r.rel, entry: r.entry || null, root: !!r.root };
     const onDisk = byName.get(r.name);
     if (onDisk) {
@@ -74,15 +86,86 @@ function withViews(disk, dirPath) {
     const type = r.type === "folder" ? "directory" : r.type;
     byName.set(r.name, { ...decorate({ name: r.name, path: `${dirPath}/${r.name}`, type, size: type === "directory" ? null : r.size }), virtual: true, view });
   }
-  const dirsFirst = (n) => (n.type === "directory" ? 0 : 1);
+  const dirsFirst = (n) => (n.type === "directory" || n.type === "pending" ? 0 : 1);
   return [...byName.values()].sort((a, b) => dirsFirst(a) - dirsFirst(b) || a.name.localeCompare(b.name));
 }
 
+// A view's crate can list many files: read it up to this size.
+const CRATE_MAX_BYTES = 32 * 2 ** 20;
+// A view's structured layouts (structuredLayouts.js), from its crate in
+// the session, kept per view version once it's read; by path while it
+// can't be (not staged yet, or an error), and tried again next time.
+const layoutsCache = new Map();
+async function layoutsFor(source) {
+  const base = sourceBase(source);
+  const key = `${base}|${source.viewId}|${source.version}`;
+  if (layoutsCache.has(key)) return layoutsCache.get(key);
+  let crate = null;
+  try {
+    const text = props.readText ? await props.readText(`${base}/${VIEW_CRATE_DIR}/view.json`, CRATE_MAX_BYTES) : null;
+    crate = text ? JSON.parse(text) : null;
+  } catch {
+    crate = null;
+  }
+  const layouts = layoutsOf(crate, source.entries);
+  if (crateRoot(crate)) layoutsCache.set(key, layouts);
+  return layouts;
+}
+
+// A folder of a view that is one of its structured layouts gets it: FileNode
+// shows a bundle as one row (the knowledge graph). A group layout (the
+// metadata records) stays the folder it is: its entries are one row in it
+// (childrenOf), and the folder's row says what it holds.
+async function withLayouts(rows) {
+  for (const n of rows) {
+    if (n.type !== "directory" || !n.view?.rel) continue;
+    const layouts = await layoutsFor(n.view.source);
+    const found = layoutAt(layouts, n.view.rel);
+    if (found?.entry.presentation === "group") {
+      n.group = found;
+      n.note = await recordsNote(n.view.source, found, layouts);
+    } else n.layout = found;
+  }
+  return rows;
+}
+
+// The metadata folder's line: its models, and its records when the graph's
+// summary (graph.json) is on the disk; the view's crate doesn't count them.
+async function recordsNote(source, records, layouts) {
+  const models = records.models?.length || 0;
+  if (!models) return "";
+  const line = `${models} ${models === 1 ? "model" : "models"}`;
+  const kgx = layouts.find((l) => l.id === "kgx");
+  if (!kgx || !props.readText) return line;
+  let n = null;
+  try {
+    n = graphRecords(parseKgxGraph(await props.readText(`${sourceBase(source)}/${kgx.folder}/${layoutById("kgx").summaryFile}`)));
+  } catch {
+    n = null;
+  }
+  return n == null ? line : `${line} · ${n.toLocaleString()} records`;
+}
+
 // A folder's children: on the disk (none for one that's only in a view),
-// with what the views hold there.
+// with what the views hold there. A group layout's folder has its entries
+// in one row of their own, a folder of the tree only (its key, not its path,
+// is unique; its path is the folder's, for its code).
 async function childrenOf(node) {
   const disk = node.virtual ? [] : (await props.listDir(node.path)).map(decorate);
-  return withViews(disk, node.path);
+  const rows = await withLayouts(withViews(disk, node.path));
+  if (!node.group) return rows;
+  const names = groupNames(node.group);
+  const inGroup = rows.filter((n) => names.has(n.name));
+  if (!inGroup.length) return rows;
+  const group = {
+    ...decorate({ name: node.group.entry.label, path: node.path, type: "directory" }),
+    key: `${node.path}#${node.group.id}`,
+    virtual: inGroup.every((n) => n.virtual),
+    view: node.view,
+    layout: node.group,
+    children: inGroup,
+  };
+  return [group, ...rows.filter((n) => !names.has(n.name))];
 }
 
 async function loadRoot(preserve = false) {
@@ -111,7 +194,7 @@ async function loadRoot(preserve = false) {
 function collectOpenPaths(nodes, acc = new Set()) {
   for (const n of nodes || []) {
     if (n.type === "directory" && n.open) {
-      acc.add(n.path);
+      acc.add(n.key || n.path);
       collectOpenPaths(n.children, acc);
     }
   }
@@ -120,7 +203,7 @@ function collectOpenPaths(nodes, acc = new Set()) {
 
 async function expandPaths(nodes, openPaths) {
   for (const n of nodes || []) {
-    if (n.type === "directory" && openPaths.has(n.path)) {
+    if (n.type === "directory" && openPaths.has(n.key || n.path)) {
       await toggle(n); // opens + lazily loads children
       await expandPaths(n.children, openPaths);
     }
@@ -166,6 +249,16 @@ function refresh() {
 watch(
   () => props.inputs?.sources,
   () => {
+    layoutsCache.clear();
+    if (props.ready && roots.value.length) refresh();
+  }
+);
+
+// An input joining the session, or added: the tree shows its row, or its
+// folder.
+watch(
+  () => (props.inputs?.pending || []).map((p) => p.viewId).join(","),
+  () => {
     if (props.ready && roots.value.length) refresh();
   }
 );
@@ -194,6 +287,9 @@ function downloadSelected(noted = false) {
   if (noted) props.inputs.noteCost();
   props.inputs.downloadSelected();
 }
+
+// The inputs that couldn't join the session, with why.
+const pendingProblems = computed(() => (props.inputs?.pending || []).filter((p) => p.error));
 
 function fmtSize(n) {
   if (n == null) return "";
@@ -298,6 +394,7 @@ function copyPath(node) {
         :fmt-size="fmtSize"
         :fmt-time="fmtTime"
         :inputs="inputs"
+        :read-text="readText"
         :kernel-name="kernelName"
         :assist-available="assistAvailable"
         :assist-paused="assistPaused"
@@ -311,8 +408,13 @@ function copyPath(node) {
       />
     </ul>
 
-    <!-- The inputs: what's ticked, what's under way, the disk. -->
-    <div v-if="inputs && ready && (inputs.sources.length || inputs.requestError)" class="fb__foot">
+    <!-- The inputs: what's ticked, what's under way, the disk; an input that
+         couldn't join the session, and trying again. -->
+    <div v-if="inputs && ready && (inputs.sources.length || inputs.requestError || pendingProblems.length)" class="fb__foot">
+      <div v-for="p in pendingProblems" :key="p.viewId" class="fb__bar fb__bar--problem">
+        <span class="fb__bar-text">{{ p.error }}</span>
+        <button class="fb__bar-btn" @click="inputs.retryPending(p.viewId)">Retry</button>
+      </div>
       <div v-if="inputs.selected.size && costAsk" class="fb__bar fb__bar--ask">
         <span class="fb__bar-text">{{ costLine(costAsk) }}</span>
         <button class="fb__bar-btn fb__bar-btn--go" @click="downloadSelected()">Download</button>
@@ -329,7 +431,7 @@ function copyPath(node) {
         <button class="fb__bar-btn" @click="inputs.cancelAll()">Cancel all</button>
       </div>
       <p v-if="inputs.requestError" class="fb__msg fb__msg--error">{{ inputs.requestError }}</p>
-      <div class="fb__disk" title="Files downloaded from the inputs, against the disk the session was started with. The environment and your own files use it too.">
+      <div v-if="inputs.sources.length || inputs.requestError" class="fb__disk" title="Files downloaded from the inputs, against the disk the session was started with. The environment and your own files use it too.">
         <span class="fb__disk-text">{{ inputs.diskUse.text }}</span>
         <span v-if="inputs.diskUse.share != null" class="fb__disk-bar" :class="{ 'is-full': inputs.diskUse.full }">
           <span :style="{ width: `${Math.round(inputs.diskUse.share * 100)}%` }" />
@@ -462,6 +564,16 @@ function copyPath(node) {
   gap: 6px;
   font-size: 12px;
   color: theme.$gray_6;
+}
+/* An input that couldn't join the session: why, wrapped, then Retry. */
+.fb__bar--problem {
+  flex-wrap: wrap;
+
+  .fb__bar-text {
+    flex-basis: 100%;
+    white-space: normal;
+    color: theme.$red_2;
+  }
 }
 /* What a download costs: the line wraps, the buttons below it. */
 .fb__bar--ask {

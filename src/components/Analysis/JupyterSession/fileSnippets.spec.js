@@ -86,6 +86,10 @@ describe("metadataFolder", () => {
   it("knows a view's metadata folders by their path in the view", () => {
     expect(metadataFolder("metadata/")).toEqual({ level: "metadata", model: null });
     expect(metadataFolder("metadata/models/case/")).toEqual({ level: "model", model: "case" });
+    expect(metadataFolder("metadata/kgx/")).toEqual({ level: "kgx", model: null });
+    expect(metadataFolder("metadata/kgx")).toEqual({ level: "kgx", model: null });
+    expect(metadataFolder("metadata/kgx/sub/")).toBeNull();
+    expect(metadataFolder("files/metadata/kgx/")).toBeNull();
   });
 
   it("knows nothing of other folders, whatever their name", () => {
@@ -139,6 +143,22 @@ describe("folderSnippets", () => {
     expect(summary.code).toContain('SUMMARIZE "case"');
     expect(summary.code).toContain('(metadata / "models" / "case" / "versions")');
     expect(query.code).toContain('metadata = Path(INPUT_DIR / "v/metadata")');
+  });
+
+  it("loads, queries and walks the knowledge graph from its Parquet files", () => {
+    const [load, query, nx] = folderSnippets("input/v/metadata/kgx/", "metadata/kgx/", py);
+    expect([load.id, query.id, nx.id]).toEqual(["load", "query", "networkx"]);
+    expect(load.code.split("\n")[0]).toMatch(/knowledge graph \(KGX tables\): plain DuckDB, no Pennsieve library needed$/);
+    expect(load.code).toContain('kgx = Path(INPUT_DIR / "v/metadata/kgx")');
+    expect(load.code).toContain("CREATE OR REPLACE VIEW nodes AS SELECT * FROM read_parquet(");
+    expect(load.code).toContain("SELECT predicate, count(*) AS edges FROM edges");
+    expect(query.code).toContain("WHERE a.predicate = 'biolink:has_attribute'");
+    expect(query.code).toContain("JOIN edges AS b ON b.object = a.object AND b.subject <> a.subject");
+    expect(nx.code).toMatch(/^# Needs pandas, networkx \(/m);
+    expect(nx.code).toContain('nodes = pd.read_csv(kgx / "nodes.tsv.gz", **tsv)');
+    expect(nx.code).not.toContain("parquet");
+    expect(nx.code).toContain('nx.from_pandas_edgelist(edges, "subject", "object", edge_attr=["predicate"], create_using=nx.MultiDiGraph)');
+    expect(folderSnippets("input/v/metadata/kgx", "metadata/kgx/", "R 4.4.1")).toEqual([]);
   });
 
   it("has none in R, or for a folder that isn't a view's metadata folder", () => {

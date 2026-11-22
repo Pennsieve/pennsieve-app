@@ -16,6 +16,8 @@ import { visibleEntries } from "./fileBrowserHelpers";
 import { stackFormat, stackIcon, costLine } from "./inputsHelpers";
 import { fileSnippets, folderSnippets, stackSnippets } from "./fileSnippets";
 import AssistIcon from "./AssistIcon.vue";
+import LayoutPanel from "./LayoutPanel.vue";
+import IconGraph from "@/components/icons/IconGraph.vue";
 
 const props = defineProps({
   node: { type: Object, required: true },
@@ -29,6 +31,8 @@ const props = defineProps({
   fmtTime: { type: Function, required: true },
   // The session's view inputs (useSessionInputs), or null.
   inputs: { type: Object, default: null },
+  // Reads a small text file of the session: a structured layout's summary.
+  readText: { type: Function, default: null },
   // The kernel's name ("Python 3.12.3", "R 4.4.1"): the language of a file's starter code.
   kernelName: { type: String, default: "" },
   // The session has a code assistant: Code offers Ask… on any file.
@@ -68,8 +72,33 @@ const viewTitle = computed(() => {
   const records = models.length ? `\nMetadata records of ${models.map((m) => m.name).join(", ")} under metadata/` : "";
   return `${view.value.source.name}\n${viewProgress.value.done} of ${viewProgress.value.total} files in the session${records}`;
 });
+/* ------------------------------------------------- structured layouts --- */
+// A view's structured layout (structuredLayouts.js) is one row: its name
+// and icon; a click opens its summary (LayoutPanel), its caret its files, in
+// place, as does the panel's Show files. The metadata records are a group
+// of the metadata folder's entries (FileBrowser), the knowledge graph its
+// kgx/ folder; the folder itself says what it holds (node.note).
+const layout = computed(() => (props.inputs && view.value && props.node.layout) || null);
+const bundle = computed(() => !!layout.value);
+const panelOpen = ref(false);
+const layoutFiles = computed(() => new Set(layout.value?.files || []));
+const layoutSize = computed(() =>
+  layout.value ? view.value.source.entries.reduce((n, e) => n + (layoutFiles.value.has(e.cratePath) ? e.size || 0 : 0), 0) : 0
+);
+function showFiles() {
+  if (!props.node.open) emit("toggle", props.node);
+}
+// The path its code reads.
+const codePath = computed(() => (layout.value ? layout.value.entry.codePath(props.node.path) : props.node.path));
+
+// A view folder's files not in the session and not under way.
 const left = computed(() => (isViewFolder.value ? props.inputs.remainingIn(view.value.source, view.value.rel) : []));
-const leftSize = computed(() => left.value.reduce((n, e) => n + (e.size || 0), 0));
+// The layout's own (the panel's Download).
+const layoutLeft = computed(() => (layout.value ? left.value.filter((e) => layoutFiles.value.has(e.cratePath)) : []));
+// What the folder's ⤓ downloads: a layout's own files (the records, not
+// the graph beside them), else all that's left.
+const folderLeft = computed(() => (layout.value ? layoutLeft.value : left.value));
+const leftSize = computed(() => folderLeft.value.reduce((n, e) => n + (e.size || 0), 0));
 const selected = computed(() => remote.value && props.inputs.isSelected(view.value.source, view.value.entry.cratePath));
 // Ticking shows on hover, and on every remote file once any is ticked.
 const ticking = computed(() => props.inputs?.selected.size > 0);
@@ -89,7 +118,7 @@ function download() {
 }
 function downloadAll() {
   const { source } = view.value;
-  const entries = left.value;
+  const entries = folderLeft.value;
   start(leftSize.value, entries, () => props.inputs.requestEntries(source, entries));
 }
 // noted: don't say what it costs again in this session.
@@ -110,6 +139,8 @@ function go(noted = false) {
 const isFolder = computed(() => props.node.type === "directory");
 const hasRecords = computed(() => (view.value?.source?.models || []).length > 0);
 const snippets = computed(() => {
+  // Not before something of it is downloaded: the code reads the disk.
+  if (layout.value) return props.node.virtual ? [] : layout.value.entry.snippets(props.node.path, props.kernelName);
   if (isStack.value) return stackSnippets(view.value.entry, props.kernelName);
   if (isFolder.value) return props.node.virtual || !hasRecords.value ? [] : folderSnippets(props.node.path, view.value.rel, props.kernelName);
   return props.node.type === "file" && !remote.value && !isNotebook(props.node) ? fileSnippets(props.node.path, props.kernelName) : [];
@@ -131,9 +162,30 @@ function pickSnippet(s) {
   emit("insert-snippet", s.code);
 }
 
+// The panel's downloads: the layout's files, or its summary's (graph.json).
+// One that asks first asks under the row: the panel makes way.
+function downloadFiles(entries) {
+  const size = entries.reduce((n, e) => n + (e.size || 0), 0);
+  start(size, entries, () => props.inputs.requestEntries(view.value.source, entries));
+  if (confirm.value) panelOpen.value = false;
+}
+
+/* ------------------------------------------------- joining the session --- */
+// An input still on its way: what it's waiting for.
+const pendingLine = computed(() =>
+  props.node.pending?.state === "adding" ? "adding to the session…" : "preparing the dataset's records…"
+);
+const pendingTitle = computed(() => {
+  const p = props.node.pending;
+  if (!p) return undefined;
+  if (p.error) return p.error;
+  return `${p.label || p.name}\nThe dataset's records are being prepared; they join the session as input/${p.name}/ when they're ready.`;
+});
+
 function onRow() {
   const n = props.node;
-  if (n.type === "directory") emit("toggle", n);
+  if (bundle.value) panelOpen.value = true;
+  else if (n.type === "directory") emit("toggle", n);
   else if (isStack.value) return;
   else if (remote.value) download();
   else emit("insert", n.path);
@@ -142,12 +194,34 @@ function onRow() {
 
 <template>
   <li class="fn">
+    <!-- An input joining the session (pendingSessionInputs): its dataset's
+         records being prepared, then added; not a folder yet. -->
     <div
+      v-if="node.pending"
+      class="fn__row is-remote is-pending"
+      :style="{ paddingLeft: depth * 14 + 8 + 'px' }"
+      :title="pendingTitle"
+    >
+      <span class="fn__caret" />
+      <img class="fn__icon" :src="iconOf({ name: node.name, type: 'directory' })" alt="" />
+      <span class="fn__name">{{ node.name }}</span>
+      <span class="fn__end">
+        <span v-if="node.pending.error" class="fn__state fn__state--failed">couldn't be added</span>
+        <template v-else>
+          <span class="fn__spinner" aria-hidden="true" />
+          <span class="fn__from fn__from--pending">{{ pendingLine }}</span>
+        </template>
+      </span>
+    </div>
+    <div
+      v-else
       class="fn__row"
       :class="{ 'is-remote': remote || isStack, 'is-selected': selected }"
       :style="{ paddingLeft: depth * 14 + 8 + 'px' }"
       :title="
-        isStack
+        bundle
+          ? `${node.path}\n${layout.entry.title}: click for its summary, ▸ for its files`
+          : isStack
           ? `${node.path}\n${stackFormat(view.entry)}: read in place from the notebook`
           : remote
           ? `${node.path} · ${fmtSize(node.size)}\nNot downloaded yet: click to download`
@@ -156,7 +230,18 @@ function onRow() {
       @click="onRow"
     >
       <span class="fn__caret">
-        <template v-if="node.type === 'directory'">{{ node.open ? "▾" : "▸" }}</template>
+        <!-- A bundle's caret is its files: click it to expand in place. -->
+        <button
+          v-if="bundle"
+          class="fn__expand"
+          :aria-expanded="node.open"
+          :aria-label="node.open ? 'Hide its files' : 'Show its files'"
+          :title="node.open ? 'Hide its files' : 'Show its files'"
+          @click.stop="emit('toggle', node)"
+        >
+          {{ node.open ? "▾" : "▸" }}
+        </button>
+        <template v-else-if="node.type === 'directory'">{{ node.open ? "▾" : "▸" }}</template>
         <input
           v-else-if="remote && !under"
           type="checkbox"
@@ -168,12 +253,14 @@ function onRow() {
           @change="inputs.toggleSelect(view.source, view.entry)"
         />
       </span>
-      <img class="fn__icon" :src="isStack ? stackIcon(view.entry) : iconOf(node)" alt="" />
+      <IconGraph v-if="bundle && layout.entry.icon === 'graph'" class="fn__icon fn__icon--graph" :width="16" :height="16" />
+      <img v-else-if="bundle" class="fn__icon" src="/file-icons/icon-tabular.svg" alt="" />
+      <img v-else class="fn__icon" :src="isStack ? stackIcon(view.entry) : iconOf(node)" alt="" />
       <!-- The view's crate folder is shown by what it is; its name is in the row's title. -->
       <span
         class="fn__name"
         :title="node.name === VIEW_CRATE_DIR ? 'This input\'s dataset view (.pennsieve/view.json, an RO-Crate): where its files come from, their sizes and checksums.' : undefined"
-        >{{ node.name === VIEW_CRATE_DIR ? "input manifest" : node.name }}</span
+        >{{ bundle ? layout.entry.label : node.name === VIEW_CRATE_DIR ? "input manifest" : node.name }}</span
       >
       <span
         v-if="depth === 0 && node.type === 'directory' && node.name === 'output'"
@@ -198,8 +285,10 @@ function onRow() {
         <path d="M4.5 12.5h7.2a2.8 2.8 0 0 0 .4-5.6 4 4 0 0 0-7.7-1A3.3 3.3 0 0 0 4.5 12.5z" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" />
       </svg>
 
+      <span v-if="node.note" class="fn__from" title="The dataset's metadata records, as tables and as a graph">{{ node.note }}</span>
       <span v-if="under" class="fn__state fn__state--active">{{ progress }}</span>
       <span v-else-if="failed" class="fn__state fn__state--failed" :title="fileState.error">failed · retry</span>
+      <span v-else-if="bundle" class="fn__size">{{ fmtSize(layoutSize) }}</span>
       <span v-else-if="isStack" class="fn__size">{{ view.entry.size ? fmtSize(view.entry.size) : stackFormat(view.entry) }}</span>
       <span v-else-if="node.type !== 'directory' && node.size != null" class="fn__size">{{ fmtSize(node.size) }}</span>
 
@@ -226,9 +315,9 @@ function onRow() {
         </template>
         <template v-else>
           <button
-            v-if="isViewFolder && left.length"
+            v-if="isViewFolder && folderLeft.length"
             class="fn__act"
-            :title="`Download all ${left.length} not in the session (${fmtSize(leftSize)})`"
+            :title="`Download all ${folderLeft.length} not in the session (${fmtSize(leftSize)})`"
             aria-label="Download all"
             @click="downloadAll"
           >
@@ -255,14 +344,14 @@ function onRow() {
             v-if="hasCode"
             class="fn__act fn__act--text"
             :class="{ 'is-on': showSnippets }"
-            :title="isFolder ? 'Starter code for these metadata records: query them with SQL' : 'Starter code for this file: load, summarize, plot'"
+            :title="layout ? `Starter code for the ${layout.entry.label.toLowerCase()}` : isFolder ? 'Starter code for these metadata records: query them with SQL' : 'Starter code for this file: load, summarize, plot'"
             :aria-expanded="showSnippets"
             @click="onCode"
           >
             Code
           </button>
-          <button class="fn__act" title="Insert the path into a cell, as code (INPUT_DIR / …)" @click="emit('insert', node.path)">↩</button>
-          <button class="fn__act" title="Copy the path, as code (INPUT_DIR / …)" @click="emit('copy', node)">⧉</button>
+          <button class="fn__act" title="Insert the path into a cell, as code (INPUT_DIR / …)" @click="emit('insert', codePath)">↩</button>
+          <button class="fn__act" title="Copy the path, as code (INPUT_DIR / …)" @click="emit('copy', { ...node, path: codePath })">⧉</button>
         </template>
       </span>
       </span>
@@ -295,6 +384,24 @@ function onRow() {
       </template>
     </div>
 
+    <LayoutPanel
+      v-if="layout && panelOpen"
+      v-model="panelOpen"
+      :node="node"
+      :layout="layout"
+      :inputs="inputs"
+      :read-text="readText"
+      :snippets="snippets"
+      :left="layoutLeft"
+      :fmt-size="fmtSize"
+      :fmt-time="fmtTime"
+      @insert-snippet="pickSnippet"
+      @copy="emit('copy', { ...node, path: codePath })"
+      @show-files="showFiles"
+      @download="downloadFiles(layoutLeft)"
+      @download-files="downloadFiles"
+    />
+
     <span v-if="node.loading" class="fn__loading" :style="{ paddingLeft: (depth + 1) * 14 + 22 + 'px' }">
       loading…
     </span>
@@ -302,7 +409,7 @@ function onRow() {
     <ul v-if="node.open && node.children && children.length" class="fn__children">
       <FileNode
         v-for="child in children"
-        :key="child.path"
+        :key="child.key || child.path"
         :node="child"
         :depth="depth + 1"
         :show-hidden="showHidden"
@@ -311,6 +418,7 @@ function onRow() {
         :fmt-size="fmtSize"
         :fmt-time="fmtTime"
         :inputs="inputs"
+        :read-text="readText"
         :kernel-name="kernelName"
         :assist-available="assistAvailable"
         :assist-paused="assistPaused"
@@ -371,6 +479,18 @@ function onRow() {
   visibility: visible;
 }
 .fn__icon { flex: 0 0 auto; width: 16px; height: 16px; }
+.fn__icon--graph { color: theme.$purple_2; }
+/* A bundle's caret is a button: its files, in place. */
+.fn__expand {
+  border: none;
+  background: none;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+.fn__expand:hover,
+.fn__expand:focus-visible { color: theme.$purple_3; outline: none; }
 .fn__name {
   min-width: 0;
   overflow: hidden;
@@ -390,6 +510,22 @@ function onRow() {
 .fn__row.is-remote .fn__name { color: theme.$gray_4; }
 .fn__row.is-remote .fn__icon { opacity: 0.55; }
 .fn__cloud { flex: 0 0 auto; color: theme.$gray_3; }
+/* An input joining the session: not clickable, a small spinner by its line. */
+.fn__row.is-pending { cursor: default; }
+.fn__row.is-pending:hover { background: none; }
+.fn__from--pending { max-width: 200px; color: theme.$purple_2; }
+.fn__spinner {
+  flex: 0 0 auto;
+  width: 10px;
+  height: 10px;
+  border: 1.5px solid theme.$gray_2;
+  border-top-color: theme.$purple_2;
+  border-radius: 50%;
+  animation: fn-spin 0.9s linear infinite;
+}
+@keyframes fn-spin {
+  to { transform: rotate(360deg); }
+}
 .fn__size { color: theme.$gray_4; font-size: 11px; }
 .fn__state { font-size: 11px; }
 .fn__state--active { color: theme.$purple_2; }
