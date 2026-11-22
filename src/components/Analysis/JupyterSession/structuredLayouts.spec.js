@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { LAYOUTS, layoutsOf, layoutAt, kgxSummary, parseKgxGraph, recordsModels, crateRoot } from "./structuredLayouts";
+import { LAYOUTS, layoutsOf, layoutAt, kgxSummary, parseKgxGraph, recordsModels, crateRoot, groupNames, graphRecords } from "./structuredLayouts";
 
 const KGX = "https://schemas.pennsieve.io/structures/kgx";
 const kgxFiles = ["nodes.tsv.gz", "edges.tsv.gz", "nodes.parquet", "edges.parquet", "graph.json", "graph_stats.yaml"].map((f) => `metadata/kgx/${f}`);
@@ -18,14 +18,14 @@ describe("structured layouts: the registry", () => {
       expect(l.conformsTo).toBe(`https://schemas.pennsieve.io/structures/${l.id}`);
       expect(l.spec).toMatch(new RegExp(`^${l.conformsTo}/v\\d`));
       expect(l.label && l.icon && l.folder).toBeTruthy();
-      expect(["bundle", "folder"]).toContain(l.presentation);
+      expect(["bundle", "group"]).toContain(l.presentation);
       expect(typeof l.snippets).toBe("function");
     }
   });
 
   it("keeps the records a folder (with a badge) and makes the graph a bundle", () => {
     const [records, kgx] = LAYOUTS;
-    expect([records.folder, records.presentation]).toEqual(["metadata", "folder"]);
+    expect([records.folder, records.presentation]).toEqual(["metadata", "group"]);
     expect([kgx.folder, kgx.presentation]).toEqual(["metadata/kgx", "bundle"]);
   });
 
@@ -120,9 +120,9 @@ describe("structured layouts: detection", () => {
 
   it("finds a folder's layout by its path in the view", () => {
     const layouts = layoutsOf(null, kgxFiles.map((cratePath) => ({ cratePath })));
-    expect(layoutAt(layouts, "metadata/kgx/").entry.label).toBe("Knowledge graph (KGX)");
+    expect(layoutAt(layouts, "metadata/kgx/").entry.label).toBe("Records as a graph (KGX)");
     expect(layoutAt(layouts, "metadata/")).toBeNull();
-    expect(layoutAt(layoutsOf(crate({ "views:models": models })), "metadata/").entry.presentation).toBe("folder");
+    expect(layoutAt(layoutsOf(crate({ "views:models": models })), "metadata/").entry.presentation).toBe("group");
     expect(layoutAt(layouts, "files/metadata/kgx/")).toBeNull();
   });
 
@@ -174,5 +174,18 @@ describe("structured layouts: summaries", () => {
 
   it("groups the records' models by name with their versions", () => {
     expect(recordsModels([{ name: "a", version: 1 }, { name: "a", version: "2" }, null, { version: 1 }])).toEqual([{ name: "a", versions: [{ version: 1, records: "" }] }]);
+  });
+
+  it("counts a graph's records: its nodes of Pennsieve models, not ontology terms", () => {
+    const summary = kgxSummary({ counts: { nodes_by_category: { "pennsieve:case": 3, "pennsieve:drug": 2, "biolink:Disease": 7 } } });
+    expect(graphRecords(summary)).toBe(5);
+    expect(graphRecords(kgxSummary({ counts: {} }))).toBeNull();
+    expect(graphRecords(null)).toBeNull();
+  });
+
+  it("names the metadata folder's entries a group layout holds", () => {
+    const records = layoutAt(layoutsOf(crate({ "views:models": models, "views:relationships": [{ path: "metadata/relationships.csv" }] })), "metadata/");
+    expect([...groupNames(records)].sort()).toEqual(["models", "relationships.csv"]);
+    expect(groupNames(null).size).toBe(0);
   });
 });

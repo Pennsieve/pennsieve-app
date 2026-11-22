@@ -1,10 +1,12 @@
 // A dataset view's structured layouts: folders of a view that hold its
 // metadata in a declared structure (packages-service formats registry), not
-// plain files. Each entry says how the Session files tree presents it: as
-// a bundle (one row with the layout's name and icon, its click the
-// summary, its caret its files) or as a folder with a badge (the folder as
-// ever, the summary one of its actions). Either way the summary is read
-// from the layout's own description files, and its files stay a click away.
+// plain files. The Session files tree shows each as a bundle: one row with
+// the layout's name and icon, its click the summary (read from the layout's
+// own description files), its caret its files, in place. The metadata
+// records and the knowledge graph are the same records in two shapes, so
+// both are rows of the metadata folder: the records a group of its entries
+// (presentation "group": models/, relationships.csv), the graph its own
+// folder (presentation "bundle": kgx/).
 //
 // A view's crate (.pennsieve/view.json, staged in its input folder) says
 // which it holds: views:models for the metadata records
@@ -81,6 +83,13 @@ export function recordsModels(models) {
     .map(([name, versions]) => ({ name, versions: versions.sort((a, b) => a.version - b.version) }));
 }
 
+// How many records a graph holds: its nodes of Pennsieve models (the
+// others are ontology terms), or null.
+export function graphRecords(summary) {
+  const records = (summary?.categories || []).filter((c) => c.name.startsWith("pennsieve:"));
+  return records.length ? records.reduce((n, c) => n + c.count, 0) : null;
+}
+
 /* ------------------------------------------------------------ registry --- */
 export const LAYOUTS = [
   {
@@ -88,13 +97,13 @@ export const LAYOUTS = [
     conformsTo: `${STRUCTURES}/pennsieve-records`,
     spec: `${STRUCTURES}/pennsieve-records/v1.0`,
     specLabel: "Pennsieve metadata records v1.0",
-    // The dataset's core metadata: a folder people browse (its models,
-    // versions, relationships.csv), with a badge.
+    // The metadata folder stays a folder; its records' entries (models/,
+    // relationships.csv, files.csv) are one row in it.
     folder: "metadata",
-    presentation: "folder",
-    label: "Metadata records",
+    presentation: "group",
+    label: "Records as tables",
     icon: "records",
-    title: "The dataset's metadata records: each model's schema and records, and how records link",
+    title: "The dataset's metadata records as tables: each model's schema and records (models/), and how records link (relationships.csv). For pandas or DuckDB",
     codePath: (path) => noSlash(path),
     snippets: (path, kernelName) => folderSnippets(noSlash(path), "metadata/", kernelName),
   },
@@ -105,9 +114,9 @@ export const LAYOUTS = [
     specLabel: "KGX tables v1.0",
     folder: "metadata/kgx",
     presentation: "bundle",
-    label: "Knowledge graph (KGX)",
+    label: "Records as a graph (KGX)",
     icon: "graph",
-    title: "The dataset's metadata records as a knowledge graph: records are nodes, their links and coded values edges",
+    title: "The same metadata records as a knowledge graph: records are nodes, their links and coded values edges. For NetworkX or GRAPE",
     codePath: (path) => noSlash(path),
     snippets: (path, kernelName) => folderSnippets(noSlash(path), "metadata/kgx/", kernelName),
     // Its summary is graph.json, beside the graph's tables.
@@ -195,4 +204,15 @@ export function layoutAt(layouts, rel) {
   const folder = noSlash(rel || "");
   const found = (layouts || []).find((l) => l.folder === folder);
   return found ? { ...found, entry: layoutById(found.id) } : null;
+}
+
+// A folder's entries (its children's names) that a group layout holds: the
+// first path segment of each of its files under the folder.
+export function groupNames(layout) {
+  const names = new Set();
+  for (const p of layout?.files || []) {
+    const rest = p.slice(layout.folder.length + 1);
+    if (rest) names.add(rest.split("/")[0]);
+  }
+  return names;
 }

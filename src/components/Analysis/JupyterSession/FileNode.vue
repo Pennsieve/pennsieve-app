@@ -73,13 +73,13 @@ const viewTitle = computed(() => {
   return `${view.value.source.name}\n${viewProgress.value.done} of ${viewProgress.value.total} files in the session${records}`;
 });
 /* ------------------------------------------------- structured layouts --- */
-// A view's structured layout (structuredLayouts.js) shows as its entry
-// says: the knowledge graph as a bundle (its name and icon; a click opens
-// its summary, LayoutPanel, and its caret its files, in place), the
-// metadata records as the folder it is, with a badge. Both have Summary
-// among their actions, and the panel's Show files expands them here.
+// A view's structured layout (structuredLayouts.js) is one row: its name
+// and icon; a click opens its summary (LayoutPanel), its caret its files, in
+// place, as does the panel's Show files. The metadata records are a group
+// of the metadata folder's entries (FileBrowser), the knowledge graph its
+// kgx/ folder; the folder itself says what it holds (node.note).
 const layout = computed(() => (props.inputs && view.value && props.node.layout) || null);
-const bundle = computed(() => layout.value?.entry.presentation === "bundle");
+const bundle = computed(() => !!layout.value);
 const panelOpen = ref(false);
 const layoutFiles = computed(() => new Set(layout.value?.files || []));
 const layoutSize = computed(() =>
@@ -227,12 +227,6 @@ function onRow() {
         :title="node.name === VIEW_CRATE_DIR ? 'This input\'s dataset view (.pennsieve/view.json, an RO-Crate): where its files come from, their sizes and checksums.' : undefined"
         >{{ bundle ? layout.entry.label : node.name === VIEW_CRATE_DIR ? "input manifest" : node.name }}</span
       >
-      <!-- A folder that is a layout says which. -->
-      <span v-if="layout && !bundle" class="fn__badge" :title="layout.entry.title">
-        <IconGraph v-if="layout.entry.icon === 'graph'" :width="10" :height="10" />
-        <img v-else src="/file-icons/icon-tabular.svg" alt="" />
-        {{ layout.entry.label }}
-      </span>
       <span
         v-if="depth === 0 && node.type === 'directory' && node.name === 'output'"
         class="fn__tag fn__tag--out"
@@ -256,6 +250,7 @@ function onRow() {
         <path d="M4.5 12.5h7.2a2.8 2.8 0 0 0 .4-5.6 4 4 0 0 0-7.7-1A3.3 3.3 0 0 0 4.5 12.5z" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" />
       </svg>
 
+      <span v-if="node.note" class="fn__from" title="The dataset's metadata records, as tables and as a graph">{{ node.note }}</span>
       <span v-if="under" class="fn__state fn__state--active">{{ progress }}</span>
       <span v-else-if="failed" class="fn__state fn__state--failed" :title="fileState.error">failed · retry</span>
       <span v-else-if="bundle" class="fn__size">{{ fmtSize(layoutSize) }}</span>
@@ -301,14 +296,6 @@ function onRow() {
             @click="inputs.remove(view.source)"
           >
             🗑
-          </button>
-          <button
-            v-if="layout"
-            class="fn__act fn__act--text"
-            :title="`What the ${layout.entry.label.toLowerCase()} hold, and their files`"
-            @click="panelOpen = true"
-          >
-            Summary
           </button>
           <button
             v-if="isNotebook(node)"
@@ -387,7 +374,7 @@ function onRow() {
     <ul v-if="node.open && node.children && children.length" class="fn__children">
       <FileNode
         v-for="child in children"
-        :key="child.path"
+        :key="child.key || child.path"
         :node="child"
         :depth="depth + 1"
         :show-hidden="showHidden"
@@ -469,21 +456,6 @@ function onRow() {
 }
 .fn__expand:hover,
 .fn__expand:focus-visible { color: theme.$purple_3; outline: none; }
-/* A layout's badge on its folder: small, quiet. */
-.fn__badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-  margin-left: 6px;
-  padding: 0 6px;
-  border: 1px solid theme.$gray_2;
-  border-radius: 8px;
-  font-size: 10px;
-  color: theme.$purple_2;
-  white-space: nowrap;
-
-  img { width: 10px; height: 10px; }
-}
 .fn__name {
   min-width: 0;
   overflow: hidden;
