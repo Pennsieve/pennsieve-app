@@ -166,7 +166,7 @@ describe("folderSnippets", () => {
     const nx = folderSnippets("input/v/metadata/kgx", "metadata/kgx/", py).find((s) => s.id === "networkx");
     expect(nx.code).toContain('degree = pd.concat([edges.subject, edges.object]).value_counts()');
     expect(nx.code).toContain("whole = len(edges) <= 500000");
-    expect(nx.code).toContain("edges = edges[edges.subject.isin(seed) | edges.object.isin(seed)]");
+    expect(nx.code).toContain("edges = edges[edges.subject.isin(seed) | edges.object.isin(seed)].head(500000)");
     // The graph is built after the cut, from the edges it keeps.
     expect(nx.code.indexOf("edges = edges[")).toBeLessThan(nx.code.indexOf("nx.from_pandas_edgelist"));
   });
@@ -179,7 +179,7 @@ describe("folderSnippets", () => {
     ].filter((s) => s.code.includes("duckdb"));
     expect(duck.length).toBeGreaterThan(5);
     for (const s of duck) {
-      expect(s.code).toContain(`con = duckdb.connect(config={"memory_limit": f"{os.sysconf('SC_PAGE_SIZE') * os.sysconf('SC_PHYS_PAGES') // 2**21}MB"})`);
+      expect(s.code).toContain(`con = duckdb.connect(config={"memory_limit": f"{os.sysconf('SC_PAGE_SIZE') * os.sysconf('SC_PHYS_PAGES') // 2**21}MiB"})`);
       expect(s.code).not.toContain("duckdb.connect()");
     }
   });
