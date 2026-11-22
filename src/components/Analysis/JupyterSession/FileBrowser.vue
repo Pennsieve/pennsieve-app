@@ -71,6 +71,12 @@ function withViews(disk, dirPath) {
   if (!rows.length) return disk;
   const byName = new Map(disk.map((n) => [n.name, n]));
   for (const r of rows) {
+    // An input still on its way (pendingSessionInputs): a row that says so,
+    // until its folder is there.
+    if (r.type === "pending") {
+      if (!byName.has(r.name)) byName.set(r.name, { ...decorate({ name: r.name, path: `${dirPath}/${r.name}`, type: "pending" }), virtual: true, pending: r.pending });
+      continue;
+    }
     const view = { source: r.source, rel: r.rel, entry: r.entry || null, root: !!r.root };
     const onDisk = byName.get(r.name);
     if (onDisk) {
@@ -80,7 +86,7 @@ function withViews(disk, dirPath) {
     const type = r.type === "folder" ? "directory" : r.type;
     byName.set(r.name, { ...decorate({ name: r.name, path: `${dirPath}/${r.name}`, type, size: type === "directory" ? null : r.size }), virtual: true, view });
   }
-  const dirsFirst = (n) => (n.type === "directory" ? 0 : 1);
+  const dirsFirst = (n) => (n.type === "directory" || n.type === "pending" ? 0 : 1);
   return [...byName.values()].sort((a, b) => dirsFirst(a) - dirsFirst(b) || a.name.localeCompare(b.name));
 }
 
@@ -248,6 +254,15 @@ watch(
   }
 );
 
+// An input joining the session, or added: the tree shows its row, or its
+// folder.
+watch(
+  () => (props.inputs?.pending || []).map((p) => p.viewId).join(","),
+  () => {
+    if (props.ready && roots.value.length) refresh();
+  }
+);
+
 defineExpose({ refresh });
 
 watch(
@@ -272,6 +287,9 @@ function downloadSelected(noted = false) {
   if (noted) props.inputs.noteCost();
   props.inputs.downloadSelected();
 }
+
+// The inputs that couldn't join the session, with why.
+const pendingProblems = computed(() => (props.inputs?.pending || []).filter((p) => p.error));
 
 function fmtSize(n) {
   if (n == null) return "";
@@ -390,8 +408,13 @@ function copyPath(node) {
       />
     </ul>
 
-    <!-- The inputs: what's ticked, what's under way, the disk. -->
-    <div v-if="inputs && ready && (inputs.sources.length || inputs.requestError)" class="fb__foot">
+    <!-- The inputs: what's ticked, what's under way, the disk; an input that
+         couldn't join the session, and trying again. -->
+    <div v-if="inputs && ready && (inputs.sources.length || inputs.requestError || pendingProblems.length)" class="fb__foot">
+      <div v-for="p in pendingProblems" :key="p.viewId" class="fb__bar fb__bar--problem">
+        <span class="fb__bar-text">{{ p.error }}</span>
+        <button class="fb__bar-btn" @click="inputs.retryPending(p.viewId)">Retry</button>
+      </div>
       <div v-if="inputs.selected.size && costAsk" class="fb__bar fb__bar--ask">
         <span class="fb__bar-text">{{ costLine(costAsk) }}</span>
         <button class="fb__bar-btn fb__bar-btn--go" @click="downloadSelected()">Download</button>
@@ -408,7 +431,7 @@ function copyPath(node) {
         <button class="fb__bar-btn" @click="inputs.cancelAll()">Cancel all</button>
       </div>
       <p v-if="inputs.requestError" class="fb__msg fb__msg--error">{{ inputs.requestError }}</p>
-      <div class="fb__disk" title="Files downloaded from the inputs, against the disk the session was started with. The environment and your own files use it too.">
+      <div v-if="inputs.sources.length || inputs.requestError" class="fb__disk" title="Files downloaded from the inputs, against the disk the session was started with. The environment and your own files use it too.">
         <span class="fb__disk-text">{{ inputs.diskUse.text }}</span>
         <span v-if="inputs.diskUse.share != null" class="fb__disk-bar" :class="{ 'is-full': inputs.diskUse.full }">
           <span :style="{ width: `${Math.round(inputs.diskUse.share * 100)}%` }" />
@@ -541,6 +564,16 @@ function copyPath(node) {
   gap: 6px;
   font-size: 12px;
   color: theme.$gray_6;
+}
+/* An input that couldn't join the session: why, wrapped, then Retry. */
+.fb__bar--problem {
+  flex-wrap: wrap;
+
+  .fb__bar-text {
+    flex-basis: 100%;
+    white-space: normal;
+    color: theme.$red_2;
+  }
 }
 /* What a download costs: the line wraps, the buttons below it. */
 .fb__bar--ask {

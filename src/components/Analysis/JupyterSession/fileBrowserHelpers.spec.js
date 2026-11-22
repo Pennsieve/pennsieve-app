@@ -37,6 +37,11 @@ describe("only what's downloaded", () => {
     expect(visibleEntries(entries, true, false)).toHaveLength(5);
   });
 
+  it("keeps an input still joining the session", () => {
+    const entries = [{ name: "Mouse-study-Input-data", virtual: true, type: "pending" }];
+    expect(visibleEntries(entries, false, true)).toHaveLength(1);
+  });
+
   it("is remembered", () => {
     const store = new Map();
     const storage = { getItem: (k) => store.get(k) ?? null, setItem: (k, v) => store.set(k, v) };
