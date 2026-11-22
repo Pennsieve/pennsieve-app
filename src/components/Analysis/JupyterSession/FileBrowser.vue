@@ -17,7 +17,7 @@ import { visibleEntries, readShowHidden, writeShowHidden, readOnlyLocal, writeOn
 import { useRememberedFold } from "./sectionFold";
 import { costLine } from "./inputsHelpers";
 import { sourceBase } from "./useSessionInputs";
-import { layoutsOf, layoutAt, crateRoot } from "./structuredLayouts";
+import { layoutsOf, layoutAt, crateRoot, groupNames, layoutById, parseKgxGraph, graphRecords } from "./structuredLayouts";
 import { VIEW_CRATE_DIR } from "@/composables/useJupyterSession";
 
 const props = defineProps({
@@ -107,19 +107,59 @@ async function layoutsFor(source) {
 }
 
 // A folder of a view that is one of its structured layouts gets it: FileNode
-// shows it as its layout's entry says (a bundle, or a folder with a badge).
+// shows a bundle as one row (the knowledge graph). A group layout (the
+// metadata records) stays the folder it is: its entries are one row in it
+// (childrenOf), and the folder's row says what it holds.
 async function withLayouts(rows) {
   for (const n of rows) {
-    if (n.type === "directory" && n.view?.rel) n.layout = layoutAt(await layoutsFor(n.view.source), n.view.rel);
+    if (n.type !== "directory" || !n.view?.rel) continue;
+    const layouts = await layoutsFor(n.view.source);
+    const found = layoutAt(layouts, n.view.rel);
+    if (found?.entry.presentation === "group") {
+      n.group = found;
+      n.note = await recordsNote(n.view.source, found, layouts);
+    } else n.layout = found;
   }
   return rows;
 }
 
+// The metadata folder's line: its models, and its records when the graph's
+// summary (graph.json) is on the disk; the view's crate doesn't count them.
+async function recordsNote(source, records, layouts) {
+  const models = records.models?.length || 0;
+  if (!models) return "";
+  const line = `${models} ${models === 1 ? "model" : "models"}`;
+  const kgx = layouts.find((l) => l.id === "kgx");
+  if (!kgx || !props.readText) return line;
+  let n = null;
+  try {
+    n = graphRecords(parseKgxGraph(await props.readText(`${sourceBase(source)}/${kgx.folder}/${layoutById("kgx").summaryFile}`)));
+  } catch {
+    n = null;
+  }
+  return n == null ? line : `${line} · ${n.toLocaleString()} records`;
+}
+
 // A folder's children: on the disk (none for one that's only in a view),
-// with what the views hold there.
+// with what the views hold there. A group layout's folder has its entries
+// in one row of their own, a folder of the tree only (its key, not its path,
+// is unique; its path is the folder's, for its code).
 async function childrenOf(node) {
   const disk = node.virtual ? [] : (await props.listDir(node.path)).map(decorate);
-  return withLayouts(withViews(disk, node.path));
+  const rows = await withLayouts(withViews(disk, node.path));
+  if (!node.group) return rows;
+  const names = groupNames(node.group);
+  const inGroup = rows.filter((n) => names.has(n.name));
+  if (!inGroup.length) return rows;
+  const group = {
+    ...decorate({ name: node.group.entry.label, path: node.path, type: "directory" }),
+    key: `${node.path}#${node.group.id}`,
+    virtual: inGroup.every((n) => n.virtual),
+    view: node.view,
+    layout: node.group,
+    children: inGroup,
+  };
+  return [group, ...rows.filter((n) => !names.has(n.name))];
 }
 
 async function loadRoot(preserve = false) {
@@ -148,7 +188,7 @@ async function loadRoot(preserve = false) {
 function collectOpenPaths(nodes, acc = new Set()) {
   for (const n of nodes || []) {
     if (n.type === "directory" && n.open) {
-      acc.add(n.path);
+      acc.add(n.key || n.path);
       collectOpenPaths(n.children, acc);
     }
   }
@@ -157,7 +197,7 @@ function collectOpenPaths(nodes, acc = new Set()) {
 
 async function expandPaths(nodes, openPaths) {
   for (const n of nodes || []) {
-    if (n.type === "directory" && openPaths.has(n.path)) {
+    if (n.type === "directory" && openPaths.has(n.key || n.path)) {
       await toggle(n); // opens + lazily loads children
       await expandPaths(n.children, openPaths);
     }
