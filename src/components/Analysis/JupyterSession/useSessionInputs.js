@@ -307,9 +307,9 @@ export function useSessionInputs({
       pending.value = pending.value.filter((x) => x.viewId !== viewId);
       // Its record files on the disk, as a session that started with the
       // view has them (staged before it started); its other files a click
-      // away, as ever.
+      // away, as ever, the knowledge graph's too (large for a big dataset).
       const source = sources.value.find((s) => s.nodeId === folder);
-      const records = source ? source.entries.filter((e) => e.cratePath.startsWith("metadata/")) : [];
+      const records = source ? source.entries.filter((e) => e.cratePath.startsWith("metadata/") && !e.cratePath.startsWith("metadata/kgx/")) : [];
       if (records.length) await requestEntries(source, records);
     } catch (e) {
       if (e?.name === "AbortError") return;
