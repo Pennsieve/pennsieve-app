@@ -119,8 +119,10 @@ export function sessionFolderName(viewName = "") {
 // The folder of a run's input that joins its session once it runs: after
 // its view's name when it's the notebook's only input (as the sidecar
 // names the view a session starts with), else the input's node id (the
-// folder a session with several inputs gives each).
-export const pendingFolderName = ({ viewName, nodeId, only }) => (only || !nodeId ? sessionFolderName(viewName) : nodeId);
+// folder a session with several inputs gives each, made a folder name as
+// the view's is when it isn't one: workflow-service takes only those).
+export const pendingFolderName = ({ viewName, nodeId, only }) =>
+  only || !nodeId ? sessionFolderName(viewName) : /^[A-Za-z0-9._-]{1,60}$/.test(nodeId) ? nodeId : sessionFolderName(nodeId);
 
 /* ---------------------------------------------------------- attaching --- */
 // Whether a failure is worth trying again in a moment: no answer, or the

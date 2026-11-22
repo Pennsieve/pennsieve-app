@@ -95,7 +95,10 @@ const codePath = computed(() => (layout.value ? layout.value.entry.codePath(prop
 const left = computed(() => (isViewFolder.value ? props.inputs.remainingIn(view.value.source, view.value.rel) : []));
 // The layout's own (the panel's Download).
 const layoutLeft = computed(() => (layout.value ? left.value.filter((e) => layoutFiles.value.has(e.cratePath)) : []));
-const leftSize = computed(() => left.value.reduce((n, e) => n + (e.size || 0), 0));
+// What the folder's ⤓ downloads: a layout's own files (the records, not
+// the graph beside them), else all that's left.
+const folderLeft = computed(() => (layout.value ? layoutLeft.value : left.value));
+const leftSize = computed(() => folderLeft.value.reduce((n, e) => n + (e.size || 0), 0));
 const selected = computed(() => remote.value && props.inputs.isSelected(view.value.source, view.value.entry.cratePath));
 // Ticking shows on hover, and on every remote file once any is ticked.
 const ticking = computed(() => props.inputs?.selected.size > 0);
@@ -115,7 +118,7 @@ function download() {
 }
 function downloadAll() {
   const { source } = view.value;
-  const entries = left.value;
+  const entries = folderLeft.value;
   start(leftSize.value, entries, () => props.inputs.requestEntries(source, entries));
 }
 // noted: don't say what it costs again in this session.
@@ -312,9 +315,9 @@ function onRow() {
         </template>
         <template v-else>
           <button
-            v-if="isViewFolder && left.length"
+            v-if="isViewFolder && folderLeft.length"
             class="fn__act"
-            :title="`Download all ${left.length} not in the session (${fmtSize(leftSize)})`"
+            :title="`Download all ${folderLeft.length} not in the session (${fmtSize(leftSize)})`"
             aria-label="Download all"
             @click="downloadAll"
           >

@@ -1211,6 +1211,9 @@ async function execute() {
     if (pendingViews.length && !fromPlatform) {
       holdPendingInputs(newRun?.executionRunId || newRun?.uuid || newRun?.id || newRun?.runId, pendingViews);
     }
+    // The run has them: the next notebook builds its own, with the records
+    // as they are then.
+    for (const id of Object.keys(sessionViews)) delete sessionViews[id];
     EventBus.$emit("toast", {
       detail: {
         type: "success",
