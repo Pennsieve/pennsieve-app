@@ -6,13 +6,15 @@
 // stop them (cancelInputs, on a sidecar new enough). While the session
 // runs, views can be added (AddDataDialog) and removed: the sidecar lists
 // what's staged (inputSources), which can differ from the run's data
-// sources.
-import { computed, onBeforeUnmount, reactive, ref, watch } from "vue";
+// sources. A new notebook's dataset records can join the session once it
+// runs (pendingSessionInputs): they're added here when their view is built.
+import { computed, onBeforeUnmount, reactive, ref, toValue, watch } from "vue";
 import { ElMessageBox } from "element-plus";
 import * as siteConfig from "@/site-config/site.json";
 import { useGetToken } from "@/composables/useGetToken";
 import { CancelUnavailable } from "@/composables/useJupyterSession";
-import { getView, listEntries } from "@/utils/viewsService";
+import { getView, listEntries, waitForView } from "@/utils/viewsService";
+import { pendingInputsOf, dropPendingInput, attachPendingInput } from "./pendingSessionInputs";
 import {
   folderContents,
   splitStacks,
@@ -99,8 +101,18 @@ export function useSessionInputs({
   const selected = ref(new Map());
   let pollTimer = null;
   let doneCount = 0;
+  // Whether the session's sources have been read (whether it can add views
+  // is known then).
+  let sourcesRead = false;
+  const currentRun = () => (typeof runId === "function" ? runId() : runId);
 
-  async function loadSources() {
+  // One read at a time: a second caller waits for the one under way.
+  let loadingSources = null;
+  function loadSources() {
+    loadingSources ||= readSources().finally(() => (loadingSources = null));
+    return loadingSources;
+  }
+  async function readSources() {
     error.value = null;
     loading.value = true;
     try {
@@ -174,6 +186,7 @@ export function useSessionInputs({
           };
         })
       );
+      sourcesRead = true;
       await refreshStatus();
     } catch (e) {
       console.warn("[inputs]", e?.message || e);
@@ -208,14 +221,146 @@ export function useSessionInputs({
     }, POLL_MS);
   }
 
+  onBeforeUnmount(() => {
+    clearTimeout(pollTimer);
+    attachAbort?.abort();
+  });
+
+  /* ------------------------------------------------- joining the session --- */
+  // The run's inputs still to join the session (pendingSessionInputs): the
+  // dataset's records, started by the New Notebook dialog and built while
+  // the session started. Each is { ...input, state, error }: state
+  // "preparing" (its view is being built), "adding" (being added),
+  // "failed" (error says why; retryPending tries again) or "unavailable"
+  // (the session can't add views: an older or compliant node's sidecar).
+  const pending = ref([]);
+  let attachAbort = null;
+  const pendingOf = (viewId) => pending.value.find((p) => p.viewId === viewId);
+  function setPending(viewId, state, err = null) {
+    const p = pendingOf(viewId);
+    if (!p) return;
+    p.state = state;
+    p.error = err;
+  }
+
+  // What's held for this run, keeping the state of those under way.
+  function readPending() {
+    const held = pendingInputsOf(currentRun());
+    pending.value = held.map((i) => pendingOf(i.viewId) || { ...i, state: null, error: null });
+  }
   watch(
-    ready,
-    (r) => {
-      if (r && !sources.value.length && !loading.value) loadSources();
-    },
-    { immediate: true }
+    () => currentRun(),
+    () => {
+      attachAbort?.abort();
+      attachAbort = null;
+      pending.value = [];
+      sourcesRead = false;
+      // The new run's own, once its session is connected.
+      if (toValue(ready)) loadSources().then(attachPending);
+    }
   );
-  onBeforeUnmount(() => clearTimeout(pollTimer));
+
+  // Adds those not under way, once the session's views are read: each when
+  // its view is built, one by one as they're ready. While the sources
+  // couldn't be read (the session isn't reachable yet), each says so with
+  // Retry; the next connect tries again too.
+  function attachPending() {
+    readPending();
+    if (!pending.value.length) return;
+    if (error.value || !sourcesRead) {
+      for (const p of pending.value) {
+        if (!underWay(p)) setPending(p.viewId, "failed", `${p.label || "The dataset's records"} couldn't join the session yet: ${error.value || "its inputs couldn't be read"}`);
+      }
+      return;
+    }
+    if (!canAdd.value) {
+      for (const p of pending.value) {
+        if (p.state !== "unavailable") {
+          setPending(
+            p.viewId,
+            "unavailable",
+            `This session can't add data while it runs (its compute node needs an update), so ${p.label || "the dataset's records"} couldn't join it. Update the node and start the notebook again.`
+          );
+        }
+      }
+      return;
+    }
+    if (!attachAbort) attachAbort = new AbortController();
+    for (const p of pending.value) if (!underWay(p)) attachOne(p.viewId, attachAbort.signal);
+  }
+  const underWay = (p) => p.state === "preparing" || p.state === "adding";
+
+  async function attachOne(viewId, signal) {
+    const run = currentRun();
+    const p = pendingOf(viewId);
+    if (!p) return;
+    // Added already (the page was reloaded before it was let go).
+    if (sources.value.some((s) => s.viewId === viewId)) {
+      dropPendingInput(run, viewId);
+      pending.value = pending.value.filter((x) => x.viewId !== viewId);
+      return;
+    }
+    setPending(viewId, "preparing");
+    try {
+      const taken = new Set(sources.value.map((s) => s.inputFolder || s.nodeId).filter(Boolean));
+      const folder = await attachPendingInput(
+        { ...p },
+        {
+          waitForView: async (id, opts) => {
+            const view = await waitForView(id, opts);
+            setPending(viewId, "adding");
+            return view;
+          },
+          // Not when another tab of this session (or this page before a
+          // reload) has added it meanwhile: the sidecar lists it then.
+          addInputSource: async (name, id, version) => {
+            const now = inputSources ? await inputSources().catch(() => null) : null;
+            const there = now?.find?.((s) => s.viewId === id);
+            if (there) throw Object.assign(new Error("added already"), { status: 409, added: there.root ? "" : there.name });
+            return addInputSource(name, id, version);
+          },
+          taken,
+          signal,
+        }
+      );
+      dropPendingInput(run, viewId);
+      if (run !== currentRun()) return;
+      await loadSources();
+      pending.value = pending.value.filter((x) => x.viewId !== viewId);
+      // Its record files on the disk, as a session that started with the
+      // view has them (staged before it started); its other files a click
+      // away, as ever, the knowledge graph's too (large for a big dataset).
+      const source = sources.value.find((s) => s.nodeId === folder);
+      const records = source ? source.entries.filter((e) => e.cratePath.startsWith("metadata/") && !e.cratePath.startsWith("metadata/kgx/")) : [];
+      if (records.length) await requestEntries(source, records);
+    } catch (e) {
+      if (e?.name === "AbortError") return;
+      if (e?.added !== undefined) {
+        dropPendingInput(run, viewId);
+        if (run !== currentRun()) return;
+        await loadSources();
+        pending.value = pending.value.filter((x) => x.viewId !== viewId);
+        return;
+      }
+      console.warn("[inputs] adding", p.label || viewId, e?.message || e);
+      setPending(viewId, "failed", `${p.label || "The dataset's records"} couldn't join the session: ${e?.message || e}`);
+    }
+  }
+
+  // Tries a failed one again (the sources read again first: the session may
+  // have come back).
+  async function retryPending(viewId) {
+    const p = pendingOf(viewId);
+    if (!p || (p.state !== "failed" && p.state !== "unavailable")) return;
+    p.state = null;
+    p.error = null;
+    await loadSources();
+    attachPending();
+  }
+
+  // Whether data can be added: not on a compliant node, whose sidecar
+  // can't fetch a new view's crate (removing still works).
+  const canAdd = computed(() => canChange.value && canAddViews(sidecarCanAdd.value, node()));
 
   /* ------------------------------------------------------------- the tree --- */
   // What a folder of the tree holds from the views, beside what's on disk:
@@ -225,6 +370,10 @@ export function useSessionInputs({
     const rows = [];
     if (dirPath === "input") {
       for (const s of sources.value) if (s.inputFolder) rows.push({ name: s.inputFolder, type: "folder", source: s, rel: "", root: true });
+      // An input on its way: a row of its own until it's added.
+      for (const p of pending.value) {
+        if (!sources.value.some((s) => s.viewId === p.viewId)) rows.push({ name: p.name, type: "pending", pending: p });
+      }
     }
     const at = sourceAt(sources.value, dirPath);
     if (at) {
@@ -269,7 +418,6 @@ export function useSessionInputs({
   // the user's own files use it too); null when the disk isn't known.
   const freeBytes = computed(() => (diskGiB.value ? Math.max(0, diskGiB.value * GiB - inputBytes.value - activeLeft.value) : null));
   /* --------------------------------------------------------- what it costs --- */
-  const currentRun = () => (typeof runId === "function" ? runId() : runId);
   // Whether the user said not to be told again in this session.
   const costNoted = ref(readCostNoted(currentRun()));
   watch(
@@ -372,6 +520,18 @@ export function useSessionInputs({
     }
   }
 
+  // Once the session is connected: its views, then the inputs still to
+  // join it. (Last, as it can run at once.)
+  watch(
+    ready,
+    async (r) => {
+      if (!r) return;
+      if (!sources.value.length || !sourcesRead) await loadSources();
+      attachPending();
+    },
+    { immediate: true }
+  );
+
   return reactive({
     sources,
     canChange,
@@ -404,8 +564,8 @@ export function useSessionInputs({
     downloadSelected,
     remove,
     removable: computed(() => canChange.value && !!removeInputSource),
-    // Whether data can be added: not on a compliant node, whose sidecar
-    // can't fetch a new view's crate (removing still works).
-    canAdd: computed(() => canChange.value && canAddViews(sidecarCanAdd.value, node())),
+    canAdd,
+    pending,
+    retryPending,
   });
 }

@@ -9,8 +9,10 @@
     { datasetId, version, datasetName, path, name, isFolder, size }.
   whyNot(name): why a file can't be chosen ("" when it can): the input's
     file types. Folders can always be chosen.
-  parts: what the input can take, { files, records }: its files, its
-    metadata records, or both (sourceInputs.js sourceParts).
+  parts: what the input can take, { files, records, kgx }: its files, its
+    metadata records, its knowledge graph (sourceInputs.js sourceParts).
+    Published datasets have no knowledge graph yet: an input that takes only
+    a graph says so and offers nothing.
 */
 import { computed, onBeforeUnmount, ref } from "vue";
 import { pagePublicDatasets, browsePublicFiles, listPublicModels } from "@/utils/publicDatasets";
@@ -24,6 +26,8 @@ const props = defineProps({
   parts: { type: Object, default: () => ({ files: true, records: true }) },
 });
 const emit = defineEmits(["update:modelValue"]);
+// An input that takes only a knowledge graph, which no published dataset has.
+const graphOnly = computed(() => props.parts.kgx && !props.parts.files && !props.parts.records);
 
 const PAGE = 500;
 
@@ -174,7 +178,11 @@ const groups = computed(() => groupPicks(props.modelValue));
 </script>
 
 <template>
-  <div class="pfp">
+  <p v-if="graphOnly" class="pfp__empty pfp__no-graph">
+    Published datasets have no knowledge graph yet. Choose a workspace dataset's graph instead.
+  </p>
+  <div v-else class="pfp">
+    <p v-if="parts.kgx" class="pfp__empty pfp__no-graph">Published datasets have no knowledge graph yet: its graph input needs a workspace dataset.</p>
     <div class="pfp__search">
       <label for="pfp-dataset">Public dataset</label>
       <el-select
