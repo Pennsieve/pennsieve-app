@@ -34,6 +34,10 @@ async function render() {
     // A plain copy: vega annotates specs it's given, and the output's data is
     // a reactive object that's saved with the notebook.
     const spec = JSON.parse(JSON.stringify(props.spec));
+    // A spec's own embed options (usermeta.embedOptions, which Altair sets)
+    // would override ours: the menu, the editor URL its data is posted to,
+    // how its data is loaded. Ours apply.
+    if (spec.usermeta && typeof spec.usermeta === "object") delete spec.usermeta.embedOptions;
     result = await embed(host.value, spec, {
       mode: props.mode,
       // Only the PNG/SVG export: no "open in Vega Editor" (it posts the data

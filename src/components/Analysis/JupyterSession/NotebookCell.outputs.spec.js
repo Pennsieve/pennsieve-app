@@ -45,6 +45,18 @@ describe("notebook outputs", () => {
     expect(opts.actions.editor).toBe(false);
   });
 
+  it("ignore the chart's own embed options (Altair's usermeta), which would override ours", async () => {
+    embed.mockClear();
+    const spec = { ...ALTAIR["application/vnd.vegalite.v5+json"], usermeta: { embedOptions: { actions: true, editorUrl: "https://evil.example/" }, note: "kept" } };
+    const w = mountCell(codeCell([{ output_type: "display_data", data: { "application/vnd.vegalite.v5+json": spec }, metadata: {} }]));
+    await flushPromises();
+    const [, given] = embed.mock.calls[0];
+    expect(given.usermeta).toEqual({ note: "kept" });
+    // The output itself (saved with the notebook) is unchanged.
+    expect(spec.usermeta.embedOptions.actions).toBe(true);
+    w.unmount();
+  });
+
   it("render a Vega spec in vega mode", async () => {
     embed.mockClear();
     mountCell(codeCell([{ output_type: "display_data", data: { "application/vnd.vega.v5+json": { marks: [] } }, metadata: {} }]));
