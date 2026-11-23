@@ -94,13 +94,13 @@ describe("AssistBar: one box", () => {
     await w.findAll(".nb-assist__chip")[0].trigger("click");
     expect(w.emitted("suggest")).toHaveLength(1);
     await w.findAll(".nb-assist__chip")[1].trigger("click");
-    expect(w.emitted("submit")).toEqual([["Explain what this cell does."]]);
+    expect(w.emitted("explain")).toHaveLength(1);
     await w.findAll(".nb-assist__chip")[2].trigger("click");
     expect(w.emitted("fix")).toHaveLength(1);
     await w.find("input").setValue("plot by sex");
     expect(chips(w)).toEqual([]);
     await w.find("input").trigger("keydown.enter");
-    expect(w.emitted("submit").at(-1)).toEqual(["plot by sex"]);
+    expect(w.emitted("submit")).toEqual([["plot by sex"]]);
   });
 
   it("offers only what fits the cell and the session", () => {
@@ -108,6 +108,18 @@ describe("AssistBar: one box", () => {
     // The single-shot assistant: no starters it can't do.
     expect(chips(mountBar({ agent: false }, { cellHasCode: true }))).toEqual([]);
     expect(chips(mountBar({ agent: true, canSuggest: true, state: "done", text: "x" }))).toEqual([]);
+  });
+});
+
+describe("AssistBar: answers", () => {
+  it("an explanation of the cell goes above it, with no code to write", () => {
+    const w = mountBar({ agent: true, state: "done", answer: "Loads the edges.", explains: true }, { cellHasCode: true });
+    expect(actions(w)).toEqual(["Insert above as Markdown", "Close"]);
+  });
+
+  it("an answer about the data goes below, and can become code", () => {
+    const w = mountBar({ agent: true, state: "done", answer: "Ibuprofen treats 3 diseases." }, { cellHasCode: true });
+    expect(actions(w)).toEqual(["Insert below as Markdown", "Write code for this", "Close"]);
   });
 });
 
