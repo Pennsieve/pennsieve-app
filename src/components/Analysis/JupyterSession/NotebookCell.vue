@@ -352,7 +352,8 @@ function latexOf(data) {
 .nb-cell {
   position: relative;
   display: grid;
-  grid-template-columns: 44px 1fr;
+  /* Wide enough for a cell's AI cost (✦ $0.09) as well as its [n]. */
+  grid-template-columns: 54px 1fr;
   align-items: flex-start;
   border: 1px solid transparent;
   border-radius: 4px;

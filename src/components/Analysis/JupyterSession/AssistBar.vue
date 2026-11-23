@@ -277,7 +277,7 @@ $assist_tint: #f0ebfb;
   padding: 6px 8px;
   border: 1px solid theme.$gray_2;
   border-left: 2px solid $assist;
-  border-radius: 4px;
+  border-radius: 0;
   background: theme.$white;
   font-size: 12px;
 }
@@ -305,7 +305,7 @@ $assist_tint: #f0ebfb;
   margin-top: 8px;
   padding: 4px 6px;
   border: 1px solid theme.$gray_2;
-  border-radius: 4px;
+  border-radius: 0;
   background: theme.$white;
 }
 .nb-assist__input {
@@ -419,7 +419,7 @@ $assist_tint: #f0ebfb;
 .nb-assist__chip {
   padding: 2px 10px;
   border: 1px solid theme.$gray_2;
-  border-radius: 12px;
+  border-radius: 3px;
   background: theme.$white;
   color: theme.$gray_6;
   font-size: 12px;
