@@ -12,7 +12,7 @@ import { endInteractiveSession } from "@/composables/useJupyterSession";
 import { useGetToken } from "@/composables/useGetToken";
 import { useMetricsCounters } from "@/composables/useMetricsCounters";
 import { isNotebookWorkflow } from "./notebookHelpers";
-import { isNotebookSession, sessionWords } from "./sessionKinds";
+import { isNotebookSession, sessionAllowed, sessionWords } from "./sessionKinds";
 import RunHistory from "./RunHistory.vue";
 import RunWizardDialog from "./RunWizardDialog.vue";
 
@@ -432,7 +432,7 @@ onBeforeUnmount(() => {
               @click="selectRun(run)"
             >
               <div
-                v-if="run.interactive && run.status === 'STARTED'"
+                v-if="run.interactive && run.status === 'STARTED' && sessionAllowed(run)"
                 class="active-run-actions"
                 @click.stop
               >

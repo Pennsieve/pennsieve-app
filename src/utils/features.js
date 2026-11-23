@@ -14,6 +14,11 @@ export const FEATURE_DEFAULTS = Object.freeze({
   // instead of data-source and data-target nodes. On only where
   // workflow-service supports them (Pennsieve/workflow-service#103).
   workflowInterface: false,
+  // Web app sessions: an interactive step whose app serves its own page,
+  // opened from a run. This only hides the buttons, the session page and the
+  // builder's choice. The back end doesn't check it, so it is not a security
+  // control.
+  webAppSessions: false,
 })
 
 export function resolveFeatures(features = {}) {

@@ -4,6 +4,7 @@
 // problem points at, and the app card
 // an app.yml gives.
 import { load as loadYaml } from "js-yaml";
+import { isFeatureEnabled } from "@/utils/features";
 import { createPort, normalizeEdamFormat, normalizeOrcid, parseManifest, PARAM_TYPES, validateParameterValue, isEarlierLayout, isNumericType } from "./applicationSchema";
 
 /* ─────────────── Kind: batch or interactive ─────────────── */
@@ -14,10 +15,11 @@ export const APP_KINDS = Object.freeze([
 ]);
 
 // The interactive session types the platform runs today (runtime.sessionType):
-// a notebook, or a web page the app serves itself.
+// a notebook, or a web page the app serves itself. The web app choice is
+// behind the webAppSessions site flag.
 export const SESSION_KINDS = Object.freeze([
   { value: "jupyter", label: "Jupyter" },
-  { value: "webapp", label: "Web app" },
+  ...(isFeatureEnabled("webAppSessions") ? [{ value: "webapp", label: "Web app" }] : []),
 ]);
 
 // An app is interactive when its app.yml says it's a live session.

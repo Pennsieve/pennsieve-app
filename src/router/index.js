@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from "vue-router";
 import { propOr } from 'ramda'
 import { PublicationStatus, PublicationTabs } from '../utils/constants.js'
 import store from '../store'
+import { isFeatureEnabled } from '@/utils/features'
 
 import NotFound from './not-found/NotFound.vue'
 import MyCollectionsStage from "@/router/MyWorkSpace/MyCollectionsStage.vue";
@@ -199,6 +200,14 @@ function requireAdminRights(to, from, next) {
   }
 }
 
+// Web app sessions are behind a site flag. With it off, the session page
+// sends you back to the run.
+function requireWebAppSessions(to, from, next) {
+  if (isFeatureEnabled('webAppSessions')) return next()
+  const { orgId, runId } = to.params
+  next(orgId ? { name: 'run-detail', params: { orgId, runId } } : { name: 'my-run-detail', params: { runId } })
+}
+
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
@@ -236,6 +245,7 @@ const router = createRouter({
       // session, then sends the tab to the app. Laid out like 'run-notebook'.
       name: 'run-session',
       path: '/:orgId/analysis/runs/:runId/session',
+      beforeEnter: requireWebAppSessions,
       components: {
         page: WebAppSession,
         navigation: BfNavigation,
@@ -760,6 +770,7 @@ const router = createRouter({
           // A web app session outside any workspace; see 'run-session'.
           name: 'my-run-session',
           path: 'analysis/sessions/:runId',
+          beforeEnter: requireWebAppSessions,
           components: {
             stage: WebAppSession,
             navigation: UserNavigation,

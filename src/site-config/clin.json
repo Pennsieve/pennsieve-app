@@ -50,6 +50,7 @@
     "workflowInterface": false,
     "inAppLogin": true,
     "publishing": false,
-    "office365Viewer": false
+    "office365Viewer": false,
+    "webAppSessions": false
   }
 }

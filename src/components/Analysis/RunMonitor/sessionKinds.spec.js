@@ -1,6 +1,12 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
+
+// The flag comes from the built site's config, so set it here.
+const enabled = { webAppSessions: true };
+vi.mock("@/utils/features", () => ({ isFeatureEnabled: (name) => enabled[name] }));
+
 import {
   isNotebookSession,
+  sessionAllowed,
   sessionKind,
   sessionOffered,
   sessionStep,
@@ -13,6 +19,10 @@ const webapp = { id: "review", type: "processor", runtimeConfig: { interactive: 
 const batch = { id: "n4", type: "processor", runtimeConfig: {} };
 
 describe("a run's live session", () => {
+  beforeEach(() => {
+    enabled.webAppSessions = true;
+  });
+
   it("is the DAG's interactive step", () => {
     expect(sessionStep([batch, webapp])).toBe(webapp);
     expect(sessionStep([batch])).toBeNull();
@@ -34,6 +44,14 @@ describe("a run's live session", () => {
     expect(sessionOffered(webapp, { runActive: true, stepStatus: "SUCCEEDED" })).toBe(false);
     expect(sessionOffered(webapp, { runActive: false, stepStatus: "STARTED" })).toBe(false);
     expect(sessionOffered(null, { runActive: true, stepStatus: "STARTED" })).toBe(false);
+  });
+
+  it("offers no web app session while the site flag is off, and still offers a notebook", () => {
+    enabled.webAppSessions = false;
+    expect(sessionAllowed(webapp)).toBe(false);
+    expect(sessionOffered(webapp, { runActive: true, stepStatus: "STARTED" })).toBe(false);
+    expect(sessionAllowed(notebook)).toBe(true);
+    expect(sessionOffered(notebook, { runActive: true, stepStatus: "STARTED" })).toBe(true);
   });
 
   it("is named for its kind", () => {
