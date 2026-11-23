@@ -10,9 +10,8 @@ import CodeMirrorEditor from "./CodeMirrorEditor.vue";
 import PlotlyOutput from "./PlotlyOutput.vue";
 import MathOutput from "./MathOutput.vue";
 import VegaOutput from "./VegaOutput.vue";
-import HtmlFrameOutput from "./HtmlFrameOutput.vue";
-import { altairSpec, needsFrame } from "./htmlFrameHelpers";
-import { ansiRuns, streamText } from "./outputHelpers";
+import { altairSpec } from "./altairHtml";
+import { cachedAnsiRuns, streamText } from "./outputHelpers";
 import AssistBar from "./AssistBar.vue";
 import AssistIcon from "./AssistIcon.vue";
 import { cellSpendLabel, cellSpendTitle } from "./assistHelpers";
@@ -126,12 +125,6 @@ function imgSrc(data) {
 function rawHtmlOf(data) {
   const h = data["text/html"];
   return Array.isArray(h) ? h.join("") : h;
-}
-// HTML with scripts runs in a sandboxed frame; other HTML is sanitized into
-// the page.
-function frameHtmlOf(data) {
-  const h = rawHtmlOf(data);
-  return needsFrame(h) ? h : null;
 }
 function htmlOf(data) {
   const h = rawHtmlOf(data);
@@ -291,12 +284,12 @@ function latexOf(data) {
         <div v-for="(o, i) in cell.outputs" :key="i" class="nb-output">
           <!-- execute_result keeps an Out[n] prompt -->
           <template v-if="o.output_type === 'stream'">
-            <pre class="nb-stream" :class="{ 'nb-stderr': o.name === 'stderr' }"><span v-for="(r, k) in ansiRuns(streamText(o))" :key="k" :class="r.cls">{{ r.text }}</span></pre>
+            <pre class="nb-stream" :class="{ 'nb-stderr': o.name === 'stderr' }"><span v-for="(r, k) in cachedAnsiRuns(o, streamText(o))" :key="k" :class="r.cls">{{ r.text }}</span></pre>
           </template>
 
           <template v-else-if="o.output_type === 'error'">
             <pre class="nb-stderr">{{ o.ename }}: {{ o.evalue }}
-<span v-for="(r, k) in ansiRuns((o.traceback || []).join('\n'))" :key="k" :class="r.cls">{{ r.text }}</span></pre>
+<span v-for="(r, k) in cachedAnsiRuns(o, (o.traceback || []).join('\n'))" :key="k" :class="r.cls">{{ r.text }}</span></pre>
             <button
               v-if="assistAvailable && !cell._assist"
               class="nb-fix"
@@ -314,7 +307,6 @@ function latexOf(data) {
             <VegaOutput v-else-if="vegaOf(o.data)" :spec="vegaOf(o.data).spec" :mode="vegaOf(o.data).mode" />
             <img v-else-if="imgSrc(o.data)" class="nb-img" :src="imgSrc(o.data)" alt="output" />
             <div v-else-if="svgOf(o.data)" class="nb-svg" v-html="svgOf(o.data)" />
-            <HtmlFrameOutput v-else-if="frameHtmlOf(o.data)" :html="frameHtmlOf(o.data)" />
             <div v-else-if="htmlOf(o.data)" class="nb-html markdown-body" v-html="htmlOf(o.data)" />
             <MathOutput v-else-if="latexOf(o.data)" :latex="latexOf(o.data)" />
             <div
@@ -571,6 +563,14 @@ function latexOf(data) {
 .ansi-magenta-bg { background: #d160c4; }
 .ansi-cyan-bg { background: #60c6c8; }
 .ansi-white-bg { background: #c5c1b4; }
+.ansi-bright-black-bg { background: #282c36; }
+.ansi-bright-red-bg { background: #b22b31; }
+.ansi-bright-green-bg { background: #007427; }
+.ansi-bright-yellow-bg { background: #b27d12; }
+.ansi-bright-blue-bg { background: #0065ca; }
+.ansi-bright-magenta-bg { background: #a03196; }
+.ansi-bright-cyan-bg { background: #258f8f; }
+.ansi-bright-white-bg { background: #a1a6b2; }
 /* Under an error: a quiet link to the assistant. */
 .nb-fix {
   display: inline-flex;
