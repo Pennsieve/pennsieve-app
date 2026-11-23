@@ -127,3 +127,10 @@ describe("pip's output (\\r\\n line ends and colours)", () => {
   });
 });
 
+describe("colon-form colour codes", () => {
+  it("skip a whole 256-colour or RGB parameter, the rest still applies", () => {
+    expect(ansiRuns("\u001b[1;38:2::0:0:0mx")).toEqual([{ text: "x", cls: "ansi-bold" }]);
+    expect(ansiRuns("\u001b[38:5:0;31mx")).toEqual([{ text: "x", cls: "ansi-red-fg" }]);
+  });
+});
+

@@ -49,7 +49,9 @@ export function ansiRuns(text) {
     push(s.slice(last, m.index));
     last = ANSI_ESCAPE.lastIndex;
     if (m[2] !== "m") continue;
-    const codes = (m[1] || "0").split(/[;:]/).map(Number);
+    // A colon-form code (38:5:n, 38:2::r:g:b) is one parameter: 256-colour
+    // and RGB codes are left uncoloured, whatever their length.
+    const codes = (m[1] || "0").split(";").map((p) => (p.includes(":") ? NaN : Number(p)));
     for (let i = 0; i < codes.length; i++) {
       const c = codes[i];
       if (c === 0) [fg, bg, bold] = [null, null, false];
