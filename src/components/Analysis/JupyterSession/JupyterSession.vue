@@ -163,6 +163,8 @@ const {
   assistStatus,
   askAssist,
   askAgent,
+  complete,
+  inspect,
   setSource,
   addCell,
   addCellAbove,
@@ -1367,6 +1369,8 @@ const kernelPill = computed(() => {
             @focus-next="selectRel(1)"
             :assist-available="assistAvailable"
             :assist-paused="assistPaused"
+            :complete="complete"
+            :inspect="inspect"
             @assist="onAssist(cell, $event)"
           />
           <div class="nb-add-row">
