@@ -5,11 +5,11 @@
 // tab over to the app, on the session's own host. Unlike a notebook
 // (NotebookSession.vue) nothing of the session is shown inside Pennsieve.
 import { computed, onBeforeUnmount, onMounted, ref } from "vue";
-import { useRoute } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 import BfPage from "../../layout/BfPage/BfPage.vue";
 import BfButton from "../../shared/bf-button/BfButton.vue";
 import { fetchConnection } from "@/composables/useJupyterSession";
-import { webAppSessionUrl } from "../RunMonitor/sessionKinds";
+import { openWebAppSession } from "../RunMonitor/sessionKinds";
 
 const props = defineProps({
   // Passed by the router; a run outside any workspace has no orgId.
@@ -18,6 +18,7 @@ const props = defineProps({
 });
 
 const route = useRoute();
+const router = useRouter();
 const resolvedRunId = computed(() => props.runId || route.params.runId || "");
 const runRoute = computed(() =>
   props.orgId || route.params.orgId
@@ -28,8 +29,16 @@ const runRoute = computed(() =>
 const error = ref("");
 // Leaving the page while it waits must not pull the tab to the app later.
 let left = false;
+
+// Back from the app can bring this page back exactly as it was left, still
+// saying it is opening. Load the address it was left with instead (the run).
+function onPageShow(event) {
+  if (event.persisted) window.location.reload();
+}
+onMounted(() => window.addEventListener("pageshow", onPageShow));
 onBeforeUnmount(() => {
   left = true;
+  window.removeEventListener("pageshow", onPageShow);
 });
 
 async function open() {
@@ -41,9 +50,11 @@ async function open() {
   try {
     const conn = await fetchConnection(resolvedRunId.value, { what: "app" });
     if (left) return;
-    // replace, not assign: Back from the app then leaves this tab's history
-    // instead of landing here and opening the app again.
-    window.location.replace(webAppSessionUrl(conn));
+    // The app opens with a form post, which adds to this tab's history. Leave
+    // the run's address behind it, so Back from the app lands on the run
+    // instead of here, where it would open the app again.
+    window.history.replaceState(null, "", router.resolve(runRoute.value).href);
+    openWebAppSession(conn);
   } catch (e) {
     if (!left) error.value = e?.message || "Could not open the session.";
   }

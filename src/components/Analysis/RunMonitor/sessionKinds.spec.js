@@ -10,8 +10,8 @@ import {
   sessionKind,
   sessionOffered,
   sessionStep,
+  openWebAppSession,
   sessionWords,
-  webAppSessionUrl,
 } from "./sessionKinds";
 
 const notebook = { id: "nb", type: "processor", runtimeConfig: { interactive: true, sessionType: "jupyter" } };
@@ -61,9 +61,22 @@ describe("a run's live session", () => {
     expect(sessionWords({ runtimeConfig: { interactive: true, sessionType: "viewer" } }).open).toBe("Open App");
   });
 
-  it("opens a web app at its own host, with the token for the auth proxy", () => {
-    expect(webAppSessionUrl({ kernelUrl: "https://run-1.basic.sessions.example/", token: "a.b+c" })).toBe(
-      "https://run-1.basic.sessions.example/?token=a.b%2Bc"
-    );
+  it("opens a web app by posting the token to the session's auth proxy, never in an address", () => {
+    let posted = null;
+    const submit = vi.spyOn(window.HTMLFormElement.prototype, "submit").mockImplementation(function () {
+      posted = this;
+    });
+    try {
+      openWebAppSession({ kernelUrl: "https://run-1.basic.sessions.example/", token: "a.b+c" });
+    } finally {
+      submit.mockRestore();
+    }
+
+    expect(posted.method.toLowerCase()).toBe("post");
+    expect(posted.action).toBe("https://run-1.basic.sessions.example/pennsieve/open");
+    expect(posted.action).not.toContain("a.b");
+    const fields = [...posted.querySelectorAll("input")];
+    expect(fields.map((f) => [f.type, f.name, f.value])).toEqual([["hidden", "token", "a.b+c"]]);
+    posted.remove();
   });
 });

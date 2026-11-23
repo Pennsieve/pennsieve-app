@@ -56,9 +56,19 @@ const WORDS = {
 
 export const sessionWords = (step) => WORDS[sessionKind(step)] || WORDS[WEBAPP];
 
-// The address a web app session's tab opens: the session's own host with its
-// token. The session's auth proxy moves the token into a cookie on that first
-// request, so the app's pages and forms need nothing else.
-export function webAppSessionUrl({ kernelUrl, token }) {
-  return `${kernelUrl.replace(/\/+$/, "")}/?token=${encodeURIComponent(token)}`;
+// Hands this tab over to a web app session. The token goes to the session's
+// auth proxy in a form post, never in an address, where the browser's
+// history, a request log or the app's own page could read it. The proxy keeps
+// it in a cookie the app's pages can't read and sends the tab on to the app.
+export function openWebAppSession({ kernelUrl, token }, doc = document) {
+  const form = doc.createElement("form");
+  form.method = "post";
+  form.action = `${kernelUrl.replace(/\/+$/, "")}/pennsieve/open`;
+  const field = doc.createElement("input");
+  field.type = "hidden";
+  field.name = "token";
+  field.value = token;
+  form.appendChild(field);
+  doc.body.appendChild(form);
+  form.submit();
 }
