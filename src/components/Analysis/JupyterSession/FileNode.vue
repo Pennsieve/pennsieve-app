@@ -366,8 +366,9 @@ function onRow() {
           <button class="fn__act" :title="`Download (${fmtSize(node.size)})`" aria-label="Download" @click="download">⤓</button>
         </template>
         <template v-else>
+          <!-- (A layout's own ⤓ is always shown at its row's end.) -->
           <button
-            v-if="isViewFolder && folderLeft.length"
+            v-if="isViewFolder && folderLeft.length && !bundle"
             class="fn__act"
             :title="`Download all ${folderLeft.length} not in the session (${fmtSize(leftSize)})`"
             aria-label="Download all"
