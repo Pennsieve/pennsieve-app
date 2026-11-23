@@ -8,6 +8,14 @@ const toEnd = (w) => {
   const view = EditorView.findFromDOM(w.find(".cm-editor").element);
   view.dispatch({ selection: { anchor: view.state.doc.length } });
 };
+const view = (w) => EditorView.findFromDOM(w.find(".cm-editor").element);
+// Typing at the cursor, as a user does (CodeMirror's input.type event).
+const type = (w, text) => {
+  const v = view(w);
+  const at = v.state.selection.main.head;
+  v.dispatch({ changes: { from: at, insert: text }, selection: { anchor: at + text.length }, userEvent: "input.type" });
+};
+const labels = () => [...document.querySelectorAll(".cm-tooltip-autocomplete li")].map((li) => li.textContent);
 const tab = (w, shiftKey = false) =>
   w.find(".cm-content").element.dispatchEvent(new KeyboardEvent("keydown", { key: "Tab", keyCode: 9, shiftKey, bubbles: true, cancelable: true }));
 
@@ -32,6 +40,41 @@ describe("CodeMirrorEditor kernel help", () => {
     await new Promise((r) => setTimeout(r, 100));
     tab(w);
     expect(w.emitted("update:modelValue").at(-1)[0]).toBe("df.head");
+    w.unmount();
+  });
+
+  it("shows the kernel's matches in its order, ones that don't spell what's typed too", async () => {
+    const complete = vi.fn(async () => ({ status: "ok", matches: ["n=", "zeta", "abs"], cursor_start: 0, cursor_end: 0, metadata: {} }));
+    const w = mount(CodeMirrorEditor, { props: { modelValue: "x=\\alpha", complete }, attachTo: document.body });
+    complete.mockResolvedValueOnce({ status: "ok", matches: ["α"], cursor_start: 2, cursor_end: 8, metadata: {} });
+    toEnd(w);
+    tab(w);
+    await vi.waitFor(() => expect(labels()).toEqual(["α"]));
+    w.unmount();
+    const w2 = mount(CodeMirrorEditor, { props: { modelValue: "f(", complete }, attachTo: document.body });
+    toEnd(w2);
+    tab(w2);
+    await vi.waitFor(() => expect(labels()).toEqual(["n=", "zeta", "abs"]));
+    w2.unmount();
+  });
+
+  it("narrows the list as a name is typed, and closes it on anything else without asking again", async () => {
+    const complete = vi.fn(async () => ({ status: "ok", matches: ["head", "hist", "shape"], cursor_start: 3, cursor_end: 4, metadata: {} }));
+    const w = mount(CodeMirrorEditor, { props: { modelValue: "df.h", complete }, attachTo: document.body });
+    toEnd(w);
+    tab(w);
+    // The kernel's list as it sent it, then narrowed as the name grows.
+    await vi.waitFor(() => expect(labels()).toEqual(["head", "hist", "shape"]));
+    type(w, "e");
+    await vi.waitFor(() => expect(labels()).toEqual(["head"]));
+    type(w, "(");
+    await vi.waitFor(() => expect(labels()).toEqual([]));
+    await new Promise((r) => setTimeout(r, 50));
+    expect(complete).toHaveBeenCalledTimes(1);
+    // Tab asks again.
+    tab(w);
+    await vi.waitFor(() => expect(complete).toHaveBeenCalledTimes(2));
+    expect(complete.mock.calls[1]).toEqual(["df.he(", 6]);
     w.unmount();
   });
 

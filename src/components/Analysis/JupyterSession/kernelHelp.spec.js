@@ -41,8 +41,11 @@ describe("completionResult", () => {
     expect(r.from).toBe(22);
     expect(r.to).toBe(24);
     expect(r.options).toEqual([{ label: "arange", type: "function" }, { label: "array", type: "class" }]);
-    expect(r.validFor.test("ray")).toBe(true);
-    expect(r.validFor.test("(")).toBe(false);
+    expect(r.filter).toBe(false);
+  });
+
+  it("offers nothing for a reply without its range", () => {
+    expect(completionResult("np.ar", { matches: ["array"], cursor_end: 5 })).toBeNull();
   });
 
   it("maps the kernel's positions after an emoji", () => {
