@@ -3,10 +3,11 @@
 // under an error, Fix): the user says what the code should do, and the
 // proposal comes back with what the assistant did to get there (the files it
 // read, what it looked at in the kernel, its runs) and what it cost. They
-// take it (into this cell, or a new one below) or leave it. Nothing runs
-// unless they choose Fix and run. The state is the cell's _assist
-// (JupyterSession owns it).
-import { computed, nextTick, onMounted, ref } from "vue";
+// take it (into this cell, or a new one below) or leave it, or ask for a
+// change (Refine: a follow-up in the same conversation, also after it's in
+// the cell and has run). Nothing runs unless they choose Fix and run. The
+// state is the cell's _assist (JupyterSession owns it).
+import { computed, nextTick, onMounted, ref, watch } from "vue";
 import { marked } from "marked";
 import DOMPurify from "dompurify";
 import { cellCode, stepLabel, usageLine } from "./assistHelpers";
@@ -17,7 +18,7 @@ const props = defineProps({
   // The cell has code: taking the reply replaces it.
   cellHasCode: { type: Boolean, default: false },
 });
-const emit = defineEmits(["submit", "suggest", "stop", "accept", "accept-run", "use-run", "insert-below", "insert-below-run", "insert-answer", "answer-to-code", "discard", "clear-file"]);
+const emit = defineEmits(["submit", "suggest", "refine", "stop", "accept", "accept-run", "use-run", "insert-below", "insert-below-run", "insert-answer", "answer-to-code", "discard", "clear-file"]);
 
 const prompt = ref(props.assist.prompt || "");
 const input = ref(null);
@@ -41,11 +42,35 @@ onMounted(async () => {
   input.value?.focus();
 });
 
-// Nothing typed: the agent may suggest the next cell instead.
-const suggests = computed(() => !fix.value && !!props.assist.canSuggest && !prompt.value.trim());
+// A proposal (or answer) to follow up: what's typed asks for a change to it.
+const refining = computed(
+  () => !!props.assist.followUps && !!props.assist.conversationId && !fix.value && !asking.value && props.assist.state !== "budget"
+);
+const placeholder = computed(() => {
+  const a = props.assist;
+  if (refining.value) return a.answer ? "Ask a follow-up question" : a.used ? "Ask for a change to this cell" : "Ask for a change to this code";
+  if (a.file) return `What should the code do with ${fileName.value}?`;
+  return a.canSuggest ? "Describe the code this cell should have, or ask for a suggestion" : "Describe the code this cell should have";
+});
+// Each proposal starts the box empty for the next follow-up.
+watch(
+  () => props.assist.conversationId,
+  (id, was) => {
+    if (id && id !== was && refining.value) prompt.value = "";
+  }
+);
+
+// Nothing typed: the agent may suggest the next cell instead; with something
+// typed, a suggestion with that in mind is on offer next to Write.
+const suggests = computed(() => !fix.value && !refining.value && !!props.assist.canSuggest && !prompt.value.trim());
+const steers = computed(() => !fix.value && !refining.value && !asking.value && !!props.assist.canSuggest && !!prompt.value.trim());
 
 function submit() {
   if (asking.value) return;
+  if (refining.value) {
+    if (prompt.value.trim()) emit("refine", prompt.value.trim());
+    return;
+  }
   if (suggests.value) return emit("suggest");
   if (!fix.value && !prompt.value.trim()) return;
   emit("submit", prompt.value.trim());
@@ -62,7 +87,7 @@ function submit() {
         ref="input"
         v-model="prompt"
         class="nb-assist__input"
-        :placeholder="assist.file ? `What should the code do with ${fileName}?` : assist.canSuggest ? 'Describe the code this cell should have, or ask for a suggestion' : 'Describe the code this cell should have'"
+        :placeholder="placeholder"
         :disabled="asking"
         aria-label="What the code should do"
         @keydown.enter.prevent="submit"
@@ -73,6 +98,15 @@ function submit() {
       </span>
       <button v-if="asking" class="nb-assist__btn" @click="emit('stop')">Stop</button>
       <button
+        v-else-if="refining"
+        class="nb-assist__btn nb-assist__btn--go"
+        :disabled="!prompt.trim()"
+        title="The assistant changes its proposal as asked, in the same conversation: it sees the cell and, once it has run, what it showed"
+        @click="submit"
+      >
+        Refine
+      </button>
+      <button
         v-else-if="suggests"
         class="nb-assist__btn nb-assist__btn--go"
         title="The assistant proposes a next step from the cells above and the session's data"
@@ -80,10 +114,25 @@ function submit() {
       >
         Suggest
       </button>
-      <button v-else-if="!fix" class="nb-assist__btn nb-assist__btn--go" :disabled="!prompt.trim()" @click="submit">Write</button>
+      <template v-else-if="!fix">
+        <button
+          v-if="steers"
+          class="nb-assist__btn"
+          title="The assistant proposes a next step from the cells above and the session's data, with this in mind"
+          @click="emit('suggest', prompt.trim())"
+        >
+          Suggest
+        </button>
+        <button class="nb-assist__btn nb-assist__btn--go" :disabled="!prompt.trim()" @click="submit">Write</button>
+      </template>
       <button v-else-if="assist.state === 'error' || assist.state === 'idle'" class="nb-assist__btn nb-assist__btn--go" @click="submit">Try again</button>
       <button class="nb-assist__x" title="Close (Esc)" aria-label="Close" @click="emit('discard')">✕</button>
     </div>
+
+    <!-- The conversation a follow-up continues: what was asked in it. -->
+    <p v-if="refining && assist.asked && assist.asked.length" class="nb-assist__asked" :title="assist.asked.join(' → ')">
+      Continuing: {{ assist.asked.join(" → ") }}
+    </p>
 
     <!-- What the assistant did: each look or run as it happens. -->
     <ul v-if="assist.steps && assist.steps.length" class="nb-assist__steps">
@@ -288,6 +337,14 @@ $assist_tint: #f0ebfb;
 }
 .nb-assist__note--model {
   font-style: italic;
+}
+.nb-assist__asked {
+  margin: 4px 0 0;
+  color: theme.$gray_4;
+  font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .nb-assist__summary {
   margin: 6px 0 0;

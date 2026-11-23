@@ -118,8 +118,15 @@ export async function getAgent(kernelBaseUrl, token, { fetchFn = globalThis.fetc
     });
     if (!resp.ok) return { available: false };
     const body = await resp.json();
-    // modes: what the agent takes (write, fix, suggest); an older one says nothing.
-    return { available: !!body.available, model: body.model || "", budget: body.budget || null, modes: Array.isArray(body.modes) ? body.modes : ["write", "fix"] };
+    // modes: what the agent takes (write, fix, suggest); an older one says
+    // nothing. followUps: a proposal can be followed up in its conversation.
+    return {
+      available: !!body.available,
+      model: body.model || "",
+      budget: body.budget || null,
+      modes: Array.isArray(body.modes) ? body.modes : ["write", "fix"],
+      followUps: body.followUps === true,
+    };
   } catch {
     return { available: false };
   }

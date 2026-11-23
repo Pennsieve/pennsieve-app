@@ -15,7 +15,7 @@ import AddDataDialog from "./AddDataDialog.vue";
 import { useSessionInputs } from "./useSessionInputs";
 import EnvironmentPanel from "./EnvironmentPanel.vue";
 import { sessionPathCode } from "./pathCode";
-import { acceptedCode, addCellSpend, assistRequest, budgetPause, cellCode, requestCost, sessionFiles } from "./assistHelpers";
+import { acceptedCode, addCellSpend, assistRequest, budgetPause, cellCode, followUpRequest, requestCost, sessionFiles } from "./assistHelpers";
 import RuntimeMark from "../WorkflowGraph/RuntimeMark.vue";
 import { fetchRun } from "../RunMonitor/runDetails";
 import { runOnGpu, runNodeId, gpuShortLabel, gpuMarkTitle, sessionRestrictions } from "../RunMonitor/notebookHelpers";
@@ -573,9 +573,24 @@ function openAssist(cell, { mode = "write", file = "" } = {}) {
   // An agent that says it can suggests a next cell when nothing is typed
   // (not for a file: that asks what to do with it).
   const canSuggest = !!assistInfo.value.agent && (assistInfo.value.modes || []).includes("suggest") && mode === "write" && !file;
-  cell._assist = { mode, file, canSuggest, prompt: "", state: "idle", text: "", error: "", steps: [], note: "", usage: null, budget: null };
+  cell._assist = { ...newAssist(mode, file), canSuggest };
   select(cell.id);
   if (mode === "fix") submitAssist(cell, "");
+}
+
+// A bar's state. followUps: the agent continues a proposal's conversation
+// with a follow-up (asked: what was asked in it so far).
+function newAssist(mode = "write", file = "") {
+  const followUps = !!assistInfo.value.agent && !!assistInfo.value.followUps;
+  return { mode, file, canSuggest: false, followUps, asked: [], prompt: "", state: "idle", text: "", error: "", steps: [], note: "", usage: null, budget: null };
+}
+
+// After a proposal is put in a cell: the bar stays on it, empty, for a
+// follow-up in the same conversation. used: the proposal is in the cell;
+// usedOutputs: its outputs then (a run since replaces them).
+function keepFollowUp(target, a) {
+  if (!target || !a.followUps || !a.conversationId) return;
+  target._assist = { ...newAssist(), conversationId: a.conversationId, asked: a.asked || [], used: true, usedOutputs: target.outputs };
 }
 
 // An agent's event, onto the bar's state (step, run, note, usage, budget).
@@ -605,7 +620,7 @@ function onAgentEvent(a, ev) {
 // the single-shot assistant was tried, 2026-11-23: a third of the agent's
 // cost, but on a knowledge graph's questions it guessed values the agent
 // looks up, right 1 time in 6 against the agent's 4.)
-async function submitAssist(cell, prompt, { allowRun = false, codeOnly = false } = {}) {
+async function submitAssist(cell, prompt, { allowRun = false, codeOnly = false, followUp = false } = {}) {
   const a = cell._assist;
   if (!a) return;
   const info = assistInfo.value;
@@ -613,7 +628,10 @@ async function submitAssist(cell, prompt, { allowRun = false, codeOnly = false }
   a.via = viaAgent ? "agent" : "single";
   // Each request (a continuation too) counts its own tokens.
   Object.assign(a, { prompt, state: "asking", error: "", note: "", running: allowRun, usage: null, countedTokens: 0, partial: false });
-  if (!allowRun) Object.assign(a, { text: "", steps: [], usage: null, budget: null, outputs: null, conversationId: "" });
+  // A follow-up continues the conversation; anything else but Fix and run
+  // starts one.
+  if (!allowRun) Object.assign(a, { text: "", answer: "", steps: [], usage: null, budget: null, outputs: null, conversationId: followUp ? a.conversationId : "" });
+  if (!allowRun && prompt) a.asked = [...(followUp ? a.asked || [] : []), prompt];
   const controller = new AbortController();
   assistAborts.set(cell.id, controller);
   try {
@@ -621,6 +639,8 @@ async function submitAssist(cell, prompt, { allowRun = false, codeOnly = false }
       const body =
         allowRun && a.conversationId
           ? { mode: "fix", conversationId: a.conversationId, allowRun: true }
+          : followUp
+          ? followUpRequest({ conversationId: a.conversationId, prompt, cell, used: !!a.used, ran: !!a.used && cell.outputs !== a.usedOutputs })
           : assistRequest({
               mode: a.mode,
               prompt,
@@ -642,6 +662,8 @@ async function submitAssist(cell, prompt, { allowRun = false, codeOnly = false }
         summary: proposal.summary || "",
         outputs: proposal.outputs || null,
         conversationId: proposal.conversationId,
+        // The new proposal isn't in the cell (yet).
+        used: false,
       });
     } else {
       const body = assistRequest({
@@ -714,6 +736,9 @@ async function fixAndRun(cell) {
     cell.outputs = a.outputs;
     cell.execution_count = null;
     closeAssist(cell);
+    // Its run's outputs are in the cell: a follow-up sends them.
+    keepFollowUp(cell, a);
+    if (cell._assist) cell._assist.usedOutputs = null;
     fileBrowserRef.value?.refresh?.();
   } else {
     a.state = "failed";
@@ -729,9 +754,10 @@ function onAssist(cell, { action, prompt }) {
     if (a.mode === "suggest") a.mode = "write";
     submitAssist(cell, prompt);
   } else if (action === "suggest") {
+    // With something typed: a next step with that in mind.
     a.mode = "suggest";
-    submitAssist(cell, "");
-  } else if (action === "stop") assistAborts.get(cell.id)?.abort();
+    submitAssist(cell, prompt || "");
+  } else if (action === "refine") submitAssist(cell, prompt, { followUp: true }); else if (action === "stop") assistAborts.get(cell.id)?.abort();
   else if (action === "clear-file") a.file = "";
   else if (action === "discard") closeAssist(cell);
   else if (action === "accept-run") fixAndRun(cell);
@@ -755,6 +781,7 @@ function onAssist(cell, { action, prompt }) {
     let id = cell.id;
     if (action.startsWith("insert-below")) id = addCell(cell.id, "code");
     setSource(id, code);
+    keepFollowUp(cells.value[idx(id)], a);
     focusCell(id);
     // ...and run, for the actions that say so.
     if (action.endsWith("-run")) {
