@@ -13,7 +13,7 @@ import FileNode from "./FileNode.vue";
 import { ArrowRight } from "@element-plus/icons-vue";
 import { fileIconForPath } from "@/utils/fileIconForPath";
 import { sessionPathCode } from "./pathCode";
-import { visibleEntries, readShowHidden, writeShowHidden, readOnlyLocal, writeOnlyLocal } from "./fileBrowserHelpers";
+import { visibleEntries, readShowHidden, writeShowHidden, readOnlyLocal, writeOnlyLocal, fmtSize } from "./fileBrowserHelpers";
 import { useRememberedFold } from "./sectionFold";
 import { costLine } from "./inputsHelpers";
 import { sourceBase } from "./useSessionInputs";
@@ -37,7 +37,7 @@ const props = defineProps({
   inputs: { type: Object, default: null },
 });
 
-const emit = defineEmits(["insert-path", "open-notebook", "insert-snippet", "ask-file", "add-data"]);
+const emit = defineEmits(["insert-path", "open-notebook", "insert-snippet", "ask-file", "add-data", "starters"]);
 
 // Tree node: { name, path, type, size, last_modified, children, open, loading }
 const roots = ref([]);
@@ -189,6 +189,25 @@ async function loadRoot(preserve = false) {
   } finally {
     loading.value = false;
   }
+  emitStarters();
+}
+
+// The inputs' structured layouts (the records as tables, as a graph), for the
+// notebook's start card: [{ key, source, layout (with its entry), path }],
+// path the folder its starter code reads.
+async function emitStarters() {
+  const out = [];
+  for (const source of props.inputs?.sources || []) {
+    try {
+      for (const l of await layoutsFor(source)) {
+        const layout = layoutAt([l], l.folder);
+        if (layout?.entry) out.push({ key: `${sourceBase(source)}|${l.id}|${l.folder}`, source, layout, path: `${sourceBase(source)}/${l.folder}` });
+      }
+    } catch {
+      // No layouts for it: nothing to offer.
+    }
+  }
+  emit("starters", out);
 }
 
 function collectOpenPaths(nodes, acc = new Set()) {
@@ -290,15 +309,6 @@ function downloadSelected(noted = false) {
 
 // The inputs that couldn't join the session, with why.
 const pendingProblems = computed(() => (props.inputs?.pending || []).filter((p) => p.error));
-
-function fmtSize(n) {
-  if (n == null) return "";
-  if (n < 0) n = 0;
-  if (n < 1024) return `${n} B`;
-  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
-  if (n < 1024 * 1024 * 1024) return `${(n / (1024 * 1024)).toFixed(1)} MB`;
-  return `${(n / (1024 * 1024 * 1024)).toFixed(1)} GB`;
-}
 
 function fmtTime(t) {
   if (!t) return "";

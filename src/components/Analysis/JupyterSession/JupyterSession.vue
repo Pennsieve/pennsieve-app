@@ -9,6 +9,9 @@ import { useRoute, useRouter, onBeforeRouteLeave } from "vue-router";
 import { useJupyterSession } from "@/composables/useJupyterSession";
 import { markSessionEnded } from "../RunMonitor/endedSessions";
 import NotebookCell from "./NotebookCell.vue";
+import StartCard from "./StartCard.vue";
+import { notebookEmpty } from "./startCardHelpers";
+import { fmtSize } from "./fileBrowserHelpers";
 import AssistSpend from "./AssistSpend.vue";
 import FileBrowser from "./FileBrowser.vue";
 import AddDataDialog from "./AddDataDialog.vue";
@@ -828,6 +831,19 @@ function onAssist(cell, { action, prompt }) {
   }
 }
 
+// An empty notebook's start card: the inputs' records (as tables, as a
+// graph) to load, while the notebook has no code (until hidden).
+const starters = ref([]);
+const startDismissed = ref(false);
+const showStart = computed(() => status.value === "ready" && !startDismissed.value && starters.value.length > 0 && notebookEmpty(cells.value));
+// Its Suggest: the agent's first step, in the first cell.
+function suggestFirstStep() {
+  const cell = cells.value.find((c) => c.cell_type === "code") || cells.value[idx(addCell(null, "code"))];
+  if (!cell) return;
+  if (!cell._assist) openAssist(cell);
+  onAssist(cell, { action: "suggest" });
+}
+
 // A file's Ask… (the file browser): the assistant on a cell of its own,
 // about that file.
 function askAboutFile(path) {
@@ -1234,6 +1250,7 @@ const kernelPill = computed(() => {
             @insert-path="insertPath"
             @open-notebook="requestOpen"
             @insert-snippet="insertSnippet"
+            @starters="starters = $event"
             :assist-available="assistAvailable"
             :assist-paused="assistPaused"
             @ask-file="askAboutFile"
@@ -1412,6 +1429,17 @@ const kernelPill = computed(() => {
         </div>
 
         <div class="nb-doc">
+          <StartCard
+            v-if="showStart"
+            :starters="starters"
+            :inputs="inputs"
+            :kernel-name="kernelName"
+            :can-suggest="assistAvailable && !assistPaused && !!assistInfo.agent"
+            :fmt-size="fmtSize"
+            @insert-snippet="insertSnippet"
+            @suggest="suggestFirstStep"
+            @dismiss="startDismissed = true"
+          />
           <NotebookCell
             v-for="(cell, i) in cells"
             :key="cell.id"
