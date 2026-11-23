@@ -20,7 +20,7 @@ const props = defineProps({
   // The cell's last run failed: Fix is on offer.
   cellHasError: { type: Boolean, default: false },
 });
-const emit = defineEmits(["submit", "suggest", "refine", "restart", "fix", "stop", "accept", "accept-run", "use-run", "insert-below", "insert-below-run", "insert-answer", "answer-to-code", "discard", "clear-file"]);
+const emit = defineEmits(["submit", "suggest", "explain", "refine", "restart", "fix", "stop", "accept", "accept-run", "use-run", "insert-below", "insert-below-run", "insert-answer", "answer-to-code", "discard", "clear-file"]);
 
 const prompt = ref(props.assist.prompt || "");
 const input = ref(null);
@@ -90,7 +90,7 @@ const chips = computed(() => {
   if (fix.value || refining.value || asking.value || prompt.value.trim() || a.file || a.text || a.answer) return [];
   const out = [];
   if (a.canSuggest) out.push({ label: "Suggest a next step", run: () => emit("suggest") });
-  if (a.agent && props.cellHasCode) out.push({ label: "Explain this cell", run: () => emit("submit", "Explain what this cell does.") });
+  if (a.agent && props.cellHasCode) out.push({ label: "Explain this cell", run: () => emit("explain") });
   if (props.cellHasError) out.push({ label: "Fix the error", run: () => emit("fix") });
   return out;
 });
@@ -186,9 +186,13 @@ function submit() {
 
     <!-- A question's answer: words, to keep as a Markdown cell or turn into code. -->
     <div v-if="assist.state === 'done' && assist.answer" class="nb-assist__answer markdown-body" v-html="answerHtml" />
+    <!-- An explanation of the cell goes above it; an answer about the data
+         below it, and can be turned into code. -->
     <div v-if="assist.state === 'done' && assist.answer" class="nb-assist__actions">
-      <button class="nb-assist__btn nb-assist__btn--go" @click="emit('insert-answer')">Insert as Markdown cell</button>
-      <button class="nb-assist__btn" @click="emit('answer-to-code')">Write code for this</button>
+      <button class="nb-assist__btn nb-assist__btn--go" @click="emit('insert-answer')">
+        {{ assist.explains ? "Insert above as Markdown" : "Insert below as Markdown" }}
+      </button>
+      <button v-if="!assist.explains" class="nb-assist__btn" @click="emit('answer-to-code')">Write code for this</button>
       <button class="nb-assist__btn" @click="emit('discard')">Close</button>
     </div>
 

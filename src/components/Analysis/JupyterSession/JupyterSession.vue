@@ -776,22 +776,30 @@ function onAssist(cell, { action, prompt }) {
   if (!a) return;
   if (action === "submit") {
     if (a.mode === "suggest") a.mode = "write";
+    a.explains = false;
     submitAssist(cell, prompt);
   } else if (action === "suggest") {
     a.mode = "suggest";
     submitAssist(cell, "");
+  } else if (action === "explain") {
+    // Explain this cell: an answer about its code (kept above it, no code to write).
+    if (a.mode === "suggest") a.mode = "write";
+    a.explains = true;
+    submitAssist(cell, "Explain what this cell does.");
   } else if (action === "refine") submitAssist(cell, prompt, { followUp: true });
   else if (action === "restart") {
     // A new request on this cell, outside the conversation.
-    Object.assign(a, { mode: "write", conversationId: "", asked: [], text: "", answer: "", summary: "", steps: [], state: "idle", error: "", used: false, placement: "", usage: null, budget: null, outputs: null, partial: false, canSuggest: canSuggestFor("write", a.file) });
+    Object.assign(a, { mode: "write", conversationId: "", asked: [], text: "", answer: "", summary: "", steps: [], state: "idle", error: "", used: false, explains: false, placement: "", usage: null, budget: null, outputs: null, partial: false, canSuggest: canSuggestFor("write", a.file) });
   } else if (action === "stop") assistAborts.get(cell.id)?.abort();
   else if (action === "clear-file") a.file = "";
   else if (action === "discard") closeAssist(cell);
   else if (action === "accept-run") fixAndRun(cell);
   else if (action === "insert-answer") {
-    // An answer, kept in the notebook as a Markdown cell below.
-    const id = addCell(cell.id, "markdown");
-    setSource(id, `${a.answer}\n\n_Answered by the AI assistant._`);
+    // An answer, kept in the notebook as a Markdown cell: an explanation of
+    // the cell above it (prose, then the code it's about), any other answer
+    // below it (with the results).
+    const id = a.explains ? addCellAbove(cell.id, "markdown") : addCell(cell.id, "markdown");
+    setSource(id, `${a.answer}\n\n_${a.explains ? "Explained" : "Answered"} by the AI assistant._`);
     const md = cells.value[idx(id)];
     if (md) md._editing = false;
     closeAssist(cell);

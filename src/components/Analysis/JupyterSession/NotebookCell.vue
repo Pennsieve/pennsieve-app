@@ -250,6 +250,7 @@ function latexOf(data) {
         :cell-has-error="hasError"
         @submit="assist('submit', $event)"
         @suggest="assist('suggest')"
+        @explain="assist('explain')"
         @fix="assist('fix')"
         @refine="assist('refine', $event)"
         @restart="assist('restart')"
