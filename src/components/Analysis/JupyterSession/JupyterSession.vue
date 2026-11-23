@@ -587,7 +587,8 @@ function canSuggestFor(mode, file) {
 // with a follow-up (asked: what was asked in it so far).
 function newAssist(mode = "write", file = "") {
   const followUps = !!assistInfo.value.agent && !!assistInfo.value.followUps;
-  return { mode, file, canSuggest: false, followUps, asked: [], prompt: "", state: "idle", text: "", error: "", steps: [], note: "", usage: null, budget: null };
+  // agent: the session's agent answers (questions in words, a proposal's place).
+  return { mode, file, canSuggest: false, agent: !!assistInfo.value.agent, followUps, asked: [], prompt: "", state: "idle", text: "", error: "", steps: [], note: "", usage: null, budget: null };
 }
 
 // After a proposal is put in a cell: the bar stays on it, empty, for a
@@ -636,8 +637,8 @@ async function submitAssist(cell, prompt, { allowRun = false, codeOnly = false, 
   Object.assign(a, { prompt, state: "asking", error: "", note: "", running: allowRun, usage: null, countedTokens: 0, partial: false });
   // A follow-up continues the conversation; anything else but Fix and run
   // starts one. The proposal followed up comes back if the follow-up fails.
-  const previous = followUp ? { text: a.text, answer: a.answer, summary: a.summary } : null;
-  if (!allowRun) Object.assign(a, { text: "", answer: "", steps: [], usage: null, budget: null, outputs: null, conversationId: followUp ? a.conversationId : "" });
+  const previous = followUp ? { text: a.text, answer: a.answer, summary: a.summary, placement: a.placement } : null;
+  if (!allowRun) Object.assign(a, { text: "", answer: "", placement: "", steps: [], usage: null, budget: null, outputs: null, conversationId: followUp ? a.conversationId : "" });
   if (!allowRun && prompt) a.asked = [...(followUp ? a.asked || [] : []), prompt];
   const controller = new AbortController();
   assistAborts.set(cell.id, controller);
@@ -669,6 +670,8 @@ async function submitAssist(cell, prompt, { allowRun = false, codeOnly = false, 
         summary: proposal.summary || "",
         outputs: proposal.outputs || null,
         conversationId: proposal.conversationId,
+        // Where it goes: the cell's code, or a new cell below it (a next step).
+        placement: proposal.placement || "",
         // The new proposal isn't in the cell (yet).
         used: false,
         turn: (a.turn || 0) + 1,
@@ -770,9 +773,8 @@ function onAssist(cell, { action, prompt }) {
     if (a.mode === "suggest") a.mode = "write";
     submitAssist(cell, prompt);
   } else if (action === "suggest") {
-    // With something typed: a next step with that in mind.
     a.mode = "suggest";
-    submitAssist(cell, prompt || "");
+    submitAssist(cell, "");
   } else if (action === "refine") submitAssist(cell, prompt, { followUp: true });
   else if (action === "restart") {
     // A new request on this cell, outside the conversation.

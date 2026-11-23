@@ -52,6 +52,8 @@ const emit = defineEmits([
 const editorRef = ref(null);
 
 const isCode = computed(() => props.cell.cell_type === "code");
+// The last run failed: the assistant offers to fix it.
+const hasError = computed(() => (props.cell.outputs || []).some((o) => o.output_type === "error"));
 const editing = computed(() =>
   isCode.value ? true : !!props.cell._editing
 );
@@ -245,8 +247,10 @@ function latexOf(data) {
         v-if="cell._assist && isCode && cell._assist.mode !== 'fix'"
         :assist="cell._assist"
         :cell-has-code="!!cell.source.trim()"
+        :cell-has-error="hasError"
         @submit="assist('submit', $event)"
-        @suggest="assist('suggest', $event)"
+        @suggest="assist('suggest')"
+        @fix="assist('fix')"
         @refine="assist('refine', $event)"
         @restart="assist('restart')"
         @stop="assist('stop')"
