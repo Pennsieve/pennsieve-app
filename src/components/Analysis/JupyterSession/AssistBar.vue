@@ -24,6 +24,7 @@ const emit = defineEmits(["submit", "suggest", "refine", "restart", "fix", "stop
 
 const prompt = ref(props.assist.prompt || "");
 const input = ref(null);
+const refineInput = ref(null);
 const asking = computed(() => props.assist.state === "asking");
 const fix = computed(() => props.assist.mode === "fix");
 const code = computed(() => cellCode(props.assist.text));
@@ -54,12 +55,27 @@ const placeholder = computed(() => {
   if (a.file) return `What should the code do with ${fileName.value}?`;
   return a.agent ? "Ask a question, or say what the code should do" : "Describe the code this cell should have";
 });
+// A proposal or answer shown in a conversation: the request heads the bar,
+// and the follow-up box sits under the proposal, where reading it ends.
+const shown = computed(() => !!(code.value || props.assist.answer));
+const threaded = computed(
+  () => !!props.assist.followUps && !!props.assist.conversationId && !fix.value && (shown.value || asking.value)
+);
+const heading = computed(() => {
+  const a = props.assist;
+  return (a.asked || []).join(" → ") || a.prompt || (a.mode === "suggest" ? "A suggested next step" : "");
+});
+const refineBelow = computed(() => refining.value && shown.value);
+
 // Each proposal (and the bar kept on a cell after Use) starts the box empty
-// for the next follow-up.
+// for the next follow-up, ready to type in.
 watch(
   () => props.assist.turn,
-  () => {
-    if (refining.value) prompt.value = "";
+  async () => {
+    if (!refining.value) return;
+    prompt.value = "";
+    await nextTick();
+    (refineInput.value || input.value)?.focus({ preventScroll: true });
   }
 );
 
@@ -96,6 +112,7 @@ function submit() {
     <div class="nb-assist__ask">
       <AssistIcon class="nb-assist__mark" :size="15" />
       <span v-if="fix" class="nb-assist__title">{{ title }}</span>
+      <span v-else-if="threaded" class="nb-assist__title nb-assist__request" :title="heading">{{ heading }}</span>
       <input
         v-else
         ref="input"
@@ -111,7 +128,8 @@ function submit() {
         <button v-if="!asking" class="nb-assist__x" aria-label="Leave the file out" @click="emit('clear-file')">✕</button>
       </span>
       <button v-if="asking" class="nb-assist__btn" @click="emit('stop')">Stop</button>
-      <template v-else-if="refining">
+      <!-- The bar kept on a cell after Use: one line, the box in it. -->
+      <template v-else-if="refining && !shown">
         <button
           class="nb-assist__btn nb-assist__btn--go"
           :disabled="!prompt.trim()"
@@ -123,7 +141,7 @@ function submit() {
         <button class="nb-assist__btn" title="A new request on this cell, outside this conversation" @click="emit('restart')">Start over</button>
       </template>
       <button
-        v-else-if="!fix"
+        v-else-if="!fix && !threaded"
         class="nb-assist__btn nb-assist__btn--go"
         :disabled="!prompt.trim()"
         title="A question gets an answer; a change or a next step gets code (Enter)"
@@ -131,7 +149,7 @@ function submit() {
       >
         Ask
       </button>
-      <button v-else-if="assist.state === 'error' || assist.state === 'idle'" class="nb-assist__btn nb-assist__btn--go" @click="submit">Try again</button>
+      <button v-else-if="fix && (assist.state === 'error' || assist.state === 'idle')" class="nb-assist__btn nb-assist__btn--go" @click="submit">Try again</button>
       <button class="nb-assist__x" title="Close (Esc)" aria-label="Close" @click="emit('discard')">✕</button>
     </div>
 
@@ -140,7 +158,7 @@ function submit() {
     </div>
 
     <!-- The conversation a follow-up continues: what was asked in it. -->
-    <p v-if="refining && assist.asked && assist.asked.length" class="nb-assist__asked" :title="assist.asked.join(' → ')">
+    <p v-if="refining && !shown && assist.asked && assist.asked.length" class="nb-assist__asked" :title="assist.asked.join(' → ')">
       Continuing: {{ assist.asked.join(" → ") }}
     </p>
 
@@ -210,6 +228,27 @@ function submit() {
       <span class="nb-assist__note">Written by AI: read it before you run it.</span>
     </div>
 
+    <!-- A change to what's shown: in the same conversation. -->
+    <div v-if="refineBelow" class="nb-assist__refine">
+      <input
+        ref="refineInput"
+        v-model="prompt"
+        class="nb-assist__input"
+        :placeholder="placeholder"
+        aria-label="Ask for a change"
+        @keydown.enter.prevent="submit"
+      />
+      <button
+        class="nb-assist__btn nb-assist__btn--go"
+        :disabled="!prompt.trim()"
+        title="The assistant changes its proposal as asked, in the same conversation: it sees the cell and, once it has run, what it showed"
+        @click="submit"
+      >
+        Refine
+      </button>
+      <button class="nb-assist__btn" title="A new request on this cell, outside this conversation" @click="emit('restart')">Start over</button>
+    </div>
+
     <!-- What it used: tokens, and the cost as the run's governor prices it. -->
     <p v-if="usage" class="nb-assist__usage" title="Tokens as the node's LLM governor counted them; the cost is the run's AI spend before and after this request.">{{ usage }}</p>
   </div>
@@ -248,6 +287,21 @@ $assist_tint: #f0ebfb;
 .nb-assist__title {
   flex: 1;
   color: theme.$gray_6;
+}
+.nb-assist__request {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.nb-assist__refine {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  padding: 4px 6px;
+  border: 1px solid theme.$gray_2;
+  border-radius: 4px;
+  background: theme.$white;
 }
 .nb-assist__input {
   flex: 1;
