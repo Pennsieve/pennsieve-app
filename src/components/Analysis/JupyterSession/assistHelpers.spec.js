@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { ASSIST_NOTE, acceptedCode, assistRequest, cellCode, cellError, deltaText, addCellSpend, budgetPause, cellSpendLabel, cellSpendTitle, requestCost, runSpend, sessionFiles, sseEvents, stepLabel, usageLine } from "./assistHelpers";
-import { getAgent } from "./assistStream";
+import { ASSIST_NOTE, acceptedCode, assistRequest, followUpOutputs, followUpRequest, cellCode, cellError, deltaText, addCellSpend, budgetPause, cellSpendLabel, cellSpendTitle, requestCost, runSpend, sessionFiles, sseEvents, stepLabel, usageLine } from "./assistHelpers";
+import { getAgent, postAssist } from "./assistStream";
 
 const delta = (text) => `event: content_block_delta\ndata: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":${JSON.stringify(text)}}}\n\n`;
 
@@ -121,10 +121,14 @@ describe("runSpend", () => {
 describe("a cell's spend", () => {
   it("adds each request's tokens and cost", () => {
     let spend = addCellSpend(null, { input_tokens: 3000, output_tokens: 200 }, 0.03);
-    spend = addCellSpend(spend, { input_tokens: 1000, output_tokens: 100, cache_read_input_tokens: 500 }, null);
-    expect(spend).toEqual({ requests: 2, tokens: 4800, usd: 0.03 });
+    spend = addCellSpend(spend, { input_tokens: 1000, output_tokens: 100, cache_read_input_tokens: 500 }, null, "agent");
+    expect(spend).toEqual({ requests: 2, tokens: 4800, usd: 0.03, input: 4000, output: 300, cacheRead: 500, cacheWrite: 0, agentRequests: 1 });
     expect(cellSpendLabel(spend)).toBe("$0.03");
-    expect(cellSpendTitle(spend)).toBe("AI assistant on this cell: 2 requests, 4.8k tokens, about $0.03");
+    expect(cellSpendTitle(spend)).toBe("AI assistant on this cell: 2 requests, 4.8k tokens (4.0k new + 500 cached in, 300 out), about $0.03; 1 by the agent");
+    // A cell saved before the split was kept: its totals, then the split from here on.
+    const old = addCellSpend({ requests: 1, tokens: 5000, usd: 0.02 }, { input_tokens: 100, output_tokens: 50 }, 0.01, "single");
+    expect(old).toMatchObject({ requests: 2, tokens: 5150, input: 100, output: 50 });
+    expect(old.agentRequests).toBeUndefined();
   });
 
   it("shows tokens without a cost, and nothing without requests", () => {
@@ -142,8 +146,54 @@ describe("budgetPause", () => {
   });
 });
 
+describe("followUpRequest", () => {
+  const cell = { source: "df.plot()", outputs: [{ output_type: "stream", name: "stdout", text: "ok\n" }] };
+
+  it("is the change asked, in the conversation", () => {
+    expect(followUpRequest({ conversationId: "c", prompt: "log scale", cell, kernel: "Python 3.12" })).toEqual({ mode: "write", conversationId: "c", prompt: "log scale", kernel: "Python 3.12" });
+  });
+
+  it("has the cell once the proposal is in it, and its outputs once it ran", () => {
+    expect(followUpRequest({ conversationId: "c", prompt: "x", cell, used: true })).toEqual({ mode: "write", conversationId: "c", prompt: "x", kernel: "", cell: "df.plot()" });
+    expect(followUpRequest({ conversationId: "c", prompt: "x", cell, used: true, ran: true }).outputs).toEqual([{ output_type: "stream", name: "stdout", text: "ok\n" }]);
+  });
+
+  it("says a cell is still running rather than sending its partial output", () => {
+    const body = followUpRequest({ conversationId: "c", prompt: "x", cell: { ...cell, _running: true }, used: true, ran: true });
+    expect(body.running).toBe(true);
+    expect(body.outputs).toBeUndefined();
+  });
+
+  it("keeps the outputs small: colours out, the newest kept, an error always", () => {
+    const outs = [
+      { output_type: "error", ename: "E", evalue: "\x1b[31mbad\x1b[0m", traceback: [] },
+      ...Array.from({ length: 20 }, (_, i) => ({ output_type: "stream", name: "stdout", text: `${i} ` + "═".repeat(5000) })),
+    ];
+    const out = followUpOutputs(outs);
+    expect(JSON.stringify(out).length).toBeLessThanOrEqual(16000);
+    expect(out[0]).toMatchObject({ output_type: "error", evalue: "bad" });
+    expect(out.at(-1).text.startsWith("19 ")).toBe(true);
+  });
+
+  it("sends outputs' text, clipped, and figures by their type only", () => {
+    const out = followUpOutputs([
+      { output_type: "display_data", data: { "image/png": "iVBOR".repeat(10000), "text/plain": ["<Figure ", "640x480>"] }, metadata: {} },
+      { output_type: "stream", name: "stdout", text: "x".repeat(20000) },
+      { output_type: "error", ename: "KeyError", evalue: "'sex'", traceback: Array.from({ length: 50 }, (_, i) => `line ${i}`) },
+    ]);
+    expect(out[0]).toEqual({ output_type: "display_data", data: { "image/png": "", "text/plain": "<Figure 640x480>" } });
+    expect(out[1].text.length).toBeLessThan(4100);
+    expect(out[2].traceback).toHaveLength(30);
+    expect(out[2].traceback.at(-1)).toBe("line 49");
+  });
+});
+
 describe("getAgent", () => {
   const answering = (body) => async () => ({ ok: true, json: async () => body });
+  it("knows whether the agent takes follow-ups", async () => {
+    expect((await getAgent("https://k", "t", { fetchFn: answering({ available: true, followUps: true }) })).followUps).toBe(true);
+    expect((await getAgent("https://k", "t", { fetchFn: answering({ available: true }) })).followUps).toBe(false);
+  });
   it("keeps the modes the agent takes", async () => {
     const agent = await getAgent("https://k", "t", { fetchFn: answering({ available: true, model: "m", modes: ["write", "fix", "suggest"] }) });
     expect(agent.modes).toEqual(["write", "fix", "suggest"]);
@@ -154,3 +204,20 @@ describe("getAgent", () => {
     expect(agent.modes).toEqual(["write", "fix"]);
   });
 });
+
+describe("postAssist", () => {
+  it("reports the request's tokens from the stream's usage", async () => {
+    const sse = [
+      { type: "message_start", message: { usage: { input_tokens: 4200, cache_read_input_tokens: 1800, output_tokens: 1 } } },
+      { type: "content_block_delta", delta: { type: "text_delta", text: "print(1)" } },
+      { type: "message_delta", usage: { output_tokens: 120 } },
+    ].map((e) => `data: ${JSON.stringify(e)}\n\n`).join("");
+    const body = new ReadableStream({ start: (c) => (c.enqueue(new TextEncoder().encode(sse)), c.close()) });
+    const fetchFn = async () => ({ ok: true, body });
+    let usage = null;
+    const reply = await postAssist("https://k", "t", {}, { fetchFn, onUsage: (u) => (usage = u) });
+    expect(reply).toBe("print(1)");
+    expect(usage).toEqual({ input_tokens: 4200, cache_read_input_tokens: 1800, output_tokens: 120 });
+  });
+});
+

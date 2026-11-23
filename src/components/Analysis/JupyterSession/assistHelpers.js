@@ -91,6 +91,53 @@ export function assistRequest({ mode = "write", prompt = "", cell, cells, kernel
   return body;
 }
 
+// A follow-up on the agent's last proposal, in the same conversation: the
+// change asked; with the cell's code when the proposal was put in (perhaps
+// edited), and its last run's outputs when it ran since (ran: the cell's
+// outputs aren't the ones it had when the proposal went in), or that it's
+// still running. kernel: as the first request said it (the session keeps the
+// conversation's own).
+const CELL_CHARS = 16384;
+export function followUpRequest({ conversationId, prompt, cell, kernel = "", used = false, ran = false }) {
+  const body = { mode: "write", conversationId, prompt, kernel };
+  if (used && cell) {
+    body.cell = String(cell.source || "").slice(0, CELL_CHARS);
+    if (cell._running) body.running = true;
+    else if (ran) body.outputs = followUpOutputs(cell.outputs);
+  }
+  return body;
+}
+
+// A cell's outputs as a follow-up sends them: their text, without terminal
+// colours, clipped (each, and all together: the newest kept, and an error
+// always); a figure or other rich output by its type only (the agent reads
+// text). The session reads about 4,000 characters of them.
+const OUTPUT_CHARS = 4000;
+const OUTPUTS_CHARS = 16000;
+const TERMINAL = /\x1b\[[0-9;?]*[A-Za-z]/g;
+const clipText = (t, limit = OUTPUT_CHARS) => {
+  const s = (Array.isArray(t) ? t.join("") : String(t ?? "")).replace(TERMINAL, "");
+  return s.length > limit ? `${s.slice(0, limit / 2)}\n…\n${s.slice(-limit / 2)}` : s;
+};
+export function followUpOutputs(outputs) {
+  const out = (outputs || []).map((o) => {
+    if (o.output_type === "stream") return { output_type: "stream", name: o.name, text: clipText(o.text) };
+    if (o.output_type === "error") {
+      return { output_type: "error", ename: String(o.ename || ""), evalue: clipText(o.evalue, 1000), traceback: (o.traceback || []).slice(-30).map((t) => clipText(t, 1000)) };
+    }
+    const data = {};
+    for (const mime of Object.keys(o.data || {})) data[mime] = mime === "text/plain" ? clipText(o.data[mime]) : "";
+    return { output_type: o.output_type, data };
+  });
+  // The oldest go first while they're too long together.
+  let size = JSON.stringify(out).length;
+  for (let i = 0; size > OUTPUTS_CHARS && i < out.length; ) {
+    if (out[i].output_type === "error") i++;
+    else size -= JSON.stringify(out.splice(i, 1)[0]).length + 1;
+  }
+  return out;
+}
+
 // An agent's step, in words: what it looked at or ran.
 const STEP_VERBS = { read_file: "Read", list_files: "Listed", inspect: "Looked at", run_code: "Ran" };
 export function stepLabel(step) {
@@ -157,15 +204,21 @@ export function requestCost(before, after) {
 }
 
 // A cell's AI spend, kept with the notebook (cell metadata pennsieve.ai):
-// its requests, their tokens, and their cost where the governor gave one.
-export function addCellSpend(spend, usage, usd) {
-  const t = usage ? (usage.input_tokens || 0) + (usage.output_tokens || 0) + (usage.cache_read_input_tokens || 0) + (usage.cache_creation_input_tokens || 0) : 0;
+// its requests (and how many went to the agent), their tokens, split as the
+// governor counts them (new input, output, cached input read and written),
+// and their cost where the governor gave one. via: "agent" or "single".
+const SPLIT = { input: "input_tokens", output: "output_tokens", cacheRead: "cache_read_input_tokens", cacheWrite: "cache_creation_input_tokens" };
+export function addCellSpend(spend, usage, usd, via = "") {
   const prev = spend || { requests: 0, tokens: 0, usd: 0 };
-  return {
+  const next = {
+    ...prev,
     requests: (prev.requests || 0) + 1,
-    tokens: (prev.tokens || 0) + t,
+    tokens: (prev.tokens || 0) + Object.values(SPLIT).reduce((n, k) => n + (usage?.[k] || 0), 0),
     usd: Math.round(((prev.usd || 0) + (usd || 0)) * 1e6) / 1e6,
   };
+  for (const [key, field] of Object.entries(SPLIT)) next[key] = (prev[key] || 0) + (usage?.[field] || 0);
+  if (via === "agent") next.agentRequests = (prev.agentRequests || 0) + 1;
+  return next;
 }
 
 // The cell's spend in its gutter: its cost, or its tokens without one.
@@ -178,5 +231,7 @@ export function cellSpendTitle(spend) {
   if (!spend?.requests) return "";
   const n = spend.requests === 1 ? "1 request" : `${spend.requests} requests`;
   const cost = spend.usd > 0 ? `, about ${dollars(spend.usd)}` : "";
-  return `AI assistant on this cell: ${n}, ${tokens(spend.tokens || 0)} tokens${cost}`;
+  const split = spend.input != null ? ` (${tokens(spend.input + (spend.cacheWrite || 0))} new + ${tokens(spend.cacheRead || 0)} cached in, ${tokens(spend.output || 0)} out)` : "";
+  const agent = spend.agentRequests ? `; ${spend.agentRequests} by the agent` : "";
+  return `AI assistant on this cell: ${n}, ${tokens(spend.tokens || 0)} tokens${split}${cost}${agent}`;
 }

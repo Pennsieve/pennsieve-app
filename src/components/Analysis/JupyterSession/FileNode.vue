@@ -88,6 +88,32 @@ const layoutSize = computed(() =>
 function showFiles() {
   if (!props.node.open) emit("toggle", props.node);
 }
+// How much of a layout is in the session: none (greyed, a cloud, Download),
+// some, under way (its progress), or all (Load).
+const layoutState = computed(() => {
+  if (!layout.value) return null;
+  const files = view.value.source.entries.filter((e) => layoutFiles.value.has(e.cratePath));
+  let done = 0, under = 0, bytes = 0, size = 0;
+  for (const e of files) {
+    const st = props.inputs.stateOf(view.value.source, e.cratePath);
+    if (st?.state === "done") done++;
+    else if (st?.state === "queued" || st?.state === "downloading") {
+      under++;
+      bytes += st.bytes || 0;
+      size += st.size || e.size || 0;
+    }
+  }
+  return {
+    total: files.length,
+    done,
+    under,
+    percent: size ? Math.floor((100 * bytes) / size) : 0,
+    none: done === 0 && under === 0,
+    all: files.length > 0 && done === files.length,
+  };
+});
+// The layout's Load: its first starter, once it's all downloaded.
+const loadSnippet = computed(() => (layoutState.value?.all ? snippets.value.find((s) => s.id === "load") || null : null));
 // The path its code reads.
 const codePath = computed(() => (layout.value ? layout.value.entry.codePath(props.node.path) : props.node.path));
 
@@ -216,11 +242,12 @@ function onRow() {
     <div
       v-else
       class="fn__row"
-      :class="{ 'is-remote': remote || isStack, 'is-selected': selected }"
+      :class="{ 'is-remote': remote || isStack || layoutState?.none, 'is-selected': selected }"
       :style="{ paddingLeft: depth * 14 + 8 + 'px' }"
       :title="
         bundle
-          ? `${node.path}\n${layout.entry.title}: click for its summary, ▸ for its files`
+          ? `${node.path}\n${layout.entry.title}: click for its summary, ▸ for its files` +
+            (layoutState?.none ? '\nNot downloaded yet: Download brings it into the session' : layoutState && !layoutState.all ? `\n${layoutState.done} of ${layoutState.total} files downloaded` : '')
           : isStack
           ? `${node.path}\n${stackFormat(view.entry)}: read in place from the notebook`
           : remote
@@ -259,6 +286,7 @@ function onRow() {
       <!-- The view's crate folder is shown by what it is; its name is in the row's title. -->
       <span
         class="fn__name"
+        :class="{ 'fn__name--bundle': bundle }"
         :title="node.name === VIEW_CRATE_DIR ? 'This input\'s dataset view (.pennsieve/view.json, an RO-Crate): where its files come from, their sizes and checksums.' : undefined"
         >{{ bundle ? layout.entry.label : node.name === VIEW_CRATE_DIR ? "input manifest" : node.name }}</span
       >
@@ -279,16 +307,41 @@ function onRow() {
            size, progress or failure), then its actions on hover. -->
       <span class="fn__end">
       <span v-if="viewProgress" class="fn__from" :title="viewTitle">
-        {{ view.source.subtitle }} · {{ viewProgress.done }}/{{ viewProgress.total }}<template v-if="view.source.models?.length"> · {{ view.source.models.length }} {{ view.source.models.length === 1 ? "model" : "models" }}</template>
+        {{ view.source.subtitle }} · {{ viewProgress.done }}/{{ viewProgress.total }} files<template v-if="view.source.models?.length"> · {{ view.source.models.length }} {{ view.source.models.length === 1 ? "model" : "models" }}</template>
       </span>
-      <svg v-if="remote && !under" class="fn__cloud" width="12" height="12" viewBox="0 0 16 16" aria-label="Not downloaded">
+      <svg v-if="(remote && !under) || layoutState?.none" class="fn__cloud" width="12" height="12" viewBox="0 0 16 16" aria-label="Not downloaded">
         <path d="M4.5 12.5h7.2a2.8 2.8 0 0 0 .4-5.6 4 4 0 0 0-7.7-1A3.3 3.3 0 0 0 4.5 12.5z" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" />
       </svg>
 
       <span v-if="node.note" class="fn__from" title="The dataset's metadata records, as tables and as a graph">{{ node.note }}</span>
       <span v-if="under" class="fn__state fn__state--active">{{ progress }}</span>
       <span v-else-if="failed" class="fn__state fn__state--failed" :title="fileState.error">failed · retry</span>
-      <span v-else-if="bundle" class="fn__size">{{ fmtSize(layoutSize) }}</span>
+      <template v-else-if="bundle">
+        <span v-if="layoutState.under" class="fn__state fn__state--active">downloading {{ layoutState.percent }}%</span>
+        <!-- Greyed with a cloud when none is downloaded (said in the title). -->
+        <span v-else-if="layoutState.none" class="fn__size">{{ fmtSize(layoutSize) }}</span>
+        <span v-else-if="!layoutState.all" class="fn__size">{{ layoutState.done }}/{{ layoutState.total }}</span>
+        <span v-else class="fn__size">{{ fmtSize(layoutSize) }}</span>
+        <!-- Always shown (not on hover only): what to do with it next. -->
+        <button
+          v-if="!layoutState.under && !layoutState.all && layoutLeft.length"
+          class="fn__now"
+          :title="`Download its ${layoutLeft.length} files (${fmtSize(layoutLeft.reduce((n, e) => n + (e.size || 0), 0))}) into the session`"
+          :aria-label="`Download ${layout.entry.label.toLowerCase()}`"
+          @click.stop="downloadFiles(layoutLeft)"
+        >
+          ⤓
+        </button>
+        <button
+          v-else-if="loadSnippet"
+          class="fn__now"
+          :title="`${loadSnippet.title}: adds a cell`"
+          :aria-label="`Load ${layout.entry.label.toLowerCase()}`"
+          @click.stop="pickSnippet(loadSnippet)"
+        >
+          Load
+        </button>
+      </template>
       <span v-else-if="isStack" class="fn__size">{{ view.entry.size ? fmtSize(view.entry.size) : stackFormat(view.entry) }}</span>
       <span v-else-if="node.type !== 'directory' && node.size != null" class="fn__size">{{ fmtSize(node.size) }}</span>
 
@@ -314,8 +367,9 @@ function onRow() {
           <button class="fn__act" :title="`Download (${fmtSize(node.size)})`" aria-label="Download" @click="download">⤓</button>
         </template>
         <template v-else>
+          <!-- (A layout's own ⤓ is always shown at its row's end.) -->
           <button
-            v-if="isViewFolder && folderLeft.length"
+            v-if="isViewFolder && folderLeft.length && !bundle"
             class="fn__act"
             :title="`Download all ${folderLeft.length} not in the session (${fmtSize(leftSize)})`"
             aria-label="Download all"
@@ -497,6 +551,8 @@ function onRow() {
   text-overflow: ellipsis;
   color: theme.$gray_6;
 }
+/* A layout's name stays readable beside its size, state and button. */
+.fn__name--bundle { flex: 0 1 auto; max-width: calc(100% - 10em); }
 /* Sizes, states and actions in a column at the right. */
 .fn__end {
   display: flex;
@@ -569,6 +625,22 @@ function onRow() {
   color: theme.$gray_5;
   padding: 1px 5px;
   border-radius: 2px;
+}
+.fn__now {
+  flex: 0 0 auto;
+  margin-left: 6px;
+  padding: 0 6px;
+  border: 1px solid theme.$gray_2;
+  border-radius: 3px;
+  background: theme.$white;
+  color: theme.$purple_2;
+  font-size: 11px;
+  line-height: 16px;
+  cursor: pointer;
+}
+.fn__now:hover,
+.fn__now:focus-visible {
+  border-color: theme.$purple_2;
 }
 .fn__act--text {
   font-size: 11px;

@@ -155,10 +155,35 @@ describe("folderSnippets", () => {
     expect(query.code).toContain("WHERE a.predicate = 'biolink:has_attribute'");
     expect(query.code).toContain("JOIN edges AS b ON b.object = a.object AND b.subject <> a.subject");
     expect(nx.code).toMatch(/^# Needs pandas, networkx \(/m);
-    expect(nx.code).toContain('nodes = pd.read_csv(kgx / "nodes.tsv.gz", **tsv)');
+    expect(nx.code).toContain('nodes = pd.read_csv(kgx / "nodes.tsv.gz", usecols=["id", "category", "name"], **tsv)');
+    expect(nx.code).toContain('edges = pd.read_csv(kgx / "edges.tsv.gz", usecols=["subject", "predicate", "object"], **tsv)');
     expect(nx.code).not.toContain("parquet");
-    expect(nx.code).toContain('nx.from_pandas_edgelist(edges, "subject", "object", edge_attr=["predicate"], create_using=nx.MultiDiGraph)');
+    expect(nx.code).toContain('nx.from_pandas_edgelist(graph_edges, "subject", "object", edge_attr=["predicate"], create_using=nx.MultiDiGraph)');
     expect(folderSnippets("input/v/metadata/kgx", "metadata/kgx/", "R 4.4.1")).toEqual([]);
+  });
+
+  it("keeps a large graph out of NetworkX: degrees in pandas, the graph around a hub", () => {
+    const nx = folderSnippets("input/v/metadata/kgx", "metadata/kgx/", py).find((s) => s.id === "networkx");
+    expect(nx.code).toContain('degree = pd.concat([edges.subject, edges.object]).value_counts()');
+    expect(nx.code).toContain("whole = len(edges) <= 500000");
+    expect(nx.code).toContain("graph_edges = edges[edges.subject.isin(seed) | edges.object.isin(seed)].head(500000)");
+    // edges itself stays the whole graph, for the cells after it.
+    expect(nx.code.match(/^\s*edges = /gm)).toEqual(["edges = "]);
+    // The graph is built after the cut, from the edges it keeps.
+    expect(nx.code.indexOf("graph_edges = edges[")).toBeLessThan(nx.code.indexOf("nx.from_pandas_edgelist"));
+  });
+
+  it("holds DuckDB to half the session's memory in every DuckDB starter", () => {
+    const duck = [
+      ...folderSnippets("input/v/metadata/kgx", "metadata/kgx/", py),
+      ...folderSnippets("input/v/metadata", "metadata/", py),
+      ...folderSnippets("input/v/metadata/models/case", "metadata/models/case/", py),
+    ].filter((s) => s.code.includes("duckdb"));
+    expect(duck.length).toBeGreaterThan(5);
+    for (const s of duck) {
+      expect(s.code).toContain(`con = duckdb.connect(config={"memory_limit": f"{os.sysconf('SC_PAGE_SIZE') * os.sysconf('SC_PHYS_PAGES') // 2**21}MiB"})`);
+      expect(s.code).not.toContain("duckdb.connect()");
+    }
   });
 
   it("has none in R, or for a folder that isn't a view's metadata folder", () => {
