@@ -32,5 +32,6 @@ export function starterState(inputs, source, files) {
   };
 }
 
-// Whether a notebook has no code yet (the start card's time).
-export const notebookEmpty = (cells) => (cells || []).every((c) => !String(c.source || "").trim());
+// Whether a notebook has no code yet (the start card's time): a title or
+// notes in Markdown don't count.
+export const notebookEmpty = (cells) => (cells || []).every((c) => c.cell_type !== "code" || !String(c.source || "").trim());

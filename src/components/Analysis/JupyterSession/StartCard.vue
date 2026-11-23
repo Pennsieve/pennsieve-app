@@ -1,72 +1,52 @@
 <script setup>
-// An empty notebook's start: the session's data is in input/ but not in
-// Python yet, so the card says so and offers to load it: each input's
-// structured layouts (the records as tables, as a graph), downloaded first
-// when they aren't yet (the cell goes in once they are), and a first step
-// from the assistant. The notebook shows it while it has no code.
-import { computed, reactive, watch } from "vue";
+// An empty notebook's start: the session's data is in input/ but not loaded
+// yet, so the card says so and offers to load it: each input's structured
+// layouts (the records as tables, as a graph) that have starter code in this
+// kernel's language, downloaded first when they aren't yet, and a first step
+// from the assistant. The notebook shows it while it has no code; the loads
+// asked for are the notebook's (they finish even after the card is gone).
+import { reactive } from "vue";
 import { costLine } from "./inputsHelpers";
-import { starterState } from "./startCardHelpers";
 
 const props = defineProps({
-  // [{ key, source, layout (with its entry), path }] (FileBrowser's starters).
-  starters: { type: Array, default: () => [] },
-  // The session's view inputs (useSessionInputs).
+  // [{ key, source, layout, path, code, state }] (starterRows): what to load.
+  rows: { type: Array, default: () => [] },
+  // Keys of the loads waiting for their download.
+  waiting: { type: Object, default: () => new Set() },
+  // Why the last download couldn't start, or "".
+  error: { type: String, default: "" },
+  // The kernel's language: "Python" or "R".
+  language: { type: String, default: "Python" },
+  // The session's view inputs (useSessionInputs): the download check.
   inputs: { type: Object, required: true },
-  kernelName: { type: String, default: "" },
   // The agent can suggest a first step.
   canSuggest: { type: Boolean, default: false },
   fmtSize: { type: Function, required: true },
 });
-const emit = defineEmits(["insert-snippet", "suggest", "dismiss"]);
+const emit = defineEmits(["load", "suggest", "dismiss"]);
 
-// What each starter's data is in the session: downloaded, under way, or not.
-const rows = computed(() =>
-  props.starters.map((s) => ({ ...s, state: starterState(props.inputs, s.source, s.layout.files || []), label: s.layout.entry.label }))
-);
-const loadCode = (s) => s.layout.entry.snippets(s.path, props.kernelName).find((x) => x.id === "load")?.code || "";
-
-// Starters downloading to be loaded: their cell goes in once all is here.
-const waiting = reactive(new Set());
-// A download that asks first (big, costly, or doesn't fit): { key, bytes, fits, cost, go }.
-const confirm = reactive({ key: "", bytes: 0, fits: true, cost: null, go: null });
+// A download that asks first (big, costly, or doesn't fit): { key, bytes, fits, cost, row }.
+const confirm = reactive({ key: "", bytes: 0, fits: true, cost: null, row: null });
 
 function load(row) {
-  if (row.state.all) return emit("insert-snippet", loadCode(row));
-  if (row.state.under) return waiting.add(row.key);
-  const go = () => {
-    props.inputs.requestEntries(row.source, row.state.left);
-    waiting.add(row.key);
-  };
+  if (row.state.all || row.state.under) return emit("load", row);
   const c = props.inputs.check(row.state.leftBytes, row.state.left);
-  if (c.ask) Object.assign(confirm, { key: row.key, bytes: row.state.leftBytes, fits: c.fits, cost: c.cost, go });
-  else go();
+  if (c.ask) Object.assign(confirm, { key: row.key, bytes: row.state.leftBytes, fits: c.fits, cost: c.cost, row });
+  else emit("load", row);
 }
 function decide(ok, noted = false) {
-  const go = confirm.go;
-  Object.assign(confirm, { key: "", go: null });
+  const row = confirm.row;
+  Object.assign(confirm, { key: "", row: null });
   if (!ok) return;
   if (noted) props.inputs.noteCost();
-  go?.();
+  emit("load", row);
 }
 
-watch(
-  rows,
-  (list) => {
-    for (const row of list) {
-      if (!waiting.has(row.key)) continue;
-      if (row.state.all) {
-        waiting.delete(row.key);
-        emit("insert-snippet", loadCode(row));
-      } else if (row.state.failed) waiting.delete(row.key);
-    }
-  },
-  { deep: true }
-);
-
+const busy = (row) => row.state.under || props.waiting.has(row.key);
 function buttonLabel(row) {
-  const what = row.label.charAt(0).toLowerCase() + row.label.slice(1);
-  if (row.state.under || waiting.has(row.key)) return row.state.under ? `Downloading ${what}… ${row.state.percent}%` : `Loading ${what}…`;
+  const what = row.layout.entry.label.charAt(0).toLowerCase() + row.layout.entry.label.slice(1);
+  if (row.state.under) return `Downloading ${what}… ${row.state.percent}%`;
+  if (props.waiting.has(row.key)) return `Loading ${what}…`;
   if (row.state.all) return `Load ${what}`;
   return `Download and load ${what} · ${props.fmtSize(row.state.leftBytes)}`;
 }
@@ -76,17 +56,17 @@ function buttonLabel(row) {
   <div class="nb-start" role="region" aria-label="Start with your data">
     <div class="nb-start__head">
       <p class="nb-start__title">
-        Your data is in <code>input/</code>, not loaded into Python yet.
+        Your data is in <code>input/</code>, not loaded into {{ language }} yet.
       </p>
       <button class="nb-start__x" title="Hide" aria-label="Hide" @click="emit('dismiss')">✕</button>
     </div>
-    <div class="nb-start__actions">
+    <div class="nb-start__actions" aria-live="polite">
       <button
         v-for="row in rows"
         :key="row.key"
         class="nb-start__btn"
         :class="{ 'nb-start__btn--go': row.state.all }"
-        :disabled="row.state.under || waiting.has(row.key)"
+        :disabled="busy(row)"
         :title="row.layout.entry.title"
         @click="load(row)"
       >
@@ -96,6 +76,7 @@ function buttonLabel(row) {
         Suggest a first step
       </button>
     </div>
+    <p v-if="error" class="nb-start__error" role="alert">The download couldn't start: {{ error }}</p>
     <p v-if="confirm.key" class="nb-start__confirm">
       <template v-if="confirm.fits">
         Download {{ fmtSize(confirm.bytes) }}?
@@ -162,6 +143,11 @@ function buttonLabel(row) {
 .nb-start__btn--go {
   border-color: theme.$purple_2;
   color: theme.$purple_2;
+}
+.nb-start__error {
+  margin: 8px 0 0;
+  color: theme.$red_2;
+  font-size: 12px;
 }
 .nb-start__confirm {
   margin: 8px 0 0;

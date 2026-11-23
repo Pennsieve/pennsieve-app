@@ -1,8 +1,9 @@
 import { describe, it, expect, vi } from "vitest";
 import { mount } from "@vue/test-utils";
-import { nextTick, reactive } from "vue";
+import { computed, nextTick, reactive } from "vue";
 import StartCard from "./StartCard.vue";
 import { starterState, notebookEmpty } from "./startCardHelpers";
+import { useStartLoads } from "./useStartLoads";
 import { fmtSize } from "./fileBrowserHelpers";
 
 const source = {
@@ -48,48 +49,46 @@ describe("starterState", () => {
 
   it("knows an empty notebook", () => {
     expect(notebookEmpty([{ source: "" }, { source: "  \n" }])).toBe(true);
-    expect(notebookEmpty([{ source: "x = 1" }])).toBe(false);
+    expect(notebookEmpty([{ cell_type: "code", source: "x = 1" }])).toBe(false);
+    // A title in Markdown isn't code.
+    expect(notebookEmpty([{ cell_type: "markdown", source: "# Study" }, { cell_type: "code", source: "" }])).toBe(true);
   });
 });
 
-describe("StartCard", () => {
-  const card = (inputs, props = {}) => mount(StartCard, { props: { starters: [tables, graph], inputs, fmtSize, canSuggest: true, ...props } });
-  const labels = (w) => w.findAll(".nb-start__btn").map((b) => b.text());
+// The card's rows, as the notebook makes them (starterRows).
+const rowsOf = (inputs, list = [tables, graph]) =>
+  list.map((s) => ({ ...s, code: s.layout.entry.snippets(s.path).find((x) => x.id === "load").code, state: starterState(inputs, s.source, s.layout.files) }));
 
-  it("says the data isn't loaded, and offers to load each layout and a first step", () => {
-    const w = card(fakeInputs({ "metadata/models/a/versions/1/records.jsonl": done, "metadata/relationships.csv": done }));
-    expect(w.text()).toContain("not loaded into Python yet");
+describe("StartCard", () => {
+  const card = (inputs, props = {}) =>
+    mount(StartCard, { props: { rows: rowsOf(inputs), inputs, fmtSize, canSuggest: true, ...props } });
+  const labels = (w) => w.findAll(".nb-start__btn").map((b) => b.text());
+  const tablesDone = () => fakeInputs({ "metadata/models/a/versions/1/records.jsonl": done, "metadata/relationships.csv": done });
+
+  it("says the data isn't loaded, in the kernel's language, and offers each load and a first step", () => {
+    const w = card(tablesDone(), { language: "R" });
+    expect(w.text()).toContain("not loaded into R yet");
     expect(labels(w)).toEqual(["Load records as tables", "Download and load records as a graph (KGX) · 2.9 KB", "Suggest a first step"]);
   });
 
-  it("loads what's downloaded at once", async () => {
-    const w = card(fakeInputs({ "metadata/models/a/versions/1/records.jsonl": done, "metadata/relationships.csv": done }));
+  it("asks the notebook to load (a download that needs it, after asking)", async () => {
+    const inputs = tablesDone();
+    const w = card(inputs);
     await w.findAll(".nb-start__btn")[0].trigger("click");
-    expect(w.emitted("insert-snippet")).toEqual([['load("input/metadata")']]);
-  });
-
-  it("downloads first, then puts the cell in once it's all here", async () => {
-    const inputs = fakeInputs();
-    const w = card(inputs);
-    await w.findAll(".nb-start__btn")[1].trigger("click");
-    expect(inputs.requestEntries).toHaveBeenCalledWith(source, graph.layout.files.map((p) => source.entries.find((e) => e.cratePath === p)));
-    expect(labels(w)[1]).toBe("Downloading records as a graph (KGX)… 0%");
-    expect(w.emitted("insert-snippet")).toBeUndefined();
-    inputs.states["metadata/kgx/nodes.parquet"] = done;
-    inputs.states["metadata/kgx/edges.parquet"] = done;
-    await nextTick();
-    expect(w.emitted("insert-snippet")).toEqual([['load("input/metadata/kgx")']]);
-  });
-
-  it("asks first for a download that needs it", async () => {
-    const inputs = fakeInputs();
+    expect(w.emitted("load")[0][0].key).toBe("t");
     inputs.check = () => ({ ask: true, fits: true, cost: null });
-    const w = card(inputs);
     await w.findAll(".nb-start__btn")[1].trigger("click");
-    expect(inputs.requestEntries).not.toHaveBeenCalled();
+    expect(w.emitted("load")).toHaveLength(1);
     expect(w.find(".nb-start__confirm").text()).toContain("Download 2.9 KB?");
     await w.findAll(".nb-start__confirm .nb-start__btn")[0].trigger("click");
-    expect(inputs.requestEntries).toHaveBeenCalled();
+    expect(w.emitted("load")[1][0].key).toBe("g");
+  });
+
+  it("shows a load waiting, and an error", () => {
+    const w = card(fakeInputs(), { waiting: new Set(["g"]), error: "the node is busy" });
+    expect(labels(w)[1]).toBe("Loading records as a graph (KGX)…");
+    expect(w.find(".nb-start__btn[disabled]").exists()).toBe(true);
+    expect(w.find(".nb-start__error").text()).toContain("the node is busy");
   });
 
   it("offers no first step without the agent, and can be hidden", async () => {
@@ -97,5 +96,56 @@ describe("StartCard", () => {
     expect(labels(w)).not.toContain("Suggest a first step");
     await w.find(".nb-start__x").trigger("click");
     expect(w.emitted("dismiss")).toHaveLength(1);
+  });
+});
+
+describe("useStartLoads", () => {
+  function setup(inputs) {
+    const rows = computed(() => rowsOf(inputs));
+    const inserted = [];
+    const loads = useStartLoads({ inputs, rows, insert: (code) => inserted.push(code) });
+    return { rows, inserted, loads };
+  }
+
+  it("downloads, then puts each cell in once it's here, whatever else happens meanwhile", async () => {
+    const inputs = fakeInputs();
+    const { rows, inserted, loads } = setup(inputs);
+    await loads.load(rows.value[0]);
+    await loads.load(rows.value[1]);
+    expect([...loads.waiting.value]).toEqual(["t", "g"]);
+    for (const p of tables.layout.files) inputs.states[p] = done;
+    await nextTick();
+    expect(inserted).toEqual(['load("input/metadata")']);
+    // The card is gone by now (the notebook has code): the graph's still comes.
+    for (const p of graph.layout.files) inputs.states[p] = done;
+    await nextTick();
+    expect(inserted).toEqual(['load("input/metadata")', 'load("input/metadata/kgx")']);
+    expect(loads.waiting.value.size).toBe(0);
+  });
+
+  it("lets go of a download that couldn't start, and says why", async () => {
+    const inputs = fakeInputs();
+    inputs.requestEntries = vi.fn(async () => {
+      inputs.requestError = "the node can't fetch inputs";
+    });
+    const { rows, loads } = setup(inputs);
+    await loads.load(rows.value[1]);
+    expect(loads.waiting.value.size).toBe(0);
+    expect(loads.error.value).toBe("the node can't fetch inputs");
+  });
+
+  it("doesn't take an earlier failure for this download's", async () => {
+    const failed = { state: "failed" };
+    const inputs = fakeInputs({ "metadata/kgx/nodes.parquet": failed, "metadata/kgx/edges.parquet": failed });
+    inputs.requestEntries = vi.fn(async () => {});
+    const { rows, inserted, loads } = setup(inputs);
+    await loads.load(rows.value[1]);
+    inputs.states["metadata/models/a/versions/1/records.jsonl"] = { state: "downloading", size: 100, bytes: 1 };
+    await nextTick();
+    expect(loads.waiting.value.has("g"), "still waiting: its download hasn't begun").toBe(true);
+    inputs.states["metadata/kgx/nodes.parquet"] = done;
+    inputs.states["metadata/kgx/edges.parquet"] = done;
+    await nextTick();
+    expect(inserted).toEqual(['load("input/metadata/kgx")']);
   });
 });
