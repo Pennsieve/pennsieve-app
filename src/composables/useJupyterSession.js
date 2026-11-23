@@ -25,6 +25,8 @@ import {
 } from "@jupyterlab/services";
 import { PYTHON_PACKAGES_CODE, R_PACKAGES_CODE, parsePackages } from "@/components/Analysis/JupyterSession/environmentHelpers";
 import { getAgent, getAssist, postAgent, postAssist } from "@/components/Analysis/JupyterSession/assistStream";
+import { displayIdOf, pushOutput, toNbOutputs, updateDisplay } from "@/components/Analysis/JupyterSession/outputHelpers";
+import { kernelReply } from "@/components/Analysis/JupyterSession/kernelHelp";
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const toWs = (u) => u.replace(/^http/i, "ws");
@@ -676,7 +678,7 @@ export function useJupyterSession() {
           source: c.source,
         };
         if (c.cell_type === "code") {
-          base.outputs = c.outputs || [];
+          base.outputs = toNbOutputs(c.outputs);
           base.execution_count = c.execution_count ?? null;
         }
         return base;
@@ -833,34 +835,6 @@ export function useJupyterSession() {
 
   // ---- execution ------------------------------------------------------------
 
-  // Apply carriage returns: within each line, a \r resets to the start, so keep
-  // only the text after the last \r (collapses tqdm-style progress bars to their
-  // final state instead of concatenating every update).
-  function applyCarriageReturns(text) {
-    if (text.indexOf("\r") === -1) return text;
-    return text
-      .split("\n")
-      .map((line) => {
-        const i = line.lastIndexOf("\r");
-        return i === -1 ? line : line.slice(i + 1);
-      })
-      .join("\n");
-  }
-
-  // Coalesce consecutive stream outputs of the same name (matches Jupyter), and
-  // collapse carriage returns so progress bars render cleanly.
-  function pushOutput(cell, out) {
-    if (out.output_type === "stream") {
-      const last = cell.outputs[cell.outputs.length - 1];
-      if (last && last.output_type === "stream" && last.name === out.name) {
-        last.text = applyCarriageReturns(last.text + out.text);
-        return;
-      }
-      out.text = applyCarriageReturns(out.text);
-    }
-    cell.outputs.push(out);
-  }
-
   // The packages the kernel can import, asked silently (no cell, no history):
   // [{ name, version }], or null when it printed none. It waits behind a
   // cell that's running.
@@ -914,13 +888,19 @@ export function useJupyterSession() {
             execution_count: c.execution_count,
           });
           break;
-        case "display_data":
+        case "display_data": {
+          const out = { output_type: "display_data", data: c.data, metadata: c.metadata || {} };
+          // Kept so a later update_display_data finds it; not saved.
+          const displayId = displayIdOf(c);
+          if (displayId) out._displayId = displayId;
+          addOutput(out);
+          break;
+        }
         case "update_display_data":
-          addOutput({
-            output_type: "display_data",
-            data: c.data,
-            metadata: c.metadata || {},
-          });
+          // Changes the outputs already shown with that id, wherever they
+          // are, without adding one (and, as in Jupyter, without doing a
+          // pending clear_output(wait=True)).
+          if (updateDisplay(cells.value, displayIdOf(c), c)) dirty.value = true;
           break;
         case "error":
           addOutput({
@@ -1141,6 +1121,17 @@ export function useJupyterSession() {
     status.value = "closed";
   }
 
+  // Tab completion and Shift-Tab help in a cell, from the kernel: the reply's
+  // content, or null (no kernel, or no answer in time).
+  function complete(code, cursorPos) {
+    return kernel ? kernelReply(() => kernel.requestComplete({ code, cursor_pos: cursorPos })) : Promise.resolve(null);
+  }
+  function inspect(code, cursorPos) {
+    return kernel
+      ? kernelReply(() => kernel.requestInspect({ code, cursor_pos: cursorPos, detail_level: 0 }))
+      : Promise.resolve(null);
+  }
+
   return {
     // state
     status,
@@ -1195,5 +1186,8 @@ export function useJupyterSession() {
     interrupt,
     restart,
     restartAndRunAll,
+    // editor
+    complete,
+    inspect,
   };
 }

@@ -53,9 +53,10 @@ export async function getAssist(kernelBaseUrl, token, { fetchFn = globalThis.fet
   }
 }
 
-// Asks, calling onText with the reply so far as it arrives; resolves to the
-// whole reply. signal stops it.
-export async function postAssist(kernelBaseUrl, token, body, { onText, signal, fetchFn = globalThis.fetch } = {}) {
+// Asks, calling onText with the reply so far as it arrives, and onUsage with
+// the request's tokens (Anthropic's message_start and message_delta usage, as
+// the agent reports them); resolves to the whole reply. signal stops it.
+export async function postAssist(kernelBaseUrl, token, body, { onText, onUsage, signal, fetchFn = globalThis.fetch } = {}) {
   const resp = await fetchFn(`${kernelBaseUrl}${ASSIST_PATH}`, {
     method: "POST",
     credentials: "include",
@@ -77,6 +78,7 @@ export async function postAssist(kernelBaseUrl, token, body, { onText, signal, f
   const decoder = new TextDecoder();
   let buffer = "";
   let reply = "";
+  let usage = null;
   for (;;) {
     const { value, done } = await reader.read();
     if (done) break;
@@ -84,6 +86,11 @@ export async function postAssist(kernelBaseUrl, token, body, { onText, signal, f
     const { events, rest } = sseEvents(buffer);
     buffer = rest;
     for (const ev of events) {
+      const u = ev?.type === "message_start" ? ev.message?.usage : ev?.type === "message_delta" ? ev.usage : null;
+      if (u) {
+        usage = { ...(usage || {}), ...Object.fromEntries(Object.entries(u).filter(([, v]) => typeof v === "number")) };
+        onUsage?.(usage);
+      }
       const text = deltaText(ev);
       if (text) {
         reply += text;
@@ -111,8 +118,15 @@ export async function getAgent(kernelBaseUrl, token, { fetchFn = globalThis.fetc
     });
     if (!resp.ok) return { available: false };
     const body = await resp.json();
-    // modes: what the agent takes (write, fix, suggest); an older one says nothing.
-    return { available: !!body.available, model: body.model || "", budget: body.budget || null, modes: Array.isArray(body.modes) ? body.modes : ["write", "fix"] };
+    // modes: what the agent takes (write, fix, suggest); an older one says
+    // nothing. followUps: a proposal can be followed up in its conversation.
+    return {
+      available: !!body.available,
+      model: body.model || "",
+      budget: body.budget || null,
+      modes: Array.isArray(body.modes) ? body.modes : ["write", "fix"],
+      followUps: body.followUps === true,
+    };
   } catch {
     return { available: false };
   }
@@ -152,14 +166,15 @@ export async function postAgent(kernelBaseUrl, token, body, { onEvent, signal, f
     buffer = rest;
     for (const ev of events) {
       if (ev.type === "proposal") proposal = ev;
-      if (ev.type === "error") failure = ev.message || "The assistant stopped with an error.";
+      if (ev.type === "error") failure = ev;
       if (ev.type === "budget_exceeded") usedUp = ev;
       onEvent?.(ev);
     }
   }
   // No AI budget left: not a failure of the assistant's, said as it is.
   if (usedUp) throw Object.assign(new Error(usedUp.message || "There's no AI budget left."), { budgetExceeded: usedUp });
-  if (failure) throw new Error(failure);
+  // code: conversation_ended, when a follow-up's conversation is gone.
+  if (failure) throw Object.assign(new Error(failure.message || "The assistant stopped with an error."), { code: failure.code || "" });
   if (!proposal) throw new Error("The assistant stopped without proposing code.");
   return proposal;
 }

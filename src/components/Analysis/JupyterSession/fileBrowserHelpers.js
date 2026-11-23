@@ -41,3 +41,13 @@ export const readShowHidden = (storage = globalThis.localStorage) => readFlag(SH
 export const writeShowHidden = (value, storage = globalThis.localStorage) => writeFlag(SHOW_HIDDEN_KEY, value, storage);
 export const readOnlyLocal = (storage = globalThis.localStorage) => readFlag(ONLY_LOCAL_KEY, storage);
 export const writeOnlyLocal = (value, storage = globalThis.localStorage) => writeFlag(ONLY_LOCAL_KEY, value, storage);
+
+// A size in bytes, for people: 194.5 MB.
+export function fmtSize(n) {
+  if (n == null) return "";
+  if (n < 0) n = 0;
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
+  if (n < 1024 * 1024 * 1024) return `${(n / (1024 * 1024)).toFixed(1)} MB`;
+  return `${(n / (1024 * 1024 * 1024)).toFixed(1)} GB`;
+}

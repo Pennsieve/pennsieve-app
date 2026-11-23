@@ -9,13 +9,18 @@ import { useRoute, useRouter, onBeforeRouteLeave } from "vue-router";
 import { useJupyterSession } from "@/composables/useJupyterSession";
 import { markSessionEnded } from "../RunMonitor/endedSessions";
 import NotebookCell from "./NotebookCell.vue";
+import StartCard from "./StartCard.vue";
+import { notebookEmpty, starterState } from "./startCardHelpers";
+import { useStartLoads } from "./useStartLoads";
+import { isR } from "./fileSnippets";
+import { fmtSize } from "./fileBrowserHelpers";
 import AssistSpend from "./AssistSpend.vue";
 import FileBrowser from "./FileBrowser.vue";
 import AddDataDialog from "./AddDataDialog.vue";
 import { useSessionInputs } from "./useSessionInputs";
 import EnvironmentPanel from "./EnvironmentPanel.vue";
 import { sessionPathCode } from "./pathCode";
-import { acceptedCode, addCellSpend, assistRequest, budgetPause, cellCode, requestCost, sessionFiles } from "./assistHelpers";
+import { acceptedCode, addCellSpend, assistRequest, budgetPause, cellCode, followUpRequest, requestCost, sessionFiles } from "./assistHelpers";
 import RuntimeMark from "../WorkflowGraph/RuntimeMark.vue";
 import { fetchRun } from "../RunMonitor/runDetails";
 import { runOnGpu, runNodeId, gpuShortLabel, gpuMarkTitle, sessionRestrictions } from "../RunMonitor/notebookHelpers";
@@ -163,6 +168,8 @@ const {
   assistStatus,
   askAssist,
   askAgent,
+  complete,
+  inspect,
   setSource,
   addCell,
   addCellAbove,
@@ -570,10 +577,32 @@ function openAssist(cell, { mode = "write", file = "" } = {}) {
   if (cell._assist?.state === "asking") return;
   // An agent that says it can suggests a next cell when nothing is typed
   // (not for a file: that asks what to do with it).
-  const canSuggest = !!assistInfo.value.agent && (assistInfo.value.modes || []).includes("suggest") && mode === "write" && !file;
-  cell._assist = { mode, file, canSuggest, prompt: "", state: "idle", text: "", error: "", steps: [], note: "", usage: null, budget: null };
+  cell._assist = { ...newAssist(mode, file), canSuggest: canSuggestFor(mode, file) };
   select(cell.id);
   if (mode === "fix") submitAssist(cell, "");
+}
+
+// An agent that says it can suggests a next cell when nothing is typed (not
+// for a file: that asks what to do with it).
+function canSuggestFor(mode, file) {
+  return !!assistInfo.value.agent && (assistInfo.value.modes || []).includes("suggest") && mode === "write" && !file;
+}
+
+// A bar's state. followUps: the agent continues a proposal's conversation
+// with a follow-up (asked: what was asked in it so far).
+function newAssist(mode = "write", file = "") {
+  const followUps = !!assistInfo.value.agent && !!assistInfo.value.followUps;
+  // agent: the session's agent answers (questions in words, a proposal's place).
+  return { mode, file, canSuggest: false, agent: !!assistInfo.value.agent, followUps, asked: [], prompt: "", state: "idle", text: "", error: "", steps: [], note: "", usage: null, budget: null };
+}
+
+// After a proposal is put in a cell: the bar stays on it, empty, for a
+// follow-up in the same conversation. used: the proposal is in the cell;
+// usedOutputs: its outputs then (a run since replaces them).
+function keepFollowUp(target, a) {
+  if (!target || !a.followUps || !a.conversationId) return;
+  // turn: a new one empties the bar's box.
+  target._assist = { ...newAssist(), conversationId: a.conversationId, asked: a.asked || [], used: true, usedOutputs: target.outputs, turn: (a.turn || 0) + 1 };
 }
 
 // An agent's event, onto the bar's state (step, run, note, usage, budget).
@@ -598,21 +627,33 @@ function onAgentEvent(a, ev) {
   }
 }
 
-// Asks: the agent (allowRun continues a fix's conversation: Fix and run),
-// or the single-shot assistant.
-async function submitAssist(cell, prompt, { allowRun = false, codeOnly = false } = {}) {
+// Asks: the agent when the session has one (allowRun continues a fix's
+// conversation: Fix and run), else the single-shot assistant. (Writing on
+// the single-shot assistant was tried, 2026-11-23: a third of the agent's
+// cost, but on a knowledge graph's questions it guessed values the agent
+// looks up, right 1 time in 6 against the agent's 4.)
+async function submitAssist(cell, prompt, { allowRun = false, codeOnly = false, followUp = false } = {}) {
   const a = cell._assist;
   if (!a) return;
+  const info = assistInfo.value;
+  const viaAgent = !!info.agent;
+  a.via = viaAgent ? "agent" : "single";
   // Each request (a continuation too) counts its own tokens.
   Object.assign(a, { prompt, state: "asking", error: "", note: "", running: allowRun, usage: null, countedTokens: 0, partial: false });
-  if (!allowRun) Object.assign(a, { text: "", steps: [], usage: null, budget: null, outputs: null, conversationId: "" });
+  // A follow-up continues the conversation; anything else but Fix and run
+  // starts one. The proposal followed up comes back if the follow-up fails.
+  const previous = followUp ? { text: a.text, answer: a.answer, summary: a.summary, placement: a.placement, used: !!a.used } : null;
+  if (!allowRun) Object.assign(a, { text: "", answer: "", placement: "", steps: [], usage: null, budget: null, outputs: null, conversationId: followUp ? a.conversationId : "" });
+  if (!allowRun && prompt) a.asked = [...(followUp ? a.asked || [] : []), prompt];
   const controller = new AbortController();
   assistAborts.set(cell.id, controller);
   try {
-    if (assistInfo.value.agent) {
+    if (viaAgent) {
       const body =
         allowRun && a.conversationId
-          ? { mode: "fix", conversationId: a.conversationId, allowRun: true }
+          ? { mode: "fix", conversationId: a.conversationId, allowRun: true, kernel: kernelName.value }
+          : followUp
+          ? followUpRequest({ conversationId: a.conversationId, prompt, cell, kernel: kernelName.value, used: !!a.used, ran: !!a.used && cell.outputs !== a.usedOutputs })
           : assistRequest({
               mode: a.mode,
               prompt,
@@ -625,6 +666,8 @@ async function submitAssist(cell, prompt, { allowRun = false, codeOnly = false }
               packages: await assistPackages(),
             });
       if (codeOnly) body.codeOnly = true;
+      // This app places proposals: the agent may propose a next step below.
+      if (!allowRun) body.placements = true;
       const proposal = await askAgent(body, { signal: controller.signal, onEvent: (ev) => onAgentEvent(a, ev) });
       // A question's answer is words, not code.
       if (proposal.kind === "answer") a.lastAnswer = proposal.answer;
@@ -634,6 +677,13 @@ async function submitAssist(cell, prompt, { allowRun = false, codeOnly = false }
         summary: proposal.summary || "",
         outputs: proposal.outputs || null,
         conversationId: proposal.conversationId,
+        // Where it goes: the cell's code, or a new cell below it (a next step).
+        // (A session that doesn't say: a follow-up on a proposal not yet in
+        // a cell keeps where it was going.)
+        placement: proposal.placement || (previous && !previous.used ? previous.placement : "") || "",
+        // The new proposal isn't in the cell (yet).
+        used: false,
+        turn: (a.turn || 0) + 1,
       });
     } else {
       const body = assistRequest({
@@ -646,10 +696,35 @@ async function submitAssist(cell, prompt, { allowRun = false, codeOnly = false }
         files: sessionFiles(inputs.sources, kernelName.value),
         packages: await assistPackages(),
       });
-      await askAssist(body, { onText: (t) => (a.text = t), signal: controller.signal });
+      await askAssist(body, {
+        onText: (t) => (a.text = t),
+        onUsage: (u) => {
+          a.usage = u;
+          assistLast.value = { usage: u, budget: null };
+        },
+        signal: controller.signal,
+      });
+      // Its cost: the change in the governor's figures across it (the
+      // single-shot assistant reports none of its own).
+      const after = await assistStatus().catch(() => null);
+      if (after?.available) {
+        const cost = requestCost(info.budget, after.budget);
+        a.budget = cost == null ? after.budget : { ...after.budget, requestUsd: cost };
+        assistInfo.value = { ...assistInfo.value, budget: after.budget };
+        assistLast.value = { usage: a.usage, budget: a.budget };
+      }
     }
     a.state = "done";
   } catch (e) {
+    if (previous) {
+      // A follow-up that didn't come back: the proposal it was about is
+      // still there, and not what was asked.
+      const { text, answer, summary, placement } = previous;
+      Object.assign(a, { text, answer, summary, placement, state: previous.text || previous.answer ? "done" : "idle", asked: (a.asked || []).slice(0, -1) });
+      if (e?.code === "conversation_ended") Object.assign(a, { conversationId: "", asked: [], error: e.message });
+      else if (!controller.signal.aborted && !e?.budgetExceeded) a.error = e?.message || String(e);
+      if (!e?.budgetExceeded) return;
+    }
     // Stopped: what came so far can be used, but not run in one click (partial).
     if (controller.signal.aborted) Object.assign(a, { state: a.text ? "done" : "idle", partial: !!a.text });
     else if (e?.budgetExceeded) {
@@ -661,7 +736,7 @@ async function submitAssist(cell, prompt, { allowRun = false, codeOnly = false }
     // What the request cost goes on the cell it was for, saved with the
     // notebook.
     if (a.usage && !a.countedTokens) {
-      cell.ai = addCellSpend(cell.ai, a.usage, a.budget?.requestUsd);
+      cell.ai = addCellSpend(cell.ai, a.usage, a.budget?.requestUsd, a.via);
       dirty.value = true;
     }
     assistTokens.value += usageTokens(a.usage) - (a.countedTokens || 0);
@@ -690,6 +765,9 @@ async function fixAndRun(cell) {
     cell.outputs = a.outputs;
     cell.execution_count = null;
     closeAssist(cell);
+    // Its run's outputs are in the cell: a follow-up sends them.
+    keepFollowUp(cell, a);
+    if (cell._assist) cell._assist.usedOutputs = null;
     fileBrowserRef.value?.refresh?.();
   } else {
     a.state = "failed";
@@ -703,23 +781,38 @@ function onAssist(cell, { action, prompt }) {
   if (!a) return;
   if (action === "submit") {
     if (a.mode === "suggest") a.mode = "write";
+    a.explains = false;
     submitAssist(cell, prompt);
   } else if (action === "suggest") {
     a.mode = "suggest";
+    a.explains = false;
     submitAssist(cell, "");
+  } else if (action === "explain") {
+    // Explain this cell: an answer about its code (kept above it, no code to write).
+    if (a.mode === "suggest") a.mode = "write";
+    a.explains = true;
+    submitAssist(cell, "Explain what this cell does.");
+  } else if (action === "refine") submitAssist(cell, prompt, { followUp: true });
+  else if (action === "restart") {
+    // A new request on this cell, outside the conversation.
+    Object.assign(a, { mode: "write", conversationId: "", asked: [], text: "", answer: "", summary: "", steps: [], state: "idle", error: "", used: false, explains: false, placement: "", usage: null, budget: null, outputs: null, partial: false, canSuggest: canSuggestFor("write", a.file) });
   } else if (action === "stop") assistAborts.get(cell.id)?.abort();
   else if (action === "clear-file") a.file = "";
   else if (action === "discard") closeAssist(cell);
   else if (action === "accept-run") fixAndRun(cell);
   else if (action === "insert-answer") {
-    // An answer, kept in the notebook as a Markdown cell below.
-    const id = addCell(cell.id, "markdown");
-    setSource(id, `${a.answer}\n\n_Answered by the AI assistant._`);
+    // An answer, kept in the notebook as a Markdown cell: an explanation of
+    // the cell above it (prose, then the code it's about), any other answer
+    // below it (with the results).
+    const id = a.explains ? addCellAbove(cell.id, "markdown") : addCell(cell.id, "markdown");
+    setSource(id, `${a.answer}\n\n_${a.explains ? "Explained" : "Answered"} by the AI assistant._`);
     const md = cells.value[idx(id)];
     if (md) md._editing = false;
     closeAssist(cell);
   } else if (action === "answer-to-code") {
-    // Code for what was asked, with what the answer found.
+    // Code for what was asked, with what the answer found: in the same
+    // conversation where there is one.
+    if (a.followUps && a.conversationId) return submitAssist(cell, "Write the code for this.", { followUp: true });
     const asked = a.prompt;
     a.answer = "";
     submitAssist(cell, `${asked}\n\nWrite code for this. What you found before: ${a.lastAnswer || ""}`.slice(0, 3900), { codeOnly: true });
@@ -731,6 +824,7 @@ function onAssist(cell, { action, prompt }) {
     let id = cell.id;
     if (action.startsWith("insert-below")) id = addCell(cell.id, "code");
     setSource(id, code);
+    keepFollowUp(cells.value[idx(id)], a);
     focusCell(id);
     // ...and run, for the actions that say so.
     if (action.endsWith("-run")) {
@@ -738,6 +832,40 @@ function onAssist(cell, { action, prompt }) {
       if (target) Promise.resolve(onRun(target, { advance: false })).catch((e) => console.warn("Running the cell failed:", e));
     }
   }
+}
+
+// An empty notebook's start card: the inputs' records (as tables, as a
+// graph) to load, while the notebook has no code (until hidden; another
+// notebook shows it again). Only layouts with starter code in this kernel's
+// language.
+const starters = ref([]);
+const startDismissed = ref(false);
+watch(notebookSource, () => {
+  startDismissed.value = false;
+  clearStartLoads();
+});
+const kernelLanguage = computed(() => (isR(kernelName.value || "") ? "R" : "Python"));
+const starterRows = computed(() =>
+  starters.value
+    .map((s) => ({
+      ...s,
+      code: s.layout.entry.snippets(s.path, kernelName.value).find((x) => x.id === "load")?.code || "",
+      state: starterState(inputs, s.source, s.layout.files || []),
+    }))
+    .filter((r) => r.code)
+);
+const showStart = computed(() => status.value === "ready" && !startDismissed.value && starterRows.value.length > 0 && notebookEmpty(cells.value));
+
+// Loads asked from the card (finish even after it's gone).
+const { load: startLoad, waiting: startWaiting, error: startError, clear: clearStartLoads } = useStartLoads({ inputs, rows: starterRows, insert: insertSnippet });
+
+// Its Suggest: the agent's first step, in the first code cell, on a bar of
+// its own (once: not while one is being asked).
+function suggestFirstStep() {
+  const cell = cells.value.find((c) => c.cell_type === "code") || cells.value[idx(addCell(null, "code"))];
+  if (!cell || cell._assist?.state === "asking") return;
+  openAssist(cell);
+  if (cell._assist) onAssist(cell, { action: "suggest" });
 }
 
 // A file's Ask… (the file browser): the assistant on a cell of its own,
@@ -1146,6 +1274,7 @@ const kernelPill = computed(() => {
             @insert-path="insertPath"
             @open-notebook="requestOpen"
             @insert-snippet="insertSnippet"
+            @starters="starters = $event"
             :assist-available="assistAvailable"
             :assist-paused="assistPaused"
             @ask-file="askAboutFile"
@@ -1324,6 +1453,19 @@ const kernelPill = computed(() => {
         </div>
 
         <div class="nb-doc">
+          <StartCard
+            v-if="showStart"
+            :rows="starterRows"
+            :waiting="startWaiting"
+            :error="startError"
+            :language="kernelLanguage"
+            :inputs="inputs"
+            :can-suggest="assistAvailable && !assistPaused && !!assistInfo.agent"
+            :fmt-size="fmtSize"
+            @load="startLoad"
+            @suggest="suggestFirstStep"
+            @dismiss="startDismissed = true"
+          />
           <NotebookCell
             v-for="(cell, i) in cells"
             :key="cell.id"
@@ -1345,6 +1487,8 @@ const kernelPill = computed(() => {
             @focus-next="selectRel(1)"
             :assist-available="assistAvailable"
             :assist-paused="assistPaused"
+            :complete="complete"
+            :inspect="inspect"
             @assist="onAssist(cell, $event)"
           />
           <div class="nb-add-row">

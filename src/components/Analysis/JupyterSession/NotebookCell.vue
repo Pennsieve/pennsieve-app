@@ -9,6 +9,9 @@ import DOMPurify from "dompurify";
 import CodeMirrorEditor from "./CodeMirrorEditor.vue";
 import PlotlyOutput from "./PlotlyOutput.vue";
 import MathOutput from "./MathOutput.vue";
+import VegaOutput from "./VegaOutput.vue";
+import { altairSpec } from "./altairHtml";
+import { cachedAnsiRuns, streamText } from "./outputHelpers";
 import AssistBar from "./AssistBar.vue";
 import AssistIcon from "./AssistIcon.vue";
 import { cellSpendLabel, cellSpendTitle } from "./assistHelpers";
@@ -23,6 +26,9 @@ const props = defineProps({
   assistAvailable: { type: Boolean, default: false },
   // Why the assistant is paused (no AI budget left), or "".
   assistPaused: { type: String, default: "" },
+  // The kernel's completions (Tab) and help (Shift-Tab), for the editor.
+  complete: { type: Function, default: null },
+  inspect: { type: Function, default: null },
 });
 
 const emit = defineEmits([
@@ -46,6 +52,8 @@ const emit = defineEmits([
 const editorRef = ref(null);
 
 const isCode = computed(() => props.cell.cell_type === "code");
+// The last run failed: the assistant offers to fix it.
+const hasError = computed(() => (props.cell.outputs || []).some((o) => o.output_type === "error"));
 const editing = computed(() =>
   isCode.value ? true : !!props.cell._editing
 );
@@ -82,9 +90,6 @@ function escapeHtml(s) {
   );
 }
 
-// Strip ANSI escape codes from tracebacks for readable plain-text errors.
-const ANSI = /\x1b\[[0-9;]*m/g;
-const stripAnsi = (s) => String(s || "").replace(ANSI, "");
 
 function onSource(val) {
   emit("update:source", val);
@@ -122,9 +127,13 @@ function imgSrc(data) {
   if (data["image/gif"]) return `data:image/gif;base64,${data["image/gif"]}`;
   return null;
 }
-function htmlOf(data) {
+function rawHtmlOf(data) {
   const h = data["text/html"];
-  return h == null ? h : clean(Array.isArray(h) ? h.join("") : h);
+  return Array.isArray(h) ? h.join("") : h;
+}
+function htmlOf(data) {
+  const h = rawHtmlOf(data);
+  return h == null ? h : clean(h);
 }
 function textOf(data) {
   const t = data["text/plain"];
@@ -150,13 +159,26 @@ function jsonOf(data) {
 function plotlyOf(data) {
   return data["application/vnd.plotly.v1+json"] || null;
 }
+// A Vega-Lite (Altair) or Vega spec, any version: { spec, mode } or null.
+// Altair's default output is HTML that loads vega from a CDN: its spec is
+// drawn here instead.
+const altairCache = new WeakMap();
+const VEGA_MIME = /^application\/vnd\.vega(lite)?\.v\d+\+json$/;
+function vegaOf(data) {
+  const keys = Object.keys(data || {}).filter((k) => VEGA_MIME.test(k) && data[k] && typeof data[k] === "object");
+  const key = keys.find((k) => k.includes("vegalite")) || keys[0];
+  if (!key) {
+    // Parsed once per output: the template asks three times, and a spec can
+    // carry its data.
+    if (!altairCache.has(data)) altairCache.set(data, altairSpec(rawHtmlOf(data)));
+    return altairCache.get(data);
+  }
+  return { spec: data[key], mode: key.includes("vegalite") ? "vega-lite" : "vega" };
+}
 // A friendly notice for rich output types we knowingly don't render (so users
 // get an explanation instead of a raw text/plain dump or a blank).
 function unsupportedMessage(data) {
   const keys = Object.keys(data || {});
-  if (keys.some((k) => k.startsWith("application/vnd.vega"))) {
-    return "This is a Vega/Vega-Lite (Altair) chart, which the Pennsieve notebook viewer doesn’t render yet — Plotly and matplotlib charts are fully supported, so use one of those instead.";
-  }
   if (keys.some((k) => k.startsWith("application/vnd.jupyter.widget"))) {
     return "This is an interactive widget (ipywidgets), which isn’t supported in the Pennsieve notebook viewer.";
   }
@@ -225,8 +247,13 @@ function latexOf(data) {
         v-if="cell._assist && isCode && cell._assist.mode !== 'fix'"
         :assist="cell._assist"
         :cell-has-code="!!cell.source.trim()"
+        :cell-has-error="hasError"
         @submit="assist('submit', $event)"
         @suggest="assist('suggest')"
+        @explain="assist('explain')"
+        @fix="assist('fix')"
+        @refine="assist('refine', $event)"
+        @restart="assist('restart')"
         @stop="assist('stop')"
         @accept="assist('accept')"
         @use-run="assist('use-run')"
@@ -245,6 +272,8 @@ function latexOf(data) {
           :model-value="cell.source"
           :language="isCode ? 'python' : 'markdown'"
           :autofocus="selected"
+          :complete="complete"
+          :inspect="inspect"
           @update:model-value="onSource"
           @run="run({ advance: true })"
           @run-in-place="run({ advance: false })"
@@ -267,12 +296,12 @@ function latexOf(data) {
         <div v-for="(o, i) in cell.outputs" :key="i" class="nb-output">
           <!-- execute_result keeps an Out[n] prompt -->
           <template v-if="o.output_type === 'stream'">
-            <pre class="nb-stream" :class="{ 'nb-stderr': o.name === 'stderr' }">{{ Array.isArray(o.text) ? o.text.join('') : o.text }}</pre>
+            <pre class="nb-stream" :class="{ 'nb-stderr': o.name === 'stderr' }"><span v-for="(r, k) in cachedAnsiRuns(o, streamText(o))" :key="k" :class="r.cls">{{ r.text }}</span></pre>
           </template>
 
           <template v-else-if="o.output_type === 'error'">
             <pre class="nb-stderr">{{ o.ename }}: {{ o.evalue }}
-{{ stripAnsi((o.traceback || []).join('\n')) }}</pre>
+<span v-for="(r, k) in cachedAnsiRuns(o, (o.traceback || []).join('\n'))" :key="k" :class="r.cls">{{ r.text }}</span></pre>
             <button
               v-if="assistAvailable && !cell._assist"
               class="nb-fix"
@@ -287,6 +316,7 @@ function latexOf(data) {
           <template v-else>
             <!-- execute_result / display_data: richest mime first -->
             <PlotlyOutput v-if="plotlyOf(o.data)" :spec="plotlyOf(o.data)" />
+            <VegaOutput v-else-if="vegaOf(o.data)" :spec="vegaOf(o.data).spec" :mode="vegaOf(o.data).mode" />
             <img v-else-if="imgSrc(o.data)" class="nb-img" :src="imgSrc(o.data)" alt="output" />
             <div v-else-if="svgOf(o.data)" class="nb-svg" v-html="svgOf(o.data)" />
             <div v-else-if="htmlOf(o.data)" class="nb-html markdown-body" v-html="htmlOf(o.data)" />
@@ -323,7 +353,8 @@ function latexOf(data) {
 .nb-cell {
   position: relative;
   display: grid;
-  grid-template-columns: 44px 1fr;
+  /* Wide enough for a cell's AI cost (✦ $0.09) as well as its [n]. */
+  grid-template-columns: 54px 1fr;
   align-items: flex-start;
   border: 1px solid transparent;
   border-radius: 4px;
@@ -519,6 +550,40 @@ function latexOf(data) {
   background: #feeeec !important; /* red_tint */
   color: #c14d49; /* red_2 */
 }
+/* Terminal colours in streams and tracebacks (ansiRuns), as JupyterLab's. */
+.ansi-bold { font-weight: 600; }
+.ansi-black-fg { color: #3e424d; }
+.ansi-red-fg { color: #e75c58; }
+.ansi-green-fg { color: #00a250; }
+.ansi-yellow-fg { color: #ddb62b; }
+.ansi-blue-fg { color: #208ffb; }
+.ansi-magenta-fg { color: #d160c4; }
+.ansi-cyan-fg { color: #60c6c8; }
+.ansi-white-fg { color: #c5c1b4; }
+.ansi-bright-black-fg { color: #282c36; }
+.ansi-bright-red-fg { color: #b22b31; }
+.ansi-bright-green-fg { color: #007427; }
+.ansi-bright-yellow-fg { color: #b27d12; }
+.ansi-bright-blue-fg { color: #0065ca; }
+.ansi-bright-magenta-fg { color: #a03196; }
+.ansi-bright-cyan-fg { color: #258f8f; }
+.ansi-bright-white-fg { color: #a1a6b2; }
+.ansi-black-bg { background: #3e424d; }
+.ansi-red-bg { background: #e75c58; }
+.ansi-green-bg { background: #00a250; }
+.ansi-yellow-bg { background: #ddb62b; }
+.ansi-blue-bg { background: #208ffb; }
+.ansi-magenta-bg { background: #d160c4; }
+.ansi-cyan-bg { background: #60c6c8; }
+.ansi-white-bg { background: #c5c1b4; }
+.ansi-bright-black-bg { background: #282c36; }
+.ansi-bright-red-bg { background: #b22b31; }
+.ansi-bright-green-bg { background: #007427; }
+.ansi-bright-yellow-bg { background: #b27d12; }
+.ansi-bright-blue-bg { background: #0065ca; }
+.ansi-bright-magenta-bg { background: #a03196; }
+.ansi-bright-cyan-bg { background: #258f8f; }
+.ansi-bright-white-bg { background: #a1a6b2; }
 /* Under an error: a quiet link to the assistant. */
 .nb-fix {
   display: inline-flex;
