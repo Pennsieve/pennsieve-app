@@ -10,7 +10,8 @@ import { useJupyterSession } from "@/composables/useJupyterSession";
 import { markSessionEnded } from "../RunMonitor/endedSessions";
 import NotebookCell from "./NotebookCell.vue";
 import StartCard from "./StartCard.vue";
-import { notebookEmpty } from "./startCardHelpers";
+import { notebookEmpty, starterState } from "./startCardHelpers";
+import { useStartLoads } from "./useStartLoads";
 import { fmtSize } from "./fileBrowserHelpers";
 import AssistSpend from "./AssistSpend.vue";
 import FileBrowser from "./FileBrowser.vue";
@@ -783,6 +784,7 @@ function onAssist(cell, { action, prompt }) {
     submitAssist(cell, prompt);
   } else if (action === "suggest") {
     a.mode = "suggest";
+    a.explains = false;
     submitAssist(cell, "");
   } else if (action === "explain") {
     // Explain this cell: an answer about its code (kept above it, no code to write).
@@ -832,16 +834,34 @@ function onAssist(cell, { action, prompt }) {
 }
 
 // An empty notebook's start card: the inputs' records (as tables, as a
-// graph) to load, while the notebook has no code (until hidden).
+// graph) to load, while the notebook has no code (until hidden; another
+// notebook shows it again). Only layouts with starter code in this kernel's
+// language.
 const starters = ref([]);
 const startDismissed = ref(false);
-const showStart = computed(() => status.value === "ready" && !startDismissed.value && starters.value.length > 0 && notebookEmpty(cells.value));
-// Its Suggest: the agent's first step, in the first cell.
+watch(notebookSource, () => (startDismissed.value = false));
+const kernelLanguage = computed(() => (/^r\b/i.test(kernelName.value || "") ? "R" : "Python"));
+const starterRows = computed(() =>
+  starters.value
+    .map((s) => ({
+      ...s,
+      code: s.layout.entry.snippets(s.path, kernelName.value).find((x) => x.id === "load")?.code || "",
+      state: starterState(inputs, s.source, s.layout.files || []),
+    }))
+    .filter((r) => r.code)
+);
+const showStart = computed(() => status.value === "ready" && !startDismissed.value && starterRows.value.length > 0 && notebookEmpty(cells.value));
+
+// Loads asked from the card (finish even after it's gone).
+const { load: startLoad, waiting: startWaiting, error: startError } = useStartLoads({ inputs, rows: starterRows, insert: insertSnippet });
+
+// Its Suggest: the agent's first step, in the first code cell, on a bar of
+// its own (once: not while one is being asked).
 function suggestFirstStep() {
   const cell = cells.value.find((c) => c.cell_type === "code") || cells.value[idx(addCell(null, "code"))];
-  if (!cell) return;
-  if (!cell._assist) openAssist(cell);
-  onAssist(cell, { action: "suggest" });
+  if (!cell || cell._assist?.state === "asking") return;
+  openAssist(cell);
+  if (cell._assist) onAssist(cell, { action: "suggest" });
 }
 
 // A file's Ask… (the file browser): the assistant on a cell of its own,
@@ -1431,12 +1451,14 @@ const kernelPill = computed(() => {
         <div class="nb-doc">
           <StartCard
             v-if="showStart"
-            :starters="starters"
+            :rows="starterRows"
+            :waiting="startWaiting"
+            :error="startError"
+            :language="kernelLanguage"
             :inputs="inputs"
-            :kernel-name="kernelName"
             :can-suggest="assistAvailable && !assistPaused && !!assistInfo.agent"
             :fmt-size="fmtSize"
-            @insert-snippet="insertSnippet"
+            @load="startLoad"
             @suggest="suggestFirstStep"
             @dismiss="startDismissed = true"
           />

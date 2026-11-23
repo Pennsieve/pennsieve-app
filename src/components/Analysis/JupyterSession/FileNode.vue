@@ -327,7 +327,7 @@ function onRow() {
           v-if="!layoutState.under && !layoutState.all && layoutLeft.length"
           class="fn__now"
           :title="`Download its ${layoutLeft.length} files (${fmtSize(layoutLeft.reduce((n, e) => n + (e.size || 0), 0))}) into the session`"
-          aria-label="Download"
+          :aria-label="`Download ${layout.entry.label.toLowerCase()}`"
           @click.stop="downloadFiles(layoutLeft)"
         >
           ⤓
@@ -336,6 +336,7 @@ function onRow() {
           v-else-if="loadSnippet"
           class="fn__now"
           :title="`${loadSnippet.title}: adds a cell`"
+          :aria-label="`Load ${layout.entry.label.toLowerCase()}`"
           @click.stop="pickSnippet(loadSnippet)"
         >
           Load
