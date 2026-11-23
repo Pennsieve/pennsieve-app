@@ -103,7 +103,7 @@ function submit() {
         class="nb-assist__input"
         :placeholder="placeholder"
         :disabled="asking"
-        aria-label="What the code should do"
+        aria-label="Ask the assistant"
         @keydown.enter.prevent="submit"
       />
       <span v-if="assist.file" class="nb-assist__file" :title="assist.file">
@@ -122,12 +122,20 @@ function submit() {
         </button>
         <button class="nb-assist__btn" title="A new request on this cell, outside this conversation" @click="emit('restart')">Start over</button>
       </template>
-      <button v-else-if="!fix" class="nb-assist__btn nb-assist__btn--go" :disabled="!prompt.trim()" @click="submit">Ask</button>
+      <button
+        v-else-if="!fix"
+        class="nb-assist__btn nb-assist__btn--go"
+        :disabled="!prompt.trim()"
+        title="A question gets an answer; a change or a next step gets code (Enter)"
+        @click="submit"
+      >
+        Ask
+      </button>
       <button v-else-if="assist.state === 'error' || assist.state === 'idle'" class="nb-assist__btn nb-assist__btn--go" @click="submit">Try again</button>
       <button class="nb-assist__x" title="Close (Esc)" aria-label="Close" @click="emit('discard')">✕</button>
     </div>
 
-    <div v-if="chips.length" class="nb-assist__chips">
+    <div v-if="chips.length" class="nb-assist__chips" role="group" aria-label="Starters">
       <button v-for="c in chips" :key="c.label" class="nb-assist__chip" @click="c.run()">{{ c.label }}</button>
     </div>
 
@@ -358,7 +366,8 @@ $assist_tint: #f0ebfb;
   font-size: 12px;
   cursor: pointer;
 }
-.nb-assist__chip:hover {
+.nb-assist__chip:hover,
+.nb-assist__chip:focus-visible {
   border-color: theme.$purple_1;
   color: theme.$purple_1;
 }

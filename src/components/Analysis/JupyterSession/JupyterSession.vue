@@ -637,7 +637,7 @@ async function submitAssist(cell, prompt, { allowRun = false, codeOnly = false, 
   Object.assign(a, { prompt, state: "asking", error: "", note: "", running: allowRun, usage: null, countedTokens: 0, partial: false });
   // A follow-up continues the conversation; anything else but Fix and run
   // starts one. The proposal followed up comes back if the follow-up fails.
-  const previous = followUp ? { text: a.text, answer: a.answer, summary: a.summary, placement: a.placement } : null;
+  const previous = followUp ? { text: a.text, answer: a.answer, summary: a.summary, placement: a.placement, used: !!a.used } : null;
   if (!allowRun) Object.assign(a, { text: "", answer: "", placement: "", steps: [], usage: null, budget: null, outputs: null, conversationId: followUp ? a.conversationId : "" });
   if (!allowRun && prompt) a.asked = [...(followUp ? a.asked || [] : []), prompt];
   const controller = new AbortController();
@@ -661,6 +661,8 @@ async function submitAssist(cell, prompt, { allowRun = false, codeOnly = false, 
               packages: await assistPackages(),
             });
       if (codeOnly) body.codeOnly = true;
+      // This app places proposals: the agent may propose a next step below.
+      if (!allowRun) body.placements = true;
       const proposal = await askAgent(body, { signal: controller.signal, onEvent: (ev) => onAgentEvent(a, ev) });
       // A question's answer is words, not code.
       if (proposal.kind === "answer") a.lastAnswer = proposal.answer;
@@ -671,7 +673,9 @@ async function submitAssist(cell, prompt, { allowRun = false, codeOnly = false, 
         outputs: proposal.outputs || null,
         conversationId: proposal.conversationId,
         // Where it goes: the cell's code, or a new cell below it (a next step).
-        placement: proposal.placement || "",
+        // (A session that doesn't say: a follow-up on a proposal not yet in
+        // a cell keeps where it was going.)
+        placement: proposal.placement || (previous && !previous.used ? previous.placement : "") || "",
         // The new proposal isn't in the cell (yet).
         used: false,
         turn: (a.turn || 0) + 1,
@@ -710,7 +714,8 @@ async function submitAssist(cell, prompt, { allowRun = false, codeOnly = false, 
     if (previous) {
       // A follow-up that didn't come back: the proposal it was about is
       // still there, and not what was asked.
-      Object.assign(a, previous, { state: previous.text || previous.answer ? "done" : "idle", asked: (a.asked || []).slice(0, -1) });
+      const { text, answer, summary, placement } = previous;
+      Object.assign(a, { text, answer, summary, placement, state: previous.text || previous.answer ? "done" : "idle", asked: (a.asked || []).slice(0, -1) });
       if (e?.code === "conversation_ended") Object.assign(a, { conversationId: "", asked: [], error: e.message });
       else if (!controller.signal.aborted && !e?.budgetExceeded) a.error = e?.message || String(e);
       if (!e?.budgetExceeded) return;
@@ -778,7 +783,7 @@ function onAssist(cell, { action, prompt }) {
   } else if (action === "refine") submitAssist(cell, prompt, { followUp: true });
   else if (action === "restart") {
     // A new request on this cell, outside the conversation.
-    Object.assign(a, { mode: "write", conversationId: "", asked: [], text: "", answer: "", summary: "", steps: [], state: "idle", error: "", used: false, usage: null, budget: null, outputs: null, partial: false, canSuggest: canSuggestFor("write", a.file) });
+    Object.assign(a, { mode: "write", conversationId: "", asked: [], text: "", answer: "", summary: "", steps: [], state: "idle", error: "", used: false, placement: "", usage: null, budget: null, outputs: null, partial: false, canSuggest: canSuggestFor("write", a.file) });
   } else if (action === "stop") assistAborts.get(cell.id)?.abort();
   else if (action === "clear-file") a.file = "";
   else if (action === "discard") closeAssist(cell);
