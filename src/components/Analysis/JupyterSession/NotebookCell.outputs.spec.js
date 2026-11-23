@@ -1,3 +1,4 @@
+import altairDefault from "./__fixtures__/altair-default.html?raw";
 import { describe, it, expect, vi } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { nextTick, reactive } from "vue";
@@ -54,6 +55,17 @@ describe("notebook outputs", () => {
     expect(given.usermeta).toEqual({ note: "kept" });
     // The output itself (saved with the notebook) is unchanged.
     expect(spec.usermeta.embedOptions.actions).toBe(true);
+    w.unmount();
+  });
+
+  it("draw Altair's HTML output (its default) with vega-embed, not in a frame", async () => {
+    embed.mockClear();
+    const html = altairDefault;
+    const w = mountCell(codeCell([{ output_type: "execute_result", data: { "text/html": html, "text/plain": "alt.Chart(...)" }, metadata: {}, execution_count: 1 }]));
+    await flushPromises();
+    expect(embed).toHaveBeenCalledTimes(1);
+    expect(embed.mock.calls[0][2].actions.editor).toBe(false);
+    expect(w.find("iframe").exists()).toBe(false);
     w.unmount();
   });
 

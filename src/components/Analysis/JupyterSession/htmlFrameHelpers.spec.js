@@ -1,5 +1,10 @@
+import altairDefault from "./__fixtures__/altair-default.html?raw";
+import altairOlli from "./__fixtures__/altair-olli.html?raw";
+import altairStandard from "./__fixtures__/altair-standard.html?raw";
+import altairUniversal from "./__fixtures__/altair-universal.html?raw";
 import { describe, it, expect } from "vitest";
 import {
+  altairSpec,
   FRAME_HEIGHT_MESSAGE,
   MAX_FRAME_HEIGHT,
   buildSrcdoc,
@@ -78,3 +83,25 @@ describe("height messages", () => {
     expect(frameHeight(null, frame)).toBeNull();
   });
 });
+
+describe("altairSpec", () => {
+  // Altair 6.3's HTML, by template; the title holds "})({" and ", {" to
+  // test the boundaries.
+  const fixtures = { default: altairDefault, universal: altairUniversal, standard: altairStandard, olli: altairOlli };
+  const fixture = (t) => fixtures[t];
+
+  it.each(["default", "universal", "standard", "olli"])("reads the chart's spec from Altair's %s HTML", (t) => {
+    const got = altairSpec(fixture(t));
+    expect(got.mode).toBe("vega-lite");
+    expect(got.spec.mark.type || got.spec.mark).toBe("bar");
+    expect(got.spec.title).toBe("x })({ y, {z}");
+    expect(Object.values(got.spec.datasets)[0]).toEqual([{ a: "A", b: 3 }, { a: "B", b: 7 }, { a: "C", b: 2 }]);
+  });
+
+  it("is null for other HTML, or Altair's HTML cut short", () => {
+    expect(altairSpec("<div>hi</div><script>x()</script>")).toBeNull();
+    expect(altairSpec(undefined)).toBeNull();
+    expect(altairSpec(fixture("universal").replace(/\}\);\s*<\/script>\s*$/, "</script>"))).toBeNull();
+  });
+});
+

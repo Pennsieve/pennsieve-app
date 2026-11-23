@@ -83,3 +83,51 @@ export function frameHeight(event, frameWindow, max = MAX_FRAME_HEIGHT) {
   if (typeof h !== "number" || !Number.isFinite(h)) return null;
   return Math.min(Math.max(Math.ceil(h), 0), max);
 }
+
+// Altair's HTML output (its default renderer, in any front end): a script
+// that loads vega from a CDN and embeds the chart, its spec written as JSON in
+// the script. The spec, so the notebook draws the chart itself (no CDN, its
+// own export menu), as { spec, mode }, or null for any other HTML. Altair's
+// templates end with })({spec}, {embed options}); ("universal", "olli") or
+// set var spec = {...}; var embedOpt = {...}; ("standard").
+const parseObject = (text) => {
+  try {
+    const v = JSON.parse(text);
+    return v && typeof v === "object" && !Array.isArray(v) ? v : null;
+  } catch {
+    return null;
+  }
+};
+const vegaMode = (opts) => (opts?.mode === "vega" ? "vega" : "vega-lite");
+export function altairSpec(html) {
+  if (typeof html !== "string" || !html.includes("vegaEmbed") || !html.includes("vega-embed@")) return null;
+  const end = html.lastIndexOf("</script>");
+  if (end < 0) return null;
+  const script = html.slice(0, end).trimEnd();
+  // standard: var spec = {...}; var embedOpt = {...};
+  const specAt = script.indexOf("var spec = ");
+  const optAt = script.indexOf("var embedOpt = ");
+  if (specAt >= 0 && optAt > specAt) {
+    const spec = parseObject(script.slice(specAt + 11, optAt).trim().replace(/;$/, ""));
+    const optEnd = script.indexOf(";\n", optAt);
+    const opts = optEnd > 0 ? parseObject(script.slice(optAt + 15, optEnd)) : null;
+    return spec ? { spec, mode: vegaMode(opts) } : null;
+  }
+  // universal, olli: })({spec}, {embed options});
+  if (!script.endsWith(");")) return null;
+  // The call, and in it the boundary between the two: the options are last
+  // and small. Either text can also occur in the spec's strings, so each
+  // candidate is tried, from the end, until both halves are objects.
+  for (let call = script.lastIndexOf("})({"); call >= 0; call = script.lastIndexOf("})({", call - 1)) {
+    const args = script.slice(call + 3, -2);
+    for (let cut = args.lastIndexOf(", {"); cut > 0; cut = args.lastIndexOf(", {", cut - 1)) {
+      const opts = parseObject(args.slice(cut + 2));
+      if (!opts) continue;
+      const spec = parseObject(args.slice(0, cut));
+      if (spec) return { spec, mode: vegaMode(opts) };
+      break;
+    }
+  }
+  return null;
+}
+

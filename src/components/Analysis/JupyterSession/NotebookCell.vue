@@ -11,7 +11,7 @@ import PlotlyOutput from "./PlotlyOutput.vue";
 import MathOutput from "./MathOutput.vue";
 import VegaOutput from "./VegaOutput.vue";
 import HtmlFrameOutput from "./HtmlFrameOutput.vue";
-import { needsFrame } from "./htmlFrameHelpers";
+import { altairSpec, needsFrame } from "./htmlFrameHelpers";
 import { ansiRuns, streamText } from "./outputHelpers";
 import AssistBar from "./AssistBar.vue";
 import AssistIcon from "./AssistIcon.vue";
@@ -162,11 +162,19 @@ function plotlyOf(data) {
   return data["application/vnd.plotly.v1+json"] || null;
 }
 // A Vega-Lite (Altair) or Vega spec, any version: { spec, mode } or null.
+// Altair's default output is HTML that loads vega from a CDN: its spec is
+// drawn here instead.
+const altairCache = new WeakMap();
 const VEGA_MIME = /^application\/vnd\.vega(lite)?\.v\d+\+json$/;
 function vegaOf(data) {
   const keys = Object.keys(data || {}).filter((k) => VEGA_MIME.test(k) && data[k] && typeof data[k] === "object");
   const key = keys.find((k) => k.includes("vegalite")) || keys[0];
-  if (!key) return null;
+  if (!key) {
+    // Parsed once per output: the template asks three times, and a spec can
+    // carry its data.
+    if (!altairCache.has(data)) altairCache.set(data, altairSpec(rawHtmlOf(data)));
+    return altairCache.get(data);
+  }
   return { spec: data[key], mode: key.includes("vegalite") ? "vega-lite" : "vega" };
 }
 // A friendly notice for rich output types we knowingly don't render (so users
