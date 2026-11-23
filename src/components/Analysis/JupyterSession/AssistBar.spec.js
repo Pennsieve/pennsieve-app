@@ -124,7 +124,8 @@ describe("AssistBar: where the code goes", () => {
 
   it("uses an empty cell whatever the placement", () => {
     const w = mountBar({ agent: true, state: "done", text: "x", placement: "below" }, { cellHasCode: false });
-    expect(actions(w)[0]).toBe("Use and run");
+    // Nothing to keep: no Insert below, which would leave the empty cell behind.
+    expect(actions(w)).toEqual(["Use and run", "Discard"]);
   });
 
   it("a suggestion from a session without placements goes below", () => {
