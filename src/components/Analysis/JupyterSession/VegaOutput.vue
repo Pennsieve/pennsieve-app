@@ -4,6 +4,7 @@
 // bundle. vega-embed (with vega and vega-lite) is lazy-imported so it only
 // loads when a notebook actually produces one.
 import { onMounted, onBeforeUnmount, ref, watch, nextTick } from "vue";
+import { vegaEmbedOptions } from "./vegaEmbedOptions";
 
 const props = defineProps({
   spec: { type: Object, required: true },
@@ -14,23 +15,37 @@ const props = defineProps({
 const host = ref(null);
 const failed = ref("");
 let result = null;
+// Each render's number: an embed that finishes after a newer render started
+// (or after unmount) is finalized at once instead of shown.
+let seq = 0;
+let unmounted = false;
 
-function finalize() {
+function finalize(r = result) {
   try {
-    result?.finalize();
+    r?.finalize();
   } catch (_) {
     /* ignore */
   }
-  result = null;
+  if (r === result) result = null;
 }
 
 async function render() {
+  const mine = ++seq;
+  const stale = () => unmounted || mine !== seq;
   await nextTick();
-  if (!host.value || !props.spec) return;
+  if (stale() || !host.value || !props.spec) return;
   failed.value = "";
   try {
-    const { default: embed } = await import("vega-embed");
+    const [{ default: embed }, { expressionInterpreter }] = await Promise.all([
+      import("vega-embed"),
+      import("vega-interpreter"),
+    ]);
+    if (stale()) return;
     finalize();
+    // A fresh element per render: an embed still drawing for an older render
+    // draws into its own, detached one.
+    const el = document.createElement("div");
+    host.value.replaceChildren(el);
     // A plain copy: vega annotates specs it's given, and the output's data is
     // a reactive object that's saved with the notebook.
     const spec = JSON.parse(JSON.stringify(props.spec));
@@ -38,14 +53,14 @@ async function render() {
     // would override ours: the menu, the editor URL its data is posted to,
     // how its data is loaded. Ours apply.
     if (spec.usermeta && typeof spec.usermeta === "object") delete spec.usermeta.embedOptions;
-    result = await embed(host.value, spec, {
-      mode: props.mode,
-      // Only the PNG/SVG export: no "open in Vega Editor" (it posts the data
-      // to another site) or source views.
-      actions: { export: true, source: false, compiled: false, editor: false },
-      renderer: "svg",
-    });
+    const r = await embed(el, spec, vegaEmbedOptions(props.mode, expressionInterpreter));
+    if (stale()) {
+      finalize(r);
+      return;
+    }
+    result = r;
   } catch (e) {
+    if (stale()) return;
     // eslint-disable-next-line no-console
     console.error("VegaOutput render failed:", e);
     finalize();
@@ -56,7 +71,10 @@ async function render() {
 onMounted(render);
 // Re-render when a new chart replaces this one (an updated display).
 watch(() => [props.spec, props.mode], render);
-onBeforeUnmount(finalize);
+onBeforeUnmount(() => {
+  unmounted = true;
+  finalize();
+});
 </script>
 
 <template>
