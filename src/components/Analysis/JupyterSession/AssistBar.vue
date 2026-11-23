@@ -25,6 +25,7 @@ const emit = defineEmits(["submit", "suggest", "refine", "restart", "fix", "stop
 const prompt = ref(props.assist.prompt || "");
 const input = ref(null);
 const refineInput = ref(null);
+const root = ref(null);
 const asking = computed(() => props.assist.state === "asking");
 const fix = computed(() => props.assist.mode === "fix");
 const code = computed(() => cellCode(props.assist.text));
@@ -68,13 +69,16 @@ const heading = computed(() => {
 const refineBelow = computed(() => refining.value && shown.value);
 
 // Each proposal (and the bar kept on a cell after Use) starts the box empty
-// for the next follow-up, ready to type in.
+// for the next follow-up, ready to type in: unless the user went on to
+// something else meanwhile (typing in another cell), which keeps its focus.
 watch(
   () => props.assist.turn,
   async () => {
     if (!refining.value) return;
     prompt.value = "";
     await nextTick();
+    const active = document.activeElement;
+    if (active && active !== document.body && !root.value?.contains(active)) return;
     (refineInput.value || input.value)?.focus({ preventScroll: true });
   }
 );
@@ -108,11 +112,11 @@ function submit() {
 </script>
 
 <template>
-  <div class="nb-assist" @click.stop @keydown.esc.stop="emit('discard')">
+  <div ref="root" class="nb-assist" @click.stop @keydown.esc.stop="emit('discard')">
     <div class="nb-assist__ask">
       <AssistIcon class="nb-assist__mark" :size="15" />
       <span v-if="fix" class="nb-assist__title">{{ title }}</span>
-      <span v-else-if="threaded" class="nb-assist__title nb-assist__request" :title="heading">{{ heading }}</span>
+      <span v-else-if="threaded" class="nb-assist__title nb-assist__request" role="heading" aria-level="3" :title="heading">{{ heading }}</span>
       <input
         v-else
         ref="input"
@@ -235,7 +239,7 @@ function submit() {
         v-model="prompt"
         class="nb-assist__input"
         :placeholder="placeholder"
-        aria-label="Ask for a change"
+        :aria-label="placeholder"
         @keydown.enter.prevent="submit"
       />
       <button
