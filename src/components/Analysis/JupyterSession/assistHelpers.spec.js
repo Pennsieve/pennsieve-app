@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { ASSIST_NOTE, acceptedCode, assistRequest, cellCode, cellError, deltaText, addCellSpend, budgetPause, cellSpendLabel, cellSpendTitle, requestCost, runSpend, sessionFiles, sseEvents, stepLabel, usageLine } from "./assistHelpers";
+import { ASSIST_NOTE, acceptedCode, assistRequest, followUpOutputs, followUpRequest, cellCode, cellError, deltaText, addCellSpend, budgetPause, cellSpendLabel, cellSpendTitle, requestCost, runSpend, sessionFiles, sseEvents, stepLabel, usageLine } from "./assistHelpers";
 import { getAgent, postAssist } from "./assistStream";
 
 const delta = (text) => `event: content_block_delta\ndata: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":${JSON.stringify(text)}}}\n\n`;
@@ -146,8 +146,37 @@ describe("budgetPause", () => {
   });
 });
 
+describe("followUpRequest", () => {
+  const cell = { source: "df.plot()", outputs: [{ output_type: "stream", name: "stdout", text: "ok\n" }] };
+
+  it("is the change asked, in the conversation", () => {
+    expect(followUpRequest({ conversationId: "c", prompt: "log scale", cell })).toEqual({ mode: "write", conversationId: "c", prompt: "log scale" });
+  });
+
+  it("has the cell once the proposal is in it, and its outputs once it ran", () => {
+    expect(followUpRequest({ conversationId: "c", prompt: "x", cell, used: true })).toEqual({ mode: "write", conversationId: "c", prompt: "x", cell: "df.plot()" });
+    expect(followUpRequest({ conversationId: "c", prompt: "x", cell, used: true, ran: true }).outputs).toEqual([{ output_type: "stream", name: "stdout", text: "ok\n" }]);
+  });
+
+  it("sends outputs' text, clipped, and figures by their type only", () => {
+    const out = followUpOutputs([
+      { output_type: "display_data", data: { "image/png": "iVBOR".repeat(10000), "text/plain": ["<Figure ", "640x480>"] }, metadata: {} },
+      { output_type: "stream", name: "stdout", text: "x".repeat(20000) },
+      { output_type: "error", ename: "KeyError", evalue: "'sex'", traceback: Array.from({ length: 50 }, (_, i) => `line ${i}`) },
+    ]);
+    expect(out[0]).toEqual({ output_type: "display_data", data: { "image/png": "", "text/plain": "<Figure 640x480>" } });
+    expect(out[1].text.length).toBeLessThan(8100);
+    expect(out[2].traceback).toHaveLength(30);
+    expect(out[2].traceback.at(-1)).toBe("line 49");
+  });
+});
+
 describe("getAgent", () => {
   const answering = (body) => async () => ({ ok: true, json: async () => body });
+  it("knows whether the agent takes follow-ups", async () => {
+    expect((await getAgent("https://k", "t", { fetchFn: answering({ available: true, followUps: true }) })).followUps).toBe(true);
+    expect((await getAgent("https://k", "t", { fetchFn: answering({ available: true }) })).followUps).toBe(false);
+  });
   it("keeps the modes the agent takes", async () => {
     const agent = await getAgent("https://k", "t", { fetchFn: answering({ available: true, model: "m", modes: ["write", "fix", "suggest"] }) });
     expect(agent.modes).toEqual(["write", "fix", "suggest"]);

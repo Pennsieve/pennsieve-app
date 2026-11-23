@@ -91,6 +91,38 @@ export function assistRequest({ mode = "write", prompt = "", cell, cells, kernel
   return body;
 }
 
+// A follow-up on the agent's last proposal, in the same conversation: the
+// change asked; with the cell's code when the proposal was put in (perhaps
+// edited), and its last run's outputs when it ran since (ran: the cell's
+// outputs aren't the ones it had when the proposal went in).
+export function followUpRequest({ conversationId, prompt, cell, used = false, ran = false }) {
+  const body = { mode: "write", conversationId, prompt };
+  if (used && cell) {
+    body.cell = cell.source || "";
+    if (ran) body.outputs = followUpOutputs(cell.outputs);
+  }
+  return body;
+}
+
+// A cell's outputs as a follow-up sends them: their text, clipped; a figure
+// or other rich output by its type only (the agent reads text).
+const OUTPUT_CHARS = 8000;
+const clipText = (t) => {
+  const s = Array.isArray(t) ? t.join("") : String(t ?? "");
+  return s.length > OUTPUT_CHARS ? `${s.slice(0, OUTPUT_CHARS / 2)}\n…\n${s.slice(-OUTPUT_CHARS / 2)}` : s;
+};
+export function followUpOutputs(outputs) {
+  return (outputs || []).slice(-20).map((o) => {
+    if (o.output_type === "stream") return { output_type: "stream", name: o.name, text: clipText(o.text) };
+    if (o.output_type === "error") {
+      return { output_type: "error", ename: String(o.ename || ""), evalue: clipText(o.evalue), traceback: (o.traceback || []).slice(-30).map(clipText) };
+    }
+    const data = {};
+    for (const mime of Object.keys(o.data || {})) data[mime] = mime === "text/plain" ? clipText(o.data[mime]) : "";
+    return { output_type: o.output_type, data };
+  });
+}
+
 // An agent's step, in words: what it looked at or ran.
 const STEP_VERBS = { read_file: "Read", list_files: "Listed", inspect: "Looked at", run_code: "Ran" };
 export function stepLabel(step) {
