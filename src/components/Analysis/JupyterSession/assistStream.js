@@ -166,14 +166,15 @@ export async function postAgent(kernelBaseUrl, token, body, { onEvent, signal, f
     buffer = rest;
     for (const ev of events) {
       if (ev.type === "proposal") proposal = ev;
-      if (ev.type === "error") failure = ev.message || "The assistant stopped with an error.";
+      if (ev.type === "error") failure = ev;
       if (ev.type === "budget_exceeded") usedUp = ev;
       onEvent?.(ev);
     }
   }
   // No AI budget left: not a failure of the assistant's, said as it is.
   if (usedUp) throw Object.assign(new Error(usedUp.message || "There's no AI budget left."), { budgetExceeded: usedUp });
-  if (failure) throw new Error(failure);
+  // code: conversation_ended, when a follow-up's conversation is gone.
+  if (failure) throw Object.assign(new Error(failure.message || "The assistant stopped with an error."), { code: failure.code || "" });
   if (!proposal) throw new Error("The assistant stopped without proposing code.");
   return proposal;
 }

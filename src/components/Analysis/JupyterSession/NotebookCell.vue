@@ -248,6 +248,7 @@ function latexOf(data) {
         @submit="assist('submit', $event)"
         @suggest="assist('suggest', $event)"
         @refine="assist('refine', $event)"
+        @restart="assist('restart')"
         @stop="assist('stop')"
         @accept="assist('accept')"
         @use-run="assist('use-run')"

@@ -150,12 +150,29 @@ describe("followUpRequest", () => {
   const cell = { source: "df.plot()", outputs: [{ output_type: "stream", name: "stdout", text: "ok\n" }] };
 
   it("is the change asked, in the conversation", () => {
-    expect(followUpRequest({ conversationId: "c", prompt: "log scale", cell })).toEqual({ mode: "write", conversationId: "c", prompt: "log scale" });
+    expect(followUpRequest({ conversationId: "c", prompt: "log scale", cell, kernel: "Python 3.12" })).toEqual({ mode: "write", conversationId: "c", prompt: "log scale", kernel: "Python 3.12" });
   });
 
   it("has the cell once the proposal is in it, and its outputs once it ran", () => {
-    expect(followUpRequest({ conversationId: "c", prompt: "x", cell, used: true })).toEqual({ mode: "write", conversationId: "c", prompt: "x", cell: "df.plot()" });
+    expect(followUpRequest({ conversationId: "c", prompt: "x", cell, used: true })).toEqual({ mode: "write", conversationId: "c", prompt: "x", kernel: "", cell: "df.plot()" });
     expect(followUpRequest({ conversationId: "c", prompt: "x", cell, used: true, ran: true }).outputs).toEqual([{ output_type: "stream", name: "stdout", text: "ok\n" }]);
+  });
+
+  it("says a cell is still running rather than sending its partial output", () => {
+    const body = followUpRequest({ conversationId: "c", prompt: "x", cell: { ...cell, _running: true }, used: true, ran: true });
+    expect(body.running).toBe(true);
+    expect(body.outputs).toBeUndefined();
+  });
+
+  it("keeps the outputs small: colours out, the newest kept, an error always", () => {
+    const outs = [
+      { output_type: "error", ename: "E", evalue: "\x1b[31mbad\x1b[0m", traceback: [] },
+      ...Array.from({ length: 20 }, (_, i) => ({ output_type: "stream", name: "stdout", text: `${i} ` + "═".repeat(5000) })),
+    ];
+    const out = followUpOutputs(outs);
+    expect(JSON.stringify(out).length).toBeLessThanOrEqual(16000);
+    expect(out[0]).toMatchObject({ output_type: "error", evalue: "bad" });
+    expect(out.at(-1).text.startsWith("19 ")).toBe(true);
   });
 
   it("sends outputs' text, clipped, and figures by their type only", () => {
@@ -165,7 +182,7 @@ describe("followUpRequest", () => {
       { output_type: "error", ename: "KeyError", evalue: "'sex'", traceback: Array.from({ length: 50 }, (_, i) => `line ${i}`) },
     ]);
     expect(out[0]).toEqual({ output_type: "display_data", data: { "image/png": "", "text/plain": "<Figure 640x480>" } });
-    expect(out[1].text.length).toBeLessThan(8100);
+    expect(out[1].text.length).toBeLessThan(4100);
     expect(out[2].traceback).toHaveLength(30);
     expect(out[2].traceback.at(-1)).toBe("line 49");
   });

@@ -572,10 +572,15 @@ function openAssist(cell, { mode = "write", file = "" } = {}) {
   if (cell._assist?.state === "asking") return;
   // An agent that says it can suggests a next cell when nothing is typed
   // (not for a file: that asks what to do with it).
-  const canSuggest = !!assistInfo.value.agent && (assistInfo.value.modes || []).includes("suggest") && mode === "write" && !file;
-  cell._assist = { ...newAssist(mode, file), canSuggest };
+  cell._assist = { ...newAssist(mode, file), canSuggest: canSuggestFor(mode, file) };
   select(cell.id);
   if (mode === "fix") submitAssist(cell, "");
+}
+
+// An agent that says it can suggests a next cell when nothing is typed (not
+// for a file: that asks what to do with it).
+function canSuggestFor(mode, file) {
+  return !!assistInfo.value.agent && (assistInfo.value.modes || []).includes("suggest") && mode === "write" && !file;
 }
 
 // A bar's state. followUps: the agent continues a proposal's conversation
@@ -590,7 +595,8 @@ function newAssist(mode = "write", file = "") {
 // usedOutputs: its outputs then (a run since replaces them).
 function keepFollowUp(target, a) {
   if (!target || !a.followUps || !a.conversationId) return;
-  target._assist = { ...newAssist(), conversationId: a.conversationId, asked: a.asked || [], used: true, usedOutputs: target.outputs };
+  // turn: a new one empties the bar's box.
+  target._assist = { ...newAssist(), conversationId: a.conversationId, asked: a.asked || [], used: true, usedOutputs: target.outputs, turn: (a.turn || 0) + 1 };
 }
 
 // An agent's event, onto the bar's state (step, run, note, usage, budget).
@@ -629,7 +635,8 @@ async function submitAssist(cell, prompt, { allowRun = false, codeOnly = false, 
   // Each request (a continuation too) counts its own tokens.
   Object.assign(a, { prompt, state: "asking", error: "", note: "", running: allowRun, usage: null, countedTokens: 0, partial: false });
   // A follow-up continues the conversation; anything else but Fix and run
-  // starts one.
+  // starts one. The proposal followed up comes back if the follow-up fails.
+  const previous = followUp ? { text: a.text, answer: a.answer, summary: a.summary } : null;
   if (!allowRun) Object.assign(a, { text: "", answer: "", steps: [], usage: null, budget: null, outputs: null, conversationId: followUp ? a.conversationId : "" });
   if (!allowRun && prompt) a.asked = [...(followUp ? a.asked || [] : []), prompt];
   const controller = new AbortController();
@@ -638,9 +645,9 @@ async function submitAssist(cell, prompt, { allowRun = false, codeOnly = false, 
     if (viaAgent) {
       const body =
         allowRun && a.conversationId
-          ? { mode: "fix", conversationId: a.conversationId, allowRun: true }
+          ? { mode: "fix", conversationId: a.conversationId, allowRun: true, kernel: kernelName.value }
           : followUp
-          ? followUpRequest({ conversationId: a.conversationId, prompt, cell, used: !!a.used, ran: !!a.used && cell.outputs !== a.usedOutputs })
+          ? followUpRequest({ conversationId: a.conversationId, prompt, cell, kernel: kernelName.value, used: !!a.used, ran: !!a.used && cell.outputs !== a.usedOutputs })
           : assistRequest({
               mode: a.mode,
               prompt,
@@ -664,6 +671,7 @@ async function submitAssist(cell, prompt, { allowRun = false, codeOnly = false, 
         conversationId: proposal.conversationId,
         // The new proposal isn't in the cell (yet).
         used: false,
+        turn: (a.turn || 0) + 1,
       });
     } else {
       const body = assistRequest({
@@ -696,6 +704,14 @@ async function submitAssist(cell, prompt, { allowRun = false, codeOnly = false, 
     }
     a.state = "done";
   } catch (e) {
+    if (previous) {
+      // A follow-up that didn't come back: the proposal it was about is
+      // still there, and not what was asked.
+      Object.assign(a, previous, { state: previous.text || previous.answer ? "done" : "idle", asked: (a.asked || []).slice(0, -1) });
+      if (e?.code === "conversation_ended") Object.assign(a, { conversationId: "", asked: [], error: e.message });
+      else if (!controller.signal.aborted && !e?.budgetExceeded) a.error = e?.message || String(e);
+      if (!e?.budgetExceeded) return;
+    }
     // Stopped: what came so far can be used, but not run in one click (partial).
     if (controller.signal.aborted) Object.assign(a, { state: a.text ? "done" : "idle", partial: !!a.text });
     else if (e?.budgetExceeded) {
@@ -757,7 +773,11 @@ function onAssist(cell, { action, prompt }) {
     // With something typed: a next step with that in mind.
     a.mode = "suggest";
     submitAssist(cell, prompt || "");
-  } else if (action === "refine") submitAssist(cell, prompt, { followUp: true }); else if (action === "stop") assistAborts.get(cell.id)?.abort();
+  } else if (action === "refine") submitAssist(cell, prompt, { followUp: true });
+  else if (action === "restart") {
+    // A new request on this cell, outside the conversation.
+    Object.assign(a, { mode: "write", conversationId: "", asked: [], text: "", answer: "", summary: "", steps: [], state: "idle", error: "", used: false, canSuggest: canSuggestFor("write", a.file) });
+  } else if (action === "stop") assistAborts.get(cell.id)?.abort();
   else if (action === "clear-file") a.file = "";
   else if (action === "discard") closeAssist(cell);
   else if (action === "accept-run") fixAndRun(cell);
@@ -769,7 +789,9 @@ function onAssist(cell, { action, prompt }) {
     if (md) md._editing = false;
     closeAssist(cell);
   } else if (action === "answer-to-code") {
-    // Code for what was asked, with what the answer found.
+    // Code for what was asked, with what the answer found: in the same
+    // conversation where there is one.
+    if (a.followUps && a.conversationId) return submitAssist(cell, "Write the code for this.", { followUp: true });
     const asked = a.prompt;
     a.answer = "";
     submitAssist(cell, `${asked}\n\nWrite code for this. What you found before: ${a.lastAnswer || ""}`.slice(0, 3900), { codeOnly: true });

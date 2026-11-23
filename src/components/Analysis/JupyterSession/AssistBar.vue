@@ -18,7 +18,7 @@ const props = defineProps({
   // The cell has code: taking the reply replaces it.
   cellHasCode: { type: Boolean, default: false },
 });
-const emit = defineEmits(["submit", "suggest", "refine", "stop", "accept", "accept-run", "use-run", "insert-below", "insert-below-run", "insert-answer", "answer-to-code", "discard", "clear-file"]);
+const emit = defineEmits(["submit", "suggest", "refine", "restart", "stop", "accept", "accept-run", "use-run", "insert-below", "insert-below-run", "insert-answer", "answer-to-code", "discard", "clear-file"]);
 
 const prompt = ref(props.assist.prompt || "");
 const input = ref(null);
@@ -52,11 +52,12 @@ const placeholder = computed(() => {
   if (a.file) return `What should the code do with ${fileName.value}?`;
   return a.canSuggest ? "Describe the code this cell should have, or ask for a suggestion" : "Describe the code this cell should have";
 });
-// Each proposal starts the box empty for the next follow-up.
+// Each proposal (and the bar kept on a cell after Use) starts the box empty
+// for the next follow-up.
 watch(
-  () => props.assist.conversationId,
-  (id, was) => {
-    if (id && id !== was && refining.value) prompt.value = "";
+  () => props.assist.turn,
+  () => {
+    if (refining.value) prompt.value = "";
   }
 );
 
@@ -97,15 +98,17 @@ function submit() {
         <button v-if="!asking" class="nb-assist__x" aria-label="Leave the file out" @click="emit('clear-file')">✕</button>
       </span>
       <button v-if="asking" class="nb-assist__btn" @click="emit('stop')">Stop</button>
-      <button
-        v-else-if="refining"
-        class="nb-assist__btn nb-assist__btn--go"
-        :disabled="!prompt.trim()"
-        title="The assistant changes its proposal as asked, in the same conversation: it sees the cell and, once it has run, what it showed"
-        @click="submit"
-      >
-        Refine
-      </button>
+      <template v-else-if="refining">
+        <button
+          class="nb-assist__btn nb-assist__btn--go"
+          :disabled="!prompt.trim()"
+          title="The assistant changes its proposal as asked, in the same conversation: it sees the cell and, once it has run, what it showed"
+          @click="submit"
+        >
+          Refine
+        </button>
+        <button class="nb-assist__btn" title="A new request on this cell, outside this conversation" @click="emit('restart')">Start over</button>
+      </template>
       <button
         v-else-if="suggests"
         class="nb-assist__btn nb-assist__btn--go"
