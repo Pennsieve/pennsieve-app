@@ -158,7 +158,7 @@ describe("folderSnippets", () => {
     expect(nx.code).toContain('nodes = pd.read_csv(kgx / "nodes.tsv.gz", usecols=["id", "category", "name"], **tsv)');
     expect(nx.code).toContain('edges = pd.read_csv(kgx / "edges.tsv.gz", usecols=["subject", "predicate", "object"], **tsv)');
     expect(nx.code).not.toContain("parquet");
-    expect(nx.code).toContain('nx.from_pandas_edgelist(edges, "subject", "object", edge_attr=["predicate"], create_using=nx.MultiDiGraph)');
+    expect(nx.code).toContain('nx.from_pandas_edgelist(graph_edges, "subject", "object", edge_attr=["predicate"], create_using=nx.MultiDiGraph)');
     expect(folderSnippets("input/v/metadata/kgx", "metadata/kgx/", "R 4.4.1")).toEqual([]);
   });
 
@@ -166,9 +166,11 @@ describe("folderSnippets", () => {
     const nx = folderSnippets("input/v/metadata/kgx", "metadata/kgx/", py).find((s) => s.id === "networkx");
     expect(nx.code).toContain('degree = pd.concat([edges.subject, edges.object]).value_counts()');
     expect(nx.code).toContain("whole = len(edges) <= 500000");
-    expect(nx.code).toContain("edges = edges[edges.subject.isin(seed) | edges.object.isin(seed)].head(500000)");
+    expect(nx.code).toContain("graph_edges = edges[edges.subject.isin(seed) | edges.object.isin(seed)].head(500000)");
+    // edges itself stays the whole graph, for the cells after it.
+    expect(nx.code.match(/^\s*edges = /gm)).toEqual(["edges = "]);
     // The graph is built after the cut, from the edges it keeps.
-    expect(nx.code.indexOf("edges = edges[")).toBeLessThan(nx.code.indexOf("nx.from_pandas_edgelist"));
+    expect(nx.code.indexOf("graph_edges = edges[")).toBeLessThan(nx.code.indexOf("nx.from_pandas_edgelist"));
   });
 
   it("holds DuckDB to half the session's memory in every DuckDB starter", () => {
