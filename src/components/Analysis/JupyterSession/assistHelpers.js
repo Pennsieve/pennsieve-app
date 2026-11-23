@@ -91,6 +91,20 @@ export function assistRequest({ mode = "write", prompt = "", cell, cells, kernel
   return body;
 }
 
+// Whether a request goes to the agent (several model calls: it looks at the
+// session's files and variables, can run its fix, answers questions in
+// words) or to the single-shot assistant (one call, a fraction of the
+// tokens). The agent for Fix and run, a suggestion (nothing typed), and a
+// question; the single-shot assistant for writing or fixing a cell. Either
+// one when it's the only one the session has.
+const QUESTION = /^(what|why|how|which|where|when|who|is|are|does|do|can|could|should|explain|describe|tell me)\b/i;
+export function useAgent({ agent = false, single = false, mode = "write", prompt = "", allowRun = false, suggest = false } = {}) {
+  if (!agent) return false;
+  if (!single || allowRun || suggest) return true;
+  const p = String(prompt || "").trim();
+  return mode === "write" && (p.endsWith("?") || QUESTION.test(p));
+}
+
 // An agent's step, in words: what it looked at or ran.
 const STEP_VERBS = { read_file: "Read", list_files: "Listed", inspect: "Looked at", run_code: "Ran" };
 export function stepLabel(step) {
@@ -157,15 +171,21 @@ export function requestCost(before, after) {
 }
 
 // A cell's AI spend, kept with the notebook (cell metadata pennsieve.ai):
-// its requests, their tokens, and their cost where the governor gave one.
-export function addCellSpend(spend, usage, usd) {
-  const t = usage ? (usage.input_tokens || 0) + (usage.output_tokens || 0) + (usage.cache_read_input_tokens || 0) + (usage.cache_creation_input_tokens || 0) : 0;
+// its requests (and how many went to the agent), their tokens, split as the
+// governor counts them (new input, output, cached input read and written),
+// and their cost where the governor gave one. via: "agent" or "single".
+const SPLIT = { input: "input_tokens", output: "output_tokens", cacheRead: "cache_read_input_tokens", cacheWrite: "cache_creation_input_tokens" };
+export function addCellSpend(spend, usage, usd, via = "") {
   const prev = spend || { requests: 0, tokens: 0, usd: 0 };
-  return {
+  const next = {
+    ...prev,
     requests: (prev.requests || 0) + 1,
-    tokens: (prev.tokens || 0) + t,
+    tokens: (prev.tokens || 0) + Object.values(SPLIT).reduce((n, k) => n + (usage?.[k] || 0), 0),
     usd: Math.round(((prev.usd || 0) + (usd || 0)) * 1e6) / 1e6,
   };
+  for (const [key, field] of Object.entries(SPLIT)) next[key] = (prev[key] || 0) + (usage?.[field] || 0);
+  if (via === "agent") next.agentRequests = (prev.agentRequests || 0) + 1;
+  return next;
 }
 
 // The cell's spend in its gutter: its cost, or its tokens without one.
@@ -178,5 +198,7 @@ export function cellSpendTitle(spend) {
   if (!spend?.requests) return "";
   const n = spend.requests === 1 ? "1 request" : `${spend.requests} requests`;
   const cost = spend.usd > 0 ? `, about ${dollars(spend.usd)}` : "";
-  return `AI assistant on this cell: ${n}, ${tokens(spend.tokens || 0)} tokens${cost}`;
+  const split = spend.input != null ? ` (${tokens(spend.input + (spend.cacheWrite || 0))} new + ${tokens(spend.cacheRead || 0)} cached in, ${tokens(spend.output || 0)} out)` : "";
+  const agent = spend.agentRequests ? `; ${spend.agentRequests} by the agent` : "";
+  return `AI assistant on this cell: ${n}, ${tokens(spend.tokens || 0)} tokens${split}${cost}${agent}`;
 }

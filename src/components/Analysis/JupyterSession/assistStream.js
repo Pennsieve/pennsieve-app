@@ -53,9 +53,10 @@ export async function getAssist(kernelBaseUrl, token, { fetchFn = globalThis.fet
   }
 }
 
-// Asks, calling onText with the reply so far as it arrives; resolves to the
-// whole reply. signal stops it.
-export async function postAssist(kernelBaseUrl, token, body, { onText, signal, fetchFn = globalThis.fetch } = {}) {
+// Asks, calling onText with the reply so far as it arrives, and onUsage with
+// the request's tokens (Anthropic's message_start and message_delta usage, as
+// the agent reports them); resolves to the whole reply. signal stops it.
+export async function postAssist(kernelBaseUrl, token, body, { onText, onUsage, signal, fetchFn = globalThis.fetch } = {}) {
   const resp = await fetchFn(`${kernelBaseUrl}${ASSIST_PATH}`, {
     method: "POST",
     credentials: "include",
@@ -77,6 +78,7 @@ export async function postAssist(kernelBaseUrl, token, body, { onText, signal, f
   const decoder = new TextDecoder();
   let buffer = "";
   let reply = "";
+  let usage = null;
   for (;;) {
     const { value, done } = await reader.read();
     if (done) break;
@@ -84,6 +86,11 @@ export async function postAssist(kernelBaseUrl, token, body, { onText, signal, f
     const { events, rest } = sseEvents(buffer);
     buffer = rest;
     for (const ev of events) {
+      const u = ev?.type === "message_start" ? ev.message?.usage : ev?.type === "message_delta" ? ev.usage : null;
+      if (u) {
+        usage = { ...(usage || {}), ...Object.fromEntries(Object.entries(u).filter(([, v]) => typeof v === "number")) };
+        onUsage?.(usage);
+      }
       const text = deltaText(ev);
       if (text) {
         reply += text;

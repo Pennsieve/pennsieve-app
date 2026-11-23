@@ -15,7 +15,7 @@ import AddDataDialog from "./AddDataDialog.vue";
 import { useSessionInputs } from "./useSessionInputs";
 import EnvironmentPanel from "./EnvironmentPanel.vue";
 import { sessionPathCode } from "./pathCode";
-import { acceptedCode, addCellSpend, assistRequest, budgetPause, cellCode, requestCost, sessionFiles } from "./assistHelpers";
+import { acceptedCode, addCellSpend, assistRequest, budgetPause, cellCode, requestCost, sessionFiles, useAgent } from "./assistHelpers";
 import RuntimeMark from "../WorkflowGraph/RuntimeMark.vue";
 import { fetchRun } from "../RunMonitor/runDetails";
 import { runOnGpu, runNodeId, gpuShortLabel, gpuMarkTitle, sessionRestrictions } from "../RunMonitor/notebookHelpers";
@@ -598,18 +598,22 @@ function onAgentEvent(a, ev) {
   }
 }
 
-// Asks: the agent (allowRun continues a fix's conversation: Fix and run),
-// or the single-shot assistant.
+// Asks: the agent (Fix and run, continuing a fix's conversation or starting
+// one; a suggestion; a question), or, for writing or fixing a cell, the
+// single-shot assistant: one model call instead of several (useAgent).
 async function submitAssist(cell, prompt, { allowRun = false, codeOnly = false } = {}) {
   const a = cell._assist;
   if (!a) return;
+  const info = assistInfo.value;
+  const viaAgent = useAgent({ agent: info.agent, single: info.single, mode: a.mode, prompt: codeOnly ? "" : prompt, allowRun, suggest: a.mode === "suggest" });
+  a.via = viaAgent ? "agent" : "single";
   // Each request (a continuation too) counts its own tokens.
   Object.assign(a, { prompt, state: "asking", error: "", note: "", running: allowRun, usage: null, countedTokens: 0, partial: false });
   if (!allowRun) Object.assign(a, { text: "", steps: [], usage: null, budget: null, outputs: null, conversationId: "" });
   const controller = new AbortController();
   assistAborts.set(cell.id, controller);
   try {
-    if (assistInfo.value.agent) {
+    if (viaAgent) {
       const body =
         allowRun && a.conversationId
           ? { mode: "fix", conversationId: a.conversationId, allowRun: true }
@@ -625,6 +629,8 @@ async function submitAssist(cell, prompt, { allowRun = false, codeOnly = false }
               packages: await assistPackages(),
             });
       if (codeOnly) body.codeOnly = true;
+      // Fix and run after a single-shot fix: a new conversation that may run.
+      if (allowRun) body.allowRun = true;
       const proposal = await askAgent(body, { signal: controller.signal, onEvent: (ev) => onAgentEvent(a, ev) });
       // A question's answer is words, not code.
       if (proposal.kind === "answer") a.lastAnswer = proposal.answer;
@@ -646,7 +652,23 @@ async function submitAssist(cell, prompt, { allowRun = false, codeOnly = false }
         files: sessionFiles(inputs.sources, kernelName.value),
         packages: await assistPackages(),
       });
-      await askAssist(body, { onText: (t) => (a.text = t), signal: controller.signal });
+      await askAssist(body, {
+        onText: (t) => (a.text = t),
+        onUsage: (u) => {
+          a.usage = u;
+          assistLast.value = { usage: u, budget: null };
+        },
+        signal: controller.signal,
+      });
+      // Its cost: the change in the governor's figures across it (the
+      // single-shot assistant reports none of its own).
+      const after = await assistStatus().catch(() => null);
+      if (after?.available) {
+        const cost = requestCost(info.budget, after.budget);
+        a.budget = cost == null ? after.budget : { ...after.budget, requestUsd: cost };
+        assistInfo.value = { ...assistInfo.value, budget: after.budget };
+        assistLast.value = { usage: a.usage, budget: a.budget };
+      }
     }
     a.state = "done";
   } catch (e) {
@@ -661,7 +683,7 @@ async function submitAssist(cell, prompt, { allowRun = false, codeOnly = false }
     // What the request cost goes on the cell it was for, saved with the
     // notebook.
     if (a.usage && !a.countedTokens) {
-      cell.ai = addCellSpend(cell.ai, a.usage, a.budget?.requestUsd);
+      cell.ai = addCellSpend(cell.ai, a.usage, a.budget?.requestUsd, a.via);
       dirty.value = true;
     }
     assistTokens.value += usageTokens(a.usage) - (a.countedTokens || 0);
@@ -677,6 +699,8 @@ async function submitAssist(cell, prompt, { allowRun = false, codeOnly = false }
 // ran cleanly stays on offer. Without the agent: use the fix and run it once.
 async function fixAndRun(cell) {
   const a = cell._assist;
+  // Without the agent: use the fix and run it once. With it, the agent runs
+  // its fix (a single-shot fix starts it a conversation of its own).
   if (!assistInfo.value.agent) {
     setSource(cell.id, acceptedCode(a.text));
     closeAssist(cell);

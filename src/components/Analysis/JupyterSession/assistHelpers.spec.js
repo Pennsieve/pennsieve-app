@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { ASSIST_NOTE, acceptedCode, assistRequest, cellCode, cellError, deltaText, addCellSpend, budgetPause, cellSpendLabel, cellSpendTitle, requestCost, runSpend, sessionFiles, sseEvents, stepLabel, usageLine } from "./assistHelpers";
-import { getAgent } from "./assistStream";
+import { useAgent, ASSIST_NOTE, acceptedCode, assistRequest, cellCode, cellError, deltaText, addCellSpend, budgetPause, cellSpendLabel, cellSpendTitle, requestCost, runSpend, sessionFiles, sseEvents, stepLabel, usageLine } from "./assistHelpers";
+import { getAgent, postAssist } from "./assistStream";
 
 const delta = (text) => `event: content_block_delta\ndata: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":${JSON.stringify(text)}}}\n\n`;
 
@@ -121,10 +121,14 @@ describe("runSpend", () => {
 describe("a cell's spend", () => {
   it("adds each request's tokens and cost", () => {
     let spend = addCellSpend(null, { input_tokens: 3000, output_tokens: 200 }, 0.03);
-    spend = addCellSpend(spend, { input_tokens: 1000, output_tokens: 100, cache_read_input_tokens: 500 }, null);
-    expect(spend).toEqual({ requests: 2, tokens: 4800, usd: 0.03 });
+    spend = addCellSpend(spend, { input_tokens: 1000, output_tokens: 100, cache_read_input_tokens: 500 }, null, "agent");
+    expect(spend).toEqual({ requests: 2, tokens: 4800, usd: 0.03, input: 4000, output: 300, cacheRead: 500, cacheWrite: 0, agentRequests: 1 });
     expect(cellSpendLabel(spend)).toBe("$0.03");
-    expect(cellSpendTitle(spend)).toBe("AI assistant on this cell: 2 requests, 4.8k tokens, about $0.03");
+    expect(cellSpendTitle(spend)).toBe("AI assistant on this cell: 2 requests, 4.8k tokens (4.0k new + 500 cached in, 300 out), about $0.03; 1 by the agent");
+    // A cell saved before the split was kept: its totals, then the split from here on.
+    const old = addCellSpend({ requests: 1, tokens: 5000, usd: 0.02 }, { input_tokens: 100, output_tokens: 50 }, 0.01, "single");
+    expect(old).toMatchObject({ requests: 2, tokens: 5150, input: 100, output: 50 });
+    expect(old.agentRequests).toBeUndefined();
   });
 
   it("shows tokens without a cost, and nothing without requests", () => {
@@ -154,3 +158,38 @@ describe("getAgent", () => {
     expect(agent.modes).toEqual(["write", "fix"]);
   });
 });
+
+describe("useAgent", () => {
+  const both = { agent: true, single: true };
+  it("sends writing and fixing to the single-shot assistant when the session has both", () => {
+    expect(useAgent({ ...both, mode: "write", prompt: "plot b against a" })).toBe(false);
+    expect(useAgent({ ...both, mode: "fix", prompt: "" })).toBe(false);
+  });
+  it("sends Fix and run, suggestions and questions to the agent", () => {
+    expect(useAgent({ ...both, mode: "fix", allowRun: true })).toBe(true);
+    expect(useAgent({ ...both, mode: "suggest", suggest: true })).toBe(true);
+    expect(useAgent({ ...both, prompt: "Which drug treats the most diseases?" })).toBe(true);
+    expect(useAgent({ ...both, prompt: "explain what this cell does" })).toBe(true);
+  });
+  it("uses whichever one there is", () => {
+    expect(useAgent({ agent: true, single: false, prompt: "plot it" })).toBe(true);
+    expect(useAgent({ agent: false, single: true, allowRun: true })).toBe(false);
+  });
+});
+
+describe("postAssist", () => {
+  it("reports the request's tokens from the stream's usage", async () => {
+    const sse = [
+      { type: "message_start", message: { usage: { input_tokens: 4200, cache_read_input_tokens: 1800, output_tokens: 1 } } },
+      { type: "content_block_delta", delta: { type: "text_delta", text: "print(1)" } },
+      { type: "message_delta", usage: { output_tokens: 120 } },
+    ].map((e) => `data: ${JSON.stringify(e)}\n\n`).join("");
+    const body = new ReadableStream({ start: (c) => (c.enqueue(new TextEncoder().encode(sse)), c.close()) });
+    const fetchFn = async () => ({ ok: true, body });
+    let usage = null;
+    const reply = await postAssist("https://k", "t", {}, { fetchFn, onUsage: (u) => (usage = u) });
+    expect(reply).toBe("print(1)");
+    expect(usage).toEqual({ input_tokens: 4200, cache_read_input_tokens: 1800, output_tokens: 120 });
+  });
+});
+
