@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { applyCarriageReturns, displayIdOf, pushOutput, toNbOutputs, updateDisplay } from "./outputHelpers";
+import { ansiRuns, applyCarriageReturns, displayIdOf, pushOutput, streamText, toNbOutputs, updateDisplay } from "./outputHelpers";
 
 const display = (text, displayId) => ({
   output_type: "display_data",
@@ -77,3 +77,36 @@ describe("display ids", () => {
     expect(toNbOutputs(undefined)).toEqual([]);
   });
 });
+
+describe("pip's output (\\r\\n line ends and colours)", () => {
+  const notice = "\r\n\u001b[1m[\u001b[0m\u001b[34;49mnotice\u001b[0m\u001b[1;39;49m]\u001b[0m\u001b[39;49m A new release of pip is available\u001b[0m\r\n";
+
+  it("keeps \\r\\n lines, also split across writes", () => {
+    expect(applyCarriageReturns("a\r\nb\r\n")).toBe("a\nb\n");
+    const cell = { outputs: [] };
+    pushOutput(cell, { output_type: "stream", name: "stdout", text: "line one\r" });
+    pushOutput(cell, { output_type: "stream", name: "stdout", text: "\nline two\n" });
+    expect(cell.outputs[0].text).toBe("line one\nline two\n");
+    // A real carriage return still overwrites.
+    const bar = { outputs: [] };
+    pushOutput(bar, { output_type: "stream", name: "stdout", text: "10%\r" });
+    pushOutput(bar, { output_type: "stream", name: "stdout", text: "100%\n" });
+    expect(bar.outputs[0].text).toBe("100%\n");
+  });
+
+  it("shows pip's notice with its colours, the codes gone", () => {
+    const cell = { outputs: [] };
+    pushOutput(cell, { output_type: "stream", name: "stdout", text: notice });
+    const runs = ansiRuns(streamText(cell.outputs[0]));
+    expect(runs.map((r) => r.text).join("")).toBe("\n[notice] A new release of pip is available\n");
+    expect(runs.find((r) => r.text === "notice").cls).toBe("ansi-blue-fg");
+    expect(runs.find((r) => r.text === "[").cls).toBe("ansi-bold");
+  });
+
+  it("drops other escapes and reads past 256-colour codes", () => {
+    expect(ansiRuns("a\u001b[2K\u001b[1Ab").map((r) => r.text).join("")).toBe("ab");
+    expect(ansiRuns("\u001b[38;5;208mo\u001b[31mr")).toEqual([{ text: "o", cls: "" }, { text: "r", cls: "ansi-red-fg" }]);
+    expect(ansiRuns("\u001b]0;title\u0007x")).toEqual([{ text: "x", cls: "" }]);
+  });
+});
+

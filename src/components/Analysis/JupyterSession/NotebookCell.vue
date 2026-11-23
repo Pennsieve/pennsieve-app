@@ -12,6 +12,7 @@ import MathOutput from "./MathOutput.vue";
 import VegaOutput from "./VegaOutput.vue";
 import HtmlFrameOutput from "./HtmlFrameOutput.vue";
 import { needsFrame } from "./htmlFrameHelpers";
+import { ansiRuns, streamText } from "./outputHelpers";
 import AssistBar from "./AssistBar.vue";
 import AssistIcon from "./AssistIcon.vue";
 import { cellSpendLabel, cellSpendTitle } from "./assistHelpers";
@@ -85,9 +86,6 @@ function escapeHtml(s) {
   );
 }
 
-// Strip ANSI escape codes from tracebacks for readable plain-text errors.
-const ANSI = /\x1b\[[0-9;]*m/g;
-const stripAnsi = (s) => String(s || "").replace(ANSI, "");
 
 function onSource(val) {
   emit("update:source", val);
@@ -285,12 +283,12 @@ function latexOf(data) {
         <div v-for="(o, i) in cell.outputs" :key="i" class="nb-output">
           <!-- execute_result keeps an Out[n] prompt -->
           <template v-if="o.output_type === 'stream'">
-            <pre class="nb-stream" :class="{ 'nb-stderr': o.name === 'stderr' }">{{ Array.isArray(o.text) ? o.text.join('') : o.text }}</pre>
+            <pre class="nb-stream" :class="{ 'nb-stderr': o.name === 'stderr' }"><span v-for="(r, k) in ansiRuns(streamText(o))" :key="k" :class="r.cls">{{ r.text }}</span></pre>
           </template>
 
           <template v-else-if="o.output_type === 'error'">
             <pre class="nb-stderr">{{ o.ename }}: {{ o.evalue }}
-{{ stripAnsi((o.traceback || []).join('\n')) }}</pre>
+<span v-for="(r, k) in ansiRuns((o.traceback || []).join('\n'))" :key="k" :class="r.cls">{{ r.text }}</span></pre>
             <button
               v-if="assistAvailable && !cell._assist"
               class="nb-fix"
@@ -539,6 +537,32 @@ function latexOf(data) {
   background: #feeeec !important; /* red_tint */
   color: #c14d49; /* red_2 */
 }
+/* Terminal colours in streams and tracebacks (ansiRuns), as JupyterLab's. */
+.ansi-bold { font-weight: 600; }
+.ansi-black-fg { color: #3e424d; }
+.ansi-red-fg { color: #e75c58; }
+.ansi-green-fg { color: #00a250; }
+.ansi-yellow-fg { color: #ddb62b; }
+.ansi-blue-fg { color: #208ffb; }
+.ansi-magenta-fg { color: #d160c4; }
+.ansi-cyan-fg { color: #60c6c8; }
+.ansi-white-fg { color: #c5c1b4; }
+.ansi-bright-black-fg { color: #282c36; }
+.ansi-bright-red-fg { color: #b22b31; }
+.ansi-bright-green-fg { color: #007427; }
+.ansi-bright-yellow-fg { color: #b27d12; }
+.ansi-bright-blue-fg { color: #0065ca; }
+.ansi-bright-magenta-fg { color: #a03196; }
+.ansi-bright-cyan-fg { color: #258f8f; }
+.ansi-bright-white-fg { color: #a1a6b2; }
+.ansi-black-bg { background: #3e424d; }
+.ansi-red-bg { background: #e75c58; }
+.ansi-green-bg { background: #00a250; }
+.ansi-yellow-bg { background: #ddb62b; }
+.ansi-blue-bg { background: #208ffb; }
+.ansi-magenta-bg { background: #d160c4; }
+.ansi-cyan-bg { background: #60c6c8; }
+.ansi-white-bg { background: #c5c1b4; }
 /* Under an error: a quiet link to the assistant. */
 .nb-fix {
   display: inline-flex;
