@@ -9,6 +9,9 @@ import DOMPurify from "dompurify";
 import CodeMirrorEditor from "./CodeMirrorEditor.vue";
 import PlotlyOutput from "./PlotlyOutput.vue";
 import MathOutput from "./MathOutput.vue";
+import VegaOutput from "./VegaOutput.vue";
+import HtmlFrameOutput from "./HtmlFrameOutput.vue";
+import { needsFrame } from "./htmlFrameHelpers";
 import AssistBar from "./AssistBar.vue";
 import AssistIcon from "./AssistIcon.vue";
 import { cellSpendLabel, cellSpendTitle } from "./assistHelpers";
@@ -122,9 +125,19 @@ function imgSrc(data) {
   if (data["image/gif"]) return `data:image/gif;base64,${data["image/gif"]}`;
   return null;
 }
-function htmlOf(data) {
+function rawHtmlOf(data) {
   const h = data["text/html"];
-  return h == null ? h : clean(Array.isArray(h) ? h.join("") : h);
+  return Array.isArray(h) ? h.join("") : h;
+}
+// HTML with scripts runs in a sandboxed frame; other HTML is sanitized into
+// the page.
+function frameHtmlOf(data) {
+  const h = rawHtmlOf(data);
+  return needsFrame(h) ? h : null;
+}
+function htmlOf(data) {
+  const h = rawHtmlOf(data);
+  return h == null ? h : clean(h);
 }
 function textOf(data) {
   const t = data["text/plain"];
@@ -150,13 +163,18 @@ function jsonOf(data) {
 function plotlyOf(data) {
   return data["application/vnd.plotly.v1+json"] || null;
 }
+// A Vega-Lite (Altair) or Vega spec, any version: { spec, mode } or null.
+const VEGA_MIME = /^application\/vnd\.vega(lite)?\.v\d+\+json$/;
+function vegaOf(data) {
+  const keys = Object.keys(data || {}).filter((k) => VEGA_MIME.test(k) && data[k] && typeof data[k] === "object");
+  const key = keys.find((k) => k.includes("vegalite")) || keys[0];
+  if (!key) return null;
+  return { spec: data[key], mode: key.includes("vegalite") ? "vega-lite" : "vega" };
+}
 // A friendly notice for rich output types we knowingly don't render (so users
 // get an explanation instead of a raw text/plain dump or a blank).
 function unsupportedMessage(data) {
   const keys = Object.keys(data || {});
-  if (keys.some((k) => k.startsWith("application/vnd.vega"))) {
-    return "This is a Vega/Vega-Lite (Altair) chart, which the Pennsieve notebook viewer doesn’t render yet — Plotly and matplotlib charts are fully supported, so use one of those instead.";
-  }
   if (keys.some((k) => k.startsWith("application/vnd.jupyter.widget"))) {
     return "This is an interactive widget (ipywidgets), which isn’t supported in the Pennsieve notebook viewer.";
   }
@@ -287,8 +305,10 @@ function latexOf(data) {
           <template v-else>
             <!-- execute_result / display_data: richest mime first -->
             <PlotlyOutput v-if="plotlyOf(o.data)" :spec="plotlyOf(o.data)" />
+            <VegaOutput v-else-if="vegaOf(o.data)" :spec="vegaOf(o.data).spec" :mode="vegaOf(o.data).mode" />
             <img v-else-if="imgSrc(o.data)" class="nb-img" :src="imgSrc(o.data)" alt="output" />
             <div v-else-if="svgOf(o.data)" class="nb-svg" v-html="svgOf(o.data)" />
+            <HtmlFrameOutput v-else-if="frameHtmlOf(o.data)" :html="frameHtmlOf(o.data)" />
             <div v-else-if="htmlOf(o.data)" class="nb-html markdown-body" v-html="htmlOf(o.data)" />
             <MathOutput v-else-if="latexOf(o.data)" :latex="latexOf(o.data)" />
             <div
