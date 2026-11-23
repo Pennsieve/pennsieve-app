@@ -22,28 +22,34 @@ export function useStartLoads({ inputs, rows, insert }) {
     if (inputs.requestError) {
       pending.delete(row.key);
       error.value = inputs.requestError;
+    } else if (pending.has(row.key)) {
+      // Asked for (the request refreshes the files' states before it
+      // returns): a failure from here on is this download's, one already
+      // there included.
+      pending.get(row.key).seen = true;
+      settle();
     }
   }
+  // Another notebook: its loads aren't this one's.
+  const clear = () => pending.clear();
 
-  watch(
-    rows,
-    (list) => {
-      for (const row of list) {
-        const p = pending.get(row.key);
-        if (!p) continue;
-        if (row.state.under) p.seen = true;
-        else if (row.state.all) {
-          pending.delete(row.key);
-          insert(row.code);
-        } else if (row.state.failed && p.seen) {
-          pending.delete(row.key);
-          error.value = `${row.layout.entry.label} didn't download.`;
-        }
+  function settle() {
+    for (const row of rows.value) {
+      const p = pending.get(row.key);
+      if (!p) continue;
+      if (row.state.under) p.seen = true;
+      else if (row.state.all) {
+        pending.delete(row.key);
+        insert(row.code);
+      } else if (row.state.failed && p.seen) {
+        pending.delete(row.key);
+        error.value = `${row.layout.entry.label} didn't download.`;
       }
-    },
-    { deep: true }
-  );
+    }
+  }
+  // Each row's state, not its source's files (walked on every status poll).
+  watch(() => rows.value.map((r) => `${r.key}:${r.state.all}:${r.state.under}:${r.state.failed}`).join("|"), settle);
 
   const waiting = computed(() => new Set(pending.keys()));
-  return { load, waiting, error };
+  return { load, waiting, error, clear };
 }

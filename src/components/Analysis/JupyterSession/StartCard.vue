@@ -11,8 +11,8 @@ import { costLine } from "./inputsHelpers";
 const props = defineProps({
   // [{ key, source, layout, path, code, state }] (starterRows): what to load.
   rows: { type: Array, default: () => [] },
-  // Keys of the loads waiting for their download.
-  waiting: { type: Object, default: () => new Set() },
+  // Keys of the loads waiting for their download (a Set).
+  waiting: { type: [Set, Object], default: () => new Set() },
   // Why the last download couldn't start, or "".
   error: { type: String, default: "" },
   // The kernel's language: "Python" or "R".

@@ -7,7 +7,7 @@
 // lines say it's a template and which libraries it needs.
 import { httpsOf, sessionPathCode, stackCode } from "./pathCode";
 
-const isR = (kernelName = "") => {
+export const isR = (kernelName = "") => {
   const k = kernelName.toLowerCase();
   return k === "r" || k.startsWith("r ");
 };

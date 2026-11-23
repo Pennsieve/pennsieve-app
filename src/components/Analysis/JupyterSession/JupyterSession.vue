@@ -12,6 +12,7 @@ import NotebookCell from "./NotebookCell.vue";
 import StartCard from "./StartCard.vue";
 import { notebookEmpty, starterState } from "./startCardHelpers";
 import { useStartLoads } from "./useStartLoads";
+import { isR } from "./fileSnippets";
 import { fmtSize } from "./fileBrowserHelpers";
 import AssistSpend from "./AssistSpend.vue";
 import FileBrowser from "./FileBrowser.vue";
@@ -839,8 +840,11 @@ function onAssist(cell, { action, prompt }) {
 // language.
 const starters = ref([]);
 const startDismissed = ref(false);
-watch(notebookSource, () => (startDismissed.value = false));
-const kernelLanguage = computed(() => (/^r\b/i.test(kernelName.value || "") ? "R" : "Python"));
+watch(notebookSource, () => {
+  startDismissed.value = false;
+  clearStartLoads();
+});
+const kernelLanguage = computed(() => (isR(kernelName.value || "") ? "R" : "Python"));
 const starterRows = computed(() =>
   starters.value
     .map((s) => ({
@@ -853,7 +857,7 @@ const starterRows = computed(() =>
 const showStart = computed(() => status.value === "ready" && !startDismissed.value && starterRows.value.length > 0 && notebookEmpty(cells.value));
 
 // Loads asked from the card (finish even after it's gone).
-const { load: startLoad, waiting: startWaiting, error: startError } = useStartLoads({ inputs, rows: starterRows, insert: insertSnippet });
+const { load: startLoad, waiting: startWaiting, error: startError, clear: clearStartLoads } = useStartLoads({ inputs, rows: starterRows, insert: insertSnippet });
 
 // Its Suggest: the agent's first step, in the first code cell, on a bar of
 // its own (once: not while one is being asked).
