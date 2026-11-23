@@ -776,7 +776,7 @@ function onAssist(cell, { action, prompt }) {
   } else if (action === "refine") submitAssist(cell, prompt, { followUp: true });
   else if (action === "restart") {
     // A new request on this cell, outside the conversation.
-    Object.assign(a, { mode: "write", conversationId: "", asked: [], text: "", answer: "", summary: "", steps: [], state: "idle", error: "", used: false, canSuggest: canSuggestFor("write", a.file) });
+    Object.assign(a, { mode: "write", conversationId: "", asked: [], text: "", answer: "", summary: "", steps: [], state: "idle", error: "", used: false, usage: null, budget: null, outputs: null, partial: false, canSuggest: canSuggestFor("write", a.file) });
   } else if (action === "stop") assistAborts.get(cell.id)?.abort();
   else if (action === "clear-file") a.file = "";
   else if (action === "discard") closeAssist(cell);
