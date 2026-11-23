@@ -9,7 +9,7 @@ const buttons = (w) => w.findAll(".nb-assist__ask .nb-assist__btn").map((b) => b
 describe("AssistBar follow-ups", () => {
   it("asks for a change to a proposal in its conversation", async () => {
     const w = bar({ followUps: true, conversationId: "c", state: "done", text: "df.plot()", asked: ["plot it"], prompt: "plot it" });
-    expect(buttons(w)).toEqual(["Refine"]);
+    expect(buttons(w)).toEqual(["Refine", "Start over"]);
     expect(w.find("input").attributes("placeholder")).toBe("Ask for a change to this code");
     expect(w.find(".nb-assist__asked").text()).toBe("Continuing: plot it");
     await w.find("input").setValue("use a log scale");
@@ -21,16 +21,22 @@ describe("AssistBar follow-ups", () => {
   it("after the proposal is in the cell, says so", () => {
     const w = bar({ followUps: true, conversationId: "c", used: true, asked: ["plot it"] });
     expect(w.find("input").attributes("placeholder")).toBe("Ask for a change to this cell");
-    expect(buttons(w)).toEqual(["Refine"]);
+    expect(buttons(w)).toEqual(["Refine", "Start over"]);
   });
 
-  it("empties the box for each new proposal", async () => {
-    const assist = reactive({ mode: "write", state: "done", steps: [], prompt: "", followUps: true, conversationId: "c1", asked: [] });
+  it("empties the box for each new proposal in the same conversation", async () => {
+    const assist = reactive({ mode: "write", state: "done", steps: [], prompt: "", followUps: true, conversationId: "c", asked: [], turn: 1 });
     const w = mount(AssistBar, { props: { assist } });
     await w.find("input").setValue("smaller");
-    assist.conversationId = "c2";
+    assist.turn = 2;
     await nextTick();
     expect(w.find("input").element.value).toBe("");
+  });
+
+  it("starts over outside the conversation", async () => {
+    const w = bar({ followUps: true, conversationId: "c", state: "done", text: "x", asked: ["a"] });
+    await w.findAll(".nb-assist__btn").find((b) => b.text() === "Start over").trigger("click");
+    expect(w.emitted("restart")).toHaveLength(1);
   });
 
   it("is a new request where the session has no follow-ups", () => {

@@ -94,33 +94,48 @@ export function assistRequest({ mode = "write", prompt = "", cell, cells, kernel
 // A follow-up on the agent's last proposal, in the same conversation: the
 // change asked; with the cell's code when the proposal was put in (perhaps
 // edited), and its last run's outputs when it ran since (ran: the cell's
-// outputs aren't the ones it had when the proposal went in).
-export function followUpRequest({ conversationId, prompt, cell, used = false, ran = false }) {
-  const body = { mode: "write", conversationId, prompt };
+// outputs aren't the ones it had when the proposal went in), or that it's
+// still running. kernel: as the first request said it (the session keeps the
+// conversation's own).
+const CELL_CHARS = 16384;
+export function followUpRequest({ conversationId, prompt, cell, kernel = "", used = false, ran = false }) {
+  const body = { mode: "write", conversationId, prompt, kernel };
   if (used && cell) {
-    body.cell = cell.source || "";
-    if (ran) body.outputs = followUpOutputs(cell.outputs);
+    body.cell = String(cell.source || "").slice(0, CELL_CHARS);
+    if (cell._running) body.running = true;
+    else if (ran) body.outputs = followUpOutputs(cell.outputs);
   }
   return body;
 }
 
-// A cell's outputs as a follow-up sends them: their text, clipped; a figure
-// or other rich output by its type only (the agent reads text).
-const OUTPUT_CHARS = 8000;
-const clipText = (t) => {
-  const s = Array.isArray(t) ? t.join("") : String(t ?? "");
-  return s.length > OUTPUT_CHARS ? `${s.slice(0, OUTPUT_CHARS / 2)}\n…\n${s.slice(-OUTPUT_CHARS / 2)}` : s;
+// A cell's outputs as a follow-up sends them: their text, without terminal
+// colours, clipped (each, and all together: the newest kept, and an error
+// always); a figure or other rich output by its type only (the agent reads
+// text). The session reads about 4,000 characters of them.
+const OUTPUT_CHARS = 4000;
+const OUTPUTS_CHARS = 16000;
+const TERMINAL = /\x1b\[[0-9;?]*[A-Za-z]/g;
+const clipText = (t, limit = OUTPUT_CHARS) => {
+  const s = (Array.isArray(t) ? t.join("") : String(t ?? "")).replace(TERMINAL, "");
+  return s.length > limit ? `${s.slice(0, limit / 2)}\n…\n${s.slice(-limit / 2)}` : s;
 };
 export function followUpOutputs(outputs) {
-  return (outputs || []).slice(-20).map((o) => {
+  const out = (outputs || []).map((o) => {
     if (o.output_type === "stream") return { output_type: "stream", name: o.name, text: clipText(o.text) };
     if (o.output_type === "error") {
-      return { output_type: "error", ename: String(o.ename || ""), evalue: clipText(o.evalue), traceback: (o.traceback || []).slice(-30).map(clipText) };
+      return { output_type: "error", ename: String(o.ename || ""), evalue: clipText(o.evalue, 1000), traceback: (o.traceback || []).slice(-30).map((t) => clipText(t, 1000)) };
     }
     const data = {};
     for (const mime of Object.keys(o.data || {})) data[mime] = mime === "text/plain" ? clipText(o.data[mime]) : "";
     return { output_type: o.output_type, data };
   });
+  // The oldest go first while they're too long together.
+  let size = JSON.stringify(out).length;
+  for (let i = 0; size > OUTPUTS_CHARS && i < out.length; ) {
+    if (out[i].output_type === "error") i++;
+    else size -= JSON.stringify(out.splice(i, 1)[0]).length + 1;
+  }
+  return out;
 }
 
 // An agent's step, in words: what it looked at or ran.
