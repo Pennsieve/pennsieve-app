@@ -124,8 +124,9 @@ const lineBefore = (state) => {
   return empty ? state.sliceDoc(state.doc.lineAt(head).from, head) : "";
 };
 
-// A list of completions is showing, or is being asked for.
-const listing = (state) => completionStatus(state) === "pending" || selectedCompletion(state) != null;
+// A list of completions is showing (asked for counts too, for Tab).
+const listShown = (state) => selectedCompletion(state) != null;
+const listing = (state) => completionStatus(state) === "pending" || listShown(state);
 
 // Completions are asked for (Tab or Ctrl-Space), never while typing: each is
 // a request to the kernel.
@@ -134,7 +135,7 @@ async function kernelCompletions(context) {
   if (!complete) return null;
   const code = context.state.doc.toString();
   const reply = await complete(code, toCodePoints(code, context.pos));
-  return context.aborted ? null : completionResult(code, reply);
+  return context.aborted ? null : completionResult(code, reply, context.pos);
 }
 
 // Shift-Tab help, shown below the cursor until the next edit, cursor move,
@@ -148,17 +149,22 @@ const helpField = StateField.define({
   },
   provide: (f) => showTooltip.from(f),
 });
-const helpOnBlur = EditorView.focusChangeEffect.of((state, focusing) =>
-  !focusing && state.field(helpField, false) ? setHelp.of(null) : null
-);
+// Focus moving into the help (to select or scroll it) keeps it; anywhere
+// else closes it.
+function closeHelpOnLeave(e, v) {
+  if (v.state.field(helpField, false) && !v.dom.contains(e.relatedTarget)) v.dispatch({ effects: setHelp.of(null) });
+}
+const helpOnBlur = EditorView.domEventHandlers({ blur: closeHelpOnLeave });
 function helpTooltip(pos, text) {
   return {
     pos,
     above: false,
-    create: () => {
+    create: (v) => {
       const dom = document.createElement("pre");
       dom.className = "cm-kernel-help";
       dom.textContent = text;
+      dom.tabIndex = -1;
+      dom.addEventListener("focusout", (e) => closeHelpOnLeave(e, v));
       return { dom };
     },
   };
@@ -220,7 +226,7 @@ function notebookKeymap() {
         key: "ArrowUp",
         run: (v) => {
           // An arrow on a list that just opened stays in the cell.
-          if (listing(v.state)) return true;
+          if (listShown(v.state)) return true;
           const line = v.state.doc.lineAt(v.state.selection.main.head);
           if (line.number === 1) {
             emit("arrow-up");
@@ -232,7 +238,7 @@ function notebookKeymap() {
       {
         key: "ArrowDown",
         run: (v) => {
-          if (listing(v.state)) return true;
+          if (listShown(v.state)) return true;
           const { doc, selection } = v.state;
           const line = doc.lineAt(selection.main.head);
           if (line.number === doc.lines) {

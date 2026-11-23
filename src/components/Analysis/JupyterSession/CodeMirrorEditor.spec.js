@@ -78,6 +78,17 @@ describe("CodeMirrorEditor kernel help", () => {
     w.unmount();
   });
 
+  it("keeps the arrows for the cell while the kernel is still answering", async () => {
+    const complete = vi.fn(() => new Promise(() => {}));
+    const w = mount(CodeMirrorEditor, { props: { modelValue: "a\ndf.h", complete }, attachTo: document.body });
+    toEnd(w);
+    tab(w);
+    await vi.waitFor(() => expect(complete).toHaveBeenCalled());
+    w.find(".cm-content").element.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowUp", keyCode: 38, bubbles: true, cancelable: true }));
+    expect(view(w).state.doc.lineAt(view(w).state.selection.main.head).number).toBe(1);
+    w.unmount();
+  });
+
   it("indents on Tab at the start of a line, without asking the kernel", async () => {
     const complete = vi.fn();
     const w = mount(CodeMirrorEditor, { props: { modelValue: "", complete }, attachTo: document.body });
@@ -104,6 +115,16 @@ describe("CodeMirrorEditor kernel help", () => {
     toEnd(w);
     tab(w, true);
     await vi.waitFor(() => expect(document.querySelector(".cm-kernel-help")?.textContent).toBe("Signature: len(obj, /)"));
+    // Kept while focus is in it (selecting its text), closed when focus leaves.
+    const help = () => document.querySelector(".cm-kernel-help");
+    const outside = document.body.appendChild(document.createElement("button"));
+    w.find(".cm-content").element.focus();
+    help().focus();
+    await flushPromises();
+    expect(help()).not.toBeNull();
+    outside.focus();
+    await vi.waitFor(() => expect(help()).toBeNull());
+    outside.remove();
     w.unmount();
   });
 });

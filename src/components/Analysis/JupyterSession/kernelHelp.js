@@ -64,7 +64,7 @@ const TYPES = {
 // would drop ones that don't spell what's typed, like \alpha → α). Typing more
 // of a name narrows them to those it starts; typing anything else closes the
 // list without asking the kernel again (only Tab and Ctrl-Space ask).
-export function completionResult(text, reply) {
+export function completionResult(text, reply, cursor = Infinity) {
   if (!reply?.matches?.length || !Number.isInteger(reply.cursor_start) || !Number.isInteger(reply.cursor_end)) return null;
   const types = new Map();
   for (const t of reply.metadata?._jupyter_types_experimental || []) {
@@ -77,7 +77,8 @@ export function completionResult(text, reply) {
   if (!options.length) return null;
   const from = fromCodePoints(text, reply.cursor_start);
   const to = fromCodePoints(text, reply.cursor_end);
-  const asked = text.slice(from, to);
+  // What was typed when asking (a range past the cursor, mid-word, ends there).
+  const asked = text.slice(from, Math.max(from, Math.min(to, cursor)));
   return {
     from,
     to,
