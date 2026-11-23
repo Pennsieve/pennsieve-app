@@ -17,8 +17,10 @@ const props = defineProps({
   assist: { type: Object, required: true },
   // The cell has code: taking the reply replaces it.
   cellHasCode: { type: Boolean, default: false },
+  // The cell's last run failed: Fix is on offer.
+  cellHasError: { type: Boolean, default: false },
 });
-const emit = defineEmits(["submit", "suggest", "refine", "restart", "stop", "accept", "accept-run", "use-run", "insert-below", "insert-below-run", "insert-answer", "answer-to-code", "discard", "clear-file"]);
+const emit = defineEmits(["submit", "suggest", "refine", "restart", "fix", "stop", "accept", "accept-run", "use-run", "insert-below", "insert-below-run", "insert-answer", "answer-to-code", "discard", "clear-file"]);
 
 const prompt = ref(props.assist.prompt || "");
 const input = ref(null);
@@ -50,7 +52,7 @@ const placeholder = computed(() => {
   const a = props.assist;
   if (refining.value) return a.answer ? "Ask a follow-up question" : a.used ? "Ask for a change to this cell" : "Ask for a change to this code";
   if (a.file) return `What should the code do with ${fileName.value}?`;
-  return a.canSuggest ? "Describe the code this cell should have, or ask for a suggestion" : "Describe the code this cell should have";
+  return a.agent ? "Ask a question, or say what the code should do" : "Describe the code this cell should have";
 });
 // Each proposal (and the bar kept on a cell after Use) starts the box empty
 // for the next follow-up.
@@ -61,10 +63,22 @@ watch(
   }
 );
 
-// Nothing typed: the agent may suggest the next cell instead; with something
-// typed, a suggestion with that in mind is on offer next to Write.
-const suggests = computed(() => !fix.value && !refining.value && !!props.assist.canSuggest && !prompt.value.trim());
-const steers = computed(() => !fix.value && !refining.value && !asking.value && !!props.assist.canSuggest && !!prompt.value.trim());
+// One box for a question, a change or a next step (the agent works out which,
+// and where its code goes). With nothing typed yet, a few starters.
+const chips = computed(() => {
+  const a = props.assist;
+  if (fix.value || refining.value || asking.value || prompt.value.trim() || a.file || a.text || a.answer) return [];
+  const out = [];
+  if (a.canSuggest) out.push({ label: "Suggest a next step", run: () => emit("suggest") });
+  if (a.agent && props.cellHasCode) out.push({ label: "Explain this cell", run: () => emit("submit", "Explain what this cell does.") });
+  if (props.cellHasError) out.push({ label: "Fix the error", run: () => emit("fix") });
+  return out;
+});
+// The proposal is a new cell after this one (a next step), not its code.
+const below = computed(() => {
+  const a = props.assist;
+  return props.cellHasCode && (a.placement === "below" || (a.mode === "suggest" && !a.placement));
+});
 
 function submit() {
   if (asking.value) return;
@@ -72,7 +86,6 @@ function submit() {
     if (prompt.value.trim()) emit("refine", prompt.value.trim());
     return;
   }
-  if (suggests.value) return emit("suggest");
   if (!fix.value && !prompt.value.trim()) return;
   emit("submit", prompt.value.trim());
 }
@@ -109,27 +122,13 @@ function submit() {
         </button>
         <button class="nb-assist__btn" title="A new request on this cell, outside this conversation" @click="emit('restart')">Start over</button>
       </template>
-      <button
-        v-else-if="suggests"
-        class="nb-assist__btn nb-assist__btn--go"
-        title="The assistant proposes a next step from the cells above and the session's data"
-        @click="submit"
-      >
-        Suggest
-      </button>
-      <template v-else-if="!fix">
-        <button
-          v-if="steers"
-          class="nb-assist__btn"
-          title="The assistant proposes a next step from the cells above and the session's data, with this in mind"
-          @click="emit('suggest', prompt.trim())"
-        >
-          Suggest
-        </button>
-        <button class="nb-assist__btn nb-assist__btn--go" :disabled="!prompt.trim()" @click="submit">Write</button>
-      </template>
+      <button v-else-if="!fix" class="nb-assist__btn nb-assist__btn--go" :disabled="!prompt.trim()" @click="submit">Ask</button>
       <button v-else-if="assist.state === 'error' || assist.state === 'idle'" class="nb-assist__btn nb-assist__btn--go" @click="submit">Try again</button>
       <button class="nb-assist__x" title="Close (Esc)" aria-label="Close" @click="emit('discard')">✕</button>
+    </div>
+
+    <div v-if="chips.length" class="nb-assist__chips">
+      <button v-for="c in chips" :key="c.label" class="nb-assist__chip" @click="c.run()">{{ c.label }}</button>
     </div>
 
     <!-- The conversation a follow-up continues: what was asked in it. -->
@@ -187,9 +186,12 @@ function submit() {
       <button class="nb-assist__btn" @click="emit('discard')">Discard</button>
       <span class="nb-assist__note">Stopped part-way: read it before you run it.</span>
     </div>
-    <div v-else-if="assist.state === 'done' && code && assist.mode === 'suggest' && cellHasCode" class="nb-assist__actions">
+    <!-- Where the code goes is the assistant's call (a next step goes below);
+         the other place is a click away. -->
+    <div v-else-if="assist.state === 'done' && code && below" class="nb-assist__actions">
       <button class="nb-assist__btn nb-assist__btn--go" @click="emit('insert-below-run')">Insert below and run</button>
       <button class="nb-assist__btn" @click="emit('insert-below')">Insert below</button>
+      <button class="nb-assist__btn" @click="emit('accept')">Replace this cell</button>
       <button class="nb-assist__btn" @click="emit('discard')">Discard</button>
       <span class="nb-assist__note">Written by AI from your session's data: read it before you run it.</span>
     </div>
@@ -340,6 +342,25 @@ $assist_tint: #f0ebfb;
 }
 .nb-assist__note--model {
   font-style: italic;
+}
+.nb-assist__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 6px 0 0 22px;
+}
+.nb-assist__chip {
+  padding: 2px 10px;
+  border: 1px solid theme.$gray_2;
+  border-radius: 12px;
+  background: theme.$white;
+  color: theme.$gray_6;
+  font-size: 12px;
+  cursor: pointer;
+}
+.nb-assist__chip:hover {
+  border-color: theme.$purple_1;
+  color: theme.$purple_1;
 }
 .nb-assist__asked {
   margin: 4px 0 0;

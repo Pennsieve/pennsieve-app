@@ -41,19 +41,58 @@ describe("AssistBar follow-ups", () => {
 
   it("is a new request where the session has no follow-ups", () => {
     const w = bar({ followUps: false, conversationId: "c", state: "done", text: "x", prompt: "plot it" });
-    expect(buttons(w)).toEqual(["Write"]);
+    expect(buttons(w).slice(0, 1)).toEqual(["Ask"]);
   });
 });
 
-describe("AssistBar suggestions", () => {
-  it("suggests with nothing typed, and with something typed offers it next to Write", async () => {
-    const w = bar({ canSuggest: true });
-    expect(buttons(w)).toEqual(["Suggest"]);
-    await w.find("input").setValue("focus on outcomes");
-    expect(buttons(w)).toEqual(["Suggest", "Write"]);
-    await w.findAll(".nb-assist__ask button").find((b) => b.text() === "Suggest").trigger("click");
-    expect(w.emitted("suggest")).toEqual([["focus on outcomes"]]);
+const chips = (w) => w.findAll(".nb-assist__chip").map((c) => c.text());
+const actions = (w) => w.findAll(".nb-assist__actions .nb-assist__btn").map((b) => b.text());
+const mountBar = (assist, props = {}) => mount(AssistBar, { props: { assist: reactive({ mode: "write", state: "idle", steps: [], prompt: "", ...assist }), ...props } });
+
+describe("AssistBar: one box", () => {
+  it("has one Ask button, and starters while nothing is typed", async () => {
+    const w = mountBar({ agent: true, canSuggest: true }, { cellHasCode: true, cellHasError: true });
+    expect(buttons(w)).toEqual(["Ask"]);
+    expect(w.find("input").attributes("placeholder")).toBe("Ask a question, or say what the code should do");
+    expect(chips(w)).toEqual(["Suggest a next step", "Explain this cell", "Fix the error"]);
+    await w.findAll(".nb-assist__chip")[0].trigger("click");
+    expect(w.emitted("suggest")).toHaveLength(1);
+    await w.findAll(".nb-assist__chip")[1].trigger("click");
+    expect(w.emitted("submit")).toEqual([["Explain what this cell does."]]);
+    await w.findAll(".nb-assist__chip")[2].trigger("click");
+    expect(w.emitted("fix")).toHaveLength(1);
+    await w.find("input").setValue("plot by sex");
+    expect(chips(w)).toEqual([]);
     await w.find("input").trigger("keydown.enter");
-    expect(w.emitted("submit")).toEqual([["focus on outcomes"]]);
+    expect(w.emitted("submit").at(-1)).toEqual(["plot by sex"]);
+  });
+
+  it("offers only what fits the cell and the session", () => {
+    expect(chips(mountBar({ agent: true, canSuggest: true }))).toEqual(["Suggest a next step"]);
+    // The single-shot assistant: no starters it can't do.
+    expect(chips(mountBar({ agent: false }, { cellHasCode: true }))).toEqual([]);
+    expect(chips(mountBar({ agent: true, canSuggest: true, state: "done", text: "x" }))).toEqual([]);
+  });
+});
+
+describe("AssistBar: where the code goes", () => {
+  it("puts a next step below, with replacing a click away", () => {
+    const w = mountBar({ agent: true, state: "done", text: "df.describe()", placement: "below" }, { cellHasCode: true });
+    expect(actions(w)).toEqual(["Insert below and run", "Insert below", "Replace this cell", "Discard"]);
+  });
+
+  it("replaces the cell for a change, with inserting below a click away", () => {
+    const w = mountBar({ agent: true, state: "done", text: "df.plot()", placement: "replace" }, { cellHasCode: true });
+    expect(actions(w)).toEqual(["Replace and run", "Insert below", "Discard"]);
+  });
+
+  it("uses an empty cell whatever the placement", () => {
+    const w = mountBar({ agent: true, state: "done", text: "x", placement: "below" }, { cellHasCode: false });
+    expect(actions(w)[0]).toBe("Use and run");
+  });
+
+  it("a suggestion from a session without placements goes below", () => {
+    const w = mountBar({ agent: true, mode: "suggest", state: "done", text: "x" }, { cellHasCode: true });
+    expect(actions(w)[0]).toBe("Insert below and run");
   });
 });
