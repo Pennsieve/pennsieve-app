@@ -227,7 +227,8 @@ function submit() {
     </div>
     <div v-else-if="assist.state === 'done' && code" class="nb-assist__actions">
       <button class="nb-assist__btn nb-assist__btn--go" @click="emit('use-run')">{{ cellHasCode ? "Replace and run" : "Use and run" }}</button>
-      <button class="nb-assist__btn" @click="emit('insert-below')">Insert below</button>
+      <!-- Below an empty cell it would only leave the empty cell behind. -->
+      <button v-if="cellHasCode" class="nb-assist__btn" @click="emit('insert-below')">Insert below</button>
       <button class="nb-assist__btn" @click="emit('discard')">Discard</button>
       <span class="nb-assist__note">Written by AI: read it before you run it.</span>
     </div>
