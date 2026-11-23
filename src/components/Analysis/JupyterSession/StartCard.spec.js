@@ -134,15 +134,40 @@ describe("useStartLoads", () => {
     expect(loads.error.value).toBe("the node can't fetch inputs");
   });
 
+  it("lets go of a download that fails at once, and of every load for another notebook", async () => {
+    const failed = { state: "failed" };
+    const inputs = fakeInputs();
+    inputs.requestEntries = vi.fn(async () => {
+      for (const p of graph.layout.files) inputs.states[p] = failed;
+    });
+    const { rows, loads } = setup(inputs);
+    await loads.load(rows.value[1]);
+    await nextTick();
+    expect(loads.waiting.value.size).toBe(0);
+    expect(loads.error.value).toContain("didn't download");
+    inputs.requestEntries = vi.fn(async () => {});
+    await loads.load(rows.value[0]);
+    expect(loads.waiting.value.size).toBe(1);
+    loads.clear();
+    expect(loads.waiting.value.size).toBe(0);
+  });
+
   it("doesn't take an earlier failure for this download's", async () => {
     const failed = { state: "failed" };
     const inputs = fakeInputs({ "metadata/kgx/nodes.parquet": failed, "metadata/kgx/edges.parquet": failed });
-    inputs.requestEntries = vi.fn(async () => {});
+    let begin;
+    // The request returns once the sidecar has it queued (its states refreshed).
+    inputs.requestEntries = vi.fn(() => new Promise((resolve) => (begin = resolve)));
     const { rows, inserted, loads } = setup(inputs);
-    await loads.load(rows.value[1]);
+    const asked = loads.load(rows.value[1]);
+    // Something else changes while the request is on its way: the old failure isn't this one's.
     inputs.states["metadata/models/a/versions/1/records.jsonl"] = { state: "downloading", size: 100, bytes: 1 };
     await nextTick();
     expect(loads.waiting.value.has("g"), "still waiting: its download hasn't begun").toBe(true);
+    for (const p of graph.layout.files) inputs.states[p] = { state: "queued", size: 1, bytes: 0 };
+    begin();
+    await asked;
+    expect(loads.waiting.value.has("g")).toBe(true);
     inputs.states["metadata/kgx/nodes.parquet"] = done;
     inputs.states["metadata/kgx/edges.parquet"] = done;
     await nextTick();
