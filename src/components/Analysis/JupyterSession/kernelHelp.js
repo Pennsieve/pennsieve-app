@@ -59,9 +59,13 @@ const TYPES = {
 };
 
 // A complete_reply as a CodeMirror completion result (positions in the
-// editor's units), or null when there's nothing to offer.
+// editor's units), or null when there's nothing to offer. The kernel's
+// matches are shown as it sent them, in its order (CodeMirror's own matching
+// would drop ones that don't spell what's typed, like \alpha → α). Typing more
+// of a name narrows them to those it starts; typing anything else closes the
+// list without asking the kernel again (only Tab and Ctrl-Space ask).
 export function completionResult(text, reply) {
-  if (!reply?.matches?.length) return null;
+  if (!reply?.matches?.length || !Number.isInteger(reply.cursor_start) || !Number.isInteger(reply.cursor_end)) return null;
   const types = new Map();
   for (const t of reply.metadata?._jupyter_types_experimental || []) {
     if (t && typeof t.text === "string") types.set(t.text, t.type);
@@ -71,12 +75,21 @@ export function completionResult(text, reply) {
     return type ? { label, type } : { label };
   });
   if (!options.length) return null;
+  const from = fromCodePoints(text, reply.cursor_start);
+  const to = fromCodePoints(text, reply.cursor_end);
+  const asked = text.slice(from, to);
   return {
-    from: fromCodePoints(text, reply.cursor_start),
-    to: fromCodePoints(text, reply.cursor_end),
+    from,
+    to,
     options,
-    // Typing more of a name narrows the list here; anything else asks again.
-    validFor: /^[\w$]*$/,
+    filter: false,
+    update(current, from, to, context) {
+      const typed = context.state.sliceDoc(from, context.pos);
+      const more = typed.startsWith(asked) ? typed.slice(asked.length) : null;
+      if (more === null || !/^[\w$]*$/.test(more)) return { ...current, from, to, options: [] };
+      const t = typed.toLowerCase();
+      return { ...current, from, to: Math.max(to, context.pos), options: options.filter((o) => o.label.toLowerCase().startsWith(t)) };
+    },
   };
 }
 

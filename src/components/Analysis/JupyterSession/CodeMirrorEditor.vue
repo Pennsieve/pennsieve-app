@@ -23,9 +23,11 @@ import {
 } from "@codemirror/commands";
 import {
   autocompletion,
+  completionKeymap,
   startCompletion,
   acceptCompletion,
   completionStatus,
+  selectedCompletion,
 } from "@codemirror/autocomplete";
 import {
   syntaxHighlighting,
@@ -122,6 +124,9 @@ const lineBefore = (state) => {
   return empty ? state.sliceDoc(state.doc.lineAt(head).from, head) : "";
 };
 
+// A list of completions is showing, or is being asked for.
+const listing = (state) => completionStatus(state) === "pending" || selectedCompletion(state) != null;
+
 // Completions are asked for (Tab or Ctrl-Space), never while typing: each is
 // a request to the kernel.
 async function kernelCompletions(context) {
@@ -132,8 +137,8 @@ async function kernelCompletions(context) {
   return context.aborted ? null : completionResult(code, reply);
 }
 
-// Shift-Tab help, shown below the cursor until the next edit, cursor move or
-// Escape.
+// Shift-Tab help, shown below the cursor until the next edit, cursor move,
+// Escape, or the editor losing focus.
 const setHelp = StateEffect.define();
 const helpField = StateField.define({
   create: () => null,
@@ -143,6 +148,9 @@ const helpField = StateField.define({
   },
   provide: (f) => showTooltip.from(f),
 });
+const helpOnBlur = EditorView.focusChangeEffect.of((state, focusing) =>
+  !focusing && state.field(helpField, false) ? setHelp.of(null) : null
+);
 function helpTooltip(pos, text) {
   return {
     pos,
@@ -171,9 +179,10 @@ const tabKeymap = keymap.of([
   {
     key: "Tab",
     run: (v) => {
-      // A list just opened takes a moment before it accepts: Tab does nothing
-      // meanwhile (it would otherwise leave the editor).
-      if (completionStatus(v.state) === "active") return acceptCompletion(v) || true;
+      // A list just opened (or still being asked for) takes a moment before
+      // it accepts: Tab does nothing meanwhile (it would otherwise leave the
+      // editor).
+      if (listing(v.state)) return acceptCompletion(v) || true;
       if (kernelHelp(props.complete) && completesHere(lineBefore(v.state))) return startCompletion(v);
       return indentMore(v);
     },
@@ -210,6 +219,8 @@ function notebookKeymap() {
       {
         key: "ArrowUp",
         run: (v) => {
+          // An arrow on a list that just opened stays in the cell.
+          if (listing(v.state)) return true;
           const line = v.state.doc.lineAt(v.state.selection.main.head);
           if (line.number === 1) {
             emit("arrow-up");
@@ -221,6 +232,7 @@ function notebookKeymap() {
       {
         key: "ArrowDown",
         run: (v) => {
+          if (listing(v.state)) return true;
           const { doc, selection } = v.state;
           const line = doc.lineAt(selection.main.head);
           if (line.number === doc.lines) {
@@ -238,11 +250,14 @@ onMounted(() => {
   const state = EditorState.create({
     doc: props.modelValue,
     extensions: [
-      // Before the notebook's keys, so Escape and the arrows act on an open
-      // list of completions first.
-      autocompletion({ override: [kernelCompletions], activateOnTyping: false }),
+      // The list's keys, before the notebook's so Escape and the arrows act
+      // on an open list first; not the macOS Alt-` and Alt-i (Alt-i types
+      // accents).
+      autocompletion({ override: [kernelCompletions], activateOnTyping: false, defaultKeymap: false }),
+      Prec.highest(keymap.of(completionKeymap.filter((b) => !b.mac))),
       notebookKeymap(),
       helpField,
+      helpOnBlur,
       lineNumbers(),
       history(),
       drawSelection(),
