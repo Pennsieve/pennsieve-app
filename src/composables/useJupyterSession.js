@@ -26,6 +26,7 @@ import {
 import { PYTHON_PACKAGES_CODE, R_PACKAGES_CODE, parsePackages } from "@/components/Analysis/JupyterSession/environmentHelpers";
 import { getAgent, getAssist, postAgent, postAssist } from "@/components/Analysis/JupyterSession/assistStream";
 import { displayIdOf, pushOutput, toNbOutputs, updateDisplay } from "@/components/Analysis/JupyterSession/outputHelpers";
+import { kernelReply } from "@/components/Analysis/JupyterSession/kernelHelp";
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const toWs = (u) => u.replace(/^http/i, "ws");
@@ -1120,6 +1121,17 @@ export function useJupyterSession() {
     status.value = "closed";
   }
 
+  // Tab completion and Shift-Tab help in a cell, from the kernel: the reply's
+  // content, or null (no kernel, or no answer in time).
+  function complete(code, cursorPos) {
+    return kernel ? kernelReply(() => kernel.requestComplete({ code, cursor_pos: cursorPos })) : Promise.resolve(null);
+  }
+  function inspect(code, cursorPos) {
+    return kernel
+      ? kernelReply(() => kernel.requestInspect({ code, cursor_pos: cursorPos, detail_level: 0 }))
+      : Promise.resolve(null);
+  }
+
   return {
     // state
     status,
@@ -1174,5 +1186,8 @@ export function useJupyterSession() {
     interrupt,
     restart,
     restartAndRunAll,
+    // editor
+    complete,
+    inspect,
   };
 }

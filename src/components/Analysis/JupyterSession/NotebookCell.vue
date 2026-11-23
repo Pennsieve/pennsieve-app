@@ -26,6 +26,9 @@ const props = defineProps({
   assistAvailable: { type: Boolean, default: false },
   // Why the assistant is paused (no AI budget left), or "".
   assistPaused: { type: String, default: "" },
+  // The kernel's completions (Tab) and help (Shift-Tab), for the editor.
+  complete: { type: Function, default: null },
+  inspect: { type: Function, default: null },
 });
 
 const emit = defineEmits([
@@ -262,6 +265,8 @@ function latexOf(data) {
           :model-value="cell.source"
           :language="isCode ? 'python' : 'markdown'"
           :autofocus="selected"
+          :complete="complete"
+          :inspect="inspect"
           @update:model-value="onSource"
           @run="run({ advance: true })"
           @run-in-place="run({ advance: false })"
