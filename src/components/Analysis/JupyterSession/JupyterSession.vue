@@ -15,7 +15,7 @@ import AddDataDialog from "./AddDataDialog.vue";
 import { useSessionInputs } from "./useSessionInputs";
 import EnvironmentPanel from "./EnvironmentPanel.vue";
 import { sessionPathCode } from "./pathCode";
-import { acceptedCode, addCellSpend, assistRequest, budgetPause, cellCode, requestCost, sessionFiles, useAgent } from "./assistHelpers";
+import { acceptedCode, addCellSpend, assistRequest, budgetPause, cellCode, requestCost, sessionFiles } from "./assistHelpers";
 import RuntimeMark from "../WorkflowGraph/RuntimeMark.vue";
 import { fetchRun } from "../RunMonitor/runDetails";
 import { runOnGpu, runNodeId, gpuShortLabel, gpuMarkTitle, sessionRestrictions } from "../RunMonitor/notebookHelpers";
@@ -598,14 +598,16 @@ function onAgentEvent(a, ev) {
   }
 }
 
-// Asks: the agent (Fix and run, continuing a fix's conversation or starting
-// one; a suggestion; a question), or, for writing or fixing a cell, the
-// single-shot assistant: one model call instead of several (useAgent).
+// Asks: the agent when the session has one (allowRun continues a fix's
+// conversation: Fix and run), else the single-shot assistant. (Writing on
+// the single-shot assistant was tried, 2026-11-23: a third of the agent's
+// cost, but on a knowledge graph's questions it guessed values the agent
+// looks up, right 1 time in 6 against the agent's 4.)
 async function submitAssist(cell, prompt, { allowRun = false, codeOnly = false } = {}) {
   const a = cell._assist;
   if (!a) return;
   const info = assistInfo.value;
-  const viaAgent = useAgent({ agent: info.agent, single: info.single, mode: a.mode, prompt: codeOnly ? "" : prompt, allowRun, suggest: a.mode === "suggest" });
+  const viaAgent = !!info.agent;
   a.via = viaAgent ? "agent" : "single";
   // Each request (a continuation too) counts its own tokens.
   Object.assign(a, { prompt, state: "asking", error: "", note: "", running: allowRun, usage: null, countedTokens: 0, partial: false });
@@ -629,8 +631,6 @@ async function submitAssist(cell, prompt, { allowRun = false, codeOnly = false }
               packages: await assistPackages(),
             });
       if (codeOnly) body.codeOnly = true;
-      // Fix and run after a single-shot fix: a new conversation that may run.
-      if (allowRun) body.allowRun = true;
       const proposal = await askAgent(body, { signal: controller.signal, onEvent: (ev) => onAgentEvent(a, ev) });
       // A question's answer is words, not code.
       if (proposal.kind === "answer") a.lastAnswer = proposal.answer;
@@ -699,8 +699,6 @@ async function submitAssist(cell, prompt, { allowRun = false, codeOnly = false }
 // ran cleanly stays on offer. Without the agent: use the fix and run it once.
 async function fixAndRun(cell) {
   const a = cell._assist;
-  // Without the agent: use the fix and run it once. With it, the agent runs
-  // its fix (a single-shot fix starts it a conversation of its own).
   if (!assistInfo.value.agent) {
     setSource(cell.id, acceptedCode(a.text));
     closeAssist(cell);

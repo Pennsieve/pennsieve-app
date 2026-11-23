@@ -91,20 +91,6 @@ export function assistRequest({ mode = "write", prompt = "", cell, cells, kernel
   return body;
 }
 
-// Whether a request goes to the agent (several model calls: it looks at the
-// session's files and variables, can run its fix, answers questions in
-// words) or to the single-shot assistant (one call, a fraction of the
-// tokens). The agent for Fix and run, a suggestion (nothing typed), and a
-// question; the single-shot assistant for writing or fixing a cell. Either
-// one when it's the only one the session has.
-const QUESTION = /^(what|why|how|which|where|when|who|is|are|does|do|can|could|should|explain|describe|tell me)\b/i;
-export function useAgent({ agent = false, single = false, mode = "write", prompt = "", allowRun = false, suggest = false } = {}) {
-  if (!agent) return false;
-  if (!single || allowRun || suggest) return true;
-  const p = String(prompt || "").trim();
-  return mode === "write" && (p.endsWith("?") || QUESTION.test(p));
-}
-
 // An agent's step, in words: what it looked at or ran.
 const STEP_VERBS = { read_file: "Read", list_files: "Listed", inspect: "Looked at", run_code: "Ran" };
 export function stepLabel(step) {

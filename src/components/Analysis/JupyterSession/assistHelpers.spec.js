@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { useAgent, ASSIST_NOTE, acceptedCode, assistRequest, cellCode, cellError, deltaText, addCellSpend, budgetPause, cellSpendLabel, cellSpendTitle, requestCost, runSpend, sessionFiles, sseEvents, stepLabel, usageLine } from "./assistHelpers";
+import { ASSIST_NOTE, acceptedCode, assistRequest, cellCode, cellError, deltaText, addCellSpend, budgetPause, cellSpendLabel, cellSpendTitle, requestCost, runSpend, sessionFiles, sseEvents, stepLabel, usageLine } from "./assistHelpers";
 import { getAgent, postAssist } from "./assistStream";
 
 const delta = (text) => `event: content_block_delta\ndata: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":${JSON.stringify(text)}}}\n\n`;
@@ -156,24 +156,6 @@ describe("getAgent", () => {
   it("takes an older agent, which lists none, as write and fix only", async () => {
     const agent = await getAgent("https://k", "t", { fetchFn: answering({ available: true, model: "m" }) });
     expect(agent.modes).toEqual(["write", "fix"]);
-  });
-});
-
-describe("useAgent", () => {
-  const both = { agent: true, single: true };
-  it("sends writing and fixing to the single-shot assistant when the session has both", () => {
-    expect(useAgent({ ...both, mode: "write", prompt: "plot b against a" })).toBe(false);
-    expect(useAgent({ ...both, mode: "fix", prompt: "" })).toBe(false);
-  });
-  it("sends Fix and run, suggestions and questions to the agent", () => {
-    expect(useAgent({ ...both, mode: "fix", allowRun: true })).toBe(true);
-    expect(useAgent({ ...both, mode: "suggest", suggest: true })).toBe(true);
-    expect(useAgent({ ...both, prompt: "Which drug treats the most diseases?" })).toBe(true);
-    expect(useAgent({ ...both, prompt: "explain what this cell does" })).toBe(true);
-  });
-  it("uses whichever one there is", () => {
-    expect(useAgent({ agent: true, single: false, prompt: "plot it" })).toBe(true);
-    expect(useAgent({ agent: false, single: true, allowRun: true })).toBe(false);
   });
 });
 
