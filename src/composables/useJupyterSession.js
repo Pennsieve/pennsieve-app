@@ -1033,14 +1033,15 @@ export function useJupyterSession() {
     return deleteInputsFetch(kernelBaseUrl, sessionToken, files);
   }
 
-  // The notebook's code assistant (see getAssist, postAssist).
-  // The notebook's agent when the session's image has one, else the
-  // sidecar's single-shot assistant: { available, agent, model, budget }.
+  // The notebook's code assistants: the agent, when the session's image has
+  // one, and the sidecar's single-shot assistant, which simple requests use
+  // (one model call instead of several; see useAgent):
+  // { available, agent, single, model, budget, modes }.
   async function assistStatus() {
     if (!kernelBaseUrl) return { available: false };
-    const agent = await getAgent(kernelBaseUrl, sessionToken);
-    if (agent.available) return { ...agent, agent: true };
-    return { ...(await getAssist(kernelBaseUrl, sessionToken)), agent: false };
+    const [agent, single] = await Promise.all([getAgent(kernelBaseUrl, sessionToken), getAssist(kernelBaseUrl, sessionToken)]);
+    if (agent.available) return { ...agent, agent: true, single: single.available };
+    return { ...single, agent: false, single: single.available };
   }
 
   // Asks the agent about this notebook's kernel.
