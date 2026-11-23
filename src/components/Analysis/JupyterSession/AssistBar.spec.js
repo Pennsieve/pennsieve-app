@@ -56,6 +56,19 @@ describe("AssistBar follow-ups", () => {
     w.unmount();
   });
 
+  it("leaves the focus where the user went meanwhile", async () => {
+    const elsewhere = document.body.appendChild(document.createElement("textarea"));
+    const assist = reactive({ mode: "write", state: "done", steps: [], prompt: "", text: "x", followUps: true, conversationId: "c", asked: ["a"], turn: 1 });
+    const w = mount(AssistBar, { props: { assist }, attachTo: document.body });
+    elsewhere.focus();
+    assist.turn = 2;
+    await nextTick();
+    await nextTick();
+    expect(document.activeElement).toBe(elsewhere);
+    w.unmount();
+    elsewhere.remove();
+  });
+
   it("starts over outside the conversation", async () => {
     const w = bar({ followUps: true, conversationId: "c", state: "done", text: "x", asked: ["a"] });
     await w.findAll(".nb-assist__refine .nb-assist__btn").find((b) => b.text() === "Start over").trigger("click");
