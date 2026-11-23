@@ -25,9 +25,11 @@ export function applyCarriageReturns(text) {
 
 // Terminal colours (ANSI SGR codes) as runs of text with classes, as Jupyter
 // shows them; other escape sequences (cursor moves, erasing, titles) are
-// dropped. 256-colour and RGB codes are read past and left uncoloured.
+// dropped (charset selections like \x1b(B too). 256-colour and RGB codes, in
+// ; or : form, are read past and left uncoloured. Colours set before a \r on
+// the same line are lost with the text the \r replaces.
 const ANSI_COLORS = ["black", "red", "green", "yellow", "blue", "magenta", "cyan", "white"];
-const ANSI_ESCAPE = /\x1b\[([0-9;?]*)([A-Za-z])|\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)?/g;
+const ANSI_ESCAPE = /\x1b\[([0-9;:?]*)([A-Za-z])|\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)?|\x1b[()*+][0-9A-Za-z]/g;
 export function ansiRuns(text) {
   const s = String(text ?? "");
   const runs = [];
@@ -47,7 +49,7 @@ export function ansiRuns(text) {
     push(s.slice(last, m.index));
     last = ANSI_ESCAPE.lastIndex;
     if (m[2] !== "m") continue;
-    const codes = (m[1] || "0").split(";").map(Number);
+    const codes = (m[1] || "0").split(/[;:]/).map(Number);
     for (let i = 0; i < codes.length; i++) {
       const c = codes[i];
       if (c === 0) [fg, bg, bold] = [null, null, false];
@@ -63,6 +65,18 @@ export function ansiRuns(text) {
     }
   }
   push(s.slice(last));
+  return runs;
+}
+
+// ansiRuns, remembered per output (streams can be long, and the cell
+// re-renders on every write): parsed again only when the text changed.
+const ansiCache = new WeakMap();
+export function cachedAnsiRuns(owner, text) {
+  if (!owner || typeof owner !== "object") return ansiRuns(text);
+  const hit = ansiCache.get(owner);
+  if (hit && hit.text === text) return hit.runs;
+  const runs = ansiRuns(text);
+  ansiCache.set(owner, { text, runs });
   return runs;
 }
 

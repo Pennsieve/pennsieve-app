@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { ansiRuns, applyCarriageReturns, displayIdOf, pushOutput, streamText, toNbOutputs, updateDisplay } from "./outputHelpers";
+import { ansiRuns, cachedAnsiRuns, applyCarriageReturns, displayIdOf, pushOutput, streamText, toNbOutputs, updateDisplay } from "./outputHelpers";
 
 const display = (text, displayId) => ({
   output_type: "display_data",
@@ -107,6 +107,23 @@ describe("pip's output (\\r\\n line ends and colours)", () => {
     expect(ansiRuns("a\u001b[2K\u001b[1Ab").map((r) => r.text).join("")).toBe("ab");
     expect(ansiRuns("\u001b[38;5;208mo\u001b[31mr")).toEqual([{ text: "o", cls: "" }, { text: "r", cls: "ansi-red-fg" }]);
     expect(ansiRuns("\u001b]0;title\u0007x")).toEqual([{ text: "x", cls: "" }]);
+  });
+
+  it("read colon-form codes and drop charset selections", () => {
+    expect(ansiRuns("\u001b[38:5:1mo\u001b[31mr")).toEqual([{ text: "o", cls: "" }, { text: "r", cls: "ansi-red-fg" }]);
+    expect(ansiRuns("\u001b[38:2:10:20:30;1mb")).toEqual([{ text: "b", cls: "ansi-bold" }]);
+    expect(ansiRuns("\u001b(Ba\u001b)0b\u001b(0c").map((r) => r.text).join("")).toBe("abc");
+    expect(ansiRuns("\u001b[101mx")).toEqual([{ text: "x", cls: "ansi-bright-red-bg" }]);
+  });
+
+  it("are parsed again only when an output's text changes", () => {
+    const o = {};
+    const a = cachedAnsiRuns(o, "\u001b[31mred");
+    expect(cachedAnsiRuns(o, "\u001b[31mred")).toBe(a);
+    const b = cachedAnsiRuns(o, "\u001b[31mred more");
+    expect(b).not.toBe(a);
+    expect(b).toEqual([{ text: "red more", cls: "ansi-red-fg" }]);
+    expect(cachedAnsiRuns({}, "\u001b[31mred")).not.toBe(b);
   });
 });
 
