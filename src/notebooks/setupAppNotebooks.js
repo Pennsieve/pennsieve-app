@@ -10,6 +10,8 @@ import { runScopeChannel } from "@/realtime/channels";
 import EventBus from "@/utils/event-bus";
 import { defineAsyncComponent } from "vue";
 import { isFeatureEnabled } from "@/utils/features";
+import { PLATFORM_KEYS, registerPlatform } from "@pennsieve/notebooks/components/Analysis/platforms/index";
+import workspacePlatform from "./workspacePlatform";
 
 // Realtime payloads arrive as JSON text or already parsed.
 const parseEventData = (data) => {
@@ -22,6 +24,9 @@ const parseEventData = (data) => {
 };
 
 export function setupAppNotebooks({ siteConfig, store, router, realtime }) {
+  // A workspace's own datasets, as a data platform for the quick launcher.
+  registerPlatform(workspacePlatform);
+
   // The active workspace, or the user's own outside one (My Workspace).
   const scope = () => {
     const organizationId = store.state.activeOrganization?.organization?.id;
@@ -71,6 +76,11 @@ export function setupAppNotebooks({ siteConfig, store, router, realtime }) {
       ),
     },
     launch: {
+      // In a workspace its datasets come first; My Workspace has none.
+      get platforms() {
+        const others = PLATFORM_KEYS.filter((k) => k !== workspacePlatform.key);
+        return scope().kind === "workspace" ? [workspacePlatform.key, ...others] : others;
+      },
       // Where a user adds a compute node: the workspace's, or their own.
       get computeNodes() {
         const orgId = router.currentRoute.value.params.orgId;
