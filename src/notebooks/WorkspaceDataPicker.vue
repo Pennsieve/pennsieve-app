@@ -51,7 +51,13 @@ const onSearch = () => {
   clearTimeout(timer);
   timer = setTimeout(() => search(query.value), 300);
 };
-onMounted(() => !dataset.value && search());
+// Opened again on a dataset already chosen (back to the data step): its
+// records and files as they were, what's ticked still ticked.
+onMounted(() => {
+  if (!dataset.value) return search();
+  restoreTicks();
+  load(dataset.value);
+});
 
 /* ------------------------------------------------- records and files ---- */
 const available = ref([]);
@@ -62,11 +68,8 @@ const ok = (url) => useSendXhr(url);
 const childrenUrl = async (kind, id) =>
   `${siteConfig.apiUrl}/${kind}/${id}?api_key=${await useGetToken()}&includeAncestors=true&limit=500&offset=0`;
 
-async function open(ds) {
-  dataset.value = ds;
-  files.value = [];
-  models.value = [];
-  store.commit("analysisModule/CLEAR_SELECTED_FILES");
+// A dataset's records to offer and its top folder.
+async function load(ds) {
   ancestors.value = [];
   current.value = { content: { name: "" } };
   available.value = [];
@@ -78,6 +81,22 @@ async function open(ds) {
   } catch (err) {
     console.error("Failed to fetch files:", err);
     listing.value = [];
+  }
+}
+function open(ds) {
+  dataset.value = ds;
+  files.value = [];
+  models.value = [];
+  store.commit("analysisModule/CLEAR_SELECTED_FILES");
+  load(ds);
+}
+// The files chosen, back in the table's store, by folder.
+function restoreTicks() {
+  store.commit("analysisModule/CLEAR_SELECTED_FILES");
+  const byFolder = {};
+  for (const f of files.value) (byFolder[f.content?.parentId || "root"] ||= []).push(f);
+  for (const [parentId, selected] of Object.entries(byFolder)) {
+    store.commit("analysisModule/SET_SELECTED_FILES", { selectedFiles: selected, parentId });
   }
 }
 function clear() {
