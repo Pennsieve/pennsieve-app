@@ -8,7 +8,7 @@
 // runs is started now and joins the session when it's built
 // (pendingSessionInputs); otherwise it's built before the run is sent.
 import { defineAsyncComponent } from "vue";
-import IconPennsieveMark from "@/components/icons/IconPennsieveMark.vue";
+import IconDatasets from "@/components/icons/IconDatasets.vue";
 import {
   createWorkspaceRunView,
   prepareWorkspaceRunView,
@@ -36,7 +36,9 @@ export default {
   name: "This workspace",
   desc: "Files and records from a dataset here",
   noun: "datasets",
-  mark: { icon: IconPennsieveMark, iconProps: (s) => ({ width: Math.round(s * 0.42), height: Math.round(s * 0.48), color: "currentColor" }), tone: "dark" },
+  // Private data: listed apart from the public platforms.
+  private: true,
+  mark: { icon: IconDatasets, iconProps: (s) => ({ width: Math.round(s * 0.5), height: Math.round(s * 0.5), color: "currentColor" }), tone: "brand" },
   title: "Choose a dataset in this workspace",
   intro: ["A dataset's files, its metadata records, or both. The notebook starts with them in its input/ folder."],
   picker: defineAsyncComponent(() => import("./WorkspaceDataPicker.vue")),
