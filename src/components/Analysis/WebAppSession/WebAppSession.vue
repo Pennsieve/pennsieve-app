@@ -8,7 +8,7 @@ import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import BfPage from "../../layout/BfPage/BfPage.vue";
 import BfButton from "../../shared/bf-button/BfButton.vue";
-import { fetchConnection } from "@/composables/useJupyterSession";
+import { fetchConnection } from "@pennsieve/notebooks/composables/useJupyterSession";
 import { openWebAppSession } from "../RunMonitor/sessionKinds";
 
 const props = defineProps({

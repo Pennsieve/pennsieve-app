@@ -47,8 +47,8 @@ import { useReadOnlyDatasetStore } from "@/stores/readOnlyDatasetStore.js";
 import BfStage from "@/components/layout/BfStage/BfStage.vue";
 import BfButton from "@/components/shared/bf-button/BfButton.vue";
 import AddToCollectionDialog from "./AddToCollectionDialog.vue";
-import { viewsServiceUrl } from "@/utils/viewsService";
-import { notebookRoute } from "@/utils/publicDatasets";
+import { viewsServiceUrl } from "@pennsieve/notebooks/utils/viewsService";
+import { notebookRoute } from "@pennsieve/notebooks/utils/publicDatasets";
 
 const route = useRoute();
 const router = useRouter();

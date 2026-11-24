@@ -9,7 +9,7 @@ const exampleCache = createExampleCache(exampleUnavailable);
 
 <script setup>
 import { computed, ref, watch, onMounted } from "vue";
-import { interfaceDag } from "../RunMonitor/workflowInterface";
+import { interfaceDag } from "@pennsieve/notebooks/components/Analysis/RunMonitor/workflowInterface";
 import { useStore } from "vuex";
 import { useRouter, useRoute } from "vue-router";
 
@@ -22,7 +22,7 @@ import RunWizardDialog from "../RunMonitor/RunWizardDialog.vue";
 import { ioSummary, usageLine, cardText } from "./workflowSummary";
 import { activeFilters, applyFilters, domainOptions, FACET_DEFAULTS, INPUT_OPTIONS, VISIBILITY_OPTIONS, fieldOptions, inheritedTags, tagOptions, libraryWorkflows, mergeWorkflows, outputOptions, sortWorkflows, SORTS } from "./galleryFilter";
 import { useGetToken } from "@/composables/useGetToken";
-import { isNotebookWorkflow } from "../RunMonitor/notebookHelpers";
+import { isNotebookWorkflow } from "@pennsieve/notebooks/components/Analysis/RunMonitor/notebookHelpers";
 import { exampleLabel, exampleVersion, PDF_URL_FRESH_MS } from "./runExamples";
 import SampleOutputViewer from "./SampleOutputViewer.vue";
 import { workflowReportNote } from "./reportNote";

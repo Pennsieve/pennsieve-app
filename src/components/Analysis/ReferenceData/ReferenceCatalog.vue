@@ -161,7 +161,7 @@ import { Search } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import StageActions from '@/components/shared/StageActions/StageActions.vue'
 import IconArrowLeft from '@/components/icons/IconArrowLeft.vue'
-import { environmentsServiceUrl, findReferences } from '@/utils/environmentsService'
+import { environmentsServiceUrl, findReferences } from '@pennsieve/notebooks/utils/environmentsService'
 import { versionManifest } from '@/components/Analysis/WorkflowBuilder/appManifestInfo'
 import { appTitle } from '@/components/Analysis/Applications/appCards'
 import {

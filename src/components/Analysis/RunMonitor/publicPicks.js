@@ -4,8 +4,8 @@
 // version's metadata records of those models (recordsPick), which the view
 // takes beside the files.
 
-import { isRecordsPick } from "@/utils/recordsPicks";
-export { recordsPick, isRecordsPick, recordsPickOf } from "@/utils/recordsPicks";
+import { isRecordsPick } from "@pennsieve/notebooks/utils/recordsPicks";
+export { recordsPick, isRecordsPick, recordsPickOf } from "@pennsieve/notebooks/utils/recordsPicks";
 
 const keyOf = (p) => `${p.datasetId}:${p.version}:${isRecordsPick(p) ? `records:${[...p.models].sort().join(",")}` : p.path}`;
 const sameVersion = (a, b) => a.datasetId === b.datasetId && a.version === b.version;

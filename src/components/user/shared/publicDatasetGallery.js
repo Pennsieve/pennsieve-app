@@ -1,7 +1,7 @@
 // The public datasets page as the Workflows Library and Apps galleries:
 // its sorts, filter sections, chips and card text. Pure, so it's easy to
 // test. Datasets are utils/publicDatasets' (toPublicDataset).
-import { formatBytes } from "@/components/Analysis/RunMonitor/dataTargets";
+import { formatBytes } from "@pennsieve/notebooks/components/Analysis/RunMonitor/dataTargets";
 import { matchesAny } from "@/components/Analysis/Facets/facets";
 
 // Discover sorts (search/datasets orderBy); Best match only with a search.

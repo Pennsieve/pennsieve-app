@@ -13,9 +13,9 @@ import { useRoute, useRouter } from "vue-router";
 import BfButton from "../../shared/bf-button/BfButton.vue";
 import RunWorkflowSummary from "../Workflows/RunWorkflowSummary.vue";
 import { useWorkflowSearch } from "@/composables/useWorkflowSearch";
-import { isNotebookWorkflow } from "./notebookHelpers";
+import { isNotebookWorkflow } from "@pennsieve/notebooks/components/Analysis/RunMonitor/notebookHelpers";
 import { needsDataset } from "./runSetup";
-import { viewsServiceUrl } from "@/utils/viewsService";
+import { viewsServiceUrl } from "@pennsieve/notebooks/utils/viewsService";
 
 const store = useStore();
 const route = useRoute();

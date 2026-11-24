@@ -4,19 +4,11 @@
 //   webapp   a web page the app serves itself, opened in a new browser tab
 import { isFeatureEnabled } from "@/utils/features";
 
-export const NOTEBOOK = "jupyter";
-export const WEBAPP = "webapp";
-
-// A run's interactive step: the DAG node whose app declares a live session,
-// or null.
-export const sessionStep = (dag = []) =>
-  (dag || []).find((d) => d.runtimeConfig?.interactive || d.interactive) || null;
-
-// The step's kind. A session without a type is a notebook, as the platform
-// reads it.
-export const sessionKind = (step) => step?.runtimeConfig?.sessionType || step?.sessionType || NOTEBOOK;
-
-export const isNotebookSession = (step) => sessionKind(step) === NOTEBOOK;
+// The kinds and a run's session step come from @pennsieve/notebooks; the
+// run pages' rules and words for each kind are the app's.
+import { NOTEBOOK, WEBAPP, isNotebookSession, sessionKind } from "@pennsieve/notebooks/components/Analysis/RunMonitor/sessionKinds";
+export { NOTEBOOK, WEBAPP, isNotebookSession, sessionKind };
+export { sessionStep } from "@pennsieve/notebooks/components/Analysis/RunMonitor/sessionKinds";
 
 // Web app sessions are behind the webAppSessions site flag. With it off, a
 // web app step gets no Open or End on the run pages; cancel the run to stop it.
