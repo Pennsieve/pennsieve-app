@@ -179,8 +179,11 @@ onBeforeUnmount(() => {
     </template>
     <template v-else>
       <div class="wdp__chosen">
-        <strong>{{ dataset.content?.name }}</strong>
-        <el-button link @click="clear">Other dataset</el-button>
+        <div class="wdp__chosen-text">
+          <strong>{{ dataset.content?.name }}</strong>
+          <span v-if="dataset.content?.description" class="wdp__muted">{{ dataset.content.description }}</span>
+        </div>
+        <el-button size="small" @click="clear">Change dataset</el-button>
       </div>
       <MetadataRecordsChoice
         v-if="available.length"
@@ -247,10 +250,23 @@ onBeforeUnmount(() => {
     border-color: theme.$purple_3;
   }
 }
+// The dataset chosen, and the way to another.
 .wdp__chosen {
   display: flex;
   align-items: center;
-  gap: 10px;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid theme.$purple_3;
+  border-radius: 4px;
+  background: theme.$purple_tint;
+}
+.wdp__chosen-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 .wdp__files {
   max-height: 320px;
