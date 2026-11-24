@@ -38,6 +38,7 @@ import { createPinia } from 'pinia'
 import { useDuckDBStore } from '@/stores/duckdbStore'
 
 import { createRealtime } from '@/realtime'
+import { setupAppNotebooks } from '@/notebooks/setupAppNotebooks'
 
 Amplify.configure(AWSConfig)
 
@@ -91,6 +92,8 @@ app.use(router);
 // identifiers stripped from the path. Empty id = disabled.
 initAnalytics(router, siteConfig.googleAnalytics)
 
+// The notebooks' host: endpoints, tokens, and the workspace as their scope.
+setupAppNotebooks({ siteConfig, store, router, realtime: () => app.config.globalProperties.$realtime });
 app.mount("#app");
 
 app.config.globalProperties.$sanitize = (html, allowedTags=['br']) => striptags(html, allowedTags)

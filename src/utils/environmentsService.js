@@ -1,5 +1,4 @@
-import * as siteConfig from '@/site-config/site.json'
-import { useGetToken } from '@/composables/useGetToken'
+import { notebookEndpoints, notebookToken } from '@/notebooks/host'
 
 // environments-service (api2.<domain>/environments) keeps a user's
 // environments: named, versioned Python package sets, each version built once
@@ -10,7 +9,7 @@ import { useGetToken } from '@/composables/useGetToken'
 
 // The service's base URL, or '' where the platform has none yet: the app
 // then offers no environments.
-export function environmentsServiceUrl(config = siteConfig) {
+export function environmentsServiceUrl(config = notebookEndpoints()) {
   return (config.environmentsServiceUrl || '').replace(/\/+$/, '')
 }
 
@@ -25,8 +24,8 @@ export class EnvironmentsServiceError extends Error {
 export async function environmentsRequest(path, {
   method = 'GET',
   body,
-  config = siteConfig,
-  getToken = useGetToken,
+  config = notebookEndpoints(),
+  getToken = notebookToken,
   fetchFn = globalThis.fetch,
 } = {}) {
   const base = environmentsServiceUrl(config)

@@ -1,5 +1,4 @@
-import * as siteConfig from '@/site-config/site.json'
-import { useGetToken } from '@/composables/useGetToken'
+import { notebookEndpoints, notebookToken } from '@/notebooks/host'
 import { isRecordsPick } from '@/utils/recordsPicks'
 
 // views-service (api2.<domain>/views) keeps a user's dataset views: an
@@ -12,7 +11,7 @@ import { isRecordsPick } from '@/utils/recordsPicks'
 
 // The service's base URL, or '' where the platform has none yet: the app
 // then offers no public dataset inputs.
-export function viewsServiceUrl(config = siteConfig) {
+export function viewsServiceUrl(config = notebookEndpoints()) {
   return (config.viewsServiceUrl || '').replace(/\/+$/, '')
 }
 
@@ -27,8 +26,8 @@ export class ViewsServiceError extends Error {
 export async function viewsRequest(path, {
   method = 'GET',
   body,
-  config = siteConfig,
-  getToken = useGetToken,
+  config = notebookEndpoints(),
+  getToken = notebookToken,
   fetchFn = globalThis.fetch,
 } = {}) {
   const base = viewsServiceUrl(config)
@@ -149,7 +148,7 @@ export async function createRunView({ name, picks }, options = {}) {
 // Whether a workspace input's files go through a view too (they always do
 // with records): on where views of workspace files are deployed, until
 // every input is a view (phase 3).
-export function workspaceFilesAsViews(config = siteConfig) {
+export function workspaceFilesAsViews(config = notebookEndpoints()) {
   return !!viewsServiceUrl(config) && config.workspaceFilesAsViews === true
 }
 
