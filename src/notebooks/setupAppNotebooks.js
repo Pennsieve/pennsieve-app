@@ -9,7 +9,6 @@ import { useGetAllTokens, useGetToken } from "@/composables/useGetToken";
 import { runScopeChannel } from "@/realtime/channels";
 import EventBus from "@/utils/event-bus";
 import { defineAsyncComponent } from "vue";
-import { isFeatureEnabled } from "@/utils/features";
 import { PLATFORM_KEYS, registerPlatform } from "@pennsieve/notebooks/components/Analysis/platforms/index";
 import workspacePlatform from "./workspacePlatform";
 
@@ -66,14 +65,9 @@ export function setupAppNotebooks({ siteConfig, store, router, realtime }) {
     user: () => store.state.profile || null,
     members: () => store.state.orgMembers || [],
     pennsieveAppUrl: "",
-    // The New notebook launcher: the quick one where the site has it, else
-    // the dialog. Loaded when the notebooks page first opens it.
+    // The New notebook launcher, loaded when the notebooks page first opens it.
     components: {
-      launcher: defineAsyncComponent(() =>
-        isFeatureEnabled("quickLauncher")
-          ? import("@pennsieve/notebooks/launch/QuickLaunchDialog.vue")
-          : import("@/components/Analysis/RunMonitor/NewNotebookDialog.vue")
-      ),
+      launcher: defineAsyncComponent(() => import("@pennsieve/notebooks/launch/QuickLaunchDialog.vue")),
     },
     launch: {
       // In a workspace its datasets come first; My Workspace has none.

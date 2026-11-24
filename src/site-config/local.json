@@ -58,7 +58,6 @@
     "workflowInterface": true,
     "inAppLogin": true,
     "publishing": true,
-    "office365Viewer": true,
-    "quickLauncher": true
+    "office365Viewer": true
   }
 }

@@ -38,7 +38,7 @@
     "@pennsieve-viz/core": "^0.5.0",
     "@pennsieve-viz/micro-ct": "^1.0.72",
     "@pennsieve-viz/tsviewer": "2.4.0",
-    "@pennsieve/notebooks": "^0.2.1",
+    "@pennsieve/notebooks": "^0.2.2",
     "@sigma/node-border": "^3.0.0",
     "@types/d3": "^7.4.3",
     "@types/ramda": "^0.29.10",
