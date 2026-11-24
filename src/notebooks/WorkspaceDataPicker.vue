@@ -2,7 +2,7 @@
 // The picker of this workspace's data (workspacePlatform): a dataset, then
 // its metadata records and its files, as the New notebook dialog picks them.
 // Its parts are v-model:dataset, v-model:files and v-model:models.
-import { onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useStore } from "vuex";
 import AnalysisFilesTable from "@/components/FilesTable/AnalysisFilesTable.vue";
 import BreadcrumbNavigation from "@/components/datasets/files/BreadcrumbNavigation/BreadcrumbNavigation.vue";
@@ -62,6 +62,8 @@ onMounted(() => {
 /* ------------------------------------------------- records and files ---- */
 const available = ref([]);
 const listing = ref([]);
+// While a folder's files are being read.
+const loadingFiles = ref(false);
 const ancestors = ref([]);
 const current = ref({ content: { name: "" } });
 const ok = (url) => useSendXhr(url);
@@ -76,13 +78,19 @@ async function load(ds) {
   listWorkspaceModels(ds.content.id)
     .then((m) => dataset.value === ds && (available.value = m))
     .catch(() => {});
+  loadingFiles.value = true;
   try {
     listing.value = [...((await ok(await childrenUrl("datasets", ds.content.id))).children || [])];
   } catch (err) {
     console.error("Failed to fetch files:", err);
     listing.value = [];
+  } finally {
+    loadingFiles.value = false;
   }
 }
+// The dataset has no files at all (its top folder is empty).
+const atTop = computed(() => !current.value.content?.id);
+const noFiles = computed(() => !loadingFiles.value && atTop.value && !listing.value.length);
 function open(ds) {
   dataset.value = ds;
   files.value = [];
@@ -183,6 +191,13 @@ onBeforeUnmount(() => {
       <p v-if="models.length && !filesWithRecords" class="wdp__muted">
         The notebook takes the dataset's metadata records. Untick them to choose its files instead.
       </p>
+      <div v-else-if="loadingFiles && atTop" class="wdp__muted">Loading files…</div>
+      <div v-else-if="noFiles" class="wdp__empty">
+        <strong>No files in this dataset</strong>
+        <span class="wdp__muted">
+          {{ available.length ? "Its metadata records above are what the notebook starts with." : "Choose another dataset, or start without data." }}
+        </span>
+      </div>
       <template v-else>
         <div class="wdp__count">
           <strong>{{ files.length }}</strong> file{{ files.length === 1 ? "" : "s" }} selected
@@ -194,7 +209,8 @@ onBeforeUnmount(() => {
           :file-id="current?.content?.id"
           @navigate-breadcrumb="toCrumb"
         />
-        <div class="wdp__files pp-list">
+        <div v-if="!loadingFiles && !listing.length" class="wdp__muted wdp__empty-folder">This folder is empty</div>
+        <div v-else class="wdp__files pp-list">
           <analysis-files-table :data="listing" @selection-change="onSelect" @click-file-label="openFolder" />
         </div>
       </template>
@@ -239,6 +255,18 @@ onBeforeUnmount(() => {
 .wdp__files {
   max-height: 320px;
   overflow-y: auto;
+}
+.wdp__empty {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 20px;
+  text-align: center;
+  border: 1px dashed theme.$gray_3;
+  border-radius: 4px;
+}
+.wdp__empty-folder {
+  padding: 16px 0;
 }
 .wdp__muted {
   color: theme.$gray_4;
