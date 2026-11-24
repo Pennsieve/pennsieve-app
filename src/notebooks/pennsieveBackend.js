@@ -214,6 +214,15 @@ export function createPennsieveBackend({
       return resp.json();
     },
 
+    // The scope's run counters in a range (lastMonth, lastYear, allTime): the
+    // workspace's, or the user's own outside one.
+    async getUsageCounters({ range } = {}) {
+      const params = scoped();
+      if (!params.has("organization_id")) params.set("scope", "user");
+      if (range) params.set("range", range);
+      return json(`/compute/workflows/metrics/counters?${params}`);
+    },
+
     // Live run status: handler({ runId, status }) for each run of the scope.
     // Returns the unsubscribe. Without the site's realtime, a no-op.
     subscribeRunStatus: subscribeRunStatus || (() => () => {}),

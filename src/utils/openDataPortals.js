@@ -6,7 +6,7 @@
 // the portal's datasets; their manifests name them, and Discover's search
 // finds them by words. A notebook takes one as a view of its folder, like
 // any Open Data dataset.
-import { useSendXhr } from '@/mixins/request/request_composable'
+import { sendXhr as notebookSendXhr } from '@/notebooks/sendXhr'
 import { listOpenDataFolder } from '@/utils/viewsService'
 
 // registry: the Open Data catalog's entry (registry.opendata.aws/<name>);
@@ -43,7 +43,7 @@ export async function portalDatasetIds(portal, { listFolder = listOpenDataFolder
 
 // The ids of the portal's datasets that match query, best first: Discover's
 // search, kept to those in the bucket (ids).
-export async function searchPortal(query, ids, { sendXhr = useSendXhr } = {}) {
+export async function searchPortal(query, ids, { sendXhr = notebookSendXhr } = {}) {
   const words = query.trim()
   if (!words) return ids
   const inBucket = new Set(ids)

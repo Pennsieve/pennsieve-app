@@ -5,8 +5,8 @@
 // from these (viewsService viewForDataset). Used by the new notebook dialog
 // and the running session's Inputs panel.
 import { onMounted, ref, watch } from "vue";
-import * as siteConfig from "@/site-config/site.json";
-import { useSendXhr } from "@/mixins/request/request_composable";
+import { notebookEndpoints } from "@/notebooks/host";
+import { sendXhr } from "@/notebooks/sendXhr";
 import { pagePublicDatasets, listPublicModels } from "@/utils/publicDatasets";
 import IconCompass from "@/components/icons/IconCompass.vue";
 import MetadataRecordsChoice from "./MetadataRecordsChoice.vue";
@@ -88,8 +88,8 @@ async function selectPublicDataset(d) {
   version.value = d.version;
   publicVersions.value = [d.version];
   try {
-    const url = `${siteConfig.discoverUrl}/datasets/${d.id}/versions`;
-    const response = await useSendXhr(url, { method: "GET" });
+    const url = `${notebookEndpoints().discoverUrl}/datasets/${d.id}/versions`;
+    const response = await sendXhr(url, { method: "GET" });
     const versions = (Array.isArray(response) ? response : [])
       .map((v) => v.version)
       .filter((v) => Number.isInteger(v))

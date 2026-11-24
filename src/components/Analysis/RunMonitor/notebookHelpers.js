@@ -1,6 +1,6 @@
 import { gpuTaskResources, nodeRegion } from "../ComputeNodes/computeNodeHelpers";
 import { PLATFORMS, PLATFORM_KEYS } from "../platforms";
-import { RUNNING_STATUSES, runsEmptyState } from "./runHelpers";
+import { RUNNING_STATUSES, runsEmptyState } from "@/notebooks/runFormat";
 
 // Shared helpers for the Notebooks tab + launcher. A notebook is a workflow
 // whose step's app declares, in its app.yml, a live Jupyter session;

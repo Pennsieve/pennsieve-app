@@ -27,6 +27,7 @@ configureNotebooks({
     subscribeRunStatus: () => () => {},
   },
   locations: { run: () => ({}), notebook: () => ({}), listedRun: () => ({}) },
+  components: {},
 });
 
 const mountAs = (name, query = {}, props = {}) => {

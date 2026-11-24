@@ -8,6 +8,7 @@ import { createPennsieveBackend } from "./pennsieveBackend";
 import { useGetAllTokens, useGetToken } from "@/composables/useGetToken";
 import { runScopeChannel } from "@/realtime/channels";
 import EventBus from "@/utils/event-bus";
+import { defineAsyncComponent } from "vue";
 
 // Realtime payloads arrive as JSON text or already parsed.
 const parseEventData = (data) => {
@@ -59,6 +60,8 @@ export function setupAppNotebooks({ siteConfig, store, router, realtime }) {
     user: () => store.state.profile || null,
     members: () => store.state.orgMembers || [],
     pennsieveAppUrl: "",
+    // Loaded when the notebooks page first opens it.
+    components: { launcher: defineAsyncComponent(() => import("@/components/Analysis/RunMonitor/NewNotebookDialog.vue")) },
     notify: ({ type, message }) => EventBus.$emit("toast", { detail: { type, msg: message } }),
     locations: {
       // The run's page, in its workspace or in My Analysis for a personal run.

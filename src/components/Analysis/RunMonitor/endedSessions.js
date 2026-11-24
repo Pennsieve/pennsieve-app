@@ -7,7 +7,7 @@
   in memory, since ending in the notebook leads straight to the run's page.
 */
 import { reactive } from "vue";
-import { isTerminalStatus } from "./runHelpers";
+import { isTerminalStatus } from "@/notebooks/runFormat";
 
 const KEY = "pennsieve.endedSessions";
 

@@ -1,5 +1,5 @@
-import * as siteConfig from '@/site-config/site.json'
-import { useSendXhr } from '@/mixins/request/request_composable'
+import { notebookEndpoints } from '@/notebooks/host'
+import { sendXhr as notebookSendXhr } from '@/notebooks/sendXhr'
 
 // Published datasets as the app's pickers offer them: found through Discover,
 // read anonymously as on the public dataset pages, and only openly published
@@ -36,7 +36,7 @@ export const toPublicDataset = (d) => ({
 // newest research datasets, embargoed ones left out by the server so the
 // count and the offset agree. { datasets, totalCount, fetched }: how many
 // match in all, and how many rows this page held, for the next offset.
-export async function pagePublicDatasets({ query = '', offset = 0, limit = 25 } = {}, { sendXhr = useSendXhr, config = siteConfig } = {}) {
+export async function pagePublicDatasets({ query = '', offset = 0, limit = 25 } = {}, { sendXhr = notebookSendXhr, config = notebookEndpoints() } = {}) {
   const base = config.discoverUrl
   const url = query
     ? `${base}/search/datasets?limit=${limit}&offset=${offset}&embargo=false&query=${encodeURIComponent(query)}`
@@ -57,7 +57,7 @@ export async function searchPublicDatasets(query = '', options = {}) {
 
 // One published dataset version (the latest without one), as the pickers
 // offer it.
-export async function fetchPublicDataset(id, version = null, { sendXhr = useSendXhr, config = siteConfig } = {}) {
+export async function fetchPublicDataset(id, version = null, { sendXhr = notebookSendXhr, config = notebookEndpoints() } = {}) {
   const base = `${config.discoverUrl}/datasets/${encodeURIComponent(id)}`
   const url = version != null ? `${base}/versions/${encodeURIComponent(version)}` : base
   return toPublicDataset(await sendXhr(url, { method: 'GET' }))
@@ -68,7 +68,7 @@ export async function fetchPublicDataset(id, version = null, { sendXhr = useSend
 // datasets page filters and pages them itself. Code releases are left out.
 export async function listPublicDatasets(
   { query = '', orderBy = 'date', orderDirection = 'desc' } = {},
-  { sendXhr = useSendXhr, config = siteConfig } = {}
+  { sendXhr = notebookSendXhr, config = notebookEndpoints() } = {}
 ) {
   const params = new URLSearchParams({ limit: 1000, offset: 0, embargo: false, orderBy, orderDirection })
   if (query) params.set('query', query)
@@ -87,14 +87,14 @@ export const notebookRoute = (d) => ({
 })
 
 // How many openly published research datasets Discover has.
-export async function countPublicDatasets({ sendXhr = useSendXhr, config = siteConfig } = {}) {
+export async function countPublicDatasets({ sendXhr = notebookSendXhr, config = notebookEndpoints() } = {}) {
   const response = await sendXhr(`${config.discoverUrl}/datasets?limit=1&offset=0&datasetType=research&embargo=false`, { method: 'GET' })
   return response?.totalCount ?? null
 }
 
 // A folder of a published version, a page at a time: { files, totalCount },
 // each file { name, path, type ("Directory" for a folder), size, fileType }.
-export async function browsePublicFiles({ id, version, path = '', limit = 500, offset = 0 }, { sendXhr = useSendXhr, config = siteConfig } = {}) {
+export async function browsePublicFiles({ id, version, path = '', limit = 500, offset = 0 }, { sendXhr = notebookSendXhr, config = notebookEndpoints() } = {}) {
   const params = new URLSearchParams({ limit, offset })
   if (path) params.set('path', path)
   const response = await sendXhr(

@@ -1,11 +1,11 @@
 <script setup>
 // What notebook sessions have taken, in a range: how many, the time spent in
 // them, and what they cost. From the notebook share of the workspace's
-// counters, or in My Workspace your own (useMetricsCounters), counted as each
+// counters, or in My Workspace your own (the backend's usage counters), counted as each
 // session ends. Laid out as the Workflows tab's overview; no success rate,
 // since a session ends however it ends.
 import { computed, onMounted, ref } from "vue";
-import { useMetricsCounters } from "@/composables/useMetricsCounters";
+import { notebookBackend } from "@/notebooks/host";
 import IconInfoSmall from "../../icons/IconInfoSmall.vue";
 import { notebookUsage, sessionCost, sessionTime } from "./notebookUsage";
 
@@ -15,7 +15,18 @@ const RANGES = [
   { label: "Last Year", value: "lastYear" },
   { label: "All time", value: "allTime" },
 ];
-const { counters, isLoading, fetchCounters } = useMetricsCounters({ range });
+const counters = ref(null);
+const isLoading = ref(false);
+async function fetchCounters() {
+  isLoading.value = true;
+  try {
+    counters.value = await notebookBackend().getUsageCounters({ range: range.value });
+  } catch (err) {
+    console.error("Metrics counters error:", err);
+  } finally {
+    isLoading.value = false;
+  }
+}
 const usage = computed(() => notebookUsage(counters.value));
 // Anything at all, in any range: until then the strip stays out of the way.
 const everUsed = ref(false);

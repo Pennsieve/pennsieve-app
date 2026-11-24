@@ -2,13 +2,13 @@
 // (GET {api2}/compute/workflows/runs/{id}, metrics.totalEstimatedCost) when
 // it's opened, and kept for the page's life. A run that's
 // still going, or whose metrics aren't in, is read again next time.
-import { useGetToken } from "@/composables/useGetToken";
+import { notebookToken } from "@/notebooks/host";
 
 const runs = new Map(); // run id -> the run, once its metrics are in
 const pending = new Map(); // run id -> promise
 
 // The run as GET returns it (with metrics), or null.
-export async function fetchRun(api2Url, runId, { getToken = useGetToken, fetchFn = globalThis.fetch } = {}) {
+export async function fetchRun(api2Url, runId, { getToken = notebookToken, fetchFn = globalThis.fetch } = {}) {
   if (runs.has(runId)) return runs.get(runId);
   if (pending.has(runId)) return pending.get(runId);
   const p = (async () => {

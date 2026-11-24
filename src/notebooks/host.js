@@ -15,6 +15,7 @@
 //   pennsieveAppUrl  the Pennsieve app, for links out (compute nodes)
 //   notify({ type, message })  a message to the user (success, info,
 //               warning, error)
+//   components  the site's own parts: launcher, the New notebook dialog
 //   locations   vue-router locations of the site's pages: run(runId), where
 //               ending a session leads; notebook(runId), a run's notebook;
 //               listedRun(runId), where a notebook picked from the list opens
@@ -38,4 +39,5 @@ export const notebookUser = () => current().user?.() ?? null;
 export const notebookMembers = () => current().members?.() ?? [];
 export const pennsieveAppUrl = () => current().pennsieveAppUrl || "";
 export const notebookLocations = () => current().locations;
+export const notebookComponents = () => current().components || {};
 export const notebookNotify = (type, message) => current().notify?.({ type, message });

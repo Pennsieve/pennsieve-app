@@ -1,20 +1,20 @@
 <script setup>
 // Notebooks tab: a focused view over interactive-notebook runs. Lists ONLY runs
 // launched from the defined public notebook workflows ("Jupyter Notebook" =
-// Python today), and opens the self-contained NewNotebookDialog launcher.
+// Python today), and opens the site's launcher (the host's
+// components.launcher; in the Pennsieve app, NewNotebookDialog).
 import { computed, ref, onMounted, watch } from "vue";
 import { useRouter, useRoute } from "vue-router";
 import BfButton from "../../shared/bf-button/BfButton.vue";
 import IconControllerPlay from "../../icons/IconControllerPlay.vue";
 import IconXCircle from "../../icons/IconXCircle.vue";
-import NewNotebookDialog from "./NewNotebookDialog.vue";
 import AnalysisViewBar from "../AnalysisViewBar.vue";
 import EnvironmentsSection from "./EnvironmentsSection.vue";
 import CreateEnvironmentDialog from "./CreateEnvironmentDialog.vue";
 import { environmentsServiceUrl } from "@/utils/environmentsService";
 import { fetchPublicDataset } from "@/utils/publicDatasets";
 import { endInteractiveSession } from "@/composables/useJupyterSession";
-import { notebookBackend, notebookLocations, notebookMembers, notebookNotify, notebookUser } from "@/notebooks/host";
+import { notebookBackend, notebookComponents, notebookLocations, notebookMembers, notebookNotify, notebookUser } from "@/notebooks/host";
 import { computeNodes, gpuTiers, loadComputeNodes, loadGpuTiers, loadTargetTypes } from "@/notebooks/notebookData";
 import { useNotebookRuns } from "@/notebooks/useNotebookRuns";
 import {
@@ -24,7 +24,7 @@ import {
   formatTime,
   runDisplayName,
   getUserName as getUserNameFn,
-} from "./runHelpers";
+} from "@/notebooks/runFormat";
 import { isNotebookWorkflow, notebookGpu, runOnGpu, runNodeId, gpuMarkTitle, notebooksEmptyState, NOTEBOOK_RUNNING_STATUSES } from "./notebookHelpers";
 import drAzumi from "@/assets/images/illustrations/illo-dr_azumi_1.svg";
 import EmptyState from "../EmptyState.vue";
@@ -40,6 +40,9 @@ const props = defineProps({
 });
 const router = useRouter();
 const route = useRoute();
+// The site's New notebook launcher: v-model (open), notebook-workflows,
+// initial-workflow-id, initial-public-dataset, personal; emits created(run).
+const NotebookLauncher = notebookComponents().launcher;
 
 // Shown in a workspace (/:orgId/analysis/notebooks) and in My Workspace
 // (/my-workspace/analysis/notebooks), where notebooks run on the user's own
@@ -440,7 +443,9 @@ onMounted(async () => {
         />
       </template>
 
-    <new-notebook-dialog
+    <component
+      :is="NotebookLauncher"
+      v-if="NotebookLauncher"
       v-model="dialogVisible"
       :notebook-workflows="notebookWorkflows"
       :initial-workflow-id="startWorkflowId"

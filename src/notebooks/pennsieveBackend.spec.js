@@ -98,3 +98,15 @@ describe("normalizeTargetTypes", () => {
     });
   });
 });
+
+describe("usage counters", () => {
+  it("counts the workspace's, or the user's own outside one", async () => {
+    const ws = backendWith([ok({ total: 1 })]);
+    await ws.backend.getUsageCounters({ range: "lastMonth" });
+    expect(ws.calls[0].url).toBe(`${API2}/compute/workflows/metrics/counters?organization_id=N%3Aorganization%3Aabc&range=lastMonth`);
+
+    const me = backendWith([ok({ total: 1 })], { kind: "user", userId: "N:user:u1" });
+    await me.backend.getUsageCounters();
+    expect(me.calls[0].url).toBe(`${API2}/compute/workflows/metrics/counters?scope=user`);
+  });
+});

@@ -5,9 +5,8 @@
 // from the run when opened) and any error, and a link to the run page for
 // logs and outputs. Filters and per-row actions come from the page.
 import { computed, ref } from "vue";
-import { useRoute } from "vue-router";
-import { useStore } from "vuex";
-import { formatCost, formatDuration, formatTime, runDisplayName, statusDotClass, statusLabel } from "./runHelpers";
+import { notebookEndpoints, notebookLocations } from "@/notebooks/host";
+import { formatCost, formatDuration, formatTime, runDisplayName, statusDotClass, statusLabel } from "@/notebooks/runFormat";
 import { costOf, costParts, fetchRun } from "./runDetails";
 import RuntimeMark from "../WorkflowGraph/RuntimeMark.vue";
 import { appRunLabel } from "./appRuns";
@@ -36,8 +35,6 @@ const props = defineProps({
 });
 const emit = defineEmits(["load-more"]);
 
-const route = useRoute();
-const store = useStore();
 
 const query = ref("");
 const shown = computed(() => {
@@ -53,16 +50,14 @@ const details = ref({}); // run id -> the run, with metrics
 async function toggle(run) {
   openId.value = openId.value === run.uuid ? null : run.uuid;
   if (!openId.value || details.value[run.uuid]) return;
-  const full = await fetchRun(store.state.config.api2Url, run.uuid);
+  const full = await fetchRun(notebookEndpoints().api2Url, run.uuid);
   if (full) details.value = { ...details.value, [run.uuid]: full };
 }
 
 // The run's page, saying which tab it was opened from (props.from) so that
 // tab stays highlighted there.
 const runPage = (run) => ({
-  ...(route.params.orgId
-    ? { name: "run-detail", params: { orgId: route.params.orgId, runId: run.uuid } }
-    : { name: "my-run-detail", params: { runId: run.uuid } }),
+  ...notebookLocations().run(run.uuid),
   ...(props.from && { query: { from: props.from } }),
 });
 const ended = (run) => run.completedAt && !["NOT_STARTED", "STARTED", "FINALIZING"].includes(run.status);
