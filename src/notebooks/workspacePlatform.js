@@ -56,7 +56,8 @@ export default {
   folderName: (p, n) => `dataset${n > 1 ? `-${n}` : ""}`,
   count: () => countDatasets(),
   regions: () => [],
-  size: () => null,
+  // The dataset's storage, as the disk suggestion reads it.
+  size: (p) => p.dataset?.content?.storage || null,
   imaging: () => false,
   publicBucket: false,
   reads: () => false,

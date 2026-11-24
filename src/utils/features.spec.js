@@ -30,7 +30,6 @@ describe('site configs', () => {
       inAppLogin: true,
       publishing: false,
       office365Viewer: false,
-      quickLauncher: false,
       webAppSessions: false,
     })
   })
