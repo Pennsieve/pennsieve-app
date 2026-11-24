@@ -25,11 +25,23 @@ describe('site configs', () => {
   })
 
   it('clin logs in on the app, has publishing off and no Office 365 viewer', () => {
-    expect(clin.features).toEqual({ workflowInterface: false, inAppLogin: true, publishing: false, office365Viewer: false, quickLauncher: false })
+    expect(clin.features).toEqual({
+      workflowInterface: false,
+      inAppLogin: true,
+      publishing: false,
+      office365Viewer: false,
+      quickLauncher: false,
+      webAppSessions: false,
+    })
   })
 
   it('only clin turns off the Office 365 viewer', () => {
     expect([dev, prod, local].map((c) => c.features.office365Viewer)).toEqual([true, true, true])
+  })
+
+  it('web app sessions are on for dev and local only', () => {
+    expect([dev, local].map((c) => c.features.webAppSessions)).toEqual([true, true])
+    expect([prod, clin, localClin].map((c) => c.features.webAppSessions)).toEqual([false, false, false])
   })
 
   it('local-clin mirrors clin features and environment name', () => {

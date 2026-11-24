@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from "vue-router";
 import { propOr } from 'ramda'
 import { PublicationStatus, PublicationTabs } from '../utils/constants.js'
 import store from '../store'
+import { isFeatureEnabled } from '@/utils/features'
 
 import NotFound from './not-found/NotFound.vue'
 import MyCollectionsStage from "@/router/MyWorkSpace/MyCollectionsStage.vue";
@@ -159,6 +160,7 @@ const RunMonitor = () => import ('../components/Analysis/RunMonitor/RunMonitor.v
 const RunDetail = () => import ('../components/Analysis/RunMonitor/RunDetail.vue')
 const NotebooksOverview = () => import ('@pennsieve/notebooks/components/Analysis/RunMonitor/NotebooksOverview.vue')
 const NotebookSession = () => import ('../components/Analysis/JupyterSession/NotebookSession.vue')
+const WebAppSession = () => import ('../components/Analysis/WebAppSession/WebAppSession.vue')
 const WorkflowBuilder = () => import ('../components/Analysis/WorkflowBuilder/WorkflowBuilder.vue')
 const WorkflowsOverview = () => import ('../components/Analysis/Workflows/WorkflowsOverview.vue')
 const AppsOverview = () => import ('../components/Analysis/Applications/AppsOverview.vue')
@@ -198,6 +200,14 @@ function requireAdminRights(to, from, next) {
   }
 }
 
+// Web app sessions are behind a site flag. With it off, the session page
+// sends you back to the run.
+function requireWebAppSessions(to, from, next) {
+  if (isFeatureEnabled('webAppSessions')) return next()
+  const { orgId, runId } = to.params
+  next(orgId ? { name: 'run-detail', params: { orgId, runId } } : { name: 'my-run-detail', params: { runId } })
+}
+
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
@@ -227,6 +237,19 @@ const router = createRouter({
       // navigation: true passes :orgId to BfNavigation (it builds links from the
       // orgId prop); without it the left-nav router-links throw "Missing
       // required param orgId".
+      props: { page: true, navigation: true },
+    },
+    {
+      // A run's web app session (an interactive step whose app serves its
+      // own page). The run page opens it in a new tab; it waits for the
+      // session, then sends the tab to the app. Laid out like 'run-notebook'.
+      name: 'run-session',
+      path: '/:orgId/analysis/runs/:runId/session',
+      beforeEnter: requireWebAppSessions,
+      components: {
+        page: WebAppSession,
+        navigation: BfNavigation,
+      },
       props: { page: true, navigation: true },
     },
     {
@@ -741,6 +764,26 @@ const router = createRouter({
             backLink: { name: 'my-notebooks' },
             title: 'Notebook',
             description: 'An interactive notebook on your personal compute node.'
+          }
+        },
+        {
+          // A web app session outside any workspace; see 'run-session'.
+          name: 'my-run-session',
+          path: 'analysis/sessions/:runId',
+          beforeEnter: requireWebAppSessions,
+          components: {
+            stage: WebAppSession,
+            navigation: UserNavigation,
+          },
+          props: {
+            stage: true,
+            navigation: true
+          },
+          meta: {
+            hideSecondaryNav: true,
+            backLink: { name: 'my-runs' },
+            title: 'App',
+            description: 'A workflow step that is waiting for you, on your personal compute node.'
           }
         },
         {

@@ -18,6 +18,7 @@ import IconControllerPlay from "../../icons/IconControllerPlay.vue";
 import IconXCircle from "../../icons/IconXCircle.vue";
 import { endInteractiveSession } from "@pennsieve/notebooks/composables/useJupyterSession";
 import { markSessionEnded, sessionEnded, endingPhase } from "@pennsieve/notebooks/components/Analysis/RunMonitor/endedSessions";
+import { isNotebookSession, sessionOffered, sessionStep, sessionWords } from "./sessionKinds";
 import AnalysisFilesTable from "../../FilesTable/AnalysisFilesTable.vue";
 import BreadcrumbNavigation from "../../datasets/files/BreadcrumbNavigation/BreadcrumbNavigation.vue";
 import { useGetToken } from "@/composables/useGetToken";
@@ -568,15 +569,17 @@ const runName = computed(() => {
 });
 
 /*
-  Interactive (Jupyter) session entry point. A run is offered a notebook when its
-  DAG contains an interactive processor and the run is still active (the step
-  pauses the workflow while the user works). The connect endpoint is the source
-  of truth — the notebook page handles "still starting" / "no session" itself.
+  Interactive session entry point. A run is offered a session when its DAG
+  contains an interactive processor (the step pauses the workflow while the
+  user works): a notebook while the run is still active, since the connect
+  endpoint is the source of truth and the notebook page handles "still
+  starting" / "no session" itself; a web app only while its step is running
+  (sessionKinds.js).
 */
-const interactiveProcessor = computed(() => {
-  const dag = selectedWorkflowActivity.value?.dag || [];
-  return dag.find((d) => d.runtimeConfig?.interactive || d.interactive) || null;
-});
+const interactiveProcessor = computed(() => sessionStep(selectedWorkflowActivity.value?.dag));
+// What this session's buttons, dialog and banner say: a notebook's words, or
+// a web app's.
+const sessionText = computed(() => sessionWords(interactiveProcessor.value));
 
 /*
   Results download: a run whose DAG ends in a download target gets a zip of
@@ -655,25 +658,34 @@ const sessionEnding = computed(() => {
     sessionStepStatus: step?.data?.status,
   });
 });
-const ENDING_MESSAGE = {
-  saving: "Session ended. Saving the notebook and its output files; the workflow continues once they're saved. This can take a few minutes.",
-  finishing: "Session ended and saved. Running the rest of the workflow…",
-};
 
 const interactiveSessionAvailable = computed(() => {
   const activity = selectedWorkflowActivity.value;
   if (!activity?.uuid || !interactiveProcessor.value || sessionEnding.value) return false;
-  return !isTerminalStatus(activity.status);
+  const step = nodes.value.find((n) => n.id === interactiveProcessor.value.id);
+  return sessionOffered(interactiveProcessor.value, {
+    runActive: !isTerminalStatus(activity.status),
+    stepStatus: step?.data?.status,
+  });
 });
 
-const openNotebook = () => {
+const openSession = () => {
   const activity = selectedWorkflowActivity.value;
   if (!activity?.uuid) return;
-  router.push(
-    isMyWorkspace.value
-      ? { name: "my-run-notebook", params: { runId: activity.uuid } }
-      : { name: "run-notebook", params: { orgId: route.params.orgId, runId: activity.uuid } }
-  );
+  if (isNotebookSession(interactiveProcessor.value)) {
+    router.push(
+      isMyWorkspace.value
+        ? { name: "my-run-notebook", params: { runId: activity.uuid } }
+        : { name: "run-notebook", params: { orgId: route.params.orgId, runId: activity.uuid } }
+    );
+    return;
+  }
+  // A web app session opens in its own tab, through the page that waits for
+  // the session and then hands the tab to the app (WebAppSession.vue).
+  const to = isMyWorkspace.value
+    ? { name: "my-run-session", params: { runId: activity.uuid } }
+    : { name: "run-session", params: { orgId: route.params.orgId, runId: activity.uuid } };
+  window.open(router.resolve(to).href, "_blank", "noopener");
 };
 
 // Terminate the interactive session without opening the notebook: ends it
@@ -2902,7 +2914,7 @@ onUnmounted(() => {
           <bf-button class="secondary" :disabled="endingSession" @click="endSession">
             {{ endingSession ? 'Ending…' : 'End Session' }}
           </bf-button>
-          <bf-button class="primary" @click="openNotebook">Open Notebook</bf-button>
+          <bf-button class="primary" @click="openSession">{{ sessionText.open }}</bf-button>
         </div>
         <!-- A succeeded run as its workflow's sample output (the API's run example), for
              whoever can edit the workflow, where it's served: the page's primary action. -->
@@ -2931,9 +2943,7 @@ onUnmounted(() => {
       align-center
     >
       <p style="margin: 0; color: #4d4d4d; line-height: 1.5;">
-        Ending the session shuts down the notebook kernel and resumes the
-        workflow at the next step. Any unsaved notebook changes will be lost —
-        open the notebook first if you need to save your work.
+        {{ sessionText.endBody }}
       </p>
       <template #footer>
         <bf-button class="secondary mr-8" :disabled="endingSession" @click="confirmEndOpen = false">
@@ -2947,7 +2957,7 @@ onUnmounted(() => {
 
     <!-- Error Banner -->
     <div v-if="mode === 'browse' && sessionEnding" class="info-banner" role="status">
-      {{ ENDING_MESSAGE[sessionEnding] }}
+      {{ sessionText[sessionEnding] }}
     </div>
     <div v-if="errorBanner" class="error-banner">
       <span class="error-banner-msg">
@@ -3026,7 +3036,7 @@ onUnmounted(() => {
                   <template v-if="mode === 'browse' && interactiveSessionAvailable && id === interactiveProcessor?.id">
                     <button
                       class="node-action node-action--end"
-                      title="End session — resumes the workflow"
+                      :title="sessionText.endTitle"
                       :disabled="endingSession"
                       @click="endSession"
                     >
@@ -3035,8 +3045,8 @@ onUnmounted(() => {
                     <button
                       class="node-action node-action--play"
                       :class="{ 'node-action--waiting': data.status === 'STARTED' }"
-                      title="Interactive notebook is waiting for you — open it"
-                      @click="openNotebook"
+                      :title="sessionText.openTitle"
+                      @click="openSession"
                     >
                       <IconControllerPlay :width="18" :height="11" color="#011f5b" />
                     </button>
@@ -3051,7 +3061,7 @@ onUnmounted(() => {
                   >
                     <button
                       class="node-action node-action--end"
-                      title="End session — resumes the workflow"
+                      :title="sessionText.endTitle"
                       :disabled="endingSession"
                       @click="endSession"
                     >
@@ -3060,8 +3070,8 @@ onUnmounted(() => {
                     <button
                       class="node-action node-action--play"
                       :class="{ 'node-action--waiting': data.status === 'STARTED' }"
-                      title="Interactive notebook is waiting for you — open it"
-                      @click="openNotebook"
+                      :title="sessionText.openTitle"
+                      @click="openSession"
                     >
                       <IconControllerPlay :width="18" :height="11" color="#011f5b" />
                     </button>

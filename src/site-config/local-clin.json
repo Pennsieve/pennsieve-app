@@ -57,6 +57,7 @@
     "inAppLogin": true,
     "publishing": false,
     "office365Viewer": false,
-    "quickLauncher": false
+    "quickLauncher": false,
+    "webAppSessions": false
   }
 }

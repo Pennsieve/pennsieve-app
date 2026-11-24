@@ -17,6 +17,11 @@ export const FEATURE_DEFAULTS = Object.freeze({
   // New notebooks start from the quick launcher (@pennsieve/notebooks:
   // data, notebook, results) instead of the New notebook dialog.
   quickLauncher: false,
+  // Web app sessions: an interactive step whose app serves its own page,
+  // opened from a run. This only hides the buttons, the session page and the
+  // builder's choice. The back end doesn't check it, so it is not a security
+  // control.
+  webAppSessions: false,
 })
 
 export function resolveFeatures(features = {}) {

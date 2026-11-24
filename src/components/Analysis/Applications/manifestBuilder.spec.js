@@ -6,6 +6,7 @@ import {
   appKind,
   setAppKind,
   manifestSchemaFor,
+  takesParameters,
   sectionOfPath,
   fieldKeyOfPath,
   builderChecks,
@@ -40,6 +41,24 @@ describe("what kind of app", () => {
     expect(back.parameters.map((p) => p.name)).toEqual(["threshold"]);
     // The session's ports stay: they're values the author has now.
     expect(back.inputs[0].name).toBe("files");
+  });
+
+  it("a web app session keeps its parameters, and writes no kernel", () => {
+    const schema = createApplicationSchema({ parameters: [createParameter({ name: "IDLE_TIMEOUT_SECONDS" })] });
+    setAppKind(schema, "interactive");
+    // A notebook, the first kind offered, has no parameters.
+    expect(takesParameters(schema)).toBe(false);
+
+    schema.runtime.sessionType = "webapp";
+    expect(takesParameters(schema)).toBe(true);
+    const m = buildManifest(manifestSchemaFor(schema), { name: "Review files" });
+    expect(m.runtime).toMatchObject({ interactive: true, sessionType: "webapp" });
+    expect(m.runtime).not.toHaveProperty("kernel");
+    expect(m.parameters.map((p) => p.name)).toEqual(["IDLE_TIMEOUT_SECONDS"]);
+    expect(validateManifestDoc(m).valid).toBe(true);
+    // Its parameters are checked like a batch step's.
+    schema.parameters.push(createParameter({ name: "IDLE_TIMEOUT_SECONDS" }));
+    expect(builderChecks({ name: "Review files" }, schema).length).toBeGreaterThan(0);
   });
 
   it("keeps an interactive app's own ports, and defaults its kernel to Python", () => {
