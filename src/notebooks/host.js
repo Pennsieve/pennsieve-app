@@ -13,6 +13,8 @@
 //   user()      the signed-in user ({ id, intId, ... }), when known
 //   members()   the workspace's members, to name who started a notebook
 //   pennsieveAppUrl  the Pennsieve app, for links out (compute nodes)
+//   notify({ type, message })  a message to the user (success, info,
+//               warning, error)
 //   locations   vue-router locations of the site's pages: run(runId), where
 //               ending a session leads
 
@@ -35,3 +37,4 @@ export const notebookUser = () => current().user?.() ?? null;
 export const notebookMembers = () => current().members?.() ?? [];
 export const pennsieveAppUrl = () => current().pennsieveAppUrl || "";
 export const notebookLocations = () => current().locations;
+export const notebookNotify = (type, message) => current().notify?.({ type, message });
