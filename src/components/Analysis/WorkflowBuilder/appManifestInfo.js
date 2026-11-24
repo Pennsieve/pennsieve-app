@@ -160,8 +160,8 @@ export function paletteGroups(apps, { stepPorts = null, me = "", name = (a) => a
   const rest = apps.filter((a) => !fits.includes(a));
   const groups = [];
   if (stepPorts) groups.push({ key: "fits", label: "Fits after the selected step", apps: [...fits].sort(byName) });
-  // Interactive apps (notebook kernels) are their own group, last: a step
-  // where the workflow waits for someone to work in a session.
+  // Interactive apps (notebook kernels, web apps) are their own group, last:
+  // a step where the workflow waits for someone to work in a session.
   const interactive = rest.filter((a) => sessionTypeOf(a));
   const batch = rest.filter((a) => !interactive.includes(a));
   const yours = batch.filter((a) => me && a.ownerId === me);
@@ -172,7 +172,7 @@ export function paletteGroups(apps, { stepPorts = null, me = "", name = (a) => a
     groups.push({
       key: "interactive",
       label: "Interactive",
-      note: "The workflow pauses here while someone works in a notebook.",
+      note: "The workflow pauses here while someone works in a notebook or an app.",
       apps: interactive.sort(byName),
     });
   }

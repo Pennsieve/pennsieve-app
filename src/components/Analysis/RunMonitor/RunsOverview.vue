@@ -12,6 +12,7 @@ import { endInteractiveSession } from "@/composables/useJupyterSession";
 import { useGetToken } from "@/composables/useGetToken";
 import { useMetricsCounters } from "@/composables/useMetricsCounters";
 import { isNotebookWorkflow } from "./notebookHelpers";
+import { isNotebookSession, sessionAllowed, sessionWords } from "./sessionKinds";
 import RunHistory from "./RunHistory.vue";
 import RunWizardDialog from "./RunWizardDialog.vue";
 
@@ -149,8 +150,10 @@ const { counters: orgCounters, isLoading: countersLoading, fetchCounters: fetchO
 // for a public one not in the list, its name.
 const workflowsById = computed(() => new Map(workflows.value.map((w) => [w.uuid, w])));
 // A notebook's run: its workflow is a notebook, or workflow-service flagged
-// the run a live session (for public notebooks this list doesn't hold).
-const isNotebookRun = (r) => !!r.interactive || isNotebookWorkflow(workflowsById.value.get(r.workflowUuid));
+// the run a live notebook session (for public notebooks this list doesn't
+// hold). A run that pauses on a web app is a workflow's run, and stays.
+const isNotebookRun = (r) =>
+  (!!r.interactive && isNotebookSession(r)) || isNotebookWorkflow(workflowsById.value.get(r.workflowUuid));
 const shownRuns = computed(() =>
   props.excludeNotebooks ? workflowInstances.value.filter((r) => !isNotebookRun(r)) : workflowInstances.value
 );
@@ -286,17 +289,22 @@ const selectRun = (run) => {
   router.push(runRoute("run-detail", run.uuid));
 };
 
-// Open the interactive notebook for a run waiting on a user session. run-notebook
-// is a top-level route, so orgId must be passed explicitly (route param, with a
-// store fallback).
-const openNotebook = (run) => {
-  if (isMyWorkspace.value) {
-    router.push({ name: "my-run-notebook", params: { runId: run.uuid } });
-    return;
-  }
+// Open the session of a run waiting on its user: a notebook in its page, a
+// web app in a new tab (through WebAppSession.vue, which waits for it).
+// run-notebook and run-session are top-level routes, so orgId must be passed
+// explicitly (route param, with a store fallback).
+const openSession = (run) => {
+  const page = isNotebookSession(run) ? "notebook" : "session";
   const orgId =
     route.params.orgId || store.state.activeOrganization?.organization?.id;
-  router.push({ name: "run-notebook", params: { orgId, runId: run.uuid } });
+  const to = isMyWorkspace.value
+    ? { name: `my-run-${page}`, params: { runId: run.uuid } }
+    : { name: `run-${page}`, params: { orgId, runId: run.uuid } };
+  if (isNotebookSession(run)) {
+    router.push(to);
+    return;
+  }
+  window.open(router.resolve(to).href, "_blank", "noopener");
 };
 
 // End the interactive session for a run (clean resume) without opening it.
@@ -424,13 +432,13 @@ onBeforeUnmount(() => {
               @click="selectRun(run)"
             >
               <div
-                v-if="run.interactive && run.status === 'STARTED'"
+                v-if="run.interactive && run.status === 'STARTED' && sessionAllowed(run)"
                 class="active-run-actions"
                 @click.stop
               >
                 <button
                   class="active-run-action active-run-action--end"
-                  title="End interactive session — resumes the workflow"
+                  :title="sessionWords(run).endTitle"
                   :disabled="endingRunId === run.uuid"
                   @click="endRun(run)"
                 >
@@ -438,8 +446,8 @@ onBeforeUnmount(() => {
                 </button>
                 <button
                   class="active-run-action active-run-action--play"
-                  title="Open interactive notebook"
-                  @click="openNotebook(run)"
+                  :title="sessionWords(run).open"
+                  @click="openSession(run)"
                 >
                   <IconControllerPlay :width="16" :height="10" color="#011f5b" />
                 </button>
@@ -579,9 +587,7 @@ onBeforeUnmount(() => {
       align-center
     >
       <p style="margin: 0; color: #4d4d4d; line-height: 1.5;">
-        Ending the session shuts down the notebook kernel and resumes the
-        workflow at the next step. Any unsaved notebook changes will be lost —
-        open the notebook first if you need to save your work.
+        {{ sessionWords(confirmEndRun).endBody }}
       </p>
       <p v-if="endRunError" style="margin: 12px 0 0; color: #c14d49; font-size: 13px;">
         {{ endRunError }}

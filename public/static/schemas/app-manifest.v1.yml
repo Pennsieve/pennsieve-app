@@ -73,3 +73,6 @@ outputs:
 #   sessionType: jupyter   # a Jupyter notebook
 #   kernel: python         # its language: python or r
 #   computeTypes: [standard]
+#
+# A web page the app serves itself (on port 8888), which a person opens from
+# the run while the workflow waits, declares sessionType: webapp and no kernel.

@@ -339,6 +339,53 @@ async function resolveKernelName(runId) {
   }
 }
 
+// Poll the broker until the session is ready: the notebook's kernel below, or
+// a web app session (WebAppSession.vue), which passes its own `what` for the
+// message when the wait runs out. The interactive task isn't up the
+// instant a run starts — the workflow may still be on earlier steps, and the
+// Fargate task takes time to launch + pull its image. During that window the
+// endpoint legitimately returns 404 (no task tagged yet) then 202 (task
+// starting), and only 200 once the kernel is reachable. So we keep waiting
+// through 404/202/transient-5xx rather than failing on the first 404. ~5 min
+// window covers a cold first launch (image pull). Only 401/403 (access) and
+// other 4xx fail fast.
+// Poll fast (1s) early so a kernel that's already up is picked up promptly,
+// then back off to 2s for the long tail of a cold launch. Total window stays
+// ~5 min (30x1s + 135x2s = 300s) to cover a first-launch image pull.
+export async function fetchConnection(
+  runId,
+  { fastMs = 1000, slowMs = 2000, fastAttempts = 30, maxAttempts = 165, what = "kernel" } = {}
+) {
+  const url = `${siteConfig.api2Url}/compute/workflows/runs/${encodeURIComponent(
+    runId
+  )}/session/connect`;
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    const delay = attempt < fastAttempts ? fastMs : slowMs;
+    let resp;
+    try {
+      const token = await useGetToken();
+      resp = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+    } catch (_) {
+      // Network blip — wait and retry rather than fail the whole connect.
+      await sleep(delay);
+      continue;
+    }
+    if (resp.status === 200) return resp.json();
+    if (resp.status === 401 || resp.status === 403) {
+      throw new Error("You do not have access to this session.");
+    }
+    // 404 = task not launched yet, 202 = starting, 5xx = transient → keep waiting.
+    if (resp.status === 404 || resp.status === 202 || resp.status >= 500) {
+      await sleep(delay);
+      continue;
+    }
+    throw new Error(`session connect failed (${resp.status})`);
+  }
+  throw new Error(
+    `The ${what} is taking longer than expected to start. It may still be launching — try reconnecting in a moment.`
+  );
+}
+
 export function useJupyterSession() {
   const status = ref("idle"); // idle | connecting | ready | error | closed
   // What to show while status === "connecting"; updated once we know whether
@@ -401,53 +448,6 @@ export function useJupyterSession() {
       }
     }, AUTOSAVE_DELAY_MS);
   });
-
-  // ---- broker connect -------------------------------------------------------
-
-  // Poll the broker until the kernel is ready. The interactive task isn't up the
-  // instant a run starts — the workflow may still be on earlier steps, and the
-  // Fargate task takes time to launch + pull its image. During that window the
-  // endpoint legitimately returns 404 (no task tagged yet) then 202 (task
-  // starting), and only 200 once the kernel is reachable. So we keep waiting
-  // through 404/202/transient-5xx rather than failing on the first 404. ~5 min
-  // window covers a cold first launch (image pull). Only 401/403 (access) and
-  // other 4xx fail fast.
-  // Poll fast (1s) early so a kernel that's already up is picked up promptly,
-  // then back off to 2s for the long tail of a cold launch. Total window stays
-  // ~5 min (30x1s + 135x2s = 300s) to cover a first-launch image pull.
-  async function fetchConnection(
-    runId,
-    { fastMs = 1000, slowMs = 2000, fastAttempts = 30, maxAttempts = 165 } = {}
-  ) {
-    const url = `${siteConfig.api2Url}/compute/workflows/runs/${encodeURIComponent(
-      runId
-    )}/session/connect`;
-    for (let attempt = 0; attempt < maxAttempts; attempt++) {
-      const delay = attempt < fastAttempts ? fastMs : slowMs;
-      let resp;
-      try {
-        const token = await useGetToken();
-        resp = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
-      } catch (_) {
-        // Network blip — wait and retry rather than fail the whole connect.
-        await sleep(delay);
-        continue;
-      }
-      if (resp.status === 200) return resp.json();
-      if (resp.status === 401 || resp.status === 403) {
-        throw new Error("You do not have access to this session.");
-      }
-      // 404 = task not launched yet, 202 = starting, 5xx = transient → keep waiting.
-      if (resp.status === 404 || resp.status === 202 || resp.status >= 500) {
-        await sleep(delay);
-        continue;
-      }
-      throw new Error(`session connect failed (${resp.status})`);
-    }
-    throw new Error(
-      "The kernel is taking longer than expected to start. It may still be launching — try reconnecting in a moment."
-    );
-  }
 
   // Construct a KernelManager and attach to (or start) a kernel, retrying while
   // the kernel HTTP endpoint is still warming up (502 / CORS-without-headers).
