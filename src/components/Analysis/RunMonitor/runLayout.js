@@ -11,7 +11,7 @@
   - workflowLayouts: the saved layouts fetched, per workflow, so moving
     between runs doesn't fetch them again; the builder forgets one it saves.
 */
-import { withInterfaceNodes } from "./workflowInterface";
+import { withInterfaceNodes } from "@pennsieve/notebooks/components/Analysis/RunMonitor/workflowInterface";
 import { overlaps } from "../WorkflowGraph/graphDensity";
 
 const hasXY = (p) => !!p && typeof p.x === "number" && typeof p.y === "number";

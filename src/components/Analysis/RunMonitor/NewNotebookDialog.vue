@@ -9,18 +9,18 @@
 //
 // Diverged enough from the standard run config that it lives on its own; opened
 // via v-model and emits `created` with the new run.
-import { isPathPrefixParam, targetParamLabel, defaultsToRunName, targetWritesToDataset, canWriteDataset, searchDatasets } from "./dataTargets";
-import { hasInterface, withInterfaceNodes, destinationChoices, NO_DESTINATION } from "./workflowInterface";
-import { acceptsInput, nodeDataReason, nodeDataNote, dataUnreachable, suggestedDisk } from "./dataHints";
+import { isPathPrefixParam, targetParamLabel, defaultsToRunName, targetWritesToDataset, canWriteDataset, searchDatasets } from "@pennsieve/notebooks/components/Analysis/RunMonitor/dataTargets";
+import { hasInterface, withInterfaceNodes, destinationChoices, NO_DESTINATION } from "@pennsieve/notebooks/components/Analysis/RunMonitor/workflowInterface";
+import { acceptsInput, nodeDataReason, nodeDataNote, dataUnreachable, suggestedDisk } from "@pennsieve/notebooks/components/Analysis/RunMonitor/dataHints";
 import { computed, nextTick, onBeforeUnmount, reactive, ref, watch } from "vue";
 import { useStore } from "vuex";
 import BfButton from "../../shared/bf-button/BfButton.vue";
 import AnalysisFilesTable from "../../FilesTable/AnalysisFilesTable.vue";
 import BreadcrumbNavigation from "../../datasets/files/BreadcrumbNavigation/BreadcrumbNavigation.vue";
-import { useGetToken } from "@/composables/useGetToken";
 import { useSendXhr } from "@/mixins/request/request_composable";
 import toQueryParams from "@/utils/toQueryParams";
-import EventBus from "@/utils/event-bus";
+import { notebookBackend, notebookEndpoints, notebookToken, notebookUser, notebookNotify } from "@pennsieve/notebooks/notebooks/host";
+import { computeNodes, targetTypes, gpuTiers, loadComputeNodes, loadGpuTiers, loadTargetTypes } from "@pennsieve/notebooks/notebooks/notebookData";
 import {
   notebookKernel,
   kernelLabel,
@@ -55,25 +55,23 @@ import {
   notebookDiskHint,
   notebookProcessorConfigs,
   nodeStatusReason,
-} from "./notebookHelpers";
+} from "@pennsieve/notebooks/components/Analysis/RunMonitor/notebookHelpers";
 import { nodeGpu, gpuOffer, gpuName, gpuTaskResources } from "../ComputeNodes/computeNodeHelpers";
 import NodeTierBadge from "../ComputeNodes/NodeTierBadge.vue";
-import { useComputeResourcesStore } from "@/stores/computeResourcesStore";
 import { fetchVariantGate, provisionerGateReason } from "./variantGate";
-import { fetchNodesSessions, capacityLabel, capacityReason } from "./notebookCapacity";
+import { fetchNodesSessions, capacityLabel, capacityReason } from "@pennsieve/notebooks/components/Analysis/RunMonitor/notebookCapacity";
 import RuntimeMark from "../WorkflowGraph/RuntimeMark.vue";
 import { STANDARD_CPU_OPTIONS, getStandardMemoryOptions, getTargetTypeLabel } from "./runHelpers";
 import { sourceLabel } from "../WorkflowGraph/sourceInputs";
-import * as siteConfig from "@/site-config/site.json";
-import { viewsServiceUrl, viewDataSource, prepareWorkspaceRunView, createWorkspaceRunView, workspaceFilesAsViews } from "@/utils/viewsService";
-import { holdPendingInputs, pendingFolderName, splitSessionViews } from "../JupyterSession/pendingSessionInputs";
+import { viewsServiceUrl, viewDataSource, prepareWorkspaceRunView, createWorkspaceRunView, workspaceFilesAsViews } from "@pennsieve/notebooks/utils/viewsService";
+import { holdPendingInputs, pendingFolderName, splitSessionViews } from "@pennsieve/notebooks/components/Analysis/JupyterSession/pendingSessionInputs";
 import { routeWorkspaceInputs } from "@/utils/workspaceInputs";
 import { listWorkspaceModels } from "@/utils/workspaceModels";
-import PlatformList from "../PlatformList.vue";
-import PlatformPane from "../PlatformPane.vue";
-import MetadataRecordsChoice from "../MetadataRecordsChoice.vue";
-import { newSelection, clearSelection, selectionReady } from "../platformSelection";
-import { PLATFORMS, PLATFORM_KEYS, platformData } from "../platforms";
+import PlatformList from "@pennsieve/notebooks/components/Analysis/PlatformList.vue";
+import PlatformPane from "@pennsieve/notebooks/components/Analysis/PlatformPane.vue";
+import MetadataRecordsChoice from "@pennsieve/notebooks/components/Analysis/MetadataRecordsChoice.vue";
+import { newSelection, clearSelection, selectionReady } from "@pennsieve/notebooks/components/Analysis/platformSelection";
+import { PLATFORMS, PLATFORM_KEYS, platformData } from "@pennsieve/notebooks/components/Analysis/platforms/index";
 
 const props = defineProps({
   modelValue: { type: Boolean, default: false },
@@ -115,14 +113,10 @@ const visible = computed({
   set: (v) => emit("update:modelValue", v),
 });
 
-/* ----------------------------------------------------------------- store ---- */
-const computeNodes = computed(
-  () => store.getters["analysisModule/computeNodes"] || []
-);
-const targetTypes = computed(
-  () => store.getters["analysisModule/targetTypes"] || []
-);
-const config = computed(() => store.state.config);
+/* ------------------------------------------------------------ the site ---- */
+// computeNodes, targetTypes and gpuTiers are the notebook pages' shared
+// lists (notebookData); the endpoints and token are the site's.
+const config = computed(() => notebookEndpoints());
 
 /* ----------------------------------------------------------- wizard state --- */
 const step = ref(0);
@@ -247,8 +241,6 @@ const runVariant = computed(() =>
 const variantResourcesSet = computed(() => isGpu.value || variantSetsResources(selectedVariant.value));
 
 // The GPU tiers (GET /compute/resources/gpu-tiers), for what a node's GPU is.
-const computeResourcesStore = useComputeResourcesStore();
-const gpuTiers = ref([]);
 const gpuOf = (cn) => nodeGpu(cn, gpuTiers.value);
 
 const selectedCard = computed(() => cardOf(cards.value, form.value.workflowId));
@@ -281,7 +273,7 @@ const nodeReasons = (cn) => {
 // leave a node without one and never block the dialog.
 async function loadCapacity(nodes = interactiveComputeNodes.value) {
   if (!nodes.length) return;
-  const read = await fetchNodesSessions(config.value.api2Url, nodes, useGetToken).catch(() => ({}));
+  const read = await fetchNodesSessions(config.value.api2Url, nodes, notebookToken).catch(() => ({}));
   nodeCapacity.value = { ...nodeCapacity.value, ...read };
 }
 // A GPU session decided before the node (chosen first, or the kernel's only).
@@ -493,7 +485,7 @@ const resultsDataset = computed(() => resultsOptions.value.find((d) => d.content
 const fetchResultsOptions = async (query = "") => {
   resultsLoading.value = true;
   try {
-    const found = await searchDatasets(config.value.apiUrl, query, { getToken: useGetToken, sendXhr: useSendXhr, toQueryParams });
+    const found = await searchDatasets(config.value.apiUrl, query, { getToken: notebookToken, sendXhr: useSendXhr, toQueryParams });
     resultsOptions.value = found.filter((d) => canWriteDataset(d.role));
   } catch (err) {
     console.error("Failed to fetch datasets:", err);
@@ -512,7 +504,7 @@ watch(viewOnly, (v) => {
 });
 
 /* ------------------------------------------------------------- run name ----- */
-const profile = computed(() => store.state.profile);
+const profile = computed(() => notebookUser());
 const nameTouched = ref(false);
 
 const slug = (s) =>
@@ -638,7 +630,7 @@ const canNext = computed(() => {
 const fetchDatasetOptions = async (query = "") => {
   datasetSearchLoading.value = true;
   try {
-    const token = await useGetToken();
+    const token = await notebookToken();
     const params = toQueryParams({
       limit: 25,
       offset: 0,
@@ -725,10 +717,7 @@ async function loadDefinition() {
   }
   definitionLoading.value = true;
   try {
-    const def = await store.dispatch(
-      "analysisModule/fetchWorkflowDefinition",
-      form.value.workflowId
-    );
+    const def = await notebookBackend().getDefinition(form.value.workflowId);
     // A workflow's input and output as the source and target nodes a run of
     // it has (workflowInterface.js).
     configDefinition.value = withInterfaceNodes(def);
@@ -747,9 +736,7 @@ async function loadDefinition() {
     }
   } catch (err) {
     console.error("Failed to load notebook workflow definition:", err);
-    EventBus.$emit("toast", {
-      detail: { type: "error", msg: "Failed to load the notebook workflow." },
-    });
+    notebookNotify("error", "Failed to load the notebook workflow.");
   } finally {
     definitionLoading.value = false;
   }
@@ -821,7 +808,7 @@ async function selectSourceNode(nodeId) {
 
 async function fetchDatasetFiles() {
   try {
-    const token = await useGetToken();
+    const token = await notebookToken();
     const datasetId = form.value.datasetId;
     const url = `${config.value.apiUrl}/datasets/${datasetId}?api_key=${token}&includeAncestors=true&limit=500&offset=0`;
     const response = await useSendXhr(url);
@@ -835,7 +822,7 @@ async function fetchDatasetFiles() {
 async function onClickFileLabel(file) {
   if (file.content.packageType !== "Collection") return;
   try {
-    const token = await useGetToken();
+    const token = await notebookToken();
     const url = `${config.value.apiUrl}/packages/${file.content.id}?api_key=${token}&includeAncestors=true&limit=500&offset=0`;
     const response = await useSendXhr(url);
     filePickerFiles.value = [...(response.children || [])];
@@ -858,7 +845,7 @@ async function onClickFileLabel(file) {
 
 async function handleNavigateBreadcrumb(id) {
   try {
-    const token = await useGetToken();
+    const token = await notebookToken();
     let url;
     if (!id || id === "root") {
       url = `${config.value.apiUrl}/datasets/${form.value.datasetId}?api_key=${token}&includeAncestors=true&limit=500&offset=0`;
@@ -947,17 +934,13 @@ function reset() {
 watch(visible, (open) => {
   if (open) {
     reset();
-    if (!variantGate.value) fetchVariantGate(config.value.api2Url, useGetToken).then((g) => (variantGate.value = g));
+    if (!variantGate.value) fetchVariantGate(config.value.api2Url, notebookToken).then((g) => (variantGate.value = g));
     nodeCapacity.value = {};
     loadCapacity();
     // Their statuses now: one may have started updating since the page opened.
-    store.dispatch("analysisModule/fetchComputeNodes", { force: true }).catch(() => {});
-    if (!gpuTiers.value.length) {
-      computeResourcesStore
-        .fetchGpuTiers(store.getters.activeOrganization?.organization?.id)
-        .then((t) => (gpuTiers.value = t || []))
-        .catch(() => {});
-    }
+    loadComputeNodes({ force: true }).catch(() => {});
+    loadTargetTypes().catch(() => {});
+    loadGpuTiers().catch(() => {});
     if (!props.personal) fetchDatasetOptions();
   }
 });
@@ -1207,7 +1190,7 @@ async function execute() {
     };
 
     console.log("[Notebook] createRun payload:", JSON.stringify(payload, null, 2));
-    const newRun = await store.dispatch("analysisModule/createRun", payload);
+    const newRun = await notebookBackend().createRun(payload);
     console.log("[Notebook] createRun response:", JSON.stringify(newRun, null, 2));
     // The session page (its run's) adds them once the session runs.
     if (pendingViews.length && !fromPlatform) {
@@ -1216,12 +1199,7 @@ async function execute() {
     // The run has them: the next notebook builds its own, with the records
     // as they are then.
     for (const id of Object.keys(sessionViews)) delete sessionViews[id];
-    EventBus.$emit("toast", {
-      detail: {
-        type: "success",
-        msg: "Starting your notebook…",
-      },
-    });
+    notebookNotify("success", "Starting your notebook…");
     store.commit("analysisModule/CLEAR_SELECTED_FILES");
     visible.value = false;
     emit("created", newRun);
@@ -1230,9 +1208,7 @@ async function execute() {
     console.error("Failed to start notebook:", err);
     // The node may have filled up since it was read (a 409): read it again.
     if (selectedComputeNode.value) loadCapacity([selectedComputeNode.value]);
-    EventBus.$emit("toast", {
-      detail: { type: "error", msg: err?.message || "Failed to start notebook." },
-    });
+    notebookNotify("error", err?.message || "Failed to start notebook.");
   } finally {
     executing.value = false;
   }

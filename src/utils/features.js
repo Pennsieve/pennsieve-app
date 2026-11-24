@@ -14,6 +14,9 @@ export const FEATURE_DEFAULTS = Object.freeze({
   // instead of data-source and data-target nodes. On only where
   // workflow-service supports them (Pennsieve/workflow-service#103).
   workflowInterface: false,
+  // New notebooks start from the quick launcher (@pennsieve/notebooks:
+  // data, notebook, results) instead of the New notebook dialog.
+  quickLauncher: false,
 })
 
 export function resolveFeatures(features = {}) {

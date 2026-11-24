@@ -29,7 +29,7 @@ import { applicationPageTitle } from "../../components/Analysis/Applications/app
 import { useComputeResourcesStore } from "@/stores/computeResourcesStore";
 import { useGetToken } from "@/composables/useGetToken";
 import EventBus from "@/utils/event-bus";
-import { runPageIsNotebook } from "@/components/Analysis/RunMonitor/notebookHelpers";
+import { runPageIsNotebook } from "@pennsieve/notebooks/components/Analysis/RunMonitor/notebookHelpers";
 import { provide, ref } from "vue";
 import { useAnalysisStageTop } from "@/composables/useAnalysisStageTop";
 

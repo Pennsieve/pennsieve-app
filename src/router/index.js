@@ -157,7 +157,7 @@ const AppManifestBuilder = () => import ('../components/Analysis/Applications/Ap
 const ActivityMonitor = () => import ('../components/Analysis/Activity/ActivityMonitor.vue')
 const RunMonitor = () => import ('../components/Analysis/RunMonitor/RunMonitor.vue')
 const RunDetail = () => import ('../components/Analysis/RunMonitor/RunDetail.vue')
-const NotebooksOverview = () => import ('../components/Analysis/RunMonitor/NotebooksOverview.vue')
+const NotebooksOverview = () => import ('@pennsieve/notebooks/components/Analysis/RunMonitor/NotebooksOverview.vue')
 const NotebookSession = () => import ('../components/Analysis/JupyterSession/NotebookSession.vue')
 const WorkflowBuilder = () => import ('../components/Analysis/WorkflowBuilder/WorkflowBuilder.vue')
 const WorkflowsOverview = () => import ('../components/Analysis/Workflows/WorkflowsOverview.vue')

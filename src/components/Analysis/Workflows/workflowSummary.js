@@ -1,6 +1,6 @@
 // What a workflow card says about a workflow, from its definition.
 import { extractRepoName, findAppByUrl, getTargetTypeLabel } from "../RunMonitor/runHelpers";
-import { interfaceDag } from "../RunMonitor/workflowInterface";
+import { interfaceDag } from "@pennsieve/notebooks/components/Analysis/RunMonitor/workflowInterface";
 
 // A target type's label, or its name capitalised where it has none
 // ("pennsieve" -> "Pennsieve").

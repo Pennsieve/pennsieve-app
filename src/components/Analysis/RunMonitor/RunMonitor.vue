@@ -19,7 +19,7 @@ import { useSendXhr } from "@/mixins/request/request_composable";
 import { useMetricsCounters } from "@/composables/useMetricsCounters";
 import toQueryParams from "@/utils/toQueryParams";
 import TargetDatasetField from "./TargetDatasetField.vue";
-import { targetWritesToDataset, targetParamFields, buildDataTargets, targetDatasetId, datasetName } from "./dataTargets";
+import { targetWritesToDataset, targetParamFields, buildDataTargets, targetDatasetId, datasetName } from "@pennsieve/notebooks/components/Analysis/RunMonitor/dataTargets";
 import { validateRunName, runDisplayName, RUN_NAME_MAX_LENGTH, targetTypeName,
   nodeMetricRows, processorConfigEntry, lambdaMemory,
 } from "./runHelpers";

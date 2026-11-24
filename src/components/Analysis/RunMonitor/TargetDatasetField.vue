@@ -9,7 +9,7 @@ import { useStore } from "vuex";
 import { useGetToken } from "@/composables/useGetToken";
 import { useSendXhr } from "@/mixins/request/request_composable";
 import toQueryParams from "@/utils/toQueryParams";
-import { searchDatasets, datasetName } from "./dataTargets";
+import { searchDatasets, datasetName } from "@pennsieve/notebooks/components/Analysis/RunMonitor/dataTargets";
 import DatasetOptionRow from "./DatasetOptionRow.vue";
 
 const props = defineProps({
