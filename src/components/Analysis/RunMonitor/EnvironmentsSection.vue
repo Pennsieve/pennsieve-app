@@ -6,7 +6,7 @@
 // version and the latest build's status, and opens its details. Polls while
 // a build runs.
 import { ref, computed, watch, onBeforeUnmount } from "vue";
-import { useStore } from "vuex";
+import { notebookUser } from "@/notebooks/host";
 import { ElMessage, ElMessageBox } from "element-plus";
 import { MoreFilled, Loading } from "@element-plus/icons-vue";
 import EnvironmentIcon from "./EnvironmentIcon.vue";
@@ -33,9 +33,8 @@ const props = defineProps({
 // use(): the page opens the dialogs.
 const emit = defineEmits(["create", "edit", "retry", "use"]);
 
-const store = useStore();
 const available = !!environmentsServiceUrl();
-const me = computed(() => store.state.profile?.id);
+const me = computed(() => notebookUser()?.id);
 
 const environments = ref([]);
 const versionsById = ref({}); // id -> versions, newest first, once read

@@ -16,7 +16,8 @@
 //   notify({ type, message })  a message to the user (success, info,
 //               warning, error)
 //   locations   vue-router locations of the site's pages: run(runId), where
-//               ending a session leads
+//               ending a session leads; notebook(runId), a run's notebook;
+//               listedRun(runId), where a notebook picked from the list opens
 
 let host = null;
 

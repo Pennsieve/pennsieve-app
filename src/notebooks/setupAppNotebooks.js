@@ -66,6 +66,17 @@ export function setupAppNotebooks({ siteConfig, store, router, realtime }) {
         const orgId = router.currentRoute.value.params.orgId;
         return orgId ? { name: "run-detail", params: { orgId, runId } } : { name: "my-run-detail", params: { runId } };
       },
+      // The run's notebook page.
+      notebook: (runId) => {
+        const orgId = router.currentRoute.value.params.orgId;
+        return orgId ? { name: "run-notebook", params: { orgId, runId } } : { name: "my-run-notebook", params: { runId } };
+      },
+      // A notebook picked from the list: its run's page in a workspace; in
+      // My Workspace, its notebook.
+      listedRun: (runId) =>
+        router.currentRoute.value.params.orgId
+          ? { name: "run-detail", params: { runId } }
+          : { name: "my-run-notebook", params: { runId } },
     },
   });
 }

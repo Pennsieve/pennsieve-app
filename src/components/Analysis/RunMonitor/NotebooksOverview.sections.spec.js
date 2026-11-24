@@ -8,24 +8,26 @@ vi.mock("vue-router", () => ({
   useRoute: () => route,
   useRouter: () => ({ replace, push }),
 }));
-// Any getter reads as an empty list; the dispatches resolve.
-vi.mock("vuex", async (importOriginal) => ({
-  ...(await importOriginal()),
-  useStore: () => ({
-    dispatch: vi.fn().mockResolvedValue(),
-    getters: new Proxy({}, { get: () => [] }),
-    state: { activeOrganization: {}, config: {} },
-  }),
-}));
-vi.mock("@/stores/computeResourcesStore", () => ({
-  // Any action resolves; any list reads empty.
-  useComputeResourcesStore: () =>
-    new Proxy({}, { get: (_, key) => (String(key).startsWith("fetch") ? () => Promise.resolve() : () => []) }),
-}));
-vi.mock("@/realtime/channels", () => ({ runScopeChannel: () => null }));
 vi.mock("@/utils/environmentsService", () => ({ environmentsServiceUrl: () => "https://environments.example" }));
 
 import NotebooksOverview from "./NotebooksOverview.vue";
+import { configureNotebooks } from "@/notebooks/host";
+
+// A workspace's notebooks, with nothing in them.
+configureNotebooks({
+  endpoints: {},
+  getToken: async () => "token",
+  backend: {
+    scope: () => ({ kind: "workspace", organizationId: "N:organization:o1" }),
+    listRuns: async () => ({ runs: [], cursor: null }),
+    listComputeNodes: async () => [],
+    listTargetTypes: async () => [],
+    listGpuTiers: async () => [],
+    listNotebookDefinitions: async () => [],
+    subscribeRunStatus: () => () => {},
+  },
+  locations: { run: () => ({}), notebook: () => ({}), listedRun: () => ({}) },
+});
 
 const mountAs = (name, query = {}, props = {}) => {
   route.name = name;

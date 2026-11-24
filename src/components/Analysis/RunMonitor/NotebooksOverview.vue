@@ -2,16 +2,7 @@
 // Notebooks tab: a focused view over interactive-notebook runs. Lists ONLY runs
 // launched from the defined public notebook workflows ("Jupyter Notebook" =
 // Python today), and opens the self-contained NewNotebookDialog launcher.
-import {
-  computed,
-  ref,
-  onMounted,
-  onBeforeUnmount,
-  getCurrentInstance,
-  watch,
-} from "vue";
-import { runScopeChannel } from "@/realtime/channels";
-import { useStore } from "vuex";
+import { computed, ref, onMounted, watch } from "vue";
 import { useRouter, useRoute } from "vue-router";
 import BfButton from "../../shared/bf-button/BfButton.vue";
 import IconControllerPlay from "../../icons/IconControllerPlay.vue";
@@ -22,9 +13,10 @@ import EnvironmentsSection from "./EnvironmentsSection.vue";
 import CreateEnvironmentDialog from "./CreateEnvironmentDialog.vue";
 import { environmentsServiceUrl } from "@/utils/environmentsService";
 import { fetchPublicDataset } from "@/utils/publicDatasets";
-import EventBus from "@/utils/event-bus";
 import { endInteractiveSession } from "@/composables/useJupyterSession";
-import { useGetToken } from "@/composables/useGetToken";
+import { notebookBackend, notebookLocations, notebookMembers, notebookNotify, notebookUser } from "@/notebooks/host";
+import { computeNodes, gpuTiers, loadComputeNodes, loadGpuTiers, loadTargetTypes } from "@/notebooks/notebookData";
+import { useNotebookRuns } from "@/notebooks/useNotebookRuns";
 import {
   statusDotClass,
   statusLabel,
@@ -39,7 +31,6 @@ import EmptyState from "../EmptyState.vue";
 import RunningNote from "../RunningNote.vue";
 import ContentIntro from '@/components/shared/ContentIntro/ContentIntro.vue';
 import { nodeGpu } from "../ComputeNodes/computeNodeHelpers";
-import { useComputeResourcesStore } from "@/stores/computeResourcesStore";
 import RuntimeMark from "../WorkflowGraph/RuntimeMark.vue";
 import RunHistory from "./RunHistory.vue";
 import NotebookUsage from "./NotebookUsage.vue";
@@ -47,35 +38,18 @@ import NotebookUsage from "./NotebookUsage.vue";
 const props = defineProps({
   section: { type: String, default: "notebooks" }, // "notebooks" | "environments"
 });
-const store = useStore();
 const router = useRouter();
 const route = useRoute();
-const realtime = getCurrentInstance()?.appContext.config.globalProperties.$realtime;
 
 // Shown in a workspace (/:orgId/analysis/notebooks) and in My Workspace
 // (/my-workspace/analysis/notebooks), where notebooks run on the user's own
-// compute nodes and there is no dataset to pick yet.
-const isMyWorkspace = computed(() => !route.params.orgId);
-const notebookRoute = (runId) =>
-  isMyWorkspace.value
-    ? { name: "my-run-notebook", params: { runId } }
-    : {
-        name: "run-notebook",
-        params: {
-          orgId: route.params.orgId || store.state.activeOrganization?.organization?.id,
-          runId,
-        },
-      };
+// compute nodes and there is no dataset to pick yet: the user's own scope.
+const isMyWorkspace = computed(() => notebookBackend().scope().kind === "user");
+const notebookRoute = (runId) => notebookLocations().notebook(runId);
 
-/* ----------------------------------------------------------------- store ---- */
-const workflowInstances = computed(
-  () => store.getters["analysisModule/workflowInstances"] || []
-);
-const config = computed(() => store.state.config);
-const profile = computed(() => store.state.profile);
-const orgMembers = computed(() => store.state.orgMembers || []);
-const getUserName = (userId) =>
-  getUserNameFn(userId, profile.value, orgMembers.value);
+/* ----------------------------------------------------------------- runs ----- */
+const { runs: workflowInstances, cursor: runsCursor, refresh: refreshRuns, loadMore, subscribe } = useNotebookRuns();
+const getUserName = (userId) => getUserNameFn(userId, notebookUser(), notebookMembers());
 
 /* --------------------------------------------------- notebook workflows ----- */
 const notebookWorkflows = ref([]);
@@ -134,9 +108,7 @@ async function openPublicFromQuery() {
     openNewNotebook("", dataset);
   } catch (err) {
     console.error("Failed to load the public dataset:", err);
-    EventBus.$emit("toast", {
-      detail: { type: "error", msg: "That public dataset can't be opened in a notebook." },
-    });
+    notebookNotify("error", "That public dataset can't be opened in a notebook.");
   }
 }
 watch(() => route.query.publicDataset, openPublicFromQuery);
@@ -170,52 +142,16 @@ const gpuWorkflowIds = computed(
 const runRuntime = (run) =>
   (run?.dag?.length ? runOnGpu(run) : gpuWorkflowIds.value.has(run.workflowUuid)) ? "gpu" : "";
 // The GPU mark's title: the run's node's GPU (its GPU tier), where known.
-const gpuTiers = ref([]);
-const computeResourcesStore = useComputeResourcesStore();
 const runRuntimeTitle = (run) => {
   if (runRuntime(run) !== "gpu") return "";
   const id = runNodeId(run);
-  const node = id && (store.getters["analysisModule/computeNodes"] || []).find((n) => n.uuid === id);
+  const node = id && computeNodes.value.find((n) => n.uuid === id);
   return gpuMarkTitle(nodeGpu(node, gpuTiers.value));
 };
 
-// Every page of the definitions a query matches: the service returns 20 at a
-// time, newest first, so a kernel published before newer workflows is on a
-// later page.
-async function fetchDefinitions(query) {
-  const token = await useGetToken();
-  const list = [];
-  let cursor = "";
-  let pages = 50;
-  do {
-    const params = new URLSearchParams(query);
-    params.set("limit", "100");
-    if (cursor) params.set("cursor", cursor);
-    const resp = await fetch(`${config.value.api2Url}/compute/workflows/definitions?${params}`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-    const result = await resp.json();
-    list.push(...(Array.isArray(result) ? result : result.workflows || []));
-    cursor = Array.isArray(result) ? "" : result.nextCursor || "";
-  } while (cursor && pages-- > 0);
-  return list;
-}
-
 async function fetchNotebookWorkflows() {
   try {
-    const orgId = store.state.activeOrganization?.organization?.id;
-    const queries = ["visibility=public&official=true"];
-    if (orgId) queries.push(`organization_id=${encodeURIComponent(orgId)}`);
-    const results = await Promise.allSettled(queries.map(fetchDefinitions));
-    const byId = new Map();
-    for (const r of results) {
-      if (r.status !== "fulfilled") continue;
-      for (const wf of r.value) {
-        if (wf?.uuid && !byId.has(wf.uuid)) byId.set(wf.uuid, wf);
-      }
-    }
-    const all = [...byId.values()];
+    const all = await notebookBackend().listNotebookDefinitions();
     // Require the Official flag (set by Pennsieve, not user-settable) so a workflow
     // a user merely *names* "Pennsieve - …" can't masquerade as an official
     // kernel. Name still selects which official workflow it is.
@@ -262,9 +198,8 @@ const historyRuns = computed(() =>
         new Date(a.completedAt || a.startedAt)
     )
 );
-const nodeName = (id) =>
-  (store.getters["analysisModule/computeNodes"] || []).find((n) => n.uuid === id)?.name || "";
-const hasMoreRuns = computed(() => !!store.getters["analysisModule/workflowInstancesCursor"]);
+const nodeName = (id) => computeNodes.value.find((n) => n.uuid === id)?.name || "";
+const hasMoreRuns = computed(() => !!runsCursor.value);
 // Live's empty states (notebooksEmptyState): "empty" (none at all) or
 // "idle" (a history, none running); null while loading or running.
 const emptyState = computed(() =>
@@ -276,7 +211,7 @@ const loadingMore = ref(false);
 async function loadMoreRuns() {
   loadingMore.value = true;
   try {
-    await store.dispatch("analysisModule/fetchMoreWorkflowInstances");
+    await loadMore();
   } catch (err) {
     console.error("Failed to load more notebooks:", err);
   } finally {
@@ -291,19 +226,16 @@ async function loadMoreRuns() {
 // the run ids before refetching, then pick the one that appears afterward (the
 // list always has a real `uuid`). Falls back to a direct id or name match.
 const onNotebookCreated = async (newRun) => {
-  const before = new Set(
-    (store.getters["analysisModule/workflowInstances"] || [])
-      .map((r) => r.uuid)
-      .filter(Boolean)
-  );
-  await store.dispatch("analysisModule/fetchWorkflowInstances");
-  const instances = store.getters["analysisModule/workflowInstances"] || [];
+  const before = new Set(workflowInstances.value.map((r) => r.uuid).filter(Boolean));
+  await refreshRuns().catch(() => {});
+  const instances = workflowInstances.value;
 
   const fresh = instances.filter((r) => r.uuid && !before.has(r.uuid));
   const directId = newRun?.executionRunId || newRun?.uuid || newRun?.id || newRun?.runId;
-  // createRun already added the run under executionRunId, so it isn't "fresh"
+  // The run's id, where the response carries it, whether or not the list
+  // has the run yet.
   const run =
-    (directId && instances.find((r) => r.uuid === directId)) ||
+    (directId && { uuid: directId }) ||
     fresh.find((r) => r.name === newRun?.name) ||
     fresh[0] ||
     (directId && instances.find((r) => r.uuid === directId)) ||
@@ -323,11 +255,7 @@ const onNotebookCreated = async (newRun) => {
 /* ----------------------------------------------------------- navigation ----- */
 // My Workspace has no run detail page yet; a run opens its notebook there.
 const selectRun = (run) => {
-  if (isMyWorkspace.value) {
-    router.push(notebookRoute(run.uuid));
-    return;
-  }
-  router.push({ name: "run-detail", params: { runId: run.uuid } });
+  router.push(notebookLocations().listedRun(run.uuid));
 };
 const openNotebook = (run) => {
   router.push(notebookRoute(run.uuid));
@@ -358,33 +286,14 @@ const confirmEndSession = async () => {
 };
 
 /* -------------------------------------------------- live updates / lifecycle */
-const parseEventData = (data) => {
-  if (typeof data === "string") {
-    try {
-      return JSON.parse(data);
-    } catch {
-      return data;
-    }
-  }
-  return data;
-};
-const onRunStatusUpdate = (raw) => {
-  const data = parseEventData(raw);
-  store.dispatch("analysisModule/applyRunStatusEvent", {
-    runId: data.runId,
-    status: data.status,
-  });
-};
-
-let analyticsChannel = null;
 onMounted(async () => {
   isLoading.value = true;
   try {
     await Promise.all([
-      store.dispatch("analysisModule/fetchWorkflowInstances"),
-      // Forced in My Workspace: the cached list may be a workspace's nodes
-      store.dispatch("analysisModule/fetchComputeNodes", { force: isMyWorkspace.value }),
-      store.dispatch("analysisModule/fetchTargetTypes"),
+      refreshRuns().catch((err) => console.error("Failed to fetch notebooks:", err)),
+      // Their statuses now: the cached list may be from before
+      loadComputeNodes({ force: true }).catch(() => {}),
+      loadTargetTypes().catch(() => {}),
       fetchNotebookWorkflows(),
     ]);
   } finally {
@@ -392,26 +301,9 @@ onMounted(async () => {
   }
   openFromQuery();
   openPublicFromQuery();
-  computeResourcesStore
-    .fetchGpuTiers(store.getters.activeOrganization?.organization?.id)
-    .then((t) => (gpuTiers.value = t || []))
-    .catch(() => {});
+  loadGpuTiers().catch(() => {});
   // Live updates for every run in the workspace (or the user's own runs)
-  if (realtime) {
-    analyticsChannel = realtime.subscribe(
-      // The route's workspace, not activeOrganization: that stays set in My
-      // Workspace, where a personal run's events go to the user's channel.
-      runScopeChannel(route.params.orgId, store.state.profile?.id)
-    );
-    analyticsChannel.bind("workflow-run-status", onRunStatusUpdate);
-  }
-});
-onBeforeUnmount(() => {
-  if (analyticsChannel) {
-    analyticsChannel.unbind("workflow-run-status", onRunStatusUpdate);
-    analyticsChannel.unsubscribe();
-    analyticsChannel = null;
-  }
+  subscribe();
 });
 </script>
 
