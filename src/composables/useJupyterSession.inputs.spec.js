@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { postInputsFetch, getInputsFetch, sessionSourcesRequest, registerSessionSource } from "./useJupyterSession";
+import { createPennsieveBackend } from "@/notebooks/pennsieveBackend";
 
 const respond = (status, body) =>
   vi.fn().mockResolvedValue({
@@ -98,12 +99,17 @@ describe("sessionSourcesRequest", () => {
 });
 
 describe("registerSessionSource", () => {
-  const config = { api2Url: "https://api2.pennsieve.net" };
-  const getToken = () => Promise.resolve("user-tok");
+  const backendWith = (fetchFn) =>
+    createPennsieveBackend({
+      endpoints: { api2Url: "https://api2.pennsieve.net" },
+      scope: () => ({ kind: "user", userId: "N:user:u1" }),
+      getToken: () => Promise.resolve("user-tok"),
+      fetchFn,
+    });
 
   it("records the view on the run with the user's token", async () => {
     const fetchFn = respond(201, { name: "more", viewId: "v1", viewVersion: 2, addedAt: "2026-11-16T00:00:00Z" });
-    const out = await registerSessionSource("run-1", { name: "more", viewId: "v1", version: 2 }, { config, getToken, fetchFn });
+    const out = await registerSessionSource("run-1", { name: "more", viewId: "v1", version: 2 }, { backend: backendWith(fetchFn) });
     expect(out.addedAt).toBe("2026-11-16T00:00:00Z");
     const [url, init] = fetchFn.mock.calls[0];
     expect(url).toBe("https://api2.pennsieve.net/compute/workflows/runs/run-1/sources");
@@ -114,7 +120,7 @@ describe("registerSessionSource", () => {
 
   it("rejects with the service's reason", async () => {
     const fetchFn = respond(404, { message: "view v1 version 2 was not found or isn't yours" });
-    await expect(registerSessionSource("run-1", { name: "more", viewId: "v1", version: 2 }, { config, getToken, fetchFn })).rejects.toMatchObject({
+    await expect(registerSessionSource("run-1", { name: "more", viewId: "v1", version: 2 }, { backend: backendWith(fetchFn) })).rejects.toMatchObject({
       status: 404,
       source: "run",
       message: "view v1 version 2 was not found or isn't yours",

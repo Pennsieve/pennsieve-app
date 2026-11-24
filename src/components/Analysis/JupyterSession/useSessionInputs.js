@@ -10,8 +10,7 @@
 // runs (pendingSessionInputs): they're added here when their view is built.
 import { computed, onBeforeUnmount, reactive, ref, toValue, watch } from "vue";
 import { ElMessageBox } from "element-plus";
-import * as siteConfig from "@/site-config/site.json";
-import { useGetToken } from "@/composables/useGetToken";
+import { notebookBackend } from "@/notebooks/host";
 import { CancelUnavailable } from "@/composables/useJupyterSession";
 import { getView, listEntries, waitForView } from "@/utils/viewsService";
 import { pendingInputsOf, dropPendingInput, attachPendingInput } from "./pendingSessionInputs";
@@ -116,13 +115,12 @@ export function useSessionInputs({
     error.value = null;
     loading.value = true;
     try {
-      const token = await useGetToken();
       const id = typeof runId === "function" ? runId() : runId;
-      const resp = await fetch(`${siteConfig.api2Url}/compute/workflows/runs/${encodeURIComponent(id)}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!resp.ok) throw new Error(`Could not read the run (${resp.status}).`);
-      const run = await resp.json();
+      const run = await notebookBackend()
+        .getRun(id)
+        .catch((e) => {
+          throw new Error(`Could not read the run (${e.status ?? e.message}).`);
+        });
       const disks = (run.processorConfigs || []).map((c) => Number(c.diskGiB) || 0);
       diskGiB.value = Math.max(0, ...disks) || null;
       const runViews = Object.entries(run.dataSources || {}).filter(([, ds]) => ds?.kind === "viewVersion");

@@ -5,7 +5,7 @@
 // surface (code + markdown cells, per-cell run, run-all, restart, command-mode
 // keyboard shortcuts).
 import { onMounted, onBeforeUnmount, nextTick, ref, computed, watch } from "vue";
-import { useRoute, useRouter, onBeforeRouteLeave } from "vue-router";
+import { useRouter, onBeforeRouteLeave } from "vue-router";
 import { useJupyterSession } from "@/composables/useJupyterSession";
 import { markSessionEnded } from "../RunMonitor/endedSessions";
 import NotebookCell from "./NotebookCell.vue";
@@ -22,13 +22,10 @@ import EnvironmentPanel from "./EnvironmentPanel.vue";
 import { sessionPathCode } from "./pathCode";
 import { acceptedCode, addCellSpend, assistRequest, budgetPause, cellCode, followUpRequest, requestCost, sessionFiles } from "./assistHelpers";
 import RuntimeMark from "../WorkflowGraph/RuntimeMark.vue";
-import { fetchRun } from "../RunMonitor/runDetails";
 import { runOnGpu, runNodeId, gpuShortLabel, gpuMarkTitle, sessionRestrictions } from "../RunMonitor/notebookHelpers";
 import IconWarningCircle from "@/components/icons/IconWarningCircle.vue";
 import { nodeGpu, nodeRegion } from "../ComputeNodes/computeNodeHelpers";
-import { useComputeResourcesStore } from "@/stores/computeResourcesStore";
-import { useStore } from "vuex";
-import * as siteConfig from "@/site-config/site.json";
+import { notebookBackend, notebookLocations } from "@/notebooks/host";
 import {
   VideoPlay,
   DArrowRight,
@@ -54,17 +51,11 @@ const sessionGpu = ref(null);
 // The run's compute node, where known: its region and tier say what a
 // download from another region costs (useSessionInputs).
 const sessionNode = ref(null);
-const vuexStore = useStore();
-const computeResourcesStore = useComputeResourcesStore();
 async function loadRunNode(run) {
   const nodeId = runNodeId(run);
   if (!nodeId) return null;
   try {
-    let nodes = vuexStore.getters["analysisModule/computeNodes"] || [];
-    if (!nodes.some((n) => n.uuid === nodeId)) {
-      await vuexStore.dispatch("analysisModule/fetchComputeNodes");
-      nodes = vuexStore.getters["analysisModule/computeNodes"] || [];
-    }
+    const nodes = await notebookBackend().listComputeNodes();
     return nodes.find((n) => n.uuid === nodeId) || null;
   } catch {
     return null;
@@ -73,7 +64,7 @@ async function loadRunNode(run) {
 async function loadSessionGpu(node) {
   if (!node) return null;
   try {
-    const tiers = await computeResourcesStore.fetchGpuTiers(vuexStore.getters.activeOrganization?.organization?.id);
+    const tiers = await notebookBackend().listGpuTiers();
     return nodeGpu(node, tiers || []);
   } catch {
     return null;
@@ -86,7 +77,9 @@ watch(
     sessionGpu.value = null;
     sessionNode.value = null;
     if (!id) return;
-    const run = await fetchRun(siteConfig.api2Url, id);
+    const run = await notebookBackend()
+      .getRun(id)
+      .catch(() => null);
     if (id !== props.runId) return;
     onGpu.value = runOnGpu(run);
     const node = await loadRunNode(run);
@@ -126,15 +119,11 @@ function dismissRestrictions() {
 }
 
 // The run's page: where ending the session leads, since the run carries on
-// (its next steps, e.g. a download target's zip, show there). In its
-// workspace, or in My Analysis for a personal run (no orgId).
-const route = useRoute();
+// (its next steps, e.g. a download target's zip, show there). The site
+// says where that is: in the Pennsieve app, the run's page in its workspace
+// or in My Analysis.
 const router = useRouter();
-const runRoute = computed(() =>
-  route.params.orgId
-    ? { name: "run-detail", params: { orgId: route.params.orgId, runId: props.runId } }
-    : { name: "my-run-detail", params: { runId: props.runId } }
-);
+const runRoute = computed(() => notebookLocations().run(props.runId));
 
 const {
   status,

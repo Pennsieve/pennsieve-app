@@ -16,8 +16,7 @@
 // ephemeral, so "resume" = reopen the .ipynb and re-run.
 
 import { ref, watch } from "vue";
-import * as siteConfig from "@/site-config/site.json";
-import { useGetToken } from "@/composables/useGetToken";
+import { notebookBackend } from "@/notebooks/host";
 import {
   KernelManager,
   ContentsManager,
@@ -38,18 +37,11 @@ const trimSlash = (u) => u.replace(/\/+$/, "");
 // the Step Functions task token, and resumes the workflow. Lightweight: no
 // kernel/contents managers, unlike the full useJupyterSession() session.
 export async function endInteractiveSession(runId) {
-  const token = await useGetToken();
-  const connectUrl = `${siteConfig.api2Url}/compute/workflows/runs/${encodeURIComponent(
-    runId
-  )}/session/connect`;
-  const resp = await fetch(connectUrl, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
-  if (resp.status === 404) return; // already gone — nothing to end
-  if (!resp.ok) {
-    throw new Error(`Could not reach the session (${resp.status}).`);
+  const { status, connection: conn } = await notebookBackend().connectSession(runId);
+  if (status === 404) return; // already gone — nothing to end
+  if (status !== 200) {
+    throw new Error(`Could not reach the session (${status}).`);
   }
-  const conn = await resp.json(); // { kernelUrl, token }
   const kernelBaseUrl = trimSlash(conn.kernelUrl);
   // See postSessionClose for how a close that tears the task down reads.
   const result = await postSessionClose(kernelBaseUrl, conn.token);
@@ -166,25 +158,8 @@ const SOURCES_PATH = "/pennsieve/inputs/sources";
 // token may read it: views-service's run routes serve only the run's views.
 // Done before the sidecar is asked to stage the view; a refusal (not the
 // run's creator, not the caller's view, the session over) says why.
-export async function registerSessionSource(
-  runId,
-  { name, viewId, version },
-  { config = siteConfig, getToken = useGetToken, fetchFn = globalThis.fetch } = {}
-) {
-  const token = await getToken();
-  const resp = await fetchFn(`${config.api2Url}/compute/workflows/runs/${encodeURIComponent(runId)}/sources`, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ name, viewId, viewVersion: version }),
-  });
-  if (!resp.ok) {
-    const data = await resp.json().catch(() => ({}));
-    const err = new Error(data.message || data.error || `The view couldn't be added to the session (${resp.status}).`);
-    err.status = resp.status;
-    err.source = "run";
-    throw err;
-  }
-  return resp.json();
+export async function registerSessionSource(runId, { name, viewId, version }, { backend = notebookBackend() } = {}) {
+  return backend.addRunSource(runId, { name, viewId, version });
 }
 
 export async function sessionSourcesRequest(kernelBaseUrl, token, method = "GET", { body, name } = {}, { fetchFn = globalThis.fetch } = {}) {
@@ -318,15 +293,7 @@ const KERNELSPEC = { r: "ir", python: "python3" };
 // session would wrongly open Python. Defaults to python3 on any failure.
 async function resolveKernelName(runId) {
   try {
-    const token = await useGetToken();
-    const url = `${siteConfig.api2Url}/compute/workflows/runs/${encodeURIComponent(
-      runId
-    )}`;
-    const resp = await fetch(url, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    if (!resp.ok) return "python3";
-    const run = await resp.json();
+    const run = await notebookBackend().getRun(runId);
     const nodes = run?.dag || run?.processors || [];
     const node = nodes.find((n) => n?.runtimeConfig?.interactive);
     const rc = node?.runtimeConfig || {};
@@ -419,30 +386,27 @@ export function useJupyterSession() {
     runId,
     { fastMs = 1000, slowMs = 2000, fastAttempts = 30, maxAttempts = 165 } = {}
   ) {
-    const url = `${siteConfig.api2Url}/compute/workflows/runs/${encodeURIComponent(
-      runId
-    )}/session/connect`;
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
       const delay = attempt < fastAttempts ? fastMs : slowMs;
-      let resp;
+      let result;
       try {
-        const token = await useGetToken();
-        resp = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+        result = await notebookBackend().connectSession(runId);
       } catch (_) {
         // Network blip — wait and retry rather than fail the whole connect.
         await sleep(delay);
         continue;
       }
-      if (resp.status === 200) return resp.json();
-      if (resp.status === 401 || resp.status === 403) {
+      const { status } = result;
+      if (status === 200) return result.connection;
+      if (status === 401 || status === 403) {
         throw new Error("You do not have access to this session.");
       }
       // 404 = task not launched yet, 202 = starting, 5xx = transient → keep waiting.
-      if (resp.status === 404 || resp.status === 202 || resp.status >= 500) {
+      if (status === 404 || status === 202 || status >= 500) {
         await sleep(delay);
         continue;
       }
-      throw new Error(`session connect failed (${resp.status})`);
+      throw new Error(`session connect failed (${status})`);
     }
     throw new Error(
       "The kernel is taking longer than expected to start. It may still be launching — try reconnecting in a moment."

@@ -58,5 +58,12 @@ export function setupAppNotebooks({ siteConfig, store, router, realtime }) {
     user: () => store.state.profile || null,
     members: () => store.state.orgMembers || [],
     pennsieveAppUrl: "",
+    locations: {
+      // The run's page, in its workspace or in My Analysis for a personal run.
+      run: (runId) => {
+        const orgId = router.currentRoute.value.params.orgId;
+        return orgId ? { name: "run-detail", params: { orgId, runId } } : { name: "my-run-detail", params: { runId } };
+      },
+    },
   });
 }

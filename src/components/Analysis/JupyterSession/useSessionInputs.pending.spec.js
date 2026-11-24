@@ -1,7 +1,16 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { ref, nextTick } from "vue";
 
-vi.mock("@/composables/useGetToken", () => ({ useGetToken: async () => "token" }));
+// The run is read with the stubbed fetch each test sets (runOk).
+vi.mock("@/notebooks/host", () => ({
+  notebookBackend: () => ({
+    getRun: async () => {
+      const resp = await globalThis.fetch();
+      if (!resp.ok) throw Object.assign(new Error(`HTTP ${resp.status}`), { status: resp.status });
+      return resp.json();
+    },
+  }),
+}));
 vi.mock("@/utils/viewsService", () => ({
   getView: vi.fn(async (id) => ({ id, name: "D: Input", sources: [{ sourceType: "workspace" }] })),
   listEntries: vi.fn(async () => []),
