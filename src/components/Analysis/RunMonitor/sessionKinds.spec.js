@@ -79,4 +79,18 @@ describe("a run's live session", () => {
     expect(fields.map((f) => [f.type, f.name, f.value])).toEqual([["hidden", "token", "a.b+c"]]);
     posted.remove();
   });
+
+  it("names the site's origin on that post, which the proxy checks", () => {
+    const submit = vi.spyOn(window.HTMLFormElement.prototype, "submit").mockImplementation(() => {});
+    try {
+      openWebAppSession({ kernelUrl: "https://run-1.basic.sessions.example", token: "a.b" });
+    } finally {
+      submit.mockRestore();
+    }
+
+    const policy = document.head.querySelector('meta[name="referrer"]');
+    expect(policy.content).toBe("strict-origin");
+    document.head.querySelectorAll('meta[name="referrer"]').forEach((m) => m.remove());
+    document.body.querySelectorAll("form").forEach((f) => f.remove());
+  });
 });

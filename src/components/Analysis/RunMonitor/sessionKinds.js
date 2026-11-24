@@ -61,6 +61,15 @@ export const sessionWords = (step) => WORDS[sessionKind(step)] || WORDS[WEBAPP];
 // history, a request log or the app's own page could read it. The proxy keeps
 // it in a cookie the app's pages can't read and sends the tab on to the app.
 export function openWebAppSession({ kernelUrl, token }, doc = document) {
+  // The site is served with "Referrer-Policy: same-origin", which makes the
+  // browser send "Origin: null" on a form post to another host. The proxy only
+  // takes this post from a Pennsieve site, so it would answer "forbidden
+  // origin". This makes the tab name its origin (no path) on the way out.
+  const policy = doc.createElement("meta");
+  policy.name = "referrer";
+  policy.content = "strict-origin";
+  doc.head.appendChild(policy);
+
   const form = doc.createElement("form");
   form.method = "post";
   form.action = `${kernelUrl.replace(/\/+$/, "")}/pennsieve/open`;
