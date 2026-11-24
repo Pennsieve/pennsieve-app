@@ -10,7 +10,7 @@ import { useStore } from "vuex";
 import BfPage from "../../layout/BfPage/BfPage.vue";
 import BfRafter from "../../shared/bf-rafter/BfRafter.vue";
 import OrgBreadcrumb from "../../shared/OrgBreadcrumb/OrgBreadcrumb.vue";
-import JupyterSession from "./JupyterSession.vue";
+import JupyterSession from "@pennsieve/notebooks/components/Analysis/JupyterSession/JupyterSession.vue";
 import { useGetToken } from "@/composables/useGetToken";
 
 const props = defineProps({

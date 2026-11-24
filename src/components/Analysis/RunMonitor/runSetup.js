@@ -4,7 +4,7 @@
 // for the workflow here (or the one node that fits).
 //
 // Pure, but for the remembered choices (localStorage, guarded).
-import { interactiveCapable, BASIC_GPU_REASON } from "./notebookHelpers";
+import { interactiveCapable, BASIC_GPU_REASON } from "@pennsieve/notebooks/components/Analysis/RunMonitor/notebookHelpers";
 import { targetWritesToDataset } from "./dataTargets";
 import { hasInterface, worksWithoutDataset } from "./workflowInterface";
 import { provisionerGateReason } from "./variantGate";

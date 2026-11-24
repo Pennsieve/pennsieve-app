@@ -15,10 +15,10 @@
     a graph says so and offers nothing.
 */
 import { computed, onBeforeUnmount, ref } from "vue";
-import { pagePublicDatasets, browsePublicFiles, listPublicModels } from "@/utils/publicDatasets";
+import { pagePublicDatasets, browsePublicFiles, listPublicModels } from "@pennsieve/notebooks/utils/publicDatasets";
 import { formatBytes } from "./dataTargets";
 import { inChosenFolder as inFolder, isPicked as picked, togglePick, groupPicks, recordsPick, recordsPickOf, isRecordsPick } from "./publicPicks";
-import MetadataRecordsChoice from "../MetadataRecordsChoice.vue";
+import MetadataRecordsChoice from "@pennsieve/notebooks/components/Analysis/MetadataRecordsChoice.vue";
 
 const props = defineProps({
   modelValue: { type: Array, default: () => [] },

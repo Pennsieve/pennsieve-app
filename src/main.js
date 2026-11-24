@@ -16,6 +16,7 @@ import ClickOutside from './utils/ClickOutsideDirective'; // Adjust the import p
 
 // Import Element Plus CSS manually to ensure proper theming
 import 'element-plus/dist/index.css'
+import '@pennsieve/notebooks/style.css'
 
 // Need to import CSS specifically because we are only using the component API.
 // https://element-plus.org/en-US/guide/quickstart.html#manually-import

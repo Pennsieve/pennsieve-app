@@ -1,6 +1,6 @@
 import { sourceLabel } from "../WorkflowGraph/sourceInputs";
 import { LAMBDA_MAX_MEMORY } from "../Applications/lambdaEligibility";
-import { statusDotClass, statusLabel, RUNNING_STATUSES, isRunningStatus, runsEmptyState, isTerminalStatus, runDisplayName, formatTime, formatDuration, formatCost, formatBytes, getUserName } from "@/notebooks/runFormat";
+import { statusDotClass, statusLabel, RUNNING_STATUSES, isRunningStatus, runsEmptyState, isTerminalStatus, runDisplayName, formatTime, formatDuration, formatCost, formatBytes, getUserName } from "@pennsieve/notebooks/notebooks/runFormat";
 
 // Run statuses and labels the notebook pages share: in @/notebooks/runFormat.
 export { statusDotClass, statusLabel, RUNNING_STATUSES, isRunningStatus, runsEmptyState, isTerminalStatus, runDisplayName, formatTime, formatDuration, formatCost, formatBytes, getUserName };

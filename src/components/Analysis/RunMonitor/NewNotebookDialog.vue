@@ -19,8 +19,8 @@ import AnalysisFilesTable from "../../FilesTable/AnalysisFilesTable.vue";
 import BreadcrumbNavigation from "../../datasets/files/BreadcrumbNavigation/BreadcrumbNavigation.vue";
 import { useSendXhr } from "@/mixins/request/request_composable";
 import toQueryParams from "@/utils/toQueryParams";
-import { notebookBackend, notebookEndpoints, notebookToken, notebookUser, notebookNotify } from "@/notebooks/host";
-import { computeNodes, targetTypes, gpuTiers, loadComputeNodes, loadGpuTiers, loadTargetTypes } from "@/notebooks/notebookData";
+import { notebookBackend, notebookEndpoints, notebookToken, notebookUser, notebookNotify } from "@pennsieve/notebooks/notebooks/host";
+import { computeNodes, targetTypes, gpuTiers, loadComputeNodes, loadGpuTiers, loadTargetTypes } from "@pennsieve/notebooks/notebooks/notebookData";
 import {
   notebookKernel,
   kernelLabel,
@@ -55,7 +55,7 @@ import {
   notebookDiskHint,
   notebookProcessorConfigs,
   nodeStatusReason,
-} from "./notebookHelpers";
+} from "@pennsieve/notebooks/components/Analysis/RunMonitor/notebookHelpers";
 import { nodeGpu, gpuOffer, gpuName, gpuTaskResources } from "../ComputeNodes/computeNodeHelpers";
 import NodeTierBadge from "../ComputeNodes/NodeTierBadge.vue";
 import { fetchVariantGate, provisionerGateReason } from "./variantGate";
@@ -63,15 +63,15 @@ import { fetchNodesSessions, capacityLabel, capacityReason } from "./notebookCap
 import RuntimeMark from "../WorkflowGraph/RuntimeMark.vue";
 import { STANDARD_CPU_OPTIONS, getStandardMemoryOptions, getTargetTypeLabel } from "./runHelpers";
 import { sourceLabel } from "../WorkflowGraph/sourceInputs";
-import { viewsServiceUrl, viewDataSource, prepareWorkspaceRunView, createWorkspaceRunView, workspaceFilesAsViews } from "@/utils/viewsService";
-import { holdPendingInputs, pendingFolderName, splitSessionViews } from "../JupyterSession/pendingSessionInputs";
+import { viewsServiceUrl, viewDataSource, prepareWorkspaceRunView, createWorkspaceRunView, workspaceFilesAsViews } from "@pennsieve/notebooks/utils/viewsService";
+import { holdPendingInputs, pendingFolderName, splitSessionViews } from "@pennsieve/notebooks/components/Analysis/JupyterSession/pendingSessionInputs";
 import { routeWorkspaceInputs } from "@/utils/workspaceInputs";
 import { listWorkspaceModels } from "@/utils/workspaceModels";
-import PlatformList from "../PlatformList.vue";
-import PlatformPane from "../PlatformPane.vue";
-import MetadataRecordsChoice from "../MetadataRecordsChoice.vue";
-import { newSelection, clearSelection, selectionReady } from "../platformSelection";
-import { PLATFORMS, PLATFORM_KEYS, platformData } from "../platforms";
+import PlatformList from "@pennsieve/notebooks/components/Analysis/PlatformList.vue";
+import PlatformPane from "@pennsieve/notebooks/components/Analysis/PlatformPane.vue";
+import MetadataRecordsChoice from "@pennsieve/notebooks/components/Analysis/MetadataRecordsChoice.vue";
+import { newSelection, clearSelection, selectionReady } from "@pennsieve/notebooks/components/Analysis/platformSelection";
+import { PLATFORMS, PLATFORM_KEYS, platformData } from "@pennsieve/notebooks/components/Analysis/platforms/index";
 
 const props = defineProps({
   modelValue: { type: Boolean, default: false },

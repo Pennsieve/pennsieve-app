@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { acceptsInput, nodeDataReason, nodeDataNote, dataUnreachable, suggestedDisk } from "./dataHints";
-import { NOTEBOOK_DISK_OPTIONS } from "./notebookHelpers";
+import { NOTEBOOK_DISK_OPTIONS } from "@pennsieve/notebooks/components/Analysis/RunMonitor/notebookHelpers";
 
 const GiB = 2 ** 30;
 

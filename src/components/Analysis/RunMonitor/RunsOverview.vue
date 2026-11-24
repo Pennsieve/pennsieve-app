@@ -8,11 +8,11 @@ import IconRotateRight from "../../icons/IconRotateRight.vue";
 import IconInfoSmall from "../../icons/IconInfoSmall.vue";
 import IconControllerPlay from "../../icons/IconControllerPlay.vue";
 import IconXCircle from "../../icons/IconXCircle.vue";
-import { endInteractiveSession } from "@/composables/useJupyterSession";
+import { endInteractiveSession } from "@pennsieve/notebooks/composables/useJupyterSession";
 import { useGetToken } from "@/composables/useGetToken";
 import { useMetricsCounters } from "@/composables/useMetricsCounters";
-import { isNotebookWorkflow } from "./notebookHelpers";
-import RunHistory from "./RunHistory.vue";
+import { isNotebookWorkflow } from "@pennsieve/notebooks/components/Analysis/RunMonitor/notebookHelpers";
+import RunHistory from "@pennsieve/notebooks/components/Analysis/RunMonitor/RunHistory.vue";
 import RunWizardDialog from "./RunWizardDialog.vue";
 
 // In the Workflows tab: no runs yet points to the Library, to start one.

@@ -38,7 +38,7 @@ import { useGetToken } from "@/composables/useGetToken";
 import { useAppUsage } from "@/composables/useAppUsage";
 import { usageSidebar } from "./appUsage";
 import { useSendXhr } from "@/mixins/request/request_composable";
-import { environmentsServiceUrl, findReferences } from "@/utils/environmentsService";
+import { environmentsServiceUrl, findReferences } from "@pennsieve/notebooks/utils/environmentsService";
 import { appDefault, catalogQuery, choiceLabel, referenceInputs, referenceKindText, referenceLabel } from "../RunMonitor/referenceSources";
 import { appLambdaEligibility, lambdaStatusLabel } from "./lambdaEligibility";
 

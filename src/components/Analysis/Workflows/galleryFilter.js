@@ -3,7 +3,7 @@
 import { appNames, ioSummary, outputLabel } from "./workflowSummary";
 import { normalizeUrl } from "../RunMonitor/runHelpers";
 import { versionManifest } from "../WorkflowBuilder/appManifestInfo";
-import { isNotebookWorkflow } from "../RunMonitor/notebookHelpers";
+import { isNotebookWorkflow } from "@pennsieve/notebooks/components/Analysis/RunMonitor/notebookHelpers";
 import { interfaceDag } from "../RunMonitor/workflowInterface";
 import { fieldsOf, domainOfTag, appDomain } from "../Applications/appDomains";
 import { freeTags, matchesAny, selectedKeys, tagFacetOptions } from "../Facets/facets";

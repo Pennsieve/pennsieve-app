@@ -3,8 +3,8 @@
 // function: the app makes its client after this runs. This file stays in
 // the app when the notebook code moves to @pennsieve/notebooks.
 
-import { configureNotebooks } from "./host";
-import { createPennsieveBackend } from "./pennsieveBackend";
+import { configureNotebooks } from "@pennsieve/notebooks/notebooks/host";
+import { createPennsieveBackend } from "@pennsieve/notebooks/notebooks/pennsieveBackend";
 import { useGetAllTokens, useGetToken } from "@/composables/useGetToken";
 import { runScopeChannel } from "@/realtime/channels";
 import EventBus from "@/utils/event-bus";
