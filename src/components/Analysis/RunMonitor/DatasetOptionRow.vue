@@ -5,7 +5,7 @@
   role). A dataset with no files is dimmed.
 */
 import { computed } from "vue";
-import { datasetSummary } from "./dataTargets";
+import { datasetSummary } from "@pennsieve/notebooks/components/Analysis/RunMonitor/dataTargets";
 
 const props = defineProps({
   dataset: { type: Object, required: true },

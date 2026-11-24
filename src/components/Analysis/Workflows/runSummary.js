@@ -4,7 +4,7 @@
 // workflow's definition and its steps' app.yml (portsOfStep).
 import { appNames, outputLabel } from "./workflowSummary";
 import { sourceLabel, sourceHints, portsOfStep } from "../WorkflowGraph/sourceInputs";
-import { interfaceDag } from "../RunMonitor/workflowInterface";
+import { interfaceDag } from "@pennsieve/notebooks/components/Analysis/RunMonitor/workflowInterface";
 
 // What an input takes, without its name (it's beside it): "CSV files", "a
 // BIDS folder", "CSV, JSON files"; "" when its app has no app.yml.

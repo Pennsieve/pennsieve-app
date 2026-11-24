@@ -9,7 +9,7 @@ const exampleCache = createExampleCache(exampleUnavailable);
 
 <script setup>
 import { computed, ref, watch, onMounted } from "vue";
-import { interfaceDag } from "../RunMonitor/workflowInterface";
+import { interfaceDag } from "@pennsieve/notebooks/components/Analysis/RunMonitor/workflowInterface";
 import { useStore } from "vuex";
 import { useRouter, useRoute } from "vue-router";
 

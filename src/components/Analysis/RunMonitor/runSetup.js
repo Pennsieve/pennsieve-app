@@ -5,8 +5,8 @@
 //
 // Pure, but for the remembered choices (localStorage, guarded).
 import { interactiveCapable, BASIC_GPU_REASON } from "@pennsieve/notebooks/components/Analysis/RunMonitor/notebookHelpers";
-import { targetWritesToDataset } from "./dataTargets";
-import { hasInterface, worksWithoutDataset } from "./workflowInterface";
+import { targetWritesToDataset } from "@pennsieve/notebooks/components/Analysis/RunMonitor/dataTargets";
+import { hasInterface, worksWithoutDataset } from "@pennsieve/notebooks/components/Analysis/RunMonitor/workflowInterface";
 import { provisionerGateReason } from "./variantGate";
 
 // Why a node can't run a workflow, as short reasons ("Paused", "No LLM

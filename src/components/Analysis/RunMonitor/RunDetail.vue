@@ -31,7 +31,7 @@ import { formatResources, formatRunTime, nodeDurationSec, stepExecutionTarget } 
 import { useSendXhr } from "@/mixins/request/request_composable";
 import toQueryParams from "@/utils/toQueryParams";
 import TargetDatasetField from "./TargetDatasetField.vue";
-import { targetWritesToDataset, targetParamFields, buildDataTargets, targetDatasetId, datasetName, shownTargetParams, datasetSummary, sortDatasets, isPathPrefixParam } from "./dataTargets";
+import { targetWritesToDataset, targetParamFields, buildDataTargets, targetDatasetId, datasetName, shownTargetParams, datasetSummary, sortDatasets, isPathPrefixParam } from "@pennsieve/notebooks/components/Analysis/RunMonitor/dataTargets";
 import DatasetOptionRow from "./DatasetOptionRow.vue";
 import RunExampleAction from "./RunExampleAction.vue";
 import PublicFilesPicker from "./PublicFilesPicker.vue";
@@ -43,7 +43,7 @@ import FilePlacementChoice from "./FilePlacementChoice.vue";
 import { FILE_PATHS_SELECTION, FILE_PATHS_SOURCE, filePathsOf, filePathsField, sharedNames } from "./inputFilePaths";
 import IoPill from "../WorkflowGraph/IoPill.vue";
 import { warningHeadline } from "@pennsieve/notebooks/components/Analysis/RunMonitor/runDetails";
-import { withInterfaceNodes, destinationChoices, NO_DESTINATION } from "./workflowInterface";
+import { withInterfaceNodes, destinationChoices, NO_DESTINATION } from "@pennsieve/notebooks/components/Analysis/RunMonitor/workflowInterface";
 import { appOf, appRunLabel, appRunPayload, appStepId, setupKey } from "./appRuns";
 import { placeRunNodes, workflowLayouts } from "./runLayout";
 import { importStatusUrl, importSummary, importStillMoving, isDatasetImport } from "./runImports";

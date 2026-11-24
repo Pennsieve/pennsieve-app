@@ -16,7 +16,7 @@
 */
 import { computed, onBeforeUnmount, ref } from "vue";
 import { pagePublicDatasets, browsePublicFiles, listPublicModels } from "@pennsieve/notebooks/utils/publicDatasets";
-import { formatBytes } from "./dataTargets";
+import { formatBytes } from "@pennsieve/notebooks/components/Analysis/RunMonitor/dataTargets";
 import { inChosenFolder as inFolder, isPicked as picked, togglePick, groupPicks, recordsPick, recordsPickOf, isRecordsPick } from "./publicPicks";
 import MetadataRecordsChoice from "@pennsieve/notebooks/components/Analysis/MetadataRecordsChoice.vue";
 

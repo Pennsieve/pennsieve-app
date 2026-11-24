@@ -9,9 +9,9 @@
 //
 // Diverged enough from the standard run config that it lives on its own; opened
 // via v-model and emits `created` with the new run.
-import { isPathPrefixParam, targetParamLabel, defaultsToRunName, targetWritesToDataset, canWriteDataset, searchDatasets } from "./dataTargets";
-import { hasInterface, withInterfaceNodes, destinationChoices, NO_DESTINATION } from "./workflowInterface";
-import { acceptsInput, nodeDataReason, nodeDataNote, dataUnreachable, suggestedDisk } from "./dataHints";
+import { isPathPrefixParam, targetParamLabel, defaultsToRunName, targetWritesToDataset, canWriteDataset, searchDatasets } from "@pennsieve/notebooks/components/Analysis/RunMonitor/dataTargets";
+import { hasInterface, withInterfaceNodes, destinationChoices, NO_DESTINATION } from "@pennsieve/notebooks/components/Analysis/RunMonitor/workflowInterface";
+import { acceptsInput, nodeDataReason, nodeDataNote, dataUnreachable, suggestedDisk } from "@pennsieve/notebooks/components/Analysis/RunMonitor/dataHints";
 import { computed, nextTick, onBeforeUnmount, reactive, ref, watch } from "vue";
 import { useStore } from "vuex";
 import BfButton from "../../shared/bf-button/BfButton.vue";
@@ -59,7 +59,7 @@ import {
 import { nodeGpu, gpuOffer, gpuName, gpuTaskResources } from "../ComputeNodes/computeNodeHelpers";
 import NodeTierBadge from "../ComputeNodes/NodeTierBadge.vue";
 import { fetchVariantGate, provisionerGateReason } from "./variantGate";
-import { fetchNodesSessions, capacityLabel, capacityReason } from "./notebookCapacity";
+import { fetchNodesSessions, capacityLabel, capacityReason } from "@pennsieve/notebooks/components/Analysis/RunMonitor/notebookCapacity";
 import RuntimeMark from "../WorkflowGraph/RuntimeMark.vue";
 import { STANDARD_CPU_OPTIONS, getStandardMemoryOptions, getTargetTypeLabel } from "./runHelpers";
 import { sourceLabel } from "../WorkflowGraph/sourceInputs";

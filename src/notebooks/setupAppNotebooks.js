@@ -9,6 +9,7 @@ import { useGetAllTokens, useGetToken } from "@/composables/useGetToken";
 import { runScopeChannel } from "@/realtime/channels";
 import EventBus from "@/utils/event-bus";
 import { defineAsyncComponent } from "vue";
+import { isFeatureEnabled } from "@/utils/features";
 
 // Realtime payloads arrive as JSON text or already parsed.
 const parseEventData = (data) => {
@@ -60,8 +61,22 @@ export function setupAppNotebooks({ siteConfig, store, router, realtime }) {
     user: () => store.state.profile || null,
     members: () => store.state.orgMembers || [],
     pennsieveAppUrl: "",
-    // Loaded when the notebooks page first opens it.
-    components: { launcher: defineAsyncComponent(() => import("@/components/Analysis/RunMonitor/NewNotebookDialog.vue")) },
+    // The New notebook launcher: the quick one where the site has it, else
+    // the dialog. Loaded when the notebooks page first opens it.
+    components: {
+      launcher: defineAsyncComponent(() =>
+        isFeatureEnabled("quickLauncher")
+          ? import("@pennsieve/notebooks/launch/QuickLaunchDialog.vue")
+          : import("@/components/Analysis/RunMonitor/NewNotebookDialog.vue")
+      ),
+    },
+    launch: {
+      // Where a user adds a compute node: the workspace's, or their own.
+      get computeNodes() {
+        const orgId = router.currentRoute.value.params.orgId;
+        return orgId ? { name: "compute-nodes", params: { orgId } } : { name: "my-compute-nodes" };
+      },
+    },
     notify: ({ type, message }) => EventBus.$emit("toast", { detail: { type, msg: message } }),
     locations: {
       // The run's page, in its workspace or in My Analysis for a personal run.
