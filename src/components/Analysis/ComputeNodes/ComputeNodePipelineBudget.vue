@@ -17,8 +17,8 @@
     />
 
     <ul class="cn-list">
-      <li class="budget-row" :title="nodeRow?.notes || undefined">
-        <span class="budget-who">Whole node</span>
+      <li class="budget-row" :class="{ 'is-limiting': limitingRow === 'node' }" :title="nodeRow?.notes || undefined">
+        <span class="budget-who">Whole node<span v-if="limitingRow === 'node'" class="budget-limiting">At this limit</span></span>
         <span class="budget-limits">
           <span :class="{ unset: !nodeLimits }">{{ nodeLimits || 'No limit' }}</span>
           <span class="budget-notebooks" :class="{ unset: notebooksUnset(nodeRow) }">{{ tierNotebookLine(nodeRow, notebookCeiling) }}</span>
@@ -30,8 +30,8 @@
       </li>
       <!-- The per-user row holds the per-run cap too, so a personal node
            (one user) keeps it, as "Your runs". -->
-      <li class="budget-row" :title="defaultRow?.notes || undefined">
-        <span class="budget-who">{{ perUser ? 'Each user' : 'Your runs' }}</span>
+      <li class="budget-row" :class="{ 'is-limiting': limitingRow === 'default' }" :title="defaultRow?.notes || undefined">
+        <span class="budget-who">{{ perUser ? 'Each user' : 'Your runs' }}<span v-if="limitingRow === 'default'" class="budget-limiting">At this limit</span></span>
         <span class="budget-limits">
           <span :class="{ unset: !defaultLimits }">{{ defaultLimits || 'No limit' }}</span>
           <span class="budget-notebooks" :class="{ unset: notebooksUnset(defaultRow) }">{{ tierNotebookLine(defaultRow, notebookCeiling) }}</span>
@@ -42,8 +42,14 @@
         </span>
       </li>
       <template v-if="perUser">
-        <li v-for="row in userRows" :key="row.userId" class="budget-row" :title="row.notes || undefined">
-          <span class="budget-who">{{ getUserName(row.userId) }}</span>
+        <li
+          v-for="row in userRows"
+          :key="row.userId"
+          class="budget-row"
+          :class="{ 'is-limiting': limitingRow === row.userId }"
+          :title="row.notes || undefined"
+        >
+          <span class="budget-who">{{ getUserName(row.userId) }}<span v-if="limitingRow === row.userId" class="budget-limiting">At this limit</span></span>
           <span class="budget-limits">
             <span :class="{ unset: !otherLimits(row) }">{{ otherLimits(row) || 'No limit' }}</span>
             <span class="budget-notebooks" :class="{ unset: notebooksUnset(row) }">{{ tierNotebookLine(row, notebookCeiling) }}</span>
@@ -127,6 +133,30 @@ const meterLevel = computed(() => budgetStore.warningLevel(props.nodeId))
 const meterPerRunUsd = computed(() => budgetStore.perRunUsd(props.nodeId))
 const meterLoading = computed(() => budgetStore.isLoading(props.nodeId))
 const meterError = computed(() => budgetStore.getError(props.nodeId))
+
+// The row whose limit blocks a run now, marked in the list: the blocking axis's
+// source tier — the node's row, the per-user default, or the user's own
+// override. null while nothing blocks.
+const AXIS_FIELDS = {
+  'node-daily': 'nodeDaily',
+  'node-monthly': 'nodeMonthly',
+  'user-daily': 'userDaily',
+  'user-monthly': 'userMonthly',
+  'node-concurrency': 'nodeConcurrency',
+  'user-concurrency': 'userConcurrency',
+}
+const limitingRow = computed(() => {
+  const b = meterBudget.value
+  if (!b || b.allowed !== false) return null
+  const source = b[AXIS_FIELDS[b.blockedAxis]]?.source
+  if (source === 'node') return 'node'
+  if (source === 'node-default') return 'default'
+  if (source === 'user') {
+    const ids = [profile.value?.id, profile.value?.intId]
+    return userRows.value.find((r) => ids.includes(r.userId))?.userId || null
+  }
+  return null
+})
 
 const availableUsersForPicker = computed(() => {
   const taken = new Set(userRows.value.map((r) => r.userId))
@@ -254,6 +284,21 @@ watch(() => props.nodeId, load)
     align-items: center;
     gap: 8px;
   }
+}
+// The limit a run is blocked on: a red edge, and a tag by its name.
+.budget-row.is-limiting {
+  box-shadow: inset 3px 0 0 theme.$red_2;
+  background: theme.$red_tint;
+}
+.budget-limiting {
+  margin-left: 8px;
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-size: 11px;
+  font-weight: 600;
+  color: theme.$red_2;
+  background: theme.$white;
+  border: 1px solid theme.$red_2;
 }
 .budget-add {
   justify-content: flex-start !important;
