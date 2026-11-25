@@ -113,7 +113,13 @@
     "woofmark": "^4.2.6"
   },
   "overrides": {
-    "element-plus": "2.8.5"
+    "element-plus": "2.8.5",
+    "@loaders.gl/compression": {
+      "fflate": "0.7.5"
+    },
+    "fabric": {
+      "canvas": "^3.2.1"
+    }
   },
   "devDependencies": {
     "@rushstack/eslint-patch": "^1.1.4",
