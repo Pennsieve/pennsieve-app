@@ -149,8 +149,8 @@ import CardTags from "@/components/Analysis/Facets/CardTags.vue";
 import { toggleKey } from "@/components/Analysis/Facets/facets";
 import IconCompass from "@/components/icons/IconCompass.vue";
 import BfButton from "@/components/shared/bf-button/BfButton.vue";
-import { viewsServiceUrl } from "@/utils/viewsService";
-import { listPublicDatasets, notebookRoute } from "@/utils/publicDatasets";
+import { viewsServiceUrl } from "@pennsieve/notebooks/utils/viewsService";
+import { listPublicDatasets, notebookRoute } from "@pennsieve/notebooks/utils/publicDatasets";
 import {
   FILTER_SECTIONS,
   sortOrder,

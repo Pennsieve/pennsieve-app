@@ -1,5 +1,10 @@
 import { sourceLabel } from "../WorkflowGraph/sourceInputs";
 import { LAMBDA_MAX_MEMORY } from "../Applications/lambdaEligibility";
+import { targetTypeName, getTargetTypeLabel, STANDARD_CPU_OPTIONS, getStandardMemoryOptions, statusDotClass, statusLabel, RUNNING_STATUSES, isRunningStatus, runsEmptyState, isTerminalStatus, runDisplayName, formatTime, formatDuration, formatCost, formatBytes, getUserName } from "@pennsieve/notebooks/notebooks/runFormat";
+
+// Run statuses, labels, the standard CPU and memory choices and target-type
+// names the notebook code shares: @pennsieve/notebooks (notebooks/runFormat).
+export { targetTypeName, getTargetTypeLabel, STANDARD_CPU_OPTIONS, getStandardMemoryOptions, statusDotClass, statusLabel, RUNNING_STATUSES, isRunningStatus, runsEmptyState, isTerminalStatus, runDisplayName, formatTime, formatDuration, formatCost, formatBytes, getUserName };
 /**
  * Shared pure utility functions for RunsOverview and RunDetail.
  */
@@ -57,52 +62,6 @@ export const nodeBorderColor = (type, status) => {
   return "#cccccc";
 };
 
-export const statusDotClass = (status) => {
-  switch (status) {
-    case "NOT_STARTED": return "dot-gray";
-    case "STARTED": return "dot-blue";
-    case "FINALIZING": return "dot-amber";
-    case "SUCCEEDED": return "dot-green";
-    case "FAILED": return "dot-red";
-    case "CANCELLED": return "dot-amber";
-    default: return "dot-gray";
-  }
-};
-
-export const statusLabel = (status) => {
-  switch (status) {
-    case "NOT_STARTED": return "Pending";
-    case "STARTED": return "Running";
-    case "FINALIZING": return "Finalizing";
-    case "SUCCEEDED": return "Complete";
-    case "FAILED": return "Failed";
-    case "CANCELLED": return "Cancelled";
-    default: return status || "Unknown";
-  }
-};
-
-// A run that's running or on its way, as Live's "Active" cards count it:
-// queued (NOT_STARTED), running (STARTED), or ending (FINALIZING).
-export const RUNNING_STATUSES = ["NOT_STARTED", "STARTED", "FINALIZING"];
-export const isRunningStatus = (status) => RUNNING_STATUSES.includes(status);
-
-// Which empty state a run list shows (Notebooks and Workflows Live):
-// - "empty": nothing at all (none loaded, no more pages, no history
-//   counted elsewhere: hasHistory);
-// - "idle": a history, but none running;
-// - null: still loading the first page (no flash), filtered (the list's own
-//   "no results" applies), or some are running.
-export function runsEmptyState({ loading = false, runs = [], hasMore = false, hasHistory = false, filtered = false } = {}) {
-  if (loading && !runs.length) return null;
-  if (filtered) return null;
-  if (runs.some((r) => isRunningStatus(r.status))) return null;
-  return runs.length || hasMore || hasHistory ? "idle" : "empty";
-}
-
-export const isTerminalStatus = (status) => {
-  return ["SUCCEEDED", "FAILED", "CANCELLED"].includes(status);
-};
-
 // Label helpers
 export const extractRepoName = (gitUrl) => {
   if (!gitUrl) return "";
@@ -125,15 +84,6 @@ export const findAppByUrl = (sourceUrl, applications) => {
     ) || null
   );
 };
-
-// A target type's name for people: the registry's label, else the type itself.
-export const targetTypeName = (targetType, targetTypes = []) => {
-  const tt = targetTypes.find((t) => t.targetType === targetType);
-  return tt?.label || targetType;
-};
-
-export const getTargetTypeLabel = (targetType, targetTypes = []) =>
-  targetType ? targetTypeName(targetType, targetTypes) : "Data Target";
 
 // A data source is named after the app inputs its links feed ("signals"),
 // given the run's or workflow's DAG; else "Data Source".
@@ -174,55 +124,9 @@ export const validateRunName = (raw) => {
   return { valid: true, error: null, value: name };
 };
 
-export const runDisplayName = (run) => {
-  if (!run) return "";
-  const name = typeof run.name === "string" ? run.name.trim() : "";
-  if (name) return name;
-  return run.workflowName || "";
-};
-
-// Time formatting
-export const formatTime = (dateStr) => {
-  if (!dateStr) return "N/A";
-  const d = new Date(dateStr);
-  if (isNaN(d.getTime())) return "N/A";
-  return d.toLocaleString();
-};
-
-export const formatDuration = (start, end) => {
-  if (!start || !end) return "N/A";
-  const ms = new Date(end) - new Date(start);
-  if (isNaN(ms) || ms < 0) return "N/A";
-  const seconds = Math.floor(ms / 1000);
-  if (seconds < 60) return `${seconds}s`;
-  const minutes = Math.floor(seconds / 60);
-  const remainingSec = seconds % 60;
-  if (minutes < 60) return `${minutes}m ${remainingSec}s`;
-  const hours = Math.floor(minutes / 60);
-  const remainingMin = minutes % 60;
-  return `${hours}h ${remainingMin}m`;
-};
-
-export const formatCost = (cost) => {
-  if (cost == null) return "N/A";
-  if (cost === 0) return "$0.00";
-  // Not "$0.0000": a cost too small for four decimals isn't none.
-  if (cost < 0.0001) return "< $0.0001";
-  if (cost < 0.01) return `$${cost.toFixed(4)}`;
-  return `$${cost.toFixed(2)}`;
-};
-
 export const formatModelName = (model) => {
   if (!model) return "N/A";
   return model.replace(/^(us|eu|ap)\./, "").replace(/^arn:.*\//, "");
-};
-
-export const formatBytes = (bytes) => {
-  if (bytes == null) return "N/A";
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-  return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
 };
 
 export const formatDurationSec = (sec) => {
@@ -385,44 +289,6 @@ export const getCpuForMemory = (memory) => {
   return mem > parseInt(ceiling, 10) ? largest : FARGATE_CPU_OPTIONS[0];
 };
 
-// Standard (Fargate) CPU/memory selection for workflow processors.
-// Mirrors the original Create Application form exactly: CPU is offered in whole
-// CPU units (1024 = 1 CPU) and the available memory depends on the chosen CPU.
-export const STANDARD_CPU_OPTIONS = [
-  { value: "1024", label: "1 CPU" },
-  { value: "2048", label: "2 CPU" },
-  { value: "4096", label: "4 CPU" },
-  { value: "8192", label: "8 CPU" },
-];
-
-// Memory range (in GB) selectable for each CPU value: start..end stepping by `i`.
-// Extra CPU keys are kept unsurfaced for parity with the original form.
-const STANDARD_MEMORY_MAP = {
-  "256": { start: 1, end: 2, i: 1 },
-  "512": { start: 1, end: 4, i: 1 },
-  "1024": { start: 2, end: 8, i: 1 },
-  "2048": { start: 4, end: 16, i: 1 },
-  "4096": { start: 8, end: 30, i: 1 },
-  "8192": { start: 16, end: 60, i: 4 },
-  "16384": { start: 32, end: 120, i: 8 },
-};
-
-// Memory options for a given CPU value, matching the original Create Application
-// form. Values are returned in MiB (GB * 1024) with GB labels.
-export const getStandardMemoryOptions = (cpu) => {
-  const memVars = STANDARD_MEMORY_MAP[String(cpu)];
-  if (!memVars) return [];
-  const { start, end, i } = memVars;
-  const options = [];
-  if (String(cpu) === "256") {
-    options.push({ value: "512", label: "512 MiB" });
-  }
-  for (let gb = start; gb <= end; gb += i) {
-    options.push({ value: String(gb * 1024), label: `${gb} GB` });
-  }
-  return options;
-};
-
 export const formatResourceLabel = (val) => {
   const n = parseInt(val, 10);
   if (n >= 1024) return `${(n / 1024).toFixed(n % 1024 === 0 ? 0 : 1)} GB`;
@@ -438,18 +304,6 @@ export const computeNodeName = (uuid, computeNodes) => {
   if (!uuid) return "N/A";
   const node = computeNodes.find((n) => n.uuid === uuid);
   return node ? node.name : uuid;
-};
-
-export const getUserName = (userId, profile, orgMembers) => {
-  if (!userId) return "Unknown";
-  if (profile && (profile.id === userId || profile.intId === userId)) {
-    return `${profile.firstName} ${profile.lastName}`.trim() || "You";
-  }
-  const member = orgMembers.find((m) => m.id === userId || m.intId === userId);
-  if (member) {
-    return `${member.firstName} ${member.lastName}`.trim() || "Unknown User";
-  }
-  return String(userId).includes(":") ? String(userId).split(":").pop() : String(userId);
 };
 
 // An input's download while a run's inputs are staged (workflow-service's

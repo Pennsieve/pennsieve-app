@@ -16,6 +16,7 @@ import ClickOutside from './utils/ClickOutsideDirective'; // Adjust the import p
 
 // Import Element Plus CSS manually to ensure proper theming
 import 'element-plus/dist/index.css'
+import '@pennsieve/notebooks/style.css'
 
 // Need to import CSS specifically because we are only using the component API.
 // https://element-plus.org/en-US/guide/quickstart.html#manually-import
@@ -38,6 +39,7 @@ import { createPinia } from 'pinia'
 import { useDuckDBStore } from '@/stores/duckdbStore'
 
 import { createRealtime } from '@/realtime'
+import { setupAppNotebooks } from '@/notebooks/setupAppNotebooks'
 
 Amplify.configure(AWSConfig)
 
@@ -91,6 +93,8 @@ app.use(router);
 // identifiers stripped from the path. Empty id = disabled.
 initAnalytics(router, siteConfig.googleAnalytics)
 
+// The notebooks' host: endpoints, tokens, and the workspace as their scope.
+setupAppNotebooks({ siteConfig, store, router, realtime: () => app.config.globalProperties.$realtime });
 app.mount("#app");
 
 app.config.globalProperties.$sanitize = (html, allowedTags=['br']) => striptags(html, allowedTags)

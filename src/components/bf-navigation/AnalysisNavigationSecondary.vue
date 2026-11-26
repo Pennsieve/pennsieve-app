@@ -120,12 +120,12 @@ import IconAnalysis from "../icons/IconAnalysis.vue";
 import IconProcedure from "../icons/IconProcedure.vue";
 import IconActivity from "../icons/IconActivity.vue";
 import IconStorage from "../icons/IconStorage.vue";
-import { environmentsServiceUrl } from "@/utils/environmentsService";
+import { environmentsServiceUrl } from "@pennsieve/notebooks/utils/environmentsService";
 import IconNotebook from "../icons/IconNotebook.vue";
 import IconApp from "../icons/IconApp.vue";
 import IconComputeNode from "../icons/IconComputeNode.vue";
 import CustomTheme from "../../mixins/custom-theme";
-import { runPageIsNotebook } from "@/components/Analysis/RunMonitor/notebookHelpers";
+import { runPageIsNotebook } from "@pennsieve/notebooks/components/Analysis/RunMonitor/notebookHelpers";
 
 export default {
   name: "AnalysisNavigationSecondary",

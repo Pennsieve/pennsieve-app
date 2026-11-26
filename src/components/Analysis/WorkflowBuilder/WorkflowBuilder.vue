@@ -70,7 +70,7 @@ import { canvasDefinition, toInterfaceDefinition } from "./builderInterface";
 import { workflowLayouts } from "../RunMonitor/runLayout";
 import IoPill from "../WorkflowGraph/IoPill.vue";
 import ReferencePickerDialog from "../RunMonitor/ReferencePickerDialog.vue";
-import { findReferences, environmentsServiceUrl } from "@/utils/environmentsService";
+import { findReferences, environmentsServiceUrl } from "@pennsieve/notebooks/utils/environmentsService";
 import { referenceInputs, isAppDefault, formatSize, choiceLabel, createReferenceCatalog } from "../RunMonitor/referenceSources";
 import { isFeatureEnabled } from "@/utils/features";
 import { useGraphHistory, snapshot } from "./graphHistory";

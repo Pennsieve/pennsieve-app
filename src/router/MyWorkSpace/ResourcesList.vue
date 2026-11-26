@@ -35,7 +35,7 @@
 
 <script>
 import UserDashboardCard from "@/components/user/dashboard/UserDashboardCard.vue";
-import { environmentsServiceUrl } from "@/utils/environmentsService";
+import { environmentsServiceUrl } from "@pennsieve/notebooks/utils/environmentsService";
 
 export default {
   name: "ResourcesList",

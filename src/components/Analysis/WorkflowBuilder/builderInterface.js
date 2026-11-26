@@ -13,8 +13,8 @@
 
   Pure.
 */
-import { hasInterface, withInterfaceNodes } from "../RunMonitor/workflowInterface";
-import { targetWritesToDataset } from "../RunMonitor/dataTargets";
+import { hasInterface, withInterfaceNodes } from "@pennsieve/notebooks/components/Analysis/RunMonitor/workflowInterface";
+import { targetWritesToDataset } from "@pennsieve/notebooks/components/Analysis/RunMonitor/dataTargets";
 import { PREFIX_PARAMS } from "./outputPorts";
 
 const prefixKey = (targetType) => (targetWritesToDataset(targetType) ? "PATH_PREFIX" : "pathPrefix");

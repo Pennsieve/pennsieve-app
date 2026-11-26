@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { runPageIsNotebook } from "./notebookHelpers";
+import { runPageIsNotebook } from "@pennsieve/notebooks/components/Analysis/RunMonitor/notebookHelpers";
 
 describe("runPageIsNotebook", () => {
   const runs = [{ uuid: "nb", workflowName: "Pennsieve - Python Notebook", interactive: true }, { uuid: "wf", workflowName: "jupyter-ish name" }];

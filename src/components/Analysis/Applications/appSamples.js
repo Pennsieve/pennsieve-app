@@ -3,7 +3,7 @@
   of the workflows the app is in.
 */
 import { normalizeUrl } from "../RunMonitor/runHelpers";
-import { interfaceDag } from "../RunMonitor/workflowInterface";
+import { interfaceDag } from "@pennsieve/notebooks/components/Analysis/RunMonitor/workflowInterface";
 
 export const sameRepo = (a, b) => !!a && !!b && normalizeUrl(a).toLowerCase() === normalizeUrl(b).toLowerCase();
 

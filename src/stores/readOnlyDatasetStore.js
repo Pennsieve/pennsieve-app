@@ -4,7 +4,7 @@ import { useSendXhr } from "@/mixins/request/request_composable.js";
 import { useDuckDBStore } from "@/stores/duckdbStore.js";
 import * as siteConfig from "@/site-config/site.json";
 import { getPublicFileUrl } from "@/utils/downloadService";
-import { browsePublicFiles } from "@/utils/publicDatasets";
+import { browsePublicFiles } from "@pennsieve/notebooks/utils/publicDatasets";
 
 // "cde_classification" -> "Cde Classification"
 const humanize = (name) =>

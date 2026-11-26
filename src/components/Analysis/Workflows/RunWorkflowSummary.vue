@@ -6,7 +6,7 @@
   every step, so it's always clear what is being run.
 */
 import { computed } from "vue";
-import { interfaceDag } from "../RunMonitor/workflowInterface";
+import { interfaceDag } from "@pennsieve/notebooks/components/Analysis/RunMonitor/workflowInterface";
 import WorkflowThumbnail from "../WorkflowGraph/WorkflowThumbnail.vue";
 import LlmMark from "../WorkflowGraph/LlmMark.vue";
 import { runSummary } from "./runSummary";

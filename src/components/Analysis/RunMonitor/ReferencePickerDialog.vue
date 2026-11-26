@@ -9,7 +9,7 @@
 import { computed, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import BfButton from "../../shared/bf-button/BfButton.vue";
-import { findReferences } from "@/utils/environmentsService";
+import { findReferences } from "@pennsieve/notebooks/utils/environmentsService";
 import {
   catalogQuery,
   fitsInput,

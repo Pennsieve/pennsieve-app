@@ -49,6 +49,32 @@ export default defineConfig({
     alias: {
       "@": fileURLToPath(new URL("./src", import.meta.url)),
     },
+    // One copy of what the app and @pennsieve/notebooks share (its peers and
+    // dependencies), from the app's node_modules, also when the package is
+    // linked from a local checkout (npm link).
+    dedupe: [
+      "vue",
+      "vue-router",
+      "element-plus",
+      "@element-plus/icons-vue",
+      "@jupyterlab/services",
+      "@codemirror/autocomplete",
+      "@codemirror/commands",
+      "@codemirror/lang-markdown",
+      "@codemirror/lang-python",
+      "@codemirror/language",
+      "@codemirror/state",
+      "@codemirror/view",
+      "dompurify",
+      "katex",
+      "marked",
+      "plotly.js-dist",
+      "ramda",
+      "vega",
+      "vega-embed",
+      "vega-interpreter",
+      "vega-lite",
+    ],
   },
   // Need to build for esnext to support PDF Viewer which has a await statement that needs next es
   optimizeDeps: {
