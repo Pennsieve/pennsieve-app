@@ -160,13 +160,29 @@ const axisKey = computed(() => props.budget?.blockedAxis || '')
 const isConcurrencyBlock = computed(() => axisKey.value.endsWith('concurrency'))
 const isNodeSpendBlock = computed(() => axisKey.value.startsWith('node-') && !isConcurrencyBlock.value)
 
-const blockedPill = computed(() => (isConcurrencyBlock.value ? 'At run limit' : 'Budget reached'))
+// Which limit blocks, the node's or the user's own: the two have different
+// remedies, and the limits list below marks the same one.
+const BLOCKED_PILLS = {
+  'node-concurrency': 'At the node’s run limit',
+  'user-concurrency': 'At your run limit',
+  'node-daily': 'Node’s daily budget reached',
+  'node-monthly': 'Node’s monthly budget reached',
+  'user-daily': 'Your daily budget reached',
+  'user-monthly': 'Your monthly budget reached',
+}
+const blockedPill = computed(
+  () => BLOCKED_PILLS[axisKey.value] || (isConcurrencyBlock.value ? 'At run limit' : 'Budget reached'),
+)
 
 // The four remedies. Node spend → the pot is shared and empty, so waiting or
 // bringing your own node. User spend → your slice is spent; an owner can raise
 // it. Concurrency → purely transient.
 const remedy = computed(() => {
   if (!blocked.value) return ''
+  // Open notebooks are runs too, so closing one frees a slot.
+  if (axisKey.value === 'user-concurrency') {
+    return 'You have as many runs in flight as your limit allows; open notebooks count. Close a notebook or wait for a run to finish, then try again.'
+  }
   if (isConcurrencyBlock.value) {
     return 'Wait for one of the running pipelines to finish, then try again.'
   }
